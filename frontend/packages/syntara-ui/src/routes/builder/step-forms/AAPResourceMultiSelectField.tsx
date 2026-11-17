@@ -273,8 +273,6 @@ export function AAPResourceMultiSelectField({
 
   useEffect(() => () => clearTimeout(debounceRef.current), [])
 
-  const helperTextId = `${fieldId}-helper`
-
   return (
     <StackItem>
       <SynFormField<AAPJobTemplateFormData, typeof nameField>
@@ -284,7 +282,7 @@ export function AAPResourceMultiSelectField({
         fieldId={fieldId}
         hint={helperText}
       >
-        {({ field }) => {
+        {({ field, describedBy }) => {
           let selectedIds: readonly number[] = []
           if (Array.isArray(field.value)) {
             selectedIds = field.value as number[]
@@ -307,7 +305,7 @@ export function AAPResourceMultiSelectField({
               onToggle={handleToggle}
               onFilterChange={setFilterValue}
               onFilterClear={() => setFilterValue('')}
-              ariaDescribedBy={helperTextId}
+              ariaDescribedBy={describedBy}
               defaultValues={defaultValues}
             />
           )

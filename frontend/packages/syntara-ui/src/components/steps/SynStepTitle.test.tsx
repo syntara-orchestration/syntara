@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import userEvent from '@testing-library/user-event'
+import { describe, expect, it, vi } from 'vitest'
 
 import { SynStepTitle } from './SynStepTitle'
 
@@ -60,11 +61,43 @@ describe('SynStepTitle', () => {
       expect(screen.getByRole('heading', { level: 2 })).toBeInTheDocument()
     })
 
-    it('renders long title without truncation', () => {
+    it('keeps the full title in the heading when it is visually clamped', () => {
       const longTitle = 'This is a very long title that might need to wrap or truncate in some contexts'
       render(<SynStepTitle title={longTitle} />)
 
-      expect(screen.getByText(longTitle)).toBeInTheDocument()
+      expect(screen.getByRole('heading', { level: 2, name: longTitle })).toBeInTheDocument()
+    })
+
+    it('shows a tooltip with the full title when the clamped title is hovered', async () => {
+      const user = userEvent.setup()
+      const scrollHeight = vi.spyOn(HTMLElement.prototype, 'scrollHeight', 'get').mockReturnValue(80)
+      const clientHeight = vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(20)
+      const longTitle = 'A very long step title that clamps'
+
+      render(<SynStepTitle title={longTitle} />)
+      await user.hover(screen.getByRole('heading', { name: longTitle }))
+
+      expect(await screen.findByRole('tooltip')).toHaveTextContent(longTitle)
+      scrollHeight.mockRestore()
+      clientHeight.mockRestore()
+    })
+
+    it('shows the title tooltip when the step focus target is focused', async () => {
+      const user = userEvent.setup()
+      const scrollHeight = vi.spyOn(HTMLElement.prototype, 'scrollHeight', 'get').mockReturnValue(80)
+      const clientHeight = vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(20)
+      const longTitle = 'A very long step title that clamps'
+
+      render(
+        <button type="button" className="react-flow__node">
+          <SynStepTitle title={longTitle} />
+        </button>
+      )
+      await user.tab()
+
+      expect(await screen.findByRole('tooltip')).toHaveTextContent(longTitle)
+      scrollHeight.mockRestore()
+      clientHeight.mockRestore()
     })
 
     it('renders title with special characters', () => {

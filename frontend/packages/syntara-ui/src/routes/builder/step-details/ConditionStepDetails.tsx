@@ -1,7 +1,7 @@
 import type { ConditionActivity } from '@syntara/contracts'
 import type { ReactNode } from 'react'
 
-import { useAlerts } from '../../../providers/alerts'
+import { useAlerts } from '../../../providers/alerts/AlertContext'
 import { useWorkflowStoreActions } from '../../../stores/useWorkflowStore'
 import { ConditionStepForm } from '../step-forms/ConditionStepForm'
 

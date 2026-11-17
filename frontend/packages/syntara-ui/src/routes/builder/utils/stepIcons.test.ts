@@ -1,7 +1,7 @@
 import type { ComponentType } from 'react'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 
-import { RegistryStepId } from '../../../constants'
+import { RegistryStepId } from '../../../constants/registryStepIds'
 import { getCanvasStepIconDescriptor } from '../../workflows/canvas/nodes/stepIconResolver'
 
 import { resolveIconForStep, resolveIconForType } from './stepIcons'

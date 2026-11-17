@@ -28,12 +28,7 @@ import {
   TextInput,
   Tooltip,
 } from '@patternfly/react-core'
-import {
-  RhMicronsCaretDownIcon,
-  RhUiAddCircleIcon,
-  RhUiGripVerticalFillIcon,
-  RhUiTrashIcon,
-} from '@patternfly/react-icons'
+import { RhUiCaretDownIcon, RhUiAddCircleIcon, RhUiGripVerticalFillIcon, RhUiTrashIcon } from '@patternfly/react-icons'
 import type { ReactNode } from 'react'
 import { useCallback, use, useEffect, useMemo, useRef, useState } from 'react'
 import type { Control } from 'react-hook-form'
@@ -148,7 +143,7 @@ function SwitchCaseHeader({
             onClick={hasError ? undefined : onToggleExpanded}
             aria-label={`${isExpanded ? 'Collapse' : 'Expand'} path ${index + 1}`}
           >
-            <RhMicronsCaretDownIcon className={styles.toggleIcon} />
+            <RhUiCaretDownIcon className={styles.toggleIcon} />
           </Button>
         </DisabledWithTooltip>
       </FlexItem>

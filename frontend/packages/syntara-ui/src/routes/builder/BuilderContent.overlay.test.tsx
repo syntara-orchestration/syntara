@@ -7,7 +7,8 @@ import * as React from 'react'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 
 import { approvalsClient, executionsClient, workflowClient } from '../../client'
-import { AlertProvider } from '../../providers/alerts'
+import { AlertProvider } from '../../providers/alerts/AlertProvider'
+import { FeatureFlagsProvider } from '../../providers/feature-flags-provider'
 
 vi.mock('./components/StepEditorOverlay', () => ({
   StepEditorOverlay: ({ isOpen }: { isOpen: boolean }) => (isOpen ? <div data-testid="step-editor-overlay" /> : null),
@@ -77,9 +78,11 @@ const queryClient = new QueryClient({
 
 const wrapper = ({ children }: { children: ReactNode }) => (
   <QueryClientProvider client={queryClient}>
-    <AlertProvider>
-      <ReactFlowProvider>{children}</ReactFlowProvider>
-    </AlertProvider>
+    <FeatureFlagsProvider>
+      <AlertProvider>
+        <ReactFlowProvider>{children}</ReactFlowProvider>
+      </AlertProvider>
+    </FeatureFlagsProvider>
   </QueryClientProvider>
 )
 

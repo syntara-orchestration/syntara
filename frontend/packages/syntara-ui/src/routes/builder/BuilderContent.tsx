@@ -7,6 +7,7 @@ import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'r
 
 import { useUnsavedChanges } from '../../app/useUnsavedChanges'
 import { executionsClient, workflowClient } from '../../client'
+import { SynLabel } from '../../components/labels/SynLabel'
 import { SynPage } from '../../components/layout/SynPage'
 import { SynPanel } from '../../components/layout/SynPanel'
 import { SynPanelStack, SynPanelStackItem } from '../../components/layout/SynPanelStack'
@@ -15,7 +16,8 @@ import { SynStepExpandedAllContext } from '../../components/steps/SynStepExpande
 import { useSearchParams } from '../../hooks/routing/useSearchParams'
 import { useCursorPagination } from '../../hooks/useCursorPagination'
 import { useProjectSelector } from '../../hooks/useProjectSelector'
-import { useAlerts } from '../../providers/alerts'
+import { useAlerts } from '../../providers/alerts/AlertContext'
+import { useFeatureFlag } from '../../providers/use-feature-flag'
 import { useWorkflowStore } from '../../stores/useWorkflowStore'
 import { getErrorMessage } from '../../utils/apiErrors'
 import { detachPromise } from '../../utils/detachPromise'
@@ -69,6 +71,7 @@ type WorkflowVersion = WorkflowAPI.components['schemas']['WorkflowVersionRead']
 // eslint-disable-next-line max-lines-per-function, complexity
 export function BuilderContent(props: BuilderContentProps) {
   const { workflow, isNew, workflowId, executionCopy, initialViewVersion } = props
+  const isWorkflowBuilderQolEnabled = useFeatureFlag('workflow_builder_qol')
   const navigate = useNavigate()
   const setLocation = useCallback(
     (to: string) => {
@@ -104,7 +107,7 @@ export function BuilderContent(props: BuilderContentProps) {
   } = useWorkflowStore()
   const { registerSaveHandler, unregisterSaveHandler, requestNavigation } = useUnsavedChanges()
   const handleExecutionNavigate = useCallback(
-    (id: string) => requestNavigation(`/executions/${id}`),
+    (id: string) => requestNavigation(`/executions/${id}?history=open`),
     [requestNavigation]
   )
 
@@ -633,6 +636,15 @@ export function BuilderContent(props: BuilderContentProps) {
                   isStepEditorOpen={isStepEditorOpen}
                 />
               </StackItem>
+              {/*
+                Temporary proof of concept. Remove this marker and flag once
+                workflow-builder improvements ship and no code depends on it.
+              */}
+              {isWorkflowBuilderQolEnabled && (
+                <StackItem>
+                  <SynLabel status="info">workflow_builder_qol is enabled (test proof of concept)</SynLabel>
+                </StackItem>
+              )}
               <BuilderReadOnlyBanner
                 canEdit={builderPermissions.canEdit}
                 isLoading={builderPermissions.isLoading}
