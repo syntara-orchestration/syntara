@@ -107,5 +107,12 @@ export function buildConfiguration(integrationType: string, values: EditIntegrat
       ...securityFields(values),
     }
   }
+  if (integrationType === IntegrationTypeEnum.OPENSHIFT) {
+    return {
+      integration_type: IntegrationTypeEnum.OPENSHIFT,
+      base_url: values.base_url ?? '',
+      ...securityFields(values),
+    }
+  }
   return { integration_type: 'mcp_server' as const, base_url: values.base_url ?? '', ...securityFields(values) }
 }

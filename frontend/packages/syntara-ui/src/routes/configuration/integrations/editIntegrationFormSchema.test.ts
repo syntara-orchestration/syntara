@@ -333,6 +333,39 @@ describe('buildConfiguration', () => {
     })
   })
 
+  describe('OpenShift (Execution plane infrastructure)', () => {
+    it('returns openshift configuration with matching integration_type', () => {
+      const openshiftValues = {
+        ...baseValues,
+        integration_type: 'openshift',
+        base_url: 'https://ep-control-plane:6443',
+        ca_certificate: '-----BEGIN CERTIFICATE-----\n...',
+      }
+      const config = buildConfiguration('openshift', openshiftValues)
+      expect(config).toEqual({
+        integration_type: 'openshift',
+        base_url: 'https://ep-control-plane:6443',
+        allow_http: false,
+        insecure_skip_tls_verify: false,
+        ca_certificate: '-----BEGIN CERTIFICATE-----\n...',
+      })
+    })
+
+    it('falls back to empty string when base_url is undefined', () => {
+      const withoutUrl = {
+        ...baseValues,
+        integration_type: 'openshift',
+        base_url: undefined,
+      } as unknown as typeof baseValues
+      const config = buildConfiguration('openshift', withoutUrl)
+      expect(config).toEqual({
+        integration_type: 'openshift',
+        base_url: '',
+        ...expectedSecurityDefaults,
+      })
+    })
+  })
+
   describe('unknown type', () => {
     it('falls back to MCP configuration', () => {
       const config = buildConfiguration('unknown_type', baseValues)

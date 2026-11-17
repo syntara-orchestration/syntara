@@ -134,6 +134,33 @@ const mockAapIntegration = {
   labels: {},
 }
 
+const mockOpenShiftIntegration = {
+  id: 'int-openshift-1',
+  name: 'EP Control Plane',
+  description: 'Execution plane infrastructure',
+  integration_type: 'openshift',
+  enabled: true,
+  validation_status: 'available',
+  scope: 'global',
+  configuration: {
+    integration_type: 'openshift',
+    base_url: 'https://ep-control-plane:6443',
+    allow_http: false,
+    insecure_skip_tls_verify: false,
+    ca_certificate: '-----BEGIN CERTIFICATE-----\n...',
+  },
+  management_credential_id: 'cred-existing',
+  last_validated_at: '2026-01-01T00:00:00Z',
+  validation_error: null,
+  refresh_status: 'available',
+  last_refreshed_at: '2026-01-01T00:00:00Z',
+  refresh_error: null,
+  created_at: '2026-01-01T00:00:00Z',
+  updated_at: '2026-01-01T00:00:00Z',
+  created_by: { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', name: 'user-1', type: 'user' },
+  labels: {},
+}
+
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
 })
@@ -771,6 +798,37 @@ describe('EditIntegrationForm', () => {
       render(<EditIntegrationForm />, { wrapper })
 
       expect(screen.getByRole('textbox', { name: /api url/i })).toHaveValue('')
+    })
+  })
+
+  describe('Execution plane infrastructure (OpenShift)', () => {
+    beforeEach(() => {
+      setupMocks({ integration: mockOpenShiftIntegration })
+    })
+
+    it('calls discover with matching openshift integration_type values on test connection', async () => {
+      const { discoverMutate } = setupMutationMocks()
+      const user = userEvent.setup()
+      render(<EditIntegrationForm />, { wrapper })
+
+      await user.click(screen.getByRole('button', { name: 'Test connection' }))
+
+      expect(discoverMutate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          body: {
+            integration_type: 'openshift',
+            configuration: {
+              integration_type: 'openshift',
+              base_url: 'https://ep-control-plane:6443',
+              allow_http: false,
+              insecure_skip_tls_verify: false,
+              ca_certificate: '-----BEGIN CERTIFICATE-----\n...',
+            },
+            credential_id: 'cred-existing',
+          },
+        }),
+        expect.any(Object)
+      )
     })
   })
 
