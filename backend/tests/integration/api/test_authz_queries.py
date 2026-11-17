@@ -5,9 +5,8 @@ Covers the can-i, who-can, and what-can-i endpoints defined in
 evaluation with full explainability (matched policy, denial reason, etc.).
 """
 
-from collections.abc import Awaitable, Callable, Generator
+from collections.abc import Awaitable, Callable
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
 import pytest
@@ -18,8 +17,6 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from syntara.api.main import app
 from syntara.auth.dependencies import get_current_user
-from syntara.authz.dependencies import get_authz_evaluator
-from syntara.authz.evaluator import evaluate_policy_input
 from syntara.authz.models import RoleAssignment
 from syntara.authz.models.policy import Policy
 from syntara.authz.models.project import Project
@@ -53,26 +50,9 @@ async def _fetch_all_what_can_i(client: AsyncClient) -> list[dict[str, Any]]:
     return all_permissions
 
 
-def _opa_evaluate_cli(opa_input: dict[str, Any]) -> dict[str, Any]:
-    """Evaluate authz against the real rego policy through regopy."""
-    return evaluate_policy_input(opa_input)
-
-
-@pytest.fixture(autouse=True)
-def _override_opa_dependency() -> Generator[None, None, None]:
-    """Override the authz evaluator dependency via app.dependency_overrides.
-
-    The conftest _mock_evaluator uses monkeypatch.setattr which doesn't affect
-    Depends(...) in router.py when it imports its own dependency reference.
-    This fixture uses dependency_overrides which FastAPI resolves at call time.
-    """
-    mock_evaluator = AsyncMock()
-    mock_evaluator.evaluate = MagicMock(side_effect=_opa_evaluate_cli)
-    app.dependency_overrides[get_authz_evaluator] = lambda: mock_evaluator
-    app.dependency_overrides[get_authz_evaluator] = lambda: mock_evaluator
-    yield
-    app.dependency_overrides.pop(get_authz_evaluator, None)
-    app.dependency_overrides.pop(get_authz_evaluator, None)
+# NOTE: the autouse ``_mock_evaluator`` in this package's conftest already
+# installs a regopy-backed evaluator on ``app.state.authz_evaluator`` for every
+# test here, so no per-module evaluator fixture is needed.
 
 
 # ============================================================================
