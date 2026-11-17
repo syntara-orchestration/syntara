@@ -22,7 +22,7 @@ import { detachPromise } from '../../utils/detachPromise'
 import { accessClient } from '../access/accessClient'
 import type { ProjectRead } from '../access/types'
 
-import { getProjectDetailPath } from './accessManagementPaths'
+import { getProjectDetailDestination } from './accessManagementPaths'
 import { ProjectFormModal } from './ProjectFormModal'
 import { ProjectDeleteDialog } from './projects/ProjectDeleteDialog'
 import { useProjectPermissions } from './useProjectPermissions'
@@ -88,7 +88,7 @@ function ProjectRow({
   return (
     <Tr>
       <Td dataLabel="Name">
-        <LinkCell href={getProjectDetailPath(project.id ?? '')}>
+        <LinkCell href={getProjectDetailDestination(project.id ?? '')}>
           <Truncate content={project.name ?? ''} />
         </LinkCell>
       </Td>

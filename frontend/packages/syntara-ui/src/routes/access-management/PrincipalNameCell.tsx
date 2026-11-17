@@ -2,7 +2,7 @@ import { Truncate } from '@patternfly/react-core'
 
 import { LinkCell } from '../../components/table/LinkCell'
 
-import { getPrincipalDetailPath } from './accessManagementPaths'
+import { getPrincipalDetailDestination } from './accessManagementPaths'
 import type { RolePrincipalType } from './RoleAssignmentTypes'
 
 type PrincipalNameCellProps = {
@@ -18,7 +18,7 @@ export function PrincipalNameCell({ principalType, principalId, name }: Readonly
   }
 
   return (
-    <LinkCell href={getPrincipalDetailPath(principalType, principalId)}>
+    <LinkCell href={getPrincipalDetailDestination(principalType, principalId)}>
       <Truncate content={name} />
     </LinkCell>
   )

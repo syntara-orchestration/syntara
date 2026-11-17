@@ -7,6 +7,8 @@ import {
 } from '../providers/unsaved-changes/unsavedChangesContext'
 import { detachPromise } from '../utils/detachPromise'
 
+import { navigateToTarget, type NavigationTarget } from './typed-route-destinations'
+
 const noop = () => () => {}
 
 export function useUnsavedChanges(): UnsavedChangesContextType {
@@ -15,7 +17,7 @@ export function useUnsavedChanges(): UnsavedChangesContextType {
 
   const fallback = useMemo<UnsavedChangesContextType>(
     () => ({
-      requestNavigation: (path: string) => detachPromise(navigate({ to: path })),
+      requestNavigation: (target: NavigationTarget) => detachPromise(navigateToTarget(navigate, target)),
       registerSaveHandler: noop,
       unregisterSaveHandler: () => {},
       registerDirtyCheck: noop,
