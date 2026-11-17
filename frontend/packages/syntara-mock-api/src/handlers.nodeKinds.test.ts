@@ -31,10 +31,6 @@ type StepTypePermission = {
   blocked_by: {
     kind: string
     label: string
-    reason: string
-    policy: string | null
-    scope: string | null
-    project: string | null
   } | null
 }
 
@@ -73,8 +69,7 @@ describe('GET /api/v1/node_kinds', () => {
         const entries = (await response.json()) as StepTypePermission[]
         const script = entries.find((entry) => entry.kind === 'script')
         expect(script?.can_write).toBe(false)
-        expect(script?.blocked_by).toMatchObject({ reason: 'explicit_deny', scope: 'any', project: null })
-        expect(script?.blocked_by?.policy).toBeTruthy()
+        expect(script?.blocked_by).toEqual({ kind: 'script', label: 'Script' })
       }
     } finally {
       writeDeniedNodeKinds.length = 0
@@ -86,10 +81,9 @@ describe('GET /api/v1/node_kinds', () => {
     projectWriteDeniedNodeKinds['default'] = ['script']
     try {
       const blocked = (await (await listNodeKinds(`project_id=${FIRST_PROJECT_ID}`)).json()) as StepTypePermission[]
-      expect(blocked.find((entry) => entry.kind === 'script')?.blocked_by).toMatchObject({
-        reason: 'explicit_deny',
-        scope: 'project',
-        project: 'default',
+      expect(blocked.find((entry) => entry.kind === 'script')?.blocked_by).toEqual({
+        kind: 'script',
+        label: 'Script',
       })
 
       const elsewhere = (await (await listNodeKinds(`project_id=${SECOND_PROJECT_ID}`)).json()) as StepTypePermission[]

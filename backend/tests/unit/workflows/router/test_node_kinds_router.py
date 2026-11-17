@@ -121,59 +121,23 @@ class TestListNodeKinds:
         assert by_kind["script"].can_write is True
         assert by_kind["script"].blocked_by is None
 
-    async def test_project_deny_reports_policy_scope_and_project(self) -> None:
-        effective: list[dict[str, object]] = [
-            {"name": "no-scripts/1@payments", "policy_name": "no-scripts", "scope": "project", "project": "payments"}
-        ]
-        script = _result(allowed=False, denied=True, denied_by="no-scripts/1@payments", effective_policies=effective)
+    async def test_blocked_kind_names_the_step_type_only(self) -> None:
+        """The Blocked step type carries kind and label; policy attribution stays in audit events (R11)."""
+        script = _result(allowed=False, denied=True, denied_by="no-scripts")
         response = await self._call({"script": script})
         blocked = {entry.kind: entry for entry in response}["script"].blocked_by
         assert blocked is not None
         assert blocked.kind == "script"
         assert blocked.label == "Script"
-        assert blocked.reason == "explicit_deny"
-        assert blocked.policy == "no-scripts"
-        assert blocked.scope == "project"
-        assert blocked.project == "payments"
+        assert set(blocked.model_dump()) == {"kind", "label"}
 
-    async def test_global_deny_has_null_project(self) -> None:
-        effective: list[dict[str, object]] = [{"name": "no-scripts", "policy_name": "no-scripts", "scope": "any"}]
-        response = await self._call(
-            {"script": _result(allowed=False, denied=True, denied_by="no-scripts", effective_policies=effective)}
-        )
-        blocked = {entry.kind: entry for entry in response}["script"].blocked_by
-        assert blocked is not None
-        assert blocked.reason == "explicit_deny"
-        assert blocked.policy == "no-scripts"
-        assert blocked.scope == "any"
-        assert blocked.project is None
-
-    async def test_missing_allow_reports_no_matching_allow(self) -> None:
+    async def test_missing_allow_also_blocks(self) -> None:
         response = await self._call({"script": _result(allowed=False)})
         blocked = {entry.kind: entry for entry in response}["script"].blocked_by
         assert blocked is not None
-        assert blocked.reason == "no_matching_allow"
-        assert blocked.policy is None
-        assert blocked.scope is None
-        assert blocked.project == "payments"
+        assert blocked.label == "Script"
 
     async def test_unknown_project_is_rejected(self) -> None:
         with patch.object(module, "_project_name", AsyncMock(side_effect=ProjectNotFoundError("nope"))):
             with pytest.raises(ProjectNotFoundError):
                 await module.list_node_kinds(uuid4(), AsyncMock(), _user(), MagicMock())
-
-
-class TestDenyScope:
-    """The scope comes from the matching effective statement only."""
-
-    def test_self_scope_is_normalized_to_project(self) -> None:
-        result = _result(
-            denied=True,
-            denied_by="p/0",
-            effective_policies=[{"name": "p/0", "policy_name": "p", "scope": "self", "project": "payments"}],
-        )
-        assert module._deny_scope(result, "p/0") == ("project", "payments")
-
-    def test_unknown_identifier_reports_no_scope(self) -> None:
-        result = _result(denied=True, denied_by="gone", effective_policies=[{"name": "other", "scope": "any"}])
-        assert module._deny_scope(result, "gone") == (None, None)

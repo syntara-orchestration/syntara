@@ -57,14 +57,8 @@ export const writeDeniedNodeKinds: string[] = []
  */
 export const projectWriteDeniedNodeKinds: Record<string, string[]> = {}
 
-function blockedBy(
-  kind: string,
-  reason: 'explicit_deny',
-  policy: string,
-  scope: string,
-  project: string | null
-): StepTypeBlockedBy {
-  return { kind, label: LABELS[kind] ?? kind, reason, policy, scope, project }
+function blockedBy(kind: string): StepTypeBlockedBy {
+  return { kind, label: LABELS[kind] ?? kind }
 }
 
 /** Project the step-type verdicts for the calling principal. */
@@ -75,13 +69,6 @@ export function nodeKindsForCaller(projectName: string | null): StepTypePermissi
     if (!projectDenied && !globallyDenied) {
       return { kind, category, can_write: true, blocked_by: null }
     }
-    return {
-      kind,
-      category,
-      can_write: false,
-      blocked_by: projectDenied
-        ? blockedBy(kind, 'explicit_deny', `no-${kind.replaceAll('_', '-')}-in-${projectName}`, 'project', projectName)
-        : blockedBy(kind, 'explicit_deny', `no-${kind.replaceAll('_', '-')}-anywhere`, 'any', null),
-    }
+    return { kind, category, can_write: false, blocked_by: blockedBy(kind) }
   })
 }

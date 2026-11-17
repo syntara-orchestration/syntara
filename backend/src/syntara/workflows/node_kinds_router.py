@@ -32,7 +32,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from syntara.auth import get_current_user
 from syntara.authz.dependencies import get_authz_evaluator
-from syntara.authz.engine import AuthzRequest, AuthzResult, authorize
+from syntara.authz.engine import AuthzRequest, authorize
 from syntara.authz.evaluator import AuthzEvaluator
 from syntara.authz.exceptions import ProjectNotFoundError
 from syntara.authz.models.project import Project
@@ -89,28 +89,19 @@ def _category(kind: str) -> str:
 
 
 class StepTypeBlockedBy(SQLModel):
-    """Why the caller may not author one step type (the P2 Blocked step type shape).
+    """The Blocked step type shape shared with the P5 save denial.
+
+    Names the step type only: policy names and scopes are recorded in audit
+    events, never shown to the caller (AC-3.g, R11).
 
     Attributes:
         kind: The step type identifier.
         label: Human-readable step type label.
-        reason: ``explicit_deny`` when a deny policy matched, ``no_matching_allow``
-            when no allow covers the kind.
-        policy: Originating policy display name, or ``None`` for a missing allow.
-        scope: Scope of the matching effective deny statement (``any`` or
-            ``project``), or ``None`` for a missing allow.
-        project: Project name for a project-scoped deny, ``None`` for a global
-            deny (and for a missing allow, where the evaluated project name is
-            reported instead).
 
     """
 
     kind: str
     label: str
-    reason: str
-    policy: str | None = None
-    scope: str | None = None
-    project: str | None = None
 
 
 class StepTypePermissionRead(SQLModel):
@@ -145,49 +136,14 @@ async def _project_name(db: AsyncSession, project_id: UUID) -> str:
     return project.name
 
 
-def _deny_scope(result: AuthzResult, identifier: str) -> tuple[str | None, str | None]:
-    """Return (scope, project) of the effective statement behind *identifier*.
-
-    Never infers the scope from the policy's first statement or from another
-    assignment of the same policy: the identifier names the exact statement
-    (possibly project-scoped by the role assignment) that denied the action.
-    """
-    for statement in result.effective_policies:
-        if statement.get("name") != identifier:
-            continue
-        scope = statement.get("scope")
-        if scope in ("self", "own"):
-            scope = "project"
-        return (scope, statement.get("project")) if isinstance(scope, str) else (None, None)
-    return None, None
-
-
-def _blocked_by(kind: str, result: AuthzResult, project_name: str) -> StepTypeBlockedBy:
+def _blocked_by(kind: str) -> StepTypeBlockedBy:
     """Build the Blocked step type for one denied kind.
 
     Treats ``allowed == False`` as blocked even when ``denied`` is false or
-    ``denied_by`` is empty: the absence of a matching allow is reported as
-    ``no_matching_allow`` with no policy to attribute.
+    ``denied_by`` is empty: the absence of a matching allow blocks the kind too.
+    Policy attribution stays in audit events, not in the response (R11).
     """
-    label = node_kind_display_label(kind)
-    if not (result.denied or result.denied_by):
-        return StepTypeBlockedBy(
-            kind=kind,
-            label=label,
-            reason="no_matching_allow",
-            policy=None,
-            scope=None,
-            project=project_name or None,
-        )
-    scope, project = _deny_scope(result, result.denied_by)
-    return StepTypeBlockedBy(
-        kind=kind,
-        label=label,
-        reason="explicit_deny",
-        policy=result.policy_name(result.denied_by),
-        scope=scope,
-        project=project,
-    )
+    return StepTypeBlockedBy(kind=kind, label=node_kind_display_label(kind))
 
 
 async def _step_type_verdicts(
@@ -218,7 +174,7 @@ async def _step_type_verdicts(
                 kind=kind,
                 category=_category(kind),
                 can_write=result.allowed,
-                blocked_by=None if result.allowed else _blocked_by(kind, result, project_name),
+                blocked_by=None if result.allowed else _blocked_by(kind),
             )
         )
     return entries

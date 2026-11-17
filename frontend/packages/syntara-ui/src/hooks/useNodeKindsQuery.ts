@@ -22,7 +22,7 @@ type UseNodeKindsQueryOptions = {
  *
  * Every authenticated user may call the endpoint: the response is reference
  * data plus the caller's own `step_type:write` verdict per kind (`can_write`)
- * and, when blocked, the policy that blocks it (`blocked_by`). One request
+ * and, when blocked, the Blocked step type naming it (`blocked_by`). One request
  * covers every step type, so the add-step panel never needs per-kind `can_i`
  * calls.
  *

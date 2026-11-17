@@ -113,7 +113,7 @@ describe('StepTypeOptionsList', () => {
             label: 'Script',
             icon: vi.fn(),
             isDisabled: true,
-            disabledTooltip: 'Blocked by p (all projects)',
+            disabledTooltip: "You don't have permission to write this step.",
           },
           { id: 'loop', label: 'Loop', icon: vi.fn() },
         ]}
@@ -130,7 +130,7 @@ describe('StepTypeOptionsList', () => {
     expect(onSelect).not.toHaveBeenCalled()
 
     await user.hover(script)
-    expect(await screen.findByText('Blocked by p (all projects)')).toBeInTheDocument()
+    expect(await screen.findByText("You don't have permission to write this step.")).toBeInTheDocument()
   })
 
   it('renders empty when stepTypes array is empty', () => {

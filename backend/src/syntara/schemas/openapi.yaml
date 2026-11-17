@@ -11,7 +11,7 @@
 openapi: 3.1.0
 info:
   title: Syntara API
-  version: 1.4.0
+  version: 1.5.0
   description: A distributed multi-agent workflow orchestration system
 servers:
   - url: /api/v1
@@ -35325,19 +35325,14 @@ components:
       type: object
       title: StepTypeBlockedBy
       description: |
-        Why the caller may not author one step type (the P2 Blocked step type shape).
+        The Blocked step type shape shared with the P5 save denial.
+
+        Names the step type only: policy names and scopes are recorded in audit
+        events, never shown to the caller (AC-3.g, R11).
 
         Attributes:
             kind: The step type identifier.
             label: Human-readable step type label.
-            reason: ``explicit_deny`` when a deny policy matched, ``no_matching_allow``
-                when no allow covers the kind.
-            policy: Originating policy display name, or ``None`` for a missing allow.
-            scope: Scope of the matching effective deny statement (``any`` or
-                ``project``), or ``None`` for a missing allow.
-            project: Project name for a project-scoped deny, ``None`` for a global
-                deny (and for a missing allow, where the evaluated project name is
-                reported instead).
       properties:
         kind:
           type: string
@@ -35345,28 +35340,9 @@ components:
         label:
           type: string
           title: Label
-        reason:
-          type: string
-          title: Reason
-        policy:
-          anyOf:
-            - type: string
-            - type: 'null'
-          title: Policy
-        scope:
-          anyOf:
-            - type: string
-            - type: 'null'
-          title: Scope
-        project:
-          anyOf:
-            - type: string
-            - type: 'null'
-          title: Project
       required:
         - kind
         - label
-        - reason
     StepTypePermissionRead:
       type: object
       title: StepTypePermissionRead

@@ -140,14 +140,9 @@ class TestListNodeKinds:
 
         blocked = _by_kind((await author_client.get(_NODE_KINDS_URL, params={"project_id": str(payments.id)})).json())
         assert blocked["script"]["can_write"] is False
-        assert blocked["script"]["blocked_by"] == {
-            "kind": "script",
-            "label": "Script",
-            "reason": "explicit_deny",
-            "policy": "no-scripts-in-payments",
-            "scope": "project",
-            "project": "payments",
-        }
+        # The Blocked step type names the step type only (AC-3.g, R11):
+        # policy names and scopes stay in audit events.
+        assert blocked["script"]["blocked_by"] == {"kind": "script", "label": "Script"}
         assert blocked["http_request"]["can_write"] is True
 
         elsewhere = _by_kind((await author_client.get(_NODE_KINDS_URL, params={"project_id": str(other.id)})).json())
@@ -167,20 +162,16 @@ class TestListNodeKinds:
             response = await author_client.get(_NODE_KINDS_URL, params={"project_id": str(project.id)})
             entries = _by_kind(response.json())
             assert entries["script"]["can_write"] is False
-            assert entries["script"]["blocked_by"] is not None
-            assert entries["script"]["blocked_by"]["reason"] == "explicit_deny"
-            assert entries["script"]["blocked_by"]["policy"] == "no-scripts-anywhere"
-            assert entries["script"]["blocked_by"]["scope"] == "any"
-            assert entries["script"]["blocked_by"]["project"] is None
+            assert entries["script"]["blocked_by"] == {"kind": "script", "label": "Script"}
 
     @pytest.mark.asyncio
-    async def test_missing_allow_reports_no_matching_allow(
+    async def test_missing_allow_also_blocks(
         self,
         base_client: AsyncClient,
         user_factory: Callable[..., Awaitable[User]],
         test_db_session: AsyncSession,
     ) -> None:
-        """Without the built-in allow the engine default is deny, with no policy to name."""
+        """Without the built-in allow the engine default is deny; the shape stays kind and label."""
         from syntara.api.main import app
         from syntara.auth.dependencies import get_current_user
 
@@ -211,14 +202,7 @@ class TestListNodeKinds:
             assert resp.status_code == 200, resp.text
             entries = _by_kind(resp.json())
             assert entries["script"]["can_write"] is False
-            assert entries["script"]["blocked_by"] == {
-                "kind": "script",
-                "label": "Script",
-                "reason": "no_matching_allow",
-                "policy": None,
-                "scope": None,
-                "project": "payments",
-            }
+            assert entries["script"]["blocked_by"] == {"kind": "script", "label": "Script"}
         finally:
             app.dependency_overrides.pop(get_current_user, None)
 
@@ -232,7 +216,7 @@ class TestListNodeKinds:
         await _assign_policy(db, test_user, "deny-scripts-for-admin", [_statement("deny", kind="script")])
         entries = _by_kind((await auth_client.get(_NODE_KINDS_URL, params={"project_id": str(project.id)})).json())
         assert entries["script"]["can_write"] is False
-        assert entries["script"]["blocked_by"]["policy"] == "deny-scripts-for-admin"
+        assert entries["script"]["blocked_by"] == {"kind": "script", "label": "Script"}
 
     @pytest.mark.asyncio
     async def test_no_kill_switch_write_route(self, author_client: AsyncClient) -> None:

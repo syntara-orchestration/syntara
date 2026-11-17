@@ -27,10 +27,6 @@ const scriptKind = {
   blocked_by: {
     kind: 'script',
     label: 'Script',
-    reason: 'explicit_deny',
-    policy: 'no-scripts-in-payments',
-    scope: 'project',
-    project: 'payments',
   },
 }
 

@@ -49,10 +49,6 @@ function setNodeKinds(...kinds: NodeKind[]) {
 const scriptDeny = {
   kind: 'script',
   label: 'Script',
-  reason: 'explicit_deny',
-  policy: 'no-scripts-in-payments',
-  scope: 'project',
-  project: 'payments',
 } as const
 
 const scriptEntry = {
@@ -180,7 +176,7 @@ describe('AddStepPanel step-type gating', () => {
     expect(onSelectStep).toHaveBeenCalledWith('http_request', null)
   })
 
-  it('explains the block in a tooltip naming the policy and scope on hover', async () => {
+  it('explains the block in a tooltip naming the step type on hover', async () => {
     setNodeKinds(
       kind({ kind: 'script', can_write: false, blocked_by: scriptDeny }),
       kind({ kind: 'http_request' }),
@@ -192,7 +188,7 @@ describe('AddStepPanel step-type gating', () => {
     await user.click(screen.getByRole('switch', { name: 'Show restricted steps' }))
     await user.hover(screen.getByRole('button', { name: 'Script' }))
 
-    expect(await screen.findByText('Blocked by no-scripts-in-payments (project payments)')).toBeInTheDocument()
+    expect(await screen.findByText("You don't have permission to write Script steps.")).toBeInTheDocument()
   })
 
   it('points at the switch when every entry in the list is blocked', async () => {
@@ -272,20 +268,9 @@ describe('AddStepPanel step-type gating', () => {
     expect(screen.queryByRole('button', { name: 'Script' })).not.toBeInTheDocument()
   })
 
-  it('explains a missing allow instead of naming a denying policy', async () => {
+  it('uses the same tooltip for a missing allow as for an explicit deny', async () => {
     setNodeKinds(
-      kind({
-        kind: 'script',
-        can_write: false,
-        blocked_by: {
-          kind: 'script',
-          label: 'Script',
-          reason: 'no_matching_allow',
-          policy: null,
-          scope: null,
-          project: 'payments',
-        },
-      }),
+      kind({ kind: 'script', can_write: false, blocked_by: scriptDeny }),
       kind({ kind: 'http_request' }),
       kind({ kind: 'agentic' })
     )
@@ -295,9 +280,7 @@ describe('AddStepPanel step-type gating', () => {
     await user.click(screen.getByRole('switch', { name: 'Show restricted steps' }))
     await user.hover(screen.getByRole('button', { name: 'Script' }))
 
-    expect(
-      await screen.findByText('No policy grants write permission for Script in project payments')
-    ).toBeInTheDocument()
+    expect(await screen.findByText("You don't have permission to write Script steps.")).toBeInTheDocument()
   })
 })
 
@@ -316,7 +299,7 @@ describe('AddStepPanel step-type gating for container entries', () => {
       { id: 'loop', label: 'Loop', icon: () => <div>LoopIcon</div>, order: 2 },
     ],
   }
-  const loopDeny = { ...scriptDeny, kind: 'loop', label: 'Loop', policy: 'no-loops' }
+  const loopDeny = { ...scriptDeny, kind: 'loop', label: 'Loop' }
 
   beforeEach(() => {
     vi.clearAllMocks()

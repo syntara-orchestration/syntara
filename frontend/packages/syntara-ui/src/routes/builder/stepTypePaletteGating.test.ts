@@ -39,22 +39,9 @@ const allKinds = registry(
   kind({ kind: 'scheduled_trigger', category: 'trigger' })
 )
 
-const projectDeny = {
+const scriptDeny = {
   kind: 'script',
   label: 'Script',
-  reason: 'explicit_deny',
-  policy: 'no-scripts-in-payments',
-  scope: 'project',
-  project: 'payments',
-} as const
-
-const globalDeny = {
-  kind: 'script',
-  label: 'Script',
-  reason: 'explicit_deny',
-  policy: 'no-scripts-anywhere',
-  scope: 'any',
-  project: null,
 } as const
 
 describe('gatePaletteEntry', () => {
@@ -67,12 +54,12 @@ describe('gatePaletteEntry', () => {
   })
 
   it('marks a kind the caller may not write as blocked but visible', () => {
-    const kinds = registry(kind({ kind: 'script', can_write: false, blocked_by: projectDeny }))
+    const kinds = registry(kind({ kind: 'script', can_write: false, blocked_by: scriptDeny }))
 
     expect(gatePaletteEntry({ id: RegistryStepId.ACTION_SCRIPT }, kinds)).toEqual({
       kind: 'script',
       isBlocked: true,
-      blockedBy: projectDeny,
+      blockedBy: scriptDeny,
     })
   })
 
@@ -92,8 +79,8 @@ describe('gatePaletteEntry', () => {
 
   it('disables a container entry only when every subtype is blocked', () => {
     const kinds = registry(
-      kind({ kind: 'script', can_write: false, blocked_by: projectDeny }),
-      kind({ kind: 'http_request', can_write: false, blocked_by: globalDeny })
+      kind({ kind: 'script', can_write: false, blocked_by: scriptDeny }),
+      kind({ kind: 'http_request', can_write: false, blocked_by: scriptDeny })
     )
 
     expect(
@@ -134,7 +121,7 @@ describe('gatePaletteEntries', () => {
   it('keeps every entry visible and preserves display order', () => {
     const kinds = registry(
       kind({ kind: 'script' }),
-      kind({ kind: 'http_request', can_write: false, blocked_by: globalDeny }),
+      kind({ kind: 'http_request', can_write: false, blocked_by: scriptDeny }),
       kind({ kind: 'agentic' })
     )
 
@@ -145,9 +132,9 @@ describe('gatePaletteEntries', () => {
     ])
   })
 
-  it('attaches a tooltip naming the policy and scope to blocked entries', () => {
+  it('attaches the permission-denied tooltip to blocked entries', () => {
     const kinds = registry(
-      kind({ kind: 'script', can_write: false, blocked_by: projectDeny }),
+      kind({ kind: 'script', can_write: false, blocked_by: scriptDeny }),
       kind({ kind: 'http_request' }),
       kind({ kind: 'agentic' })
     )
@@ -156,7 +143,7 @@ describe('gatePaletteEntries', () => {
 
     expect(gated[0]).toMatchObject({
       isDisabled: true,
-      disabledTooltip: 'Blocked by no-scripts-in-payments (project payments)',
+      disabledTooltip: "You don't have permission to write Script steps.",
     })
     expect(gated[1].isDisabled).toBeUndefined()
   })
@@ -217,37 +204,7 @@ describe('filterRestrictedEntries', () => {
 })
 
 describe('stepTypeBlockedTooltip', () => {
-  it('names the policy and project scope of an explicit deny', () => {
-    expect(stepTypeBlockedTooltip(projectDeny)).toBe('Blocked by no-scripts-in-payments (project payments)')
-  })
-
-  it('names the policy and global scope of an explicit deny', () => {
-    expect(stepTypeBlockedTooltip(globalDeny)).toBe('Blocked by no-scripts-anywhere (all projects)')
-  })
-
-  it('explains a missing allow instead of naming a denying policy', () => {
-    expect(
-      stepTypeBlockedTooltip({
-        kind: 'script',
-        label: 'Script',
-        reason: 'no_matching_allow',
-        policy: null,
-        scope: null,
-        project: 'payments',
-      })
-    ).toBe('No policy grants write permission for Script in project payments')
-  })
-
-  it('omits the project when the evaluated project is unknown', () => {
-    expect(
-      stepTypeBlockedTooltip({
-        kind: 'script',
-        label: 'Script',
-        reason: 'no_matching_allow',
-        policy: null,
-        scope: null,
-        project: null,
-      })
-    ).toBe('No policy grants write permission for Script')
+  it('names the step type only, never the policy or scope (AC-3.g, R11)', () => {
+    expect(stepTypeBlockedTooltip(scriptDeny)).toBe("You don't have permission to write Script steps.")
   })
 })

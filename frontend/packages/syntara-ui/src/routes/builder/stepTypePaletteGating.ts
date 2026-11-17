@@ -19,16 +19,11 @@ export type PaletteEntryGate = {
 /**
  * Tooltip shown on a palette entry the caller may not add.
  *
- * An explicit deny names the policy and its scope; a missing allow explains
- * that no policy grants write permission in this project.
+ * The prototype sentence, naming the step type only: policy names and scopes
+ * belong in audit events, never in caller-facing copy (AC-3.g, R11).
  */
 export function stepTypeBlockedTooltip(blockedBy: BlockedStepType): string {
-  if (blockedBy.reason === 'no_matching_allow') {
-    const project = blockedBy.project ? ` in project ${blockedBy.project}` : ''
-    return `No policy grants write permission for ${blockedBy.label}${project}`
-  }
-  const scope = blockedBy.scope === 'project' && blockedBy.project ? `project ${blockedBy.project}` : 'all projects'
-  return `Blocked by ${blockedBy.policy ?? 'a policy'} (${scope})`
+  return `You don't have permission to write ${blockedBy.label} steps.`
 }
 
 /** Tooltip shown on every entry when the permissions endpoint is unavailable. */
@@ -53,8 +48,8 @@ function gateForKind(entry: NodeKind | undefined): { isBlocked: boolean; blocked
  *
  * A `step_type:write` deny (or a missing allow) blocks the entry: the panel
  * hides it by default and, when restricted steps are revealed, shows it inert
- * with an explanatory tooltip naming the policy and scope. Steps of that kind
- * already on the canvas are untouched.
+ * with an explanatory tooltip. Steps of that kind already on the canvas are
+ * untouched.
  *
  * Container entries (`trigger`, `action`, `logic`, `aap-execution`) create no
  * step themselves; they inherit the verdict of their subtypes and are only

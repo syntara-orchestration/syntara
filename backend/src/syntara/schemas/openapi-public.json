@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Syntara API",
-    "version": "1.4.0",
+    "version": "1.5.0",
     "description": "A distributed multi-agent workflow orchestration system"
   },
   "servers": [
@@ -50425,7 +50425,7 @@
       "StepTypeBlockedBy": {
         "type": "object",
         "title": "StepTypeBlockedBy",
-        "description": "Why the caller may not author one step type (the P2 Blocked step type shape).\n\nAttributes:\n    kind: The step type identifier.\n    label: Human-readable step type label.\n    reason: ``explicit_deny`` when a deny policy matched, ``no_matching_allow``\n        when no allow covers the kind.\n    policy: Originating policy display name, or ``None`` for a missing allow.\n    scope: Scope of the matching effective deny statement (``any`` or\n        ``project``), or ``None`` for a missing allow.\n    project: Project name for a project-scoped deny, ``None`` for a global\n        deny (and for a missing allow, where the evaluated project name is\n        reported instead).\n",
+        "description": "The Blocked step type shape shared with the P5 save denial.\n\nNames the step type only: policy names and scopes are recorded in audit\nevents, never shown to the caller (AC-3.g, R11).\n\nAttributes:\n    kind: The step type identifier.\n    label: Human-readable step type label.\n",
         "properties": {
           "kind": {
             "type": "string",
@@ -50434,49 +50434,11 @@
           "label": {
             "type": "string",
             "title": "Label"
-          },
-          "reason": {
-            "type": "string",
-            "title": "Reason"
-          },
-          "policy": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Policy"
-          },
-          "scope": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Scope"
-          },
-          "project": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Project"
           }
         },
         "required": [
           "kind",
-          "label",
-          "reason"
+          "label"
         ]
       },
       "StepTypePermissionRead": {
