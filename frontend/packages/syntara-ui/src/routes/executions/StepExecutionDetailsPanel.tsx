@@ -161,11 +161,13 @@ function DataPane({
   return (
     <Stack className={styles.contentContainer}>
       <StackItem className={styles.dataPaneHeaderRow}>
-        <Stack hasGutter>
-          <Flex alignItems={{ default: 'alignItemsCenter' }} gap={{ default: 'gapSm' }}>
-            <FlexItem flex={{ default: 'flexNone' }} className={styles.dataPaneTitle}>
-              {title}
-            </FlexItem>
+        <div className={styles.dataPaneHeader}>
+          <Flex
+            className={styles.dataPaneTitleRow}
+            justifyContent={{ default: 'justifyContentSpaceBetween' }}
+            alignItems={{ default: 'alignItemsCenter' }}
+          >
+            <FlexItem className={styles.dataPaneTitle}>{title}</FlexItem>
             <FlexItem>
               <Button
                 variant="plain"
@@ -181,7 +183,7 @@ function DataPane({
             </FlexItem>
           </Flex>
           {searchAndViewControls}
-        </Stack>
+        </div>
       </StackItem>
       <StackItem isFilled className={styles.scrollPane}>
         <div ref={scrollContainerRef}>{renderContent()}</div>
