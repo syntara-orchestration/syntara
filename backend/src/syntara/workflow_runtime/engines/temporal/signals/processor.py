@@ -33,6 +33,10 @@ _USER_FRIENDLY_MESSAGES: dict[str, str] = {
         "Failed to resolve credentials for this step. Check that the credential exists and is accessible."
     ),
     "EmptyLLMResponseError": "The AI model returned an empty response. Try simplifying the prompt or retrying.",
+    "StructuredOutputValidationError": (
+        "The AI model returned a response that did not match the response schema. "
+        "Try re-running the step or adjusting the schema or prompt."
+    ),
 }
 
 

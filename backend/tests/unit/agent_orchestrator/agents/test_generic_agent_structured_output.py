@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -100,7 +101,7 @@ class TestGenericAgentStructuredOutputNoTools:
 
         assert result_state["result"] is not None
         assert result_state["result"]["content"] == parsed_output
-        assert result_state["result"]["structured_output_metadata"]["fallback_strategy_used"] == "native"
+        assert result_state["result"]["structured_output_metadata"]["fallback_strategy_used"] == "json_mode"
         mock_llm.with_structured_output.assert_called_with(server_info_schema, method="json_mode", include_raw=True)
 
     @pytest.mark.asyncio
@@ -237,8 +238,10 @@ class TestGenericAgentStructuredOutputNoTools:
 
         assert result_state["result"] is not None
         assert result_state["result"]["content"] == tool_call_output
+        assert result_state["result"]["structured_output_metadata"]["fallback_strategy_used"] == "tool_call_args"
 
     @pytest.mark.asyncio
+    @pytest.mark.usefixtures("fast_retry_settings")
     async def test_execute_structured_rejects_invalid_tool_call_arguments(
         self, mock_llm: MagicMock, sample_state: AgentState, server_info_schema: dict[str, Any]
     ) -> None:
@@ -261,6 +264,69 @@ class TestGenericAgentStructuredOutputNoTools:
         ):
             mock_record.side_effect = _make_record_side_effect()
             await agent.execute_as_node(sample_state)
+
+    @pytest.mark.asyncio
+    @pytest.mark.usefixtures("fast_retry_settings")
+    async def test_execute_structured_rejects_empty_parsed_content_without_tool_calls(
+        self, mock_llm: MagicMock, sample_state: AgentState, server_info_schema: dict[str, Any]
+    ) -> None:
+        """A schema-violating parse without any tool call must also fail the step.
+
+        Covers gateways that return an empty object as message content directly,
+        with no structured-output tool call to recover arguments from.
+        """
+        sample_state["response_schema"] = server_info_schema
+
+        raw_message = AIMessage(
+            content="{}",
+            usage_metadata={"input_tokens": 80, "output_tokens": 20, "total_tokens": 100},
+        )
+        mock_structured_llm = MagicMock()
+        mock_structured_llm.ainvoke = AsyncMock(return_value={"raw": raw_message, "parsed": {}, "parsing_error": None})
+        mock_llm.with_structured_output.return_value = mock_structured_llm
+
+        agent = GenericAgent(llm=mock_llm, available_tools=[])
+        with (
+            patch("syntara.agent_orchestrator.agents.generic_agent.record_llm_call") as mock_record,
+            pytest.raises(AgentOrchestratorError, match="Structured output did not match the response schema"),
+        ):
+            mock_record.side_effect = _make_record_side_effect()
+            await agent.execute_as_node(sample_state)
+
+    @pytest.mark.asyncio
+    @pytest.mark.usefixtures("fast_retry_settings")
+    async def test_execute_structured_recovers_on_retry_after_validation_failure(
+        self, mock_llm: MagicMock, sample_state: AgentState, server_info_schema: dict[str, Any]
+    ) -> None:
+        """A schema-violating parse is retried — the gateway quirk is intermittent."""
+        sample_state["response_schema"] = server_info_schema
+
+        valid_output = {"hostname": "server-01", "ip": "192.168.1.10", "status": "active"}
+        invalid_raw = AIMessage(
+            content="{}",
+            usage_metadata={"input_tokens": 80, "output_tokens": 20, "total_tokens": 100},
+        )
+        valid_raw = AIMessage(
+            content='{"hostname":"server-01"}',
+            usage_metadata={"input_tokens": 80, "output_tokens": 20, "total_tokens": 100},
+        )
+        responses = [
+            {"raw": invalid_raw, "parsed": {}, "parsing_error": None},
+            {"raw": valid_raw, "parsed": valid_output, "parsing_error": None},
+        ]
+        mock_structured_llm = MagicMock()
+        mock_structured_llm.ainvoke = AsyncMock(side_effect=responses)
+        mock_llm.with_structured_output.return_value = mock_structured_llm
+
+        agent = GenericAgent(llm=mock_llm, available_tools=[])
+        with patch("syntara.agent_orchestrator.agents.generic_agent.record_llm_call") as mock_record:
+            mock_record.side_effect = _make_record_side_effect()
+            result_state = await agent.execute_as_node(sample_state)
+
+        assert result_state["result"] is not None
+        assert result_state["result"]["content"] == valid_output
+        assert result_state["result"]["structured_output_metadata"]["fallback_strategy_used"] == "json_mode"
+        assert mock_structured_llm.ainvoke.await_count == 2
 
 
 class TestStructuredOutputSystemPrompt:
@@ -349,7 +415,7 @@ class TestGenericAgentStructuredOutputWithTools:
 
         assert result_state["result"] is not None
         assert result_state["result"]["content"] == extracted_output
-        assert result_state["result"]["structured_output_metadata"]["fallback_strategy_used"] == "native"
+        assert result_state["result"]["structured_output_metadata"]["fallback_strategy_used"] == "json_mode"
         # Case A: tools present → standard tool-loop path (bind_tools), then extraction.
         mock_llm.bind_tools.assert_called()
         # Standard tool-loop call (100+50) + extraction call (40+15)
@@ -444,6 +510,125 @@ class TestGenericAgentStructuredOutputWithTools:
             },
         ]
 
+    @pytest.mark.asyncio
+    @pytest.mark.usefixtures("fast_retry_settings")
+    async def test_extraction_rejects_empty_parsed_content(
+        self, mock_llm: MagicMock, sample_state: AgentState, server_info_schema: dict[str, Any]
+    ) -> None:
+        """A schema-violating extraction parse must fail the step, not complete empty.
+
+        The tool-loop answer holds plain prose (no recoverable JSON), and the
+        extraction response parses to an empty object without any tool call.
+        """
+        sample_state["response_schema"] = server_info_schema
+
+        standard_message = AIMessage(
+            content="The server hostname is server-01 and IP is 192.168.1.10",
+            response_metadata={"model": "gpt-4"},
+            usage_metadata={"input_tokens": 100, "output_tokens": 50, "total_tokens": 150},
+        )
+        mock_llm.bind_tools.return_value.ainvoke = AsyncMock(return_value=standard_message)
+
+        extraction_raw = AIMessage(
+            content="{}",
+            usage_metadata={"input_tokens": 40, "output_tokens": 15, "total_tokens": 55},
+        )
+        mock_extraction_llm = MagicMock()
+        mock_extraction_llm.ainvoke = AsyncMock(
+            return_value={"raw": extraction_raw, "parsed": {}, "parsing_error": None}
+        )
+        mock_llm.with_structured_output.return_value = mock_extraction_llm
+
+        mock_tool = MagicMock()
+        mock_tool.name = "test_tool"
+
+        agent = GenericAgent(llm=mock_llm, available_tools=[mock_tool])
+        with (
+            patch("syntara.agent_orchestrator.agents.generic_agent.record_llm_call") as mock_record,
+            pytest.raises(AgentOrchestratorError, match="Structured output did not match the response schema"),
+        ):
+            mock_record.side_effect = _make_record_side_effect()
+            await agent.execute_as_node(sample_state)
+
+    @pytest.mark.asyncio
+    async def test_extraction_recovers_tool_call_arguments(
+        self, mock_llm: MagicMock, sample_state: AgentState, server_info_schema: dict[str, Any]
+    ) -> None:
+        """The structured result arriving as a tool call is recovered after the tool loop."""
+        sample_state["response_schema"] = server_info_schema
+
+        standard_message = AIMessage(
+            content="The server hostname is server-01 and IP is 192.168.1.10",
+            response_metadata={"model": "gpt-4"},
+            usage_metadata={"input_tokens": 100, "output_tokens": 50, "total_tokens": 150},
+        )
+        mock_llm.bind_tools.return_value.ainvoke = AsyncMock(return_value=standard_message)
+
+        tool_call_output = {"hostname": "server-01", "ip": "192.168.1.10", "status": "active"}
+        extraction_raw = AIMessage(
+            content="{}",
+            tool_calls=[{"id": "structured-output", "name": "json_schema", "args": tool_call_output}],
+            usage_metadata={"input_tokens": 40, "output_tokens": 15, "total_tokens": 55},
+        )
+        mock_extraction_llm = MagicMock()
+        mock_extraction_llm.ainvoke = AsyncMock(
+            return_value={"raw": extraction_raw, "parsed": {}, "parsing_error": None}
+        )
+        mock_llm.with_structured_output.return_value = mock_extraction_llm
+
+        mock_tool = MagicMock()
+        mock_tool.name = "test_tool"
+
+        agent = GenericAgent(llm=mock_llm, available_tools=[mock_tool])
+        with patch("syntara.agent_orchestrator.agents.generic_agent.record_llm_call") as mock_record:
+            mock_record.side_effect = _make_record_side_effect()
+            result_state = await agent.execute_as_node(sample_state)
+
+        assert result_state["result"] is not None
+        assert result_state["result"]["content"] == tool_call_output
+        assert result_state["result"]["structured_output_metadata"]["fallback_strategy_used"] == "tool_call_args"
+
+    @pytest.mark.asyncio
+    async def test_extraction_recovers_json_payload_from_answer_text(
+        self, mock_llm: MagicMock, sample_state: AgentState, server_info_schema: dict[str, Any]
+    ) -> None:
+        """The tool-loop answer's JSON payload is recovered when extraction returns empty.
+
+        The model writes the answer as text and the gateway mangles the extraction
+        call into an empty object, so the text is parsed as a last resort.
+        """
+        sample_state["response_schema"] = server_info_schema
+
+        answer_payload = {"hostname": "server-01", "ip": "192.168.1.10", "status": "active"}
+        standard_message = AIMessage(
+            content=f"{json.dumps(answer_payload)}{{}}",
+            response_metadata={"model": "gpt-4"},
+            usage_metadata={"input_tokens": 100, "output_tokens": 50, "total_tokens": 150},
+        )
+        mock_llm.bind_tools.return_value.ainvoke = AsyncMock(return_value=standard_message)
+
+        extraction_raw = AIMessage(
+            content="{}",
+            usage_metadata={"input_tokens": 40, "output_tokens": 15, "total_tokens": 55},
+        )
+        mock_extraction_llm = MagicMock()
+        mock_extraction_llm.ainvoke = AsyncMock(
+            return_value={"raw": extraction_raw, "parsed": {}, "parsing_error": None}
+        )
+        mock_llm.with_structured_output.return_value = mock_extraction_llm
+
+        mock_tool = MagicMock()
+        mock_tool.name = "test_tool"
+
+        agent = GenericAgent(llm=mock_llm, available_tools=[mock_tool])
+        with patch("syntara.agent_orchestrator.agents.generic_agent.record_llm_call") as mock_record:
+            mock_record.side_effect = _make_record_side_effect()
+            result_state = await agent.execute_as_node(sample_state)
+
+        assert result_state["result"] is not None
+        assert result_state["result"]["content"] == answer_payload
+        assert result_state["result"]["structured_output_metadata"]["fallback_strategy_used"] == "text_parse"
+
 
 class TestGenericAgentTokenTracking:
     """Test token usage tracking with structured output."""
@@ -476,7 +661,7 @@ class TestGenericAgentTokenTracking:
         result = result_state["result"]
         assert result is not None
         assert result["content"] == parsed_output
-        assert result["structured_output_metadata"]["fallback_strategy_used"] == "native"
+        assert result["structured_output_metadata"]["fallback_strategy_used"] == "json_mode"
         assert result_state["llm_token_usage_log"] == [
             {
                 "input_tokens": 120,
@@ -497,3 +682,41 @@ class TestGenericAgentTokenTracking:
         parsed, raw_out = GenericAgent._unpack_structured_response({"hostname": "x"})
         assert parsed == {"hostname": "x"}
         assert raw_out is None
+
+
+class TestJsonPayloadExtractionHelpers:
+    """Test recovery of JSON payloads embedded in answer text."""
+
+    def test_json_object_substrings_bare_object(self) -> None:
+        assert GenericAgent._json_object_substrings('{"a": 1}') == ['{"a": 1}']
+
+    def test_json_object_substrings_prose_wrapped(self) -> None:
+        text = 'Here is the answer: {"a": {"b": 2}} — enjoy'
+        assert GenericAgent._json_object_substrings(text) == ['{"a": {"b": 2}}']
+
+    def test_json_object_substrings_trailing_empty_object(self) -> None:
+        # Gateways that force structured output into a tool call can leave a
+        # stray empty object after the model's answer.
+        assert GenericAgent._json_object_substrings('{"a": 1}{}') == ['{"a": 1}', "{}"]
+
+    def test_json_object_substrings_braces_inside_strings(self) -> None:
+        assert GenericAgent._json_object_substrings('{"a": "} not a brace"}') == ['{"a": "} not a brace"}']
+
+    def test_json_object_substrings_no_objects(self) -> None:
+        assert GenericAgent._json_object_substrings("plain text, no braces") == []
+        assert GenericAgent._json_object_substrings("") == []
+
+    def test_json_payload_matching_schema_recovers_first_valid(self) -> None:
+        schema: dict[str, Any] = {"type": "object", "properties": {"a": {"type": "string"}}, "required": ["a"]}
+        assert GenericAgent._json_payload_matching_schema('{"a": "x"}{}', schema) == {"a": "x"}
+
+    def test_json_payload_matching_schema_skips_invalid_candidates(self) -> None:
+        schema: dict[str, Any] = {"type": "object", "properties": {"a": {"type": "string"}}, "required": ["a"]}
+        # The first object misses the required field; the second satisfies it.
+        text = '{"b": 1} {"a": "x"}'
+        assert GenericAgent._json_payload_matching_schema(text, schema) == {"a": "x"}
+
+    def test_json_payload_matching_schema_returns_none_when_nothing_matches(self) -> None:
+        schema: dict[str, Any] = {"type": "object", "properties": {"a": {"type": "string"}}, "required": ["a"]}
+        assert GenericAgent._json_payload_matching_schema("no json here", schema) is None
+        assert GenericAgent._json_payload_matching_schema('{"b": 1}', schema) is None
