@@ -1846,7 +1846,7 @@ class WorkflowClientSettings(BaseSettings):
     )
 
     ep_callback_service_cn: str = Field(
-        default="execution-plane.ao.svc",
+        default="execution-plane-callback.ao.svc",
         description="mTLS service identity permitted to deliver EP completion events.",
     )
 

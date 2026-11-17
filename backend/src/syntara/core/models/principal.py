@@ -38,8 +38,14 @@ KNOWN_SERVICE_CNS: tuple[str, ...] = (
     "worker.ao.svc",
     "background-worker.ao.svc",
     "temporal.ao.svc",
-    "execution-plane.ao.svc",
 )
+
+
+def configured_service_cns() -> tuple[str, ...]:
+    """Return built-in service CNs plus the configured EP callback identity."""
+    from syntara.core.config.base import get_settings  # noqa: PLC0415
+
+    return tuple(dict.fromkeys((*KNOWN_SERVICE_CNS, get_settings().ep_callback_service_cn)))
 
 
 def service_principal_id(cn: str) -> UUID:

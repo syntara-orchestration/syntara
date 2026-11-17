@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
 import httpx
@@ -13,8 +13,10 @@ from execution_plane_client.commands.credentials import CredentialResolve, Crede
 from execution_plane_client.errors import ProtocolConflict
 from fastapi import FastAPI, Request, Response
 
+from syntara.authz.exceptions import AuthorizationDeniedError, authorization_denied_handler
 from syntara.core.config.base import get_settings
 from syntara.core.database.session import get_db
+from syntara.core.models.principal import service_principal_id
 from syntara.execution_plane import bridge
 from syntara.execution_plane.commands import credentials as command_credentials
 from syntara.execution_plane.commands.context import AOCommandContext
@@ -26,9 +28,14 @@ if TYPE_CHECKING:
 
 
 @pytest.fixture
-def callback() -> tuple[FastAPI, AsyncMock]:
+def callback(monkeypatch: pytest.MonkeyPatch) -> tuple[FastAPI, AsyncMock]:
     app = FastAPI()
     app.include_router(bridge.router)
+    app.add_exception_handler(AuthorizationDeniedError, authorization_denied_handler)  # type: ignore[arg-type]
+    app.state.authz_evaluator = MagicMock()
+    authorize = AsyncMock()
+    authorize.return_value.allowed = True
+    monkeypatch.setattr(bridge, "authorize", authorize)
     session = AsyncMock()
     app.dependency_overrides[get_db] = lambda: session
 
@@ -83,6 +90,79 @@ async def test_credential_command_returns_typed_correlated_transport_receipt(
         },
     }
     assert resolved["credential_ref"] == CredentialResolve.model_validate(message.command.payload).credential_ref
+
+
+@pytest.mark.asyncio
+async def test_credential_command_uses_credential_specific_permission(
+    callback: tuple[FastAPI, AsyncMock], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    app, _ = callback
+    authorize = AsyncMock()
+    authorize.return_value.allowed = True
+    monkeypatch.setattr(bridge, "authorize", authorize)
+    monkeypatch.setattr(
+        command_credentials.CredentialResolveCommandHandler,
+        "_resolve_credential",
+        AsyncMock(return_value="resolved-token"),
+    )
+
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://ao") as client:
+        response = await client.post(
+            "/api/execution_plane/v1/commands", json=credential_command().model_dump(mode="json")
+        )
+
+    assert response.status_code == 200, response.text
+    assert authorize.await_count == 1
+    await_args = authorize.await_args
+    assert await_args is not None
+    request_arg = await_args.args[2]
+    assert request_arg.user_id == service_principal_id(get_settings().ep_callback_service_cn)
+    assert request_arg.resource_type == "execution-plane-callback"
+    assert request_arg.action == "resolve-credential"
+
+
+@pytest.mark.asyncio
+async def test_credential_command_rejects_service_principal_without_callback_role(
+    callback: tuple[FastAPI, AsyncMock], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    app, _ = callback
+    authorize = AsyncMock()
+    authorize.return_value.allowed = False
+    monkeypatch.setattr(bridge, "authorize", authorize)
+    resolve_credential = AsyncMock(return_value="resolved-token")
+    monkeypatch.setattr(
+        command_credentials.CredentialResolveCommandHandler,
+        "_resolve_credential",
+        resolve_credential,
+    )
+
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://ao") as client:
+        response = await client.post(
+            "/api/execution_plane/v1/commands", json=credential_command().model_dump(mode="json")
+        )
+
+    assert response.status_code == 403
+    authorize.assert_awaited_once()
+    resolve_credential.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_credential_command_rejects_wrong_certificate_identity(
+    callback: tuple[FastAPI, AsyncMock], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    app, _ = callback
+    monkeypatch.setattr(
+        bridge,
+        "get_settings",
+        lambda: SimpleNamespace(ep_callback_service_cn="other-allowlisted-service"),
+    )
+
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://ao") as client:
+        response = await client.post(
+            "/api/execution_plane/v1/commands", json=credential_command().model_dump(mode="json")
+        )
+
+    assert response.status_code == 403
 
 
 @pytest.mark.asyncio

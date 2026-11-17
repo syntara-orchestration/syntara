@@ -1,6 +1,8 @@
 """Unit tests for the shared user reference resolver."""
 
 import logging
+from collections.abc import Callable
+from contextlib import AbstractContextManager
 from types import SimpleNamespace
 from typing import ClassVar
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -210,6 +212,20 @@ class TestNonUserPrincipals:
         await UserReferenceResolver(mock_session).resolve([obj])
         assert obj.created_by.name == cn
         assert obj.updated_by.name == cn
+
+    @pytest.mark.asyncio
+    async def test_resolves_configured_execution_plane_callback_principal_by_cn(
+        self,
+        mock_session: MagicMock,
+        override_settings: Callable[..., AbstractContextManager[object]],
+    ) -> None:
+        cn = "execution-plane.k8s.serviceaccount"
+        svc_id = service_principal_id(cn)
+        with override_settings(ep_callback_service_cn=cn):
+            mock_session.exec = AsyncMock(return_value=[_row(svc_id)])
+            obj = SimpleNamespace(created_by=svc_id, updated_by=None)
+            await UserReferenceResolver(mock_session).resolve([obj])
+        assert obj.created_by.name == cn
 
     @pytest.mark.asyncio
     async def test_falls_back_to_raw_id_for_unknown_principal(self, mock_session: MagicMock) -> None:

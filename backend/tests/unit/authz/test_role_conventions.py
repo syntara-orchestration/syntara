@@ -139,6 +139,14 @@ class TestRolePolicyMapping:  # noqa: D101
         names = builtin_role_policy_names("auditor")
         assert not any("credential:use" in n for n in names)
 
+    def test_execution_plane_callback_role_has_only_callback_policies(self) -> None:
+        names = builtin_role_policy_names("execution-plane-callback")
+        assert names == [
+            "execution-plane-callback:complete:any",
+            "execution-plane-callback:resolve-credential:any",
+            "execution-plane-callback:resolve-credential-workload:any",
+        ]
+
     def test_user_does_not_have_credential_use(self) -> None:
         names = builtin_role_policy_names("user")
         assert not any("credential:use" in n for n in names)
