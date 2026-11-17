@@ -15,7 +15,7 @@ The recommended baseline is **one cold-start Kubernetes Job and one SDK Execute 
 |---|---|---|---|
 | D1 | One EP attempt owns one deterministic Job, one worker Pod, and at most one Execute submission. Do not reuse the Pod across work items. | EP cold-start design creates a Job with one completion and `backoffLimit: 0`; transport submits Execute once. It fences claim generations and requires reconciliation after an ambiguous submission. | EP architecture + AAP-98873 integration owner. **Proposed; approval pending.** |
 | D2 | The SDK workload server may serve concurrent calls, but the selected cold-start lifecycle uses one invocation per Pod. EP dispatch concurrency is a separate control. | Step-types PR #8 and current script runtime admit multiple concurrent Execute handlers; EP PR #107 bounds concurrent dispatches. Neither requires a shared warm Pod. | SDK architecture AAP-95467 + EP. **Proposed; confirm explicitly.** |
-| D3 | AO supplies a trusted, digest-pinned image and resolved step revision. EP selects the registered target, provisions the isolated Job, and owns the workload-to-OpenShift transport. A workflow cannot choose an arbitrary image or target namespace. | EP `work.execute` accepts image and selectors; AO must constrain those values before submitting. The EP API/command is not a Syntara-owned SDK contract. | AO/EP integration AAP-98873. **Proposed; exact AO API mapping pending.** |
+| D3 | AO uses the EP-provided EP Client to call EP. AO supplies a trusted, digest-pinned image and resolved step revision; EP selects the registered target, provisions the isolated Job, and owns the workload-to-OpenShift transport. A workflow cannot choose an arbitrary image or target namespace. | EP `work.execute` accepts image and selectors; AO must constrain those values before submitting. The EP Client is the supported AO-to-EP calling surface; its exact API, authentication, retry, and version contract must be recorded in AAP-98873. | AO/EP integration AAP-98873, coordinated with AAP-97389. **Proposed; client contract/version pending.** |
 | D4 | Script `environment` is ordinary, caller-controlled input, never a secret-delivery mechanism. Script steps do not declare workload credentials in their current manifests. No credential value is exposed to arbitrary Script code in this design. | Current script manifests expose `code`, `environment`, and output bounds; they do not declare a credential recipe. | Script step owner + Product Security. **Proposed; security review pending.** |
 | D5 | For credential-capable plugins, the SDK bidirectional callback is the workload credential contract. EP must resolve a declared recipe for the current attempt and return it only on the authenticated SDK stream. This does not make credentials available to Script unless a separate Script design is approved. | SDK ADR 0011 defines invocation-scoped callbacks and mTLS; current EP workload protocol says bound credentials are still unavailable. | EP + SDK architecture AAP-95467 + AAP-97389. **Contract direction documented; end-to-end resolver not proven.** |
 | D6 | A submitted script is not automatically replayed after a timeout or uncertain result. Script side effects make exactly-once behavior impossible to infer from transport status. | EP records `reconciliation_required` after uncertain submission; its cold-start notes explicitly say Job ownership does not create exactly-once execution. | EP + AO retry owners. **Proposed; confirm AO mapping and user-visible state.** |
@@ -28,6 +28,7 @@ sequenceDiagram
     participant U as Workflow / caller
     participant T as Temporal
     participant A as AO worker activity
+    participant EC as EP Client (AO dependency)
     participant C as AO credential authority
     participant E as EP API + Work Store
     participant W as EP worker / K8s manager
@@ -38,7 +39,10 @@ sequenceDiagram
     U->>T: Start workflow containing Script node
     T->>A: Schedule Script activity
     A->>A: Validate node config; map language to configured plugin image + revision
-    A->>E: work.execute (image digest, selectors, inputs, timeout, credential refs)
+    A->>EC: Submit work.execute (image digest, selectors, inputs, timeout, credential refs)
+    EC->>E: Call EP supported API/command surface
+    E-->>EC: Accepted WorkItem reference
+    EC-->>A: Return submission result
     E->>E: Validate and persist WorkItem; select active ExecutionTarget
     E->>W: Claim one attempt (fenced claim generation)
     W->>C: credential.resolve (OpenShift Cluster credential reference)
@@ -67,6 +71,7 @@ sequenceDiagram
 | Component | Owns | Must not own / receive |
 |---|---|---|
 | AO workflow engine | User-facing node configuration; workflow and Temporal activity identity; trusted mapping from `language` to allowed image digest, revision, and target selectors; AO retry policy; projecting EP result to the Script node output. | OpenShift API token in a workload; user-supplied image/namespace authority; EP Kubernetes Job lifecycle. |
+| EP Client library used by AO | EP owns and publishes the supported client contract/release; AO uses the client to make supported calls to EP. Exact method names, auth, retry behavior, and version compatibility belong to AAP-98873/client documentation. | Workflow policy, target selection, OpenShift Cluster credentials, or Job lifecycle. Do not duplicate EP command/API semantics in AO. |
 | EP API and Work Store | WorkItem state, target selection, attempt/claim generation, timeout and cancellation state, result persistence, completion notification, cleanup status. | AO database or Temporal history access. EP is a separate service and must not connect directly to either store. |
 | EP worker / Kubernetes manager | Cluster API client; namespaced Job/NetworkPolicy lifecycle; workload transport; SDK stream; credential resolution adapter for declared workload recipes; reconciliation and diagnostics. | Arbitrary workload code execution in the manager process; unbounded image choice or cross-namespace access. |
 | EP scheduler, target reconciler, and resource monitor | Claim/lease fencing, active target selection, target health, and dispatch admission. Cluster API health checks resolve the Cluster credential through AO. | Scheduling work to disabled/draining/unhealthy targets or using workload recipe credentials as Cluster credentials. |
@@ -90,14 +95,14 @@ EP evidence was read from `devel` commit `7c50410ac8a61478fe54ba6bfb245cb9018f14
 - [Current Syntara `devel` Script activity and its security warning](https://github.com/syntara-orchestration/syntara/blob/e721ffaa0dc6bb780bc6542bd61294014911f3e7/backend/src/syntara/workflow_runtime/engines/temporal/activities/script_activity.py)
 - [Prior direct OpenShift feature-branch Script activity](https://github.com/syntara-orchestration/syntara/blob/8ec9c163f07589f1a99d310d341aab42c4bb111a/backend/src/syntara/workflows/workflow_engine/activities/script_activity.py)
 
-**Call-chain validation gap:** Syntara `devel` does not submit this SDK `work.execute` contract from the Script activity, and a shared-cluster AO→EP→Script end-to-end trace was not present in the evidence. AAP-98873 must link the implementation commit/PR and a trace proving the path before this document can be marked “verified.”
+**Call-chain validation gap:** Syntara `devel` does not submit this SDK `work.execute` contract from the Script activity. The AO integration with the EP-provided Client and a shared-cluster AO→EP→Script end-to-end trace were not present in the evidence. AAP-98873 must link the client package/version, the AO integration commit/PR, and a trace proving the path before this document can be marked “verified.”
 
 ## 3. Invocation, image, and result contract
 
 ### Selected lifecycle proposal
 
 1. AO validates Script input and routes `language=python|bash` to the corresponding configured plugin and immutable image digest. AO supplies the compiled step revision, not a legacy fixture identity such as `script.v1`.
-2. AO submits one EP `work.execute` command with workflow-run identity, step revision, non-secret inputs, runtime context, credential bindings (only if the selected plugin declares them), timeout, and allowed selectors.
+2. AO uses the EP-provided EP Client to submit one `work.execute` command with workflow-run identity, step revision, non-secret inputs, runtime context, credential bindings (only if the selected plugin declares them), timeout, and allowed selectors.
 3. EP persists a logical WorkItem, assigns one attempt/claim generation, selects an active `Cluster` and `ExecutionTarget`, and launches one cold-start Job with one completion, `parallelism=1`, and `backoffLimit=0`.
 4. The EP worker verifies Job/Pod ownership, waits for readiness, negotiates SDK Health, checks the exact advertised revision, and submits one Execute stream.
 5. The SDK container runs one Script invocation. Its Python/Bash child process is not a new Pod and shares the container's OS identity and Pod security context.
@@ -218,7 +223,7 @@ Every event should be correlated by AO workflow/execution ID, EP WorkItem ID, cl
 
 | Work item | Boundary / dependency | Required before implementation is considered ready |
 |---|---|---|
-| [AAP-98873 integration design](https://redhat.atlassian.net/browse/AAP-98873) | AO↔EP command, callback, auth, result mapping, image/revision ownership | Link the AO implementation PR and a verified call trace. |
+| [AAP-98873 integration design](https://redhat.atlassian.net/browse/AAP-98873) | EP Client dependency and AO↔EP command, callback, auth, result mapping, image/revision ownership | Record the client package/version and API contract; link the AO implementation PR and a verified call trace. |
 | [ANSTRAT-1803 execution work](https://redhat.atlassian.net/browse/ANSTRAT-1803) | Product execution feature | Keep this document aligned with epic scope and rollout. |
 | [ANSTRAT-2422 published SDK contracts](https://redhat.atlassian.net/browse/ANSTRAT-2422) | Versioned SDK ABI, manifests, credential callback contract | Pin compatible version and migration/compatibility rule. |
 | [AAP-95467 SDK architecture](https://redhat.atlassian.net/browse/AAP-95467) | SDK ABI, invocation/server lifecycle | Approve one-invocation-per-Job interpretation and compatibility gate. |
@@ -239,7 +244,7 @@ The task identifies two open operator/version questions as [AAP-98864](https://r
 | Open item | Owner | Impact / release disposition |
 |---|---|---|
 | Confirm the invocation statement means one Execute per EP attempt; distinguish runtime server concurrency from Pod reuse. | EP + SDK architecture AAP-95467 | **Release-blocking for lifecycle and retry semantics.** |
-| Confirm the AO activity call path, image/revision mapping, authentication, callback, and result projection; current workspace branch still uses direct OpenShift. | AO + EP AAP-98873 | **Release-blocking for end-to-end acceptance.** |
+| Confirm AO's use of the EP-provided Client, including package/version, API, authentication/retry behavior, image/revision mapping, callback, and result projection; current Syntara devel still runs Script in the Temporal worker. | AO + EP AAP-98873, coordinated with AAP-97389 | **Release-blocking for end-to-end acceptance.** |
 | Implement and validate EP's per-attempt workload credential resolver; current docs mark bound workload credentials unavailable. Confirm Script itself does not expose credentials. | EP + AO credential owner + Product Security | **Release-blocking if Script or any selected plugin requires workload credentials.** |
 | Approve SDK version and compatibility rollout; ADR 0011 is an in-place `v1alpha1` breaking change. | SDK + EP + packaging AAP-97389 | **Release-blocking for mixed-version deployment.** |
 | Confirm the exact customer OpenShift versions, RBAC artifact, CNI support, egress policy, image pull auth and quotas. | Operator/install owner + customer admin | **Release-blocking for supported production installation.** |
