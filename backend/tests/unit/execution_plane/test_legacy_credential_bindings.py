@@ -10,7 +10,7 @@ from syntara.execution_plane.registry.bindings import legacy_credential_bindings
 from syntara.execution_plane.registry.stub import PluginRegistryError, StubPluginRegistry
 
 
-class FakePluginRegistry:
+class FakePluginRegistry(StubPluginRegistry):
     """Registry double for future plugin node types."""
 
     def __init__(self, recipe_ids: tuple[str, ...]) -> None:

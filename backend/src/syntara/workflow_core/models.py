@@ -137,7 +137,7 @@ class ActivityName(StrEnum):
     APPROVAL = "execute_approval_activity"
     HTTP_REQUEST = "execute_http_request_activity"
     INTERNAL_ACTIVITY = "execute_internal_activity"
-    SCRIPT = "execute_script_activity"
+    PLUGIN = "execute_plugin_action_activity"
     # Internal
     CREDENTIAL_RESOLUTION = "resolve_workflow_credentials"
     INTEGRATION_RESOLUTION = "resolve_workflow_integration"

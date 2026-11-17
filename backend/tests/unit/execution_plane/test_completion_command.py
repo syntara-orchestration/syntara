@@ -1,6 +1,6 @@
 """Exercise AO's EP callback using real shared command envelopes."""
 
-from collections.abc import Awaitable, Callable
+from collections.abc import AsyncGenerator, Awaitable, Callable
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
@@ -14,6 +14,7 @@ from syntara.authz.exceptions import AuthorizationDeniedError, authorization_den
 from syntara.core.config.base import get_settings
 from syntara.core.database.session import get_db
 from syntara.execution_plane import bridge
+from syntara.workflow_core.models import NodeType
 from syntara.workflows.executions_router import get_temporal_execution_service
 
 
@@ -28,11 +29,18 @@ def callback(monkeypatch: pytest.MonkeyPatch) -> tuple[FastAPI, AsyncMock, Magic
     monkeypatch.setattr(bridge, "authorize", authorize)
     session = AsyncMock()
     rows = MagicMock()
-    rows.first.return_value = ("workflow-id", "activity-id")
+    rows.first.return_value = ("workflow-id", "activity-id", NodeType.SCRIPT)
     session.exec.return_value = rows
     temporal = AsyncMock()
-    app.dependency_overrides[get_db] = lambda: session
-    app.dependency_overrides[get_temporal_execution_service] = lambda: temporal
+
+    async def override_get_db() -> AsyncGenerator[AsyncMock, None]:
+        yield session
+
+    async def override_temporal_service() -> AsyncMock:
+        return temporal
+
+    app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[get_temporal_execution_service] = override_temporal_service
 
     @app.middleware("http")
     async def certificate(request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
@@ -47,7 +55,7 @@ def completion():
     work_id = uuid4()
     return Completion(
         status=CompletionStatus.COMPLETED,
-        result={"output": {"stdout": "ok"}},
+        result={"output": {"return_code": 0, "stdout": "ok", "stderr": ""}},
         work_item_id=work_id,
     ).to_message(
         source_id="execution-plane",
@@ -142,7 +150,9 @@ async def test_completion_command_resolves_temporal_activity_and_acknowledges(ca
     validate.assert_called_once()
     if outcome is CompletionStatus.COMPLETED:
         temporal.complete_async_activity.assert_awaited_once_with(
-            temporal_workflow_id="workflow-id", activity_id="activity-id", result={"output": {"stdout": "ok"}}
+            temporal_workflow_id="workflow-id",
+            activity_id="activity-id",
+            result={"output": {"return_code": 0, "stdout": "ok", "stderr": ""}},
         )
     elif outcome is CompletionStatus.CANCELLED:
         temporal.report_cancellation_async_activity.assert_awaited_once_with(
@@ -236,3 +246,21 @@ async def test_completion_runtime_context_cannot_redirect_activity_or_result(cal
     assert response.json()["resource"]["kind"] == "work_item"
     assert response.json()["resource"]["resource_id"] == message.command.payload["work_item_id"]
     temporal.complete_async_activity.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_completion_rejects_completed_result_that_violates_output_schema(callback):
+    app, temporal, _ = callback
+    message = completion()
+    body = message.model_dump(mode="json")
+    body["command"]["payload"]["result"] = {"output": {"return_code": 0}}
+
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://ao") as client:
+        response = await client.post("/api/execution_plane/v1/commands", json=body)
+
+    assert response.status_code == 200, response.text
+    temporal.complete_async_activity.assert_not_awaited()
+    temporal.fail_async_activity.assert_awaited_once()
+    error = temporal.fail_async_activity.await_args.kwargs["error"]
+    assert error.type == "ExecutionPlaneProtocolError"
+    assert error.non_retryable is True
