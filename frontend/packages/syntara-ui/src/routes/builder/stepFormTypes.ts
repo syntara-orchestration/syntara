@@ -1,4 +1,4 @@
-import type { MissedSchedulePolicy, NodeSettings } from '@syntara/contracts'
+import type { FormDefinition, MissedSchedulePolicy, NodeSettings } from '@syntara/contracts'
 
 export type TriggerFormData = {
   name?: string
@@ -13,6 +13,11 @@ export type TriggerFormData = {
   webhookPath?: string
   inputSchema?: string
   authorizedServiceAccountIds?: string[]
+  form_definition?: FormDefinition
+  message?: string
+  submit_label?: string
+  success_message?: string
+  css_override?: string
 }
 
 export type ActionFormData = {

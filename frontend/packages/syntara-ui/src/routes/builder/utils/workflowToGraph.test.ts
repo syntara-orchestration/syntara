@@ -228,5 +228,15 @@ describe('workflowToGraph', () => {
       }
       expect(getTriggerDisplayData(trigger)).toEqual({ name: 'My EDA Trigger', details: 'EDA: /github-events' })
     })
+
+    it('returns Form details for form triggers', () => {
+      const trigger = {
+        id: 'form',
+        type: TriggerTypeEnum.FORM_TRIGGER,
+        name: 'Intake',
+        parameters: { form_definition: { fields: [] } },
+      }
+      expect(getTriggerDisplayData(trigger)).toEqual({ name: 'Intake', details: 'Form' })
+    })
   })
 })

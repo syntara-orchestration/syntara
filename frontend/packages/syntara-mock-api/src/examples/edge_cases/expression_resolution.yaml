@@ -1,5 +1,5 @@
 ---
-schema_version: "2.0.0"
+schema_version: '2.0.0'
 name: expression-resolution-test
 description: Test expression resolution with multiple placeholders and nested paths
 
@@ -27,7 +27,7 @@ nodes:
     parameters:
       language: bash
       environment:
-        INPUT_GREETING: "Hello, ${trigger.firstName} ${trigger.lastName}!"
+        INPUT_GREETING: 'Hello, ${trigger.firstName} ${trigger.lastName}!'
       code: |
         echo "Greeting: $INPUT_GREETING"
 

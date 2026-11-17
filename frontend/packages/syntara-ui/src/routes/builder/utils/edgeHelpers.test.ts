@@ -13,6 +13,7 @@ import {
   isApprovalHandle,
   isBranchHandle,
   isConditionalHandle,
+  isFormPromptHandle,
   isLoopHandle,
   v2PortToHandle,
   v2TargetPortToHandle,
@@ -58,6 +59,18 @@ describe('edgeHelpers', () => {
 
     it('returns false for undefined', () => {
       expect(isApprovalHandle(undefined)).toBe(false)
+    })
+  })
+
+  describe('isFormPromptHandle', () => {
+    it('returns true for submitted and fallback handles', () => {
+      expect(isFormPromptHandle(EdgeHandleEnum.SUBMITTED)).toBe(true)
+      expect(isFormPromptHandle(EdgeHandleEnum.FALLBACK)).toBe(true)
+    })
+
+    it('returns false for unrelated handles', () => {
+      expect(isFormPromptHandle(EdgeHandleEnum.APPROVED)).toBe(false)
+      expect(isFormPromptHandle(undefined)).toBe(false)
     })
   })
 

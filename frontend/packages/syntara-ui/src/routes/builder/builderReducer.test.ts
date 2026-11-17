@@ -755,6 +755,40 @@ describe('builderReducer', () => {
       expect(result.validationSource).toBeNull()
     })
 
+    it('CLEAR_NODE_VALIDATION_ERRORS removes only form-definition findings for the node', () => {
+      const stateWithErrors: BuilderState = {
+        ...initialState,
+        validationErrors: [
+          {
+            message: 'Form field invalid',
+            nodeId: 'form-1',
+            fieldPath: 'parameters.form_definition.fields.0.label',
+          },
+          {
+            message: 'Missing Submitted connection',
+            nodeId: 'form-1',
+            rule: 'form-prompt-connections',
+          },
+          { message: 'Other node', nodeId: 'task-2' },
+        ],
+        validationSource: 'verify',
+      }
+      const result = builderReducer(stateWithErrors, {
+        type: 'CLEAR_NODE_VALIDATION_ERRORS',
+        payload: { nodeId: 'form-1' },
+      })
+
+      expect(result.validationErrors).toEqual([
+        {
+          message: 'Missing Submitted connection',
+          nodeId: 'form-1',
+          rule: 'form-prompt-connections',
+        },
+        { message: 'Other node', nodeId: 'task-2' },
+      ])
+      expect(result.validationSource).toBe('verify')
+    })
+
     it('INIT_WORKFLOW clears validation errors', () => {
       const stateWithErrors: BuilderState = {
         ...initialState,

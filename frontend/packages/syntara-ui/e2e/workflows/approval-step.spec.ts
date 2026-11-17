@@ -15,9 +15,8 @@
  */
 
 import { type Page, test, expect } from '../fixtures'
-import { openAddStepPanel } from '../helpers/v2-steps'
+import { openAddStepPanel, selectHumanTaskStep } from '../helpers/v2-steps'
 import {
-  addStepPanel,
   buildUniqueName,
   closeStepEditorPanel,
   deleteWorkflow,
@@ -34,11 +33,7 @@ import {
  */
 async function openApprovalStepForm(page: Page) {
   await openAddStepPanel(page)
-
-  const panel = addStepPanel(page)
-  const approvalBtn = panel.getByRole('button', { name: 'Approval', exact: true })
-  await expect(approvalBtn).toBeVisible()
-  await approvalBtn.click()
+  await selectHumanTaskStep(page, 'Approval')
 
   // Wait for the form to load
   const nameInput = page.getByRole('textbox', { name: 'Name', exact: true })

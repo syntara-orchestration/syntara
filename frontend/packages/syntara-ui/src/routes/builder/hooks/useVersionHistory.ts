@@ -9,6 +9,7 @@ import { useAlerts } from '../../../providers/alerts'
 import { getErrorMessage } from '../../../utils/apiErrors'
 import { detachPromise } from '../../../utils/detachPromise'
 import { downloadVersionExport } from '../../../utils/downloadWorkflowExport'
+import { getWorkflowValidationFailureDescription } from '../useWorkflowVerification'
 
 import { buildWorkflowVersionsQuery } from './buildWorkflowVersionsQuery'
 import { resolvePublishedVersionName } from './versionHistoryHelpers'
@@ -124,7 +125,10 @@ export function useVersionHistory({ workflowId, isNew, onVersionUpdated }: UseVe
             )
           },
           onError: (error: unknown) => {
-            showError({ title: 'Failed to publish version', description: getErrorMessage(error) })
+            showError({
+              title: 'Failed to publish version',
+              description: getWorkflowValidationFailureDescription(error) ?? getErrorMessage(error),
+            })
           },
         }
       )

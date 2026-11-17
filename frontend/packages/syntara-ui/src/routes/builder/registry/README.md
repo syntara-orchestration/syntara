@@ -18,6 +18,12 @@ registry/
 │   ├── registerGenericStep.ts
 │   ├── registerLogicStep.ts
 │   └── registerTriggerStep.ts
+│   ├── registerAAPNode.ts
+│   ├── registerActionNode.ts
+│   ├── registerAIAgentNode.ts
+│   ├── registerHumanTasksStep.ts
+│   ├── registerGenericNode.ts
+│   ├── registerLogicNode.ts
 └── README.md               # This file
 ```
 

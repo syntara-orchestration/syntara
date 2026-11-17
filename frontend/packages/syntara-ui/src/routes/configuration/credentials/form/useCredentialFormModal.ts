@@ -8,19 +8,17 @@ import { useAlerts } from '../../../../providers/alerts'
 import { useSelectableProjects } from '../../../access/useAllProjects'
 import type { Credential } from '../credentialConstants'
 
+import { submitCredentialFormModal } from './credentialFormModalSubmit'
 import type { CredentialFormData } from './credentialFormSchema'
 import {
-  buildEditInputs,
   buildExclusiveGroups,
   computeInitialGroupIndex,
   getAllExclusiveFieldIds,
   getAuthMethodInsertIndex,
   getDefaultInputs,
-  getTypeInputs,
   getVisibleFields,
-  stripHiddenGroupFields,
-  validateAllDynamicFields,
 } from './credentialFormUtils'
+import { useCredentialFormModalQueries } from './useCredentialFormModalQueries'
 
 type UseCredentialFormModalOptions = {
   form: ReturnType<typeof useSynForm<CredentialFormData>>
@@ -35,7 +33,6 @@ type UseCredentialFormModalOptions = {
   onSuccess?: () => void
 }
 
-// eslint-disable-next-line max-lines-per-function -- modal state, queries, and submit paths stay in one hook
 export function useCredentialFormModal({
   form,
   isOpen,
@@ -55,15 +52,10 @@ export function useCredentialFormModal({
 
   const selectedTypeId = useWatch({ control, name: 'credential_type_id' }) ?? ''
 
-  const typesQuery = credentialsClient.useQuery('get', '/credential_types')
-  const allTypes = useMemo(() => typesQuery.data?.resources ?? [], [typesQuery.data])
-  const types = useMemo(() => {
-    if (!compatibleTypeNames?.length) return allTypes
-    return allTypes.filter((t) => compatibleTypeNames.includes(t.name))
-  }, [allTypes, compatibleTypeNames])
-
-  const selectedType = useMemo(() => types.find((t) => t.id === selectedTypeId), [types, selectedTypeId])
-  const typeInputs = useMemo(() => (selectedType ? getTypeInputs(selectedType) : null), [selectedType])
+  const { typesQuery, allTypes, types, selectedType, typeInputs } = useCredentialFormModalQueries(
+    compatibleTypeNames,
+    selectedTypeId
+  )
 
   const exclusiveGroups = useMemo(() => (typeInputs ? buildExclusiveGroups(typeInputs) : []), [typeInputs])
   const [activeGroupIndex, setActiveGroupIndex] = useState(0)
@@ -191,77 +183,25 @@ export function useCredentialFormModal({
   }, [])
 
   const onSubmit = (formData: CredentialFormData) => {
-    const submitType = allTypes.find((t) => t.id === formData.credential_type_id)
-    const submitTypeInputs = submitType ? getTypeInputs(submitType) : typeInputs
-    const submitVisibleFields = submitTypeInputs ? getVisibleFields(submitTypeInputs, activeGroupIndex) : visibleFields
-    const latestInputs = getValues('inputs') ?? formData.inputs ?? {}
-
-    if (!submitTypeInputs) {
-      setError('credential_type_id', { message: 'Credential type is required' })
-      return
-    }
-
-    if (
-      !validateAllDynamicFields(
-        {
-          typeInputs: submitTypeInputs,
-          inputs: latestInputs,
-          visibleFields: submitVisibleFields,
-          isEditMode,
-          touchedSecrets,
-        },
-        setError
-      )
-    ) {
-      return
-    }
-
-    const cleanedInputs = stripHiddenGroupFields(latestInputs, submitTypeInputs, submitVisibleFields)
-
-    if (isEditMode && credentialToEdit) {
-      patchCredential(
-        {
-          params: { path: { credential_id: credentialToEdit.id ?? '' } },
-          body: {
-            name: formData.name,
-            description: formData.description || null,
-            inputs: buildEditInputs(cleanedInputs, submitTypeInputs, touchedSecrets),
-          },
-        },
-        {
-          onSuccess: () => {
-            showAlert({ title: 'Credential updated', variant: 'success', autoDismiss: true })
-            onSuccess?.()
-            handleClose()
-          },
-          onError: handleError({ title: 'Failed to update credential' }),
-        }
-      )
-      return
-    }
-
-    createCredential(
-      {
-        body: {
-          name: formData.name,
-          description: formData.description || null,
-          credential_type_id: formData.credential_type_id,
-          inputs: cleanedInputs,
-          project_id: formData.project_id,
-        },
-      },
-      {
-        onSuccess: (response) => {
-          showAlert({ title: 'Credential created', variant: 'success', autoDismiss: true })
-          if (response?.id) {
-            onCreated?.(response.id)
-          }
-          onSuccess?.()
-          handleClose()
-        },
-        onError: handleError({ title: 'Failed to create credential' }),
-      }
-    )
+    submitCredentialFormModal({
+      formData,
+      allTypes,
+      typeInputs,
+      visibleFields,
+      activeGroupIndex,
+      getValues,
+      setError,
+      isEditMode,
+      credentialToEdit,
+      touchedSecrets,
+      patchCredential,
+      createCredential,
+      showAlert,
+      onSuccess,
+      onCreated,
+      handleClose,
+      handleError,
+    })
   }
 
   const credentialTypeHint = selectedType?.description && !typesQuery.error ? selectedType.description : undefined

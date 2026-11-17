@@ -181,7 +181,7 @@ test.describe('Permission gating — Navigation visibility', () => {
 
     await expect(nav.getByRole('link', { name: 'Workflows' })).toBeVisible()
     await expect(nav.getByRole('link', { name: 'Workflow Runs' })).toBeVisible()
-    await expect(nav.getByRole('link', { name: 'Approvals' })).toBeVisible()
+    await expect(nav.getByRole('link', { name: 'Tasks' })).toBeVisible()
 
     await expect(mainNavGroup(app, 'Configuration')).toBeVisible()
     await expectDockedNavGroupChildLinks(app, 'Configuration', ['Integrations', 'Credentials'], 'Integrations')
@@ -200,7 +200,7 @@ test.describe('Permission gating — Navigation visibility', () => {
 
     await expect(nav.getByRole('link', { name: 'Workflows' })).toBeVisible()
     await expect(nav.getByRole('link', { name: 'Workflow Runs' })).toBeVisible()
-    await expect(nav.getByRole('link', { name: 'Approvals' })).toBeVisible()
+    await expect(nav.getByRole('link', { name: 'Tasks' })).toBeVisible()
     await expect(mainNavGroup(viewerApp, 'Configuration')).toBeVisible()
 
     await expect(mainNavGroup(viewerApp, 'System Administration')).not.toBeVisible()
@@ -211,7 +211,7 @@ test.describe('Permission gating — Navigation visibility', () => {
 
     await expect(nav.getByRole('link', { name: 'Workflows' })).toBeVisible()
     await expect(nav.getByRole('link', { name: 'Workflow Runs' })).toBeVisible()
-    await expect(nav.getByRole('link', { name: 'Approvals' })).toBeVisible()
+    await expect(nav.getByRole('link', { name: 'Tasks' })).toBeVisible()
     await expect(mainNavGroup(auditorApp, 'Configuration')).toBeVisible()
 
     await expect(mainNavGroup(auditorApp, 'System Administration')).toBeVisible()
@@ -228,7 +228,7 @@ test.describe('Permission gating — Navigation visibility', () => {
 
     await expect(nav.getByRole('link', { name: 'Workflows' })).toBeVisible()
     await expect(nav.getByRole('link', { name: 'Workflow Runs' })).toBeVisible()
-    await expect(nav.getByRole('link', { name: 'Approvals' })).toBeVisible()
+    await expect(nav.getByRole('link', { name: 'Tasks' })).toBeVisible()
 
     // User has credential read only (no integration) → Configuration is a single nav link.
     await expect(mainNavGroup(userApp, 'Configuration')).toBeVisible()

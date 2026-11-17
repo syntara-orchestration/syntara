@@ -48,6 +48,9 @@ class MetricType(StrEnum):
     WORKFLOW_DURATION = "workflow_duration_ms"
     WORKFLOW_STATUS = "workflow_status"
     ACTIVITY_DURATION = "activity_duration_ms"
+    FORM_PROMPT_SUBMISSION_HANDOFF = "form_prompt_submission_handoff_ms"
+    FORM_PROMPT_RESUME_DISPATCH = "form_prompt_resume_dispatch_ms"
+    FORM_TRIGGER_SUBMISSION_START = "form_trigger_submission_start_ms"
 
     # Agent Metrics (FR-018 to FR-020)
     AGENT_ROUTING_DURATION = "agent_routing_ms"
@@ -147,6 +150,9 @@ METRIC_CATEGORIES: dict[MetricsCategoryType, list[MetricType]] = {
         MetricType.WORKFLOW_DURATION,
         MetricType.WORKFLOW_STATUS,
         MetricType.ACTIVITY_DURATION,
+        MetricType.FORM_PROMPT_SUBMISSION_HANDOFF,
+        MetricType.FORM_PROMPT_RESUME_DISPATCH,
+        MetricType.FORM_TRIGGER_SUBMISSION_START,
     ],
     MetricsCategoryType.AGENT: [
         MetricType.AGENT_ROUTING_DURATION,
@@ -165,6 +171,7 @@ METRIC_CATEGORIES: dict[MetricsCategoryType, list[MetricType]] = {
         MetricType.API_RESPONSE_TIME,
         MetricType.API_ERROR_RATE,
         MetricType.API_THROUGHPUT,
+        MetricType.FORM_PROMPT_SUBMISSION_HANDOFF,
     ],
     MetricsCategoryType.WORKFLOW_ENGINE: [
         MetricType.WORKFLOW_CREATION_SUCCESS_RATE,
@@ -172,6 +179,7 @@ METRIC_CATEGORIES: dict[MetricsCategoryType, list[MetricType]] = {
         MetricType.WORKFLOW_VALIDATION_DURATION,
         MetricType.WORKFLOW_DURATION,
         MetricType.WORKFLOW_STATUS,
+        MetricType.FORM_PROMPT_RESUME_DISPATCH,
     ],
     MetricsCategoryType.TEMPORAL_WORKER: [
         MetricType.TEMPORAL_QUEUE_DEPTH,
@@ -183,6 +191,7 @@ METRIC_CATEGORIES: dict[MetricsCategoryType, list[MetricType]] = {
         MetricType.WORKFLOW_START_LATENCY,
         MetricType.WORKFLOW_COMPLETION_RATE,
         MetricType.TEMPORAL_EXECUTION_SERVICE_DURATION,
+        MetricType.FORM_TRIGGER_SUBMISSION_START,
         MetricType.SCHEDULED_TRIGGER_FIRES,
         MetricType.SCHEDULED_TRIGGER_LATENCY,
     ],

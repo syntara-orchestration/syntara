@@ -22,10 +22,12 @@ import { RhUiCloseIcon, RhUiErrorIcon } from '@patternfly/react-icons'
 import { type Dispatch, useCallback, useMemo, useState } from 'react'
 
 import { formatDateYMD, parseDateYMD } from '../../utils/dateUtils'
+import { getIanaTimezones } from '../../utils/timezoneList'
 import type { ScheduleFrequency } from '../../utils/triggerFormatting'
 import { FieldHelpPopover } from '../FieldHelpPopover'
 import { SynSelect } from '../SynSelect'
 
+import { to12HourTimeString } from './formDateTimeUtils'
 import styles from './ScheduleBuilderFields.module.css'
 import { END_DATE_HELP, FREQUENCY_HELP, INTERVAL_HELP, START_DATE_HELP } from './scheduleHelpText'
 import { type BuilderAction, useScheduleBuilder } from './useScheduleBuilder'
@@ -57,38 +59,9 @@ const frequencyOptions: { value: ScheduleFrequency; label: string }[] = [
   { value: 'yearly', label: 'Yearly' },
 ]
 
-// ── Timezone list ────────────────────────────────────────────────────────
-
-let cachedTimezones: string[] | null = null
-
-function getTimezones(): string[] {
-  if (!cachedTimezones) {
-    try {
-      cachedTimezones = Intl.supportedValuesOf('timeZone')
-    } catch {
-      cachedTimezones = ['UTC']
-    }
-  }
-  return cachedTimezones
-}
-
 // ── Sub-components (module-scoped per S6478) ─────────────────────────────
 
 type DispatchBuilder = Dispatch<BuilderAction>
-
-/**
- * Converts an internal 24-hour "HH:MM" time to the "h:mm AM/PM" string PF's `TimePicker`
- * expects for its `time` prop once `is24Hour` is unset (its default is 12-hour display).
- * Passing the bare 24-hour string directly would be misread as 12-hour input.
- */
-function to12HourTimeString(hhmm: string): string {
-  const [hourStr, minuteStr] = hhmm.split(':')
-  const hour = Number(hourStr)
-  if (hhmm === '' || minuteStr === undefined || Number.isNaN(hour)) return hhmm
-  const suffix = hour >= 12 ? 'PM' : 'AM'
-  const displayHour = hour % 12 === 0 ? 12 : hour % 12
-  return `${displayHour}:${minuteStr} ${suffix}`
-}
 
 function StartDateTimeField({
   startDate,
@@ -112,7 +85,7 @@ function StartDateTimeField({
   const [tzOpen, setTzOpen] = useState(false)
   const [tzFilter, setTzFilter] = useState('')
 
-  const timezones = getTimezones()
+  const timezones = getIanaTimezones()
   const filteredTimezones = tzFilter
     ? timezones.filter((tz) => tz.toLowerCase().includes(tzFilter.toLowerCase()))
     : timezones

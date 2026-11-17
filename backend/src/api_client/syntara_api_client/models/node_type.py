@@ -9,6 +9,8 @@ class NodeType(str, Enum):
     CONDITION = "condition"
     CONVERGE = "converge"
     EDA_TRIGGER = "eda_trigger"
+    FORM_PROMPT = "form_prompt"
+    FORM_TRIGGER = "form_trigger"
     HTTP_REQUEST = "http_request"
     INTERNAL_ACTIVITY = "internal_activity"
     LOOP = "loop"

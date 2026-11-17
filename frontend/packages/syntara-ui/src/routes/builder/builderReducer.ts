@@ -1,8 +1,10 @@
 import type { Node } from '@xyflow/react'
 
+/* eslint-disable max-lines -- reducer cases for builder UI state */
 import type { NodeType } from '../workflows/canvas/nodes/NodeType'
 
 import type { FlowPosition } from './types'
+import { isFormDefinitionValidationFindingForNode } from './utils/validation/formDefinitionValidationFindings'
 
 export type ValidationSeverity = 'error' | 'warning'
 
@@ -15,6 +17,8 @@ export type ValidationError = {
   nodeName?: string
   severity?: ValidationSeverity
   fieldPath?: string | null
+  /** Canvas validation rule id when the finding came from frontend rules. */
+  rule?: string | null
 }
 
 // Builder state interface
@@ -110,6 +114,7 @@ export type BuilderAction =
     }
   | { type: 'SET_VALIDATION_ERRORS'; payload: ValidationError[]; source?: ValidationSource }
   | { type: 'CLEAR_VALIDATION_ERRORS' }
+  | { type: 'CLEAR_NODE_VALIDATION_ERRORS'; payload: { nodeId: string } }
   | { type: 'DISMISS_VALIDATION_BANNER' }
 
 // Lookup table for simple state updates - maps action type to the state key it updates
@@ -374,6 +379,19 @@ function handleValidationAction(state: BuilderState, action: BuilderAction): Bui
   }
   if (action.type === 'CLEAR_VALIDATION_ERRORS') {
     return { ...state, validationErrors: [], validationBannerDismissed: false, validationSource: null }
+  }
+  if (action.type === 'CLEAR_NODE_VALIDATION_ERRORS') {
+    const { nodeId } = action.payload
+    const filtered = state.validationErrors.filter((error) => !isFormDefinitionValidationFindingForNode(error, nodeId))
+    if (filtered.length === state.validationErrors.length) {
+      return state
+    }
+    return {
+      ...state,
+      validationErrors: filtered,
+      validationBannerDismissed: false,
+      validationSource: filtered.length === 0 ? null : state.validationSource,
+    }
   }
   if (action.type === 'DISMISS_VALIDATION_BANNER') {
     return { ...state, validationBannerDismissed: true }

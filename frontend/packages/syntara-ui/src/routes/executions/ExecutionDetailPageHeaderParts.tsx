@@ -10,6 +10,7 @@ import { RunHistoryToggleButton } from '../builder/RunHistoryToggleButton'
 import { ApprovalActionButtons } from './ApprovalActionButtons'
 import { CancelExecutionButton } from './CancelExecutionButton'
 import { isExecutionRetryable } from './executionRetryable'
+import { FormPromptActionButtons } from './FormPromptActionButtons'
 import { RetryExecutionButton } from './RetryExecutionButton'
 
 type Execution = ExecutionsAPI.components['schemas']['ExecutionRead']
@@ -46,6 +47,10 @@ export type ExecutionDetailHeaderToolbarProps = Readonly<{
   isApprovalLoading: boolean
   isApprovalPanelOpen?: boolean
   onReviewClick: () => void
+  showFormPromptActionStrip: boolean
+  isFormPromptLoading: boolean
+  isFormPromptPanelOpen?: boolean
+  onRespondClick: () => void
   historyCardOpen: boolean
   onToggleHistory: () => void
   onBackToEditor: () => void
@@ -60,6 +65,10 @@ export function ExecutionDetailHeaderToolbar({
   isApprovalLoading,
   isApprovalPanelOpen,
   onReviewClick,
+  showFormPromptActionStrip,
+  isFormPromptLoading,
+  isFormPromptPanelOpen,
+  onRespondClick,
   historyCardOpen,
   onToggleHistory,
   onBackToEditor,
@@ -72,6 +81,13 @@ export function ExecutionDetailHeaderToolbar({
 
   return (
     <>
+      {showFormPromptActionStrip && (
+        <FormPromptActionButtons
+          isLoading={isFormPromptLoading}
+          isDisabled={isFormPromptPanelOpen}
+          onRespondClick={onRespondClick}
+        />
+      )}
       {showApprovalActionStrip && (
         <ApprovalActionButtons
           isLoading={isApprovalLoading}
@@ -93,7 +109,10 @@ export function ExecutionDetailHeaderToolbar({
       <Button variant="secondary" onClick={onCopyToEditor}>
         Copy to editor
       </Button>
-      <Button variant={showApprovalActionStrip ? 'secondary' : 'primary'} onClick={onBackToEditor}>
+      <Button
+        variant={showApprovalActionStrip || showFormPromptActionStrip ? 'secondary' : 'primary'}
+        onClick={onBackToEditor}
+      >
         Back to editor
       </Button>
       <RunHistoryToggleButton onClick={onToggleHistory} isActive={historyCardOpen} />

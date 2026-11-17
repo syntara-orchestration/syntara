@@ -23,6 +23,10 @@ type ApprovalNavigationHeaderProps = Readonly<{
   onClose: () => void
   /** Accessible label for the close button. Defaults to `"Close"`. */
   closeAriaLabel?: string
+  /** Accessible label for the previous navigation button. Defaults to `"Previous approval"`. */
+  navigatePrevAriaLabel?: string
+  /** Accessible label for the next navigation button. Defaults to `"Next approval"`. */
+  navigateNextAriaLabel?: string
   /** Optional icon rendered before the title. */
   icon?: ReactNode
 }>
@@ -43,6 +47,8 @@ export function ApprovalNavigationHeader({
   onNavigateNext,
   onClose,
   closeAriaLabel = 'Close',
+  navigatePrevAriaLabel = 'Previous approval',
+  navigateNextAriaLabel = 'Next approval',
   icon,
 }: ApprovalNavigationHeaderProps) {
   const showNavigation = totalCount !== undefined && totalCount > 1 && onNavigatePrev && onNavigateNext
@@ -92,7 +98,7 @@ export function ApprovalNavigationHeader({
               <FlexItem>
                 <Button
                   variant="plain"
-                  aria-label="Previous approval"
+                  aria-label={navigatePrevAriaLabel}
                   isAriaDisabled={!hasPrev}
                   onClick={hasPrev ? onNavigatePrev : undefined}
                 >
@@ -104,7 +110,7 @@ export function ApprovalNavigationHeader({
               <FlexItem>
                 <Button
                   variant="plain"
-                  aria-label="Next approval"
+                  aria-label={navigateNextAriaLabel}
                   isAriaDisabled={!hasNext}
                   onClick={hasNext ? onNavigateNext : undefined}
                 >

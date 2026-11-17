@@ -219,7 +219,7 @@ describe('useSelectedActivity', () => {
         result.current.handleRowClick('task-1#iter-3', 'Task 1 (iter 3)')
       })
 
-      expect(onNodeSelect).toHaveBeenCalledWith('task-1', 'Task 1 (iter 3)')
+      expect(onNodeSelect).toHaveBeenCalledWith('task-1', 'Task 1 (iter 3)', 'task-1#iter-3')
     })
 
     it('calls onNodeSelect with plain key when no composite separator', () => {
@@ -237,7 +237,7 @@ describe('useSelectedActivity', () => {
         result.current.handleRowClick('task-1', 'Task 1')
       })
 
-      expect(onNodeSelect).toHaveBeenCalledWith('task-1', 'Task 1')
+      expect(onNodeSelect).toHaveBeenCalledWith('task-1', 'Task 1', 'task-1')
     })
 
     it('does not throw when onNodeSelect is undefined', () => {

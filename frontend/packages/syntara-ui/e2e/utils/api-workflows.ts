@@ -5,7 +5,13 @@ import type { Page } from '../fixtures'
 
 import { apiRequest, ensureProject, getAuthToken } from './api-core'
 
-type WorkflowStepDef = { id: string; type: string; name?: string; parameters: Record<string, unknown> }
+type WorkflowStepDef = {
+  id: string
+  type: string
+  name?: string
+  parameters: Record<string, unknown>
+  settings?: { timeout?: number }
+}
 type WorkflowEdgeDef = { from: string; to: string; from_port?: string }
 
 /** Create a workflow via the API. Returns the new workflow ID. */

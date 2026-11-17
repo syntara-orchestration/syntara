@@ -7,6 +7,8 @@ import { fileURLToPath } from 'url'
 config({
   path: new URL('.env.local', import.meta.url).pathname,
   quiet: true,
+  // Prefer package-local E2E env over stale shell exports (e.g. SKIP_WEB_SERVER without BASE_URL).
+  override: true,
 })
 
 import { isSkipWebServerForPlaywrightTests } from './e2e/playwrightWebServerEnv'

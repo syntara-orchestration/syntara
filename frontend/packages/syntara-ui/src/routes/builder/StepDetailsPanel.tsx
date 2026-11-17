@@ -2,6 +2,7 @@ import { Button, Flex } from '@patternfly/react-core'
 import type {
   ConditionActivity,
   ConvergeActivity,
+  FormDefinition,
   LoopActivity,
   SwitchActivity,
   TaskActivity,
@@ -32,6 +33,7 @@ import {
 import type { NodeType } from '../workflows/canvas/nodes/NodeType'
 import { renderStepIcon } from '../workflows/canvas/nodes/renderStepIcon'
 
+import type { ValidationError } from './builderReducer'
 import { StepRegistry } from './registry/StepRegistry'
 import {
   ApprovalStepDetails,
@@ -43,6 +45,7 @@ import {
   TriggerStepDetails,
   WaitStepDetails,
 } from './step-details'
+import { FormPromptNodeDetails } from './step-details/FormPromptNodeDetails'
 import { StepEditorLayout } from './StepEditorLayout'
 import { StepRawDataView } from './StepRawDataView'
 import type { WorkflowMetadata } from './types/workflowMetadata'
@@ -81,6 +84,15 @@ function getAddModeFormId(
     [RegistryStepId.APPROVAL]: 'approval-step-form',
   }
   if (stepTypeId && stepTypeId in simpleFormMap) return simpleFormMap[stepTypeId]
+
+  // Human task subtypes
+  if (stepTypeId === RegistryStepId.HUMAN_TASKS && stepSubtypeId) {
+    const humanTaskFormMap: Record<string, string> = {
+      [RegistryStepId.APPROVAL]: 'approval-step-form',
+      [RegistryStepId.FORM_PROMPT]: 'form-prompt-step-form',
+    }
+    return humanTaskFormMap[stepSubtypeId]
+  }
 
   // Logic step subtypes
   if (stepTypeId === RegistryStepId.LOGIC && stepSubtypeId) {
@@ -142,6 +154,7 @@ function getEditModeFormId(node: Node<NodeType['data']> | undefined): string | u
   if (node.type === FlowNodeType.CONVERGE) return 'converge-step-form'
   if (node.type === FlowNodeType.WAIT) return 'wait-step-form'
   if (node.type === FlowNodeType.APPROVAL) return 'approval-step-form'
+  if (node.type === FlowNodeType.FORM_PROMPT) return 'form-prompt-step-form'
   if (node.type === FlowNodeType.SWITCH) return 'switch-step-form'
   if (node.type === FlowNodeType.TASK) {
     return getTaskFormId(node.data as TaskActivity)
@@ -182,18 +195,31 @@ function renderEditModeContent(params: {
   onClose: () => void
   onHeaderContentChange: (content: ReactNode | null) => void
   projectId?: string
+  validationErrors?: ValidationError[]
+  onFormDefinitionCommitted?: (nodeId: string, formDefinition: FormDefinition) => void
 }): ReactNode {
-  const { node, currentWorkflow, onClose, onHeaderContentChange, projectId } = params
+  const {
+    node,
+    currentWorkflow,
+    onClose,
+    onHeaderContentChange,
+    projectId,
+    validationErrors,
+    onFormDefinitionCommitted,
+  } = params
   if (node.type === FlowNodeType.TRIGGER) {
     const triggerIdx = parseTriggerIndex(node.id) ?? 0
     const trigger = currentWorkflow?.triggers?.[triggerIdx]
     if (trigger) {
+      const triggerValidationErrors = validationErrors?.filter((err) => err.nodeId === trigger.id)
       return (
         <TriggerStepDetails
           trigger={trigger}
           triggerIndex={triggerIdx}
           onClose={onClose}
           onHeaderContentChange={onHeaderContentChange}
+          serverValidationErrors={triggerValidationErrors}
+          onFormDefinitionCommitted={onFormDefinitionCommitted}
         />
       )
     }
@@ -219,6 +245,21 @@ function renderEditModeContent(params: {
         onClose={onClose}
         onHeaderContentChange={onHeaderContentChange}
         projectId={projectId}
+      />
+    )
+  }
+
+  if (node.type === FlowNodeType.FORM_PROMPT) {
+    const activityValidationErrors = validationErrors?.filter((err) => err.nodeId === node.id)
+    return (
+      <FormPromptNodeDetails
+        taskData={node.data as Activity}
+        nodeId={node.id}
+        onClose={onClose}
+        onHeaderContentChange={onHeaderContentChange}
+        projectId={projectId}
+        serverValidationErrors={activityValidationErrors}
+        onFormDefinitionCommitted={onFormDefinitionCommitted}
       />
     )
   }
@@ -300,6 +341,9 @@ type StepDetailsPanelProps = {
   onRunStep?: () => void
   readOnly?: boolean
   onStepAdded?: () => void
+  onNodeAdded?: () => void
+  validationErrors?: ValidationError[]
+  onFormDefinitionCommitted?: (nodeId: string, formDefinition: FormDefinition) => void
 }
 
 function createAddStepHandler(
@@ -328,6 +372,8 @@ export function StepDetailsPanel(props: StepDetailsPanelProps) {
     onRunStep,
     readOnly,
     onStepAdded,
+    validationErrors,
+    onFormDefinitionCommitted,
   } = props
   const { showError } = useAlerts()
   // Use typed selector for optimized subscription
@@ -481,6 +527,8 @@ export function StepDetailsPanel(props: StepDetailsPanelProps) {
           onClose,
           onHeaderContentChange: setHeaderContent,
           projectId,
+          validationErrors,
+          onFormDefinitionCommitted,
         })}
       </Flex>
     )

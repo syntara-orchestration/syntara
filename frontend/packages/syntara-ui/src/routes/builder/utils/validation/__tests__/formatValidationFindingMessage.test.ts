@@ -43,4 +43,10 @@ describe('formatValidationFindingMessage', () => {
       'Missing required field: code'
     )
   })
+
+  it('does not rewrite trigger ids that appear as prefixes of property names', () => {
+    const message =
+      "Additional properties are not allowed ('form_definition', 'message', 'submit_label', 'success_message' were unexpected)"
+    expect(formatValidationFindingMessage(message, 'form', 'Intake')).toBe(message)
+  })
 })

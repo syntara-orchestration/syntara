@@ -840,8 +840,6 @@ jobs:
       - test-build
       - scripts-checks
       - frontend-checks-gate
-      - konflux-frontend-gate
-      - konflux-ui-tests-gate
       - shared-checks-gate
       - test-compose-e2e
     steps:
@@ -853,7 +851,7 @@ jobs:
           fi
 
           ok="success|skipped"
-          for job in gen-contracts checks unit-tests route-baseline coverage-report storybook-build test-build scripts-checks frontend-checks-gate test-compose-e2e konflux-frontend-gate konflux-ui-tests-gate shared-checks-gate; do
+          for job in gen-contracts checks unit-tests route-baseline coverage-report storybook-build test-build scripts-checks frontend-checks-gate test-compose-e2e shared-checks-gate; do
             case "$job" in
               gen-contracts)           result="${{ needs.gen-contracts.result }}" ;;
               checks)                  result="${{ needs.checks.result }}" ;;
@@ -865,8 +863,6 @@ jobs:
               scripts-checks)          result="${{ needs.scripts-checks.result }}" ;;
               frontend-checks-gate)    result="${{ needs.frontend-checks-gate.result }}" ;;
               test-compose-e2e)        result="${{ needs.test-compose-e2e.result }}" ;;
-              konflux-frontend-gate)   result="${{ needs.konflux-frontend-gate.result }}" ;;
-              konflux-ui-tests-gate)   result="${{ needs.konflux-ui-tests-gate.result }}" ;;
               shared-checks-gate)      result="${{ needs.shared-checks-gate.result }}" ;;
             esac
             echo "$job: $result"

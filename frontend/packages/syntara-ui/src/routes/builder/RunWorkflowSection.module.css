@@ -1,0 +1,10 @@
+/* Plain Run + focusable disabled MenuToggle use aria-disabled; match native disabled appearance. */
+.runActionDisabled {
+  color: var(--pf-t--global--text--color--disabled);
+}
+
+.runActionDisabled :global(.pf-v6-c-menu-toggle__text),
+.runActionDisabled :global(.pf-v6-c-menu-toggle__toggle-icon),
+.runActionDisabled :global(.pf-v6-c-button__icon) {
+  color: var(--pf-t--global--icon--color--disabled);
+}

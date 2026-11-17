@@ -619,9 +619,10 @@ class TestWhoCanPermissionGate:
                 body, user, db, evaluator, resource_project="my-project", request=self._make_request()
             )
 
-    def test_gate_rules_contain_approval_decide(self) -> None:
+    def test_gate_rules_contain_project_scoped_builder_queries(self) -> None:
         pairs = {(r.resource_type, r.action) for r in _WHO_CAN_GATE_RULES}
         assert ("approval", "decide") in pairs
+        assert ("form_prompt", "submit") in pairs
 
     @pytest.mark.asyncio
     async def test_tier1_allows_workflow_editor_with_project(self) -> None:

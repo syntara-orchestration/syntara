@@ -27,6 +27,9 @@ const REGISTRY_SUBTYPE_DOC_KEYS: Readonly<Record<string, string>> = {
   [RegistryStepId.LOGIC_WAIT]: 'wait',
   [RegistryStepId.AAP_JOB_TEMPLATE]: 'launchAapJobTemplate',
   [RegistryStepId.AAP_WORKFLOW_TEMPLATE]: 'launchAapWorkflowTemplate',
+  [RegistryStepId.TRIGGER_FORM]: 'builder',
+  [RegistryStepId.HUMAN_TASKS]: 'builder',
+  [RegistryStepId.FORM_PROMPT]: 'builder',
 }
 
 const TRIGGER_TYPE_DOC_KEYS: Readonly<Record<string, string>> = {
@@ -34,6 +37,7 @@ const TRIGGER_TYPE_DOC_KEYS: Readonly<Record<string, string>> = {
   [TriggerTypeEnum.SCHEDULED]: 'scheduleTrigger',
   [TriggerTypeEnum.WEBHOOK_TRIGGER]: 'webhookTrigger',
   [TriggerTypeEnum.EDA_TRIGGER]: 'eventDrivenAnsibleTrigger',
+  [TriggerTypeEnum.FORM_TRIGGER]: 'builder',
 }
 
 const EXECUTOR_TYPE_DOC_KEYS: Readonly<Record<string, string>> = {
@@ -46,6 +50,7 @@ const EXECUTOR_TYPE_DOC_KEYS: Readonly<Record<string, string>> = {
 
 const FLOW_TYPE_DOC_KEYS: Readonly<Record<string, string>> = {
   [FlowNodeType.APPROVAL]: 'approval',
+  [FlowNodeType.FORM_PROMPT]: 'builder',
   [FlowNodeType.CONDITION]: 'conditional',
   [FlowNodeType.CONVERGE]: 'converge',
   [FlowNodeType.LOOP]: 'loop',

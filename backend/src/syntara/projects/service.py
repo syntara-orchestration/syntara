@@ -14,6 +14,7 @@ from syntara.authz.models.assignments import RoleAssignment
 from syntara.authz.models.project import Project
 from syntara.core.models import User
 from syntara.core.services import BaseService
+from syntara.forms.models.form_prompt import FormPrompt
 from syntara.projects.schemas import ProjectListResponse
 
 logger = structlog.stdlib.get_logger(__name__)
@@ -346,17 +347,22 @@ class ProjectService(BaseService):
             delete(ApprovalRequest).where(ApprovalRequest.project_id == project_id)  # type: ignore[arg-type]
         )
 
-        # 2. Invocations
+        # 2. Form prompts
+        await self.session.exec(
+            delete(FormPrompt).where(FormPrompt.project_id == project_id)  # type: ignore[arg-type]
+        )
+
+        # 3. Invocations
         await self.session.exec(
             delete(Invocation).where(Invocation.project_id == project_id)  # type: ignore[arg-type]
         )
 
-        # 3. Executions (must precede workflow deletion)
+        # 4. Executions (must precede workflow deletion)
         await self.session.exec(
             delete(Execution).where(Execution.project_id == project_id)  # type: ignore[arg-type]
         )
 
-        # 4. Workflows (clear published_version_id first to avoid self-ref FK,
+        # 5. Workflows (clear published_version_id first to avoid self-ref FK,
         #    delete webhook triggers, then versions before workflows — FK is RESTRICT, not CASCADE)
         await self.session.exec(
             update(Workflow)
@@ -372,14 +378,17 @@ class ProjectService(BaseService):
             delete(Workflow).where(Workflow.project_id == project_id)  # type: ignore[arg-type]
         )
 
-        # 5. Credentials + secrets
-        secret_ids_result = await self.session.exec(
-            select(Credential.secret_id).where(
-                Credential.project_id == project_id,
-                Credential.secret_id.isnot(None),  # type: ignore[union-attr]
-            )
+        # 6. Credentials + secrets
+        secret_ids = list(
+            (
+                await self.session.exec(
+                    select(Credential.secret_id).where(
+                        Credential.project_id == project_id,
+                        Credential.secret_id.isnot(None),  # type: ignore[union-attr]
+                    )
+                )
+            ).all()
         )
-        secret_ids = list(secret_ids_result.all())
 
         await self.session.exec(
             delete(Credential).where(Credential.project_id == project_id)  # type: ignore[arg-type]
@@ -388,38 +397,38 @@ class ProjectService(BaseService):
             await self.session.exec(delete(EncryptedSecret).where(col(EncryptedSecret.secret_id).in_(secret_ids)))
             await self.session.exec(delete(Secret).where(col(Secret.id).in_(secret_ids)))
 
-        # 6. File metadata
+        # 7. File metadata
         await self.session.exec(
             delete(FileMetadata).where(FileMetadata.project_id == project_id)  # type: ignore[arg-type]
         )
 
-        # 7. Integration project assignments (junction table)
+        # 8. Integration project assignments (junction table)
         await self.session.exec(
             delete(IntegrationProjectAssignment).where(IntegrationProjectAssignment.project_id == project_id)  # type: ignore[arg-type]
         )
 
-        # 8. Service account credentials (must precede service_accounts — FK has no CASCADE)
+        # 9. Service account credentials (must precede service_accounts — FK has no CASCADE)
         sa_ids_subq = select(ServiceAccount.id).where(ServiceAccount.project_id == project_id).scalar_subquery()
         await self.session.exec(
             delete(ServiceAccountCredential).where(col(ServiceAccountCredential.service_account_id).in_(sa_ids_subq))
         )
 
-        # 8b. Service accounts
+        # 9b. Service accounts
         await self.session.exec(
             delete(ServiceAccount).where(ServiceAccount.project_id == project_id)  # type: ignore[arg-type]
         )
 
-        # 9. Role assignments
+        # 10. Role assignments
         await self.session.exec(
             delete(RoleAssignment).where(RoleAssignment.project_id == project_id)  # type: ignore[arg-type]
         )
 
-        # 10. Custom roles
+        # 11. Custom roles
         await self.session.exec(
             delete(Role).where(Role.project_id == project_id)  # type: ignore[arg-type]
         )
 
-        # 11. Custom policies
+        # 12. Custom policies
         await self.session.exec(
             delete(Policy).where(Policy.project_id == project_id)  # type: ignore[arg-type]
         )

@@ -29,6 +29,7 @@ vi.mock('../routes/feature-flags/feature-flag-demo-page', () => ({
   FeatureFlagDemo: () => <div>FeatureFlagDemo</div>,
 }))
 vi.mock('../routes/approvals/Approvals', () => ({ default: () => <div>Approvals</div> }))
+vi.mock('../routes/tasks/TasksAccessGate', () => ({ default: () => <div>TasksAccessGate</div> }))
 vi.mock('../routes/access-management/AccessManagement', () => ({
   AccessManagement: () => <div>AccessManagement</div>,
 }))
@@ -116,6 +117,7 @@ const lazyRouteNames = [
   'SettingsCategoryRoute',
   'FeatureFlagDemo',
   'Approvals',
+  'TasksAccessGate',
   'AccessManagement',
   'AccessManagementCheckAccessRoute',
   'AccessManagementTokenRevocationRoute',

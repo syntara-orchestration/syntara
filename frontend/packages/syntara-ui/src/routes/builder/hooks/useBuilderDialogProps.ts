@@ -2,6 +2,7 @@ import type { Dispatch, SetStateAction } from 'react'
 
 import type { DialogState } from '../../../hooks/useDialogState'
 import { parseTriggerIndex } from '../../../utils/triggerNodeIds'
+import { isFormTriggerType, readFormTriggerPresentation } from '../../workflows/formTrigger/formTriggerRunUtils'
 import type { BuilderAction } from '../builderReducer'
 import type { RunStepDialogData } from '../components/RunStepDialog'
 import type { PendingImportData } from '../useWorkflowImportExport'
@@ -53,6 +54,11 @@ export function useBuilderDialogProps(params: BuilderDialogPropsParams) {
 
   const triggers = currentWorkflow?.triggers ?? []
   const selectedTrigger = triggers[selectedTriggerIndex] ?? triggers[0]
+  const selectedTriggerRecord = selectedTrigger as
+    { id?: string; name?: string; type?: string; parameters?: Record<string, unknown> } | undefined
+  const formTrigger = isFormTriggerType(selectedTriggerRecord?.type)
+    ? readFormTriggerPresentation(selectedTriggerRecord?.parameters)
+    : undefined
 
   const triggerPred = runStepDialog.item?.predecessors?.find((p) => p.isTrigger)
   const runStepTriggerNodeId = triggerPred
@@ -68,10 +74,11 @@ export function useBuilderDialogProps(params: BuilderDialogPropsParams) {
     handleRunWorkflow,
     handleDeleteWorkflow,
     isDeleting,
-    triggerName: (selectedTrigger as { name?: string } | undefined)?.name ?? 'Trigger',
-    triggerNodeId: (selectedTrigger as { id?: string } | undefined)?.id,
-    triggerInputSchema: ((selectedTrigger as { parameters?: Record<string, unknown> } | undefined)?.parameters
-      ?.input_schema ?? undefined) as Record<string, unknown> | undefined,
+    triggerName: selectedTriggerRecord?.name ?? 'Trigger',
+    triggerNodeId: selectedTriggerRecord?.id,
+    triggerInputSchema: (selectedTriggerRecord?.parameters?.input_schema ?? undefined) as
+      Record<string, unknown> | undefined,
+    formTrigger,
     runStepDialog,
     runStepTriggerNodeId,
     onRunStepExecutionCreated: (executionId: string, { clearMocksOnComplete }: { clearMocksOnComplete: boolean }) => {

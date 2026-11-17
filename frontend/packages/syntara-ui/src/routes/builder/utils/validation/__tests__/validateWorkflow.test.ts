@@ -1,4 +1,5 @@
 import type { Activity } from '@syntara/contracts'
+import { ActivityTypeEnum, TriggerTypeEnum } from '@syntara/contracts'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { FlowNodeType } from '../../../../../constants'
@@ -102,6 +103,46 @@ describe('validateWorkflow', () => {
       const result = validateWorkflow(activities, edges)
       expect(result).toBeDefined()
       expect(Array.isArray(result.errors)).toBe(true)
+    })
+  })
+
+  describe('form definition rules', () => {
+    it('includes form step errors when form_definition is incomplete', () => {
+      const activities: Activity[] = [
+        {
+          type: ActivityTypeEnum.FORM_PROMPT,
+          id: 'form-1',
+          name: 'Survey',
+          parameters: { form_definition: { fields: [] } },
+        },
+      ]
+
+      const result = validateWorkflow(activities, [], {
+        triggers: [{ type: TriggerTypeEnum.MANUAL_TRIGGER, id: 'trigger-1', parameters: {} }],
+      })
+
+      expect(result.valid).toBe(false)
+      expect(
+        result.errors.some((error) => error.rule === 'form-prompt-form-definition' && error.nodeId === 'form-1')
+      ).toBe(true)
+    })
+
+    it('includes form trigger errors when form_definition is incomplete', () => {
+      const result = validateWorkflow([], [], {
+        triggers: [
+          {
+            type: TriggerTypeEnum.FORM_TRIGGER,
+            id: 'trigger-1',
+            name: 'Intake',
+            parameters: { form_definition: { fields: [] } },
+          },
+        ],
+      })
+
+      expect(result.valid).toBe(false)
+      expect(
+        result.errors.some((error) => error.rule === 'form-trigger-form-definition' && error.nodeId === 'trigger-1')
+      ).toBe(true)
     })
   })
 

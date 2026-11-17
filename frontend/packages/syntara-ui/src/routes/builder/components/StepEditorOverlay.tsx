@@ -1,9 +1,11 @@
 import { Flex, FlexItem } from '@patternfly/react-core'
+import type { FormDefinition } from '@syntara/contracts'
 import type { Node } from '@xyflow/react'
 import { memo } from 'react'
 
 import { useDocLink } from '../../../utils/docs/useDocLink'
 import type { NodeType } from '../../workflows/canvas/nodes/NodeType'
+import type { ValidationError } from '../builderReducer'
 import { StepDetailsPanel } from '../StepDetailsPanel'
 import type { WorkflowMetadata } from '../types/workflowMetadata'
 import { resolveStepDocKey } from '../utils/resolveStepDocKey'
@@ -27,6 +29,9 @@ type StepEditorOverlayProps = {
   workflowMetadata?: WorkflowMetadata
   onRunStep?: () => void
   onStepAdded?: () => void
+  onNodeAdded?: () => void
+  validationErrors?: ValidationError[]
+  onFormDefinitionCommitted?: (nodeId: string, formDefinition: FormDefinition) => void
 }
 
 export const StepEditorOverlay = memo(function StepEditorOverlay(props: StepEditorOverlayProps) {
@@ -49,6 +54,9 @@ export const StepEditorOverlay = memo(function StepEditorOverlay(props: StepEdit
     workflowMetadata,
     onRunStep,
     onStepAdded,
+    onNodeAdded,
+    validationErrors,
+    onFormDefinitionCommitted,
   } = props
 
   const stepDocKey = resolveStepDocKey({ mode, stepTypeId, stepSubtypeId, selectedNode })
@@ -86,6 +94,9 @@ export const StepEditorOverlay = memo(function StepEditorOverlay(props: StepEdit
           onRunStep={isVersionView ? undefined : onRunStep}
           readOnly={isVersionView}
           onStepAdded={onStepAdded}
+          onNodeAdded={onNodeAdded}
+          validationErrors={validationErrors}
+          onFormDefinitionCommitted={onFormDefinitionCommitted}
         />
       </FlexItem>
     </Flex>

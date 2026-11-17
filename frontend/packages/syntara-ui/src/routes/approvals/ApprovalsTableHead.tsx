@@ -11,7 +11,7 @@ export type ApprovalsTableHeadProps = {
   allRowsExpanded: boolean
   collapseAllAriaLabel: string
   onCollapseAll: (event: unknown, rowIndex: number, isOpen: boolean) => void
-  /** Whether any approval on the current page has expandable decision notes. Hides the expand-all toggle when false. */
+  /** Whether the table has rows to expand. Hides the expand-all toggle when false. */
   hasExpandableRows?: boolean
   showSelect?: boolean
   allPendingSelected?: boolean

@@ -115,11 +115,6 @@ export function useWorkflowGraphInit({
     const hasWorkflow = !!currentWorkflow
     const isCorrectWorkflow = lastWorkflowIdRef.current === workflowId
 
-    const hasActivities = (currentWorkflow?.workflow?.activities?.length ?? 0) > 0
-    if (hasWorkflow && hasActivities && initialEdges.length === 0) {
-      return
-    }
-
     const edgesValid = !hasWorkflow || initialEdges.length === 0 || edgesMatchWorkflow(initialEdges, currentWorkflow)
 
     if (

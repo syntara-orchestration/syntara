@@ -27,6 +27,8 @@ type UseWorkflowImportExportOptions = Readonly<{
   workflowName: string
   workflowDescription: string
   onPendingImport: (data: PendingImportData) => void
+  /** Flush open step editor into the store before manual Verify (same as silent verify on load). */
+  beforeVerify?: () => Promise<boolean>
 }>
 
 export function applyImportToCanvas(
@@ -62,10 +64,11 @@ export function useWorkflowImportExport({
   workflowName,
   workflowDescription,
   onPendingImport,
+  beforeVerify,
 }: UseWorkflowImportExportOptions) {
   const importFileRef = useRef<HTMLInputElement>(null)
   const { showError } = useAlerts()
-  const verification = useWorkflowVerification({ dispatch })
+  const verification = useWorkflowVerification({ dispatch, beforeVerify })
 
   const handleImportFile = useCallback(
     (event: React.ChangeEvent<HTMLInputElement>) => {

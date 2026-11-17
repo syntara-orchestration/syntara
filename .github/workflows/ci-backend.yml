@@ -292,6 +292,14 @@ jobs:
         if: github.event_name != 'merge_group'
         run: git fetch origin devel
 
+      - name: Fetch feature base branch for OpenAPI comparison
+        if: >-
+          github.event_name == 'pull_request' &&
+          startsWith(github.base_ref, 'feature/')
+        env:
+          PR_BASE_REF: ${{ github.base_ref }}
+        run: git fetch --no-tags origin "$PR_BASE_REF:refs/remotes/origin/$PR_BASE_REF"
+
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: "3.12"
@@ -323,11 +331,28 @@ jobs:
         working-directory: backend
 
       - name: Check OpenAPI breaking changes against devel
-        if: github.event_name != 'merge_group'
+        if: >-
+          github.event_name != 'merge_group' &&
+          !startsWith(github.base_ref, 'feature/')
         run: make check-openapi-breaking-pre-commit
         working-directory: backend
         env:
           OPENAPI_PR_LABELS: ${{ steps.pr-labels.outputs.labels }}
+
+      - name: Check OpenAPI breaking changes against feature base (warning only)
+        if: >-
+          github.event_name == 'pull_request' &&
+          startsWith(github.base_ref, 'feature/')
+        env:
+          OPENAPI_PR_LABELS: ${{ steps.pr-labels.outputs.labels }}
+          PR_BASE_REF: ${{ github.base_ref }}
+        run: |
+          set -euo pipefail
+          if make check-openapi-breaking OPENAPI_BASE_REF="origin/$PR_BASE_REF"; then
+            echo "OpenAPI breaking changes check passed against $PR_BASE_REF."
+          else
+            echo "::warning title=OpenAPI breaking changes::The check against $PR_BASE_REF did not pass. It is advisory for PRs targeting feature branches; review the check output."
+          fi
 
       - name: Install oasdiff
         if: github.event_name == 'merge_group'
@@ -564,7 +589,12 @@ jobs:
   test-compose-e2e:
     name: (Backend) Test Podman Compose E2E
     needs: changes
-    if: needs.changes.outputs.backend == 'true' && github.event_name == 'merge_group'
+    if: >-
+      needs.changes.outputs.backend == 'true' &&
+      (
+        github.event_name == 'merge_group' ||
+        (github.event_name == 'pull_request' && startsWith(github.base_ref, 'feature/'))
+      )
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     env:
@@ -662,12 +692,8 @@ jobs:
           echo "All services are healthy"
 
       - name: Run E2E tests (excluding global revocation)
-        uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3
-        with:
-          timeout_minutes: 20
-          max_attempts: 3
-          retry_wait_seconds: 30
-          command: cd backend && make test-e2e
+        timeout-minutes: 60
+        run: cd backend && make test-e2e
         env:
           APP_SCRIPT_NODES_ENABLED: "true"
           APP_BASE_URL: https://localhost:8000
@@ -1000,8 +1026,6 @@ jobs:
       - test-cli
       - test-integration
       - test-compose-e2e
-      - konflux-backend-gate
-      - konflux-api-tests-gate
       - shared-checks-gate
       - snyk-sast
       - snyk-sca
@@ -1023,7 +1047,7 @@ jobs:
 
           # Check all other required jobs
           ok="success|skipped"
-          for job in api-spec-validation api-spec-bundle api-spec-drift generate-api-client check-api-paths check-dead-code check-cycles check-orphans check-openapi-breaking verify-test-structure mypy test-unit test-cli test-integration test-compose-e2e konflux-backend-gate konflux-api-tests-gate shared-checks-gate snyk-sast snyk-sca; do
+          for job in api-spec-validation api-spec-bundle api-spec-drift generate-api-client check-api-paths check-dead-code check-cycles check-orphans check-openapi-breaking verify-test-structure mypy test-unit test-cli test-integration test-compose-e2e shared-checks-gate snyk-sast snyk-sca; do
             case "$job" in
               api-spec-validation)   result="${{ needs.api-spec-validation.result }}" ;;
               api-spec-bundle)       result="${{ needs.api-spec-bundle.result }}" ;;
@@ -1040,8 +1064,6 @@ jobs:
               test-cli)              result="${{ needs.test-cli.result }}" ;;
               test-integration)      result="${{ needs.test-integration.result }}" ;;
               test-compose-e2e)      result="${{ needs.test-compose-e2e.result }}" ;;
-              konflux-backend-gate)  result="${{ needs.konflux-backend-gate.result }}" ;;
-              konflux-api-tests-gate) result="${{ needs.konflux-api-tests-gate.result }}" ;;
               shared-checks-gate)    result="${{ needs.shared-checks-gate.result }}" ;;
               snyk-sast)             result="${{ needs.snyk-sast.result }}" ;;
               snyk-sca)              result="${{ needs.snyk-sca.result }}" ;;

@@ -74,10 +74,21 @@ export function useBuilderApproval({
     [setPendingApproval]
   )
 
+  const approvalCanvasNodeIds = useMemo(() => {
+    const ids = new Set<string>()
+    for (const activity of currentWorkflow?.workflow?.activities ?? []) {
+      if (activity.type === ActivityTypeEnum.APPROVAL && activity.id) {
+        ids.add(activity.id)
+      }
+    }
+    return ids
+  }, [currentWorkflow])
+
   useAutoApprovalDetection({
     executionId: isLiveRunActive ? (mostRecentExecutionId ?? undefined) : undefined,
     fetchForStep,
     onApprovalDetected: handleApprovalDetected,
+    shouldProbeWaitingNode: (canvasNodeId) => approvalCanvasNodeIds.has(canvasNodeId),
   })
 
   const activityNameMap = useMemo(() => {

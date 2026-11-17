@@ -488,7 +488,12 @@ class TestSyncWebhookTriggers:
                 },
                 {
                     "id": "trigger-2",
-                    "type": "schedule_trigger",
+                    "type": "scheduled_trigger",
+                    "parameters": {},
+                },
+                {
+                    "id": "trigger-3",
+                    "type": "form_trigger",
                     "parameters": {},
                 },
             ]

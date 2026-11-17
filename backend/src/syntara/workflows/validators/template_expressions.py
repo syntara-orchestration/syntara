@@ -1,8 +1,9 @@
 """Template expression validation for V2 workflow definitions.
 
 Validates that ``${...}`` expressions in node parameters reference valid
-scopes and existing activity/trigger IDs.  Produces errors for unresolved
-activity references and invalid namespace scopes.
+scopes and existing activity/trigger IDs. Rejects template expressions in
+form-trigger parameters, which have no upstream execution context. Produces
+errors for unresolved activity references and invalid namespace scopes.
 """
 
 import re
@@ -112,6 +113,10 @@ def check_template_expressions(
 ) -> list[ValidationFinding]:
     """Validate template expressions in all nodes and triggers.
 
+    Form-trigger parameters reject all expressions because a trigger has no
+    upstream context. Other nodes and triggers may use expressions when their
+    scopes resolve to a built-in namespace or an existing node.
+
     Returns:
         List of validation findings for invalid expressions.
 
@@ -127,8 +132,24 @@ def check_template_expressions(
         element_id = element.get("id")
         expressions = _extract_element_expressions(element)
         in_loop_body = element_id in loop_body_map
+        is_form_trigger = element.get("type") == "form_trigger"
 
-        for expr_body, _field_path in expressions:
+        for expr_body, field_path in expressions:
+            if is_form_trigger:
+                findings.append(
+                    ValidationFinding(
+                        severity=ValidationSeverity.error,
+                        category=ValidationCategory.schema_violation,
+                        message=(
+                            f"Template expression '${{{expr_body}}}' is not supported in form trigger parameters "
+                            "because the trigger has no upstream node to resolve it against."
+                        ),
+                        node_id=element_id,
+                        field_path=field_path,
+                    )
+                )
+                continue
+
             scope = expr_body.split(".")[0]
 
             if scope in BUILTIN_SCOPES:

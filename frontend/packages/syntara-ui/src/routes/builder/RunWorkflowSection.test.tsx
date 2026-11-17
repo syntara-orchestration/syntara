@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 
 import { RunWorkflowSection } from './RunWorkflowSection'
+import { workflowVerificationBlockedTooltip } from './workflowVerificationBlockedTooltip'
 
 describe('RunWorkflowSection', () => {
   const defaultPermissions = {
@@ -120,22 +121,31 @@ describe('RunWorkflowSection', () => {
       expect(await screen.findByText('No run permission')).toBeInTheDocument()
     })
 
-    it('shows validation tooltip (singular) when saved with a single validation issue', async () => {
+    it('shows validation tooltip when saved with a single validation issue', async () => {
       const user = userEvent.setup()
       render(<RunWorkflowSection {...defaultProps} validationErrorCount={1} />)
 
       await user.hover(screen.getByRole('button', { name: /^Run$/i }))
 
-      expect(await screen.findByText('Resolve validation issue before running — 1 found')).toBeInTheDocument()
+      expect(await screen.findByText(workflowVerificationBlockedTooltip('running', 1))).toBeInTheDocument()
     })
 
-    it('shows validation tooltip (plural) when saved with multiple validation issues', async () => {
+    it('shows validation tooltip when banner count blocks run even if store count is zero', async () => {
+      const user = userEvent.setup()
+      render(<RunWorkflowSection {...defaultProps} bannerBlockingValidationErrorCount={2} />)
+
+      await user.hover(screen.getByRole('button', { name: /^Run$/i }))
+
+      expect(await screen.findByText(workflowVerificationBlockedTooltip('running', 2))).toBeInTheDocument()
+    })
+
+    it('shows plural validation tooltip when multiple issues are recorded', async () => {
       const user = userEvent.setup()
       render(<RunWorkflowSection {...defaultProps} validationErrorCount={3} />)
 
       await user.hover(screen.getByRole('button', { name: /^Run$/i }))
 
-      expect(await screen.findByText('Resolve validation issues before running — 3 found')).toBeInTheDocument()
+      expect(await screen.findByText(workflowVerificationBlockedTooltip('running', 3))).toBeInTheDocument()
     })
 
     it('shows no-triggers tooltip over validation issues when both apply', async () => {
@@ -199,7 +209,26 @@ describe('RunWorkflowSection', () => {
         />
       )
 
-      expect(screen.getByRole('button', { name: /Run workflow/i })).toBeDisabled()
+      const runToggle = screen.getByRole('button', { name: /Run workflow/i })
+      expect(runToggle).toHaveAttribute('aria-disabled', 'true')
+      expect(runToggle).not.toBeDisabled()
+    })
+
+    it('shows validation tooltip on focus for multi-trigger Run when blocked', async () => {
+      const user = userEvent.setup()
+      render(
+        <RunWorkflowSection
+          {...defaultProps}
+          validationErrorCount={1}
+          triggers={[
+            { id: 'trigger-1', name: 'Manual' },
+            { id: 'trigger-2', name: 'Webhook' },
+          ]}
+        />
+      )
+
+      await user.tab()
+      expect(await screen.findByText(workflowVerificationBlockedTooltip('running', 1))).toBeInTheDocument()
     })
   })
 
@@ -231,6 +260,22 @@ describe('RunWorkflowSection', () => {
 
       await user.click(screen.getByRole('button', { name: /^Run$/i }))
 
+      expect(dispatch).not.toHaveBeenCalled()
+    })
+
+    it('keeps Run focusable and shows validation tooltip when issues are recorded', async () => {
+      const user = userEvent.setup()
+      const dispatch = vi.fn()
+      render(<RunWorkflowSection {...defaultProps} validationErrorCount={2} dispatch={dispatch} />)
+
+      const runButton = screen.getByRole('button', { name: /^Run$/i })
+      expect(runButton).toHaveAttribute('aria-disabled', 'true')
+      expect(runButton).not.toBeDisabled()
+
+      await user.hover(runButton)
+      expect(await screen.findByText(workflowVerificationBlockedTooltip('running', 2))).toBeInTheDocument()
+
+      await user.click(runButton)
       expect(dispatch).not.toHaveBeenCalled()
     })
   })

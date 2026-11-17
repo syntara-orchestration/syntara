@@ -12,6 +12,10 @@ export const AppRoute = {
     Root: '/executions',
     Execution: '/executions/:executionId',
   },
+  Tasks: {
+    Root: '/tasks',
+    Tab: '/tasks/$tab',
+  },
   Approvals: {
     Root: '/approvals',
   },

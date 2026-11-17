@@ -189,8 +189,8 @@ class ActivitySyncProbeMixin:
     ) -> None:
         """Process a synthetic STARTED event from describe() probing.
 
-        Sets the activity to RUNNING (or WAITING for approval nodes) and
-        syncs to the database.
+        Sets the activity to RUNNING, or WAITING for approval and form-prompt
+        nodes and timed waits, then syncs to the database.
         """
         update = metadata.pending_activity_updates.get(event.scheduled_event_id)
         if not update or update["status"] != ActivityStatus.PENDING:
@@ -200,7 +200,9 @@ class ActivitySyncProbeMixin:
         activity_def = metadata.activity_definitions_map.get(canvas_id, {})
         activity_type = activity_def.get("type")
         new_status = (
-            ActivityStatus.WAITING if activity_type in (NodeType.APPROVAL, NodeType.WAIT) else ActivityStatus.RUNNING
+            ActivityStatus.WAITING
+            if activity_type in (NodeType.APPROVAL, NodeType.FORM_PROMPT, NodeType.WAIT)
+            else ActivityStatus.RUNNING
         )
 
         update["status"] = new_status

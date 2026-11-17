@@ -62,6 +62,7 @@ export function extractTaskActivities(activities: Activity[]): Activity[] {
       activity.type === ActivityTypeEnum.AAP_JOB_TEMPLATE ||
       activity.type === ActivityTypeEnum.AAP_WORKFLOW_JOB_TEMPLATE ||
       activity.type === ActivityTypeEnum.APPROVAL ||
+      activity.type === ActivityTypeEnum.FORM_PROMPT ||
       activity.type === ActivityTypeEnum.INTERNAL_ACTIVITY ||
       activity.type === 'generic'
     ) {
@@ -116,6 +117,9 @@ export function getTriggerDisplayData(trigger: Trigger): { name: string; details
       break
     case TriggerTypeEnum.EDA_TRIGGER:
       details = getWebhookStyleDetails(trigger.parameters, 'EDA')
+      break
+    case TriggerTypeEnum.FORM_TRIGGER:
+      details = 'Form'
       break
   }
 

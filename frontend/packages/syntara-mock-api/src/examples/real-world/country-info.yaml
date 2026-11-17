@@ -1,5 +1,5 @@
 ---
-schema_version: "2.0.0"
+schema_version: '2.0.0'
 name: country-info
 description: Fetch and analyze country information from REST Countries API
 metadata:
@@ -20,7 +20,7 @@ triggers:
             type: string
             description: ISO 3166-1 alpha-2 country code
             default: US
-            pattern: "^[A-Z]{2}$"
+            pattern: '^[A-Z]{2}$'
 
 nodes:
   - id: fetch_country

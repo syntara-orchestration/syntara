@@ -13,6 +13,7 @@ import type { ValueOf } from './types'
 export const RegistryStepId = {
   TRIGGER: 'trigger',
   TRIGGER_MANUAL: 'trigger-manual',
+  TRIGGER_FORM: 'trigger-form',
   TRIGGER_SCHEDULED: 'trigger-scheduled',
   TRIGGER_WEBHOOK: 'trigger-webhook',
   TRIGGER_EDA: 'trigger-eda',
@@ -20,6 +21,8 @@ export const RegistryStepId = {
   ACTION_SCRIPT: 'action-script',
   ACTION_API: 'action-api',
   APPROVAL: 'approval',
+  FORM_PROMPT: 'form-prompt',
+  HUMAN_TASKS: 'human-tasks',
   LOGIC: 'logic',
   LOGIC_CONDITION: 'logic-condition',
   LOGIC_CONVERGE: 'logic-converge',

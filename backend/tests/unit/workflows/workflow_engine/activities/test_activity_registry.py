@@ -2,6 +2,8 @@
 
 from typing import ClassVar
 
+from syntara.workflow_core.graph import _NODE_SETTINGS_CLASS
+from syntara.workflow_core.models import NODE_OUTPUT_MODELS, ActivityName, NodeType
 from syntara.workflow_runtime.engines.temporal.activities.registry import (
     ACTIVITY_REGISTRY,
     BACKGROUND_ACTIVITY_REGISTRY,
@@ -45,3 +47,12 @@ class TestBackgroundActivityRegistry:
             f"Builtin workflow trigger type(s) {missing} have no matching activity in "
             "BACKGROUND_ACTIVITY_REGISTRY — workflows using these triggers will fail."
         )
+
+    def test_form_trigger_is_registered_only_in_main_registry(self) -> None:
+        """Form triggers are user-authored and must not be registered for built-in workflows."""
+        assert ActivityName.FORM_TRIGGER.value == "form_trigger"
+        assert NodeType.FORM_TRIGGER.value == "form_trigger"
+        assert ActivityName.FORM_TRIGGER in ACTIVITY_REGISTRY
+        assert ActivityName.FORM_TRIGGER not in BACKGROUND_ACTIVITY_REGISTRY
+        assert NodeType.FORM_TRIGGER not in _NODE_SETTINGS_CLASS
+        assert NodeType.FORM_TRIGGER not in NODE_OUTPUT_MODELS

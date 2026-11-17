@@ -1,5 +1,5 @@
 ---
-schema_version: "2.0.0"
+schema_version: '2.0.0'
 name: error-condition-no-then
 description: Test error when condition activity has no then branch
 

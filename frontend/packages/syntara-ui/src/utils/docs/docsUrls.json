@@ -4,6 +4,8 @@
   "builder": "__PLACEHOLDER__/builder",
   "executions": "__PLACEHOLDER__/executions",
   "approvals": "__PLACEHOLDER__/approvals",
+  "tasks": "__PLACEHOLDER__/tasks",
+  "formResponses": "__PLACEHOLDER__/form-responses",
   "credentials": "__PLACEHOLDER__/credentials",
   "integrations": "__PLACEHOLDER__/integrations",
   "settings": "__PLACEHOLDER__/settings",

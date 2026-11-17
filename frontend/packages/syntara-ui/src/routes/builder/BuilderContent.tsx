@@ -1,5 +1,5 @@
 import { AlertActionLink, Flex, FlexItem, StackItem } from '@patternfly/react-core'
-import type { WorkflowAPI } from '@syntara/contracts'
+import type { FormDefinition, WorkflowAPI } from '@syntara/contracts'
 import { useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
 import { useReactFlow, useNodesInitialized } from '@xyflow/react'
@@ -60,6 +60,7 @@ import { SaveBeforeViewDialog } from './SaveBeforeViewDialog'
 import { StepActionsContext } from './StepActionsContext'
 import type { BuilderContentProps } from './types/builderContent'
 import { useBuilderPermissions } from './useBuilderPermissions'
+import { clearNodeValidationErrorsIfFormDefinitionValid } from './utils/clearNodeValidationErrors'
 import { createAddStepHandler } from './utils/panelActions'
 import { buildWorkflowDefinition, transformStepParameters } from './utils/workflowDefinitionBuilder'
 import { ValidationBanner } from './ValidationBanner'
@@ -307,6 +308,24 @@ export function BuilderContent(props: BuilderContentProps) {
     if (suppressPanelCloseRef.current) return
     dispatch({ type: 'CLOSE_NODE_EDITOR' })
   }, [dispatch, suppressPanelCloseRef])
+
+  const validationErrorsRef = useRef(state.validationErrors)
+  useEffect(() => {
+    validationErrorsRef.current = state.validationErrors
+  }, [state.validationErrors])
+
+  const handleFormDefinitionCommitted = useCallback(
+    (nodeId: string, formDefinition: FormDefinition) => {
+      clearNodeValidationErrorsIfFormDefinitionValid({
+        dispatch,
+        getValidationErrors: () => validationErrorsRef.current,
+        nodeId,
+        formDefinition,
+      })
+    },
+    [dispatch]
+  )
+
   const [pendingImport, setPendingImport] = useState<import('./useWorkflowImportExport').PendingImportData | null>(null)
   const {
     handleRunWorkflow,
@@ -775,13 +794,20 @@ export function BuilderContent(props: BuilderContentProps) {
                       projectId={builderProjectId}
                       workflowMetadata={workflowMetadata}
                       onRunStep={selectedNode ? () => detachPromise(handleRunStep(selectedNode.id)) : undefined}
+                      validationErrors={state.validationErrors}
+                      onFormDefinitionCommitted={handleFormDefinitionCommitted}
                     />
                   </StepEditorAutoSubmitContext.Provider>
                 </Flex>
               </StackItem>
             </SynReactFlowViewportGuard>
 
-            <BuilderDialogs {...dialogProps} conflictDialogProps={conflictDialogProps} />
+            <BuilderDialogs
+              {...dialogProps}
+              canRun={builderPermissions.canRun}
+              runTooltip={builderPermissions.tooltips.run}
+              conflictDialogProps={conflictDialogProps}
+            />
             <UnsavedStepEditorDialog
               isOpen={unsavedStepEditorDialogOpen}
               onClose={() => dispatch({ type: 'SET_UNSAVED_STEP_EDITOR_DIALOG', payload: false })}

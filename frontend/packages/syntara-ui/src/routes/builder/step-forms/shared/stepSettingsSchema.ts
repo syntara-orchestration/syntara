@@ -16,3 +16,19 @@ export const stepSettingsSchema = z.object({
 
 export type StepSettingsFormData = z.infer<typeof stepSettingsSchema>
 export type RetryPolicyFormData = z.infer<typeof retryPolicySchema>
+
+/** Drop unset optional fields so "System default" clears a previously explicit node override. */
+export function persistStepSettings(settings?: StepSettingsFormData): StepSettingsFormData | undefined {
+  if (!settings) return undefined
+  const next: StepSettingsFormData = { ...settings }
+  if (next.continue_on_failure === undefined) {
+    delete next.continue_on_failure
+  }
+  if (next.timeout === undefined) {
+    delete next.timeout
+  }
+  if (next.retry_policy === undefined) {
+    delete next.retry_policy
+  }
+  return Object.keys(next).length > 0 ? next : undefined
+}

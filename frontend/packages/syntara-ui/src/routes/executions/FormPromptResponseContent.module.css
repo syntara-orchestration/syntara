@@ -1,0 +1,23 @@
+.outerStack {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.scrollableBody {
+  min-height: 0;
+  min-width: 0;
+  overflow-y: auto;
+  padding-right: var(--pf-t--global--spacer--sm);
+}
+
+.message {
+  white-space: pre-wrap;
+}
+
+.footer {
+  flex-shrink: 0;
+  padding-top: var(--pf-t--global--spacer--md);
+}

@@ -1,5 +1,5 @@
 ---
-schema_version: "2.0.0"
+schema_version: '2.0.0'
 name: while-loop-max-iterations-test
 description: Test while loop stops at maxIterations
 

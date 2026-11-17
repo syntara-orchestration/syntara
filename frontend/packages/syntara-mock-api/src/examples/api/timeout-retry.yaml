@@ -1,5 +1,5 @@
 ---
-schema_version: "2.0.0"
+schema_version: '2.0.0'
 name: timeout-retry
 description: API request with timeout and exponential backoff retry
 

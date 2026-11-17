@@ -32,7 +32,7 @@ export function getStepTypeColor(nodeType: string, data?: { type?: string }): st
   if (nodeType === FlowNodeType.TRIGGER) {
     return STEP_TYPE_COLORS.trigger
   }
-  if (nodeType === ActivityTypeEnum.APPROVAL) {
+  if (nodeType === ActivityTypeEnum.APPROVAL || nodeType === ActivityTypeEnum.FORM_PROMPT) {
     return STEP_TYPE_COLORS.approval
   }
   if (

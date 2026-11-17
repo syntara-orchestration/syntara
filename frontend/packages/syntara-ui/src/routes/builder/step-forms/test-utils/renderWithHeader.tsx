@@ -16,7 +16,8 @@ import type { ReactElement, ReactNode } from 'react'
  * renderWithHeader(<MyForm onSubmit={mockOnSubmit} />)
  * ```
  */
-export function renderWithHeader(ui: ReactElement) {
+export function renderWithHeader(ui: ReactElement, options?: { formId?: string }) {
+  const formId = options?.formId ?? 'action-step-form'
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: {
@@ -33,7 +34,7 @@ export function renderWithHeader(ui: ReactElement) {
         {cloneElement(ui as ReactElement<{ onHeaderContentChange?: (content: ReactNode | null) => void }>, {
           onHeaderContentChange: setHeaderContent,
         })}
-        <button type="submit" form="action-step-form">
+        <button type="submit" form={formId}>
           Submit
         </button>
       </QueryClientProvider>
