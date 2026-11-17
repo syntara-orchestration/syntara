@@ -12,18 +12,12 @@ from syntara.workflow_core.models import (
     APIExecutorParameters,
     ApprovalNodeParameters,
     HTTPMethod,
-    ScriptExecutorParameters,
-    ScriptLanguage,
 )
 
 
 @pytest.mark.parametrize(
     ("factory", "label"),
     [
-        (
-            lambda: ScriptExecutorParameters(language=ScriptLanguage.PYTHON, code="pass"),
-            "script",
-        ),
         (lambda: APIExecutorParameters(method=HTTPMethod.GET), "http_request"),
         (lambda: AgenticExecutorParameters(prompt="test"), "agentic"),
         (ApprovalNodeParameters, "approval"),

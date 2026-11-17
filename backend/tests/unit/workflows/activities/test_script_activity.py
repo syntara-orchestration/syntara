@@ -12,6 +12,7 @@ from temporalio.exceptions import ApplicationError
 
 from syntara.core.config.base import get_settings
 from syntara.execution_plane.client import ExecutionPlaneRejectedError, ExecutionPlaneUnavailableError
+from syntara.execution_plane.registry.stub import PluginRegistryError
 from syntara.workflow_runtime.engines.temporal.activities.ep import ep_dispatch_activity as activity_module
 
 ACTIVITY_INFO_PATH = "syntara.workflow_runtime.engines.temporal.activities.ep.ep_dispatch_activity.activity.info"
@@ -111,6 +112,41 @@ class TestScriptActivityValidation:
 
 class TestScriptActivityDispatch:
     """Exercise the service boundary and stable idempotency behavior."""
+
+    def test_future_step_legacy_credential_reference_becomes_ep_binding(self) -> None:
+        credential_ref = "00000000-0000-0000-0000-000000000040"
+
+        class SingleRecipeRegistry:
+            def credential_recipe_ids(self, node_type: str) -> tuple[str, ...]:
+                assert node_type == "future-step"
+                return ("future.plugin.token",)
+
+        with patch.object(activity_module, "_PLUGIN_REGISTRY", SingleRecipeRegistry()):
+            invocation = activity_module._build_invocation({"credential_id": credential_ref}, "future-step")
+
+        assert invocation["inputs"] == {}
+        assert invocation["credential_bindings"] == [
+            {
+                "credential_recipe_id": "future.plugin.token",
+                "credential_ref": credential_ref,
+            }
+        ]
+
+    def test_future_step_legacy_credential_cannot_combine_with_explicit_bindings(self) -> None:
+        input_config = {
+            "credential_id": "00000000-0000-0000-0000-000000000040",
+            "credential_bindings": [
+                {
+                    "credential_recipe_id": "future.plugin.token",
+                    "credential_ref": "00000000-0000-0000-0000-000000000041",
+                }
+            ],
+        }
+
+        with pytest.raises(PluginRegistryError):
+            activity_module._build_invocation(input_config, "future-step")
+
+        assert _FakeEPClient.submissions == []
 
     @pytest.mark.asyncio
     async def test_completed_response_returns_ep_result(self) -> None:
