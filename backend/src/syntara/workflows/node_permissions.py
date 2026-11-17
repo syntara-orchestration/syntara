@@ -50,7 +50,8 @@ def node_kind_denial(kind: str, project_name: str, result: AuthzResult) -> NodeK
             kind=kind,
             label=node_kind_display_label(kind),
             reason="explicit_deny" if explicit else "no_matching_allow",
-            project=statement.get("project") if explicit else project_name,
+            # The evaluated project, never the statement's: policy scope stays in audit only.
+            project=project_name,
         ),
         policy=result.policy_name(result.denied_by) if result.denied_by else None,
         scope=scope,
