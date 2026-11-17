@@ -32417,6 +32417,7 @@ components:
           type: string
           format: date-time
           title: Created At
+      additionalProperties: false
       type: object
       required:
         - metric_type

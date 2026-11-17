@@ -4,7 +4,7 @@ import type { Node, NodeProps } from '@xyflow/react'
 import { Background, BackgroundVariant, Position, ReactFlow } from '@xyflow/react'
 import { useCallback, useState, type MouseEvent, type ReactNode } from 'react'
 
-import { FlowNodeType } from '../../constants'
+import { FlowNodeType } from '../../constants/nodeTypes'
 import { ACTIVITY_STATUS } from '../../routes/builder/utils/executionState/executionHelpers'
 import { StandardStepHeader } from '../../routes/workflows/canvas/nodes/common/StandardStepHeader'
 import { STEP_TYPE_COLORS } from '../../routes/workflows/canvas/stepTypeColors'

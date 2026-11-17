@@ -373,7 +373,8 @@ export function StepExecutionDetailsPanel({
   const { inputData, outputData, isLoading, error, refetch } = useStepExecutionDetails(
     stepId,
     executionId,
-    stepState?.status
+    stepState?.status,
+    stepState?.iteration
   )
 
   const approvalAudit = useMemo(() => extractApprovalAudit(outputData), [outputData])

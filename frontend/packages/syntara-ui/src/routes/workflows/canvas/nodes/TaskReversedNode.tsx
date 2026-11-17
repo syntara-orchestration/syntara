@@ -2,7 +2,7 @@ import type { TaskActivity } from '@syntara/contracts'
 import { type Node, type NodeProps } from '@xyflow/react'
 
 import { SynStep } from '../../../../components/steps/SynStep'
-import { FlowNodeType } from '../../../../constants'
+import { FlowNodeType } from '../../../../constants/nodeTypes'
 import type { ActivityStatus } from '../../execution/types'
 import { getStepTypeColor } from '../stepTypeColors'
 
@@ -53,6 +53,7 @@ export function TaskReversedStepComponent(props: NodeProps<TaskReversedNode>) {
       topBarColor={iconColor}
       semanticZoomSummary={getTaskSemanticLabels(props.data)}
       semanticZoomIcon={getTaskCanvasIcon(props.data, iconColor, 'semanticZoom')}
+      semanticZoomPreviewIcon={getTaskCanvasIcon(props.data, iconColor, 'header')}
       semanticZoomMenuActions={menuActions}
     >
       <TaskActivityDetails data={props.data} menuActions={menuActions} iconColor={iconColor} />

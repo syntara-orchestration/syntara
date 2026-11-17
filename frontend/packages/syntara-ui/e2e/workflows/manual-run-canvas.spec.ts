@@ -13,7 +13,7 @@
 
 import { type Page } from '../fixtures'
 import { test, expect } from '../fixtures'
-import { buildUniqueName, openBuilderById } from '../helpers/workflows'
+import { buildUniqueName, openBuilderById, expectCanvasStepTitleVisible } from '../helpers/workflows'
 import { createWorkflowViaApi, deleteWorkflowViaApi } from '../utils/api'
 
 /**
@@ -45,7 +45,7 @@ test.skip('clicking Run and confirming opens the live run details panel', async 
   })
   try {
     await openBuilderById(app, workflowId)
-    await expect(app.getByText('Manual trigger')).toBeVisible({ timeout: 30_000 })
+    await expectCanvasStepTitleVisible(app, 'Manual trigger', { timeout: 30_000 })
 
     await app.getByRole('button', { name: 'Run' }).click()
     const dialog = app.getByRole('dialog')
@@ -79,7 +79,7 @@ test.skip('step status badges show success after execution completes', async ({ 
   })
   try {
     await openBuilderById(app, workflowId)
-    await expect(app.getByText('Manual trigger')).toBeVisible({ timeout: 30_000 })
+    await expectCanvasStepTitleVisible(app, 'Manual trigger', { timeout: 30_000 })
 
     await app.getByRole('button', { name: 'Run' }).click()
     await app.getByRole('dialog').getByRole('button', { name: 'Run now' }).click()
@@ -109,7 +109,7 @@ test.skip('failed steps show an error status badge', async ({ app }) => {
   })
   try {
     await openBuilderById(app, workflowId)
-    await expect(app.getByText('Manual trigger')).toBeVisible({ timeout: 30_000 })
+    await expectCanvasStepTitleVisible(app, 'Manual trigger', { timeout: 30_000 })
 
     await app.getByRole('button', { name: 'Run' }).click()
     await app.getByRole('dialog').getByRole('button', { name: 'Run now' }).click()
