@@ -47,11 +47,12 @@ vi.mock('./useAllEnabledExecutionTargets', () => ({
 
 vi.mock('../../execution-plane/useExecutionTargetPermissions', () => ({
   useExecutionTargetPermissions: vi.fn(() => ({
+    canRead: true,
     canCreate: true,
     canUpdate: true,
     canDelete: true,
     isLoading: false,
-    tooltips: { create: '', update: '', enable: '', delete: '' },
+    tooltips: { read: '', create: '', update: '', enable: '', delete: '' },
   })),
 }))
 

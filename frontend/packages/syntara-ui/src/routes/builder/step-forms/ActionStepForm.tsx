@@ -36,6 +36,7 @@ import { ScriptExecutionTab } from './ScriptExecutionTab'
 import { ActivityNameField } from './shared/ActivityNameField'
 import { stepHelp } from './shared/stepFieldHelp'
 import { StepFormContainer } from './shared/StepFormContainer'
+import stepFormStyles from './shared/stepFormStyles.module.css'
 import { StepFormTabsLayout } from './shared/StepFormTabsLayout'
 import { StepSettingsForm } from './shared/StepSettingsForm'
 
@@ -212,7 +213,7 @@ function ActionParametersContent({
   const isVersionView = useIsVersionView()
 
   return (
-    <Stack hasGutter style={{ paddingInline: 'var(--pf-t--global--spacer--xs)' }}>
+    <Stack hasGutter className={stepFormStyles.tabContentStack}>
       <input type="hidden" {...register('executor')} />
       {executor === ExecutorTypeEnum.SCRIPT && (
         <>
