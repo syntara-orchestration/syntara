@@ -12,8 +12,9 @@ T = TypeVar("T", bound="StepTypeBlockedBy")
 @_attrs_define
 class StepTypeBlockedBy:
     """The Blocked step type shape shared with the P5 save denial.
-    It names the step type only: policy names and scopes are recorded
-    in audit events, never shown to the caller (AC-3.g, R11).
+
+    Names the step type only: policy names and scopes are recorded in audit
+    events, never shown to the caller (AC-3.g, R11).
 
     Attributes:
         kind: The step type identifier.

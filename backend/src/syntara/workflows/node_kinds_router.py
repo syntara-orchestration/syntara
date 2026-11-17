@@ -32,10 +32,11 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from syntara.auth import get_current_user
 from syntara.authz.dependencies import get_authz_evaluator
-from syntara.authz.engine import AuthzRequest, authorize
+from syntara.authz.engine import AuthzRequest, authorize_resolved
 from syntara.authz.evaluator import AuthzEvaluator
 from syntara.authz.exceptions import ProjectNotFoundError
 from syntara.authz.models.project import Project
+from syntara.authz.resolver import resolve_effective_policies, resolve_user_groups
 from syntara.core.database.session import get_db
 from syntara.core.models import User
 from syntara.core.syntara_router import NO_PERMISSION, SyntaraRouter
@@ -47,6 +48,9 @@ from syntara.workflows.node_kinds import (
 from syntara.workflows.workflow_engine.models.workflow_definition import NodeType
 
 router = SyntaraRouter(prefix="/node_kinds", tags=["Node Kinds"])
+
+#: The action every verdict is evaluated with, as a policy-resolution filter.
+ACTION_FILTER = f"{NODE_RESOURCE_TYPE}:{NODE_ACTION_WRITE}"
 
 # Registry grouping reported per kind. Mirrors the builder palette families
 # (trigger, logic, action) and the authoring-policy categories from P1.
@@ -152,11 +156,17 @@ async def _step_type_verdicts(
     user: User,
     project_name: str,
 ) -> list[StepTypePermissionRead]:
-    """Evaluate ``step_type:write`` for every registered kind in one pass."""
+    """Evaluate ``step_type:write`` for every registered kind in one pass.
+
+    The effective policies and group memberships are resolved once for the
+    action and reused for every kind: only the Rego evaluation differs per
+    kind, so one palette open costs one resolution instead of one per kind.
+    """
+    effective = await resolve_effective_policies(db, user.id, action_filter=ACTION_FILTER)
+    groups = await resolve_user_groups(db, user.id)
     entries: list[StepTypePermissionRead] = []
     for kind in _ALL_GRANTABLE_KINDS:
-        result = await authorize(
-            db,
+        result = await authorize_resolved(
             evaluator,
             AuthzRequest(
                 user_id=user.id,
@@ -168,6 +178,8 @@ async def _step_type_verdicts(
                 user_labels=user.labels,
                 user_metadata=user.authz_metadata,
             ),
+            effective_policies=effective,
+            groups=groups,
         )
         entries.append(
             StepTypePermissionRead(

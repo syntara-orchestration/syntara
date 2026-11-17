@@ -93,15 +93,47 @@ class TestListNodeKinds:
     async def _call(self, results: dict[str, AuthzResult]) -> list[StepTypePermissionRead]:
         user = _user()
 
-        async def fake_authorize(_db: object, _evaluator: object, request: AuthzRequest) -> AuthzResult:
+        async def fake_authorize_resolved(_evaluator: object, request: AuthzRequest, **_kwargs: object) -> AuthzResult:
             return results.get(request.resource_labels["kind"], _result(allowed=True))
 
+        async def fake_resolve(_db: object, _user_id: object, action_filter: str = "") -> list[dict[str, object]]:
+            assert action_filter == module.ACTION_FILTER
+            return []
+
+        async def fake_groups(_db: object, _user_id: object) -> list[dict[str, object]]:
+            return []
+
         with (
-            patch.object(module, "authorize", fake_authorize),
+            patch.object(module, "authorize_resolved", fake_authorize_resolved),
+            patch.object(module, "resolve_effective_policies", fake_resolve),
+            patch.object(module, "resolve_user_groups", fake_groups),
             patch.object(module, "_project_name", AsyncMock(return_value="payments")),
         ):
             entries = await module.list_node_kinds(uuid4(), AsyncMock(), user, MagicMock())
         return [StepTypePermissionRead.model_validate(entry) for entry in entries]
+
+    async def test_policies_and_groups_resolve_once_for_every_kind(self) -> None:
+        """One palette open costs one policy resolution, not one per kind (review: N+1)."""
+        user = _user()
+        resolve_calls = []
+
+        async def fake_resolve(_db: object, _user_id: object, action_filter: str = "") -> list[dict[str, object]]:
+            resolve_calls.append(action_filter)
+            return []
+
+        async def fake_groups(_db: object, _user_id: object) -> list[dict[str, object]]:
+            resolve_calls.append("groups")
+            return []
+
+        with (
+            patch.object(module, "authorize_resolved", AsyncMock(return_value=_result(allowed=True))),
+            patch.object(module, "resolve_effective_policies", fake_resolve),
+            patch.object(module, "resolve_user_groups", fake_groups),
+            patch.object(module, "_project_name", AsyncMock(return_value="payments")),
+        ):
+            await module.list_node_kinds(uuid4(), AsyncMock(), user, MagicMock())
+
+        assert resolve_calls == [module.ACTION_FILTER, "groups"]
 
     async def test_lists_every_grantable_kind_in_registry_order(self) -> None:
         response = await self._call({})
