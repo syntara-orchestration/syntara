@@ -49,7 +49,7 @@ describe('buildMockJsonSkeleton', () => {
     })
   })
 
-  it('uses node type schema over provided schemaFields when both are present', () => {
+  it('uses provided schemaFields over node type schema when both are present', () => {
     mockGetNodeOutputSchema.mockReturnValue([{ name: 'stdout', type: 'string', description: 'Output' }])
 
     const schemaFields: OutputFieldDef[] = [{ name: 'fallback', type: 'string', description: 'Fallback' }]
@@ -57,7 +57,7 @@ describe('buildMockJsonSkeleton', () => {
     const result = buildMockJsonSkeleton('script', schemaFields)
     const parsed: unknown = JSON.parse(result)
 
-    expect(parsed).toEqual({ stdout: '' })
+    expect(parsed).toEqual({ fallback: '' })
   })
 
   it('handles empty schema array', () => {

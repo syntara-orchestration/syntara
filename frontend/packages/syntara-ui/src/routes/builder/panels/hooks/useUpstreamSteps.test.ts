@@ -60,7 +60,7 @@ describe('useUpstreamSteps', () => {
 
     const { result } = renderHook(() => useUpstreamSteps('node-b'))
 
-    expect(result.current).toEqual([{ id: 'node-a', name: 'Upstream Script', type: 'script' }])
+    expect(result.current).toEqual([{ id: 'node-a', name: 'Upstream Script', type: 'script', parameters: {} }])
   })
 
   it('returns upstream Trigger when a trigger is the source', () => {
@@ -79,7 +79,9 @@ describe('useUpstreamSteps', () => {
 
     const { result } = renderHook(() => useUpstreamSteps('node-1'))
 
-    expect(result.current).toEqual([{ id: 'trigger-real-id', name: 'Manual Trigger', type: 'manual_trigger' }])
+    expect(result.current).toEqual([
+      { id: 'trigger-real-id', name: 'Manual Trigger', type: 'manual_trigger', parameters: {} },
+    ])
   })
 
   it('returns empty array when currentWorkflow is null', () => {
@@ -110,8 +112,8 @@ describe('useUpstreamSteps', () => {
     const { result } = renderHook(() => useUpstreamSteps('node-c'))
 
     expect(result.current).toEqual([
-      { id: 'node-a', name: 'Script A', type: 'script' },
-      { id: 'node-b', name: 'HTTP B', type: 'http_request' },
+      { id: 'node-a', name: 'Script A', type: 'script', parameters: {} },
+      { id: 'node-b', name: 'HTTP B', type: 'http_request', parameters: {} },
     ])
   })
 
@@ -231,7 +233,12 @@ describe('useUpstreamSteps', () => {
     const { result } = renderHook(() => useUpstreamSteps('node-1'))
 
     expect(result.current).toHaveLength(1)
-    expect(result.current[0]).toEqual({ id: 'real-trigger-id', name: 'Manual Trigger', type: 'manual_trigger' })
+    expect(result.current[0]).toEqual({
+      id: 'real-trigger-id',
+      name: 'Manual Trigger',
+      type: 'manual_trigger',
+      parameters: {},
+    })
   })
 
   it('does not return the node itself', () => {
@@ -249,6 +256,6 @@ describe('useUpstreamSteps', () => {
 
     const { result } = renderHook(() => useUpstreamSteps('node-a'))
 
-    expect(result.current).toEqual([{ id: 'node-b', name: 'Other', type: 'script' }])
+    expect(result.current).toEqual([{ id: 'node-b', name: 'Other', type: 'script', parameters: {} }])
   })
 })

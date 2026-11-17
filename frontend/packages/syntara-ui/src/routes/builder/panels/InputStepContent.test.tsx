@@ -7,24 +7,18 @@ import type { UpstreamStepInfo } from './hooks/useUpstreamSteps'
 import { InputStepContent, InputPanelStepSection } from './InputStepContent'
 import { getTriggerInputSchemaFields } from './utils/triggerSchemaUtils'
 
-// Mock the getNodeOutputSchema function
-vi.mock('@syntara/contracts', () => ({
+// Keep the real enums (effectiveOutputSchema needs them) and stub only the output schema lookup
+vi.mock('@syntara/contracts', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@syntara/contracts')>()),
   getNodeOutputSchema: vi.fn((type: string) => {
     if (type === 'script') {
-      return {
-        stdout: { type: 'string' },
-        return_code: { type: 'number' },
-      }
+      return [
+        { name: 'stdout', type: 'string', description: 'Standard output' },
+        { name: 'return_code', type: 'number', description: 'Exit code' },
+      ]
     }
     return null
   }),
-  TriggerTypeEnum: {
-    MANUAL_TRIGGER: 'manual_trigger',
-    SCHEDULED: 'scheduled',
-    EVENT: 'event',
-    WEBHOOK_TRIGGER: 'webhook_trigger',
-    EDA_TRIGGER: 'eda_trigger',
-  },
 }))
 
 // Mock the view components
@@ -249,7 +243,7 @@ describe('InputStepContent', () => {
   })
 
   describe('expressionNodeId computation', () => {
-    it.each(['manual_trigger', 'scheduled', 'event', 'webhook_trigger', 'eda_trigger'])(
+    it.each(['manual_trigger', 'scheduled_trigger', 'event', 'webhook_trigger', 'eda_trigger'])(
       'sets expressionNodeId to "trigger" for %s type',
       (type) => {
         render(
