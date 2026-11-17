@@ -9,7 +9,6 @@ import stepFormStyles from './shared/stepFormStyles.module.css'
 export type FormPresentationFormFields = {
   submit_label?: string | null
   success_message?: string | null
-  css_override?: string | null
 }
 
 type FormPresentationOptionsSectionProps = Readonly<{
@@ -46,17 +45,6 @@ export function FormPresentationOptionsSection({ idPrefix }: FormPresentationOpt
             {...register('success_message')}
             id={`${idPrefix}-success-message`}
             rows={3}
-            resizeOrientation="vertical"
-            isDisabled={isVersionView}
-          />
-        </FormGroup>
-      </StackItem>
-      <StackItem>
-        <FormGroup label="CSS override" labelHelp={stepHelp.formPromptCssOverride} fieldId={`${idPrefix}-css-override`}>
-          <TextArea
-            {...register('css_override')}
-            id={`${idPrefix}-css-override`}
-            rows={4}
             resizeOrientation="vertical"
             isDisabled={isVersionView}
           />

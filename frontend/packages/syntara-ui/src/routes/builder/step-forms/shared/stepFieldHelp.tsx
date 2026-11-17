@@ -53,7 +53,6 @@ export const stepHelp = {
   formPromptResponseWindow: createFieldHelp('Form submission window', T.FORM_PROMPT_RESPONSE_WINDOW_HELP),
   formPromptSubmitLabel: createFieldHelp('Submit button label', T.FORM_PROMPT_SUBMIT_LABEL_HELP),
   formPromptSuccessMessage: createFieldHelp('Success message', T.FORM_PROMPT_SUCCESS_MESSAGE_HELP),
-  formPromptCssOverride: createFieldHelp('CSS override', T.FORM_PROMPT_CSS_OVERRIDE_HELP),
 
   // Loop / logic
   loopItems: createFieldHelp('Items expression', T.LOOP_ITEMS_HELP),

@@ -24,7 +24,6 @@ export const formPromptFormSchema = z.object({
   fallback_decision: z.enum(['submit', 'fallback']).nullable().optional(),
   submit_label: z.string().max(64).optional(),
   success_message: z.string().max(500).optional(),
-  css_override: z.string().max(10000).optional(),
   settings: stepSettingsSchema.optional(),
 })
 
@@ -41,7 +40,6 @@ export const formPromptStoredParametersSchema = formPromptFormSchema
     fallback_decision: true,
     submit_label: true,
     success_message: true,
-    css_override: true,
   })
   .extend({
     fallback_behavior: z.enum(['fail', 'fallback']).nullable().optional(),

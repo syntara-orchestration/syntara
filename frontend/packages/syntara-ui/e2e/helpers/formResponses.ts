@@ -121,7 +121,6 @@ export type FormStepNodeParameters = {
     | typeof ENVIRONMENT_DROPDOWN_FORM_DEFINITION
   submit_label?: string
   success_message?: string
-  css_override?: string
   response_window?: number
   /** Workflow schema stores usernames / group names (strings). Objects are normalized before publish. */
   responder_users?: Array<string | { id: string; username: string }>

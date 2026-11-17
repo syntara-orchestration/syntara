@@ -16,7 +16,6 @@ describe('buildFormTriggerActivityParameters', () => {
       message: '  Hello  ',
       submit_label: '   ',
       success_message: 'Done',
-      css_override: '',
     })
 
     expect(result).toMatchObject({
@@ -24,7 +23,6 @@ describe('buildFormTriggerActivityParameters', () => {
       success_message: 'Done',
     })
     expect(result).not.toHaveProperty('submit_label')
-    expect(result).not.toHaveProperty('css_override')
     expect(result.form_definition).toBeDefined()
   })
 
