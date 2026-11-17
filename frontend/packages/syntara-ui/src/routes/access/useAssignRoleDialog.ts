@@ -1,5 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query'
 
+import { invalidateAuthzCaches } from '../../hooks/invalidateAuthzCaches'
 import { useSynForm } from '../../hooks/useSynForm'
 import { useAlerts } from '../../providers/alerts'
 import { detachPromise } from '../../utils/detachPromise'
@@ -85,6 +86,10 @@ export function useAssignRoleDialog({ onClose, onSuccess }: UseAssignRoleDialogO
           queryKey: roleAssignmentsQueryKey(data.principalType, principalId),
         })
       )
+      // A new assignment can change the caller's own grants (a deny-bearing
+      // role, or step-author): drop the can_i / node_kinds verdicts like the
+      // edit and delete paths do.
+      invalidateAuthzCaches(queryClient)
       showSuccess({
         title: 'Assignment added',
         description: assignmentAddedDescription(

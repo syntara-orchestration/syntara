@@ -13,6 +13,7 @@ import { useAssignRoleFormQueries } from './useAssignRoleFormQueries'
 const mockShowSuccess = vi.fn()
 const mockOnClose = vi.fn()
 const mockOnSuccess = vi.fn()
+const mockInvalidateAuthzCaches = vi.hoisted(() => vi.fn())
 const mockCreateSystemAssignment = vi.fn()
 const mockCreateProjectAssignment = vi.fn()
 vi.mock('../../providers/alerts', () => ({
@@ -27,6 +28,10 @@ vi.mock('./accessClient', () => ({
 
 vi.mock('./useAssignRoleFormQueries', () => ({
   useAssignRoleFormQueries: vi.fn(),
+}))
+
+vi.mock('../../hooks/invalidateAuthzCaches', () => ({
+  invalidateAuthzCaches: mockInvalidateAuthzCaches,
 }))
 
 function createQueryWrapper() {
@@ -182,6 +187,25 @@ describe('useAssignRoleDialog', () => {
     expect(mockShowSuccess).toHaveBeenCalledWith(expect.objectContaining({ title: 'Assignment added' }))
     expect(mockOnClose).toHaveBeenCalled()
     expect(mockOnSuccess).toHaveBeenCalled()
+  })
+
+  it('invalidates the authz caches so node-kind verdicts refresh after an add', () => {
+    // A new assignment can change the caller's own grants (a deny-bearing
+    // role, or step-author); without invalidation the add-step panel keeps
+    // showing the previous verdicts until a reload.
+    mockCreateProjectAssignment.mockImplementation((_req, { onSuccess }: { onSuccess: () => void }) => {
+      onSuccess()
+    })
+
+    const { result } = renderHook(() => useAssignRoleDialog({ onClose: mockOnClose, onSuccess: mockOnSuccess }), {
+      wrapper: createQueryWrapper(),
+    })
+
+    act(() => {
+      result.current.onSubmit({ ...systemSubmitData, scope: 'project', projectId: 'proj-1' })
+    })
+
+    expect(mockInvalidateAuthzCaches).toHaveBeenCalledTimes(1)
   })
 
   it('does not complete the dialog flow when mutation fails', () => {
