@@ -283,17 +283,20 @@ class TestRowLevelLockContention:
     ) -> None:
         """Verify concurrent drain SELECTs use FOR UPDATE SKIP LOCKED.
 
-        Seeds rows, then fires N concurrent drain SELECTs.  Each drain
-        locks its batch; overlapping drains skip those rows.  After
-        rollback the rows are visible again, so a second wave (NullPool
-        connect stagger longer than the lock hold) can re-read them.
+        Seeds rows, then fires N concurrent drain SELECTs.  Every session
+        is connected before any SELECT, and none roll back until every
+        SELECT has finished, so the locks overlap.  SKIP LOCKED must
+        partition the seeded rows with no duplicates.
         """
         seed_count = 200
         concurrent_drains = 5
         sem = asyncio.Semaphore(MAX_TEST_DB_CONNECTIONS)
         drain_latency = LatencyResult(label="concurrent_drain_skip_locked")
         rows_per_drain: list[int] = []
+        seen_ids: list[UUID] = []
         lock = asyncio.Lock()
+        connected = asyncio.Barrier(concurrent_drains)
+        selected = asyncio.Barrier(concurrent_drains)
 
         seed_result = await seed_audit_outbox(
             audit_worker_perf_session_factory,
@@ -305,19 +308,25 @@ class TestRowLevelLockContention:
         seeded_id_set = set(all_ids)
 
         async def drain_and_count() -> None:
-            async with sem, audit_worker_perf_session_factory() as session:
-                async with measure_latency_async(drain_latency):
-                    result = await session.execute(
-                        _DRAIN_SELECT_SQL,
-                        {"batch": DRAIN_BATCH_SIZE},
-                    )
-                    rows = result.fetchall()
-                seeded_rows = [r for r in rows if r[0] in seeded_id_set]
-                async with lock:
-                    rows_per_drain.append(len(seeded_rows))
-                # Hold the row-lock briefly to force contention for other drains
-                await asyncio.sleep(0.05)
-                await session.rollback()
+            try:
+                async with sem, audit_worker_perf_session_factory() as session:
+                    await connected.wait()
+                    async with measure_latency_async(drain_latency):
+                        result = await session.execute(
+                            _DRAIN_SELECT_SQL,
+                            {"batch": DRAIN_BATCH_SIZE},
+                        )
+                        rows = result.fetchall()
+                    seeded_rows = [r for r in rows if r[0] in seeded_id_set]
+                    async with lock:
+                        rows_per_drain.append(len(seeded_rows))
+                        seen_ids.extend(row[0] for row in seeded_rows)
+                    await selected.wait()
+                    await session.rollback()
+            except BaseException:
+                await connected.abort()
+                await selected.abort()
+                raise
 
         try:
             tasks = [asyncio.create_task(drain_and_count()) for _ in range(concurrent_drains)]
@@ -335,12 +344,16 @@ class TestRowLevelLockContention:
                 drain_p95_ms=round(drain_latency.p95, 3),
             )
 
-            # 200: drains overlapped and SKIP LOCKED partitioned the rows.
-            # 400: two serial waves (AAP-87600) — first wave rollbacks, so the
-            # second legally re-reads the same rows. Harmless; not a product bug.
-            assert total_rows_seen in (seed_count, seed_count * 2), (
+            assert all(count <= DRAIN_BATCH_SIZE for count in rows_per_drain), (
+                f"A drain exceeded the batch size (rows_per_drain={rows_per_drain})"
+            )
+            assert total_rows_seen == seed_count, (
                 f"Drains processed {total_rows_seen} seeded rows (rows_per_drain={rows_per_drain}); "
-                f"expected {seed_count} (overlapping SKIP LOCKED) or {seed_count * 2} (two waves after rollback)"
+                f"overlapping FOR UPDATE SKIP LOCKED should partition all {seed_count} rows once"
+            )
+            assert len(set(seen_ids)) == seed_count, (
+                f"Drains saw {len(set(seen_ids))} distinct seeded rows out of {total_rows_seen} "
+                f"(rows_per_drain={rows_per_drain})"
             )
 
         finally:
