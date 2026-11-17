@@ -76,10 +76,10 @@ Set `APP_EP_CANCELLATION_RECONCILIATION_INTERVAL_SECONDS` to override the defaul
 1800-second interval. PostgreSQL advisory locking prevents overlapping passes
 across worker replicas; failed cycles are retried on the next interval.
 
-Project and workflow deletion capture associated WorkItem IDs before cascading
-execution/activity deletion. After commit, a background task sends `work.delete`
-for those IDs. EP persists deletion intent, cancels active work, and removes its
-record after resource cleanup. EP request failures are logged without undoing
+After project or workflow deletion commits, a background task pages through EP
+WorkItems filtered by `runtime_context[project_id]` or `runtime_context[workflow_id]`
+and sends `work.delete` for each match. EP persists deletion intent, cancels active
+work, and removes its record after resource cleanup. EP request failures are logged without undoing
 AO deletion. There is no AO deletion reconciler; broader execution cleanup,
 including deletion by an age threshold, is separate planned work.
 
