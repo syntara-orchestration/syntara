@@ -179,7 +179,7 @@ describe('useBuilderWorkflowLifecycle', () => {
       createDeps({
         isNew: false,
         workflowId: 'wf-2',
-        workflow: { ...workflow, id: 'wf-2' } as WorkflowWithVersion,
+        workflow: { ...workflow, id: 'wf-2' },
       })
     )
     await waitFor(() => expect(result.current.isWorkflowInitialized).toBe(false))
