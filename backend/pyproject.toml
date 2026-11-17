@@ -155,6 +155,7 @@ Issues = "https://github.com/syntara-orchestration/syntara/issues"
 # Hatchling configuration for multiple modules
 [tool.hatch.build.targets.wheel]
 packages = ["src/syntara"]
+include = ["src/syntara/execution_plane/registry/manifests/*.yaml"]
 
 [tool.hatch.build.targets.sdist]
 only-include = [
