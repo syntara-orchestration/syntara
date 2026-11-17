@@ -117,6 +117,20 @@ describe('SynSelectField', () => {
     await user.click(screen.getByRole('button', { name: 'Submit' }))
 
     expect(await screen.findByText('Project is required')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Project' })).toHaveAccessibleDescription(/Project is required/)
+  })
+
+  it('associates helper text with the select toggle', () => {
+    renderWithForm<FormData>({ schema, defaultValues: { projectId: 'proj-1' } }, ({ control }) => (
+      <SynSelectField
+        name="projectId"
+        control={control}
+        label="Project"
+        options={options}
+        hint="Select the workflow project"
+      />
+    ))
+    expect(screen.getByRole('button', { name: 'Project' })).toHaveAccessibleDescription('Select the workflow project')
   })
 
   it('has no accessibility violations in default state', async () => {

@@ -93,6 +93,7 @@ function buildTriggerFormDefaults(initialData?: Partial<TriggerFormData>): Trigg
 }
 
 type TriggerNodeFormProps = Readonly<{
+  kafkaTriggerId?: string
   onSubmit: (data: TriggerFormData) => void
   initialData?: Partial<TriggerFormData>
   workflowId?: string | null
@@ -273,11 +274,13 @@ function ScheduleIntervalFields({
 // ── Main form fields ─────────────────────────────────────────────────────
 
 function TriggerFormFields({
+  kafkaTriggerId,
   workflowId,
   projectId,
   onHeaderContentChange,
   validationErrors,
 }: Readonly<{
+  kafkaTriggerId?: string
   workflowId?: string | null
   projectId?: string
   onHeaderContentChange?: (content: ReactNode | null) => void
@@ -329,7 +332,7 @@ function TriggerFormFields({
       <input type="hidden" {...register('triggerType')} />
 
       {triggerType === TriggerTypeEnum.EVENT_SUBSCRIBE && (
-        <KafkaSubscribeFields workflowId={workflowId} projectId={projectId} />
+        <KafkaSubscribeFields workflowId={workflowId} projectId={projectId} triggerId={kafkaTriggerId} />
       )}
       {triggerType === TriggerTypeEnum.MANUAL_TRIGGER && (
         <fieldset disabled={isVersionView} className={nodeFormStyles.disabledFieldset}>
@@ -488,6 +491,7 @@ function TriggerNodeFormContent(props: TriggerNodeFormProps) {
       runtimeCredentialId: isKafka ? data.runtimeCredentialId : undefined,
       topic: isKafka ? data.topic : undefined,
       filterExpression: isKafka ? data.filterExpression : undefined,
+      ...(isKafka && { kafkaStart: data.kafkaStart, kafkaGroupId: data.kafkaGroupId }),
       authorizedServiceAccountIds: isWebhookStyle ? data.authorizedServiceAccountIds : undefined,
     }
     props.onSubmit(cleanedData)
@@ -500,6 +504,7 @@ function TriggerNodeFormContent(props: TriggerNodeFormProps) {
     <NodeFormContainer formId="trigger-node-form" onSubmit={form.handleSubmit(handleSubmit)}>
       <SynForm form={form}>
         <TriggerFormFields
+          kafkaTriggerId={props.kafkaTriggerId}
           workflowId={props.workflowId}
           projectId={props.projectId}
           onHeaderContentChange={props.onHeaderContentChange}

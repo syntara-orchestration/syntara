@@ -41,10 +41,12 @@ export function KafkaIntegrationField({
   const errorId = 'kafka-integration-error'
   const changeIntegration = useCallback(
     (value: string) => {
+      if (value === integrationId) return
       setValue('integrationId', value, { shouldDirty: true, shouldValidate: true })
       setValue('runtimeCredentialId', '', { shouldDirty: true, shouldValidate: true })
+      setValue('kafkaGroupId', null, { shouldDirty: true, shouldValidate: true })
     },
-    [setValue]
+    [setValue, integrationId]
   )
   const renderToggle = useCallback(
     (ref: Ref<MenuToggleElement>) => (

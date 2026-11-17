@@ -22,6 +22,150 @@ const data = {
 }
 
 describe('Kafka Subscribe configuration', () => {
+  it('round-trips partial consumption settings and exact CEL through export/import and unrelated edits', () => {
+    const expression = '  true\n && (true || false)  '
+    const trigger = buildKafkaSubscribeTrigger('subscribe', 'Orders', {
+      ...data,
+      filterExpression: expression,
+      kafkaStart: { added_partition_position: 'latest' },
+      kafkaGroupId: 'orders.group_1-2',
+    })
+    const exported = buildWorkflowDefinition({
+      workflowName: 'Orders',
+      workflowDescription: '',
+      activities: [],
+      triggers: [trigger],
+      edges: [],
+    })
+    const imported = parseImportedDefinition(exported).workflowDef.triggers?.[0]
+    if (!imported) throw new Error('Kafka trigger was discarded')
+    const reopened = kafkaSubscribeFormDefaults(imported)
+    const updated = buildKafkaSubscribeTrigger(
+      'subscribe',
+      'Renamed',
+      { ...reopened, inputSchema: '{"type":"object"}' },
+      imported
+    )
+    expect(updated.parameters).toMatchObject({
+      start: { added_partition_position: 'latest' },
+      group_id: 'orders.group_1-2',
+      filter: { expression },
+      input_schema: { type: 'object' },
+    })
+    expect(updated.parameters?.start).not.toHaveProperty('position')
+    expect(updated.parameters?.start).not.toHaveProperty('offset_gap_policy')
+    expect(kafkaSubscribeParameters(reopened)).toMatchObject({
+      start: { added_partition_position: 'latest' },
+      group_id: 'orders.group_1-2',
+    })
+  })
+
+  it.each([undefined, null, 'custom-group'])(
+    'preserves the same-source group %s on credential-only changes',
+    (group) => {
+      const previous = {
+        id: 'subscribe',
+        name: 'Orders',
+        type: TriggerTypeEnum.EVENT_SUBSCRIBE,
+        parameters: {
+          integration_id: integrationId,
+          credential_id: credentialId,
+          topic: data.topic,
+          ...(group !== undefined && { group_id: group }),
+          start: {},
+        },
+      }
+      const updated = buildKafkaSubscribeTrigger(
+        'subscribe',
+        'Orders',
+        { ...kafkaSubscribeFormDefaults(previous), runtimeCredentialId: integrationId },
+        previous
+      )
+      expect(updated.parameters?.group_id).toBe(group)
+      expect(updated.parameters?.start).toEqual({})
+      if (group === undefined) expect(updated.parameters).not.toHaveProperty('group_id')
+    }
+  )
+
+  it.each([{ topic: 'new-topic' }, { integrationId: credentialId }, { integrationId: '' }, { topic: '' }])(
+    'resets a saved group on source change: %j',
+    (change) => {
+      const previous = buildKafkaSubscribeTrigger('subscribe', 'Orders', {
+        ...data,
+        kafkaStart: { offset_gap_policy: 'fail' },
+        kafkaGroupId: 'saved-group',
+      })
+      const updated = buildKafkaSubscribeTrigger(
+        'subscribe',
+        'Orders',
+        { ...kafkaSubscribeFormDefaults(previous), ...change, kafkaGroupId: undefined },
+        previous
+      )
+      expect(updated.parameters).toMatchObject({ start: { offset_gap_policy: 'fail' }, group_id: null })
+    }
+  )
+
+  it('allows an explicitly chosen different group for a replacement source and normalizes a cleared group', () => {
+    const previous = buildKafkaSubscribeTrigger('subscribe', 'Orders', { ...data, kafkaGroupId: 'saved-group' })
+    expect(
+      buildKafkaSubscribeTrigger(
+        'subscribe',
+        'Orders',
+        { ...data, topic: 'new-topic', kafkaGroupId: 'replacement-group' },
+        previous
+      ).parameters?.group_id
+    ).toBe('replacement-group')
+    // Preserve explicit input so publication can report a group-uniqueness conflict.
+    expect(
+      buildKafkaSubscribeTrigger(
+        'subscribe',
+        'Orders',
+        { ...data, topic: 'new-topic', kafkaGroupId: 'saved-group' },
+        previous
+      ).parameters?.group_id
+    ).toBe('saved-group')
+    expect(
+      buildKafkaSubscribeTrigger('subscribe', 'Orders', { ...data, kafkaGroupId: '' }, previous).parameters?.group_id
+    ).toBeNull()
+  })
+
+  it('does not serialize registration-only undefined policies', () => {
+    expect(
+      buildKafkaSubscribeTrigger('subscribe', 'Orders', {
+        ...data,
+        kafkaStart: { position: undefined, added_partition_position: undefined, offset_gap_policy: undefined },
+      }).parameters
+    ).not.toHaveProperty('start')
+  })
+
+  it.each(['bad group', 'group/', 'équipe', '${group}', 'a'.repeat(513), ' '])(
+    'rejects an invalid consumer group: %s',
+    (kafkaGroupId) => {
+      const result = triggerFormSchema.safeParse({ ...data, kafkaGroupId })
+      expect(result.success).toBe(false)
+      if (!result.success)
+        expect(result.error.issues).toContainEqual(expect.objectContaining({ path: ['kafkaGroupId'] }))
+    }
+  )
+
+  it.each(['', null, undefined, 'group_1-A.B', 'a'.repeat(512)])(
+    'accepts a supported optional consumer group: %s',
+    (kafkaGroupId) => {
+      expect(triggerFormSchema.safeParse({ ...data, kafkaGroupId }).success).toBe(true)
+    }
+  )
+
+  it.each([
+    { position: 'inherit' },
+    { added_partition_position: 'inherit' },
+    { offset_gap_policy: 'inherit' },
+    { position: null },
+    { added_partition_position: null },
+    { offset_gap_policy: null },
+  ])('rejects unsupported reading policies: %j', (kafkaStart) => {
+    expect(triggerFormSchema.safeParse({ ...data, kafkaStart }).success).toBe(false)
+  })
+
   it('matches backend Unicode whitespace normalization without dropping a non-empty BOM', () => {
     expect(hasKafkaFilterExpression('\u0085\u001c\u001d\u001e\u001f')).toBe(false)
     expect(hasKafkaFilterExpression('\uFEFF')).toBe(true)
