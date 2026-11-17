@@ -16,8 +16,9 @@ from syntara.approvals.services.approval_service import ApprovalService
 from syntara.audit.decorators import audit
 from syntara.audit.models.audit_event import EventCategory
 from syntara.auth import get_current_user
-from syntara.authz.dependencies import PermissionChecker, VisibilityFilter
+from syntara.authz.dependencies import PermissionChecker, VisibilityFilter, get_authz_evaluator
 from syntara.authz.engine import AllowedProjectsResult, VisibilityResult
+from syntara.authz.evaluator import AuthzEvaluator
 from syntara.authz.exceptions import PolicyNotFoundError, RoleNotFoundError
 from syntara.authz.role_assignment_router import (
     ProjectRoleAssignmentListParams,
@@ -65,6 +66,7 @@ from syntara.projects.schemas import (
 )
 from syntara.projects.service import ProjectService
 from syntara.workflows.models import WorkflowListParams
+from syntara.workflows.models.node_permission import WorkflowWriteForbiddenProblemDetail
 from syntara.workflows.models.workflow import WorkflowListResponse
 from syntara.workflows.services import WorkflowService
 
@@ -101,9 +103,10 @@ _perm_credential_delete = PermissionChecker("credential", "delete", project_para
 def get_project_service(
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
+    evaluator: Annotated[AuthzEvaluator, Depends(get_authz_evaluator)],
 ) -> ProjectService:
     """Dependency provider for ProjectService."""
-    return ProjectService(db, current_user)
+    return ProjectService(db, current_user, evaluator)
 
 
 def get_role_service(
@@ -255,6 +258,7 @@ async def replace_project(
     dependencies=[Depends(_perm_project_delete)],
     operation_id="delete_project",
     response_description="Project deleted",
+    responses={403: {"model": WorkflowWriteForbiddenProblemDetail, "description": "Forbidden"}},
 )
 @audit(EventCategory.USER_ACTION, event_action="project_delete", capture_args={"project_id"})
 async def delete_project(

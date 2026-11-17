@@ -14,7 +14,7 @@ import contextlib
 import sys
 from collections.abc import AsyncGenerator, Generator
 from pathlib import Path
-from typing import Any, NamedTuple
+from typing import NamedTuple
 from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID, uuid4
 
@@ -228,9 +228,14 @@ def _mock_evaluator_allow_all(monkeypatch: pytest.MonkeyPatch) -> None:
     under ``tests/integration/api/`` (those use the CLI-based mock).
     The ``api`` conftest's ``_mock_evaluator`` fixture overrides this one for
     tests in that directory because pytest uses the most-specific conftest.
+
+    The mock is installed on ``app.state.authz_evaluator`` — the single place
+    ``get_authz_evaluator`` reads — and never via ``app.dependency_overrides``:
+    client fixtures snapshot and restore the whole overrides dict around each
+    test, and a stale snapshot resurrecting an evaluator entry mid-request made
+    workflow writes evaluate against the real rego policy (flaky 403s).
     """
     from syntara.api.main import app
-    from syntara.authz.dependencies import get_authz_evaluator
 
     mock_evaluator = AsyncMock()
     mock_evaluator.evaluate = MagicMock(
@@ -242,14 +247,7 @@ def _mock_evaluator_allow_all(monkeypatch: pytest.MonkeyPatch) -> None:
         }
     )
 
-    def _mock_getter(request: Any = None) -> AsyncMock:  # noqa: ANN401
-        return mock_evaluator
-
-    monkeypatch.setattr("syntara.authz.dependencies.get_authz_evaluator", _mock_getter)
-    monkeypatch.setattr("syntara.authz.dependencies.get_authz_evaluator", _mock_getter)
-    monkeypatch.setattr("syntara.workflows.executions_router.get_authz_evaluator", _mock_getter)
-
-    app.dependency_overrides[get_authz_evaluator] = lambda: mock_evaluator
+    monkeypatch.setattr(app.state, "authz_evaluator", mock_evaluator, raising=False)
 
 
 @pytest.fixture

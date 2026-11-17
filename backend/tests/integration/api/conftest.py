@@ -19,7 +19,6 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from syntara.api.main import app
 from syntara.auth.dependencies import get_current_user
-from syntara.authz.dependencies import get_authz_evaluator
 from syntara.authz.evaluator import evaluate_policy_input
 from syntara.authz.models import Project, RoleAssignment
 from syntara.authz.seed import seed_authz_data
@@ -216,22 +215,17 @@ async def test_project_id(test_db_session: AsyncSession) -> str:
 
 @pytest.fixture(autouse=True)
 def _mock_evaluator(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Replace the authz evaluator with one that uses regopy directly."""
+    """Replace the authz evaluator with one that uses regopy directly.
+
+    Swaps ``app.state.authz_evaluator`` — the single place
+    ``get_authz_evaluator`` reads — which covers both ``Depends(...)`` and
+    module-level call sites. See the root integration conftest for why the
+    evaluator must not be installed via ``app.dependency_overrides``.
+    """
     mock_evaluator = AsyncMock()
     mock_evaluator.evaluate = MagicMock(side_effect=_opa_evaluate_cli)
 
-    def _mock_getter(request: Any = None) -> AsyncMock:  # noqa: ANN401
-        return mock_evaluator
-
-    monkeypatch.setattr("syntara.authz.dependencies.get_authz_evaluator", _mock_getter)
-    monkeypatch.setattr("syntara.authz.dependencies.get_authz_evaluator", _mock_getter)
-    monkeypatch.setattr("syntara.authz.router.get_authz_evaluator", _mock_getter)
-    monkeypatch.setattr("syntara.authz.role_assignment_router.get_authz_evaluator", _mock_getter)
-    monkeypatch.setattr("syntara.workflows.executions_router.get_authz_evaluator", _mock_getter)
-
-    # Also override via FastAPI dependency_overrides so Depends(...) resolves correctly.
-    app.dependency_overrides[get_authz_evaluator] = lambda: mock_evaluator
-    app.dependency_overrides[get_authz_evaluator] = lambda: mock_evaluator
+    monkeypatch.setattr(app.state, "authz_evaluator", mock_evaluator, raising=False)
 
 
 def mcp_payload(name: str | None = None, scope: str = "global") -> dict[str, object]:

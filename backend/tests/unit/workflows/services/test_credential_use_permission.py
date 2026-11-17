@@ -216,6 +216,7 @@ class TestPublishWorkflowVersionCredentialCheck:  # noqa: D101
 
         with (
             patch.object(svc, "_get_workflow_for_update", return_value=mock_workflow),
+            patch.object(svc, "_check_node_kind_write_permission", new_callable=AsyncMock),
             patch.object(svc, "_check_expected_version"),
             patch.object(svc, "_get_version_or_none", return_value=mock_version),
             patch("syntara.workflows.services.workflow_service.workflow_validator", mock_validator),
