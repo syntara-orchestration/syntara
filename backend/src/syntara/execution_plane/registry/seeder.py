@@ -39,10 +39,12 @@ def _load_manifest(filename: str, expected_name: str) -> dict[str, Any]:
     contents = files("syntara.execution_plane.registry.manifests").joinpath(filename).read_text(encoding="utf-8")
     manifest = yaml.safe_load(contents)
     if not isinstance(manifest, dict) or manifest.get("kind") != "Action":
-        raise ValueError(f"Packaged plugin manifest {filename!r} is not an Action")
+        message = f"Packaged plugin manifest {filename!r} is not an Action"
+        raise ValueError(message)
     metadata = manifest.get("metadata")
     if not isinstance(metadata, dict) or metadata.get("name") != expected_name:
-        raise ValueError(f"Packaged plugin manifest {filename!r} has the wrong Action name")
+        message = f"Packaged plugin manifest {filename!r} has the wrong Action name"
+        raise ValueError(message)
     return manifest
 
 
