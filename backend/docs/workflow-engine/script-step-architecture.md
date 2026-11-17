@@ -10,6 +10,17 @@ Please assess whether the isolation and controls below are sufficient for runnin
 
 This document is intentionally limited to Script execution. It does not restate the full AO or EP architecture.
 
+## Review at a glance
+
+**Security question:** Are the proposed controls sufficient to run customer-provided Python and Bash in a per-attempt OpenShift Pod?
+
+Product Security is asked to decide:
+
+- Whether the restricted Pod is an adequate isolation boundary for arbitrary scripts, or stronger isolation is required.
+- Whether customer-cluster egress controls and CNI validation provide an acceptable network boundary.
+- Whether the separation of cluster credentials, workload credentials, service secrets, and script output is sufficient.
+- Which image provenance, gRPC transport, resource, cancellation, retry, and cleanup controls must block release.
+
 ## Script execution flow
 
 ```mermaid
