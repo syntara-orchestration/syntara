@@ -11,12 +11,13 @@ from fastapi import APIRouter, FastAPI
 from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from syntara.api.main import lifespan
+from syntara.api.main import app, lifespan
 from syntara.audit.dispatcher import AuditEventDispatcher
 from syntara.audit.logging import AUDIT_LOGGER_NAME
 from syntara.audit.outbox import session as outbox_session
 from syntara.audit.outbox import worker as outbox_worker
 from syntara.audit.outbox.session import AuditWorkerAsyncSessionLocal
+from syntara.authz import resource_actions
 from syntara.core.database.session import AsyncSessionLocal
 from syntara.core.logging import lifecycle as logging_lifecycle
 
@@ -101,8 +102,40 @@ async def _test_lifespan_context(test_db_engine: AsyncEngine) -> AsyncGenerator[
         # Run the lifespan on a throwaway app so router (re-)registration and
         # app.state writes stay away from the app shared with other tests.
         lifespan_app = FastAPI(lifespan=lifespan)
-        async with lifespan_app.router.lifespan_context(lifespan_app):
-            yield
+        saved_route_count = len(app.routes)
+        saved_registry = (
+            resource_actions._registry,
+            resource_actions._all_pairs,
+            resource_actions._project_eligible,
+        )
+        try:
+            async with lifespan_app.router.lifespan_context(lifespan_app):
+                yield
+        finally:
+            # Startup still calls build_resource_actions() on the throwaway
+            # app; with discovery stubbed out that installs a near-empty
+            # registry in the process-global holder (project_eligible shrinks
+            # to {"project"}), which later tests on this worker would read via
+            # policy validation and the project_eligible filter. Restore the
+            # pre-startup registry, mirroring the fixture in
+            # tests/integration/authz/conftest.py.
+            (
+                resource_actions._registry,
+                resource_actions._all_pairs,
+                resource_actions._project_eligible,
+            ) = saved_registry
+
+        # Regression guard: the lifespan must not leak process-global route or
+        # registry state into later tests on this worker. A future rename or
+        # lazy import in main.py that reintroduces the poisoning — or drops
+        # the restore above — should fail here rather than silently break
+        # unrelated tests.
+        assert len(app.routes) == saved_route_count, "app lifespan must not (de)register routes on the shared app"
+        assert (
+            resource_actions._registry,
+            resource_actions._all_pairs,
+            resource_actions._project_eligible,
+        ) == saved_registry, "app lifespan must not overwrite the resource-actions registry"
 
 
 @pytest.mark.asyncio
