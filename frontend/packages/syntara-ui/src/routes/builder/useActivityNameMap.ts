@@ -101,11 +101,17 @@ function buildDefinitionNameMap(def: WorkflowDefShape | null | undefined): {
   nameMap: Map<string, string>
   typeMap: Map<string, string>
 } {
+  const fromTriggers = buildNameMap(def?.triggers)
   const fromActivities = buildNameMap(def?.workflow?.activities)
   const fromNodes = buildNameMap(def?.nodes)
-  if (fromNodes.nameMap.size === 0) return fromActivities
-  const mergedNames = new Map(fromActivities.nameMap)
-  const mergedTypes = new Map(fromActivities.typeMap)
+  const mergedNames = new Map(fromTriggers.nameMap)
+  const mergedTypes = new Map(fromTriggers.typeMap)
+  for (const [id, name] of fromActivities.nameMap) {
+    mergedNames.set(id, name)
+  }
+  for (const [id, type] of fromActivities.typeMap) {
+    mergedTypes.set(id, type)
+  }
   for (const [id, name] of fromNodes.nameMap) {
     mergedNames.set(id, name)
   }
@@ -273,7 +279,13 @@ export function useActivityNameMap(
   const { nameMap, typeMap } = useMemo(() => {
     const hasStoreData = (storeActivities && storeActivities.length > 0) || (storeTriggers && storeTriggers.length > 0)
     if (hasStoreData) {
-      return buildStoreNameMap(storeActivities ?? [], storeTriggers ?? [])
+      const fromStore = buildStoreNameMap(storeActivities ?? [], storeTriggers ?? [])
+      const fromDefinition = buildDefinitionNameMap(workflowDefinition)
+      const mergedTypes = new Map(fromDefinition.typeMap)
+      for (const [id, type] of fromStore.typeMap) {
+        mergedTypes.set(id, type)
+      }
+      return { nameMap: fromStore.nameMap, typeMap: mergedTypes }
     }
     return buildDefinitionNameMap(workflowDefinition)
   }, [storeActivities, storeTriggers, workflowDefinition])

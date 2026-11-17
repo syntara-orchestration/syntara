@@ -579,6 +579,13 @@ def _retry_selection_reason(
     overrides: dict[str, dict[str, Any]],
 ) -> tuple[str | None, list[str], list[str], list[str]]:
     """Apply selection guards and return the reported points and sanitized nodes."""
+    reason = _state_reason(source) or _selection_reason(normalized, failed_ids, replacement_ids)
+    if reason is not None:
+        # Do not report sanitized nodes for a request that cannot be retried
+        # because of its state or selection. In particular, the version scan
+        # below may otherwise populate unrelated replacement UI on a rejection.
+        return reason, normalized, [], []
+
     version_reason, sanitized, auto_included, final_selection = _version_reason(
         normalized,
         snapshot,
@@ -586,12 +593,7 @@ def _retry_selection_reason(
         successors,
         sanitized_expansion_seeds=(None if is_default_selection else set(normalized) & replacement_ids),
     )
-    reason = (
-        _state_reason(source)
-        or _selection_reason(normalized, failed_ids, replacement_ids)
-        or _converge_reason(snapshot_def, normalized, completed_ids, successors)
-        or version_reason
-    )
+    reason = _converge_reason(snapshot_def, normalized, completed_ids, successors) or version_reason
     if reason is None:
         reported_selection = sorted(
             _eligible_points(

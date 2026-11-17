@@ -230,7 +230,6 @@ export class ExecutionStateEnricher {
           completed_at: activityState.completedAt ?? undefined,
           error_details: activityState.errorDetails ?? undefined,
           replayed: isReplayedStep(activityState.startedAt, replayBaselineAt, activityState.status, {
-            outputData: activityState.outputData,
             nodeType: activity.type,
           }),
           retainedFailure: isRetainedFailure(

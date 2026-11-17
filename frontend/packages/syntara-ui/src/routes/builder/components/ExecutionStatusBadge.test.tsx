@@ -164,14 +164,6 @@ describe('ExecutionStatusBadge', () => {
       expect(badge).not.toHaveAttribute('data-replayed')
     })
 
-    it('includes retained failure and reused output when both apply', () => {
-      render(<ExecutionStatusBadge status="failed" retainedFailure replayed />)
-
-      const badge = screen.getByLabelText('Error — Retained failure — reused output from a previous run')
-      expect(badge).toHaveAttribute('data-retained-failure')
-      expect(badge).toHaveAttribute('data-replayed')
-    })
-
     it('identifies reused trigger input without claiming the output was reused', () => {
       render(<ExecutionStatusBadge status="completed" triggerInputReused />)
 

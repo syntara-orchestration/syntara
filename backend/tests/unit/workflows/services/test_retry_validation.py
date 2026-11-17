@@ -227,6 +227,42 @@ async def test_validate_retry_rejects_sanitized_upstream_output() -> None:
 
 
 @pytest.mark.asyncio
+async def test_invalid_execution_state_does_not_report_sanitized_retry_nodes() -> None:
+    execution = _make_execution(ExecutionStatus.RUNNING)
+    ref_nodes = [
+        dict(node, parameters={**node.get("parameters", {}), "input_ref": "${step_1.token}"})
+        if node["id"] == "step_2"
+        else node
+        for node in NODES
+    ]
+    session = _field_session(execution, ref_nodes, [_make_completed_activity("step_1", {"token": "[REDACTED]"})])
+
+    verdict = await validate_retry_from_failure(session, execution.id, ["step_2"])
+
+    assert verdict.eligible is False
+    assert "running" in (verdict.reason or "")
+    assert verdict.sanitized_node_ids == []
+
+
+@pytest.mark.asyncio
+async def test_invalid_selection_does_not_report_sanitized_retry_nodes() -> None:
+    execution = _make_execution(ExecutionStatus.FAILED)
+    ref_nodes = [
+        dict(node, parameters={**node.get("parameters", {}), "input_ref": "${step_1.token}"})
+        if node["id"] in {"step_2", "step_3"}
+        else node
+        for node in NODES
+    ]
+    session = _field_session(execution, ref_nodes, [_make_completed_activity("step_1", {"token": "[REDACTED]"})])
+
+    verdict = await validate_retry_from_failure(session, execution.id, ["step_3"])
+
+    assert verdict.eligible is False
+    assert "not failed nodes" in (verdict.reason or "")
+    assert verdict.sanitized_node_ids == []
+
+
+@pytest.mark.asyncio
 async def test_override_cannot_bypass_sanitized_guard() -> None:
     """A fresh-value override must not suppress the sanitized-output rejection.
 

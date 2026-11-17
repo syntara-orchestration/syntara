@@ -5,10 +5,9 @@
  * The retry engine records a replayed completed step with the *source* run's
  * `started_at` / `completed_at`, so a completed step whose start precedes the
  * retry execution's own creation never ran in that execution — it reused the
- * source run's output. A retained failure can also have reusable partial
- * output; only mark it when that output is present. The retry endpoint also
- * re-validates independently, so this is a display-only signal and never gates
- * behaviour.
+ * source run's output. Retained failures keep their failure marker but are not
+ * labeled as reused output. The retry endpoint also re-validates independently,
+ * so this is a display-only signal and never gates behaviour.
  */
 
 import { TriggerTypeEnum } from '@syntara/contracts'
@@ -19,6 +18,10 @@ const TRIGGER_TYPES = new Set<string>(Object.values(TriggerTypeEnum))
 
 function isTriggerNodeType(nodeType: string | null | undefined): boolean {
   return nodeType != null && TRIGGER_TYPES.has(nodeType)
+}
+
+function isNonTriggerNodeType(nodeType: string | null | undefined): nodeType is string {
+  return nodeType != null && !isTriggerNodeType(nodeType)
 }
 
 function predatesRetry(startedAt: string | null | undefined, replayBaselineAt: string | null | undefined): boolean {
@@ -44,26 +47,23 @@ export function resolveRetryReplayBaseline(
 }
 
 /**
- * Whether a step reused output from a previous run rather than running.
+ * Whether a step reused a previous run's successful output rather than running.
  *
- * Returns `false` whenever the answer is not provable — no baseline, no start
- * time (the step has not run yet), an unparseable timestamp, or a status that
- * cannot have restored output. A failed step needs nonempty output data because
- * it can be retained with partial output.
+ * Returns `false` whenever the answer is not provable — no node type, no
+ * baseline, no start time (the step has not run yet), an unparseable timestamp,
+ * or a status other than completed. A retained failure is not labeled as reused
+ * output.
  */
 export function isReplayedStep(
   startedAt: string | null | undefined,
   replayBaselineAt: string | null | undefined,
   status: string | null | undefined,
-  options?: { outputData?: Record<string, unknown> | null; nodeType?: string | null }
+  options?: { nodeType?: string | null }
 ): boolean {
-  const { outputData, nodeType } = options ?? {}
-  if (isTriggerNodeType(nodeType)) return false
+  const { nodeType } = options ?? {}
+  if (!isNonTriggerNodeType(nodeType)) return false
 
-  const hasReusableStatus =
-    status === ACTIVITY_STATUS.COMPLETED ||
-    (status === ACTIVITY_STATUS.FAILED && outputData != null && Object.keys(outputData).length > 0)
-  if (!hasReusableStatus) return false
+  if (status !== ACTIVITY_STATUS.COMPLETED) return false
 
   return predatesRetry(startedAt, replayBaselineAt)
 }
@@ -74,7 +74,7 @@ export function isReusedTriggerInput(
   replayBaselineAt: string | null | undefined,
   nodeType?: string | null
 ): boolean {
-  return isTriggerNodeType(nodeType) && predatesRetry(startedAt, replayBaselineAt)
+  return nodeType != null && isTriggerNodeType(nodeType) && predatesRetry(startedAt, replayBaselineAt)
 }
 
 /** Classify the retry markers for an activity row or canvas node. */
@@ -89,9 +89,9 @@ export function getRetryActivityMarkers(
   replayBaselineAt: string | null | undefined,
   nodeType?: string | null
 ): { replayed: boolean; retainedFailure: boolean; triggerInputReused: boolean } {
-  const { startedAt, status, outputData } = state ?? {}
+  const { startedAt, status } = state ?? {}
   return {
-    replayed: isReplayedStep(startedAt, replayBaselineAt, status, { outputData, nodeType }),
+    replayed: isReplayedStep(startedAt, replayBaselineAt, status, { nodeType }),
     retainedFailure: isRetainedFailure(startedAt, replayBaselineAt, status, nodeType),
     triggerInputReused: isReusedTriggerInput(startedAt, replayBaselineAt, nodeType),
   }
@@ -104,5 +104,7 @@ export function isRetainedFailure(
   status: string | null | undefined,
   nodeType?: string | null
 ): boolean {
-  return status === ACTIVITY_STATUS.FAILED && !isTriggerNodeType(nodeType) && predatesRetry(startedAt, replayBaselineAt)
+  return (
+    isNonTriggerNodeType(nodeType) && status === ACTIVITY_STATUS.FAILED && predatesRetry(startedAt, replayBaselineAt)
+  )
 }

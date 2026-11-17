@@ -1,3 +1,4 @@
+import { ActivityTypeEnum } from '@syntara/contracts'
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
@@ -60,7 +61,7 @@ describe('ExecutionActivityTable', () => {
     it('shows formatted dates and elapsed for completed activity', () => {
       renderTable({
         states: new Map([state('task-1', { status: 'completed', startedAt: T0, completedAt: T2 })]),
-        order: [{ id: 'task-1', name: 'Task' }],
+        order: [{ id: 'task-1', name: 'Task', type: ActivityTypeEnum.SCRIPT }],
       })
 
       expect(screen.getByText('1m 0s')).toBeInTheDocument()
@@ -120,7 +121,7 @@ describe('ExecutionActivityTable', () => {
     it('marks a row replayed when its start predates the retry baseline', () => {
       renderTable({
         states: new Map([state('task-1', { status: 'completed', startedAt: T0 })]),
-        order: [{ id: 'task-1', name: 'Task' }],
+        order: [{ id: 'task-1', name: 'Task', type: ActivityTypeEnum.SCRIPT }],
         replayBaselineAt: T2,
       })
 
@@ -130,7 +131,7 @@ describe('ExecutionActivityTable', () => {
     it('does not mark a retained failure without output as replayed', () => {
       renderTable({
         states: new Map([state('task-1', { status: 'failed', startedAt: T0 })]),
-        order: [{ id: 'task-1', name: 'Script' }],
+        order: [{ id: 'task-1', name: 'Script', type: ActivityTypeEnum.SCRIPT }],
         replayBaselineAt: T2,
       })
 
@@ -140,7 +141,7 @@ describe('ExecutionActivityTable', () => {
     it('does not mark a row replayed when there is no retry baseline', () => {
       renderTable({
         states: new Map([state('task-1', { status: 'completed', startedAt: T0 })]),
-        order: [{ id: 'task-1', name: 'Task' }],
+        order: [{ id: 'task-1', name: 'Task', type: ActivityTypeEnum.SCRIPT }],
       })
 
       expect(screen.queryByTestId('activity-status-label-replayed')).not.toBeInTheDocument()

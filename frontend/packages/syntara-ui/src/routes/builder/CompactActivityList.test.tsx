@@ -1,3 +1,4 @@
+import { ActivityTypeEnum } from '@syntara/contracts'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
@@ -21,7 +22,10 @@ function state(id: string, overrides: Partial<ActivityState> = {}): [string, Act
   return [id, { activityId: id, status: 'pending', ...overrides }]
 }
 
-const order: ActivityOrderItem[] = [{ id: 'task-1', name: 'Fetch Data' }, { id: 'task-2' }]
+const order: ActivityOrderItem[] = [
+  { id: 'task-1', name: 'Fetch Data', type: ActivityTypeEnum.SCRIPT },
+  { id: 'task-2', type: ActivityTypeEnum.SCRIPT },
+]
 
 const states = new Map([
   state('task-1', { status: 'completed', startedAt: '2024-01-01T00:00:00Z', completedAt: '2024-01-01T00:01:00Z' }),
@@ -115,7 +119,7 @@ describe('CompactActivityList', () => {
     render(
       <CompactActivityList
         activityStates={new Map([state('task-1', { status: 'failed', startedAt: '2024-01-01T00:00:00Z' })])}
-        activityOrder={[{ id: 'task-1', name: 'Script' }]}
+        activityOrder={[{ id: 'task-1', name: 'Script', type: ActivityTypeEnum.SCRIPT }]}
         replayBaselineAt="2024-01-02T00:00:00Z"
       />
     )
