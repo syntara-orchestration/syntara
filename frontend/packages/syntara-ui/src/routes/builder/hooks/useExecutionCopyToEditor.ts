@@ -13,6 +13,7 @@ export type ExecutionCopyData = {
 
 type UseExecutionCopyToEditorOptions = {
   executionCopy: ExecutionCopyData | undefined
+  isWorkflowInitialized: boolean
   dispatch: Dispatch<BuilderAction>
   markDirty: () => void
   showSuccess: (alert: { title: string; description?: string }) => void
@@ -20,6 +21,7 @@ type UseExecutionCopyToEditorOptions = {
 
 export function useExecutionCopyToEditor({
   executionCopy,
+  isWorkflowInitialized,
   dispatch,
   markDirty,
   showSuccess,
@@ -28,7 +30,7 @@ export function useExecutionCopyToEditor({
   const currentWorkflow = useWorkflowStore((s) => s.currentWorkflow)
 
   useEffect(() => {
-    if (!executionCopy || hasAppliedRef.current || !currentWorkflow) return
+    if (!executionCopy || hasAppliedRef.current || !currentWorkflow || !isWorkflowInitialized) return
     hasAppliedRef.current = true
 
     let copiedRunActivityIds: string[] | undefined
@@ -65,5 +67,5 @@ export function useExecutionCopyToEditor({
     url.searchParams.delete('fromExecution')
     url.searchParams.delete('linkExecution')
     window.history.replaceState({}, '', url.pathname + url.search)
-  }, [executionCopy, currentWorkflow, dispatch, markDirty, showSuccess])
+  }, [executionCopy, currentWorkflow, isWorkflowInitialized, dispatch, markDirty, showSuccess])
 }
