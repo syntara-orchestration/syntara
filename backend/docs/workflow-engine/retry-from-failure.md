@@ -96,10 +96,10 @@ activity results retained outside those paths. These counts come from graph
 reachability in the retained definition; they describe workflow nodes, not
 Temporal activity attempts.
 
-Activity IDs for loop iterations are normalized to their base node IDs during
-validation. Callers select a node, not an individual iteration. The workflow
-engine later matches source activity state using the full Temporal activity ID
-for the applicable loop iteration.
+Iteration-suffixed activity IDs (e.g. `my-node#iter-2`) are rejected by
+validation with an error asking the caller to supply the base node ID instead
+(e.g. `my-node`). Callers must always select the base node; the workflow engine
+resolves which loop iteration to replay internally.
 
 ## Workflow replay and scheduling
 
@@ -184,11 +184,11 @@ failure is non-fatal to execution creation.
 | Eligibility, graph closure, redaction checks, and counts | `backend/src/syntara/workflows/services/retry_validation.py` |
 | Retained-version lookup, retry metadata, execution creation, metrics, audit dispatch | `backend/src/syntara/workflows/services/execution_service.py` |
 | Request and preview response models; retry kind | `backend/src/syntara/workflows/models/execution.py` |
-| Source state reads and per-node replay records | `backend/src/syntara/workflows/workflow_engine/activities/retry_node_replay_activity.py` |
-| Retry graph classification, state restoration, and input overrides | `backend/src/syntara/workflows/workflow_engine/retry_mixin.py` |
-| Workflow initialization and retry-specific routing | `backend/src/syntara/workflows/workflow_engine/dynamic_workflow.py` and `converge_mixin.py` |
-| Replayed activity status and timestamp synchronization | `backend/src/syntara/workflows/workflow_engine/services/activity_execution_sync.py` and `activity_sync_monitor.py` |
-| Loop identity normalization | `backend/src/syntara/workflows/utils/loop_iteration_names.py` and `backend/src/syntara/workflows/workflow_engine/utils/loop_iteration_ids.py` |
+| Source state reads and per-node replay records | `backend/src/syntara/workflow_runtime/engines/temporal/activities/retry_node_replay_activity.py` |
+| Retry graph classification, state restoration, and input overrides | `backend/src/syntara/workflow_runtime/engines/temporal/retry_mixin.py` |
+| Workflow initialization and retry-specific routing | `backend/src/syntara/workflow_runtime/engines/temporal/dynamic_workflow.py` and `converge_mixin.py` |
+| Replayed activity status and timestamp synchronization | `backend/src/syntara/workflow_runtime/engines/temporal/services/activity_execution_sync.py` and `activity_sync_monitor.py` |
+| Loop identity normalization | `backend/src/syntara/workflows/utils/loop_iteration_names.py` and `backend/src/syntara/workflow_runtime/engines/temporal/utils/loop_iteration_ids.py` |
 | Retry request metrics | `backend/src/syntara/metrics/recorder.py` and `prometheus.py` |
 | Retry request audit and telemetry | `backend/src/syntara/workflows/audit/retry_requested.py` and `backend/src/syntara/telemetry/handlers/workflow_retry_requested.py` |
 
