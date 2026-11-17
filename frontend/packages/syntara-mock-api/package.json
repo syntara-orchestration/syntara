@@ -16,16 +16,16 @@
     "@mswjs/http-middleware": "^0.10.3",
     "@syntara/contracts": "file:../syntara-contracts",
     "jmespath": "^0.16.0",
-    "js-yaml": "^5.4.2",
-    "msw": "^3.0.1",
+    "js-yaml": "^5.5.0",
+    "msw": "^3.0.4",
     "tsx": "^4.23.15",
-    "uuid": "^14.0.2"
+    "uuid": "^14.0.3"
   },
   "devDependencies": {
     "@types/js-yaml": "^4.0.9",
-    "@types/node": "^25.6.0",
-    "eslint": "^10.11.0",
-    "typescript-eslint": "^8.71.0",
-    "vitest": "^5.0.3"
+    "@types/node": "^25.9.9",
+    "eslint": "^10.14.0",
+    "typescript-eslint": "^8.72.1",
+    "vitest": "^5.1.0"
   }
 }
