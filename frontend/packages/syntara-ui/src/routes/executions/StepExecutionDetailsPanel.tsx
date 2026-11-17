@@ -303,27 +303,28 @@ function StepDetailsHeader({
         )}
       </Flex>
       {(startedAt || completedAt || elapsedLabel) && (
-        <Stack className={styles.stepTiming}>
+        <Flex
+          className={styles.stepTiming}
+          gap={{ default: 'gapMd' }}
+          alignItems={{ default: 'alignItemsBaseline' }}
+          flexWrap={{ default: 'nowrap' }}
+        >
           {startedAt && (
-            <StackItem>
-              <Content component={ContentVariants.small}>
-                Started: <ExecutionTimestamp dateString={startedAt} />
-              </Content>
-            </StackItem>
+            <Content component={ContentVariants.small} className={styles.stepTimingItem}>
+              Started: <ExecutionTimestamp dateString={startedAt} />
+            </Content>
           )}
           {completedAt && (
-            <StackItem>
-              <Content component={ContentVariants.small}>
-                Completed: <ExecutionTimestamp dateString={completedAt} />
-              </Content>
-            </StackItem>
+            <Content component={ContentVariants.small} className={styles.stepTimingItem}>
+              Completed: <ExecutionTimestamp dateString={completedAt} />
+            </Content>
           )}
           {elapsedLabel && (
-            <StackItem>
-              <Content component={ContentVariants.small}>Elapsed time: {elapsedLabel}</Content>
-            </StackItem>
+            <Content component={ContentVariants.small} className={styles.stepTimingItem}>
+              Elapsed time: {elapsedLabel}
+            </Content>
           )}
-        </Stack>
+        </Flex>
       )}
     </StackItem>
   )

@@ -11,6 +11,7 @@ import type { SemanticZoomBranchSource } from '../../routes/workflows/canvas/sem
 import { STEP_TYPE_COLORS } from '../../routes/workflows/canvas/stepTypeColors'
 import type { ActivityStatus } from '../../routes/workflows/execution/types'
 import { ReplayedOutputBadge } from '../labels/ReplayedOutputBadge'
+import { SynLabel } from '../labels/SynLabel'
 import { SynPanel } from '../layout/SynPanel'
 
 import stepStyles from './SynStep.module.css'
@@ -108,13 +109,9 @@ function StepBottomBadge({
       )}
       {showTriggerInput && (
         <StackItem>
-          <Label
-            isCompact
-            icon={<RhUiHistoryIcon />}
-            title="The trigger ran again with input from the source run; its output was generated in this retry."
-          >
+          <SynLabel variant="outline" icon={<RhUiHistoryIcon />}>
             Reused trigger input
-          </Label>
+          </SynLabel>
         </StackItem>
       )}
       {mockDataPinned && (

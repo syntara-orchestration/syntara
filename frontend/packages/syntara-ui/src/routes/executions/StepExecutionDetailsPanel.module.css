@@ -106,6 +106,10 @@
   color: var(--pf-t--global--text--color--subtle);
 }
 
+.stepTimingItem {
+  margin: 0;
+}
+
 .dataPaneHeaderRow {
   flex-shrink: 0;
   padding-bottom: var(--pf-t--global--spacer--xs);
