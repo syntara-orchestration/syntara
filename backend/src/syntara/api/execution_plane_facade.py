@@ -89,6 +89,7 @@ def _validate_query_params(
     filterable_fields: list[str],
     *,
     supports_labels: bool = True,
+    supports_runtime_context: bool = False,
 ) -> None:
     """Validate filter and sort fields against EP metadata before forwarding.
 
@@ -99,6 +100,9 @@ def _validate_query_params(
 
     for key, _value in query_params:
         if key in excluded:
+            continue
+
+        if supports_runtime_context and re.fullmatch(r"runtime_context\[([^\[\]]+)\]", key):
             continue
 
         # Check labels[key] pattern
@@ -326,6 +330,8 @@ async def list_execution_targets(
     description=(
         "Retrieve work items. Filters use field=value or field[operator]=value; comma-separated "
         "values within one field/operator use OR and different fields/operators use AND. "
+        "runtime_context[key]=value matches exact JSON strings; empty values check key existence. "
+        "Context keys are literal top-level keys, commas are literal, and multiple keys use AND. "
         "EP validates fields and operators. Keep filters, sort, and limit unchanged when following opaque cursors."
     ),
     responses={
@@ -344,6 +350,7 @@ async def list_work_items(
         request.query_params.multi_items(),
         WORK_ITEM_FILTERABLE_FIELDS,
         supports_labels=False,  # Work items don't have labels
+        supports_runtime_context=True,
     )
     _validate_sort(params.sort, WORK_ITEM_SORTABLE_FIELDS)
 

@@ -6,7 +6,6 @@ workflow execution details (which are tested in tests/integration/workflow/).
 """
 
 import asyncio
-from uuid import uuid4
 
 import pytest
 import pytest_asyncio
@@ -22,6 +21,7 @@ from syntara.workflow_runtime.engines.temporal.activities.runtime_settings_activ
 )
 from syntara.workflow_runtime.engines.temporal.dynamic_workflow import OrchestratorWorkflow
 from syntara.workflow_runtime.engines.temporal.services.temporal_execution_service import TemporalExecutionService
+from syntara.workflows.models.execution import Execution
 
 
 @pytest_asyncio.fixture
@@ -44,17 +44,14 @@ async def execution_service(
     return TemporalExecutionService(temporal_client=temporal_client, task_queue=task_queue)
 
 
-TEST_WORKFLOW_METADATA = {
-    "workflow_context": {"workflow": {"project_id": str(uuid4())}},
-}
-
-
 @pytest.mark.integration
 @pytest.mark.asyncio
 class TestTemporalExecutionServiceIntegration:
     """Integration tests for TemporalExecutionService with real Temporal."""
 
-    async def test_start_and_complete_workflow(self, execution_service: TemporalExecutionService) -> None:
+    async def test_start_and_complete_workflow(
+        self, execution_service: TemporalExecutionService, test_execution: Execution
+    ) -> None:
         """Test starting a workflow and waiting for completion."""
         workflow_yaml = """
 schema_version: "2.0.0"
@@ -79,10 +76,15 @@ edges:
 
         # Start workflow
         result = await execution_service.start_workflow(
+            execution_id=str(test_execution.id),
             workflow_def=workflow_def,
             workflow_name="integration-test",
             trigger_node_id="trigger_manual",
-            workflow_metadata=TEST_WORKFLOW_METADATA,
+            workflow_metadata={
+                "workflow_context": {
+                    "workflow": {"project_id": str(test_execution.project_id), "id": str(test_execution.workflow_id)}
+                }
+            },
         )
 
         # Verify result structure (Pydantic model)
@@ -98,9 +100,11 @@ edges:
         workflow_result = await asyncio.wait_for(handle.result(), timeout=30)
 
         # Verify completion (activity_outputs are empty when include_node_results=False)
-        assert workflow_result["status"] == "completed"
+        assert workflow_result["status"] == "completed", f"Unexpected workflow result: {workflow_result!r}"
 
-    async def test_start_workflow_with_custom_id(self, execution_service: TemporalExecutionService) -> None:
+    async def test_start_workflow_with_custom_id(
+        self, execution_service: TemporalExecutionService, test_execution: Execution
+    ) -> None:
         """Test starting a workflow with a custom workflow ID."""
         workflow_yaml = """
 schema_version: "2.0.0"
@@ -126,11 +130,16 @@ edges:
         custom_id = "my-custom-workflow-id-12345"
 
         result = await execution_service.start_workflow(
+            execution_id=str(test_execution.id),
             workflow_def=workflow_def,
             workflow_name="custom-id-test",
             workflow_id=custom_id,
             trigger_node_id="trigger_manual",
-            workflow_metadata=TEST_WORKFLOW_METADATA,
+            workflow_metadata={
+                "workflow_context": {
+                    "workflow": {"project_id": str(test_execution.project_id), "id": str(test_execution.workflow_id)}
+                }
+            },
         )
 
         assert result.workflow_id == custom_id
@@ -139,9 +148,11 @@ edges:
             result.temporal_workflow_id, run_id=result.temporal_run_id
         )
         workflow_result = await asyncio.wait_for(handle.result(), timeout=30)
-        assert workflow_result["status"] == "completed"
+        assert workflow_result["status"] == "completed", f"Unexpected workflow result: {workflow_result!r}"
 
-    async def test_start_workflow_with_inputs(self, execution_service: TemporalExecutionService) -> None:
+    async def test_start_workflow_with_inputs(
+        self, execution_service: TemporalExecutionService, test_execution: Execution
+    ) -> None:
         """Test starting a workflow with input parameters."""
         workflow_yaml = """
 schema_version: "2.0.0"
@@ -167,11 +178,16 @@ edges:
         workflow_def = yaml.safe_load(workflow_yaml)
 
         result = await execution_service.start_workflow(
+            execution_id=str(test_execution.id),
             workflow_def=workflow_def,
             workflow_name="input-test",
             input_data={"user_name": "Alice"},
             trigger_node_id="trigger_manual",
-            workflow_metadata=TEST_WORKFLOW_METADATA,
+            workflow_metadata={
+                "workflow_context": {
+                    "workflow": {"project_id": str(test_execution.project_id), "id": str(test_execution.workflow_id)}
+                }
+            },
         )
 
         handle = execution_service.temporal_client.get_workflow_handle(
@@ -180,10 +196,10 @@ edges:
         workflow_result = await asyncio.wait_for(handle.result(), timeout=30)
 
         # Verify workflow completed (activity_outputs are empty when include_node_results=False)
-        assert workflow_result["status"] == "completed"
+        assert workflow_result["status"] == "completed", f"Unexpected workflow result: {workflow_result!r}"
 
     async def test_invalid_workflow_definition_raises_validation_error(
-        self, execution_service: TemporalExecutionService
+        self, execution_service: TemporalExecutionService, test_execution: Execution
     ) -> None:
         """Test that invalid workflow definition raises an error."""
         from syntara.core.exceptions import SafeValueError
@@ -207,13 +223,23 @@ edges: []
 
         with pytest.raises(SafeValueError):
             await execution_service.start_workflow(
+                execution_id=str(test_execution.id),
                 workflow_def=workflow_def,
                 workflow_name="invalid-workflow",
                 trigger_node_id="trigger_manual",
-                workflow_metadata=TEST_WORKFLOW_METADATA,
+                workflow_metadata={
+                    "workflow_context": {
+                        "workflow": {
+                            "project_id": str(test_execution.project_id),
+                            "id": str(test_execution.workflow_id),
+                        }
+                    }
+                },
             )
 
-    async def test_cancel_workflow(self, execution_service: TemporalExecutionService) -> None:
+    async def test_cancel_workflow(
+        self, execution_service: TemporalExecutionService, test_execution: Execution
+    ) -> None:
         """Test cancelling a running workflow."""
         workflow_yaml = """
 schema_version: "2.0.0"
@@ -240,10 +266,15 @@ edges:
 
         # Start workflow
         result = await execution_service.start_workflow(
+            execution_id=str(test_execution.id),
             workflow_def=workflow_def,
             workflow_name="cancel-test",
             trigger_node_id="trigger_manual",
-            workflow_metadata=TEST_WORKFLOW_METADATA,
+            workflow_metadata={
+                "workflow_context": {
+                    "workflow": {"project_id": str(test_execution.project_id), "id": str(test_execution.workflow_id)}
+                }
+            },
         )
 
         # Yield control so the worker can pick up the workflow
@@ -261,9 +292,7 @@ class TestCreateTemporalExecutionServiceFactory:
     """Test the factory function for creating TemporalExecutionService."""
 
     async def test_create_execution_service_integration(
-        self,
-        temporal_env: WorkflowEnvironment,
-        temporal_worker: Worker,
+        self, temporal_env: WorkflowEnvironment, temporal_worker: Worker, test_execution: Execution
     ) -> None:
         """Test creating TemporalExecutionService via factory function.
 
@@ -309,10 +338,18 @@ edges:
         ):
             workflow_def = yaml.safe_load(workflow_yaml)
             result = await service.start_workflow(
+                execution_id=str(test_execution.id),
                 workflow_def=workflow_def,
                 workflow_name="factory-test",
                 trigger_node_id="trigger_manual",
-                workflow_metadata=TEST_WORKFLOW_METADATA,
+                workflow_metadata={
+                    "workflow_context": {
+                        "workflow": {
+                            "project_id": str(test_execution.project_id),
+                            "id": str(test_execution.workflow_id),
+                        }
+                    }
+                },
             )
 
             assert result.status == "running"
@@ -321,4 +358,4 @@ edges:
                 result.temporal_workflow_id, run_id=result.temporal_run_id
             )
             workflow_result = await asyncio.wait_for(handle.result(), timeout=30)
-            assert workflow_result["status"] == "completed"
+            assert workflow_result["status"] == "completed", f"Unexpected workflow result: {workflow_result!r}"

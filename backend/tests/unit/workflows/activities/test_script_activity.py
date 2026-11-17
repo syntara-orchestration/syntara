@@ -42,7 +42,10 @@ class _FakeEPClient:
             assert isinstance(error, Exception)
             raise error
         return TransportReceipt(
-            message_id=message.message_id, resource=ResourceReference(kind="work_item", resource_id=message.command_id)
+            message_id=message.message_id,
+            resource=ResourceReference(
+                kind="work_item", resource_id=UUID(str(message.command.payload["work_item_id"]))
+            ),
         )
 
     async def get_work_item(self, *, work_item_id: UUID) -> dict[str, object]:
@@ -65,6 +68,11 @@ def mock_activity_context() -> Generator[MagicMock, None, None]:
         patch(ACTIVITY_INFO_PATH, return_value=info) as activity_info,
         patch("temporalio.activity.heartbeat"),
         patch.object(activity_module, "ExecutionPlaneHttpClient", _FakeEPClient),
+        patch.object(
+            activity_module,
+            "_work_runtime_context",
+            AsyncMock(return_value={"project_id": "test-project", "workflow_id": "test-workflow"}),
+        ),
     ):
         _FakeEPClient.responses = []
         _FakeEPClient.submissions = []
@@ -117,7 +125,7 @@ class TestScriptActivityDispatch:
 
         assert result == expected
         assert len(_FakeEPClient.submissions) == 1
-        assert _FakeEPClient.submissions[0].command_id == WORK_ITEM_ID
+        assert UUID(str(_FakeEPClient.submissions[0].command.payload["work_item_id"])) == WORK_ITEM_ID
 
     @pytest.mark.asyncio
     async def test_temporal_retry_reuses_work_item_id(self, mock_activity_context: MagicMock) -> None:
@@ -127,7 +135,10 @@ class TestScriptActivityDispatch:
             mock_activity_context.return_value.attempt = attempt
             await activity_module.execute_script_activity({"language": "bash", "code": ":"}, None, EXECUTION_ID)
 
-        assert [message.command_id for message in _FakeEPClient.submissions] == [WORK_ITEM_ID, WORK_ITEM_ID]
+        assert [UUID(str(message.command.payload["work_item_id"])) for message in _FakeEPClient.submissions] == [
+            WORK_ITEM_ID,
+            WORK_ITEM_ID,
+        ]
 
     @pytest.mark.asyncio
     async def test_execution_target_profile_is_sent_as_ep_selector(self) -> None:
@@ -158,10 +169,8 @@ class TestScriptActivityDispatch:
         invocation = command_payload["invocation"]
         assert isinstance(invocation, dict)
         assert invocation == {
-            "workflow_run_id": "unit-run",
             "step_revision_id": "script.v1",
             "inputs": {"language": "bash", "code": ":"},
-            "runtime_context": {},
             "credential_bindings": [],
             "timeout_seconds": 300,
         }
@@ -235,5 +244,5 @@ async def test_conflict_recovers_existing_work_instead_of_failing_activity():
     result = await activity_module.execute_script_activity({"language": "bash", "code": ":"}, None, EXECUTION_ID)
     assert result == expected
     assert len(_FakeEPClient.submissions) == 1
-    assert _FakeEPClient.submissions[0].command_id == WORK_ITEM_ID
+    assert UUID(str(_FakeEPClient.submissions[0].command.payload["work_item_id"])) == WORK_ITEM_ID
     assert _FakeEPClient.submissions[0].command.command_type == "work.execute"

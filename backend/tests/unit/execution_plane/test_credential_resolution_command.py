@@ -188,10 +188,10 @@ async def test_cluster_credential_command_handler_rejects_unexpected_payload(
 ) -> None:
     message = credential_command()
     payload = CredentialResolveWorkload(
+        work_item_id=uuid4(),
         attempt_id="attempt",
         credential_ref=uuid4(),
         credential_recipe_id="acme.echo.api-token",
-        workflow_run_id="workflow-run",
         step_revision_id="step-revision",
     )
 
