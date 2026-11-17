@@ -55,7 +55,7 @@ export async function setFormPromptFallbackDecision(page: Page, decision: 'fallb
   const fallbackToggle = page.getByRole('button', { name: 'Fallback decision', exact: true })
   await expect(fallbackToggle).toBeEnabled({ timeout: 10_000 })
   await fallbackToggle.click()
-  const optionName = decision === 'submit' ? 'Submitted path' : 'Fallback path (default)'
+  const optionName = decision === 'submit' ? 'Submitted path' : 'Fallback path'
   const visibleOption = page.getByRole('option', { name: optionName }).filter({ visible: true })
   await expect(visibleOption).toHaveCount(1, { timeout: 10_000 })
   await visibleOption.click()
