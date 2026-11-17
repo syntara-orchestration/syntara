@@ -32,22 +32,6 @@ class FormPromptsApi:
         endpoint_module = self._load_endpoint_module("list_form_prompts")
         return await endpoint_module.asyncio_detailed(client=self._client, **kwargs)
 
-    def create(self, **kwargs: Any) -> Response[Any]:
-        endpoint_module = self._load_endpoint_module("create_form_prompt")
-        return endpoint_module.sync_detailed(client=self._client, **kwargs)
-
-    async def async_create(self, **kwargs: Any) -> Response[Any]:
-        endpoint_module = self._load_endpoint_module("create_form_prompt")
-        return await endpoint_module.asyncio_detailed(client=self._client, **kwargs)
-
-    def batch_update(self, **kwargs: Any) -> Response[Any]:
-        endpoint_module = self._load_endpoint_module("batch_update_form_prompts")
-        return endpoint_module.sync_detailed(client=self._client, **kwargs)
-
-    async def async_batch_update(self, **kwargs: Any) -> Response[Any]:
-        endpoint_module = self._load_endpoint_module("batch_update_form_prompts")
-        return await endpoint_module.asyncio_detailed(client=self._client, **kwargs)
-
     def get(self, **kwargs: Any) -> Response[Any]:
         endpoint_module = self._load_endpoint_module("get_form_prompt")
         return endpoint_module.sync_detailed(client=self._client, **kwargs)

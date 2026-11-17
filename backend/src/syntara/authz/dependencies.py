@@ -49,6 +49,34 @@ def _record_authz_duration(start: float, resource_type: str, action: str) -> Non
         logger.debug("authz_metrics_recording_failed", exc_info=True)
 
 
+async def require_internal_service(request: Request) -> None:
+    """Allow only allowlisted internal services authenticated via mTLS.
+
+    Use on internal service-to-service endpoints in place of a
+    ``PermissionChecker``. User bearer tokens are always rejected, whatever
+    permissions the user holds. Fails closed when S2S TLS is disabled,
+    because there is then no way to tell a service caller from a user.
+
+    ``ClientCertAuthMiddleware`` sets ``is_cert_authenticated`` only for
+    CA-verified client certificates whose CN is in the S2S allowlist.
+
+    Raises:
+        AuthorizationDeniedError: If the caller is not a trusted internal service.
+
+    """
+    from syntara.core.config.base import get_settings  # noqa: PLC0415
+
+    if not get_settings().s2s_tls_enabled:
+        logger.warning("internal_service_endpoint_rejected", reason="s2s_tls_disabled", path=request.url.path)
+        msg = "This endpoint requires service-to-service TLS, which is disabled"
+        raise AuthorizationDeniedError(msg)
+
+    if not getattr(request.state, "is_cert_authenticated", False):
+        logger.info("internal_service_endpoint_rejected", reason="not_cert_authenticated", path=request.url.path)
+        msg = "This endpoint is restricted to internal services"
+        raise AuthorizationDeniedError(msg)
+
+
 def get_authz_evaluator(request: Request) -> AuthzEvaluator:
     """Get the authorization evaluator from app state.
 

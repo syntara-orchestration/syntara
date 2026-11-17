@@ -111,12 +111,14 @@ async def _create_execution_for_workflow(
 class TestFormPromptCreateAPI:
     """API integration tests for form_prompt creation."""
 
-    async def test_create_form_prompt_success(self, jwt_client: AsyncClient, test_execution: Execution) -> None:
+    async def test_create_form_prompt_success(
+        self, internal_service_client: AsyncClient, test_execution: Execution
+    ) -> None:
         """Create form_prompt returns 201 with prompt ID."""
         exec_id = test_execution.id
         payload = _form_prompt_payload(exec_id, test_execution.project_id)
 
-        response = await jwt_client.post(FORM_PROMPTS_URL, json=payload)
+        response = await internal_service_client.post(FORM_PROMPTS_URL, json=payload)
 
         assert response.status_code == 201
         data = response.json()
@@ -127,7 +129,7 @@ class TestFormPromptCreateAPI:
 
     async def test_create_form_prompt_with_responders(
         self,
-        jwt_client: AsyncClient,
+        internal_service_client: AsyncClient,
         test_execution: Execution,
         test_user: User,
     ) -> None:
@@ -136,19 +138,21 @@ class TestFormPromptCreateAPI:
         payload = _form_prompt_payload(exec_id, test_execution.project_id)
         payload["responder_user_ids"] = [str(test_user.id)]
 
-        response = await jwt_client.post(FORM_PROMPTS_URL, json=payload)
+        response = await internal_service_client.post(FORM_PROMPTS_URL, json=payload)
 
         assert response.status_code == 201
         data = response.json()
         assert data["execution_id"] == str(exec_id)
 
-    async def test_create_form_prompt_with_message(self, jwt_client: AsyncClient, test_execution: Execution) -> None:
+    async def test_create_form_prompt_with_message(
+        self, internal_service_client: AsyncClient, test_execution: Execution
+    ) -> None:
         """Create form_prompt with message field succeeds (message not in summary response)."""
         exec_id = test_execution.id
         payload = _form_prompt_payload(exec_id, test_execution.project_id)
         payload["message"] = "Please fill out this form carefully"
 
-        response = await jwt_client.post(FORM_PROMPTS_URL, json=payload)
+        response = await internal_service_client.post(FORM_PROMPTS_URL, json=payload)
 
         assert response.status_code == 201
         data = response.json()
@@ -158,7 +162,7 @@ class TestFormPromptCreateAPI:
 
     async def test_create_form_prompt_with_resolved_typed_options_round_trips(
         self,
-        jwt_client: AsyncClient,
+        internal_service_client: AsyncClient,
         test_execution: Execution,
         test_db_session: AsyncSession,
     ) -> None:
@@ -179,7 +183,7 @@ class TestFormPromptCreateAPI:
             form_definition=form_definition,
         )
 
-        response = await jwt_client.post(FORM_PROMPTS_URL, json=payload)
+        response = await internal_service_client.post(FORM_PROMPTS_URL, json=payload)
 
         assert response.status_code == 201
         prompt = await test_db_session.get(FormPrompt, UUID(response.json()["id"]))
@@ -193,7 +197,7 @@ class TestFormPromptCreateAPI:
 
     async def test_create_rejects_typed_static_option_value(
         self,
-        jwt_client: AsyncClient,
+        internal_service_client: AsyncClient,
         test_execution: Execution,
     ) -> None:
         payload = _form_prompt_payload(
@@ -211,13 +215,13 @@ class TestFormPromptCreateAPI:
             },
         )
 
-        response = await jwt_client.post(FORM_PROMPTS_URL, json=payload)
+        response = await internal_service_client.post(FORM_PROMPTS_URL, json=payload)
 
         assert response.status_code == 422
 
     async def test_create_rejects_empty_resolved_options(
         self,
-        jwt_client: AsyncClient,
+        internal_service_client: AsyncClient,
         test_execution: Execution,
     ) -> None:
         payload = _form_prompt_payload(
@@ -235,14 +239,14 @@ class TestFormPromptCreateAPI:
             },
         )
 
-        response = await jwt_client.post(FORM_PROMPTS_URL, json=payload)
+        response = await internal_service_client.post(FORM_PROMPTS_URL, json=payload)
 
         assert response.status_code == 422
 
     @pytest.mark.parametrize("loop_iteration_path", [[], [0, 1]])
     async def test_create_duplicate_pending_form_prompt_is_idempotent(
         self,
-        jwt_client: AsyncClient,
+        internal_service_client: AsyncClient,
         test_execution: Execution,
         test_db_session: AsyncSession,
         test_user: User,
@@ -263,7 +267,7 @@ class TestFormPromptCreateAPI:
             name="Decoy form",
             loop_iteration_path=decoy_loop_iteration_path,
         )
-        decoy_response = await jwt_client.post(FORM_PROMPTS_URL, json=decoy_payload)
+        decoy_response = await internal_service_client.post(FORM_PROMPTS_URL, json=decoy_payload)
         assert decoy_response.status_code == 201
 
         payload = _form_prompt_payload(
@@ -283,7 +287,7 @@ class TestFormPromptCreateAPI:
             }
         )
 
-        response1 = await jwt_client.post(FORM_PROMPTS_URL, json=payload)
+        response1 = await internal_service_client.post(FORM_PROMPTS_URL, json=payload)
         assert response1.status_code == 201
 
         retry_payload = {
@@ -299,7 +303,7 @@ class TestFormPromptCreateAPI:
             "responder_user_ids": [str(test_user.id)],
             "responder_group_ids": [str(test_group.id)],
         }
-        response2 = await jwt_client.post(FORM_PROMPTS_URL, json=retry_payload)
+        response2 = await internal_service_client.post(FORM_PROMPTS_URL, json=retry_payload)
         assert response2.status_code == 201
         assert response2.json() == response1.json()
         assert response2.json()["id"] != decoy_response.json()["id"]
@@ -336,27 +340,27 @@ class TestFormPromptCreateAPI:
 
     async def test_create_duplicate_for_different_activity_returns_409(
         self,
-        jwt_client: AsyncClient,
+        internal_service_client: AsyncClient,
         test_execution: Execution,
     ) -> None:
         """Same key but a different Temporal activity is a real conflict, not a retry."""
         payload = _form_prompt_payload(test_execution.id, test_execution.project_id, prompt_node_id="form1")
-        assert (await jwt_client.post(FORM_PROMPTS_URL, json=payload)).status_code == 201
+        assert (await internal_service_client.post(FORM_PROMPTS_URL, json=payload)).status_code == 201
 
-        response = await jwt_client.post(FORM_PROMPTS_URL, json={**payload, "temporal_activity_id": "other_activity"})
+        response = await internal_service_client.post(FORM_PROMPTS_URL, json={**payload, "temporal_activity_id": "other_activity"})
 
         assert response.status_code == 409
         assert response.json()["code"] == "FORM_ALREADY_REQUESTED"
 
     async def test_create_duplicate_for_pending_prompt_past_deadline_returns_409_expired(
         self,
-        jwt_client: AsyncClient,
+        internal_service_client: AsyncClient,
         test_execution: Execution,
         test_db_session: AsyncSession,
     ) -> None:
         """A timed-out prompt still marked pending is no longer reusable."""
         payload = _form_prompt_payload(test_execution.id, test_execution.project_id, prompt_node_id="form1")
-        response1 = await jwt_client.post(FORM_PROMPTS_URL, json=payload)
+        response1 = await internal_service_client.post(FORM_PROMPTS_URL, json=payload)
         assert response1.status_code == 201
 
         prompt = await test_db_session.get(FormPrompt, UUID(response1.json()["id"]))
@@ -365,7 +369,7 @@ class TestFormPromptCreateAPI:
         test_db_session.add(prompt)
         await test_db_session.commit()
 
-        response2 = await jwt_client.post(FORM_PROMPTS_URL, json=payload)
+        response2 = await internal_service_client.post(FORM_PROMPTS_URL, json=payload)
 
         assert response2.status_code == 409
         assert response2.json()["code"] == "FORM_EXPIRED"
@@ -373,14 +377,14 @@ class TestFormPromptCreateAPI:
     @pytest.mark.parametrize("terminal_status", ["submitted", "expired", "cancelled"])
     async def test_create_duplicate_for_non_pending_form_prompt_returns_409_not_pending(
         self,
-        jwt_client: AsyncClient,
+        internal_service_client: AsyncClient,
         test_execution: Execution,
         test_db_session: AsyncSession,
         terminal_status: str,
     ) -> None:
         """A retry cannot reuse a prompt that was already submitted, expired or cancelled."""
         payload = _form_prompt_payload(test_execution.id, test_execution.project_id, prompt_node_id="form1")
-        response1 = await jwt_client.post(FORM_PROMPTS_URL, json=payload)
+        response1 = await internal_service_client.post(FORM_PROMPTS_URL, json=payload)
         assert response1.status_code == 201
 
         prompt = await test_db_session.get(FormPrompt, UUID(response1.json()["id"]))
@@ -389,13 +393,15 @@ class TestFormPromptCreateAPI:
         test_db_session.add(prompt)
         await test_db_session.commit()
 
-        response2 = await jwt_client.post(FORM_PROMPTS_URL, json=payload)
+        response2 = await internal_service_client.post(FORM_PROMPTS_URL, json=payload)
 
         assert response2.status_code == 409
         assert response2.json()["code"] == "FORM_PROMPT_NOT_PENDING"
         assert terminal_status in response2.json()["detail"]
 
-    async def test_list_form_prompts_by_execution(self, jwt_client: AsyncClient, test_execution: Execution) -> None:
+    async def test_list_form_prompts_by_execution(
+        self, internal_service_client: AsyncClient, jwt_client: AsyncClient, test_execution: Execution
+    ) -> None:
         """List form_prompts filtered by execution_id returns matching prompts."""
         exec_id = test_execution.id
 
@@ -403,8 +409,8 @@ class TestFormPromptCreateAPI:
         payload1 = _form_prompt_payload(exec_id, test_execution.project_id, prompt_node_id="form1", name="Form 1")
         payload2 = _form_prompt_payload(exec_id, test_execution.project_id, prompt_node_id="form2", name="Form 2")
 
-        response1 = await jwt_client.post(FORM_PROMPTS_URL, json=payload1)
-        response2 = await jwt_client.post(FORM_PROMPTS_URL, json=payload2)
+        response1 = await internal_service_client.post(FORM_PROMPTS_URL, json=payload1)
+        response2 = await internal_service_client.post(FORM_PROMPTS_URL, json=payload2)
         assert response1.status_code == 201
         assert response2.status_code == 201
 
@@ -429,12 +435,12 @@ class TestFormPromptCreateAPI:
             assert "loop_iteration_path" not in item
 
     async def test_list_form_prompts_sort_by_workflow_name(
-        self, jwt_client: AsyncClient, test_execution: Execution
+        self, internal_service_client: AsyncClient, jwt_client: AsyncClient, test_execution: Execution
     ) -> None:
         """Sort by workflow_name is accepted and returns 200 (join sort on workflow)."""
         exec_id = test_execution.id
         payload = _form_prompt_payload(exec_id, test_execution.project_id, name="Sort by workflow test")
-        create_response = await jwt_client.post(FORM_PROMPTS_URL, json=payload)
+        create_response = await internal_service_client.post(FORM_PROMPTS_URL, json=payload)
         assert create_response.status_code == 201
 
         for sort_param in ("workflow_name", "-workflow_name"):
@@ -445,6 +451,7 @@ class TestFormPromptCreateAPI:
 
     async def test_list_form_prompts_sort_by_workflow_name_orders_results(
         self,
+        internal_service_client: AsyncClient,
         jwt_client: AsyncClient,
         test_db_session: AsyncSession,
         test_user: User,
@@ -462,7 +469,7 @@ class TestFormPromptCreateAPI:
             execution = await _create_execution_for_workflow(
                 test_db_session, test_user, project_id, workflow_name, test_workflow_definition
             )
-            create_response = await jwt_client.post(
+            create_response = await internal_service_client.post(
                 FORM_PROMPTS_URL,
                 json=_form_prompt_payload(execution.id, project_id, name=f"prompt-{workflow_name}"),
             )
@@ -486,6 +493,7 @@ class TestFormPromptCreateAPI:
 
     async def test_list_form_prompts_sort_by_workflow_name_tie_breaks_on_id(
         self,
+        internal_service_client: AsyncClient,
         jwt_client: AsyncClient,
         test_execution: Execution,
     ) -> None:
@@ -498,7 +506,7 @@ class TestFormPromptCreateAPI:
         exec_id = test_execution.id
         created_ids: list[str] = []
         for index in range(3):
-            create_response = await jwt_client.post(
+            create_response = await internal_service_client.post(
                 FORM_PROMPTS_URL,
                 json=_form_prompt_payload(
                     exec_id,
@@ -527,6 +535,7 @@ class TestFormPromptCreateAPI:
 
     async def test_list_form_prompts_sort_by_workflow_name_paginates_forward_and_back(
         self,
+        internal_service_client: AsyncClient,
         jwt_client: AsyncClient,
         test_db_session: AsyncSession,
         test_user: User,
@@ -542,7 +551,7 @@ class TestFormPromptCreateAPI:
             execution = await _create_execution_for_workflow(
                 test_db_session, test_user, project_id, workflow_name, test_workflow_definition
             )
-            create_response = await jwt_client.post(
+            create_response = await internal_service_client.post(
                 FORM_PROMPTS_URL,
                 json=_form_prompt_payload(execution.id, project_id, name=f"prompt-{workflow_name}"),
             )
@@ -591,6 +600,7 @@ class TestFormPromptCreateAPI:
 
     async def test_list_form_prompts_includes_submission_metadata(
         self,
+        internal_service_client: AsyncClient,
         jwt_client: AsyncClient,
         test_execution: Execution,
         test_user: User,
@@ -598,7 +608,7 @@ class TestFormPromptCreateAPI:
         """List returns responded_at and responded_by after a prompt is submitted."""
         exec_id = test_execution.id
         payload = _form_prompt_payload(exec_id, test_execution.project_id, name="Responded form")
-        create_response = await jwt_client.post(FORM_PROMPTS_URL, json=payload)
+        create_response = await internal_service_client.post(FORM_PROMPTS_URL, json=payload)
         assert create_response.status_code == 201
         prompt_id = create_response.json()["id"]
 
@@ -617,19 +627,21 @@ class TestFormPromptCreateAPI:
         assert submitted["responded_by"] is not None
         assert submitted["responded_by"]["name"]
 
-    async def test_batch_update_form_prompt_status(self, jwt_client: AsyncClient, test_execution: Execution) -> None:
+    async def test_batch_update_form_prompt_status(
+        self, internal_service_client: AsyncClient, test_execution: Execution
+    ) -> None:
         """Batch update form_prompt status via /form_prompts/batch endpoint."""
         exec_id = test_execution.id
         payload = _form_prompt_payload(exec_id, test_execution.project_id)
 
         # Create prompt
-        create_response = await jwt_client.post(FORM_PROMPTS_URL, json=payload)
+        create_response = await internal_service_client.post(FORM_PROMPTS_URL, json=payload)
         assert create_response.status_code == 201
         prompt_id = create_response.json()["id"]
 
         # Batch update to expired
         batch_payload = {"updates": [{"prompt_id": prompt_id, "status": "expired"}]}
-        batch_response = await jwt_client.post(f"{FORM_PROMPTS_URL}/batch", json=batch_payload)
+        batch_response = await internal_service_client.post(f"{FORM_PROMPTS_URL}/batch", json=batch_payload)
 
         assert batch_response.status_code == 200
         batch_result = batch_response.json()
@@ -638,14 +650,14 @@ class TestFormPromptCreateAPI:
 
     async def test_create_form_prompt_with_loop_iteration_path(
         self,
-        jwt_client: AsyncClient,
+        internal_service_client: AsyncClient,
         test_execution: Execution,
     ) -> None:
         """Create form_prompt with loop_iteration_path stores the path."""
         exec_id = test_execution.id
         payload = _form_prompt_payload(exec_id, test_execution.project_id, loop_iteration_path=[0, 1])
 
-        response = await jwt_client.post(FORM_PROMPTS_URL, json=payload)
+        response = await internal_service_client.post(FORM_PROMPTS_URL, json=payload)
 
         assert response.status_code == 201
         data = response.json()

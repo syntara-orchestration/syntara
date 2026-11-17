@@ -1,6 +1,7 @@
-import type { FormsAPI } from '@syntara/contracts'
 import { act, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+import type { FormPromptSummary } from '../formPromptTypes'
 
 import { useExecutionFormPromptPanel } from './useExecutionFormPromptPanel'
 
@@ -49,8 +50,6 @@ vi.mock('../../../providers/alerts', () => ({
 
 const mockNavigate = vi.fn()
 
-type FormPromptSummary = FormsAPI.components['schemas']['FormPromptSummary']
-
 const mockSummary: FormPromptSummary = {
   id: 'fp-1',
   execution_id: 'exec-1',
@@ -58,7 +57,6 @@ const mockSummary: FormPromptSummary = {
   prompt_node_id: 'form_a',
   name: 'Form A',
   status: 'pending',
-  temporal_activity_id: 'act-1',
 }
 
 function makeNodeClick(overrides: Record<string, unknown> = {}) {

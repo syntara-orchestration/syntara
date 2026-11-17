@@ -1,10 +1,9 @@
-import type { Approval, FormsAPI } from '@syntara/contracts'
+import type { Approval } from '@syntara/contracts'
 
 import { canvasNodeIdFromApprovalNodeId } from '../approvals/approvalNodeId'
 
 import { canvasNodeIdFromPromptNodeId } from './formPrompt/formPromptNodeId'
-
-type FormPromptSummary = FormsAPI.components['schemas']['FormPromptSummary']
+import type { FormPromptSummary } from './formPromptTypes'
 
 export function resolveWaitingNodeHighlightId(
   currentFormPrompt: FormPromptSummary | null,

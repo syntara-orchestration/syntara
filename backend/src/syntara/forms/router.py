@@ -7,7 +7,7 @@ from fastapi import Depends, Request, status
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from syntara.auth import get_current_user
-from syntara.authz.dependencies import PermissionChecker, VisibilityFilter
+from syntara.authz.dependencies import PermissionChecker, VisibilityFilter, require_internal_service
 from syntara.authz.engine import VisibilityResult
 from syntara.core.database.session import get_db
 from syntara.core.models import User
@@ -47,13 +47,13 @@ def get_form_prompt_service(
     return FormPromptService(session=session, user=user)
 
 
-# Service-to-service endpoint (Temporal worker creates form prompts).
-# Production: mTLS-authenticated service principals bypass permission checks.
-# Local dev: falls back to admin-only when s2s_tls_enabled=false.
+# Internal service-to-service endpoint: the Temporal worker creates form prompts.
+# Only allowlisted mTLS service identities may call it; user tokens are rejected.
 @router.post(
     "",
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(PermissionChecker("form_prompt", "create"))],
+    dependencies=[Depends(require_internal_service)],
+    include_in_schema=False,
     operation_id="create_form_prompt",
     summary="Create form prompt",
     description=(
@@ -115,9 +115,11 @@ async def list_form_prompts(
     )
 
 
+# Internal service-to-service endpoint: expire/cancel activities batch-update statuses.
 @router.post(
     "/batch",
-    dependencies=[Depends(PermissionChecker("form_prompt", "create"))],
+    dependencies=[Depends(require_internal_service)],
+    include_in_schema=False,
     operation_id="batch_update_form_prompts",
     summary="Batch update form prompt statuses",
     description="Batch update form prompt statuses. Internal endpoint for expire/cancel activities.",

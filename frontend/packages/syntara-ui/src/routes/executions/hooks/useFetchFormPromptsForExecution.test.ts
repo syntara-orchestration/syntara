@@ -3,6 +3,7 @@ import { act, renderHook } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { formsFetchClient } from '../../../client'
+import type { FormPromptSummary } from '../formPromptTypes'
 
 import { useFetchFormPromptsForExecution } from './useFetchFormPromptsForExecution'
 
@@ -12,7 +13,6 @@ vi.mock('../../../client', () => ({
   },
 }))
 
-type FormPromptSummary = FormsAPI.components['schemas']['FormPromptSummary']
 type FormPromptListRead = FormsAPI.components['schemas']['FormPromptListRead']
 
 const mockListPrompts: FormPromptListRead[] = [
@@ -34,7 +34,6 @@ const expectedSummary: FormPromptSummary = {
   prompt_node_id: 'collect_input',
   name: 'Collect input',
   status: 'pending',
-  temporal_activity_id: '',
 }
 
 describe('useFetchFormPromptsForExecution', () => {
@@ -179,6 +178,5 @@ describe('useFetchFormPromptsForExecution', () => {
 
     expect(fetched.map((p) => p.id)).toEqual(['fp-1', 'fp-minimal'])
     expect(fetched[1]?.name).toBe('step')
-    expect(fetched[1]?.temporal_activity_id).toBe('')
   })
 })

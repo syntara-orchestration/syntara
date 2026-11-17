@@ -11,6 +11,8 @@ The API routes, service, database records, role assignments, and responder membe
 integration test setup.
 """
 
+from collections.abc import Callable
+from contextlib import AbstractContextManager
 from typing import Any
 from unittest.mock import AsyncMock, patch
 from uuid import UUID, uuid4
@@ -35,6 +37,7 @@ from syntara.forms.services.form_prompt_service import FormPromptService
 FORM_PROMPTS_URL = "/api/v1/form_prompts"
 _FORM_DEFINITION = {"fields": [{"value_name": "reason", "type": "text", "label": "Reason", "required": True}]}
 _PROJECT_ROLES = {"project-admin", "project-user", "project-auditor"}
+_ALL_ROLES = ["admin", "auditor", "project-admin", "project-user", "project-auditor", "user"]
 _GET_SINGLE_CASES = [
     ("admin", "same", 200),
     ("admin", "other", 200),
@@ -305,41 +308,48 @@ class TestFormPromptServiceAuthorizationAPI:
         assert response.status_code == 403
         assert response.json()["code"] == "AUTHORIZATION_DENIED"
 
-    @pytest.mark.parametrize(
-        "role_name", ["admin", "auditor", "project-admin", "project-user", "project-auditor", "user"]
-    )
-    async def test_batch_update_permission_is_admin_only(self, role_name: str) -> None:
-        """The batch endpoint's form_prompt:create permission is currently admin-only."""
+    @pytest.mark.parametrize("role_name", _ALL_ROLES)
+    async def test_batch_update_rejects_user_callers(
+        self,
+        role_name: str,
+        override_settings: Callable[..., AbstractContextManager[object]],
+    ) -> None:
+        """The batch endpoint is mTLS-only: no user role, including admin, may call it."""
         await self.setup.assign_role(role_name)
         prompt = await self.setup.create_prompt()
 
-        response = await self.setup.client.post(
-            f"{FORM_PROMPTS_URL}/batch",
-            json={"updates": [{"prompt_id": str(prompt.id), "status": "expired"}]},
-        )
+        with override_settings(s2s_tls_enabled=True):
+            response = await self.setup.client.post(
+                f"{FORM_PROMPTS_URL}/batch",
+                json={"updates": [{"prompt_id": str(prompt.id), "status": "expired"}]},
+            )
 
-        if role_name == "admin":
-            assert response.status_code == 200
-            assert response.json()["total_success"] == 1
-        else:
-            assert response.status_code == 403
-            assert response.json()["code"] == "AUTHORIZATION_DENIED"
+        assert response.status_code == 403
+        assert response.json()["code"] == "AUTHORIZATION_DENIED"
+        await self.setup.session.refresh(prompt)
+        assert prompt.status == FormPromptStatus.PENDING
 
-    async def test_create_permission_denied_for_user_role(self) -> None:
-        """The built-in user role cannot create form prompts."""
-        await self.setup.assign_role("user")
+    @pytest.mark.parametrize("role_name", _ALL_ROLES)
+    async def test_create_rejects_user_callers(
+        self,
+        role_name: str,
+        override_settings: Callable[..., AbstractContextManager[object]],
+    ) -> None:
+        """The create endpoint is mTLS-only: no user role, including admin, may call it."""
+        await self.setup.assign_role(role_name)
 
-        response = await self.setup.client.post(
-            FORM_PROMPTS_URL,
-            json={
-                "execution_id": str(uuid4()),
-                "project_id": str(self.setup.project_id),
-                "prompt_node_id": "form-prompt-authz-test",
-                "name": "Authorization test form",
-                "temporal_activity_id": "form-activity",
-                "form_definition": _FORM_DEFINITION,
-            },
-        )
+        with override_settings(s2s_tls_enabled=True):
+            response = await self.setup.client.post(
+                FORM_PROMPTS_URL,
+                json={
+                    "execution_id": str(uuid4()),
+                    "project_id": str(self.setup.project_id),
+                    "prompt_node_id": "form-prompt-authz-test",
+                    "name": "Authorization test form",
+                    "temporal_activity_id": "form-activity",
+                    "form_definition": _FORM_DEFINITION,
+                },
+            )
 
         assert response.status_code == 403
         assert response.json()["code"] == "AUTHORIZATION_DENIED"

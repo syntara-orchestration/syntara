@@ -1,4 +1,3 @@
-import type { FormsAPI } from '@syntara/contracts'
 import type { NavigateFn } from '@tanstack/react-router'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
@@ -13,6 +12,7 @@ import {
   resolveFormPromptLookupKeys,
 } from '../formPrompt/formPromptNodeId'
 import { resolveCanvasNodeType, type WorkflowDefinitionLike } from '../formPrompt/resolveCanvasNodeType'
+import type { FormPromptSummary } from '../formPromptTypes'
 
 import { useAutoWaitingNodeDetection } from './useAutoWaitingNodeDetection'
 import type { useExecutionStepClick } from './useExecutionStepClick'
@@ -21,7 +21,6 @@ import { useFormPromptPanelOutboundUrlSync } from './useFormPromptPanelOutboundU
 import { useFormPromptPanelUrlSync } from './useFormPromptPanelUrlSync'
 
 type NodeClickResult = ReturnType<typeof useExecutionStepClick>
-type FormPromptSummary = FormsAPI.components['schemas']['FormPromptSummary']
 
 export function useExecutionFormPromptPanel(
   executionId: string | undefined,

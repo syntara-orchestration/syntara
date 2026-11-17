@@ -425,7 +425,6 @@ E2E_COVERAGE_EXEMPT: set[str] = {
     "approval:create:any",
     "approval:delete:any",
     # Form prompt policies — internal service-to-service endpoints for workflow engine
-    "form_prompt:create:any",
     "form_prompt:read:any",
     "form_prompt:read:project",
     "form_prompt:submit:any",

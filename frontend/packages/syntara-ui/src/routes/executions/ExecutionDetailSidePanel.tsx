@@ -1,10 +1,9 @@
-import type { Approval, FormsAPI } from '@syntara/contracts'
+import type { Approval } from '@syntara/contracts'
 
 import { ApprovalSidePanel } from './ApprovalSidePanel'
 import { FormPromptSidePanel } from './FormPromptSidePanel'
+import type { FormPromptSummary } from './formPromptTypes'
 import type { useApprovalNavigation } from './hooks/useApprovalNavigation'
-
-type FormPromptSummary = FormsAPI.components['schemas']['FormPromptSummary']
 
 type ApprovalNavigation = ReturnType<typeof useApprovalNavigation>
 

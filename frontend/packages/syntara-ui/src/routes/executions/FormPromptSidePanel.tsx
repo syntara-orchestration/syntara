@@ -1,5 +1,4 @@
 import { Stack, StackItem } from '@patternfly/react-core'
-import type { FormsAPI } from '@syntara/contracts'
 import { memo, useRef, type RefObject } from 'react'
 
 import { ApprovalNavigationHeader } from '../../components/ApprovalNavigationHeader'
@@ -15,8 +14,7 @@ import {
 } from './formPrompt/FormPromptRespondPanelFooter'
 import { FormPromptResponseContent } from './FormPromptResponseContent'
 import styles from './FormPromptSidePanel.module.css'
-
-type FormPromptSummary = FormsAPI.components['schemas']['FormPromptSummary']
+import type { FormPromptSummary } from './formPromptTypes'
 
 type FormPromptSidePanelProps = Readonly<{
   executionId: string

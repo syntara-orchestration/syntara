@@ -205,7 +205,7 @@ force-terminates the workflow, these cleanup paths do not run; see
 ## API Surface
 
 Browsers use `/form_prompts` to list, read, and submit prompts under RBAC. The Temporal
-worker uses service-authenticated operations to create prompts and update their status in
+worker uses internal, mTLS-only operations to create prompts and update their status in
 batches. After submission, the Forms API calls the workflows-owned
 `POST /executions/{execution_id}/activities/{activity_id}/signal` endpoint to resume the
 waiting activity.
@@ -236,7 +236,6 @@ a list request, the API returns only prompts from projects the caller is allowed
 
 | Action | System roles | Project roles |
 |---|---|---|
-| `form_prompt:create` | admin | — (service-to-service only) |
 | `form_prompt:read` | admin, auditor | project-admin, project-user, project-auditor |
 | `form_prompt:submit` | admin | project-admin |
 
@@ -244,8 +243,11 @@ a list request, the API returns only prompts from projects the caller is allowed
 loaded. Naming responders **narrows** tier 1, never widens it: a listed user still needs
 `form_prompt:submit`.
 
-The worker calls create and batch as an mTLS service principal, bypassing tier 1 entirely;
-when S2S TLS is disabled for local development those endpoints fall back to admin-only. See
+`POST /form_prompts` (create) and `POST /form_prompts/batch` are internal endpoints. They
+are left out of the public API schema and gated by `require_internal_service` rather than
+RBAC. Only allowlisted service identities authenticated with mTLS, such as the Temporal
+worker, can call them. User bearer tokens are rejected whatever the user's roles, and the
+endpoints fail closed when S2S TLS is disabled. See
 [S2S Certificate Authentication](../s2s-cert-authentication.md).
 
 One authorization carve-out is specific to this feature: the builder's responder picker
