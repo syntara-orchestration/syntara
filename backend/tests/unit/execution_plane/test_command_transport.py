@@ -95,3 +95,24 @@ async def test_cluster_inventory_uses_actual_cluster_ids(monkeypatch):
     assert requests[0].url.params["limit"] == "2"
     assert result["resources"][0]["id"] == str(cluster_id)
     assert result["resources"][0]["source_integration_id"] == str(integration_id)
+
+
+@pytest.mark.asyncio
+async def test_delete_work_item_sends_versioned_command(monkeypatch):
+    item_id = uuid4()
+    requests = []
+
+    def handle(request) -> httpx.Response:
+        message = json.loads(request.content)
+        requests.append(message)
+        return httpx.Response(202, json={"received": True, "message_id": message["message_id"]})
+
+    monkeypatch.setattr(client_module, "create_ep_service_token", lambda: "test-token")
+    client = object.__new__(ExecutionPlaneHttpClient)
+    client._client = httpx.AsyncClient(base_url="https://ep.example", transport=httpx.MockTransport(handle))
+    async with client:
+        await client.delete_work_item(work_item_id=item_id)
+    assert requests[0]["command"]["command_type"] == "work.delete"
+    assert requests[0]["command"]["command_revision"] == 1
+    assert requests[0]["command"]["payload"] == {"work_item_id": str(item_id)}
+    assert "work.delete" in client_module.EP_SCOPES.split()

@@ -217,9 +217,12 @@ class ProjectService(BaseService):
             raise DefaultProjectProtectionError(msg)
         await self._check_no_active_executions(project_id)
         await self._check_credentials_not_referenced_by_integrations(project.id, project.name)
-        await self._cascade_cleanup_project_resources(project_id)
+        from syntara.execution_plane.deletion import schedule_work_item_deletion  # noqa: PLC0415
+
+        work_item_ids = await self._cascade_cleanup_project_resources(project_id)
         await self.session.delete(project)
         await self.session.commit()
+        schedule_work_item_deletion(work_item_ids)
 
     async def _check_no_active_executions(self, project_id: UUID) -> None:
         """Raise 409 if the project has any non-terminal executions.
@@ -288,11 +291,12 @@ class ProjectService(BaseService):
 
         raise ProjectCredentialInUseError(project_name, credential_names, integration_names, total_count)
 
-    async def _cascade_cleanup_project_resources(self, project_id: UUID) -> None:
+    async def _cascade_cleanup_project_resources(self, project_id: UUID) -> list[UUID]:  # noqa: PLR0915
         """Delete all project-scoped resources before hard-deleting the project.
 
         Uses bulk SQL for efficiency. Ordering respects FK constraints.
         External side-effects (Temporal schedules, file storage) are best-effort.
+        Returns WorkItem IDs captured under the locks for cleanup after commit.
         """
         from sqlalchemy import func as sa_func  # noqa: PLC0415
         from sqlmodel import col  # noqa: PLC0415
@@ -304,6 +308,7 @@ class ProjectService(BaseService):
         from syntara.authz.models.role import Role  # noqa: PLC0415
         from syntara.core.models.secret import EncryptedSecret, Secret  # noqa: PLC0415
         from syntara.credentials.models.credential import Credential  # noqa: PLC0415
+        from syntara.execution_plane.deletion import collect_execution_plane_work_items  # noqa: PLC0415
         from syntara.files.models.file_metadata import FileMetadata  # noqa: PLC0415
         from syntara.integrations.models.integration import IntegrationProjectAssignment  # noqa: PLC0415
         from syntara.service_accounts.models.service_account import ServiceAccount  # noqa: PLC0415
@@ -332,6 +337,9 @@ class ProjectService(BaseService):
             )
             if non_terminal_count:
                 raise ProjectHasActiveExecutionsError(project_id, non_terminal_count)
+
+        # Snapshot under the workflow locks, before deleting execution/activity rows.
+        work_item_ids = await collect_execution_plane_work_items(self.session, project_id=project_id)
 
         # --- External cleanup (best-effort, must run BEFORE DB deletes) ---
         # _cleanup_file_storage reads FileMetadata rows to get storage paths,
@@ -425,6 +433,7 @@ class ProjectService(BaseService):
         )
 
         logger.info("Cascade-deleted project resources", project_id=str(project_id))
+        return work_item_ids
 
     async def _cleanup_temporal_schedules(self, project_id: UUID) -> None:
         """Best-effort cleanup of Temporal scheduled triggers for all project workflows."""

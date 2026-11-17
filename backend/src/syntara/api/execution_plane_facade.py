@@ -63,7 +63,6 @@ _ACTIVE_WORK_ITEM_STATUSES: tuple[WorkItemStatus, ...] = (
     WorkItemStatus.CLAIMED,
     WorkItemStatus.DISPATCHED,
     WorkItemStatus.RUNNING,
-    WorkItemStatus.CANCEL_REQUESTED,
     WorkItemStatus.RECONCILIATION_REQUIRED,
 )
 _TARGET_RESPONSES: dict[int | str, dict[str, Any]] = {

@@ -41,7 +41,7 @@ spec:
     - name: ep-git-url
       value: https://github.com/syntara-orchestration/syntara-execution-plane.git
     - name: ep-revision
-      value: devel
+      value: feat/execution-plane-cancel-delete
     - name: ao-operator-git-url
       value: https://github.com/automation-nexus/automation-orchestrator-operator.git
     - name: ao-operator-revision

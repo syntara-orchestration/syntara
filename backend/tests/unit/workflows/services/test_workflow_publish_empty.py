@@ -25,6 +25,8 @@ def mock_service() -> WorkflowService:
     """Create a WorkflowService with mocked dependencies."""
     session = AsyncMock()
     session.add = MagicMock()
+    session.exec.return_value = MagicMock()
+    session.exec.return_value.all.return_value = []
     user = MagicMock()
     user.id = uuid4()
     service = WorkflowService.__new__(WorkflowService)
