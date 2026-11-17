@@ -11,6 +11,8 @@ from typing import Any
 
 from temporalio import workflow
 
+from syntara.workflow_runtime.engines.temporal.constants import CONVERGE_TIMEOUT_REASON_MARKER
+
 with workflow.unsafe.imports_passed_through():
     from syntara.workflow_core.output_mapping import OutputMappingError
     from syntara.workflow_runtime.engines.temporal.node_settings_resolver import (
@@ -539,7 +541,10 @@ class WorkflowConvergeMixin:
                 timed_out = True
 
             if timed_out:
-                error_msg = f"Converge node {node_id} timed out after {timeout_seconds}s waiting for predecessors"
+                error_msg = (
+                    f"Converge node {node_id} {CONVERGE_TIMEOUT_REASON_MARKER} "
+                    f"{timeout_seconds}s waiting for predecessors"
+                )
                 workflow.logger.error(error_msg)
                 if self._is_retry_converge_candidate(node_id):
                     self._schedule_retry_converge_failure(

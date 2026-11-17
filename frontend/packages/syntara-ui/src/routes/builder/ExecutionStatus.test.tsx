@@ -1,6 +1,7 @@
 import type { ExecutionsAPI } from '@syntara/contracts'
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
+import { axe } from 'vitest-axe'
 
 import { ActivityStatusLabel, StatusLabel } from './ExecutionStatus'
 
@@ -125,5 +126,11 @@ describe('ActivityStatusLabel', () => {
     expect(screen.getByText('Successful')).toBeInTheDocument()
     expect(screen.getByText('Reused trigger input')).toBeInTheDocument()
     expect(screen.queryByTestId('replayed-output-badge')).not.toBeInTheDocument()
+  })
+
+  it('has no accessibility violations when status and retry markers are combined', async () => {
+    const { container } = render(<ActivityStatusLabel status="failed" retainedFailure />)
+
+    expect(await axe(container)).toHaveNoViolations()
   })
 })

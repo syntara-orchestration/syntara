@@ -206,9 +206,10 @@ async def replay_retry_node_activity(
                 col(ActivityExecution.status).in_(RESTORABLE_SOURCE_STATUSES),
             )
         else:
-            query = query.where(ActivityExecution.activity_name == node_id).order_by(
-                col(ActivityExecution.iteration).desc(), col(ActivityExecution.created_at).desc()
-            )
+            query = query.where(
+                ActivityExecution.activity_name == node_id,
+                col(ActivityExecution.status).in_(RESTORABLE_SOURCE_STATUSES),
+            ).order_by(col(ActivityExecution.iteration).desc(), col(ActivityExecution.created_at).desc())
         activity_row = (await session.exec(query.limit(1))).first()
         if activity_row is not None:
             stored = {
@@ -398,7 +399,11 @@ async def probe_retry_loop_iteration(
         )
         found = await session.exec(
             select(ActivityExecution.id)
-            .where(ActivityExecution.execution_id == source_execution_id, or_(*direct_conditions))
+            .where(
+                ActivityExecution.execution_id == source_execution_id,
+                col(ActivityExecution.status).in_(RESTORABLE_SOURCE_STATUSES),
+                or_(*direct_conditions),
+            )
             .limit(1)
         )
         return found.first() is not None

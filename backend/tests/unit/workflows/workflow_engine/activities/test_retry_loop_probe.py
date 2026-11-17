@@ -10,6 +10,7 @@ from sqlalchemy.dialects import postgresql
 from syntara.workflow_runtime.engines.temporal.activities.retry_node_replay_activity import (
     probe_retry_loop_iteration,
 )
+from syntara.workflow_runtime.engines.temporal.constants import RESTORABLE_SOURCE_STATUSES
 
 
 def _result(*, found: bool) -> MagicMock:
@@ -54,6 +55,8 @@ async def test_exact_full_path_record_means_iteration_was_reached() -> None:
     assert answer is True
     assert "body_a_iter_2_iter_3" in _render(queries[0])
     assert "src-1" in _render(queries[0])
+    for status in RESTORABLE_SOURCE_STATUSES:
+        assert status.value in _render(queries[0])
 
 
 @pytest.mark.asyncio

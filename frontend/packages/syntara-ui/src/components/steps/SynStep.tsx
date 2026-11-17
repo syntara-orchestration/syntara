@@ -97,9 +97,9 @@ function StepBottomBadge({
     <Stack data-testid="step-bottom-badges" className={stepStyles.bottomBadges}>
       {retainedFailure && (
         <StackItem>
-          <Label isCompact color="orange">
+          <SynLabel variant="outline" status="warning">
             Retained failure
-          </Label>
+          </SynLabel>
         </StackItem>
       )}
       {showReplayedOutput && (

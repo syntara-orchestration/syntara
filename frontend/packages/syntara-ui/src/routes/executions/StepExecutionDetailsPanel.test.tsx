@@ -75,6 +75,21 @@ describe('StepExecutionDetailsPanel', () => {
     expect(screen.getByText('Successful')).toBeInTheDocument()
   })
 
+  it('shows retry markers beside the step status in the details header', () => {
+    render(
+      <StepExecutionDetailsPanel
+        {...defaultProps}
+        stepState={{ ...defaultProps.stepState, status: 'failed' }}
+        stepType="script"
+        replayBaselineAt="2024-01-01T10:02:00Z"
+      />,
+      { wrapper }
+    )
+
+    expect(screen.getByText('Failed')).toBeInTheDocument()
+    expect(screen.getByText('Retained failure')).toBeInTheDocument()
+  })
+
   it('renders Input and Output panes side by side', () => {
     render(<StepExecutionDetailsPanel {...defaultProps} />, { wrapper })
 

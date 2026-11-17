@@ -258,7 +258,7 @@ async def test_invalid_selection_does_not_report_sanitized_retry_nodes() -> None
     verdict = await validate_retry_from_failure(session, execution.id, ["step_3"])
 
     assert verdict.eligible is False
-    assert "not failed nodes" in (verdict.reason or "")
+    assert "neither failed nor eligible replacements" in (verdict.reason or "")
     assert verdict.sanitized_node_ids == []
 
 
@@ -845,6 +845,29 @@ async def test_validate_retry_rejects_failure_under_completed_converge() -> None
 
 
 @pytest.mark.asyncio
+async def test_missing_snapshot_node_reason_precedes_completed_converge_reason() -> None:
+    """A missing retained-version node should report the actionable version error."""
+    execution = _make_execution(ExecutionStatus.FAILED)
+    snapshot = _make_version(1)
+    snapshot.workflow_definition = {
+        "triggers": TRIGGERS,
+        "nodes": [{"id": "conv_1", "type": "converge", "parameters": {}}],
+        "edges": [{"from": "missing_step", "to": "conv_1"}],
+    }
+    session = _mock_session(
+        (execution, "one"),
+        ([_make_activity("missing_step")], "all"),
+        ([_make_completed_activity("conv_1")], "all"),
+        (snapshot, "one"),
+    )
+
+    verdict = await validate_retry_from_failure(session, execution.id, ["missing_step"])
+
+    assert verdict.eligible is False
+    assert "not nodes in the executed workflow version: missing_step" in (verdict.reason or "")
+
+
+@pytest.mark.asyncio
 async def test_validate_retry_allows_failure_under_failed_converge() -> None:
     execution = _make_execution(ExecutionStatus.FAILED)
     session = _converge_session(execution, "failed")
@@ -909,6 +932,7 @@ async def test_validate_retry_rejects_iteration_suffixed_selection() -> None:
     verdict = await validate_retry_from_failure(_run_session(execution, _definition()), execution.id, ["step_2#iter-1"])
     assert verdict.eligible is False
     assert "base node" in (verdict.reason or "")
+    assert verdict.eligible_point_ids == []
 
 
 @pytest.mark.asyncio

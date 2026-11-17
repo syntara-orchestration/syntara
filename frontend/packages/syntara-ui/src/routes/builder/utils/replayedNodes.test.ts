@@ -46,17 +46,17 @@ describe('isReplayedStep', () => {
   })
 
   it('keeps retained failures separate from reused output when partial data is present', () => {
-    expect(
-      getRetryActivityMarkers(
-        {
-          startedAt: SOURCE_RUN_START,
-          status: ACTIVITY_STATUS.FAILED,
-          outputData: { partial_result: 'available' },
-        },
-        RETRY_CREATED_AT,
-        ACTION_NODE_TYPE
-      )
-    ).toEqual({ replayed: false, retainedFailure: true, triggerInputReused: false })
+    const failedActivityWithPartialOutput = {
+      startedAt: SOURCE_RUN_START,
+      status: ACTIVITY_STATUS.FAILED,
+      outputData: { partial_result: 'available' },
+    }
+
+    expect(getRetryActivityMarkers(failedActivityWithPartialOutput, RETRY_CREATED_AT, ACTION_NODE_TYPE)).toEqual({
+      replayed: false,
+      retainedFailure: true,
+      triggerInputReused: false,
+    })
   })
 
   it('does not flag a step that failed again during the retry', () => {

@@ -1,7 +1,5 @@
 import {
   Button,
-  Content,
-  ContentVariants,
   EmptyState,
   EmptyStateBody,
   Flex,
@@ -14,8 +12,6 @@ import {
   Tab,
   Tabs,
   TabTitleText,
-  Title,
-  TitleSizes,
   Tooltip,
 } from '@patternfly/react-core'
 import {
@@ -38,7 +34,6 @@ import { capitalize } from '../../utils/capitalize'
 import { formatElapsedTime } from '../../utils/dateUtils'
 import { detachPromise } from '../../utils/detachPromise'
 import { highlightTextLines } from '../../utils/highlightText'
-import { ActivityStatusLabel } from '../builder/ExecutionStatus'
 import { InputSchemaView } from '../builder/panels/views/InputSchemaView'
 import { InputTableView } from '../builder/panels/views/InputTableView'
 import { ViewToggle, type PanelView } from '../builder/panels/ViewToggle'
@@ -50,6 +45,7 @@ import { AgentTraceView } from './AgentTraceView'
 import { useStepExecutionDetails } from './hooks/useStepExecutionDetails'
 import { RetryInputOverrideDetails, type RetryInputOverrideDetailsProps } from './RetryInputOverrideDetails'
 import { getEffectiveRetryInputs, getRetryInputEditorValue } from './retryInputOverrides'
+import { StepDetailsHeader } from './StepDetailsHeader'
 import styles from './StepExecutionDetailsPanel.module.css'
 import { extractUsedTools, type UsedTool } from './utils/extractUsedTools'
 
@@ -61,6 +57,8 @@ type StepExecutionDetailsPanelProps = {
   stepState?: ActivityState
   /** Step type from workflow definition (e.g. 'aap_job_template'). */
   stepType?: string
+  /** Timestamp replayed steps predate; set only for retry executions. */
+  replayBaselineAt?: string | null
   retryInputOverride?: Omit<RetryInputOverrideDetailsProps, 'resolvedInputs'>
 }
 
@@ -275,61 +273,6 @@ function UsedToolsSection({ tools }: Readonly<{ tools: UsedTool[] }>) {
   )
 }
 
-function StepDetailsHeader({
-  stepName,
-  startedAt,
-  completedAt,
-  elapsedLabel,
-  status,
-}: Readonly<{
-  stepName: string
-  startedAt: string | null
-  completedAt: string | null
-  elapsedLabel: string | null
-  status?: ActivityState['status']
-}>) {
-  return (
-    <StackItem className={styles.headerRow}>
-      <Flex justifyContent={{ default: 'justifyContentSpaceBetween' }} alignItems={{ default: 'alignItemsCenter' }}>
-        <FlexItem>
-          <Title headingLevel="h2" size={TitleSizes.md} style={{ margin: 0 }}>
-            {stepName}
-          </Title>
-        </FlexItem>
-        {status && (
-          <FlexItem style={{ display: 'flex', alignItems: 'center' }}>
-            <ActivityStatusLabel status={status} />
-          </FlexItem>
-        )}
-      </Flex>
-      {(startedAt || completedAt || elapsedLabel) && (
-        <Flex
-          className={styles.stepTiming}
-          gap={{ default: 'gapMd' }}
-          alignItems={{ default: 'alignItemsBaseline' }}
-          flexWrap={{ default: 'nowrap' }}
-        >
-          {startedAt && (
-            <Content component={ContentVariants.small} className={styles.stepTimingItem}>
-              Started: <ExecutionTimestamp dateString={startedAt} />
-            </Content>
-          )}
-          {completedAt && (
-            <Content component={ContentVariants.small} className={styles.stepTimingItem}>
-              Completed: <ExecutionTimestamp dateString={completedAt} />
-            </Content>
-          )}
-          {elapsedLabel && (
-            <Content component={ContentVariants.small} className={styles.stepTimingItem}>
-              Elapsed time: {elapsedLabel}
-            </Content>
-          )}
-        </Flex>
-      )}
-    </StackItem>
-  )
-}
-
 type StepContentAreaProps = Readonly<{
   stepId: string
   inputData: Record<string, unknown> | null
@@ -459,6 +402,7 @@ export function StepExecutionDetailsPanel({
   executionId,
   stepState,
   stepType,
+  replayBaselineAt,
   retryInputOverride,
 }: Readonly<StepExecutionDetailsPanelProps>) {
   const [activeTab, setActiveTab] = useState<'io' | 'agent-steps'>('io')
@@ -491,6 +435,8 @@ export function StepExecutionDetailsPanel({
         completedAt={completedAt}
         elapsedLabel={elapsedLabel}
         status={stepState?.status}
+        nodeType={stepType}
+        replayBaselineAt={replayBaselineAt}
       />
 
       {/* Approval audit strip (shown only for decided approval steps) */}

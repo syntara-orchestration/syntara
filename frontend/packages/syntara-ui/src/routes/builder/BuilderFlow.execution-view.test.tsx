@@ -394,12 +394,12 @@ describe('BuilderFlow execution view', () => {
     })
   })
 
-  it('marks reused activity output while keeping a rerun trigger distinct', () => {
+  it('marks a retained failure separately from reused output and rerun trigger input', () => {
     setWorkflowState({
       currentWorkflow: {
         id: 'workflow-retry',
         inputs: {},
-        triggers: [{ id: 'trigger-manual', type: 'manual', name: 'Manual Trigger' }],
+        triggers: [{ id: 'trigger-manual', type: 'manual_trigger', name: 'Manual Trigger' }],
         workflow: {
           activities: [
             {
@@ -421,7 +421,7 @@ describe('BuilderFlow execution view', () => {
         { id: 'edge-trigger-replayed', source: 'trigger-0', target: 'task-replayed' },
         { id: 'edge-replayed-fresh', source: 'task-replayed', target: 'task-fresh' },
       ],
-      triggers: [{ id: 'trigger-manual', type: 'manual', name: 'Manual Trigger' }],
+      triggers: [{ id: 'trigger-manual', type: 'manual_trigger', name: 'Manual Trigger' }],
     })
     // Retry created at noon. The trigger and failed step carry the source run's
     // 11:00 start; the second actually ran inside the retry at 12:00:05.
@@ -457,7 +457,9 @@ describe('BuilderFlow execution view', () => {
 
     expect(stateOf('trigger-0').replayed).toBe(false)
     expect(stateOf('trigger-0').started_at).toBe('2026-10-09T11:00:00Z')
-    expect(stateOf('task-replayed').replayed).toBe(true)
+    expect(stateOf('trigger-0').triggerInputReused).toBe(true)
+    expect(stateOf('task-replayed').replayed).toBe(false)
+    expect(stateOf('task-replayed').retainedFailure).toBe(true)
     expect(stateOf('task-replayed').status).toBe('failed')
     expect(stateOf('task-fresh').replayed).toBe(false)
   })

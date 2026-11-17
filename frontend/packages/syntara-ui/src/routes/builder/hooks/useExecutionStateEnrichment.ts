@@ -13,6 +13,7 @@ type ExecutionStateSnapshot = {
   completed_at?: string
   replayed?: boolean
   retainedFailure?: boolean
+  triggerInputReused?: boolean
 }
 
 type UseExecutionStateEnrichmentParams = {
@@ -37,7 +38,8 @@ function hasExecutionStateChanged(
       currentState?.started_at !== newState?.started_at ||
       currentState?.completed_at !== newState?.completed_at ||
       currentState?.replayed !== newState?.replayed ||
-      currentState?.retainedFailure !== newState?.retainedFailure)
+      currentState?.retainedFailure !== newState?.retainedFailure ||
+      currentState?.triggerInputReused !== newState?.triggerInputReused)
   )
 }
 

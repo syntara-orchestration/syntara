@@ -29,6 +29,10 @@ MAX_ENV_VAR_LENGTH = _settings.max_env_var_length
 # executor nodes use _get_default_timeout() for type-appropriate defaults.
 DEFAULT_ACTIVITY_TIMEOUT_SECONDS = 30
 
+# Marker included in converge timeout reasons and shared by retry guards that
+# must distinguish a timeout from other gate failures.
+CONVERGE_TIMEOUT_REASON_MARKER = "timed out after"
+
 # Temporal only delivers activity cancellation through heartbeats, and only to an
 # activity that was scheduled with a heartbeat_timeout -- without one the server
 # drops the beats and a cancelled workflow cannot interrupt a long-running

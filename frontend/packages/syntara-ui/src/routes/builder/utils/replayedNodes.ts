@@ -83,7 +83,6 @@ export function getRetryActivityMarkers(
     | {
         startedAt?: string | null
         status?: string | null
-        outputData?: Record<string, unknown> | null
       }
     | undefined,
   replayBaselineAt: string | null | undefined,

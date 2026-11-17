@@ -219,7 +219,7 @@ def _selection_reason(
     allowed = failed_ids | (replacement_ids or set())
     unknown = [point for point in normalized if point not in allowed]
     if unknown:
-        return f"not failed nodes in this execution: {', '.join(unknown)}"
+        return f"these node IDs are neither failed nor eligible replacements in this execution: {', '.join(unknown)}"
     return None
 
 
@@ -593,7 +593,7 @@ def _retry_selection_reason(
         successors,
         sanitized_expansion_seeds=(None if is_default_selection else set(normalized) & replacement_ids),
     )
-    reason = _converge_reason(snapshot_def, normalized, completed_ids, successors) or version_reason
+    reason = version_reason or _converge_reason(snapshot_def, normalized, completed_ids, successors)
     if reason is None:
         reported_selection = sorted(
             _eligible_points(
@@ -641,7 +641,13 @@ def _retry_result_counts(
 def _normalized_retry_points(retry_point_ids: list[str]) -> tuple[list[str], list[str]]:
     """Return iteration-suffixed and normalized retry point IDs."""
     suffixed = sorted({point.strip() for point in retry_point_ids if point and LOOP_ITERATION_SEP in point.strip()})
-    normalized = sorted({point.strip() for point in retry_point_ids if point and point.strip()})
+    normalized = sorted(
+        {
+            point.strip()
+            for point in retry_point_ids
+            if point and point.strip() and LOOP_ITERATION_SEP not in point.strip()
+        }
+    )
     return suffixed, normalized
 
 
