@@ -1525,11 +1525,6 @@ export interface components {
       environment?: {
         [key: string]: string
       }
-      /**
-       * Credential Bindings
-       * @description Host-side recipe-to-credential bindings for Execution Plane dispatch.
-       */
-      credential_bindings?: components['schemas']['CredentialBinding'][]
     }
     /**
      * ScriptNode

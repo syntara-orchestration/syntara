@@ -121,7 +121,7 @@ class TestPublishEmptyWorkflow:
         assert workflow == mock_workflow
 
     @pytest.mark.asyncio
-    async def test_publish_allows_script_credential_bindings(self, mock_service: WorkflowService) -> None:
+    async def test_publish_allows_http_request_credential_bindings(self, mock_service: WorkflowService) -> None:
         workflow_id = uuid4()
         mock_workflow = MagicMock()
         mock_workflow.id = workflow_id
@@ -136,15 +136,15 @@ class TestPublishEmptyWorkflow:
         mock_version.version = 1
         mock_version.workflow_definition = {
             "schema_version": "2.0.0",
-            "name": "with-script-binding",
+            "name": "with-http-request-binding",
             "triggers": [{"id": "t1", "type": "manual_trigger", "parameters": {}}],
             "nodes": [
                 {
                     "id": "n1",
-                    "type": "script",
+                    "type": "http_request",
                     "parameters": {
-                        "language": "python",
-                        "code": "pass",
+                        "method": "GET",
+                        "url": "https://example.com",
                         "credential_bindings": [
                             {
                                 "credential_recipe_id": "acme.echo.api-token",

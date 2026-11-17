@@ -34,27 +34,37 @@ class TestValidWorkflowDefinition:
     def test_valid_definition_passes(self, validator: WorkflowValidator) -> None:
         validator.validate_workflow_definition(_valid_definition())
 
-    def test_script_credential_bindings_pass(self, validator: WorkflowValidator) -> None:
+    def test_http_request_credential_bindings_pass(self, validator: WorkflowValidator) -> None:
         definition = _valid_definition()
-        definition["nodes"][0]["parameters"]["credential_bindings"] = [
-            {
-                "credential_recipe_id": "acme.echo.api-token",
-                "credential_ref": "00000000-0000-0000-0000-000000000001",
-            }
-        ]
+        definition["nodes"][0]["type"] = "http_request"
+        definition["nodes"][0]["parameters"] = {
+            "method": "GET",
+            "url": "https://example.com",
+            "credential_bindings": [
+                {
+                    "credential_recipe_id": "acme.echo.api-token",
+                    "credential_ref": "00000000-0000-0000-0000-000000000001",
+                }
+            ],
+        }
 
         result = validator.collect_findings(definition)
 
         assert result.error_count == 0
 
-    def test_script_template_credential_recipe_id_passes(self, validator: WorkflowValidator) -> None:
+    def test_http_request_template_credential_recipe_id_passes(self, validator: WorkflowValidator) -> None:
         definition = _valid_definition()
-        definition["nodes"][0]["parameters"]["credential_bindings"] = [
-            {
-                "credential_recipe_id": "${trigger.recipeId}",
-                "credential_ref": "00000000-0000-0000-0000-000000000001",
-            }
-        ]
+        definition["nodes"][0]["type"] = "http_request"
+        definition["nodes"][0]["parameters"] = {
+            "method": "GET",
+            "url": "https://example.com",
+            "credential_bindings": [
+                {
+                    "credential_recipe_id": "${trigger.recipeId}",
+                    "credential_ref": "00000000-0000-0000-0000-000000000001",
+                }
+            ],
+        }
 
         result = validator.collect_findings(definition)
 
@@ -132,7 +142,12 @@ class TestCredentialBindings:
 
     def test_non_object_binding_is_rejected(self, validator: WorkflowValidator) -> None:
         definition = _valid_definition()
-        definition["nodes"][0]["parameters"]["credential_bindings"] = [None]
+        definition["nodes"][0]["type"] = "http_request"
+        definition["nodes"][0]["parameters"] = {
+            "method": "GET",
+            "url": "https://example.com",
+            "credential_bindings": [None],
+        }
 
         result = validator.collect_findings(definition)
 

@@ -409,13 +409,6 @@ class CredentialBindingsMixin(BaseModel):
 
 class ScriptExecutorParameters(
     ExecutionPlaneMixin,
-    # ===============================================================================
-    # TEMPORARY: Script Steps do not support or require Credentials however the
-    # Step type was chosen to help prototype the Execution Plane and Plugin SDK.
-    # Until a concrete Step type, requring Credentials, has been implemented
-    # we continue to use Script Step for development work.
-    # ===============================================================================
-    CredentialBindingsMixin,
     TemplateAwareBaseModel,
 ):
     """Parameters for script executor."""
