@@ -144,7 +144,6 @@ export type CreateFormTriggerOptions = {
   message?: string | null
   submit_label?: string | null
   success_message?: string | null
-  css_override?: string | null
 }
 
 /** Create a form trigger (v2). */

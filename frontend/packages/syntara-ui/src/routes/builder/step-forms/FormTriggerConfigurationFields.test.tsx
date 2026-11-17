@@ -45,7 +45,6 @@ function renderFields(formDefinition = createEmptyFormDefinition()) {
         message: '',
         submit_label: '',
         success_message: '',
-        css_override: '',
       },
     })
     return (

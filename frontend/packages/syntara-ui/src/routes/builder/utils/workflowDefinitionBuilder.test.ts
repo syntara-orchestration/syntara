@@ -127,7 +127,6 @@ describe('buildWorkflowDefinition', () => {
             message: 'Please fill out the form',
             submit_label: 'Submit',
             success_message: 'Thanks',
-            css_override: '.form { margin: 0; }',
           },
         },
       ]
@@ -149,7 +148,6 @@ describe('buildWorkflowDefinition', () => {
         message: 'Please fill out the form',
         submit_label: 'Submit',
         success_message: 'Thanks',
-        css_override: '.form { margin: 0; }',
         form_definition: {
           fields: [{ type: 'text', value_name: 'notes', label: 'Notes', required: false }],
         },

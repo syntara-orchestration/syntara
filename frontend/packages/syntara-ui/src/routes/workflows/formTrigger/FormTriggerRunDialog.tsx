@@ -1,9 +1,8 @@
 import { Alert, Button, Modal, ModalBody, ModalFooter, ModalHeader, Stack, StackItem } from '@patternfly/react-core'
 import { useNavigate } from '@tanstack/react-router'
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useState } from 'react'
 
 import { DisabledWithTooltip } from '../../../components/DisabledWithTooltip'
-import { resolveFormPromptCssOverride } from '../../../components/forms/resolveFormPromptCssOverride'
 import { SynDynamicForm } from '../../../components/forms/SynDynamicForm'
 import formStepResponseSurfaceStyles from '../../../components/forms/synFormStepResponseSurface.module.css'
 import { FormDataValidationError } from '../../../forms'
@@ -47,7 +46,6 @@ export function FormTriggerRunDialog({
   const [submitFailed, setSubmitFailed] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  const cssOverride = useMemo(() => resolveFormPromptCssOverride(formTrigger.cssOverride), [formTrigger.cssOverride])
   const message = formTrigger.message?.trim() || undefined
   const submitLabel = formTrigger.submitLabel?.trim() || 'Submit'
   const successMessage = formTrigger.successMessage?.trim() || 'Your request was submitted.'
@@ -111,7 +109,6 @@ export function FormTriggerRunDialog({
         <Stack hasGutter>
           <StackItem>
             <div className={`${formStepResponseSurfaceStyles.formStepResponseForm} form-step-response-form`}>
-              {cssOverride ? <style>{cssOverride}</style> : null}
               <SynDynamicForm
                 id={formId}
                 data-testid="form-trigger-run-form"

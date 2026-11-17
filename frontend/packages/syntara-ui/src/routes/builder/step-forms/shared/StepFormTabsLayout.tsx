@@ -4,6 +4,7 @@ import type { ReactNode } from 'react'
 
 import { SynPageBody } from '../../../../components/layout/SynPage'
 
+import stepFormStyles from './stepFormStyles.module.css'
 import { useStepFormTabBar } from './useStepFormTabBar'
 
 type StepFormTabsLayoutProps = {
@@ -18,7 +19,7 @@ export function StepFormTabsLayout({ parametersContent, settingsContent, hideSet
   const tabBarAction = useStepFormTabBar()
 
   return (
-    <Stack hasGutter style={{ height: '100%', minHeight: 0, flex: 1 }}>
+    <Stack hasGutter className={stepFormStyles.nodeFormTabsLayout} style={{ height: '100%', minHeight: 0, flex: 1 }}>
       <StackItem>
         <Flex justifyContent={{ default: 'justifyContentSpaceBetween' }} alignItems={{ default: 'alignItemsCenter' }}>
           <FlexItem>
@@ -30,9 +31,11 @@ export function StepFormTabsLayout({ parametersContent, settingsContent, hideSet
           {tabBarAction && <FlexItem>{tabBarAction}</FlexItem>}
         </Flex>
       </StackItem>
-      <SynPageBody>
-        <Stack hasGutter>
-          <StackItem>{activeTabKey === 0 ? parametersContent : (settingsContent ?? null)}</StackItem>
+      <SynPageBody className={stepFormStyles.nodeFormTabsBody}>
+        <Stack hasGutter className={stepFormStyles.nodeFormParametersStack}>
+          <StackItem className={stepFormStyles.nodeFormParametersItem}>
+            {activeTabKey === 0 ? parametersContent : (settingsContent ?? null)}
+          </StackItem>
         </Stack>
       </SynPageBody>
     </Stack>

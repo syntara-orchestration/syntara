@@ -11,7 +11,6 @@ export type FormPromptActivityParameterInput = {
   fallback_decision?: 'submit' | 'fallback' | null
   submit_label?: string | null
   success_message?: string | null
-  css_override?: string | null
 }
 
 type OptionalFormPromptField = {
@@ -54,11 +53,6 @@ const OPTIONAL_FORM_PROMPT_FIELDS: OptionalFormPromptField[] = [
   {
     key: 'success_message',
     read: (input) => input.success_message,
-    include: (value) => typeof value === 'string' && value !== '',
-  },
-  {
-    key: 'css_override',
-    read: (input) => input.css_override,
     include: (value) => typeof value === 'string' && value !== '',
   },
 ]

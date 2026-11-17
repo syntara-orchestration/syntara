@@ -41,21 +41,10 @@ const baseProps = {
 }
 
 describe('FormPromptPendingResponseForm', () => {
-  it('renders the dynamic form without custom CSS when override is blank', () => {
-    render(<FormPromptPendingResponseForm {...baseProps} cssOverrideSource="   " />)
+  it('renders the dynamic form fields', () => {
+    render(<FormPromptPendingResponseForm {...baseProps} />)
 
     expect(screen.getByRole('form', { name: 'Form prompt fields' })).toBeInTheDocument()
-    expect(screen.getByText('Summary')).not.toHaveStyle({ fontWeight: '700' })
-  })
-
-  it('applies scoped css_override to the rendered form', () => {
-    render(
-      <FormPromptPendingResponseForm
-        {...baseProps}
-        cssOverrideSource=".form-step-response-form label { font-weight: 700; }"
-      />
-    )
-
-    expect(screen.getByText('Summary')).toHaveStyle({ fontWeight: '700' })
+    expect(screen.getByText('Summary')).toBeInTheDocument()
   })
 })

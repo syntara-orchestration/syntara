@@ -1,4 +1,4 @@
-/* Scope target for workflow-authored css_override (use global .form-step-response-form). */
+/* Shared layout surface for form step / form-trigger response forms (global .form-step-response-form). */
 .formStepResponseForm {
   /* Floor when users shrink the textarea horizontally (not the default full column width). */
   --form-step-response-textarea-min-width: 5rem;
