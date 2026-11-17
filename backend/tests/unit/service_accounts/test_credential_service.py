@@ -273,6 +273,37 @@ class TestRotateCredential:
         with pytest.raises(ServiceAccountCredentialNotFoundError):
             await service.rotate_credential(cred_id, service_account_id=sa_id)
 
+    @pytest.mark.asyncio
+    async def test_rotate_acquires_row_lock(
+        self,
+        service: ServiceAccountCredentialService,
+        mock_session: AsyncMock,
+        override_runtime_settings: Callable[..., AbstractContextManager[object]],
+    ) -> None:
+        mock_cred = MagicMock(spec=ServiceAccountCredential)
+        mock_cred.credential_type = ServiceAccountCredentialType.CLIENT_CREDENTIALS
+        mock_cred.grace_period_seconds = 3600
+        mock_cred.hashed_secret = "$argon2id$old"  # noqa: S105
+        mock_cred.expires_at = None
+        mock_cred.update_by_user = MagicMock()
+
+        mock_query = MagicMock()
+        mock_query.with_for_update.return_value = mock_query
+        mock_result = MagicMock()
+        mock_result.one_or_none.return_value = mock_cred
+
+        def exec_side_effect(query: object) -> MagicMock:
+            return mock_result
+
+        mock_session.exec.side_effect = exec_side_effect
+
+        with override_runtime_settings({"service_accounts.credential_max_lifetime_days": 0}):
+            with patch.object(type(service), "get_credential", wraps=service.get_credential) as wrapped:
+                await service.rotate_credential(uuid4(), service_account_id=uuid4())
+                wrapped.assert_called_once()
+                _, kwargs = wrapped.call_args
+                assert kwargs["for_update"] is True
+
 
 class TestConversionMethods:
     """Tests for to_read, to_create_response, to_rotate_response."""
