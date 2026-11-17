@@ -4,7 +4,9 @@ import { RegistryStepId } from '../../constants'
 import type { NodeKind } from '../../hooks/useNodeKindsQuery'
 
 import {
+  STEP_TYPE_NO_PROJECT_TOOLTIP,
   STEP_TYPE_PERMISSIONS_UNAVAILABLE_TOOLTIP,
+  filterRestrictedEntries,
   gatePaletteEntries,
   gatePaletteEntry,
   stepTypeBlockedTooltip,
@@ -169,10 +171,48 @@ describe('gatePaletteEntries', () => {
     }
   })
 
+  it('uses the given tooltip when failing closed for another reason, such as no project', () => {
+    const gated = gatePaletteEntries(entries, new Map(), true, STEP_TYPE_NO_PROJECT_TOOLTIP)
+
+    for (const entry of gated) {
+      expect(entry.isDisabled).toBe(true)
+      expect(entry.disabledTooltip).toBe(STEP_TYPE_NO_PROJECT_TOOLTIP)
+    }
+  })
+
   it('renders entries unchanged when nothing is blocked', () => {
     const gated = gatePaletteEntries(entries, allKinds)
     expect(gated.map((entry) => entry.id)).toEqual(entries.map((entry) => entry.id))
     expect(gated.every((entry) => entry.isDisabled !== true)).toBe(true)
+  })
+})
+
+describe('filterRestrictedEntries', () => {
+  const gated = [
+    { id: 'script', isDisabled: true, disabledTooltip: 'Blocked by p (all projects)' },
+    { id: 'http_request' },
+    { id: 'agentic', isDisabled: true, disabledTooltip: 'Blocked by p (all projects)' },
+  ]
+
+  it('hides restricted entries by default and counts them', () => {
+    const { entries, restrictedCount } = filterRestrictedEntries(gated, false)
+
+    expect(entries.map((entry) => entry.id)).toEqual(['http_request'])
+    expect(restrictedCount).toBe(2)
+  })
+
+  it('keeps restricted entries in display order when revealed', () => {
+    const { entries, restrictedCount } = filterRestrictedEntries(gated, true)
+
+    expect(entries.map((entry) => entry.id)).toEqual(['script', 'http_request', 'agentic'])
+    expect(restrictedCount).toBe(2)
+  })
+
+  it('reports no restricted entries when nothing is blocked', () => {
+    expect(filterRestrictedEntries([{ id: 'script' }], false)).toEqual({
+      entries: [{ id: 'script' }],
+      restrictedCount: 0,
+    })
   })
 })
 

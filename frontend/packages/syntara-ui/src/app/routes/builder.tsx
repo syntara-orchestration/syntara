@@ -13,10 +13,18 @@ const builderEditSearch = z
   })
   .catch({})
 
+/** `projectId` pre-fills the project picker shown before the builder opens (R18). */
+const builderNewSearch = z
+  .object({
+    projectId: z.string().min(1).optional(),
+  })
+  .catch({})
+
 export const builderRoutes = [
   createRoute({
     getParentRoute: () => rootRoute,
     path: '/workflow-builder/new',
+    validateSearch: builderNewSearch,
     component: makeRouteComponent(<BuilderNew />),
   }),
   createRoute({

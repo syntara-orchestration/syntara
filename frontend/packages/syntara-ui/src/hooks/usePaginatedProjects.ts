@@ -6,7 +6,8 @@ import type { ProjectRead } from '../routes/access/types'
 
 import { useDebouncedValue } from './useDebouncedValue'
 
-const PAGE_SIZE = 20
+/** Page size of the project picker's first page; reuse it to share that page's cache entry. */
+export const PROJECTS_PAGE_SIZE = 20
 
 export function usePaginatedProjects() {
   const [filterValue, setFilterValue] = useState('')
@@ -38,7 +39,7 @@ export function usePaginatedProjects() {
     {
       params: {
         query: {
-          limit: PAGE_SIZE,
+          limit: PROJECTS_PAGE_SIZE,
           ...(debouncedFilter ? { 'name[contains]': debouncedFilter } : {}),
           ...(cursor ? { cursor } : {}),
         },

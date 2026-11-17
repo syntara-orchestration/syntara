@@ -2,6 +2,7 @@ import AxeBuilder from '@axe-core/playwright'
 
 import { type Page, test, expect, toAppUrl } from './fixtures'
 import { WCAG_TAGS } from './fixtures/accessibility'
+import { openNewWorkflowBuilder, selectProjectDialog } from './helpers/workflows'
 
 async function expectNoA11yViolations(page: Page) {
   const results = await new AxeBuilder({ page }).withTags([...WCAG_TAGS]).analyze()
@@ -37,8 +38,17 @@ test.describe('Accessibility', () => {
     await expectNoA11yViolations(app)
   })
 
-  test('workflow builder page has no accessibility violations', async ({ app }) => {
+  test('new workflow project modal has no accessibility violations', async ({ app }) => {
     await app.goto(toAppUrl('/workflow-builder/new'))
+    const dialog = selectProjectDialog(app)
+    await expect(dialog).toBeVisible()
+    await expect(dialog.getByLabel('Project', { exact: true })).toBeVisible()
+
+    await expectNoA11yViolations(app)
+  })
+
+  test('workflow builder page has no accessibility violations', async ({ app }) => {
+    await openNewWorkflowBuilder(app)
     await expect(app.getByPlaceholder('Workflow name')).toBeVisible()
 
     await expectNoA11yViolations(app)

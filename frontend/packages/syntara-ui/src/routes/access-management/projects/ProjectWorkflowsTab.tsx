@@ -70,7 +70,11 @@ export function ProjectWorkflowsTab({ projectId, isBuiltin = false }: Readonly<P
       filterFieldDefinitions={workflowFilterDefinitions}
       onFilterChange={handleFilterChange}
       onClearAllFilters={handleClearAllFilters}
-      onCreateWorkflow={canCreate ? () => detachPromise(navigate({ to: AppRoute.WorkflowBuilder.New })) : undefined}
+      onCreateWorkflow={
+        canCreate
+          ? () => detachPromise(navigate({ to: AppRoute.WorkflowBuilder.New, search: { projectId } }))
+          : undefined
+      }
       footer={getFooterProps(workflowsQuery.data)}
       getSortParams={getSortParams}
       isAllProjects={false}

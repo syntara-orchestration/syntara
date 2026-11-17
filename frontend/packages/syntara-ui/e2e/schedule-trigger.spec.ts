@@ -20,7 +20,7 @@
  *   "interval" and "continuous" only). If cron support is added, add tests here.
  */
 
-import { test, expect, toAppUrl } from './fixtures'
+import { test, expect } from './fixtures'
 import { addScheduleTrigger, openScheduleTriggerForEditing } from './helpers/v2-steps'
 import {
   buildUniqueName,
@@ -30,6 +30,7 @@ import {
   selectProjectIfRequired,
   clickAddConnectedStep,
   fillCodeEditor,
+  openNewWorkflowBuilder,
 } from './helpers/workflows'
 import { ensureProject } from './utils/api'
 
@@ -44,7 +45,7 @@ test.describe('Schedule Trigger — UI-19', () => {
 
   test.describe('Trigger selection panel', () => {
     test('Schedule trigger button is visible in trigger selection', async ({ app }) => {
-      await app.goto(toAppUrl('/workflow-builder/new'))
+      await openNewWorkflowBuilder(app)
 
       await expect(app.getByRole('heading', { name: /select a trigger step/i })).toBeVisible({
         timeout: 15_000,
@@ -53,7 +54,7 @@ test.describe('Schedule Trigger — UI-19', () => {
     })
 
     test('Clicking Schedule trigger opens the schedule configuration form', async ({ app }) => {
-      await app.goto(toAppUrl('/workflow-builder/new'))
+      await openNewWorkflowBuilder(app)
 
       await expect(app.getByRole('heading', { name: /select a trigger step/i })).toBeVisible({
         timeout: 15_000,
@@ -72,7 +73,7 @@ test.describe('Schedule Trigger — UI-19', () => {
 
   test.describe('Schedule type modes', () => {
     test('Visual schedule builder renders required fields', async ({ app }) => {
-      await app.goto(toAppUrl('/workflow-builder/new'))
+      await openNewWorkflowBuilder(app)
       await expect(app.getByRole('heading', { name: /select a trigger step/i })).toBeVisible({
         timeout: 15_000,
       })
@@ -90,7 +91,7 @@ test.describe('Schedule Trigger — UI-19', () => {
     })
 
     test('Custom cron expression mode hides the schedule builder fields', async ({ app }) => {
-      await app.goto(toAppUrl('/workflow-builder/new'))
+      await openNewWorkflowBuilder(app)
       await expect(app.getByRole('heading', { name: /select a trigger step/i })).toBeVisible({
         timeout: 15_000,
       })
@@ -110,7 +111,7 @@ test.describe('Schedule Trigger — UI-19', () => {
     })
 
     test('Frequency options include Daily, Weekly, Monthly, Yearly', async ({ app }) => {
-      await app.goto(toAppUrl('/workflow-builder/new'))
+      await openNewWorkflowBuilder(app)
       await expect(app.getByRole('heading', { name: /select a trigger step/i })).toBeVisible({
         timeout: 15_000,
       })
@@ -127,7 +128,7 @@ test.describe('Schedule Trigger — UI-19', () => {
     })
 
     test('Custom cron expression mode is available', async ({ app }) => {
-      await app.goto(toAppUrl('/workflow-builder/new'))
+      await openNewWorkflowBuilder(app)
       await expect(app.getByRole('heading', { name: /select a trigger step/i })).toBeVisible({
         timeout: 15_000,
       })
@@ -150,7 +151,7 @@ test.describe('Schedule Trigger — UI-19', () => {
       const wfName = buildUniqueName('schedule-daily')
 
       await ensureProject(app)
-      await app.goto(toAppUrl('/workflow-builder/new'))
+      await openNewWorkflowBuilder(app)
 
       try {
         await addScheduleTrigger(app, 'Daily Job', {
@@ -183,7 +184,7 @@ test.describe('Schedule Trigger — UI-19', () => {
       const wfName = buildUniqueName('schedule-weekly')
 
       await ensureProject(app)
-      await app.goto(toAppUrl('/workflow-builder/new'))
+      await openNewWorkflowBuilder(app)
 
       try {
         await addScheduleTrigger(app, 'Weekly Report', {
@@ -214,7 +215,7 @@ test.describe('Schedule Trigger — UI-19', () => {
       const wfName = buildUniqueName('schedule-continuous')
 
       await ensureProject(app)
-      await app.goto(toAppUrl('/workflow-builder/new'))
+      await openNewWorkflowBuilder(app)
 
       try {
         await addScheduleTrigger(app, 'Continuous Trigger', { scheduleType: 'continuous' })
@@ -248,7 +249,7 @@ test.describe('Schedule Trigger — UI-19', () => {
       const wfName = buildUniqueName('schedule-roundtrip')
 
       await ensureProject(app)
-      await app.goto(toAppUrl('/workflow-builder/new'))
+      await openNewWorkflowBuilder(app)
 
       try {
         await addScheduleTrigger(app, 'Persisted Schedule', {
@@ -288,7 +289,7 @@ test.describe('Schedule Trigger — UI-19', () => {
       const wfName = buildUniqueName('schedule-type-switch')
 
       await ensureProject(app)
-      await app.goto(toAppUrl('/workflow-builder/new'))
+      await openNewWorkflowBuilder(app)
 
       try {
         // Start with interval

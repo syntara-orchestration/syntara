@@ -1,169 +1,163 @@
 /**
- * E2E Tests: Builder Save Validation — Project Required
+ * E2E Tests: New Workflow — Project Chosen Before the Builder Opens
  *
  * Critical paths covered:
- * - Saving a new workflow without a project keeps the user on /new and shows
- *   a danger state on the project selector (aria-invalid)
- * - Selecting a project then saving succeeds and navigates away from /new
- * - Save button is always clickable (never aria-disabled due to missing project)
- * - Project selector is disabled when editing an existing workflow (AAP-79246)
+ * - Opening /workflow-builder/new shows the "Select a project" modal instead
+ *   of the canvas
+ * - Continue stays disabled until a project is selected; selecting one and
+ *   continuing opens the builder at /workflow-builder/new?projectId=<id>
+ * - Cancel closes the modal and returns to /workflows
+ * - /workflow-builder/new?projectId=<id> pre-fills the modal with that project
+ * - After Continue the toolbar shows "Project: <name>" as text (no project
+ *   selector) and saving persists the workflow
+ * - Editing an existing workflow shows its project as text, never as an
+ *   editable selector (project_id is immutable — AAP-79246)
  *
  * Note: Toast notifications are intentionally NOT asserted here — they are
  * tested in unit tests and are too ephemeral for reliable E2E assertions.
  *
- * AAP-82756: The builder always clears the project selection on mount for new
- * workflows, so the project selector is deterministically empty regardless of
- * any previously persisted selection in Zustand/localStorage.
+ * The modal pre-fills the only project when the user has exactly one
+ * non-built-in project. Tests that need an empty picker create a second
+ * project first so that pre-fill cannot apply.
  */
 
 import { test, expect, toAppUrl } from './fixtures'
-import { buildUniqueName, selectProjectIfRequired } from './helpers/workflows'
-import { createWorkflowViaApi, deleteWorkflowViaApi, ensureProject } from './utils/api'
+import { buildUniqueName, clickSaveAndWait, openNewWorkflowBuilder, selectProjectDialog } from './helpers/workflows'
+import {
+  createProjectViaApi,
+  createWorkflowViaApi,
+  deleteProjectViaApi,
+  deleteWorkflowViaApi,
+  ensureProject,
+} from './utils/api'
 
-test.describe('Builder save validation — project required', () => {
-  /**
-   * Core validation flow: save without project → danger state on selector →
-   * select project → save succeeds and navigates away.
-   * AAP-82756: Project is always cleared on mount so this is deterministic.
-   */
-  test('saving new workflow without project shows error then succeeds after project selection', async ({ app }) => {
-    const workflowName = buildUniqueName('e2e-proj-validation')
+test.describe('New workflow — project selection modal', () => {
+  test('opening a new workflow shows the project modal instead of the canvas', async ({ app }) => {
     await ensureProject(app)
 
     await app.goto(toAppUrl('/workflow-builder/new'))
-    await expect(app.getByRole('heading', { name: 'Select a trigger step' })).toBeVisible()
 
-    // Add a trigger step
-    await app.getByRole('button', { name: 'Manual trigger' }).click()
-    await app.getByRole('textbox', { name: 'Name', exact: true }).fill('Manual trigger')
-    await app.getByRole('button', { name: 'Create' }).click()
+    const dialog = selectProjectDialog(app)
+    await expect(dialog).toBeVisible()
+    await expect(dialog.getByLabel('Project', { exact: true })).toBeVisible()
+    await expect(dialog.getByRole('button', { name: 'Continue', exact: true })).toBeVisible()
+    await expect(dialog.getByRole('button', { name: 'Cancel', exact: true })).toBeVisible()
 
-    // Project selector must always be empty for new workflows (AAP-82756)
-    await expect(app.getByPlaceholder('Select a project')).toBeVisible()
+    // The builder is not rendered until a project is confirmed
+    await expect(app.getByRole('heading', { name: 'Select a trigger step' })).not.toBeVisible()
+    await expect(app.getByPlaceholder('Workflow name')).not.toBeVisible()
+  })
+
+  test('Continue is disabled until a project is selected', async ({ app }) => {
+    await ensureProject(app)
+    // A second project rules out the single-project pre-fill
+    const projectName = buildUniqueName('e2e-proj-modal')
+    const { id: projectId } = await createProjectViaApi(app, projectName)
 
     try {
-      await app.getByPlaceholder('Workflow name').fill(workflowName)
+      await app.goto(toAppUrl('/workflow-builder/new'))
+      const dialog = selectProjectDialog(app)
+      await expect(dialog).toBeVisible()
 
-      // Act: save without selecting a project
-      await app.getByRole('button', { name: 'Save workflow' }).click()
+      const continueButton = dialog.getByRole('button', { name: 'Continue', exact: true })
+      await expect(continueButton).toBeDisabled()
 
-      // Assert: URL remains at /new (save was rejected)
-      await expect(app).toHaveURL(/workflow-builder\/new/, { timeout: 5_000 })
+      // Act: pick the project from the typeahead
+      const projectInput = dialog.getByLabel('Project', { exact: true })
+      await projectInput.click()
+      await projectInput.fill(projectName)
+      await app.getByRole('option', { name: new RegExp(`^${projectName}(\\s|$)`) }).click()
 
-      // Assert: project selector shows aria-invalid danger state
-      await expect(app.locator('[aria-invalid="true"]')).toBeVisible()
+      // Assert: Continue is enabled and opens the builder for that project
+      await expect(continueButton).toBeEnabled()
+      await continueButton.click()
 
-      // Act: select a project (uses helper that skips non-project options like "Create project")
-      await selectProjectIfRequired(app)
-
-      // Assert: danger state is cleared
-      await expect(app.locator('[aria-invalid="true"]')).not.toBeVisible()
-
-      // Act: save again — should succeed
-      await app.getByRole('button', { name: 'Save workflow' }).click()
-
-      // Assert: navigated away from /new to the persisted workflow URL
-      await expect(app).toHaveURL(/workflow-builder\/(?!new)/, { timeout: 15_000 })
+      await expect(dialog).not.toBeVisible()
+      await expect(app).toHaveURL(new RegExp(`/workflow-builder/new\\?(?:.*&)?projectId=${projectId}`))
+      await expect(app.getByRole('heading', { name: 'Select a trigger step' })).toBeVisible()
+      await expect(app.getByText(`Project: ${projectName}`, { exact: true })).toBeVisible()
     } finally {
-      await app.goto(toAppUrl('/workflows'))
-      await app.getByPlaceholder('Filter by name').fill(workflowName)
-      await app.getByRole('button', { name: 'Apply filter' }).click()
-      const row = app.getByRole('row', { name: new RegExp(workflowName) })
-      if ((await row.count()) > 0) {
-        await row.getByRole('button', { name: /Actions|Kebab toggle/i }).click({ force: true })
-        await app.getByRole('menuitem', { name: 'Delete workflow' }).click()
-        await app.getByRole('checkbox', { name: /I understand this workflow/i }).check()
-        await app.getByRole('button', { name: 'Delete workflow' }).click()
-      }
+      await deleteProjectViaApi(app, projectId)
     }
   })
 
-  /**
-   * Verify Save button is always clickable even when no project is selected.
-   * The previous behaviour disabled the button; now validation fires on click.
-   */
-  test('Save button is clickable even without a project selected', async ({ app }) => {
+  test('Cancel returns to the workflows list', async ({ app }) => {
     await app.goto(toAppUrl('/workflow-builder/new'))
-    await expect(app.getByRole('heading', { name: 'Select a trigger step' })).toBeVisible()
+    const dialog = selectProjectDialog(app)
+    await expect(dialog).toBeVisible()
 
-    const saveButton = app.getByRole('button', { name: 'Save workflow' })
-    await expect(saveButton).toBeVisible()
-    await expect(saveButton).not.toHaveAttribute('aria-disabled', 'true')
+    await dialog.getByRole('button', { name: 'Cancel', exact: true }).click()
+
+    await expect(app).toHaveURL(/\/workflows$/)
+    await expect(app.getByRole('heading', { level: 1, name: 'Workflows' })).toBeVisible()
+    await expect(dialog).not.toBeVisible()
   })
 
   /**
-   * Saving a new workflow after selecting a project navigates away from /new.
-   * AAP-82756: Project is always cleared on mount, so explicit selection is always required.
+   * ?projectId pre-fills the modal; after Continue the toolbar shows the
+   * project as text and saving persists the workflow in that project.
    */
-  test('saving new workflow with project selected succeeds immediately', async ({ app }) => {
-    const workflowName = buildUniqueName('e2e-proj-save-ok')
+  test('projectId in the URL pre-fills the modal and the workflow saves into that project', async ({ app }) => {
     await ensureProject(app)
-
-    await app.goto(toAppUrl('/workflow-builder/new'))
-    await expect(app.getByRole('heading', { name: 'Select a trigger step' })).toBeVisible()
+    const projectName = buildUniqueName('e2e-proj-prefill')
+    const { id: projectId } = await createProjectViaApi(app, projectName)
+    const workflowName = buildUniqueName('e2e-proj-save-ok')
+    let workflowId: string | undefined
 
     try {
-      // Add a trigger step
+      await app.goto(toAppUrl(`/workflow-builder/new?projectId=${projectId}`))
+      const dialog = selectProjectDialog(app)
+      await expect(dialog).toBeVisible()
+
+      // Assert: pre-filled — the user still confirms with Continue
+      await expect(dialog.getByLabel('Project', { exact: true })).toHaveValue(projectName)
+      const continueButton = dialog.getByRole('button', { name: 'Continue', exact: true })
+      await expect(continueButton).toBeEnabled()
+      await continueButton.click()
+
+      await expect(dialog).not.toBeVisible()
+      await expect(app).toHaveURL(new RegExp(`/workflow-builder/new\\?(?:.*&)?projectId=${projectId}`))
+      await expect(app.getByRole('heading', { name: 'Select a trigger step' })).toBeVisible()
+
+      // Assert: the toolbar shows the project as text, with no selector
+      await expect(app.getByText(`Project: ${projectName}`, { exact: true })).toBeVisible()
+      await expect(app.getByRole('textbox', { name: 'Project', exact: true })).toHaveCount(0)
+
+      // Act: add a trigger, name and save
       await app.getByRole('button', { name: 'Manual trigger' }).click()
       await app.getByRole('textbox', { name: 'Name', exact: true }).fill('Manual trigger')
-      await app.getByRole('button', { name: 'Create' }).click()
-
-      // Select a project (always required since AAP-82756 clears on mount)
-      await selectProjectIfRequired(app)
-
-      // Name and save
+      await app.getByRole('button', { name: 'Create', exact: true }).click()
       await app.getByPlaceholder('Workflow name').fill(workflowName)
-      await app.getByRole('button', { name: 'Save workflow' }).click()
+      await clickSaveAndWait(app)
 
-      // Assert: navigated away from /new — workflow was persisted
+      // Assert: persisted — navigated away from /new, project unchanged
       await expect(app).toHaveURL(/workflow-builder\/(?!new)/, { timeout: 15_000 })
+      workflowId = new URL(app.url()).pathname.split('/').pop()
+      await expect(app.getByText(`Project: ${projectName}`, { exact: true })).toBeVisible()
     } finally {
-      await app.goto(toAppUrl('/workflows'))
-      await app.getByPlaceholder('Filter by name').fill(workflowName)
-      await app.getByRole('button', { name: 'Apply filter' }).click()
-      const row = app.getByRole('row', { name: new RegExp(workflowName) })
-      if ((await row.count()) > 0) {
-        await row.getByRole('button', { name: /Actions|Kebab toggle/i }).click({ force: true })
-        await app.getByRole('menuitem', { name: 'Delete workflow' }).click()
-        await app.getByRole('checkbox', { name: /I understand this workflow/i }).check()
-        await app.getByRole('button', { name: 'Delete workflow' }).click()
-      }
+      if (workflowId) await deleteWorkflowViaApi(app, workflowId)
+      await deleteProjectViaApi(app, projectId)
     }
   })
 
-  /**
-   * Project required error fires even when the workflow already has steps.
-   * AAP-82756: No skip guard needed — project is always cleared on mount.
-   */
-  test('project required error fires even when workflow has steps', async ({ app }) => {
-    await ensureProject(app)
+  test('openNewWorkflowBuilder helper lands in the builder with the chosen project', async ({ app }) => {
+    const project = await ensureProject(app)
+    expect(project, 'ensureProject must return the default project').not.toBeNull()
+    const projectName = project?.name ?? 'default'
 
-    await app.goto(toAppUrl('/workflow-builder/new'))
+    await openNewWorkflowBuilder(app, { projectName })
+
     await expect(app.getByRole('heading', { name: 'Select a trigger step' })).toBeVisible()
-
-    await app.getByRole('button', { name: 'Manual trigger' }).click()
-    await app.getByRole('textbox', { name: 'Name', exact: true }).fill('Manual trigger')
-    await app.getByRole('button', { name: 'Create' }).click()
-
-    // Project selector must be empty (AAP-82756)
-    await expect(app.getByPlaceholder('Select a project')).toBeVisible()
-
-    // Click Save without selecting a project
-    await app.getByRole('button', { name: 'Save workflow' }).click()
-
-    // Assert: URL remains at /new (save was blocked)
-    await expect(app).toHaveURL(/workflow-builder\/new/, { timeout: 5_000 })
-
-    // Assert: project selector is in danger/invalid state
-    await expect(app.locator('[aria-invalid="true"]')).toBeVisible()
+    await expect(app.getByText(`Project: ${projectName}`, { exact: true })).toBeVisible()
   })
 
   /**
-   * AAP-79246: project_id is immutable after creation — the project selector
-   * must be disabled when editing an existing workflow.
+   * AAP-79246: project_id is immutable after creation — editing an existing
+   * workflow shows the project as text, not an editable selector.
    */
-  test('project selector is disabled when editing an existing workflow', async ({ app }) => {
+  test('editing an existing workflow shows its project as text, not a selector', async ({ app }) => {
     const workflowName = buildUniqueName('e2e-proj-immutable')
+    const project = await ensureProject(app)
     const { id: workflowId } = await createWorkflowViaApi({
       app,
       name: workflowName,
@@ -174,9 +168,10 @@ test.describe('Builder save validation — project required', () => {
       await app.goto(toAppUrl(`/workflow-builder/${workflowId}`))
       await expect(app.getByPlaceholder('Workflow name')).toHaveValue(workflowName, { timeout: 15_000 })
 
-      const projectInput = app.getByRole('textbox', { name: 'Project' })
-      await expect(projectInput).toBeVisible()
-      await expect(projectInput).toBeDisabled()
+      await expect(app.getByText(`Project: ${project?.name ?? 'default'}`, { exact: true })).toBeVisible()
+      await expect(app.getByRole('textbox', { name: 'Project', exact: true })).toHaveCount(0)
+      await expect(app.getByRole('combobox', { name: 'Project', exact: true })).toHaveCount(0)
+      await expect(selectProjectDialog(app)).toHaveCount(0)
     } finally {
       await deleteWorkflowViaApi(app, workflowId)
     }

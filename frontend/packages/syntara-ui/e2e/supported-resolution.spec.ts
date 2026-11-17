@@ -15,6 +15,7 @@ import { MIN_SUPPORTED_VIEWPORT, REACT_FLOW_VIEWPORT_EMPTY_STATE } from '../src/
 
 import { type Page } from './fixtures'
 import { test, expect, toAppUrl } from './fixtures'
+import { openNewWorkflowBuilder } from './helpers/workflows'
 import { isSkipWebServerForPlaywrightTests } from './playwrightWebServerEnv'
 
 const isRealBackend = isSkipWebServerForPlaywrightTests()
@@ -122,7 +123,7 @@ test.describe('Supported resolution', () => {
   }
 
   test('workflow builder is usable at minimum supported width', async ({ app }) => {
-    await app.goto(toAppUrl(AppRoute.WorkflowBuilder.New))
+    await openNewWorkflowBuilder(app)
     await expect(app.getByPlaceholder('Workflow name')).toBeVisible()
     await expect(reactFlowViewportEmptyState(app)).not.toBeVisible()
     await expect(app.locator('.react-flow')).toBeVisible()
@@ -149,7 +150,7 @@ test.describe('Supported resolution', () => {
 test.describe('React Flow viewport guard', () => {
   test('shows full-page empty state on workflow builder below minimum width', async ({ app }) => {
     await app.setViewportSize({ width: MIN_SUPPORTED_VIEWPORT.width - 1, height: 720 })
-    await app.goto(toAppUrl(AppRoute.WorkflowBuilder.New))
+    await openNewWorkflowBuilder(app)
     await expect(app.getByRole('navigation', { name: 'Main navigation' })).toBeVisible()
     await expect(reactFlowViewportEmptyState(app)).toBeVisible()
     await expect(app.getByRole('button', { name: REACT_FLOW_VIEWPORT_EMPTY_STATE.returnLabel })).toBeVisible()
@@ -160,7 +161,7 @@ test.describe('React Flow viewport guard', () => {
 
   test('workflow builder renders at minimum width regardless of height', async ({ app }) => {
     await app.setViewportSize({ width: 1024, height: 400 })
-    await app.goto(toAppUrl(AppRoute.WorkflowBuilder.New))
+    await openNewWorkflowBuilder(app)
     await expect(app.locator('.react-flow')).toBeVisible()
     await expect(reactFlowViewportEmptyState(app)).not.toBeVisible()
   })
@@ -199,7 +200,7 @@ test.describe('React Flow viewport guard', () => {
 
   test('Return to Workflows navigates from builder empty state', async ({ app }) => {
     await app.setViewportSize({ width: MIN_SUPPORTED_VIEWPORT.width - 1, height: 720 })
-    await app.goto(toAppUrl(AppRoute.WorkflowBuilder.New))
+    await openNewWorkflowBuilder(app)
     await app.getByRole('button', { name: REACT_FLOW_VIEWPORT_EMPTY_STATE.returnLabel }).click()
     await expect(app).toHaveURL(/\/workflows$/)
     await expect(app.getByRole('heading', { level: 1, name: 'Workflows' })).toBeVisible()

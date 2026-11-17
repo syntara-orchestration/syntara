@@ -20,7 +20,7 @@
 
 import { test, expect, toAppUrl } from '../fixtures'
 import { addManualTrigger, addScriptStep } from '../helpers/v2-steps'
-import { buildUniqueName, deleteWorkflow, selectProjectIfRequired } from '../helpers/workflows'
+import { buildUniqueName, deleteWorkflow, selectProjectIfRequired, openNewWorkflowBuilder } from '../helpers/workflows'
 import { ensureProject } from '../utils/api'
 
 test.describe('Manual Trigger', () => {
@@ -28,7 +28,7 @@ test.describe('Manual Trigger', () => {
     const workflowName = buildUniqueName('e2e-manual')
 
     await ensureProject(app)
-    await app.goto(toAppUrl('/workflow-builder/new'))
+    await openNewWorkflowBuilder(app)
 
     try {
       await addManualTrigger(app, 'Start workflow')
@@ -99,7 +99,7 @@ test.describe('Manual Trigger', () => {
 
   test('trigger form shows name field with default value', async ({ app }) => {
     await ensureProject(app)
-    await app.goto(toAppUrl('/workflow-builder/new'))
+    await openNewWorkflowBuilder(app)
 
     await expect(app.getByRole('heading', { name: /select a trigger step/i })).toBeVisible({ timeout: 10_000 })
     await app.getByRole('button', { name: 'Manual trigger' }).click()

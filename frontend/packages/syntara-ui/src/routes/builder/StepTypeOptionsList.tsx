@@ -10,6 +10,7 @@ import {
   StackItem,
   Title,
 } from '@patternfly/react-core'
+import { RhUiLockIcon } from '@patternfly/react-icons'
 
 import { DisabledWithTooltip } from '../../components/DisabledWithTooltip'
 import { SynPanel } from '../../components/layout/SynPanel'
@@ -24,7 +25,7 @@ export type StepTypeOption = Pick<
   StepTypeDefinition | StepSubtypeDefinition,
   'id' | 'label' | 'icon' | 'description'
 > & {
-  /** Entry stays listed but cannot be added (for example a blocked step type). */
+  /** Entry is listed but cannot be added (for example a revealed restricted step type); shown padlocked. */
   isDisabled?: boolean
   /** Explains why the entry is disabled; shown in a tooltip on hover and focus. */
   disabledTooltip?: string
@@ -90,7 +91,7 @@ export function StepTypeOptionsList(props: StepTypeOptionsListProps) {
                       gap={{ default: 'gapSm' }}
                       flexWrap={{ default: 'nowrap' }}
                     >
-                      <FlexItem flex={{ default: 'flexNone' }}>
+                      <FlexItem flex={{ default: isDisabled ? 'flex_1' : 'flexNone' }} style={{ minWidth: 0 }}>
                         <Title headingLevel="h3" size="md">
                           {stepType.label}
                         </Title>
@@ -100,6 +101,16 @@ export function StepTypeOptionsList(props: StepTypeOptionsListProps) {
                           <Label isCompact color="orange" style={{ fontSize: 'var(--pf-t--global--font--size--sm)' }}>
                             Developer Preview
                           </Label>
+                        </FlexItem>
+                      )}
+                      {isDisabled && (
+                        <FlexItem
+                          flex={{ default: 'flexNone' }}
+                          aria-hidden="true"
+                          data-testid="step-type-lock-icon"
+                          style={{ color: 'var(--pf-t--global--icon--color--disabled)' }}
+                        >
+                          <RhUiLockIcon />
                         </FlexItem>
                       )}
                     </Flex>

@@ -15,11 +15,17 @@ import { apiRequest, ensureProject } from '../utils/api'
  * Determine the project the builder's CredentialSelector will filter by.
  *
  * For saved workflows (/workflow-builder/<id>), reads the workflow's project_id
- * from the API. For new workflows (/workflow-builder/new), falls back to the
- * first available project (matching what selectProjectIfRequired would pick).
+ * from the API. For new workflows (/workflow-builder/new?projectId=<id>), uses
+ * the project chosen in the "Select a project" modal, falling back to the
+ * `default` project (what openNewWorkflowBuilder prefers) when the URL has none.
  */
 async function getBuilderProjectId(page: Page): Promise<string> {
-  const wfIdMatch = page.url().match(/workflow-builder\/([^/?#]+)/)
+  const url = new URL(page.url())
+  const wfIdMatch = url.pathname.match(/workflow-builder\/([^/?#]+)/)
+  if (wfIdMatch?.[1] === 'new') {
+    const projectId = url.searchParams.get('projectId')
+    if (projectId) return projectId
+  }
   if (wfIdMatch && wfIdMatch[1] !== 'new') {
     const wfResp = await apiRequest(page, 'get', `/workflows/${wfIdMatch[1]}`)
     if (wfResp.ok()) {

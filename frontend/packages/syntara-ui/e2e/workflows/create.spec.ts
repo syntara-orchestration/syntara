@@ -13,7 +13,14 @@
  */
 
 import { test, expect, toAppUrl } from '../fixtures'
-import { buildUniqueName, clickSaveAndWait, deleteWorkflow, selectProjectIfRequired } from '../helpers/workflows'
+import {
+  buildUniqueName,
+  clickSaveAndWait,
+  deleteWorkflow,
+  confirmNewWorkflowProject,
+  openNewWorkflowBuilder,
+  selectProjectIfRequired,
+} from '../helpers/workflows'
 
 test.describe('Workflows - Create New Workflow', () => {
   test('user creates a new workflow with name and description', async ({ app }) => {
@@ -29,6 +36,7 @@ test.describe('Workflows - Create New Workflow', () => {
       await createButton.click()
 
       await expect(app).toHaveURL(/workflow-builder\/new/)
+      await confirmNewWorkflowProject(app)
       await expect(app.getByRole('heading', { name: 'Select a trigger step' })).toBeVisible()
 
       await app.getByRole('button', { name: 'Manual trigger' }).click()
@@ -69,7 +77,11 @@ test.describe('Workflows - Create New Workflow', () => {
 
     await app.getByRole('button', { name: 'Create workflow' }).click()
 
+    // The project is chosen in a modal before the canvas opens
     await expect(app).toHaveURL(/workflow-builder\/new/)
+    await expect(app.getByRole('dialog', { name: 'Select a project' })).toBeVisible()
+    await confirmNewWorkflowProject(app)
+    await expect(app).toHaveURL(/workflow-builder\/new\?(?:.*&)?projectId=/)
 
     const workflowNameInput = app.getByPlaceholder('Workflow name')
     await expect(workflowNameInput).toBeVisible()
@@ -81,7 +93,7 @@ test.describe('Workflows - Create New Workflow', () => {
     const customName = buildUniqueName('e2e-custom')
 
     try {
-      await app.goto(toAppUrl('/workflow-builder/new'))
+      await openNewWorkflowBuilder(app)
       await expect(app.getByRole('heading', { name: 'Select a trigger step' })).toBeVisible()
 
       await app.getByRole('button', { name: 'Manual trigger' }).click()
@@ -112,6 +124,7 @@ test.describe('Workflows - Create New Workflow', () => {
       await app.getByRole('button', { name: 'Create workflow' }).click()
 
       await expect(app).toHaveURL(/workflow-builder\/new/)
+      await confirmNewWorkflowProject(app)
       await app.getByRole('button', { name: 'Manual trigger' }).click()
       await app.getByRole('textbox', { name: 'Name', exact: true }).fill('Manual trigger')
       await app.getByRole('button', { name: 'Create' }).click()
@@ -140,6 +153,7 @@ test.describe('Workflows - Create New Workflow', () => {
       await app.goto(toAppUrl('/workflows'))
       await app.getByRole('button', { name: 'Create workflow' }).click()
       await expect(app).toHaveURL(/workflow-builder\/new/)
+      await confirmNewWorkflowProject(app)
 
       await app.getByRole('button', { name: 'Manual trigger' }).click()
       await app.getByRole('textbox', { name: 'Name', exact: true }).fill('Trigger 1')
@@ -155,6 +169,7 @@ test.describe('Workflows - Create New Workflow', () => {
       await app.goto(toAppUrl('/workflows'))
       await app.getByRole('button', { name: 'Create workflow' }).click()
       await expect(app).toHaveURL(/workflow-builder\/new/)
+      await confirmNewWorkflowProject(app)
 
       await app.getByRole('button', { name: 'Manual trigger' }).click()
       await app.getByRole('textbox', { name: 'Name', exact: true }).fill('Trigger 2')

@@ -10,7 +10,7 @@ export type GateablePaletteEntry = {
 export type PaletteEntryGate = {
   /** The backend step type this entry creates, or `null` for container entries. */
   kind: string | null
-  /** The caller may not author this step type — the entry stays visible but inert. */
+  /** The caller may not author this step type — the entry is hidden by default, or shown inert. */
   isBlocked: boolean
   /** Why the step type is blocked, when it is. */
   blockedBy: BlockedStepType | null
@@ -35,6 +35,14 @@ export function stepTypeBlockedTooltip(blockedBy: BlockedStepType): string {
 export const STEP_TYPE_PERMISSIONS_UNAVAILABLE_TOOLTIP =
   'Step type permissions could not be loaded. Ask an administrator to check the server.'
 
+/**
+ * Tooltip shown on every entry when no project is selected.
+ *
+ * Step-type denies are evaluated per project, so without one the panel cannot
+ * know what the caller may add and fails closed rather than allowing everything.
+ */
+export const STEP_TYPE_NO_PROJECT_TOOLTIP = 'Select a project to check step permissions'
+
 function gateForKind(entry: NodeKind | undefined): { isBlocked: boolean; blockedBy: BlockedStepType | null } {
   if (!entry) return { isBlocked: false, blockedBy: null }
   return { isBlocked: !entry.can_write, blockedBy: entry.blocked_by ?? null }
@@ -43,9 +51,10 @@ function gateForKind(entry: NodeKind | undefined): { isBlocked: boolean; blocked
 /**
  * Decide, per palette entry, whether it must be shown disabled.
  *
- * A `step_type:write` deny (or a missing allow) keeps the entry visible but
- * inert with an explanatory tooltip naming the policy and scope. Steps of that
- * kind already on the canvas are untouched.
+ * A `step_type:write` deny (or a missing allow) blocks the entry: the panel
+ * hides it by default and, when restricted steps are revealed, shows it inert
+ * with an explanatory tooltip naming the policy and scope. Steps of that kind
+ * already on the canvas are untouched.
  *
  * Container entries (`trigger`, `action`, `logic`, `aap-execution`) create no
  * step themselves; they inherit the verdict of their subtypes and are only
@@ -91,17 +100,22 @@ export type GatedPaletteEntry<T extends GateablePaletteEntry> = T & {
 }
 
 /**
- * Mark blocked palette entries as disabled; blocked entries stay visible.
+ * Mark blocked palette entries as disabled.
+ *
+ * Every entry is returned; whether blocked ones are shown is the caller's
+ * choice (see {@link filterRestrictedEntries}).
  *
  * @param entries Palette entries in display order.
  * @param nodeKindByKind Registry entries from `GET /node_kinds`, keyed by kind.
- * @param isUnavailable True when the permissions endpoint failed or returned nothing.
- * @returns The entries that stay visible, blocked ones carrying `isDisabled`.
+ * @param isUnavailable True when the permissions endpoint failed, returned nothing, or no project is selected.
+ * @param unavailableTooltip Tooltip for entries disabled because the permissions are unavailable.
+ * @returns The entries in display order, blocked ones carrying `isDisabled`.
  */
 export function gatePaletteEntries<T extends GateablePaletteEntry>(
   entries: readonly T[],
   nodeKindByKind: ReadonlyMap<string, NodeKind>,
-  isUnavailable = false
+  isUnavailable = false,
+  unavailableTooltip: string = STEP_TYPE_PERMISSIONS_UNAVAILABLE_TOOLTIP
 ): GatedPaletteEntry<T>[] {
   if (nodeKindByKind.size === 0 && !isUnavailable) return entries.map((entry) => ({ ...entry }))
 
@@ -112,8 +126,28 @@ export function gatePaletteEntries<T extends GateablePaletteEntry>(
     return {
       ...entry,
       isDisabled: true,
-      disabledTooltip:
-        gate.blockedBy != null ? stepTypeBlockedTooltip(gate.blockedBy) : STEP_TYPE_PERMISSIONS_UNAVAILABLE_TOOLTIP,
+      disabledTooltip: gate.blockedBy != null ? stepTypeBlockedTooltip(gate.blockedBy) : unavailableTooltip,
     }
   })
+}
+
+/**
+ * Hide restricted (disabled) palette entries unless the author asked to see them.
+ *
+ * Denied step types are hidden from the toolbox by default; a toggle reveals
+ * the full catalogue with those entries padlocked and inert.
+ *
+ * @param entries Gated palette entries in display order.
+ * @param showRestricted True to keep restricted entries in the list.
+ * @returns The entries to render and how many restricted entries the list holds.
+ */
+export function filterRestrictedEntries<T extends GateablePaletteEntry>(
+  entries: readonly GatedPaletteEntry<T>[],
+  showRestricted: boolean
+): { entries: GatedPaletteEntry<T>[]; restrictedCount: number } {
+  const restrictedCount = entries.filter((entry) => entry.isDisabled === true).length
+  return {
+    entries: showRestricted ? [...entries] : entries.filter((entry) => entry.isDisabled !== true),
+    restrictedCount,
+  }
 }

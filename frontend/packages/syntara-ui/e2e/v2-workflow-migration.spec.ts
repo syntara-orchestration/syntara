@@ -42,6 +42,7 @@ import {
   selectProjectIfRequired,
   deleteWorkflow,
   triggerLayout,
+  openNewWorkflowBuilder,
 } from './helpers/workflows'
 import { apiRequest, createWorkflowViaApi, deleteWorkflowViaApi, ensureProject } from './utils/api'
 
@@ -108,7 +109,7 @@ test.describe('V2 Workflow Schema Migration', () => {
 
   test('workflow save payload uses v2 schema format', async ({ app }) => {
     const workflowName = buildUniqueName('v2-schema-format')
-    await app.goto(toAppUrl('/workflow-builder/new'))
+    await openNewWorkflowBuilder(app)
 
     // Build a minimal workflow: manual trigger → script
     await addManualTrigger(app)
@@ -161,7 +162,11 @@ test.describe('V2 Workflow Schema Migration', () => {
     const llmIntegration = await createLlmIntegration(app, llmIntegrationName)
 
     try {
-      await app.goto(toAppUrl('/workflow-builder/new'))
+      // Pin the workflow to the LLM credential's project. `createLlmIntegration`
+      // seeds the credential under `ensureProject`'s `default`, and the backend
+      // rejects the save with "One or more credential references are invalid or
+      // belong to a different project" if the workflow lands anywhere else.
+      await openNewWorkflowBuilder(app, { projectName: project?.name })
 
       // Manual trigger + all 5 executor types
       // Note: Approval node must have a branch completed to be valid
@@ -178,12 +183,6 @@ test.describe('V2 Workflow Schema Migration', () => {
       const saveRequestPromise = app.waitForRequest(
         (req) => req.url().includes('/workflows') && req.method() === 'POST'
       )
-      // Pin the workflow to the LLM credential's project. `createLlmIntegration`
-      // seeds the credential under `ensureProject`'s `default`, while an unnamed
-      // `selectProjectIfRequired` picks whichever project the dropdown lists
-      // first — and the backend rejects the save with "One or more credential
-      // references are invalid or belong to a different project" when they differ.
-      await selectProjectIfRequired(app, project?.name)
       await app.getByPlaceholder('Workflow name').fill(workflowName)
       await clickSaveAndWait(app)
       const saveRequest = await saveRequestPromise
@@ -231,7 +230,7 @@ test.describe('V2 Workflow Schema Migration', () => {
 
   test('creates and saves all v2 control flow node types', async ({ app }) => {
     const workflowName = buildUniqueName('v2-control-flow')
-    await app.goto(toAppUrl('/workflow-builder/new'))
+    await openNewWorkflowBuilder(app)
 
     try {
       // Manual trigger + all 3 control flow types
@@ -381,7 +380,7 @@ test.describe('V2 Workflow Schema Migration', () => {
 
   test('API response preserves v2 schema format on reload', async ({ app }) => {
     const workflowName = buildUniqueName('v2-response-format')
-    await app.goto(toAppUrl('/workflow-builder/new'))
+    await openNewWorkflowBuilder(app)
 
     // Create and save a simple workflow (select project first to avoid name reset)
     await addManualTrigger(app)
@@ -438,7 +437,7 @@ test.describe('V2 Workflow Schema Migration', () => {
 
   test('edit and save workflow persists changes', async ({ app }) => {
     const workflowName = buildUniqueName('v2-edit-persist')
-    await app.goto(toAppUrl('/workflow-builder/new'))
+    await openNewWorkflowBuilder(app)
 
     try {
       // Create a simple workflow
@@ -479,7 +478,7 @@ test.describe('V2 Workflow Schema Migration', () => {
 
   test('edges with from_port persist after page reload', async ({ app }) => {
     const workflowName = buildUniqueName('v2-edge-ports')
-    await app.goto(toAppUrl('/workflow-builder/new'))
+    await openNewWorkflowBuilder(app)
 
     try {
       // Create a workflow with a condition node (produces true/false port edges)
