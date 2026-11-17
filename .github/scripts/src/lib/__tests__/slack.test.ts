@@ -1,26 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { http, HttpResponse } from 'msw'
+import { http, HttpResponse } from 'msw/http'
 import { server } from '../../__tests__/setup.js'
-import { buildVisualRegressionBaselineReadyMessage, SlackNotifier } from '../slack.js'
-
-describe('buildVisualRegressionBaselineReadyMessage', () => {
-  it('builds a concise Slack review link', () => {
-    const prUrl = 'https://github.com/owner/repo/pull/42'
-    const message = buildVisualRegressionBaselineReadyMessage(prUrl)
-    const [attachment] = message.attachments
-    const [section] = attachment?.blocks ?? []
-
-    expect(attachment?.blocks).toHaveLength(1)
-    expect(section).toMatchObject({
-      type: 'section',
-      text: {
-        type: 'mrkdwn',
-        text: `Visual regression baseline PR ready for review: <${prUrl}|Review PR>`,
-      },
-    })
-    expect(JSON.stringify(message)).not.toContain(':eyes:')
-  })
-})
+import { SlackNotifier } from '../slack.js'
 
 describe('SlackNotifier', () => {
   let notifier: SlackNotifier
@@ -41,12 +22,27 @@ describe('SlackNotifier', () => {
         })
       )
 
-      await notifier.sendDequeueBurstAlert(
-        3,
-        '42',
-        'https://github.com/owner/repo/pull/42',
-        'https://github.com/owner/repo/queue/devel'
-      )
+      await notifier.sendDequeueBurstAlert({
+        dequeues: [
+          {
+            number: 42,
+            url: 'https://github.com/owner/repo/pull/42',
+            title: 'Test PR',
+          },
+          {
+            number: 43,
+            url: 'https://github.com/owner/repo/pull/43',
+            title: 'Another PR',
+          },
+          {
+            number: 44,
+            url: 'https://github.com/owner/repo/pull/44',
+            title: 'Third PR',
+          },
+        ],
+        timeWindowMinutes: 45,
+        queueUrl: 'https://github.com/owner/repo/queue/devel',
+      })
 
       expect(requestBody).toMatchObject({
         attachments: [
@@ -70,10 +66,19 @@ describe('SlackNotifier', () => {
                   }),
                 ]),
               }),
+              expect.objectContaining({
+                type: 'section',
+                text: expect.objectContaining({
+                  text: expect.stringContaining('Multiple PRs were removed from the merge queue.'),
+                }),
+              }),
             ]),
           },
         ],
       })
+
+      const bodyText = JSON.stringify(requestBody)
+      expect(bodyText).not.toContain('failed checks')
     })
 
     it('throws when webhook returns non-200 status', async () => {
@@ -83,9 +88,13 @@ describe('SlackNotifier', () => {
         })
       )
 
-      await expect(notifier.sendDequeueBurstAlert(3, '42', 'https://pr', 'https://queue')).rejects.toThrow(
-        'Slack notification failed: 500'
-      )
+      await expect(
+        notifier.sendDequeueBurstAlert({
+          dequeues: [{ number: 42, url: 'https://pr', title: 'Test' }],
+          timeWindowMinutes: 45,
+          queueUrl: 'https://queue',
+        })
+      ).rejects.toThrow('Slack notification failed: 500')
     })
   })
 
@@ -100,7 +109,12 @@ describe('SlackNotifier', () => {
         })
       )
 
-      await notifier.sendQueueBackupAlert(5, 75, 'https://github.com/owner/repo/queue/devel')
+      await notifier.sendQueueBackupAlert({
+        queueDepth: 5,
+        minutesSinceMerge: 75,
+        timeoutMinutes: 120,
+        queueUrl: 'https://github.com/owner/repo/queue/devel',
+      })
 
       expect(requestBody).toMatchObject({
         attachments: [
@@ -167,23 +181,6 @@ describe('SlackNotifier', () => {
           },
         ],
       })
-    })
-  })
-
-  describe('sendVisualRegressionBaselineReady', () => {
-    it('posts the review notification to the configured webhook', async () => {
-      let requestReceived = false
-
-      server.use(
-        http.post(webhookUrl, () => {
-          requestReceived = true
-          return HttpResponse.text('ok')
-        })
-      )
-
-      await notifier.sendVisualRegressionBaselineReady('https://github.com/owner/repo/pull/42')
-
-      expect(requestReceived).toBe(true)
     })
   })
 })

@@ -35,13 +35,19 @@ export class GitHubClient {
    * Fetches recent workflow runs created after a specific time.
    * Returns only completed runs, optionally excluding a specific run ID.
    */
-  async getWorkflowRuns(workflowFileName: string, since: Date, excludeRunId?: number): Promise<WorkflowRun[]> {
+  async getWorkflowRuns(
+    workflowFileName: string,
+    since: Date,
+    excludeRunId?: number,
+    event?: string
+  ): Promise<WorkflowRun[]> {
     const response = await this.octokit.actions.listWorkflowRuns({
       owner: this.owner,
       repo: this.repo,
       workflow_id: workflowFileName,
       per_page: 20,
       created: `>=${since.toISOString()}`,
+      ...(event ? { event } : {}),
     })
 
     const runs = z.array(WorkflowRunSchema).parse(response.data.workflow_runs)
@@ -171,5 +177,97 @@ export class GitHubClient {
    */
   getPrUrl(prNumber: number): string {
     return `https://github.com/${this.owner}/${this.repo}/pull/${prNumber}`
+  }
+
+  /**
+   * Fetches PRs that were removed from the merge queue (dequeued).
+   * Uses the Timeline API to detect removed_from_merge_queue events.
+   * Does not include successfully merged PRs.
+   */
+  async getRecentDequeues(
+    branch: string,
+    since: Date
+  ): Promise<Array<{ number: number; title: string; dequeuedAt: string }>> {
+    // Get recently updated PRs (both open and closed)
+    const [openPrs, closedPrs] = await Promise.all([
+      this.octokit.pulls.list({
+        owner: this.owner,
+        repo: this.repo,
+        state: 'open',
+        base: branch,
+        sort: 'updated',
+        direction: 'desc',
+        per_page: 50,
+      }),
+      this.octokit.pulls.list({
+        owner: this.owner,
+        repo: this.repo,
+        state: 'closed',
+        base: branch,
+        sort: 'updated',
+        direction: 'desc',
+        per_page: 30,
+      }),
+    ])
+
+    const allPrs = [...openPrs.data, ...closedPrs.data]
+    const dequeues: Array<{
+      number: number
+      title: string
+      dequeuedAt: string
+    }> = []
+
+    // Check timeline events for each recently updated PR
+    for (const pr of allPrs.filter((pr) => new Date(pr.updated_at) >= since)) {
+      // Skip PRs that were successfully merged - those aren't dequeues
+      if (pr.merged_at) {
+        continue
+      }
+
+      try {
+        const timeline = await this.octokit.paginate(this.octokit.issues.listEventsForTimeline, {
+          owner: this.owner,
+          repo: this.repo,
+          issue_number: pr.number,
+          per_page: 100,
+        })
+
+        // Find removed_from_merge_queue events within our time window
+        // Timeline API returns various event types; we only care about ones with created_at
+        const dequeueEvents: Array<{ created_at: string }> = timeline.flatMap((event) => {
+          if (
+            !('event' in event) ||
+            event.event !== 'removed_from_merge_queue' ||
+            !('created_at' in event) ||
+            typeof event.created_at !== 'string'
+          ) {
+            return []
+          }
+
+          if (new Date(event.created_at) < since) {
+            return []
+          }
+
+          return [{ created_at: event.created_at }]
+        })
+
+        if (dequeueEvents.length > 0) {
+          const latestEvent = dequeueEvents.reduce((latest, event) =>
+            new Date(event.created_at) > new Date(latest.created_at) ? event : latest
+          )
+          dequeues.push({
+            number: pr.number,
+            title: pr.title,
+            dequeuedAt: latestEvent.created_at,
+          })
+        }
+      } catch (error) {
+        throw new Error(`Could not fetch timeline for PR #${pr.number}`, {
+          cause: error,
+        })
+      }
+    }
+
+    return dequeues.sort((a, b) => new Date(b.dequeuedAt).getTime() - new Date(a.dequeuedAt).getTime())
   }
 }

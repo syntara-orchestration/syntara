@@ -1,14 +1,21 @@
 #!/usr/bin/env node
 import { GitHubClient } from './lib/github.js'
-import { SlackNotifier } from './lib/slack.js'
 import { getEnvironment } from './lib/env.js'
+import { setOutput } from './lib/actions-output.js'
+import {
+  decideAlert,
+  inferPreviousHealthFromJobs,
+  UNHEALTHY_ALERT_OUTPUT,
+  RECOVERY_ALERT_OUTPUT,
+} from './lib/health-state.js'
 import type { HealthState } from './lib/types.js'
+import { runScript } from './lib/run-script.js'
 
-const MERGE_TIMEOUT_MINUTES = 90
+const MERGE_TIMEOUT_MINUTES = 120
 
 /**
  * Checks if the merge queue is healthy by verifying recent merge activity.
- * Returns unhealthy if the queue has entries but no merges in 90+ minutes.
+ * Returns unhealthy if the queue has entries but no merges beyond the timeout.
  */
 async function assessHealth(github: GitHubClient, branch: string): Promise<HealthState> {
   console.log('Querying merge queue status...')
@@ -29,12 +36,12 @@ async function assessHealth(github: GitHubClient, branch: string): Promise<Healt
 
   // Check for recent merges
   const now = Date.now()
-  const ninetyMinsAgo = new Date(now - MERGE_TIMEOUT_MINUTES * 60 * 1000)
-  const recentMerges = await github.getRecentMerges(branch, ninetyMinsAgo)
+  const timeoutAgo = new Date(now - MERGE_TIMEOUT_MINUTES * 60 * 1000)
+  const recentMerges = await github.getRecentMerges(branch, timeoutAgo)
 
   console.log(`Recent merges to ${branch}: ${recentMerges.length}`)
 
-  // If queue has entries but no merges in 90 min, unhealthy
+  // If queue has entries but no merges within the timeout, unhealthy
   if (recentMerges.length === 0) {
     // Calculate time since last merge
     const allMerges = await github.getRecentMerges(
@@ -64,16 +71,19 @@ async function assessHealth(github: GitHubClient, branch: string): Promise<Healt
 /**
  * Determines the health state from the previous workflow run.
  * Used to detect state transitions and avoid duplicate alerts.
+ * Passing eventName restricts the search to runs triggered the same way,
+ * so schedule runs only compare against other schedule runs.
  */
 async function getPreviousHealthState(
   github: GitHubClient,
-  currentRunId: number
+  currentRunId: number,
+  eventName?: string
 ): Promise<'healthy' | 'unhealthy' | 'unknown'> {
   console.log('Getting previous run state...')
 
   try {
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000)
-    const recentRuns = await github.getWorkflowRuns('merge-queue-health-poll.yml', oneHourAgo, currentRunId)
+    const recentRuns = await github.getWorkflowRuns('merge-queue-health-poll.yml', oneHourAgo, currentRunId, eventName)
 
     if (recentRuns.length === 0) {
       console.log('No previous runs found')
@@ -84,29 +94,7 @@ async function getPreviousHealthState(
     console.log(`Previous run ID: ${previousRun.id}`)
 
     const jobs = await github.getWorkflowRunJobs(previousRun.id)
-
-    // Check which alert step ran in the previous workflow
-    const sentUnhealthyAlert = jobs[0]?.steps?.some(
-      (step) => step.name === 'Send unhealthy alert' && step.conclusion === 'success'
-    )
-
-    const sentRecoveryAlert = jobs[0]?.steps?.some(
-      (step) => step.name === 'Send recovery alert' && step.conclusion === 'success'
-    )
-
-    if (sentRecoveryAlert) {
-      // If recovery was sent, previous state was unhealthy
-      return 'unhealthy'
-    }
-
-    if (sentUnhealthyAlert) {
-      // If unhealthy alert was sent, previous state was healthy (transition to unhealthy)
-      return 'healthy'
-    }
-
-    // If neither alert was sent, state didn't change - infer from conclusion
-    // This is imperfect but works for the steady state
-    return 'unknown'
+    return inferPreviousHealthFromJobs(jobs)
   } catch (error) {
     console.warn('Could not determine previous state:', error)
     return 'unknown'
@@ -114,54 +102,42 @@ async function getPreviousHealthState(
 }
 
 /**
- * Monitors merge queue health and sends alerts on state transitions.
- * Runs every 5 minutes to detect queue backups and recoveries.
+ * Assesses merge queue health and writes workflow outputs for alert steps.
+ * Does not send Slack messages — named workflow steps handle notifications.
  */
 async function main() {
   const env = getEnvironment()
 
   const github = new GitHubClient(env.githubToken, env.repository)
-  const slack = new SlackNotifier(env.slackWebhookUrl)
 
-  // Fetch default branch dynamically
   const defaultBranch = await github.getDefaultBranch()
   console.log(`Monitoring merge queue for branch: ${defaultBranch}`)
 
-  // Assess current health
   const currentState = await assessHealth(github, defaultBranch)
   console.log(`Current health: ${currentState.health} (${currentState.reason})`)
 
-  // Get previous health state
-  const previousHealth = await getPreviousHealthState(github, env.runId)
+  const previousHealth = await getPreviousHealthState(github, env.runId, env.eventName)
   console.log(`Previous health: ${previousHealth}`)
 
-  // Detect transitions and alert
   const queueUrl = github.getQueueUrl(defaultBranch)
+  const alert = decideAlert(currentState.health, previousHealth)
 
-  // Transition to unhealthy
-  if (currentState.health === 'unhealthy' && (previousHealth === 'healthy' || previousHealth === 'unknown')) {
-    console.log('⚠️  Transition to unhealthy detected - sending alert')
-    await slack.sendQueueBackupAlert(currentState.queueDepth!, currentState.minutesSinceMerge!, queueUrl)
-    console.log('✅ Unhealthy alert sent to Slack')
-    console.log('::set-output name=health::unhealthy')
-    return
+  setOutput('health', currentState.health)
+  setOutput('alert', alert)
+  setOutput(UNHEALTHY_ALERT_OUTPUT, String(alert === 'unhealthy'))
+  setOutput(RECOVERY_ALERT_OUTPUT, String(alert === 'recovery'))
+  setOutput('queue_url', queueUrl)
+  setOutput('timeout_minutes', String(MERGE_TIMEOUT_MINUTES))
+  setOutput('queue_depth', String(currentState.queueDepth ?? 0))
+  setOutput('minutes_since_merge', String(currentState.minutesSinceMerge ?? 0))
+
+  if (alert === 'unhealthy') {
+    console.log('⚠️  Transition to unhealthy detected — workflow will send alert')
+  } else if (alert === 'recovery') {
+    console.log('✅ Transition to healthy detected — workflow will send recovery')
+  } else {
+    console.log('No state transition — no alert needed')
   }
-
-  // Transition to healthy
-  if (currentState.health === 'healthy' && previousHealth === 'unhealthy') {
-    console.log('✅ Transition to healthy detected - sending recovery notification')
-    await slack.sendQueueRecoveryAlert(queueUrl)
-    console.log('✅ Recovery alert sent to Slack')
-    console.log('::set-output name=health::healthy')
-    return
-  }
-
-  // No transition
-  console.log('No state transition - no alert needed')
-  console.log(`::set-output name=health::${currentState.health}`)
 }
 
-main().catch((error) => {
-  console.error('Error:', error)
-  process.exit(1)
-})
+runScript(main)
