@@ -23,6 +23,7 @@ export type Workflow = WithId<WorkflowAPI.components['schemas']['WorkflowRead']>
 export const ActivityTypeEnum = {
   SCRIPT: 'script',
   HTTP_REQUEST: 'http_request',
+  KAFKA_PUBLISH: 'kafka_publish',
   AGENTIC: 'agentic',
   AAP_JOB_TEMPLATE: 'aap_job_template',
   AAP_WORKFLOW_JOB_TEMPLATE: 'aap_workflow_job_template',
@@ -89,6 +90,7 @@ export const WEBHOOK_TRIGGER_TYPES: ReadonlySet<string> = new Set([
 export const ExecutorTypeEnum = {
   SCRIPT: 'script',
   HTTP_REQUEST: 'http_request',
+  KAFKA_PUBLISH: 'kafka_publish',
   AGENTIC: 'agentic',
   AAP_JOB_TEMPLATE: 'aap_job_template',
   AAP_WORKFLOW_JOB_TEMPLATE: 'aap_workflow_job_template',
@@ -224,6 +226,8 @@ export interface NodeSettings {
   continue_on_failure?: boolean
   /** Timeout in seconds. Meaning varies by node type. Falls back to the global catalog default when absent. */
   timeout?: number
+  /** Advisory duration in seconds before showing Running long. Does not stop execution. */
+  expected_duration?: number
   /** Per-node retry policy. Absent = use all global catalog defaults. */
   retry_policy?: RetryPolicyConfig
 }
@@ -280,6 +284,12 @@ export interface ScriptActivity extends ActivityBase {
 export interface HttpRequestActivity extends ActivityBase {
   type: 'http_request'
   parameters: HttpRequestConfig & { [key: string]: unknown }
+}
+
+/** One acknowledged JSON record sent to a fixed Kafka topic. */
+export interface KafkaPublishActivity extends ActivityBase {
+  type: 'kafka_publish'
+  parameters: WorkflowAPI.components['schemas']['KafkaPublishParameters'] & { [key: string]: unknown }
 }
 
 /** AI agent node */
@@ -367,6 +377,7 @@ export interface WaitActivity extends ActivityBase {
 export type TypedActivity =
   | ScriptActivity
   | HttpRequestActivity
+  | KafkaPublishActivity
   | AgenticActivity
   | AAPJobTemplateActivity
   | AAPWorkflowJobTemplateActivity
@@ -405,4 +416,9 @@ export interface Activity {
 
 /** Executor nodes (nodes that perform work) */
 export type TaskActivity =
-  ScriptActivity | HttpRequestActivity | AgenticActivity | AAPJobTemplateActivity | AAPWorkflowJobTemplateActivity
+  | ScriptActivity
+  | HttpRequestActivity
+  | KafkaPublishActivity
+  | AgenticActivity
+  | AAPJobTemplateActivity
+  | AAPWorkflowJobTemplateActivity

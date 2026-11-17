@@ -59,6 +59,13 @@ the existing workers. Bootstrap and advertised broker connections use the
 Integration address policy. A successful connection test does not prove consumer
 group authorization or access to every advertised broker.
 
+Kafka Publish preflight and producer connections enforce that same policy at
+socket creation. Each new connection uses an approved numeric address while TLS
+continues to verify the original broker hostname. Metadata-advertised brokers and
+reconnects, including DNS changes on reused producers, go through the shared
+policy again. The Publish connection wrapper preserves aiokafka's normal producer
+shutdown and pending-delivery ownership.
+
 While a subscription is enabled and its placement is valid, connection and
 authentication failures retry automatically with exponential backoff and jitter.
 The calculated retry delay is capped at 30 seconds and has no attempt limit.

@@ -97,6 +97,7 @@ export function SynTextAreaField<
     >
       {({ field, fieldState }) => (
         <TextArea
+          ref={field.ref}
           id={resolvedFieldId}
           placeholder={placeholder}
           validated={fieldState.error ? 'error' : 'default'}

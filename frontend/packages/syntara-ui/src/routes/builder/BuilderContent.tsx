@@ -30,6 +30,7 @@ import { BuilderWorkflowPageHeader } from './BuilderWorkflowPageHeader'
 import { BuilderDialogs } from './components/BuilderDialogs'
 import { BuilderSidePanels } from './components/BuilderSidePanels'
 import { ExecutionDetailsPanelWrapper } from './components/ExecutionDetailsPanelWrapper'
+import { ExpectedDurationProvider } from './components/ExpectedDurationProvider'
 import { NodeEditorOverlay } from './components/NodeEditorOverlay'
 import { UnsavedStepEditorDialog } from './components/UnsavedStepEditorDialog'
 import { VersionHistorySidePanel } from './components/VersionHistorySidePanel'
@@ -66,8 +67,16 @@ import { VersionViewProvider } from './VersionViewProvider'
 
 type WorkflowVersion = WorkflowAPI.components['schemas']['WorkflowVersionRead']
 /* eslint-disable max-lines */
-// eslint-disable-next-line max-lines-per-function, complexity
 export function BuilderContent(props: BuilderContentProps) {
+  return (
+    <ExpectedDurationProvider>
+      <BuilderContentBody {...props} />
+    </ExpectedDurationProvider>
+  )
+}
+
+// eslint-disable-next-line max-lines-per-function, complexity
+function BuilderContentBody(props: BuilderContentProps) {
   const { workflow, isNew, workflowId, executionCopy, initialViewVersion } = props
   const navigate = useNavigate()
   const setLocation = useCallback(

@@ -20,7 +20,6 @@ from syntara.core.models.base import UserOwnedResource
 from syntara.core.models.pagination import ResourcesResponse
 from syntara.core.models.user_reference import UserReference, UserReferenceFieldsMixin
 from syntara.core.utils.sqlmodel import postgres_enum_column
-from syntara.workflows.models.workflow_definition import WorkflowDefinition
 
 if TYPE_CHECKING:
     from syntara.workflows.models.activity_execution import ActivityExecution
@@ -485,7 +484,7 @@ class ExecutionRead(UserReferenceFieldsMixin, SQLModel):
     )
 
     # Optional: Only populated when ?include=workflow_definition
-    workflow_definition: WorkflowDefinition | None = Field(
+    workflow_definition: dict[str, Any] | None = Field(
         default=None,
         description="Workflow definition from the executed version. "
         "Only included when requested via ?include=workflow_definition query parameter.",

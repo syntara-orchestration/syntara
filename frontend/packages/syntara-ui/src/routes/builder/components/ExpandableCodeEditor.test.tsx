@@ -20,11 +20,15 @@ vi.mock('@patternfly/react-code-editor', () => ({
     code,
     onCodeChange,
     customControls,
+    options,
+    isReadOnly,
     'aria-label': ariaLabel,
   }: {
     code: string
     onCodeChange: (code: string) => void
     customControls?: React.ReactNode
+    options?: { ariaRequired?: boolean; domReadOnly?: boolean }
+    isReadOnly?: boolean
     'aria-label'?: string
   }) => (
     <div data-testid="code-editor" aria-label={ariaLabel}>
@@ -33,6 +37,8 @@ vi.mock('@patternfly/react-code-editor', () => ({
         value={code}
         onChange={(e) => onCodeChange(e.target.value)}
         aria-label={ariaLabel}
+        aria-required={options?.ariaRequired}
+        readOnly={isReadOnly && options?.domReadOnly}
       />
       {customControls}
     </div>
@@ -91,6 +97,26 @@ describe('ExpandableCodeEditor', () => {
 
     // Modal should now be visible
     expect(screen.getByText('Test Modal')).toBeInTheDocument()
+  })
+
+  it('preserves required and read-only semantics in inline and expanded editors', async () => {
+    const user = userEvent.setup()
+    render(
+      <ExpandableCodeEditor
+        code='{"ok":true}'
+        onCodeChange={vi.fn()}
+        language="json"
+        ariaLabel="JSON payload"
+        modalTitle="Edit JSON payload"
+        isRequired
+        isReadOnly
+      />
+    )
+    expect(screen.getByRole('textbox', { name: 'JSON payload' })).toHaveAttribute('aria-required', 'true')
+    expect(screen.getByRole('textbox', { name: 'JSON payload' })).toHaveAttribute('readonly')
+    await user.click(screen.getByRole('button', { name: 'Open in new window' }))
+    expect(screen.getByRole('textbox', { name: 'JSON payload expanded' })).toHaveAttribute('aria-required', 'true')
+    expect(screen.getByRole('textbox', { name: 'JSON payload expanded' })).toHaveAttribute('readonly')
   })
 
   it('closes modal when close button is clicked', async () => {

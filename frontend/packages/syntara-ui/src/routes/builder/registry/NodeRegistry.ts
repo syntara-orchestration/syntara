@@ -57,6 +57,9 @@ export type NodeTypeDefinition<TFormData = unknown> = {
   /** Category for grouping (optional) */
   category?: NodeCategory
 
+  /** Show this registered step inside its parent's Add step options. */
+  parentId?: string
+
   /** Description shown in UI (optional) */
   description?: string
 

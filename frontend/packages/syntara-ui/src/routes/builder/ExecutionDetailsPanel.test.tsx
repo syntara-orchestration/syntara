@@ -82,6 +82,10 @@ vi.mock('../../hooks/routing/useSearchParams', () => ({
   useSearchParams: () => [new URLSearchParams(), vi.fn()],
 }))
 
+vi.mock('./hooks/useWorkflowEngineDefaults', () => ({
+  useWorkflowEngineDefaults: () => ({ defaults: null, isLoading: false }),
+}))
+
 vi.mock('./ExecutionStatus', () => ({
   StatusLabel: ({ status }: { status: string }) => <div data-testid="status-label">{status}</div>,
   ActivityStatusLabel: ({ status }: { status: string }) => <div data-testid="activity-status-label">{status}</div>,
