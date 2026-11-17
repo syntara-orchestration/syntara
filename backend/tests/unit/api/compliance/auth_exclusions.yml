@@ -18,6 +18,11 @@
 # catch it and ask you to remove the entry.
 
 authenticated:
+  # The list evaluates read policies per stored account, including creator scope and denies.
+  - method: GET
+    path: /api/v1/service_accounts
+    justification: Resolves readable account IDs through the policy evaluator before pagination so per-resource deny policies are applied
+
   # -- auth --
   - method: GET
     path: /api/v1/auth/me

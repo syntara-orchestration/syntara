@@ -17,6 +17,8 @@ from syntara.service_accounts.models.service_account import ServiceAccountStatus
 class ServiceAccountCreate(SQLModel):
     """Schema for creating a new service account."""
 
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")  # type: ignore[assignment]
+
     name: str = Field(
         ...,
         min_length=1,
@@ -28,16 +30,17 @@ class ServiceAccountCreate(SQLModel):
         max_length=2000,
         description="Optional description of the service account's purpose",
     )
-    project_id: UUID = Field(description="Project to create the service account in")
+    project_id: UUID | None = Field(
+        default=None,
+        description="Optional creation context; this does not limit the service account's access",
+    )
 
 
 class ServiceAccountUpdate(SQLModel):
     """Schema for updating a service account (PATCH)."""
 
-    project_id: UUID | None = Field(
-        default=None,
-        description="Project ID (immutable after creation; rejected if different from stored value)",
-    )
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")  # type: ignore[assignment]
+
     name: str | None = Field(
         default=None,
         min_length=1,
@@ -59,9 +62,11 @@ class ServiceAccountRead(UserReferenceFieldsMixin, SQLModel):
     id: UUID
     name: str
     description: str | None = None
+    project_id: UUID | None = Field(
+        default=None,
+        description="Project where the service account was created; informational only",
+    )
     status: ServiceAccountStatus
-    project_id: UUID
-    project_name: str | None = None
     last_authenticated_at: datetime | None = None
     created_by: UserReference | UUID | str | None = Field(
         default=None, description="User who created the service account"
@@ -88,3 +93,15 @@ class ServiceAccountListResponse(ResourcesResponse[ServiceAccountRead]):
         default=180,
         description="Maximum credential lifetime in days (0 for unlimited)",
     )
+
+
+class ServiceAccountDirectoryEntry(SQLModel):
+    """Basic identity for selectors; directory membership does not authorize management."""
+
+    id: UUID
+    name: str
+    status: ServiceAccountStatus
+
+
+class ServiceAccountDirectoryListResponse(ResourcesResponse[ServiceAccountDirectoryEntry]):
+    """Paginated basic service-account directory."""

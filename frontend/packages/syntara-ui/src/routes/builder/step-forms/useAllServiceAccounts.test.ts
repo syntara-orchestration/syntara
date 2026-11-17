@@ -18,7 +18,6 @@ const mockSAs = [
     id: 'sa-1',
     name: 'SA One',
     status: 'active' as const,
-    project_id: 'p-1',
     created_by: { id: 'u-1', name: 'user', type: 'user' },
     created_at: '2026-01-01T00:00:00Z',
     updated_at: '2026-01-01T00:00:00Z',
@@ -27,7 +26,6 @@ const mockSAs = [
     id: 'sa-2',
     name: 'SA Two',
     status: 'active' as const,
-    project_id: 'p-1',
     created_by: { id: 'u-1', name: 'user', type: 'user' },
     created_at: '2026-01-01T00:00:00Z',
     updated_at: '2026-01-01T00:00:00Z',
@@ -63,30 +61,30 @@ describe('useAllServiceAccounts', () => {
     expect(result.current.serviceAccounts[0].name).toBe('SA One')
   })
 
-  it('passes projectId as query parameter', async () => {
+  it('uses the basic directory', async () => {
     setupMock()
-    const { result } = renderHook(() => useAllServiceAccounts('project-123'), { wrapper })
+    const { result } = renderHook(() => useAllServiceAccounts(), { wrapper })
 
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false)
     })
 
-    expect(accessFetchClient.GET).toHaveBeenCalledWith('/service_accounts', {
+    expect(accessFetchClient.GET).toHaveBeenCalledWith('/service_accounts/directory', {
       params: {
-        query: expect.objectContaining({ sort: 'name', project_id: 'project-123' }) as Record<string, unknown>,
+        query: expect.objectContaining({ sort: 'name' }) as Record<string, unknown>,
       },
     })
   })
 
-  it('does not pass project_id when null', async () => {
+  it('does not filter identities by project', async () => {
     setupMock()
-    const { result } = renderHook(() => useAllServiceAccounts(null), { wrapper })
+    const { result } = renderHook(() => useAllServiceAccounts(), { wrapper })
 
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false)
     })
 
-    expect(accessFetchClient.GET).toHaveBeenCalledWith('/service_accounts', {
+    expect(accessFetchClient.GET).toHaveBeenCalledWith('/service_accounts/directory', {
       params: {
         query: expect.objectContaining({ sort: 'name' }) as Record<string, unknown>,
       },

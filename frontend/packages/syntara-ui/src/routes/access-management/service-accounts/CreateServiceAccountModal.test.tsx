@@ -11,7 +11,7 @@ import { accessClient } from '../../access/accessClient'
 import { useSelectableProjects } from '../../access/useAllProjects'
 
 import { CreateServiceAccountModal } from './CreateServiceAccountModal'
-import { CREDENTIAL_EXPIRATION_HELP, DESCRIPTION_HELP, NAME_HELP, PROJECT_HELP } from './serviceAccountFieldHelpText'
+import { CREDENTIAL_EXPIRATION_HELP, DESCRIPTION_HELP, NAME_HELP } from './serviceAccountFieldHelpText'
 
 const FUTURE_DATE = format(addDays(new Date(), 30), 'yyyy-MM-dd')
 
@@ -108,25 +108,12 @@ describe('CreateServiceAccountModal', () => {
       expect(screen.getByRole('heading', { name: 'Create service account' })).toBeInTheDocument()
     })
 
-    it('renders project select, name, and description fields', () => {
+    it('renders name and description without a project', () => {
       render(<CreateServiceAccountModal isOpen={true} onClose={mockOnClose} onSuccess={mockOnSuccess} />, { wrapper })
 
-      expect(screen.getByRole('button', { name: 'Select a project' })).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Select a project' })).not.toBeInTheDocument()
       expect(screen.getByRole('textbox', { name: 'Name' })).toBeInTheDocument()
       expect(screen.getByRole('textbox', { name: 'Description' })).toBeInTheDocument()
-    })
-
-    it('populates project dropdown with available projects', async () => {
-      const user = userEvent.setup()
-      render(<CreateServiceAccountModal isOpen={true} onClose={mockOnClose} onSuccess={mockOnSuccess} />, { wrapper })
-
-      await user.click(screen.getByRole('button', { name: 'Select a project' }))
-
-      await waitFor(() => {
-        expect(screen.getByRole('listbox')).toBeInTheDocument()
-        expect(screen.getByRole('option', { name: 'Project Alpha' })).toBeInTheDocument()
-        expect(screen.getByRole('option', { name: 'Project Beta' })).toBeInTheDocument()
-      })
     })
 
     it('renders credential expiration date field', () => {
@@ -135,14 +122,9 @@ describe('CreateServiceAccountModal', () => {
       expect(screen.getByLabelText('Credential expiration date')).toBeInTheDocument()
     })
 
-    it('shows project, name, description, and credential expiration help on click', async () => {
+    it('shows name, description, and credential expiration help on click', async () => {
       const user = userEvent.setup()
       render(<CreateServiceAccountModal isOpen={true} onClose={mockOnClose} onSuccess={mockOnSuccess} />, { wrapper })
-
-      await user.click(screen.getByRole('button', { name: 'More info for Project' }))
-      expect(screen.getByText(PROJECT_HELP)).toBeInTheDocument()
-
-      await user.keyboard('{Escape}')
       await user.click(screen.getByRole('button', { name: 'More info for Name' }))
       expect(screen.getByText(NAME_HELP)).toBeInTheDocument()
       expect(
@@ -184,9 +166,6 @@ describe('CreateServiceAccountModal', () => {
     it('validates expiration date on click before submit', async () => {
       const user = userEvent.setup()
       render(<CreateServiceAccountModal isOpen={true} onClose={mockOnClose} onSuccess={mockOnSuccess} />, { wrapper })
-
-      await user.click(screen.getByRole('button', { name: 'Select a project' }))
-      await user.click(await screen.findByRole('option', { name: 'Project Alpha' }))
       await user.type(screen.getByRole('textbox', { name: 'Name' }), 'my-new-sa')
 
       const dateInput = screen.getByLabelText('Credential expiration date')
@@ -207,9 +186,6 @@ describe('CreateServiceAccountModal', () => {
       const user = userEvent.setup()
       render(<CreateServiceAccountModal isOpen={true} onClose={mockOnClose} onSuccess={mockOnSuccess} />, { wrapper })
 
-      await user.click(screen.getByRole('button', { name: 'Select a project' }))
-      await user.click(await screen.findByRole('option', { name: 'Project Alpha' }))
-
       await user.type(screen.getByRole('textbox', { name: 'Name' }), 'my-new-sa')
       await user.type(screen.getByRole('textbox', { name: 'Description' }), 'Test account')
 
@@ -226,7 +202,6 @@ describe('CreateServiceAccountModal', () => {
           body: {
             name: 'my-new-sa',
             description: 'Test account',
-            project_id: '550e8400-e29b-41d4-a716-446655440000',
           },
         })
       })
@@ -252,9 +227,6 @@ describe('CreateServiceAccountModal', () => {
     it('transitions to credential phase after successful create + credential', async () => {
       const user = userEvent.setup()
       render(<CreateServiceAccountModal isOpen={true} onClose={mockOnClose} onSuccess={mockOnSuccess} />, { wrapper })
-
-      await user.click(screen.getByRole('button', { name: 'Select a project' }))
-      await user.click(await screen.findByRole('option', { name: 'Project Alpha' }))
 
       await user.type(screen.getByRole('textbox', { name: 'Name' }), 'my-new-sa')
 
@@ -292,9 +264,6 @@ describe('CreateServiceAccountModal', () => {
     it('shows warning and navigates to credentials tab when credential creation fails', async () => {
       const user = userEvent.setup()
       render(<CreateServiceAccountModal isOpen={true} onClose={mockOnClose} onSuccess={mockOnSuccess} />, { wrapper })
-
-      await user.click(screen.getByRole('button', { name: 'Select a project' }))
-      await user.click(await screen.findByRole('option', { name: 'Project Alpha' }))
 
       await user.type(screen.getByRole('textbox', { name: 'Name' }), 'my-new-sa')
 

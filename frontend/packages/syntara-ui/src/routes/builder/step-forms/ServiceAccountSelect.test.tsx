@@ -27,13 +27,15 @@ vi.mock('./CreateServiceAccountInlineModal', () => ({
     isOpen,
     onClose,
     onCreated,
+    projectId,
   }: {
     isOpen: boolean
     onClose: () => void
     onCreated: (id: string) => void
+    projectId?: string
   }) =>
     isOpen ? (
-      <div data-testid="create-sa-modal">
+      <div data-testid="create-sa-modal" data-project-id={projectId ?? ''}>
         <button onClick={onClose}>Close modal</button>
         <button onClick={() => onCreated('new-sa-id')}>Simulate create</button>
       </div>
@@ -174,6 +176,18 @@ describe('ServiceAccountSelect', () => {
     expect(screen.getByTestId('create-sa-modal')).toBeInTheDocument()
   })
 
+  it('passes the active project to inline service-account creation', async () => {
+    setupMocks()
+    const user = userEvent.setup()
+
+    render(<ServiceAccountSelect selectedIds={[]} onChange={vi.fn()} projectId="project-123" />, { wrapper })
+
+    await user.click(screen.getByText('Select service accounts'))
+    await user.click(screen.getByText('Create new service account'))
+
+    expect(screen.getByTestId('create-sa-modal')).toHaveAttribute('data-project-id', 'project-123')
+  })
+
   it('auto-selects newly created SA and refetches', async () => {
     const { refetch } = setupMocks()
     const onChange = vi.fn()
@@ -284,7 +298,7 @@ describe('ServiceAccountSelect', () => {
     expect(screen.queryByText('No service accounts available')).not.toBeInTheDocument()
   })
 
-  it('shows SA description when available', async () => {
+  it('uses only directory identities in options', async () => {
     setupMocks()
     const user = userEvent.setup()
 
@@ -292,7 +306,7 @@ describe('ServiceAccountSelect', () => {
 
     await user.click(screen.getByText('Select service accounts'))
 
-    expect(screen.getByText('CI integration')).toBeInTheDocument()
+    expect(screen.queryByText('CI integration')).not.toBeInTheDocument()
   })
 
   it('has no accessibility violations', async () => {

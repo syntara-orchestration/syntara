@@ -51,7 +51,7 @@ class TestCrossProjectDelegation:
         proj_a_id, _ = create_project(admin_api, "xproj-a")
         proj_b_id, _ = create_project(admin_api, "xproj-b")
 
-        sa = create_sa(admin_api, proj_a_id, prefix="xproj-sa")
+        sa = create_sa(admin_api, prefix="xproj-sa")
 
         cred = admin_api.service_account_credentials.create(
             service_account_id=sa.id,
@@ -79,35 +79,21 @@ class TestCrossProjectDelegation:
             assert me_resp.status_code == HTTPStatus.OK
             assert me_resp.json()["id"] == str(sa.id)
 
-            # SA can create a child SA in Project B (cross-project)
-            child_resp = httpx.post(
+            # Project grants authorize project resources, without control of identities.
+            for project_id, expected in ((proj_b_id, HTTPStatus.OK), (proj_a_id, HTTPStatus.FORBIDDEN)):
+                project_response = httpx.get(
+                    f"{syntara_base_url}/api/v1/projects/{project_id}",
+                    headers={"Authorization": f"Bearer {access_token}"},
+                    verify=e2e_ssl_context(),
+                )
+                assert project_response.status_code == expected
+            create_response = httpx.post(
                 f"{syntara_base_url}/api/v1/service_accounts",
-                json={"name": "xproj-child-sa", "project_id": str(proj_b_id)},
+                json={"name": "xproj-child-sa"},
                 headers={"Authorization": f"Bearer {access_token}"},
                 verify=e2e_ssl_context(),
             )
-            assert child_resp.status_code == HTTPStatus.CREATED, (
-                f"SA should have access to Project B, got {child_resp.status_code}: {child_resp.text}"
-            )
-            child_sa_id = child_resp.json()["id"]
-
-            # SA cannot create in a project it has no role in
-            proj_a_create = httpx.post(
-                f"{syntara_base_url}/api/v1/service_accounts",
-                json={"name": "xproj-noaccess-sa", "project_id": str(proj_a_id)},
-                headers={"Authorization": f"Bearer {access_token}"},
-                verify=e2e_ssl_context(),
-            )
-            assert proj_a_create.status_code == HTTPStatus.FORBIDDEN, (
-                f"SA should NOT have admin access to Project A, got {proj_a_create.status_code}"
-            )
-
-            # Clean up child SA
-            httpx.delete(
-                f"{syntara_base_url}/api/v1/service_accounts/{child_sa_id}",
-                headers={"Authorization": f"Bearer {access_token}"},
-                verify=e2e_ssl_context(),
-            )
+            assert create_response.status_code == HTTPStatus.FORBIDDEN
         finally:
             admin_api.service_accounts.delete(service_account_id=sa.id)
 
@@ -130,7 +116,7 @@ class TestFullLifecycle:
         project_id, _ = create_project(admin_api, "lifecycle")
 
         # --- 1. Create SA + credential ---
-        sa, client_id, client_secret = create_sa_with_credential(admin_api, project_id)
+        sa, client_id, client_secret = create_sa_with_credential(admin_api)
 
         admin_api.projects.create_role_assignment(
             project_id=project_id,

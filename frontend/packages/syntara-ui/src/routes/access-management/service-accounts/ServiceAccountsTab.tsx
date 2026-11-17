@@ -21,7 +21,7 @@ import { FilterOperatorEnum, FilterTypeEnum } from '../../../types/filters'
 import type { FilterFieldDefinition } from '../../../types/filters'
 import { detachPromise } from '../../../utils/detachPromise'
 import { accessClient } from '../../access/accessClient'
-import { getProjectDetailPath, getServiceAccountDetailPath } from '../accessManagementPaths'
+import { getServiceAccountDetailPath } from '../accessManagementPaths'
 
 import { CreateServiceAccountModal } from './CreateServiceAccountModal'
 import { EditServiceAccountModal } from './EditServiceAccountModal'
@@ -90,7 +90,7 @@ function ServiceAccountRow({
   onDelete: (sa: ServiceAccountRead) => void
 }>) {
   const permissions = useServiceAccountPermissions({
-    resourceProject: sa.project_id || sa.project_name || undefined,
+    resourceId: sa.id,
   })
 
   return (
@@ -99,13 +99,6 @@ function ServiceAccountRow({
         <SynLink to={getServiceAccountDetailPath(sa.id)}>
           <Truncate content={sa.name} />
         </SynLink>
-      </Td>
-      <Td dataLabel="Owning project">
-        {sa.project_name ? (
-          <SynLink to={getProjectDetailPath(sa.project_id)}>{sa.project_name}</SynLink>
-        ) : (
-          sa.project_id
-        )}
       </Td>
       <Td dataLabel="Created">
         <DateCell dateString={sa.created_at} />
@@ -120,7 +113,7 @@ function ServiceAccountRow({
           isChecked={sa.status === 'active'}
           // Gate with isDisabled (not a missing onChange) so useCanI's safe-false
           // window can't swallow clicks before permission resolves.
-          isDisabled={!permissions.canUpdate}
+          isDisabled={!(sa.status === 'active' ? permissions.canDisable : permissions.canEnable)}
           onChange={() => onToggleStatus(sa)}
           aria-label={`Toggle ${sa.name} status`}
         />
@@ -303,7 +296,6 @@ export function ServiceAccountsTab() {
                   <Th width={20} sort={getSortParams(0)}>
                     Name
                   </Th>
-                  <Th width={20}>Owning project</Th>
                   <Th width={20} sort={getSortParams(1)}>
                     Created
                   </Th>

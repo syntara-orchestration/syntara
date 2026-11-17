@@ -6,7 +6,7 @@ import type { CreateServiceAccountFormData } from '../../access-management/servi
 
 export type CredentialInfo = Readonly<{ identifier: string; client_secret: string; expiresAt?: string | null }>
 
-export function useCreateServiceAccountInline(expiresAt: string) {
+export function useCreateServiceAccountInline(expiresAt: string, projectId?: string) {
   const [credentials, setCredentials] = useState<CredentialInfo | null>(null)
   const [createdSaId, setCreatedSaId] = useState<string | null>(null)
   const [savedAck, setSavedAck] = useState(false)
@@ -25,7 +25,7 @@ export function useCreateServiceAccountInline(expiresAt: string) {
           body: {
             name: formData.name,
             description: formData.description ?? undefined,
-            project_id: formData.project_id,
+            ...(projectId ? { project_id: projectId } : {}),
           },
         })
         setCreatedSaId(saResponse.id)
@@ -37,17 +37,16 @@ export function useCreateServiceAccountInline(expiresAt: string) {
             ...(expiresAt ? { expires_at: `${expiresAt}T00:00:00Z` } : {}),
           },
         })
-        const cred = credResponse as { identifier: string; client_secret?: string | null; expires_at?: string | null }
         setCredentials({
-          identifier: cred.identifier,
-          client_secret: cred.client_secret ?? '',
-          expiresAt: cred.expires_at,
+          identifier: credResponse.identifier,
+          client_secret: credResponse.client_secret ?? '',
+          expiresAt: credResponse.expires_at,
         })
       } catch (error: unknown) {
         handleError({ title: 'Failed to create service account', context: formData.name })(error)
       }
     },
-    [createSA, createCred, expiresAt]
+    [createSA, createCred, expiresAt, projectId]
   )
 
   const resetState = useCallback(() => {

@@ -5,27 +5,21 @@ import {
   ClipboardCopy,
   Form,
   FormGroup,
-  MenuToggle,
   Modal,
   ModalBody,
   ModalFooter,
   ModalHeader,
-  SelectList,
-  SelectOption,
   TextInput,
 } from '@patternfly/react-core'
 import { RhUiAddIcon } from '@patternfly/react-icons'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect } from 'react'
 
 import { SynForm } from '../../../components/forms/SynForm'
-import { SynFormField } from '../../../components/forms/SynFormField'
 import { SynTextAreaField } from '../../../components/forms/SynTextAreaField'
 import { SynTextField } from '../../../components/forms/SynTextField'
-import { SynSelect } from '../../../components/SynSelect'
 import { useSynForm } from '../../../hooks/useSynForm'
 import { formatExpirationDate } from '../../../utils/dateUtils'
 import { detachPromise } from '../../../utils/detachPromise'
-import { useSelectableProjects } from '../../access/useAllProjects'
 import { CredentialExpirationField } from '../../access-management/service-accounts/CredentialExpirationField'
 import {
   createServiceAccountSchema,
@@ -43,12 +37,12 @@ export function CredentialRevealBody({ credentials }: Readonly<{ credentials: Cr
         The client secret will not be shown again. Copy and store it securely before closing this dialog.
       </Alert>
       <FormGroup label="Client ID" fieldId="sa-inline-identifier">
-        <ClipboardCopy isReadOnly hoverTip="Copy" clickTip="Copied">
+        <ClipboardCopy isReadOnly textAriaLabel="Client ID" hoverTip="Copy" clickTip="Copied">
           {credentials.identifier}
         </ClipboardCopy>
       </FormGroup>
       <FormGroup label="Client secret" fieldId="sa-inline-secret">
-        <ClipboardCopy isReadOnly hoverTip="Copy" clickTip="Copied">
+        <ClipboardCopy isReadOnly textAriaLabel="Client secret" hoverTip="Copy" clickTip="Copied">
           {credentials.client_secret}
         </ClipboardCopy>
       </FormGroup>
@@ -68,89 +62,9 @@ export function CredentialRevealBody({ credentials }: Readonly<{ credentials: Cr
   )
 }
 
-export function ProjectSelectToggle({
-  toggleRef,
-  label,
-  isOpen,
-  onToggle,
-}: Readonly<{
-  toggleRef: React.Ref<HTMLButtonElement>
-  label: string
-  isOpen: boolean
-  onToggle: () => void
-}>) {
-  return (
-    <MenuToggle ref={toggleRef} onClick={onToggle} isExpanded={isOpen} isFullWidth>
-      {label}
-    </MenuToggle>
-  )
-}
-
-function InlineProjectSelect({
-  value,
-  onChange,
-  projectOptions,
-}: Readonly<{
-  value: string
-  onChange: (val: string) => void
-  projectOptions: ReadonlyArray<{ id: string; name: string }>
-}>) {
-  const [isOpen, setIsOpen] = useState(false)
-  const selectedLabel = projectOptions.find((p) => p.id === value)?.name ?? 'Select a project'
-
-  const renderToggle = useCallback(
-    (ref: React.Ref<HTMLButtonElement>) => (
-      <ProjectSelectToggle
-        toggleRef={ref}
-        label={selectedLabel}
-        isOpen={isOpen}
-        onToggle={() => setIsOpen((prev) => !prev)}
-      />
-    ),
-    [selectedLabel, isOpen]
-  )
-
-  return (
-    <SynSelect
-      id="sa-inline-project"
-      aria-label="Project"
-      isOpen={isOpen}
-      onOpenChange={setIsOpen}
-      onSelect={(_e, val) => {
-        onChange(String(val))
-        setIsOpen(false)
-      }}
-      selected={value}
-      popperProps={{ appendTo: 'inline' }}
-      toggle={renderToggle}
-    >
-      <SelectList>
-        {projectOptions.map((p) => (
-          <SelectOption key={p.id} value={p.id} isSelected={p.id === value}>
-            {p.name}
-          </SelectOption>
-        ))}
-      </SelectList>
-    </SynSelect>
-  )
-}
-
-type CreateFormBodyProps = Readonly<{
-  projectOptions: ReadonlyArray<{ id: string; name: string }>
-}>
-
-function CreateFormBody({ projectOptions }: CreateFormBodyProps) {
+function CreateFormBody() {
   return (
     <>
-      <SynFormField name="project_id" label="Project" fieldId="sa-inline-project" isRequired>
-        {({ field }) => (
-          <InlineProjectSelect
-            value={field.value as string}
-            onChange={field.onChange}
-            projectOptions={projectOptions}
-          />
-        )}
-      </SynFormField>
       <SynTextField
         name="name"
         label="Name"
@@ -178,15 +92,6 @@ type Props = Readonly<{
 }>
 
 export function CreateServiceAccountInlineModal({ isOpen, onClose, onCreated, projectId }: Props) {
-  const { projects } = useSelectableProjects()
-  const projectOptions = useMemo(
-    () =>
-      projects
-        .filter((p): p is typeof p & { id: string } => typeof p.id === 'string')
-        .map((p) => ({ id: p.id, name: p.name })),
-    [projects]
-  )
-
   const {
     value: expiresAt,
     error: expirationError,
@@ -199,26 +104,26 @@ export function CreateServiceAccountInlineModal({ isOpen, onClose, onCreated, pr
 
   const form = useSynForm({
     schema: createServiceAccountSchema,
-    defaultValues: { name: '', description: '', project_id: projectId ?? '' },
+    defaultValues: { name: '', description: '' },
   })
   const { handleSubmit, handleError, reset } = form
 
   useEffect(() => {
     if (isOpen) {
-      reset({ name: '', description: '', project_id: projectId ?? '' })
+      reset({ name: '', description: '' })
     }
-  }, [isOpen, projectId, reset])
+  }, [isOpen, reset])
 
   const { credentials, savedAck, setSavedAck, isPending, submitForm, resetState, showCredentials } =
-    useCreateServiceAccountInline(expiresAt)
+    useCreateServiceAccountInline(expiresAt, projectId)
 
   const handleClose = useCallback(() => {
     const saId = resetState()
-    reset({ name: '', description: '', project_id: projectId ?? '' })
+    reset({ name: '', description: '' })
     resetExpirationDate()
     onClose()
     if (saId) onCreated(saId)
-  }, [resetState, onClose, onCreated, reset, resetExpirationDate, projectId])
+  }, [resetState, onClose, onCreated, reset, resetExpirationDate])
 
   const onSubmit = useCallback(
     async (formData: CreateServiceAccountFormData) => {
@@ -252,7 +157,7 @@ export function CreateServiceAccountInlineModal({ isOpen, onClose, onCreated, pr
           ) : (
             <>
               <SynForm form={form}>
-                <CreateFormBody projectOptions={projectOptions} />
+                <CreateFormBody />
               </SynForm>
               <CredentialExpirationField
                 selectedDate={expiresAt}

@@ -115,12 +115,12 @@ export const NAV_ITEMS: TNavigationItem[] = [
         label: 'Access Management',
         path: AppRoute.AccessManagement.Root,
         icon: <RhUiUsersIcon />,
-        // Admin-worthy grants only. Do not include project:read or service_account:read —
-        // those are shared with project-user / project-auditor and would over-show the hub.
-        // Project-admins unlock via role-assignment:* through can_i check_any_project.
+        // Project-only grants do not open the hub. System service-account readers get the
+        // account list, while role-assignment grants let project admins enter their projects.
         requiredPermissions: [
           { action: 'read', resourceType: 'user' },
           { action: 'read', resourceType: 'group' },
+          { action: 'read', resourceType: 'service_account' },
           { action: 'read', resourceType: 'role-assignment' },
           { action: 'assign', resourceType: 'role-assignment' },
         ],

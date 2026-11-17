@@ -42,7 +42,7 @@ class TestDisableTokenInvalidation:
         self, syntara_api: SyntaraApiRegistry, first_project_id: UUID, syntara_base_url: str
     ) -> None:
         """Outstanding Bearer tokens are rejected after the SA is disabled."""
-        sa, client_id, client_secret = create_sa_with_credential(syntara_api, first_project_id)
+        sa, client_id, client_secret = create_sa_with_credential(syntara_api)
 
         try:
             resp = token_request(syntara_base_url, client_id, client_secret)
@@ -77,7 +77,7 @@ class TestDeleteTokenInvalidation:
         self, syntara_api: SyntaraApiRegistry, first_project_id: UUID, syntara_base_url: str
     ) -> None:
         """Outstanding Bearer tokens are rejected after the SA is deleted."""
-        sa, client_id, client_secret = create_sa_with_credential(syntara_api, first_project_id)
+        sa, client_id, client_secret = create_sa_with_credential(syntara_api)
 
         resp = token_request(syntara_base_url, client_id, client_secret)
         assert resp.status_code == HTTPStatus.OK
@@ -109,7 +109,7 @@ class TestReEnableRestoresAuth:
         The old token remains revoked (token_version was incremented on disable).
         The SA must re-authenticate via client credentials to get a new token.
         """
-        sa, client_id, client_secret = create_sa_with_credential(syntara_api, first_project_id)
+        sa, client_id, client_secret = create_sa_with_credential(syntara_api)
 
         try:
             resp = token_request(syntara_base_url, client_id, client_secret)
@@ -149,7 +149,7 @@ class TestCredentialDisableTokenInvalidation:
         self, syntara_api: SyntaraApiRegistry, first_project_id: UUID, syntara_base_url: str
     ) -> None:
         """Token from credential A is rejected after disable; token from credential B still works."""
-        sa, client_id_a, client_secret_a = create_sa_with_credential(syntara_api, first_project_id)
+        sa, client_id_a, client_secret_a = create_sa_with_credential(syntara_api)
 
         try:
             cred_b = syntara_api.service_account_credentials.create(
@@ -193,7 +193,7 @@ class TestCredentialDisableTokenInvalidation:
         self, syntara_api: SyntaraApiRegistry, first_project_id: UUID, syntara_base_url: str
     ) -> None:
         """Token from a deleted credential is rejected."""
-        sa, client_id, client_secret = create_sa_with_credential(syntara_api, first_project_id)
+        sa, client_id, client_secret = create_sa_with_credential(syntara_api)
 
         try:
             access_token = token_request(syntara_base_url, client_id, client_secret).parsed.access_token

@@ -8,7 +8,6 @@ import {
   DESCRIPTION_HELP,
   GRACE_PERIOD_HELP,
   NAME_HELP,
-  PROJECT_HELP,
 } from './serviceAccountFieldHelpText'
 
 describe('serviceAccountHelp', () => {
@@ -16,18 +15,12 @@ describe('serviceAccountHelp', () => {
     const user = userEvent.setup()
     render(
       <>
-        {serviceAccountHelp.project}
         {serviceAccountHelp.name}
         {serviceAccountHelp.description}
         {serviceAccountHelp.credentialExpiration}
         {serviceAccountHelp.gracePeriod}
       </>
     )
-
-    await user.click(screen.getByRole('button', { name: 'More info for Project' }))
-    expect(screen.getByText(PROJECT_HELP)).toBeInTheDocument()
-
-    await user.keyboard('{Escape}')
     await user.click(screen.getByRole('button', { name: 'More info for Name' }))
     expect(screen.getByText(NAME_HELP)).toBeInTheDocument()
 

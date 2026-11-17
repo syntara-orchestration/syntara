@@ -116,5 +116,8 @@ exclusions:
   - operation_id: list_service_accounts
     reason: "Uses simple value filters instead of operator-based pattern - name needs allOf schema with {eq, contains, starts_with, gt, gte, lt, lte}, status needs {eq}. Sort parameter also missing pattern constraint."
 
+  - operation_id: list_service_accounts_directory
+    reason: "Uses simple value filters instead of operator-based pattern - name needs allOf schema with {eq, contains, starts_with, gt, gte, lt, lte}, status needs {eq}."
+
   - operation_id: list_service_account_credentials
     reason: "Uses simple value filters instead of operator-based pattern - credential_type/status need allOf schema with {eq}. Sort parameter also missing pattern constraint."

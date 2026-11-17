@@ -28,7 +28,7 @@ function createWrapper() {
   }
 }
 
-const CAN_I_COUNT = 11
+const CAN_I_COUNT = 10
 
 type CanIBody = {
   action: string
@@ -134,10 +134,8 @@ describe('useAccessManagementPermissions', () => {
     expect(result.current.canAccessPage).toBe(false)
   })
 
-  it('does not grant canAccessPage for project-scoped service_account:read alone', async () => {
-    mockCanIByBody(
-      (body) => body.check_any_project === true && body.resource_type === 'service_account' && body.action === 'read'
-    )
+  it('lets authenticated users access service accounts through system read permission', async () => {
+    mockCanIByBody((body) => body.resource_type === 'service_account' && body.action === 'read')
 
     const { result } = renderHook(() => useAccessManagementPermissions(), { wrapper: createWrapper() })
 
@@ -145,7 +143,7 @@ describe('useAccessManagementPermissions', () => {
       expect(result.current.isLoading).toBe(false)
     })
     expect(result.current.canReadServiceAccounts).toBe(true)
-    expect(result.current.canAccessPage).toBe(false)
+    expect(result.current.canAccessPage).toBe(true)
   })
 
   it('handles mixed permissions — canAccessPage true when role-assignment is granted', async () => {
@@ -188,9 +186,6 @@ describe('useAccessManagementPermissions', () => {
     })
     expect(accessFetchClient.POST).toHaveBeenCalledWith('/authz/can_i', {
       body: { action: 'assign', resource_type: 'role-assignment', check_any_project: true },
-    })
-    expect(accessFetchClient.POST).toHaveBeenCalledWith('/authz/can_i', {
-      body: { action: 'read', resource_type: 'service_account', check_any_project: true },
     })
     expect(accessFetchClient.POST).toHaveBeenCalledWith('/authz/can_i', {
       body: { action: 'read', resource_type: 'service_account' },

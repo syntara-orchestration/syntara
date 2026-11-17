@@ -45,7 +45,7 @@ async def test_batch_decide_reports_service_account_actor_type(
         async with test_session_factory() as session:
             approval = await session.get(ApprovalRequest, approval_ids[0])
             assert approval is not None
-            sa = ServiceAccount(name=sa_name, project_id=approval.project_id, created_by=user_ids[0])
+            sa = ServiceAccount(name=sa_name, created_by=user_ids[0])
             session.add(sa)  # the principals row is created by the before_flush hook
             await session.commit()
             sa_id = sa.id

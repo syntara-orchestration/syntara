@@ -19,7 +19,7 @@ class TestCanIRequestModel:
     def test_check_any_project_can_be_enabled(self) -> None:
         body = CanIRequest(
             action="read",
-            resource_type="service_account",
+            resource_type="workflow",
             check_any_project=True,
         )
         assert body.check_any_project is True
@@ -178,7 +178,7 @@ class TestAuthorizeAnyProjectInput:
                     return_value={
                         "allow": True,
                         "deny": False,
-                        "matched_policy": "service_account:read:project",
+                        "matched_policy": "workflow:read:project",
                         "denial_reason": "",
                         "denied_by": "",
                     }
@@ -202,7 +202,7 @@ class TestAuthorizeAnyProjectInput:
         request = AuthzRequest(
             user_id=uuid4(),
             action="read",
-            resource_type="service_account",
+            resource_type="workflow",
             resource_id="",
             check_any_project=False,
             groups=[],

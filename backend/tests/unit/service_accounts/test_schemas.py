@@ -23,34 +23,39 @@ class TestServiceAccountCreate:
         data = ServiceAccountCreate(
             name="CI Pipeline",
             description="Used by CI/CD",
-            project_id=uuid4(),
         )
         assert data.name == "CI Pipeline"
         assert data.description == "Used by CI/CD"
 
     def test_name_required(self) -> None:
-        with pytest.raises(ValidationError, match="name"):
-            ServiceAccountCreate(project_id=uuid4())
+        with pytest.raises(ValidationError):
+            ServiceAccountCreate()
 
-    def test_project_id_required(self) -> None:
+    def test_project_id_is_optional_creation_context(self) -> None:
+        project_id = uuid4()
+        assert ServiceAccountCreate(name="test").project_id is None
+        assert ServiceAccountCreate(name="test", project_id=project_id).project_id == project_id
+
+    def test_project_id_is_immutable(self) -> None:
         with pytest.raises(ValidationError, match="project_id"):
-            ServiceAccountCreate(name="test")
+            ServiceAccountUpdate.model_validate({"name": "test", "project_id": str(uuid4())})
 
     def test_description_optional(self) -> None:
-        data = ServiceAccountCreate(name="test", project_id=uuid4())
+        data = ServiceAccountCreate(name="test")
         assert data.description is None
+        assert data.project_id is None
 
     def test_name_min_length(self) -> None:
         with pytest.raises(ValidationError, match="at least 1"):
-            ServiceAccountCreate(name="", project_id=uuid4())
+            ServiceAccountCreate(name="")
 
     def test_name_max_length(self) -> None:
         with pytest.raises(ValidationError):
-            ServiceAccountCreate(name="x" * 256, project_id=uuid4())
+            ServiceAccountCreate(name="x" * 256)
 
     def test_description_max_length(self) -> None:
         with pytest.raises(ValidationError):
-            ServiceAccountCreate(name="test", description="x" * 2001, project_id=uuid4())
+            ServiceAccountCreate(name="test", description="x" * 2001)
 
 
 class TestServiceAccountUpdate:
@@ -83,12 +88,10 @@ class TestServiceAccountRead:
         now = datetime.now(tz=UTC)
         sa_id = uuid4()
         user_id = uuid4()
-        project_id = uuid4()
         data = ServiceAccountRead(
             id=sa_id,
             name="test",
             status=ServiceAccountStatus.ACTIVE,
-            project_id=project_id,
             created_by=user_id,
             created_at=now,
             updated_at=now,

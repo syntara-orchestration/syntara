@@ -98,7 +98,7 @@ export async function addManualTrigger(page: Page, name = 'Manual trigger') {
 }
 
 /** Select a service account in the trigger form's "Authorized service accounts" dropdown. */
-async function selectServiceAccount(page: Page, serviceAccountName: string) {
+export async function selectServiceAccount(page: Page, serviceAccountName: string) {
   // Two buttons match /authorized service accounts/i: the toggle (has text "Select service
   // accounts") and the FormLabelWithHelp icon (aria-label "Authorized service accounts help",
   // no text content). Filter by text content to target only the toggle and to wait for the

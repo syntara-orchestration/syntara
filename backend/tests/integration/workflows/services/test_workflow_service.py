@@ -516,7 +516,7 @@ class TestWorkflowServiceCreateWorkflow(TestWorkflowServiceBase):
     ) -> None:
         """Import with stale webhook SA UUID succeeds with warnings and strips the ID."""
         service = WorkflowService(test_db_session, test_user)
-        foreign_sa_id = str(uuid4())
+        missing_sa_id = str(uuid4())
         path = f"import-sa-{uuid4().hex[:8]}"
         workflow_definition = self._create_workflow_definition()
         workflow_definition["triggers"] = [
@@ -525,7 +525,7 @@ class TestWorkflowServiceCreateWorkflow(TestWorkflowServiceBase):
                 "type": "webhook_trigger",
                 "parameters": {
                     "webhook_path": path,
-                    "authorized_service_account_ids": [foreign_sa_id],
+                    "authorized_service_account_ids": [missing_sa_id],
                 },
             }
         ]

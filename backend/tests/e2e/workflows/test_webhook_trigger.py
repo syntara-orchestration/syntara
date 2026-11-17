@@ -61,7 +61,7 @@ class TestWebhookTrigger:
         workflow_name = unique_name("e2e-webhook-trigger")
 
         # Step 1: Create SA with credential
-        sa, client_id, client_secret = create_sa_with_credential(syntara_api, first_project_id)
+        sa, client_id, client_secret = create_sa_with_credential(syntara_api)
 
         # Step 2: Create workflow with webhook_trigger bound to the SA
         workflow_data = WorkflowCreate(
@@ -157,7 +157,7 @@ class TestWebhookTrigger:
         first_project_id: UUID,
     ):
         """POST to a nonexistent webhook path returns 404."""
-        _sa, client_id, client_secret = create_sa_with_credential(syntara_api, first_project_id)
+        _sa, client_id, client_secret = create_sa_with_credential(syntara_api)
         access_token = _get_sa_token(syntara_base_url, client_id, client_secret)
 
         unknown_path = unique_name("e2e-wh-nonexistent")
@@ -182,7 +182,7 @@ class TestWebhookTrigger:
         webhook_path = unique_name("e2e-wh-unpublished")
         workflow_name = unique_name("e2e-webhook-unpublished")
 
-        sa, client_id, client_secret = create_sa_with_credential(syntara_api, first_project_id)
+        sa, client_id, client_secret = create_sa_with_credential(syntara_api)
         access_token = _get_sa_token(syntara_base_url, client_id, client_secret)
 
         workflow_data = WorkflowCreate(

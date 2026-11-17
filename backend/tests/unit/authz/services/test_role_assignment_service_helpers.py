@@ -183,6 +183,7 @@ class TestValidatePrincipalId:
         principal.principal_type = "service_account"
         sa_entity = MagicMock()
         sa_entity.name = "deploy-bot"
+        sa_entity.project_id = uuid4()
 
         session = AsyncMock(spec=AsyncSession)
         session.get = AsyncMock(side_effect=[principal, sa_entity])

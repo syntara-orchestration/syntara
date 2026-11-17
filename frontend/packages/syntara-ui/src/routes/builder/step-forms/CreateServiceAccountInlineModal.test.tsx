@@ -8,11 +8,7 @@ import { axe } from 'vitest-axe'
 import { accessClient } from '../../access/accessClient'
 import { useCredentialExpirationDate } from '../../access-management/service-accounts/useCredentialExpirationDate'
 
-import {
-  CreateServiceAccountInlineModal,
-  CredentialRevealBody,
-  ProjectSelectToggle,
-} from './CreateServiceAccountInlineModal'
+import { CreateServiceAccountInlineModal, CredentialRevealBody } from './CreateServiceAccountInlineModal'
 import { useCreateServiceAccountInline } from './useCreateServiceAccountInline'
 
 const PROJECT_UUID = '00000000-0000-0000-0000-000000000001'
@@ -88,21 +84,13 @@ describe('CreateServiceAccountInlineModal', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
-  it('renders create form with name, description, and project fields', () => {
+  it('renders name and description without a project', () => {
     setupMutationMocks()
     render(<CreateServiceAccountInlineModal isOpen onClose={vi.fn()} onCreated={vi.fn()} />, { wrapper })
     expect(screen.getByRole('dialog')).toBeInTheDocument()
     expect(screen.getByRole('textbox', { name: 'Name' })).toBeInTheDocument()
     expect(screen.getByRole('textbox', { name: 'Description' })).toBeInTheDocument()
-    expect(screen.getByText('Select a project')).toBeInTheDocument()
-  })
-
-  it('pre-selects project when projectId is provided', () => {
-    setupMutationMocks()
-    render(<CreateServiceAccountInlineModal isOpen onClose={vi.fn()} onCreated={vi.fn()} projectId={PROJECT_UUID} />, {
-      wrapper,
-    })
-    expect(screen.getByText('Default')).toBeInTheDocument()
+    expect(screen.queryByText('Select a project')).not.toBeInTheDocument()
   })
 
   it('allows typing in name field', async () => {
@@ -162,15 +150,6 @@ describe('CreateServiceAccountInlineModal', () => {
     setupMutationMocks()
     render(<CreateServiceAccountInlineModal isOpen onClose={vi.fn()} onCreated={vi.fn()} />, { wrapper })
     expect(screen.getByTestId('expiration-field')).toBeInTheDocument()
-  })
-
-  it('renders project options in dropdown', async () => {
-    setupMutationMocks()
-    const user = userEvent.setup()
-    render(<CreateServiceAccountInlineModal isOpen onClose={vi.fn()} onCreated={vi.fn()} />, { wrapper })
-    await user.click(screen.getByText('Select a project'))
-    expect(screen.getByText('Default')).toBeInTheDocument()
-    expect(screen.getByText('Production')).toBeInTheDocument()
   })
 
   it('disables create button when isPending is true', () => {
@@ -291,23 +270,6 @@ describe('CredentialRevealBody', () => {
   })
 })
 
-describe('ProjectSelectToggle', () => {
-  it('renders label text', () => {
-    render(<ProjectSelectToggle toggleRef={null} label="Default" isOpen={false} onToggle={vi.fn()} />)
-
-    expect(screen.getByText('Default')).toBeInTheDocument()
-  })
-
-  it('calls onToggle when clicked', async () => {
-    const onToggle = vi.fn()
-    const user = userEvent.setup()
-    render(<ProjectSelectToggle toggleRef={null} label="Select" isOpen={false} onToggle={onToggle} />)
-
-    await user.click(screen.getByText('Select'))
-    expect(onToggle).toHaveBeenCalled()
-  })
-})
-
 describe('CreateServiceAccountInlineModal — Credential Reveal', () => {
   const mockSetSavedAck = vi.fn()
   const mockResetState = vi.fn()
@@ -334,7 +296,7 @@ describe('CreateServiceAccountInlineModal — Credential Reveal', () => {
   it('shows credential reveal title and credential fields', () => {
     setupCredentialRevealState()
 
-    render(<CreateServiceAccountInlineModal isOpen onClose={vi.fn()} onCreated={vi.fn()} projectId={PROJECT_UUID} />, {
+    render(<CreateServiceAccountInlineModal isOpen onClose={vi.fn()} onCreated={vi.fn()} />, {
       wrapper,
     })
 
@@ -347,7 +309,7 @@ describe('CreateServiceAccountInlineModal — Credential Reveal', () => {
   it('shows savedAck checkbox', () => {
     setupCredentialRevealState()
 
-    render(<CreateServiceAccountInlineModal isOpen onClose={vi.fn()} onCreated={vi.fn()} projectId={PROJECT_UUID} />, {
+    render(<CreateServiceAccountInlineModal isOpen onClose={vi.fn()} onCreated={vi.fn()} />, {
       wrapper,
     })
 
@@ -362,7 +324,7 @@ describe('CreateServiceAccountInlineModal — Credential Reveal', () => {
   it('disables Close button when savedAck is unchecked', () => {
     setupCredentialRevealState({ savedAck: false })
 
-    render(<CreateServiceAccountInlineModal isOpen onClose={vi.fn()} onCreated={vi.fn()} projectId={PROJECT_UUID} />, {
+    render(<CreateServiceAccountInlineModal isOpen onClose={vi.fn()} onCreated={vi.fn()} />, {
       wrapper,
     })
 
@@ -372,7 +334,7 @@ describe('CreateServiceAccountInlineModal — Credential Reveal', () => {
   it('enables Close button when savedAck is checked', () => {
     setupCredentialRevealState({ savedAck: true })
 
-    render(<CreateServiceAccountInlineModal isOpen onClose={vi.fn()} onCreated={vi.fn()} projectId={PROJECT_UUID} />, {
+    render(<CreateServiceAccountInlineModal isOpen onClose={vi.fn()} onCreated={vi.fn()} />, {
       wrapper,
     })
 
@@ -385,10 +347,7 @@ describe('CreateServiceAccountInlineModal — Credential Reveal', () => {
     const onClose = vi.fn()
     const onCreated = vi.fn()
 
-    render(
-      <CreateServiceAccountInlineModal isOpen onClose={onClose} onCreated={onCreated} projectId={PROJECT_UUID} />,
-      { wrapper }
-    )
+    render(<CreateServiceAccountInlineModal isOpen onClose={onClose} onCreated={onCreated} />, { wrapper })
 
     await user.click(getFooterCloseButton())
 
@@ -400,7 +359,7 @@ describe('CreateServiceAccountInlineModal — Credential Reveal', () => {
   it('hides create/cancel buttons in credential reveal mode', () => {
     setupCredentialRevealState()
 
-    render(<CreateServiceAccountInlineModal isOpen onClose={vi.fn()} onCreated={vi.fn()} projectId={PROJECT_UUID} />, {
+    render(<CreateServiceAccountInlineModal isOpen onClose={vi.fn()} onCreated={vi.fn()} />, {
       wrapper,
     })
 
@@ -411,10 +370,9 @@ describe('CreateServiceAccountInlineModal — Credential Reveal', () => {
   it('has no accessibility violations in credential reveal mode', async () => {
     setupCredentialRevealState()
 
-    const { container } = render(
-      <CreateServiceAccountInlineModal isOpen onClose={vi.fn()} onCreated={vi.fn()} projectId={PROJECT_UUID} />,
-      { wrapper }
-    )
+    const { container } = render(<CreateServiceAccountInlineModal isOpen onClose={vi.fn()} onCreated={vi.fn()} />, {
+      wrapper,
+    })
 
     expect(await axe(container)).toHaveNoViolations()
   })

@@ -46,7 +46,6 @@ test.describe('UI-5: Service Account Detail — View and Edit', () => {
 
     const details = app.getByRole('tabpanel', { name: 'Details' })
     await expect(details.getByText('Name')).toBeVisible()
-    await expect(details.getByText('Owning project')).toBeVisible()
     await expect(details.getByText('Description')).toBeVisible()
     await expect(details.getByText('State')).toBeVisible()
     await expect(details.getByText('Created')).toBeVisible()

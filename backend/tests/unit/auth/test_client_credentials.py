@@ -39,7 +39,6 @@ def _make_sa_and_credential(
         id=sa_id,
         name="test-sa",
         status=sa_status,
-        project_id=uuid4(),
         created_by=uuid4(),
         updated_by=uuid4(),
     )

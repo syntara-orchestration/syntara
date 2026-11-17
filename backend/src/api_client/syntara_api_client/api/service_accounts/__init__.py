@@ -24,6 +24,14 @@ class ServiceAccountsApi:
     def _load_endpoint_module(self, module_name: str) -> _EndpointModule:
         return cast(_EndpointModule, importlib.import_module(f"{__name__}.{module_name}"))
 
+    def list_directory(self, **kwargs: Any) -> Response[Any]:
+        endpoint_module = self._load_endpoint_module("list_service_accounts_directory")
+        return endpoint_module.sync_detailed(client=self._client, **kwargs)
+
+    async def async_list_directory(self, **kwargs: Any) -> Response[Any]:
+        endpoint_module = self._load_endpoint_module("list_service_accounts_directory")
+        return await endpoint_module.asyncio_detailed(client=self._client, **kwargs)
+
     def list(self, **kwargs: Any) -> Response[Any]:
         endpoint_module = self._load_endpoint_module("list_service_accounts")
         return endpoint_module.sync_detailed(client=self._client, **kwargs)

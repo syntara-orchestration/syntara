@@ -1,13 +1,12 @@
 """E2E tests for service account RBAC authorization (API-5,6,7,8,25,34).
 
 Covers:
-  API-5:  Project-scoped CRUD — project admin can manage own project SAs
-  API-6:  Cross-project operations denied with 403
-  API-7:  Platform admin sees all service accounts across projects
-  API-8:  CRUD policy enforcement — project-auditor has read-only, not write
+  API-5:  Authenticated users create/read; system admins manage
+  API-6:  Project roles do not grant service-account management
+  API-7:  Platform admin sees all service accounts
+  API-8:  System auditors have metadata access
   API-25: Role assignment — direct only, group membership rejected
-  API-34: Cross-project visibility — SA not visible to other project admin
-          until owning project grants service_account:read
+  API-34: Project grants do not grant account management
 """
 
 from __future__ import annotations
@@ -28,6 +27,7 @@ if TYPE_CHECKING:
         GroupFactory,
         ProjectFactory,
         UserFactory,
+        UserRoleAssignmentFactory,
     )
     from syntara_api_client.api import SyntaraApiRegistry
 
@@ -43,9 +43,9 @@ pytestmark = [pytest.mark.e2e]
 
 
 class TestProjectAdminCRUD:
-    """API-5: Project admin can manage own project SAs."""
+    """API-5: Project admins receive the authenticated create/read grants only."""
 
-    def test_project_admin_full_crud_lifecycle(
+    def test_project_admin_can_create_and_read_but_not_manage(
         self,
         syntara_base_url: str,
         admin_api: SyntaraApiRegistry,
@@ -60,7 +60,7 @@ class TestProjectAdminCRUD:
         user_api = api_for(syntara_base_url, username, password)
 
         # Create
-        sa = create_sa(user_api, project_id)
+        sa = create_sa(user_api)
         sa_id = sa.id
 
         try:
@@ -72,26 +72,23 @@ class TestProjectAdminCRUD:
             list_resp = user_api.service_accounts.list().assert_and_get()
             assert any(r.id == sa_id for r in list_resp.resources)
 
-            # Update
-            new_name = unique_name("e2e-authz-sa-upd")
-            updated = user_api.service_accounts.update(
+            # The creator and project-admin role do not grant management rights.
+            update_resp = user_api.service_accounts.update(
                 service_account_id=sa_id,
-                body=ServiceAccountUpdate(name=new_name),
-            ).assert_and_get()
-            assert updated.name == new_name
-
-            # Delete
-            del_resp = user_api.service_accounts.delete(service_account_id=sa_id)
-            assert del_resp.status_code == HTTPStatus.NO_CONTENT
+                body=ServiceAccountUpdate(description="denied"),
+            )
+            assert update_resp.status_code == HTTPStatus.FORBIDDEN
+            delete_resp = user_api.service_accounts.delete(service_account_id=sa_id)
+            assert delete_resp.status_code == HTTPStatus.FORBIDDEN
         except Exception:
             admin_api.service_accounts.delete(service_account_id=sa_id)
             raise
 
 
-class TestCrossProjectDenied:
-    """API-6: Cross-project operations denied with 403."""
+class TestCrossProjectRead:
+    """API-6: All authenticated users can read accounts, but only admins manage them."""
 
-    def test_project_admin_cannot_access_other_project_sas(
+    def test_project_admin_can_read_other_accounts_but_not_manage_them(
         self,
         syntara_base_url: str,
         admin_api: SyntaraApiRegistry,
@@ -100,24 +97,26 @@ class TestCrossProjectDenied:
         assign_project_role_to_user: AssignProjectRoleFactory,
     ) -> None:
         alpha_id, _ = create_project(admin_api, "alpha")
-        beta_id, _ = create_project(admin_api, "beta")
         user_id, username, password = create_user(admin_api, "cross-deny")
         assign_project_role_to_user(admin_api, alpha_id, user_id, "project-admin")
 
-        beta_sa = create_sa(admin_api, beta_id)
+        beta_sa = create_sa(admin_api)
 
         user_api = api_for(syntara_base_url, username, password)
 
         try:
-            # Create in beta → 403
+            # Signed-in humans can create independent identities
             create_resp = user_api.service_accounts.create(
-                body=ServiceAccountCreate(name=unique_name("cross-deny"), project_id=beta_id),
+                body=ServiceAccountCreate(name=unique_name("cross-deny")),
             )
-            assert create_resp.status_code == HTTPStatus.FORBIDDEN
+            assert create_resp.status_code == HTTPStatus.CREATED
+            user_api.service_accounts.delete(service_account_id=create_resp.assert_and_get().id)
 
-            # Get beta SA → 403
-            get_resp = user_api.service_accounts.get(service_account_id=beta_sa.id)
-            assert get_resp.status_code == HTTPStatus.FORBIDDEN
+            # Read is system-wide for authenticated users.
+            detail = user_api.service_accounts.get(service_account_id=beta_sa.id).assert_and_get()
+            assert detail.id == beta_sa.id
+            listing = user_api.service_accounts.list().assert_and_get()
+            assert beta_sa.id in {account.id for account in listing.resources}
 
             # Update beta SA → 403
             update_resp = user_api.service_accounts.update(
@@ -134,25 +133,21 @@ class TestCrossProjectDenied:
 
 
 class TestPlatformAdminSeesAll:
-    """API-7: Platform admin sees all service accounts across projects."""
+    """API-7: Platform admin sees all service accounts."""
 
-    def test_admin_sees_sas_in_all_projects(
+    def test_admin_sees_all_service_accounts(
         self,
         admin_api: SyntaraApiRegistry,
-        create_project: ProjectFactory,
     ) -> None:
-        proj_a_id, _ = create_project(admin_api, "vis-a")
-        proj_b_id, _ = create_project(admin_api, "vis-b")
-
-        sa_a = create_sa(admin_api, proj_a_id)
-        sa_b = create_sa(admin_api, proj_b_id)
+        sa_a = create_sa(admin_api)
+        sa_b = create_sa(admin_api)
 
         try:
             # List all — both should appear
             list_resp = admin_api.service_accounts.list().assert_and_get()
             listed_ids = {r.id for r in list_resp.resources}
-            assert sa_a.id in listed_ids, "SA from project A not in admin list"
-            assert sa_b.id in listed_ids, "SA from project B not in admin list"
+            assert sa_a.id in listed_ids, "First service account missing from admin list"
+            assert sa_b.id in listed_ids, "Second service account missing from admin list"
 
             # Get each individually
             admin_api.service_accounts.get(service_account_id=sa_a.id).assert_and_get()
@@ -163,7 +158,7 @@ class TestPlatformAdminSeesAll:
 
 
 class TestCRUDPolicyEnforcement:
-    """API-8: CRUD policy enforcement — project-auditor has read-only, not write."""
+    """API-8: System auditors have metadata access."""
 
     def test_auditor_can_read_but_not_write(
         self,
@@ -172,12 +167,12 @@ class TestCRUDPolicyEnforcement:
         create_project: ProjectFactory,
         create_user: UserFactory,
         assign_project_role_to_user: AssignProjectRoleFactory,
+        assign_system_role: UserRoleAssignmentFactory,
     ) -> None:
-        project_id, _ = create_project(admin_api, "auditor")
         user_id, username, password = create_user(admin_api, "auditor")
-        assign_project_role_to_user(admin_api, project_id, user_id, "project-auditor")
+        assign_system_role(admin_api, user_id, "auditor")
 
-        sa = create_sa(admin_api, project_id)
+        sa = create_sa(admin_api)
 
         auditor_api = api_for(syntara_base_url, username, password)
 
@@ -189,12 +184,6 @@ class TestCRUDPolicyEnforcement:
             # List → 200, SA appears
             list_resp = auditor_api.service_accounts.list().assert_and_get()
             assert any(r.id == sa.id for r in list_resp.resources)
-
-            # Create → 403
-            create_resp = auditor_api.service_accounts.create(
-                body=ServiceAccountCreate(name=unique_name("auditor-deny"), project_id=project_id),
-            )
-            assert create_resp.status_code == HTTPStatus.FORBIDDEN
 
             # Update → 403
             update_resp = auditor_api.service_accounts.update(
@@ -220,7 +209,7 @@ class TestRoleAssignmentToServiceAccount:
     ) -> None:
         """Assign a project role directly to a service account."""
         project_id, _ = create_project(admin_api, "sa-role")
-        sa = create_sa(admin_api, project_id)
+        sa = create_sa(admin_api)
 
         try:
             resp = admin_api.projects.create_role_assignment(
@@ -234,6 +223,25 @@ class TestRoleAssignmentToServiceAccount:
         finally:
             admin_api.service_accounts.delete(service_account_id=sa.id)
 
+    def test_system_role_assignment_is_visible_and_revocable(self, admin_api: SyntaraApiRegistry) -> None:
+        sa = create_sa(admin_api)
+
+        try:
+            assignment = admin_api.role_assignments.create(
+                body=RoleAssignmentCreate(principal_id=sa.id, role_name="auditor")
+            ).assert_and_get()
+            assert assignment.project_id is None
+
+            visible = admin_api.role_assignments.list(principal_id=sa.id).assert_and_get()
+            assert any(row.id == assignment.id and row.role_name == "auditor" for row in visible.resources)
+
+            revoked = admin_api.role_assignments.delete(assignment_id=assignment.id)
+            assert revoked.status_code == HTTPStatus.NO_CONTENT
+            remaining = admin_api.role_assignments.list(principal_id=sa.id).assert_and_get()
+            assert all(row.id != assignment.id for row in remaining.resources)
+        finally:
+            admin_api.service_accounts.delete(service_account_id=sa.id)
+
     def test_service_account_cannot_be_group_member(
         self,
         admin_api: SyntaraApiRegistry,
@@ -241,9 +249,8 @@ class TestRoleAssignmentToServiceAccount:
         create_group: GroupFactory,
     ) -> None:
         """GroupMemberAdd only accepts user_id — SA UUID is rejected."""
-        project_id, _ = create_project(admin_api, "sa-grp")
         group_id, _ = create_group(admin_api, "sa-grp")
-        sa = create_sa(admin_api, project_id)
+        sa = create_sa(admin_api)
 
         try:
             resp = admin_api.groups.add_member(
@@ -258,9 +265,9 @@ class TestRoleAssignmentToServiceAccount:
 
 
 class TestCrossProjectVisibility:
-    """API-34: Cross-project visibility — SA not visible until project grants read."""
+    """API-34: Project grants never convey account ownership."""
 
-    def test_sa_visible_only_after_role_grant(
+    def test_project_role_grant_does_not_expose_account(
         self,
         syntara_base_url: str,
         admin_api: SyntaraApiRegistry,
@@ -275,15 +282,22 @@ class TestCrossProjectVisibility:
         # User is project-admin on beta only
         assign_project_role_to_user(admin_api, beta_id, user_id, "project-admin")
 
-        alpha_sa = create_sa(admin_api, alpha_id)
+        alpha_sa = create_sa(admin_api)
 
         user_api = api_for(syntara_base_url, username, password)
 
         try:
-            # Alpha SA should NOT be visible
+            # All authenticated users can read identities before any project grant.
             list_before = user_api.service_accounts.list().assert_and_get()
-            visible_ids_before = {r.id for r in list_before.resources}
-            assert alpha_sa.id not in visible_ids_before, "Alpha SA visible before role grant"
+            assert alpha_sa.id in {r.id for r in list_before.resources}
+            assert user_api.service_accounts.get(service_account_id=alpha_sa.id).status_code == HTTPStatus.OK
+            assert (
+                user_api.service_accounts.update(
+                    service_account_id=alpha_sa.id,
+                    body=ServiceAccountUpdate(description="denied"),
+                ).status_code
+                == HTTPStatus.FORBIDDEN
+            )
 
             # Grant project-admin on alpha
             assign_project_role_to_user(admin_api, alpha_id, user_id, "project-admin")
@@ -291,9 +305,18 @@ class TestCrossProjectVisibility:
             # Re-authenticate to pick up new permissions
             user_api = api_for(syntara_base_url, username, password)
 
-            # Alpha SA should now be visible
+            # Project administration does not change service-account access.
             list_after = user_api.service_accounts.list().assert_and_get()
             visible_ids_after = {r.id for r in list_after.resources}
-            assert alpha_sa.id in visible_ids_after, "Alpha SA not visible after role grant"
+            assert alpha_sa.id in visible_ids_after
+            directory = user_api.service_accounts.list_directory(name=alpha_sa.name).assert_and_get()
+            assert any(entry.id == alpha_sa.id for entry in directory.resources)
+            assert (
+                user_api.service_accounts.update(
+                    service_account_id=alpha_sa.id,
+                    body=ServiceAccountUpdate(description="still denied"),
+                ).status_code
+                == HTTPStatus.FORBIDDEN
+            )
         finally:
             admin_api.service_accounts.delete(service_account_id=alpha_sa.id)

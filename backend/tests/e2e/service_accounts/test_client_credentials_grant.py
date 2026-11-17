@@ -44,7 +44,7 @@ class TestClientCredentialsGrant:
         self, syntara_api: SyntaraApiRegistry, first_project_id: UUID, syntara_base_url: str
     ) -> None:
         """POST /auth/token returns 200 with valid ES256 JWT and correct claims."""
-        sa, client_id, client_secret = create_sa_with_credential(syntara_api, first_project_id)
+        sa, client_id, client_secret = create_sa_with_credential(syntara_api)
 
         try:
             resp = token_request(syntara_base_url, client_id, client_secret)
@@ -73,7 +73,7 @@ class TestClientCredentialsGrant:
         self, syntara_api: SyntaraApiRegistry, first_project_id: UUID, syntara_base_url: str
     ) -> None:
         """A token with a tampered payload is rejected by protected endpoints."""
-        sa, client_id, client_secret = create_sa_with_credential(syntara_api, first_project_id)
+        sa, client_id, client_secret = create_sa_with_credential(syntara_api)
 
         try:
             resp = token_request(syntara_base_url, client_id, client_secret)
@@ -117,7 +117,7 @@ class TestClientCredentialsBasicAuth:
         self, syntara_api: SyntaraApiRegistry, first_project_id: UUID, syntara_base_url: str
     ) -> None:
         """Credentials via Authorization: Basic header returns a valid token."""
-        sa, client_id, client_secret = create_sa_with_credential(syntara_api, first_project_id)
+        sa, client_id, client_secret = create_sa_with_credential(syntara_api)
 
         try:
             resp = token_request(syntara_base_url, client_id, client_secret, use_basic_auth=True)
@@ -137,7 +137,7 @@ class TestClientCredentialsInvalidSecret:
         self, syntara_api: SyntaraApiRegistry, first_project_id: UUID, syntara_base_url: str
     ) -> None:
         """Correct client_id with wrong secret returns 401."""
-        sa, client_id, _ = create_sa_with_credential(syntara_api, first_project_id)
+        sa, client_id, _ = create_sa_with_credential(syntara_api)
 
         try:
             resp = token_request(syntara_base_url, client_id, "wrong-secret")
@@ -162,7 +162,7 @@ class TestClientCredentialsDisabledSA:
         self, syntara_api: SyntaraApiRegistry, first_project_id: UUID, syntara_base_url: str
     ) -> None:
         """Disabled SA cannot obtain a token."""
-        sa, client_id, client_secret = create_sa_with_credential(syntara_api, first_project_id)
+        sa, client_id, client_secret = create_sa_with_credential(syntara_api)
 
         try:
             syntara_api.service_accounts.disable(service_account_id=sa.id)
@@ -180,7 +180,7 @@ class TestClientCredentialsDeletedSA:
         self, syntara_api: SyntaraApiRegistry, first_project_id: UUID, syntara_base_url: str
     ) -> None:
         """Deleted SA cannot obtain a token."""
-        sa, client_id, client_secret = create_sa_with_credential(syntara_api, first_project_id)
+        sa, client_id, client_secret = create_sa_with_credential(syntara_api)
         syntara_api.service_accounts.delete(service_account_id=sa.id)
 
         resp = token_request(syntara_base_url, client_id, client_secret)
@@ -211,7 +211,7 @@ class TestSATokenLifetime:
         self, syntara_api: SyntaraApiRegistry, first_project_id: UUID, syntara_base_url: str
     ) -> None:
         """SA access token exp - iat matches the configured SA-specific lifetime."""
-        sa, client_id, client_secret = create_sa_with_credential(syntara_api, first_project_id)
+        sa, client_id, client_secret = create_sa_with_credential(syntara_api)
 
         try:
             resp = token_request(syntara_base_url, client_id, client_secret)

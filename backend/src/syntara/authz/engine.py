@@ -18,6 +18,7 @@ from syntara.authz.models.project import Project
 from syntara.authz.resolver import resolve_effective_policies, resolve_user_groups
 from syntara.authz.role_conventions import builtin_roles_with_system_grant
 from syntara.core.models.group import Group
+from syntara.core.models.user import User
 
 # Precomputed at import time: builtin roles that grant credential:use at system scope.
 # Used by resolve_credential_use_visibility to short-circuit to a single DB query
@@ -137,6 +138,9 @@ class AuthzRequest:
     user_labels: dict[str, str] = field(default_factory=dict)
     user_metadata: dict[str, Any] = field(default_factory=dict)
     groups: list[dict[str, Any]] | None = None
+    # Pre-resolved effective policies (skips the per-request policy lookup when
+    # the caller already resolved them, e.g. bulk list-visibility resolution).
+    effective_policies: list[dict[str, Any]] | None = None
     resource_project: str = ""
     # Advisory can_i only (POST /authz/can_i). When True, Rego matches
     # project-scoped policies regardless of resource_project. Default False —
@@ -178,7 +182,9 @@ async def authorize(
 
     """
     action_filter = f"{request.resource_type}:{request.action}"
-    effective = await resolve_effective_policies(db, request.user_id, action_filter=action_filter)
+    effective = request.effective_policies
+    if effective is None:
+        effective = await resolve_effective_policies(db, request.user_id, action_filter=action_filter)
 
     groups = request.groups
     if groups is None:
@@ -658,3 +664,48 @@ async def assign_authenticated_group_project_user(
     )
 
     return assignment
+
+
+async def resolve_service_account_read_ids(
+    db: AsyncSession, evaluator: AuthzEvaluator, user: User
+) -> list[UUID] | None:
+    """Resolve readable identities from scoped policies and per-resource denies."""
+    from syntara.service_accounts.models.service_account import ServiceAccount  # noqa: PLC0415
+
+    effective = await resolve_effective_policies(db, user.id, action_filter="service_account:read")
+    groups = await resolve_user_groups(db, user.id)
+    relevant = [
+        p for p in effective if {"service_account:read", "service_account:*"}.intersection(p.get("actions", []))
+    ]
+    if not any(p.get("effect") == "deny" for p in relevant) and any(
+        p.get("effect") == "allow" and p.get("scope") == "any" and not p.get("conditions") for p in relevant
+    ):
+        return None
+
+    candidates = select(ServiceAccount.id, ServiceAccount.created_by, ServiceAccount.labels)
+    # Limit candidates to creator-owned identities when only scoped policies can match.
+    if not any(p.get("effect") == "allow" and p.get("scope") == "any" for p in relevant):
+        candidates = candidates.where(ServiceAccount.created_by == user.id)
+    rows = await db.exec(candidates)
+    readable = []
+    for account_id, created_by, labels in rows.all():
+        result = await authorize(
+            db,
+            evaluator,
+            AuthzRequest(
+                user_id=user.id,
+                action="read",
+                resource_type="service_account",
+                resource_id=str(account_id),
+                resource_project="",
+                resource_labels=dict(labels or {}),
+                resource_metadata={"created_by": str(created_by)},
+                user_labels=user.labels,
+                user_metadata=user.authz_metadata,
+                groups=groups,
+                effective_policies=effective,
+            ),
+        )
+        if result.allowed:
+            readable.append(account_id)
+    return readable

@@ -8,6 +8,8 @@ type ServiceAccountPermissions = {
   canUpdate: boolean
   canDelete: boolean
   canRotateSecret: boolean
+  canEnable: boolean
+  canDisable: boolean
   isLoading: boolean
   isError: boolean
   tooltips: {
@@ -19,26 +21,15 @@ type ServiceAccountPermissions = {
 }
 
 type UseServiceAccountPermissionsOptions = {
-  /**
-   * Concrete project for detail/row actions. When omitted, only create uses
-   * `check_any_project` (hub chrome); update/delete/rotate stay safe-false.
-   */
-  resourceProject?: string
+  resourceId?: string
 }
 
 export function useServiceAccountPermissions(options?: UseServiceAccountPermissionsOptions): ServiceAccountPermissions {
   const resourceType = 'service_account' as const
-  const resourceProject = options?.resourceProject
-  const hasProject = Boolean(resourceProject)
+  const resourceId = options?.resourceId
+  const destructiveOptions = { resourceId, enabled: Boolean(resourceId) }
 
-  const createOptions = hasProject ? { resourceProject } : { checkAnyProject: true as const }
-  const destructiveOptions = hasProject ? { resourceProject, enabled: true } : { enabled: false }
-
-  const {
-    allowed: canCreate,
-    isChecking: isCheckingCreate,
-    isError: isErrorCreate,
-  } = useCanI('create', resourceType, createOptions)
+  const { allowed: canCreate, isChecking: isCheckingCreate, isError: isErrorCreate } = useCanI('create', resourceType)
   const {
     allowed: canUpdate,
     isChecking: isCheckingUpdate,
@@ -55,14 +46,33 @@ export function useServiceAccountPermissions(options?: UseServiceAccountPermissi
     isError: isErrorRotate,
   } = useCanI('rotate_secret', resourceType, destructiveOptions)
 
+  const {
+    allowed: canEnable,
+    isChecking: isCheckingEnable,
+    isError: isErrorEnable,
+  } = useCanI('enable', resourceType, destructiveOptions)
+  const {
+    allowed: canDisable,
+    isChecking: isCheckingDisable,
+    isError: isErrorDisable,
+  } = useCanI('disable', resourceType, destructiveOptions)
+
   return useMemo(
     () => ({
       canCreate,
       canUpdate,
       canDelete,
       canRotateSecret,
-      isLoading: isCheckingCreate || isCheckingUpdate || isCheckingDelete || isCheckingRotate,
-      isError: isErrorCreate || isErrorUpdate || isErrorDelete || isErrorRotate,
+      canEnable,
+      canDisable,
+      isLoading:
+        isCheckingCreate ||
+        isCheckingUpdate ||
+        isCheckingDelete ||
+        isCheckingRotate ||
+        isCheckingEnable ||
+        isCheckingDisable,
+      isError: isErrorCreate || isErrorUpdate || isErrorDelete || isErrorRotate || isErrorEnable || isErrorDisable,
       tooltips: {
         create: permissionTooltip('create a service account', `${resourceType}:create`),
         update: permissionTooltip('edit this service account', `${resourceType}:update`),
@@ -75,14 +85,20 @@ export function useServiceAccountPermissions(options?: UseServiceAccountPermissi
       canUpdate,
       canDelete,
       canRotateSecret,
+      canEnable,
+      canDisable,
       isCheckingCreate,
       isCheckingUpdate,
       isCheckingDelete,
       isCheckingRotate,
+      isCheckingEnable,
+      isCheckingDisable,
       isErrorCreate,
       isErrorUpdate,
       isErrorDelete,
       isErrorRotate,
+      isErrorEnable,
+      isErrorDisable,
     ]
   )
 }

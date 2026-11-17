@@ -306,8 +306,6 @@ class ProjectService(BaseService):
         from syntara.credentials.models.credential import Credential  # noqa: PLC0415
         from syntara.files.models.file_metadata import FileMetadata  # noqa: PLC0415
         from syntara.integrations.models.integration import IntegrationProjectAssignment  # noqa: PLC0415
-        from syntara.service_accounts.models.service_account import ServiceAccount  # noqa: PLC0415
-        from syntara.service_accounts.models.service_account_credential import ServiceAccountCredential  # noqa: PLC0415
         from syntara.workflows.models.execution import TERMINAL_EXECUTION_STATUSES, Execution  # noqa: PLC0415
         from syntara.workflows.models.webhook_trigger import WebhookTrigger  # noqa: PLC0415
         from syntara.workflows.models.workflow import Workflow  # noqa: PLC0415
@@ -396,17 +394,6 @@ class ProjectService(BaseService):
         # 7. Integration project assignments (junction table)
         await self.session.exec(
             delete(IntegrationProjectAssignment).where(IntegrationProjectAssignment.project_id == project_id)  # type: ignore[arg-type]
-        )
-
-        # 8. Service account credentials (must precede service_accounts — FK has no CASCADE)
-        sa_ids_subq = select(ServiceAccount.id).where(ServiceAccount.project_id == project_id).scalar_subquery()
-        await self.session.exec(
-            delete(ServiceAccountCredential).where(col(ServiceAccountCredential.service_account_id).in_(sa_ids_subq))
-        )
-
-        # 8b. Service accounts
-        await self.session.exec(
-            delete(ServiceAccount).where(ServiceAccount.project_id == project_id)  # type: ignore[arg-type]
         )
 
         # 9. Role assignments

@@ -48,7 +48,7 @@ export function ProjectDeleteDialog({
         <StackItem>
           <List>
             <ListItem>Workflows, executions, and approval requests</ListItem>
-            <ListItem>Credentials and service accounts</ListItem>
+            <ListItem>Project credentials</ListItem>
             <ListItem>Uploaded files</ListItem>
             <ListItem>Role assignments, project roles, and policies</ListItem>
             <ListItem>Integration assignments for this project</ListItem>

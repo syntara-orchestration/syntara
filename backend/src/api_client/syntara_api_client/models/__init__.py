@@ -290,6 +290,8 @@ __all__ = (
     "ServiceAccountCredentialRotateResponse",
     "ServiceAccountCredentialStatus",
     "ServiceAccountCredentialType",
+    "ServiceAccountDirectoryEntry",
+    "ServiceAccountDirectoryListResponse",
     "ServiceAccountListResponse",
     "ServiceAccountRead",
     "ServiceAccountReadLabels",

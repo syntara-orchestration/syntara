@@ -818,6 +818,24 @@ async def can_i(
     """
     resource_project = await _resolve_project_input(db, body.resource_project)
 
+    resource_metadata = body.resource_metadata
+    resource_labels = body.resource_labels
+    if body.resource_type == "service_account":
+        from syntara.service_accounts.models.service_account import ServiceAccount  # noqa: PLC0415
+
+        # Ownership must come from storage, never caller-supplied metadata.
+        resource_metadata = {}
+        resource_labels = {}
+        resource_project = ""
+        try:
+            account_id = UUID(body.resource_id)
+        except ValueError:
+            account_id = None
+        account = await db.get(ServiceAccount, account_id) if account_id else None
+        if account:
+            resource_metadata = {"created_by": str(account.created_by)}
+            resource_labels = account.labels
+
     result = await authorize(
         db,
         evaluator,
@@ -826,10 +844,10 @@ async def can_i(
             action=body.action,
             resource_type=body.resource_type,
             resource_id=body.resource_id,
-            resource_labels=body.resource_labels,
-            resource_metadata=body.resource_metadata,
+            resource_labels=resource_labels,
+            resource_metadata=resource_metadata,
             resource_project=resource_project,
-            check_any_project=body.check_any_project,
+            check_any_project=body.check_any_project and body.resource_type != "service_account",
             user_labels=current_user.labels,
             user_metadata=current_user.authz_metadata,
         ),

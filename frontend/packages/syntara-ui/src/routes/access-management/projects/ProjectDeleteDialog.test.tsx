@@ -22,7 +22,7 @@ describe('ProjectDeleteDialog', () => {
     expect(screen.getByText(/will be deleted\. This cannot be undone\./)).toBeInTheDocument()
     expect(screen.getByText('Resources that will be deleted:')).toBeInTheDocument()
     expect(screen.getByText('Workflows, executions, and approval requests')).toBeInTheDocument()
-    expect(screen.getByText('Credentials and service accounts')).toBeInTheDocument()
+    expect(screen.getByText('Project credentials')).toBeInTheDocument()
     expect(screen.getByText('Uploaded files')).toBeInTheDocument()
     expect(screen.getByText('Role assignments, project roles, and policies')).toBeInTheDocument()
     expect(screen.getByText('Integration assignments for this project')).toBeInTheDocument()

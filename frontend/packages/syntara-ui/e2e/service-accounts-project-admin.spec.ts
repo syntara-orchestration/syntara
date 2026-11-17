@@ -1,8 +1,8 @@
 /**
- * E2E Tests: Service Accounts — Full CRUD Lifecycle
+ * E2E Tests: Service Accounts — System Admin CRUD Lifecycle
  *
  * Test cases covered:
- * - UI-11: Admin can create, edit, and delete a project-scoped service account
+ * - UI-11: System admin can create, edit, and delete an independent service account
  */
 import { test, expect } from './fixtures'
 import {

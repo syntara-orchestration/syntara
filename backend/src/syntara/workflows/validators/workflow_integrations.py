@@ -306,14 +306,13 @@ def _extract_webhook_authorized_service_account_ids(workflow_definition: dict[st
 async def _sanitize_webhook_service_accounts(
     session: AsyncSession,
     workflow_definition: dict[str, Any],
-    project_id: UUID,
 ) -> list[ValidationFinding]:
-    """Remove webhook SA IDs missing from the target project during import.
+    """Remove missing webhook SA IDs during import.
 
     Mutates ``authorized_service_account_ids`` in place so stored definitions
     do not keep phantom UUIDs that would satisfy schema ``minItems: 1`` on
     Verify. Remaining IDs (if any) stay; an empty list is left when none are
-    valid in the project.
+    valid.
     """
     sa_ids = _extract_webhook_authorized_service_account_ids(workflow_definition)
     if not sa_ids:
@@ -322,7 +321,6 @@ async def _sanitize_webhook_service_accounts(
     result = await session.execute(
         select(ServiceAccount.id).where(
             col(ServiceAccount.id).in_(sa_ids),
-            ServiceAccount.project_id == project_id,
         )
     )
     found_uuids = set(result.scalars().all())
@@ -353,7 +351,7 @@ async def _sanitize_webhook_service_accounts(
                     severity=ValidationSeverity.warning,
                     category=ValidationCategory.invalid_reference,
                     message=(
-                        f"{removed_count} authorized service account(s) are not available in this project "
+                        f"{removed_count} authorized service account(s) are not available "
                         "and were removed during import"
                     ),
                     node_id=trigger.get("id"),
@@ -408,5 +406,5 @@ async def validate_workflow_references(
     tool_findings = await _clean_unavailable_tool_selections(session, workflow_definition)
     sa_findings: list[ValidationFinding] = []
     if is_import:
-        sa_findings = await _sanitize_webhook_service_accounts(session, workflow_definition, project_id)
+        sa_findings = await _sanitize_webhook_service_accounts(session, workflow_definition)
     return model_findings + tool_findings + sa_findings

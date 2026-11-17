@@ -2,8 +2,8 @@
 openapi: 3.1.0
 info:
   title: Syntara Service Accounts API
-  description: REST API for managing OAuth 2.0 service accounts for machine-to-machine authentication.
-  version: 1.1.0
+  description: Independent service identities, administrator-managed credentials, and explicit system or project role grants.
+  version: 2.0.0
 servers:
   - url: /api/v1
     description: API v1
@@ -13,6 +13,103 @@ tags:
   - name: Service Account Credentials
     description: Service account credential lifecycle management
 paths:
+  /service_accounts/directory:
+    get:
+      tags:
+        - Service Accounts
+      summary: List service accounts directory
+      description: Return ID, name, and status for selectors; this grants no management access.
+      operationId: list_service_accounts_directory
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            maximum: 100
+            exclusiveMinimum: 0
+            description: Maximum number of results per page
+            default: 20
+            title: Limit
+          description: Maximum number of results per page
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+              - type: 'null'
+            description: Pagination cursor from previous response
+            title: Cursor
+          description: Pagination cursor from previous response
+        - name: sort
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - pattern: ^-?[a-z][a-z0-9_]*$
+                type: string
+              - type: 'null'
+            description: Sort parameter (e.g., 'name', '-created_at')
+            title: Sort
+          description: Sort parameter (e.g., 'name', '-created_at')
+        - name: include_total
+          in: query
+          required: false
+          schema:
+            type: boolean
+            description: Include total count in response (expensive)
+            default: false
+            title: Include Total
+          description: Include total count in response (expensive)
+        - name: status
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - $ref: '#/components/schemas/ServiceAccountStatus'
+              - type: 'null'
+            description: Filter by status
+            title: Status
+          description: Filter by status
+        - name: name
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+              - type: 'null'
+            description: Filter by name
+            title: Name
+          description: Filter by name
+      responses:
+        '200':
+          description: Basic service account identities
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceAccountDirectoryListResponse'
+        '400':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/BadRequestError
+        '401':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError
+        '403':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError
+        '404':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/NotFoundError
+        '409':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/ConflictError
+        '422':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/ValidationError
+        '429':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/RateLimitError
+        '500':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/InternalServerError
+      x-app-permission:
+        resource: service_account
+        action: read
   /service_accounts:
     post:
       tags:
@@ -36,21 +133,21 @@ paths:
               schema:
                 $ref: '#/components/schemas/ServiceAccountRead'
         '400':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/BadRequestError
         '401':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError
         '403':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError
         '404':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/NotFoundError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/NotFoundError
         '409':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ConflictError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/ConflictError
         '422':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
-        "429":
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/ValidationError
+        '429':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/RateLimitError
         '500':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/InternalServerError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/InternalServerError
       x-app-permission:
         resource: service_account
         action: create
@@ -58,7 +155,7 @@ paths:
       tags:
         - Service Accounts
       summary: List service accounts
-      description: List service accounts with project-scoped visibility and pagination.
+      description: List service accounts readable by the current user.
       operationId: list_service_accounts
       security:
         - bearerAuth: []
@@ -132,24 +229,24 @@ paths:
               schema:
                 $ref: '#/components/schemas/ServiceAccountListResponse'
         '400':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/BadRequestError
         '401':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError
         '403':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError
         '404':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/NotFoundError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/NotFoundError
         '409':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ConflictError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/ConflictError
         '422':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
-        "429":
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/ValidationError
+        '429':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/RateLimitError
         '500':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/InternalServerError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/InternalServerError
       x-app-permission:
-        resource: service_account
-        action: read
+        resource: null
+        action: null
   /service_accounts/{service_account_id}:
     get:
       tags:
@@ -175,21 +272,21 @@ paths:
               schema:
                 $ref: '#/components/schemas/ServiceAccountRead'
         '400':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/BadRequestError
         '401':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError
         '403':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError
         '404':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/NotFoundError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/NotFoundError
         '409':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ConflictError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/ConflictError
         '422':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
-        "429":
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/ValidationError
+        '429':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/RateLimitError
         '500':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/InternalServerError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/InternalServerError
       x-app-permission:
         resource: service_account
         action: read
@@ -223,21 +320,21 @@ paths:
               schema:
                 $ref: '#/components/schemas/ServiceAccountRead'
         '400':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/BadRequestError
         '401':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError
         '403':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError
         '404':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/NotFoundError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/NotFoundError
         '409':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ConflictError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/ConflictError
         '422':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
-        "429":
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/ValidationError
+        '429':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/RateLimitError
         '500':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/InternalServerError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/InternalServerError
       x-app-permission:
         resource: service_account
         action: update
@@ -261,21 +358,21 @@ paths:
         '204':
           description: Service account deleted
         '400':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/BadRequestError
         '401':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError
         '403':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError
         '404':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/NotFoundError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/NotFoundError
         '409':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ConflictError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/ConflictError
         '422':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
-        "429":
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/ValidationError
+        '429':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/RateLimitError
         '500':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/InternalServerError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/InternalServerError
       x-app-permission:
         resource: service_account
         action: delete
@@ -304,21 +401,21 @@ paths:
               schema:
                 $ref: '#/components/schemas/ServiceAccountRead'
         '400':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/BadRequestError
         '401':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError
         '403':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError
         '404':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/NotFoundError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/NotFoundError
         '409':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ConflictError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/ConflictError
         '422':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
-        "429":
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/ValidationError
+        '429':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/RateLimitError
         '500':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/InternalServerError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/InternalServerError
       x-app-permission:
         resource: service_account
         action: disable
@@ -347,21 +444,21 @@ paths:
               schema:
                 $ref: '#/components/schemas/ServiceAccountRead'
         '400':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/BadRequestError
         '401':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError
         '403':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError
         '404':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/NotFoundError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/NotFoundError
         '409':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ConflictError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/ConflictError
         '422':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
-        "429":
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/ValidationError
+        '429':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/RateLimitError
         '500':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/InternalServerError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/InternalServerError
       x-app-permission:
         resource: service_account
         action: enable
@@ -396,21 +493,21 @@ paths:
               schema:
                 $ref: '#/components/schemas/ServiceAccountCredentialCreateResponse'
         '400':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/BadRequestError
         '401':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError
         '403':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError
         '404':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/NotFoundError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/NotFoundError
         '409':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ConflictError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/ConflictError
         '422':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
-        "429":
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/ValidationError
+        '429':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/RateLimitError
         '500':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/InternalServerError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/InternalServerError
       x-app-permission:
         resource: service_account
         action: update
@@ -499,21 +596,21 @@ paths:
               schema:
                 $ref: '#/components/schemas/ServiceAccountCredentialListResponse'
         '400':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/BadRequestError
         '401':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError
         '403':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError
         '404':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/NotFoundError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/NotFoundError
         '409':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ConflictError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/ConflictError
         '422':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
-        "429":
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/ValidationError
+        '429':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/RateLimitError
         '500':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/InternalServerError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/InternalServerError
       x-app-permission:
         resource: service_account
         action: read
@@ -549,21 +646,21 @@ paths:
               schema:
                 $ref: '#/components/schemas/ServiceAccountCredentialRead'
         '400':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/BadRequestError
         '401':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError
         '403':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError
         '404':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/NotFoundError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/NotFoundError
         '409':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ConflictError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/ConflictError
         '422':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
-        "429":
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/ValidationError
+        '429':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/RateLimitError
         '500':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/InternalServerError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/InternalServerError
       x-app-permission:
         resource: service_account
         action: read
@@ -594,21 +691,21 @@ paths:
         '204':
           description: Credential deleted
         '400':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/BadRequestError
         '401':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError
         '403':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError
         '404':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/NotFoundError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/NotFoundError
         '409':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ConflictError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/ConflictError
         '422':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
-        "429":
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/ValidationError
+        '429':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/RateLimitError
         '500':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/InternalServerError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/InternalServerError
       x-app-permission:
         resource: service_account
         action: delete
@@ -650,21 +747,21 @@ paths:
               schema:
                 $ref: '#/components/schemas/ServiceAccountCredentialRotateResponse'
         '400':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/BadRequestError
         '401':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError
         '403':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError
         '404':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/NotFoundError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/NotFoundError
         '409':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ConflictError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/ConflictError
         '422':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
-        "429":
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/ValidationError
+        '429':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/RateLimitError
         '500':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/InternalServerError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/InternalServerError
       x-app-permission:
         resource: service_account
         action: rotate_secret
@@ -700,21 +797,21 @@ paths:
               schema:
                 $ref: '#/components/schemas/ServiceAccountCredentialRead'
         '400':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/BadRequestError
         '401':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError
         '403':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError
         '404':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/NotFoundError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/NotFoundError
         '409':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ConflictError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/ConflictError
         '422':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
-        "429":
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/ValidationError
+        '429':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/RateLimitError
         '500':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/InternalServerError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/InternalServerError
       x-app-permission:
         resource: service_account
         action: disable
@@ -750,21 +847,21 @@ paths:
               schema:
                 $ref: '#/components/schemas/ServiceAccountCredentialRead'
         '400':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/BadRequestError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/BadRequestError
         '401':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError
         '403':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError
         '404':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/NotFoundError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/NotFoundError
         '409':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ConflictError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/ConflictError
         '422':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
-        "429":
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/ValidationError
+        '429':
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/RateLimitError
         '500':
-          $ref: "../base/shared-resources.openapi.yaml#/components/responses/InternalServerError"
+          $ref: ../base/shared-resources.openapi.yaml#/components/responses/InternalServerError
       x-app-permission:
         resource: service_account
         action: enable
@@ -786,14 +883,16 @@ components:
           title: Description
           description: Optional description of the service account's purpose
         project_id:
-          type: string
-          format: uuid
+          anyOf:
+            - type: string
+              format: uuid
+            - type: 'null'
           title: Project Id
-          description: Project to create the service account in
+          description: Optional creation context; this does not limit the service account's access
+      additionalProperties: false
       type: object
       required:
         - name
-        - project_id
       title: ServiceAccountCreate
       description: Schema for creating a new service account.
     ServiceAccountListResponse:
@@ -853,17 +952,15 @@ components:
             - type: string
             - type: 'null'
           title: Description
-        status:
-          $ref: '#/components/schemas/ServiceAccountStatus'
         project_id:
-          type: string
-          format: uuid
-          title: Project Id
-        project_name:
           anyOf:
             - type: string
+              format: uuid
             - type: 'null'
-          title: Project Name
+          title: Project Id
+          description: Project where the service account was created; informational only
+        status:
+          $ref: '#/components/schemas/ServiceAccountStatus'
         last_authenticated_at:
           anyOf:
             - type: string
@@ -872,18 +969,18 @@ components:
           title: Last Authenticated At
         created_by:
           anyOf:
-            - $ref: "../base/shared-resources.openapi.yaml#/components/schemas/UserReference"
-            - type: "null"
+            - $ref: '../base/shared-resources.openapi.yaml#/components/schemas/UserReference'
+            - type: 'null'
+          title: Created By
           description: User who created the service account
           readOnly: true
-          title: Created By
         updated_by:
           anyOf:
-            - $ref: "../base/shared-resources.openapi.yaml#/components/schemas/UserReference"
-            - type: "null"
+            - $ref: '../base/shared-resources.openapi.yaml#/components/schemas/UserReference'
+            - type: 'null'
+          title: Updated By
           description: User who last modified the service account
           readOnly: true
-          title: Updated By
         created_at:
           type: string
           format: date-time
@@ -902,7 +999,6 @@ components:
         - id
         - name
         - status
-        - project_id
         - created_at
         - updated_at
       title: ServiceAccountRead
@@ -931,13 +1027,7 @@ components:
             - type: 'null'
           title: Description
           description: Update the description
-        project_id:
-          anyOf:
-            - format: uuid
-              type: string
-            - type: 'null'
-          description: Project ID (immutable after creation; rejected if different from stored value)
-          title: Project Id
+      additionalProperties: false
       type: object
       title: ServiceAccountUpdate
       description: Schema for updating a service account (PATCH).
@@ -1018,15 +1108,15 @@ components:
           title: Old Secret Valid Until
         created_by:
           anyOf:
-            - $ref: "../base/shared-resources.openapi.yaml#/components/schemas/UserReference"
-            - type: "null"
+            - $ref: ../base/shared-resources.openapi.yaml#/components/schemas/UserReference
+            - type: 'null'
           description: User who created the credential
           readOnly: true
           title: Created By
         updated_by:
           anyOf:
-            - $ref: "../base/shared-resources.openapi.yaml#/components/schemas/UserReference"
-            - type: "null"
+            - $ref: ../base/shared-resources.openapi.yaml#/components/schemas/UserReference
+            - type: 'null'
           description: User who last modified the credential
           readOnly: true
           title: Updated By
@@ -1090,15 +1180,15 @@ components:
           title: Old Secret Valid Until
         created_by:
           anyOf:
-            - $ref: "../base/shared-resources.openapi.yaml#/components/schemas/UserReference"
-            - type: "null"
+            - $ref: ../base/shared-resources.openapi.yaml#/components/schemas/UserReference
+            - type: 'null'
           description: User who created the credential
           readOnly: true
           title: Created By
         updated_by:
           anyOf:
-            - $ref: "../base/shared-resources.openapi.yaml#/components/schemas/UserReference"
-            - type: "null"
+            - $ref: ../base/shared-resources.openapi.yaml#/components/schemas/UserReference
+            - type: 'null'
           description: User who last modified the credential
           readOnly: true
           title: Updated By
@@ -1181,15 +1271,15 @@ components:
           title: Old Secret Valid Until
         created_by:
           anyOf:
-            - $ref: "../base/shared-resources.openapi.yaml#/components/schemas/UserReference"
-            - type: "null"
+            - $ref: ../base/shared-resources.openapi.yaml#/components/schemas/UserReference
+            - type: 'null'
           description: User who created the credential
           readOnly: true
           title: Created By
         updated_by:
           anyOf:
-            - $ref: "../base/shared-resources.openapi.yaml#/components/schemas/UserReference"
-            - type: "null"
+            - $ref: ../base/shared-resources.openapi.yaml#/components/schemas/UserReference
+            - type: 'null'
           description: User who last modified the credential
           readOnly: true
           title: Updated By
@@ -1267,6 +1357,62 @@ components:
         - resources
       title: ServiceAccountCredentialListResponse
       description: Paginated list response for service account credentials.
+      examples:
+        - next: eyJpZCI6InV1aWQifQ
+          total: 150
+        - next: eyJpZCI6Im5leHQifQ
+          prev: eyJpZCI6InByZXYifQ
+    ServiceAccountDirectoryEntry:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        name:
+          type: string
+          title: Name
+        status:
+          $ref: '#/components/schemas/ServiceAccountStatus'
+      type: object
+      required:
+        - id
+        - name
+        - status
+      title: ServiceAccountDirectoryEntry
+      description: Basic identity for selectors; directory membership does not authorize management.
+    ServiceAccountDirectoryListResponse:
+      properties:
+        next:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Next
+          description: Cursor for next page of results
+        prev:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Prev
+          description: Cursor for previous page of results
+        total:
+          anyOf:
+            - type: integer
+              minimum: 0.0
+            - type: 'null'
+          title: Total
+          description: Total count of resources (only when include_total=true)
+        resources:
+          items:
+            $ref: '#/components/schemas/ServiceAccountDirectoryEntry'
+          type: array
+          maxItems: 100
+          title: Resources
+          description: Array of resources in current page
+      type: object
+      required:
+        - resources
+      title: ServiceAccountDirectoryListResponse
+      description: Paginated basic service-account directory.
       examples:
         - next: eyJpZCI6InV1aWQifQ
           total: 150

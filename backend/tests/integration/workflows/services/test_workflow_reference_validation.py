@@ -467,7 +467,6 @@ def _webhook_trigger_definition(
 async def _create_service_account(
     session: AsyncSession,
     user: User,
-    project_id: UUID,
     *,
     name: str | None = None,
 ) -> ServiceAccount:
@@ -476,7 +475,6 @@ async def _create_service_account(
         name=name or f"sa-{uuid4().hex[:8]}",
         client_id=f"nx_sa_{uuid4().hex[:16]}",
         hashed_secret="$argon2id$v=19$m=65536,t=3,p=4$test",  # noqa: S106
-        project_id=project_id,
         created_by=user.id,
     )
     session.add(sa)
@@ -493,7 +491,7 @@ async def _create_service_account(
 class TestWebhookServiceAccountImportWarnings:
     """Missing webhook SA IDs produce warnings on import and are stripped from the definition."""
 
-    async def test_foreign_sa_warns_on_import(
+    async def test_missing_sa_warns_on_import(
         self, test_db_session: AsyncSession, test_user: User, test_project_id: UUID
     ) -> None:
         foreign_id = str(uuid4())
@@ -505,16 +503,16 @@ class TestWebhookServiceAccountImportWarnings:
         assert findings[0].node_id == "snow_trigger"
         assert definition["triggers"][0]["parameters"]["authorized_service_account_ids"] == []
 
-    async def test_valid_project_sa_no_warning_on_import(
+    async def test_valid_account_no_warning_on_import(
         self, test_db_session: AsyncSession, test_user: User, test_project_id: UUID
     ) -> None:
-        sa = await _create_service_account(test_db_session, test_user, test_project_id)
+        sa = await _create_service_account(test_db_session, test_user)
         definition = _webhook_trigger_definition(service_account_ids=[str(sa.id)])
         findings = await validate_workflow_references(test_db_session, definition, test_project_id, is_import=True)
         assert findings == []
         assert definition["triggers"][0]["parameters"]["authorized_service_account_ids"] == [str(sa.id)]
 
-    async def test_foreign_sa_no_warning_when_not_import(
+    async def test_missing_sa_no_warning_when_not_import(
         self, test_db_session: AsyncSession, test_user: User, test_project_id: UUID
     ) -> None:
         foreign_id = str(uuid4())
@@ -522,7 +520,7 @@ class TestWebhookServiceAccountImportWarnings:
         findings = await validate_workflow_references(test_db_session, definition, test_project_id, is_import=False)
         assert findings == []
 
-    async def test_eda_trigger_foreign_sa_warns_on_import(
+    async def test_eda_trigger_missing_sa_warns_on_import(
         self, test_db_session: AsyncSession, test_user: User, test_project_id: UUID
     ) -> None:
         foreign_id = str(uuid4())
@@ -536,10 +534,10 @@ class TestWebhookServiceAccountImportWarnings:
         assert findings[0].node_id == "eda_trigger_1"
         assert definition["triggers"][0]["parameters"]["authorized_service_account_ids"] == []
 
-    async def test_mixed_sas_keeps_project_sa_on_import(
+    async def test_mixed_accounts_keep_existing_account_on_import(
         self, test_db_session: AsyncSession, test_user: User, test_project_id: UUID
     ) -> None:
-        sa = await _create_service_account(test_db_session, test_user, test_project_id)
+        sa = await _create_service_account(test_db_session, test_user)
         foreign_id = str(uuid4())
         definition = _webhook_trigger_definition(service_account_ids=[foreign_id, str(sa.id)])
         findings = await validate_workflow_references(test_db_session, definition, test_project_id, is_import=True)

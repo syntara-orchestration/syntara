@@ -173,7 +173,7 @@ describe('AssignProjectRoleModal', () => {
           refetch: vi.fn(),
         } as never
       }
-      if (path === '/service_accounts') {
+      if (path === '/service_accounts/directory') {
         return {
           data: { resources: mockServiceAccounts, next: null },
           isPending: false,

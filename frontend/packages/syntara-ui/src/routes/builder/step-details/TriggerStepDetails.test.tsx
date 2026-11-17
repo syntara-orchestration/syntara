@@ -62,13 +62,16 @@ vi.mock('../step-forms/TriggerStepForm', () => ({
     onSubmit,
     onCancel,
     submitButtonText,
+    projectId,
   }: {
     initialData?: Record<string, unknown>
     onSubmit: (data: Record<string, unknown>) => void
     onCancel: () => void
     submitButtonText?: string
+    projectId?: string
   }) => (
     <div data-testid="trigger-step-form">
+      <div data-testid="project-id">{projectId ?? ''}</div>
       <div data-testid="initial-data">{JSON.stringify(initialData)}</div>
       <button type="button" onClick={() => onSubmit(initialData ?? {})} data-testid="submit-button">
         {submitButtonText ?? 'Add step'}
@@ -89,6 +92,13 @@ describe('TriggerStepDetails Component', () => {
   })
 
   describe('Manual Trigger', () => {
+    it('passes project context to the trigger form', () => {
+      const trigger = { id: 'manual_trigger', type: TriggerTypeEnum.MANUAL_TRIGGER, name: 'Trigger', parameters: {} }
+      render(<TriggerStepDetails trigger={trigger} triggerIndex={0} projectId="project-123" onClose={mockOnClose} />)
+
+      expect(screen.getByTestId('project-id')).toHaveTextContent('project-123')
+    })
+
     it('renders TriggerStepForm with manual trigger data', () => {
       const trigger = {
         id: 'manual_trigger',

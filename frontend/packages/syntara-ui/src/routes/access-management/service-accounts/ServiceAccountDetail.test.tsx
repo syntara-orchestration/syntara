@@ -74,7 +74,7 @@ const mockServiceAccount: ServiceAccountRead = {
   name: 'deploy-bot',
   description: 'Deployment automation account',
   status: 'active',
-  project_id: 'proj-1',
+
   last_authenticated_at: '2024-06-15T10:00:00Z',
   created_by: { id: 'u-004', name: 'admin', type: 'user' },
   updated_by: null,
@@ -139,6 +139,8 @@ describe('ServiceAccountDetail', () => {
       canUpdate: true,
       canDelete: true,
       canRotateSecret: true,
+      canEnable: true,
+      canDisable: true,
       isLoading: false,
       isError: false,
       tooltips: { create: '', update: '', delete: '', rotateSecret: '' },
@@ -326,27 +328,6 @@ describe('ServiceAccountDetail', () => {
     expect(screen.getByRole('switch', { name: 'Toggle service account status' })).not.toBeChecked()
   })
 
-  it('renders owning project as a link when project_name is present', () => {
-    vi.mocked(accessClient.useQuery).mockReturnValue(
-      buildQueryResult({ ...mockServiceAccount, project_name: 'my-project' })
-    )
-
-    render(<ServiceAccountDetail />, { wrapper })
-
-    const link = screen.getByRole('link', { name: 'my-project' })
-    expect(link).toBeInTheDocument()
-    expect(link).toHaveAttribute('href', '/system-administration/access-management/projects/proj-1')
-  })
-
-  it('renders owning project as plain text when project_name is null', () => {
-    vi.mocked(accessClient.useQuery).mockReturnValue(buildQueryResult({ ...mockServiceAccount, project_name: null }))
-
-    render(<ServiceAccountDetail />, { wrapper })
-
-    expect(screen.getByText('proj-1')).toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: 'proj-1' })).not.toBeInTheDocument()
-  })
-
   it('shows Never for last authenticated when never used', () => {
     vi.mocked(accessClient.useQuery).mockReturnValue(
       buildQueryResult({ ...mockServiceAccount, last_authenticated_at: null })
@@ -420,12 +401,14 @@ describe('ServiceAccountDetail', () => {
     expect(screen.queryByText('Description')).not.toBeInTheDocument()
   })
 
-  it('disables edit and toggle controls when canUpdate is false', () => {
+  it('disables edit and toggle controls without management permissions', () => {
     vi.mocked(useServiceAccountPermissions).mockReturnValue({
       canCreate: true,
       canUpdate: false,
       canDelete: true,
       canRotateSecret: true,
+      canEnable: false,
+      canDisable: false,
       isLoading: false,
       isError: false,
       tooltips: { create: '', update: 'Insufficient permissions', delete: '', rotateSecret: '' },
@@ -443,6 +426,8 @@ describe('ServiceAccountDetail', () => {
       canUpdate: true,
       canDelete: false,
       canRotateSecret: true,
+      canEnable: true,
+      canDisable: true,
       isLoading: false,
       isError: false,
       tooltips: { create: '', update: '', delete: 'Insufficient permissions', rotateSecret: '' },

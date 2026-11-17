@@ -50,12 +50,7 @@ test.describe('Webhook Trigger', () => {
       await app.getByRole('button', { name: 'Create' }).click()
       await closeStepEditorPanel(app)
 
-      // Save workflow (select project right before save)
-      // Pin the workflow to the service account's own project. `ensureProject`
-      // puts the account in `default`, but an unnamed `selectProjectIfRequired`
-      // picks whichever project the dropdown lists first — and the backend
-      // rejects the save with "Service account(s) not found in this project"
-      // whenever those differ. The weak URL guard used to hide that 422.
+      // The workflow still needs a project; the selected service account is global.
       await selectProjectIfRequired(app, project?.name)
       await app.getByPlaceholder('Workflow name').fill(workflowName)
       await clickSaveAndWait(app)
@@ -176,11 +171,7 @@ test.describe('Webhook Trigger', () => {
       await closeStepEditorPanel(app)
 
       // Save and verify canvas shows normalized path (lowercase, no leading slash)
-      // Pin the workflow to the service account's own project. `ensureProject`
-      // puts the account in `default`, but an unnamed `selectProjectIfRequired`
-      // picks whichever project the dropdown lists first — and the backend
-      // rejects the save with "Service account(s) not found in this project"
-      // whenever those differ. The weak URL guard used to hide that 422.
+      // The workflow still needs a project; the selected service account is global.
       await selectProjectIfRequired(app, project?.name)
       await app.getByPlaceholder('Workflow name').fill(workflowName)
       await clickSaveAndWait(app)
@@ -217,11 +208,7 @@ test.describe('Webhook Trigger', () => {
       await closeStepEditorPanel(app)
 
       // Save workflow
-      // Pin the workflow to the service account's own project. `ensureProject`
-      // puts the account in `default`, but an unnamed `selectProjectIfRequired`
-      // picks whichever project the dropdown lists first — and the backend
-      // rejects the save with "Service account(s) not found in this project"
-      // whenever those differ. The weak URL guard used to hide that 422.
+      // The workflow still needs a project; the selected service account is global.
       await selectProjectIfRequired(app, project?.name)
       await app.getByPlaceholder('Workflow name').fill(workflowName)
       await clickSaveAndWait(app)

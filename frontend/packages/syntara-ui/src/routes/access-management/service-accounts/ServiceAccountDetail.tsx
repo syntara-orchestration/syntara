@@ -18,7 +18,6 @@ import { SynPageHeader } from '../../../components/layout/SynPageHeader'
 import { SynListPanel, SynListPanelTabs, SynListPanelView } from '../../../components/panels/list/SynListPanel'
 import { useQueryState } from '../../../components/states/useQueryState'
 import { SynKebabMenu } from '../../../components/SynKebabMenu'
-import { SynLink } from '../../../components/SynLink'
 import { SynPageTitle } from '../../../components/SynPageTitle'
 import { DateCell } from '../../../components/table/DateCell'
 import { useDeleteAction } from '../../../hooks/useDeleteAction'
@@ -27,7 +26,6 @@ import { useMutationErrorHandler } from '../../../hooks/useMutationErrorHandler'
 import { detachPromise } from '../../../utils/detachPromise'
 import { useDocLink } from '../../../utils/docs/useDocLink'
 import { accessClient } from '../../access/accessClient'
-import { getProjectDetailPath } from '../accessManagementPaths'
 import { DetailPageShell } from '../DetailPageShell'
 import { RoleAssignmentsPanel } from '../RoleAssignmentsPanel'
 import { RolePrincipalType } from '../RoleAssignmentTypes'
@@ -42,13 +40,6 @@ function DetailsTab({ serviceAccount }: Readonly<{ serviceAccount: ServiceAccoun
   return (
     <DescriptionList isHorizontal>
       <SynDetail label="Name">{serviceAccount.name}</SynDetail>
-      <SynDetail label="Owning project">
-        {serviceAccount.project_name ? (
-          <SynLink to={getProjectDetailPath(serviceAccount.project_id)}>{serviceAccount.project_name}</SynLink>
-        ) : (
-          serviceAccount.project_id
-        )}
-      </SynDetail>
       <SynDetail label="Description">{serviceAccount.description}</SynDetail>
       <SynDetail label="State">
         {serviceAccount.status === 'active' ? (
@@ -88,21 +79,22 @@ function ServiceAccountToolbar({
   onEdit: () => void
   onDelete: () => void
 }>) {
+  const canToggle = isEnabled ? permissions.canDisable : permissions.canEnable
   return (
     <>
-      <DisabledWithTooltip isDisabled={!permissions.canUpdate} content={permissions.tooltips.update}>
+      <DisabledWithTooltip isDisabled={!canToggle} content={permissions.tooltips.update}>
         <Switch
           id="sa-status-toggle"
           label={isEnabled ? 'Enabled' : 'Disabled'}
           isChecked={isEnabled}
           // Gate with isDisabled (not a missing onChange) so useCanI's safe-false
           // window can't swallow clicks before permission resolves.
-          isDisabled={!permissions.canUpdate}
+          isDisabled={!canToggle}
           onChange={onToggleStatus}
           aria-label="Toggle service account status"
         />
       </DisabledWithTooltip>
-      <DisabledWithTooltip isDisabled={!permissions.canUpdate} content={permissions.tooltips.update}>
+      <DisabledWithTooltip isDisabled={!canToggle} content={permissions.tooltips.update}>
         <Button
           variant="primary"
           icon={<RhUiEditIcon />}
@@ -171,7 +163,6 @@ export function ServiceAccountDetailCredentialsTabRoute() {
     <CredentialsTab
       serviceAccountId={serviceAccount.id}
       serviceAccountName={serviceAccount.name}
-      resourceProject={serviceAccount.project_id ?? serviceAccount.project_name ?? undefined}
     />
   )
 }
@@ -212,7 +203,7 @@ export function ServiceAccountDetail() {
 
   const serviceAccount = saQuery.data
   const permissions = useServiceAccountPermissions({
-    resourceProject: serviceAccount?.project_id ?? serviceAccount?.project_name ?? undefined,
+    resourceId: serviceAccount?.id,
   })
   const refetchSa = saQuery.refetch
 

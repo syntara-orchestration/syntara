@@ -55,6 +55,11 @@ class TestServiceAccountModel:
         }
         assert column_names == expected
 
+    def test_project_context_is_nullable_and_cleared_on_project_delete(self) -> None:
+        project_id = ServiceAccount.__table__.c.project_id  # type: ignore[attr-defined]
+        assert project_id.nullable
+        assert next(iter(project_id.foreign_keys)).ondelete == "SET NULL"
+
     def test_status_check_constraint(self) -> None:
         table = ServiceAccount.__table__  # type: ignore[attr-defined]
         constraint_names = [c.name for c in table.constraints if hasattr(c, "sqltext")]
@@ -63,7 +68,6 @@ class TestServiceAccountModel:
     def test_default_status_is_active(self) -> None:
         sa = ServiceAccount(
             name="test",
-            project_id=uuid4(),
             created_by=uuid4(),
         )
         assert sa.status == ServiceAccountStatus.ACTIVE
@@ -71,7 +75,6 @@ class TestServiceAccountModel:
     def test_optional_fields_default_none(self) -> None:
         sa = ServiceAccount(
             name="test",
-            project_id=uuid4(),
             created_by=uuid4(),
         )
         assert sa.last_authenticated_at is None
@@ -85,5 +88,5 @@ class TestServiceAccountAuditConfig:
         assert ServiceAccount.__auditable__ == AuditLevel.META
 
     def test_auditable_fields_include_key_metadata(self) -> None:
-        for field in ("name", "status", "project_id"):
+        for field in ("name", "status"):
             assert field in ServiceAccount.__auditable_fields__

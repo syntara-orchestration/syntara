@@ -13,7 +13,7 @@ import { useWebhookUrl } from './useWebhookUrl'
 import { WebhookPathField } from './WebhookPathField'
 import { WebhookUrlPreview } from './WebhookUrlPreview'
 
-export function WebhookFields() {
+export function WebhookFields({ projectId }: Readonly<{ projectId?: string }>) {
   const fullWebhookUrl = useWebhookUrl(WEBHOOK_BASE_URL)
 
   return (
@@ -66,6 +66,7 @@ export function WebhookFields() {
               id="webhook-authorized-service-accounts"
               selectedIds={(field.value ?? []) as string[]}
               onChange={field.onChange}
+              projectId={projectId}
             />
           )}
         </SynFormField>

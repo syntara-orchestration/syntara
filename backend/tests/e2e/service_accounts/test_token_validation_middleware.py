@@ -47,7 +47,7 @@ class TestTokenValidationAuthorized:
         self, syntara_api: SyntaraApiRegistry, first_project_id: UUID, syntara_base_url: str
     ) -> None:
         """SA Bearer token is accepted by protected endpoints and returns SA identity."""
-        sa, client_id, client_secret = create_sa_with_credential(syntara_api, first_project_id)
+        sa, client_id, client_secret = create_sa_with_credential(syntara_api)
 
         try:
             resp = token_request(syntara_base_url, client_id, client_secret)
@@ -77,10 +77,9 @@ class TestTokenValidationUnauthorized:
         create_project: ProjectFactory,
     ) -> None:
         """SA token without permissions on another project gets 403."""
-        proj_a_id, _ = create_project(admin_api, "authz-a")
         proj_b_id, _ = create_project(admin_api, "authz-b")
 
-        sa, client_id, client_secret = create_sa_with_credential(admin_api, proj_a_id)
+        sa, client_id, client_secret = create_sa_with_credential(admin_api)
 
         try:
             resp = token_request(syntara_base_url, client_id, client_secret)
@@ -109,7 +108,7 @@ class TestExpiredTokenRejected:
         Full expiry enforcement is tested at the JWT library level. This test
         verifies the token structure and that no refresh flow exists.
         """
-        sa, client_id, client_secret = create_sa_with_credential(syntara_api, first_project_id)
+        sa, client_id, client_secret = create_sa_with_credential(syntara_api)
 
         try:
             resp = token_request(syntara_base_url, client_id, client_secret)
@@ -148,7 +147,7 @@ class TestProjectRoleAssignment:
     ) -> None:
         """SA assigned project-admin on its own project can manage SAs in that project."""
         project_id, _ = create_project(admin_api, "proj-role")
-        sa = create_sa(admin_api, project_id)
+        sa = create_sa(admin_api)
 
         admin_api.projects.create_role_assignment(
             project_id=project_id,
@@ -190,7 +189,7 @@ class TestExpiredCredentialMiddlewareRejection:
         self, syntara_api: SyntaraApiRegistry, first_project_id: UUID, syntara_base_url: str
     ) -> None:
         """A JWT issued before credential expiry is rejected by middleware after expiry."""
-        sa = create_sa(syntara_api, first_project_id)
+        sa = create_sa(syntara_api)
         expires_at = datetime.now(UTC) + timedelta(seconds=self.CREDENTIAL_LIFETIME_SECONDS)
 
         cred = syntara_api.service_account_credentials.create(
@@ -237,7 +236,7 @@ class TestConcurrentServiceAccounts:
         sa_data: list[tuple[Any, str]] = []
         try:
             for _ in range(self.CONCURRENT_SA_COUNT):
-                sa, client_id, client_secret = create_sa_with_credential(syntara_api, first_project_id)
+                sa, client_id, client_secret = create_sa_with_credential(syntara_api)
                 resp = token_request(syntara_base_url, client_id, client_secret)
                 assert resp.status_code == HTTPStatus.OK
                 sa_data.append((sa, resp.parsed.access_token))
@@ -275,7 +274,7 @@ class TestLastAuthenticatedTimestamp:
         self, syntara_api: SyntaraApiRegistry, first_project_id: UUID, syntara_base_url: str
     ) -> None:
         """last_authenticated_at is null before first auth, then set after token issuance."""
-        sa, client_id, client_secret = create_sa_with_credential(syntara_api, first_project_id)
+        sa, client_id, client_secret = create_sa_with_credential(syntara_api)
 
         try:
             before = syntara_api.service_accounts.get(service_account_id=sa.id).assert_and_get()

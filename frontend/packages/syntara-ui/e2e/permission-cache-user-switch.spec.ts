@@ -1,8 +1,8 @@
 /**
  * E2E Tests: Permission cache invalidation on user switch (AAP-77299)
  *
- * After logout and re-login as a lower-privilege user, permission-gated nav
- * items must reflect the new user's permissions without a hard refresh.
+ * After logout and re-login as a lower-privilege user, admin-only nav items
+ * must disappear without a hard refresh while authenticated read access remains.
  *
  * Root cause: useCanI / usePermissionChecks use staleTime: Infinity. Without
  * queryClient.clear() on logout, the previous user's cached permissions survive
@@ -12,7 +12,11 @@
 import { type Page } from './fixtures'
 import { test, expect, toAppUrl } from './fixtures'
 import { APP_TITLE } from './helpers/appTitle'
-import { mainNavGroup } from './helpers/docked-nav'
+import {
+  expectDockedNavGroupChildLinks,
+  mainNavigation,
+  navigateViaSystemAdministrationMenu,
+} from './helpers/docked-nav'
 import { buildUniqueName } from './helpers/workflows'
 
 const VIEWER_PASSWORD = 'e2e-test-password-123!'
@@ -48,8 +52,8 @@ test('switching users reflects new permissions without hard refresh', async ({ p
       expect(tokenResp.ok(), `admin login failed: ${tokenResp.status()}`).toBeTruthy()
       const { access_token: token } = (await tokenResp.json()) as { access_token: string }
 
-      // Newly created users belong only to the "authenticated" built-in group,
-      // which has no access to System Administration.
+      // Newly created users belong to the authenticated group, which can read
+      // service accounts but has no access to the other admin sections.
       const createResp = await page.request.post(`${backendUrl}/api/v1/users`, {
         headers: { Authorization: `Bearer ${token}` },
         data: {
@@ -66,8 +70,13 @@ test('switching users reflects new permissions without hard refresh', async ({ p
       await page.goto(toAppUrl('/'))
       await expect(page.getByRole('navigation', { name: 'Main navigation' })).toBeVisible({ timeout: 15_000 })
 
-      await expect(mainNavGroup(page, 'System Administration')).toBeVisible({ timeout: 15_000 })
       await expect(page.getByRole('link', { name: 'Workflows' })).toBeVisible()
+      await expectDockedNavGroupChildLinks(
+        page,
+        'System Administration',
+        ['Access Management', 'Identity Providers', 'Settings'],
+        'Access Management'
+      )
 
       await page.getByRole('button', { name: 'User menu' }).click()
       await page.getByRole('menuitem', { name: 'Logout' }).click()
@@ -90,24 +99,29 @@ test('switching users reflects new permissions without hard refresh', async ({ p
 
       await page.goto(toAppUrl('/'))
       await expect(page.getByRole('navigation', { name: 'Main navigation' })).toBeVisible()
-      await expect(mainNavGroup(page, 'System Administration')).toBeVisible({ timeout: 15_000 })
+      await expectDockedNavGroupChildLinks(
+        page,
+        'System Administration',
+        ['Access Management', 'Identity Providers', 'Settings'],
+        'Access Management'
+      )
       await expect(page.getByRole('link', { name: 'Workflows' })).toBeVisible()
 
       await page.route('**/api/v1/auth/logout*', (route) => route.fulfill({ status: 204, body: '' }))
       await page.getByRole('button', { name: 'User menu' }).click()
       await page.getByRole('menuitem', { name: 'Logout' }).click()
-
-      // Same SPA session as real backend: re-login without page.goto() so a stale
-      // permission cache would still show admin nav to the viewer.
-      await page.getByRole('heading', { name: `Log in to ${APP_TITLE}` }).waitFor({ timeout: 15_000 })
+      await expect(page.getByRole('heading', { name: `Log in to ${APP_TITLE}` })).toBeVisible()
       currentUser = 'viewer'
       await fillLoginForm(page, 'viewer', VIEWER_PASSWORD)
     }
 
-    // If the cache was not cleared on logout, the admin-cached permission would
-    // incorrectly show System Administration to the viewer.
-    await expect(mainNavGroup(page, 'System Administration')).not.toBeVisible()
-    await expect(page.getByRole('link', { name: 'Workflows' })).toBeVisible()
+    // Authenticated users can read service accounts, but keep the cached admin-only tabs cleared.
+    await navigateViaSystemAdministrationMenu(page, 'Access Management')
+    await expect(page.getByRole('tab', { name: 'Service Accounts' })).toBeVisible()
+    await expect(page.getByRole('tab', { name: 'Users' })).not.toBeVisible()
+    const nav = mainNavigation(page)
+    await expect(nav.getByRole('link', { name: 'Settings', exact: true })).not.toBeVisible()
+    await expect(nav.getByRole('link', { name: 'Identity Providers', exact: true })).not.toBeVisible()
   } finally {
     if (viewerId) {
       const backendUrl = process.env.VITE_API_URL ?? process.env.SYNTARA_E2E_BASE_URL ?? 'http://localhost:8000'

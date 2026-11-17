@@ -1,8 +1,5 @@
 /** Help popover body text for service account create/edit/rotate form fields. */
 
-export const PROJECT_HELP =
-  "Project for this service account. Resources are isolated by project; the account's home project scopes where it is created and listed."
-
 export const NAME_HELP =
   'A human-readable name for this service account. Use a name that identifies its purpose, such as "CI Pipeline" or "Monitoring Bot."'
 

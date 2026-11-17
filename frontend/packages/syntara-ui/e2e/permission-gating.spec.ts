@@ -20,7 +20,13 @@
 
 import { loginAsUser } from './authorization/fixtures'
 import { type Page, test, expect, toAppUrl, appBaseUrl } from './fixtures'
-import { clickMainNavEntry, expectDockedNavGroupChildLinks, mainNavGroup, mainNavigation } from './helpers/docked-nav'
+import {
+  clickMainNavEntry,
+  expectDockedNavGroupChildLinks,
+  mainNavGroup,
+  mainNavigation,
+  navigateViaSystemAdministrationMenu,
+} from './helpers/docked-nav'
 import { openRowKebab } from './helpers/patternfly'
 import { buildUniqueName } from './helpers/workflows'
 import {
@@ -195,7 +201,7 @@ test.describe('Permission gating — Navigation visibility', () => {
     )
   })
 
-  test('viewer sees only operational items — no System Administration', async ({ viewerApp }) => {
+  test('viewer can read service accounts under System Administration', async ({ viewerApp }) => {
     const nav = mainNavigation(viewerApp)
 
     await expect(nav.getByRole('link', { name: 'Workflows' })).toBeVisible()
@@ -203,7 +209,10 @@ test.describe('Permission gating — Navigation visibility', () => {
     await expect(nav.getByRole('link', { name: 'Approvals' })).toBeVisible()
     await expect(mainNavGroup(viewerApp, 'Configuration')).toBeVisible()
 
-    await expect(mainNavGroup(viewerApp, 'System Administration')).not.toBeVisible()
+    await expectDockedNavGroupChildLinks(viewerApp, 'System Administration', ['Access Management'])
+    await navigateViaSystemAdministrationMenu(viewerApp, 'Access Management')
+    await expect(viewerApp.getByRole('tab', { name: 'Service Accounts' })).toBeVisible()
+    await expect(viewerApp.getByRole('tab', { name: 'Users' })).not.toBeVisible()
   })
 
   test('auditor sees all navigation items', async ({ auditorApp }) => {
@@ -254,6 +263,7 @@ test.describe('Permission gating — Access Management tabs', () => {
     'Users',
     'Groups',
     'Projects',
+    'Service Accounts',
     'Policies',
     'Roles',
     'Assignments',
@@ -285,13 +295,11 @@ test.describe('Permission gating — Access Management tabs', () => {
     await expect(auditorApp.getByRole('tab', { name: 'Check access' })).not.toBeVisible()
   })
 
-  test('user sees Users, Groups, Policies, Roles, Check access — not Projects, Assignments, or Token Revocation', async ({
-    userApp,
-  }) => {
+  test('user sees Service Accounts plus available read tabs, not project administration tabs', async ({ userApp }) => {
     await userApp.goto(toAppUrl(`${AM_URL}/users`))
     await expect(userApp.getByRole('heading', { name: 'Access Management' })).toBeVisible()
 
-    const visibleTabs = ['Users', 'Groups', 'Policies', 'Roles', 'Check access'] as const
+    const visibleTabs = ['Users', 'Groups', 'Service Accounts', 'Policies', 'Roles', 'Check access'] as const
     for (const tab of visibleTabs) {
       await expect(userApp.getByRole('tab', { name: tab })).toBeVisible()
     }
@@ -373,10 +381,10 @@ test.describe('Permission gating — Route guards', () => {
     await expect(viewerApp.getByRole('heading', { name: 'Access denied', level: 2 })).toBeVisible()
   })
 
-  test('viewer: direct URL to Access Management shows access denied', async ({ viewerApp }) => {
-    await viewerApp.goto(toAppUrl(`${AM_URL}/users`))
+  test('viewer: direct URL to Service Accounts is allowed', async ({ viewerApp }) => {
+    await viewerApp.goto(toAppUrl(`${AM_URL}/service-accounts`))
 
-    await expect(viewerApp.getByRole('heading', { name: 'Access denied', level: 2 })).toBeVisible()
+    await expect(viewerApp.getByRole('tab', { name: /Service Accounts/i })).toBeVisible()
   })
 
   test('admin: direct URL to Create User renders the form', async ({ app }) => {
@@ -1153,36 +1161,44 @@ test.describe('Permission gating — Detail page header actions', () => {
 // ── Action gating — Service Accounts ───────────────────────────────────
 
 test.describe('Permission gating — Service Account actions', () => {
-  test('auditor: Create service account button is disabled', async ({ app, auditorApp }) => {
+  test('auditor: can create service accounts but cannot manage existing ones', async ({ app, auditorApp }) => {
     const sa = await createServiceAccountViaApi(app, buildUniqueName('e2e-perm-sa'))
 
     try {
       await auditorApp.goto(toAppUrl(`${AM_URL}/service-accounts`))
+      await expect(auditorApp.getByLabel('Loading')).toHaveCount(0, { timeout: 20_000 })
       await expect(auditorApp.getByRole('tab', { name: /Service Accounts/i })).toBeVisible()
 
       const createButton = auditorApp.getByRole('button', { name: /Create service account/i })
-      await expect(createButton).toBeVisible({ timeout: 15_000 })
-      // aria-disabled is set after the permissions API resolves — give it extra time
-      await expect(createButton).toHaveAttribute('aria-disabled', 'true', { timeout: 20_000 })
+      await expect(createButton).toBeEnabled({ timeout: 20_000 })
+      await auditorApp.goto(toAppUrl(`${AM_URL}/service-accounts/${sa.id}`))
+      await expect(auditorApp.getByRole('heading', { name: sa.name })).toBeVisible()
+      await expect(auditorApp.getByRole('button', { name: 'Edit service account' })).toHaveAttribute(
+        'aria-disabled',
+        'true'
+      )
     } finally {
       await deleteServiceAccountViaApi(app, sa.id)
     }
   })
 
-  test('user: Service Accounts tab is not visible', async ({ userApp }) => {
-    await userApp.goto(toAppUrl(`${AM_URL}/users`))
-    await expect(userApp.getByRole('tab', { name: /Users/i })).toBeVisible()
-
-    await expect(userApp.getByRole('tab', { name: /Service Accounts/i })).not.toBeVisible()
+  test('user: can read the Service Accounts tab', async ({ userApp }) => {
+    await userApp.goto(toAppUrl(`${AM_URL}/service-accounts`))
+    await expect(userApp.getByRole('tab', { name: /Service Accounts/i })).toBeVisible()
   })
 
-  test('viewer: direct URL to Service Accounts shows access denied', async ({ viewerApp }) => {
-    await viewerApp.goto(toAppUrl(`${AM_URL}/service-accounts`))
-
-    // The route guard renders after the permissions API resolves — give it extra time
-    await expect(viewerApp.getByRole('heading', { name: 'Access denied', level: 2 })).toBeVisible({
-      timeout: 20_000,
-    })
+  test('viewer: can read but cannot edit a service account', async ({ app, viewerApp }) => {
+    const sa = await createServiceAccountViaApi(app, buildUniqueName('e2e-viewer-sa'))
+    try {
+      await viewerApp.goto(toAppUrl(`${AM_URL}/service-accounts/${sa.id}`))
+      await expect(viewerApp.getByRole('heading', { name: sa.name })).toBeVisible()
+      await expect(viewerApp.getByRole('button', { name: 'Edit service account' })).toHaveAttribute(
+        'aria-disabled',
+        'true'
+      )
+    } finally {
+      await deleteServiceAccountViaApi(app, sa.id)
+    }
   })
 })
 

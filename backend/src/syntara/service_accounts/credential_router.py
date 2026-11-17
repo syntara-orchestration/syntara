@@ -9,7 +9,6 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from syntara.audit.decorators import audit
 from syntara.audit.models.audit_event import EventCategory
 from syntara.auth import get_current_user
-from syntara.authz.dependencies import PermissionChecker
 from syntara.core.database.session import get_db
 from syntara.core.models import User
 from syntara.core.syntara_router import SyntaraRouter
@@ -22,7 +21,7 @@ from syntara.service_accounts.credential_schemas import (
     ServiceAccountCredentialRotateRequest,
     ServiceAccountCredentialRotateResponse,
 )
-from syntara.service_accounts.models.service_account import ServiceAccount
+from syntara.service_accounts.permissions import service_account_checker
 from syntara.service_accounts.services.credential_service import ServiceAccountCredentialService
 
 router = SyntaraRouter(
@@ -30,42 +29,12 @@ router = SyntaraRouter(
     tags=["Service Account Credentials"],
 )
 
-_sa_read = PermissionChecker(
-    "service_account",
-    "read",
-    resource_model=ServiceAccount,
-    resource_id_param="service_account_id",
-)
-_sa_update = PermissionChecker(
-    "service_account",
-    "update",
-    resource_model=ServiceAccount,
-    resource_id_param="service_account_id",
-)
-_sa_delete = PermissionChecker(
-    "service_account",
-    "delete",
-    resource_model=ServiceAccount,
-    resource_id_param="service_account_id",
-)
-_sa_rotate_secret = PermissionChecker(
-    "service_account",
-    "rotate_secret",
-    resource_model=ServiceAccount,
-    resource_id_param="service_account_id",
-)
-_sa_disable = PermissionChecker(
-    "service_account",
-    "disable",
-    resource_model=ServiceAccount,
-    resource_id_param="service_account_id",
-)
-_sa_enable = PermissionChecker(
-    "service_account",
-    "enable",
-    resource_model=ServiceAccount,
-    resource_id_param="service_account_id",
-)
+_sa_read = service_account_checker("read")
+_sa_update = service_account_checker("update")
+_sa_delete = service_account_checker("delete")
+_sa_rotate_secret = service_account_checker("rotate_secret")
+_sa_disable = service_account_checker("disable")
+_sa_enable = service_account_checker("enable")
 
 
 def get_credential_service(
