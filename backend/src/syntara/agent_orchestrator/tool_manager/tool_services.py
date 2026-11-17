@@ -312,6 +312,18 @@ def _filter_enabled_tools(
     return filtered_tools
 
 
+def _integrations_for_tool_selection(
+    integrations: list[IntegrationRead],
+    enabled_tools: list[ToolWithParameters],
+    tool_selections: set[str] | frozenset[str],
+) -> list[IntegrationRead]:
+    """Return only integrations that own one of the selected enabled tools."""
+    selected_integration_ids = {
+        tool.integration_id for tool in enabled_tools if str(tool.id) in tool_selections
+    }
+    return [integration for integration in integrations if integration.id in selected_integration_ids]
+
+
 def _enhance_tools_with_metadata(
     namespaced_tools: list[NamespacedBaseTool],
     enabled_tools: list[ToolWithParameters],
@@ -519,9 +531,14 @@ class ToolRetriever:
             self.all_integrations = await _discover_mcp_integrations()
             self.enabled_tools, self.disabled_tools = await _discover_tools()
 
-            # Step 2: Connect to enabled integrations and retrieve BaseTools
+            # Step 2: Connect only to integrations needed by selected tools.
+            integrations_to_retrieve = self.all_integrations
+            if tool_selection_strategy == "SELECTED" and tool_selections:
+                integrations_to_retrieve = _integrations_for_tool_selection(
+                    self.all_integrations, self.enabled_tools, tool_selections
+                )
             self.namespaced_tools = await _retrieve_base_tools_from_integrations(
-                self.all_integrations, self.credential_resolver
+                integrations_to_retrieve, self.credential_resolver
             )
 
             # Step 3: Filter BaseTools by enabled status
