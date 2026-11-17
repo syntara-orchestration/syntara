@@ -1,6 +1,7 @@
 import type { OutputFieldDef } from '@syntara/contracts'
 import { describe, expect, it, vi } from 'vitest'
 
+import type { PreviewFieldDef } from './effectiveOutputSchema'
 import { buildMockJsonSkeleton, parseJsonObject } from './mockDataUtils'
 
 const mockGetNodeOutputSchema = vi.fn<(nodeType: string) => OutputFieldDef[] | null>()
@@ -58,6 +59,56 @@ describe('buildMockJsonSkeleton', () => {
     const parsed: unknown = JSON.parse(result)
 
     expect(parsed).toEqual({ fallback: '' })
+  })
+
+  it('nests configured children as an object of empty values', () => {
+    mockGetNodeOutputSchema.mockReturnValue(null)
+    const schemaFields: PreviewFieldDef[] = [
+      { name: 'status', type: 'string', description: '' },
+      {
+        name: 'response_data',
+        type: 'object',
+        description: '',
+        children: [
+          { name: 'email', type: 'string', description: '' },
+          { name: 'age', type: 'number', description: '' },
+        ],
+      },
+    ]
+
+    const parsed: unknown = JSON.parse(buildMockJsonSkeleton('form_prompt', schemaFields))
+
+    expect(parsed).toStrictEqual({ status: '', response_data: { email: '', age: '' } })
+  })
+
+  it('nests children recursively', () => {
+    const schemaFields: PreviewFieldDef[] = [
+      {
+        name: 'outer',
+        type: 'object',
+        description: '',
+        children: [
+          {
+            name: 'inner',
+            type: 'object',
+            description: '',
+            children: [{ name: 'leaf', type: 'string', description: '' }],
+          },
+        ],
+      },
+    ]
+
+    const parsed: unknown = JSON.parse(buildMockJsonSkeleton(null, schemaFields))
+
+    expect(parsed).toStrictEqual({ outer: { inner: { leaf: '' } } })
+  })
+
+  it('treats an empty children array as a plain empty value', () => {
+    const schemaFields: PreviewFieldDef[] = [{ name: 'response_data', type: 'object', description: '', children: [] }]
+
+    const parsed: unknown = JSON.parse(buildMockJsonSkeleton(null, schemaFields))
+
+    expect(parsed).toStrictEqual({ response_data: '' })
   })
 
   it('handles empty schema array', () => {
