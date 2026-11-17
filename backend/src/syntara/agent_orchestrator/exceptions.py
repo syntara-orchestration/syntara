@@ -89,8 +89,15 @@ class EmptyLLMResponseError(AgentOrchestratorError, RetryableError):
         super().__init__("LLM returned empty response with no tool calls", invocation_id)
 
 
-class StructuredOutputValidationError(AgentOrchestratorError):
-    """Raised when structured output does not satisfy the response schema."""
+class StructuredOutputValidationError(AgentOrchestratorError, RetryableError):
+    """Raised when structured output does not satisfy the response schema.
+
+    Retryable because OpenAI-compatible gateways return the structured result as
+    a tool call only intermittently, so a fresh attempt often parses cleanly.
+    MRO: StructuredOutputValidationError → AgentOrchestratorError → RetryableError → SyntaraError.
+    RetryableError is a pure marker (no __init__); super().__init__ chains through
+    AgentOrchestratorError to SyntaraError without conflict.
+    """
 
     def __init__(self, invocation_id: str | None = None) -> None:
         """Initialize with optional invocation ID for context."""
