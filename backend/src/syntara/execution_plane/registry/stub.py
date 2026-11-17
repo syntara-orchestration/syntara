@@ -14,7 +14,19 @@ class PluginRegistryError(Exception):
 
 
 class PluginRegistry(Protocol):
-    """Registry interface used to resolve a node type's credential recipes."""
+    """Registry interface used to resolve a node type's plugin contract."""
+
+    def action_manifest(self, node_type: str) -> dict[str, Any]:
+        """Return the Action manifest registered for a workflow node type."""
+
+    def step_revision_id(self, node_type: str) -> str:
+        """Return the immutable workload revision identifier for a node type."""
+
+    def input_schema(self, node_type: str) -> dict[str, Any]:
+        """Return the workload input schema for a node type."""
+
+    def output_schema(self, node_type: str) -> dict[str, Any]:
+        """Return the workload output schema for a node type."""
 
     def credential_recipe_ids(self, node_type: str) -> Sequence[str]:
         """Return reachable credential recipe identifiers in manifest order."""
@@ -25,10 +37,11 @@ SCRIPT_BASH_MANIFEST: dict[str, Any] = {
     "kind": "Action",
     "metadata": {
         "name": "script-bash",
-        "displayName": "Bash Script",
-        "description": "Runs Bash code in an isolated subprocess container.",
+        "displayName": "Script",
+        "description": "Runs script code in an isolated subprocess container.",
     },
     "spec": {
+        "stepRevisionId": "script.v1",
         "runtime": {
             "kind": "custom-runner",
             "entryPoint": "syntara_node_script:BashScriptStep",
@@ -37,18 +50,23 @@ SCRIPT_BASH_MANIFEST: dict[str, Any] = {
             "kind": "inline",
             "value": {
                 "type": "object",
-                "required": ["code"],
+                "required": ["language", "code"],
                 "additionalProperties": False,
                 "properties": {
+                    "language": {
+                        "type": "string",
+                        "enum": ["bash", "python"],
+                        "description": "Script language executed by the unified script plugin.",
+                    },
                     "code": {
                         "type": "string",
                         "minLength": 1,
-                        "description": "Bash source code to execute.",
+                        "description": "Script source code to execute.",
                     },
                     "environment": {
                         "type": "object",
                         "additionalProperties": {"type": "string"},
-                        "description": "Environment variables passed to the Bash process.",
+                        "description": "Environment variables passed to the script process.",
                     },
                     "max_output_bytes": {
                         "type": "integer",
@@ -77,11 +95,16 @@ SCRIPT_BASH_MANIFEST: dict[str, Any] = {
                     },
                     "stdout": {
                         "type": "string",
-                        "description": "Standard output captured from the Bash process.",
+                        "description": "Standard output captured from the script process.",
+                    },
+                    "stdout_json": {
+                        "description": (
+                            "Parsed JSON from stdout (Python scripts only). Present if stdout contains valid JSON."
+                        ),
                     },
                     "stderr": {
                         "type": "string",
-                        "description": "Standard error captured from the Bash process.",
+                        "description": "Standard error captured from the script process.",
                     },
                 },
             },
@@ -120,6 +143,22 @@ class StubPluginRegistry:
             raise PluginRegistryError(message)
         return deepcopy(actions[0])
 
+    def step_revision_id(self, node_type: str) -> str:
+        """Return the immutable workload revision identifier for a node type."""
+        value = _manifest_spec(self.action_manifest(node_type)).get("stepRevisionId")
+        if not isinstance(value, str) or not value:
+            message = f"Action for node type {node_type!r} has no stepRevisionId"
+            raise PluginRegistryError(message)
+        return value
+
+    def input_schema(self, node_type: str) -> dict[str, Any]:
+        """Return the workload input schema for a node type."""
+        return _inline_schema(self.action_manifest(node_type), "input", node_type)
+
+    def output_schema(self, node_type: str) -> dict[str, Any]:
+        """Return the workload output schema for a node type."""
+        return _inline_schema(self.action_manifest(node_type), "output", node_type)
+
     def credential_recipe_ids(self, node_type: str) -> tuple[str, ...]:
         """Return CredentialRecipe IDs reachable from a node Action."""
         manifest = self.action_manifest(node_type)
@@ -154,6 +193,19 @@ def _manifest_spec(manifest: dict[str, Any]) -> dict[str, Any]:
         message = f"Manifest {manifest.get('metadata', {}).get('name', '<unknown>')!r} has no object spec"
         raise PluginRegistryError(message)
     return spec
+
+
+def _inline_schema(manifest: dict[str, Any], contract: str, node_type: str) -> dict[str, Any]:
+    """Return a required inline JSON Schema from an Action manifest."""
+    value = _manifest_spec(manifest).get(contract)
+    if not isinstance(value, dict) or value.get("kind") != "inline":
+        message = f"Action for node type {node_type!r} has no inline {contract} schema"
+        raise PluginRegistryError(message)
+    schema = value.get("value")
+    if not isinstance(schema, dict):
+        message = f"Action for node type {node_type!r} has an invalid inline {contract} schema"
+        raise PluginRegistryError(message)
+    return schema
 
 
 def _optional_spec_value(manifest: dict[str, Any], key: str) -> str | None:

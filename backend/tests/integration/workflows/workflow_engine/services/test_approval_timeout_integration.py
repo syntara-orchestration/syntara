@@ -173,12 +173,12 @@ edges:
     return result
 
 
-@activity.defn(name=ActivityName.SCRIPT)
+@activity.defn(name=ActivityName.PLUGIN)
 async def _test_script_activity(
-    resolved_parameters: dict[str, Any],
-    outputs: dict[str, str] | None = None,
-    project_id: str | None = None,
-    **kwargs: object,
+    input_config: dict[str, Any],
+    output_config: dict[str, str] | None,
+    node_type: str,
+    execution_id: str,
 ) -> dict[str, Any]:
     return {"output": {"status": "completed"}}
 

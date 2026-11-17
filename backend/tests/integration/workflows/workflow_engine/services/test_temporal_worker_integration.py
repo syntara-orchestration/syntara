@@ -20,7 +20,9 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
 
-from syntara.workflow_runtime.engines.temporal.activities.ep.ep_dispatch_activity import execute_script_activity
+from syntara.workflow_runtime.engines.temporal.activities.ep.ep_dispatch_activity import (
+    execute_plugin_action_activity,
+)
 from syntara.workflow_runtime.engines.temporal.activities.manual_trigger import manual_trigger
 from syntara.workflow_runtime.engines.temporal.activities.runtime_settings_activity import (
     fetch_workflow_runtime_settings,
@@ -66,7 +68,7 @@ class MockWorkerService(TemporalWorkerService):
             self.client,
             task_queue=self.task_queue,
             workflows=[OrchestratorWorkflow],
-            activities=[execute_script_activity, manual_trigger, fetch_workflow_runtime_settings],
+            activities=[execute_plugin_action_activity, manual_trigger, fetch_workflow_runtime_settings],
         )
 
         self._worker_task = asyncio.create_task(self.worker.run())
@@ -134,7 +136,7 @@ class TestTemporalWorkerServiceIntegration:
             temporal_env.client,
             task_queue="integration-test-queue",
             workflows=[OrchestratorWorkflow],
-            activities=[execute_script_activity, manual_trigger],
+            activities=[execute_plugin_action_activity, manual_trigger],
         )
 
         # Start worker in background

@@ -80,14 +80,14 @@ async def test_monitor_and_dispatch_share_identity_in_either_order(
     if monitor_first:
         await monitor._create_all_activities_upfront(test_execution.id, _DEFINITIONS)
 
-    assert (
-        await dispatch._dispatch_to_ep({"language": "bash", "code": "echo ok"}, None, test_execution.id, None) is None
+    await dispatch._dispatch_to_ep(
+        {"language": "bash", "code": "echo ok"}, None, "script", "script.v1", test_execution.id, None
     )
     work_id = UUID(ep_submission.call_args.args[1].command.payload["work_item_id"])
     assert work_id == uuid5(test_execution.id, _NODE_ID)
 
     temporal = AsyncMock()
-    result = {"output": {"stdout": "ok"}}
+    result = {"output": {"return_code": 0, "stdout": "ok", "stderr": ""}}
     async with test_db_session_factory() as reader:
         if not monitor_first:
             assert (
@@ -128,7 +128,9 @@ async def test_monitor_updates_row_created_after_dispatch(
     test_db_session_factory: async_sessionmaker[AsyncSession],
     ep_submission: AsyncMock,
 ) -> None:
-    await dispatch._dispatch_to_ep({"language": "bash", "code": "echo ok"}, None, test_execution.id, None)
+    await dispatch._dispatch_to_ep(
+        {"language": "bash", "code": "echo ok"}, None, "script", "script.v1", test_execution.id, None
+    )
     work_id = UUID(ep_submission.call_args.args[1].command.payload["work_item_id"])
     monitor = ActivitySyncService(Mock(), test_db_session_factory, AsyncMock())
     metadata = await monitor._initialize_monitoring(test_execution.id)
@@ -170,7 +172,7 @@ async def test_dispatch_moves_credential_bindings_out_of_inputs(
         ],
     }
 
-    await dispatch._dispatch_to_ep(input_config, None, test_execution.id, None)
+    await dispatch._dispatch_to_ep(input_config, None, "script", "script.v1", test_execution.id, None)
 
     first_message = ep_submission.call_args.args[1]
     payload = WorkExecute.model_validate(first_message.command.payload)
@@ -183,7 +185,7 @@ async def test_dispatch_moves_credential_bindings_out_of_inputs(
         ("acme.echo.workspace-token", second),
     ]
 
-    await dispatch._dispatch_to_ep(input_config, None, test_execution.id, None)
+    await dispatch._dispatch_to_ep(input_config, None, "script", "script.v1", test_execution.id, None)
     second_message = ep_submission.call_args.args[1]
     assert second_message.message_id != first_message.message_id
     assert payload.runtime_context == {
@@ -211,7 +213,7 @@ async def test_dispatch_rejects_unresolved_credential_binding_templates(
     }
 
     with pytest.raises(ApplicationError, match="invalid for the Execution Plane command protocol"):
-        await dispatch._dispatch_to_ep(input_config, None, test_execution.id, None)
+        await dispatch._dispatch_to_ep(input_config, None, "script", "script.v1", test_execution.id, None)
 
     ep_submission.assert_not_called()
 

@@ -14,7 +14,7 @@ from tests.fixtures.settings import enable_script_nodes
 
 @pytest.fixture(autouse=True)
 def _enable_script_nodes() -> Generator[None, None, None]:
-    """Enable script nodes for telemetry tests that call execute_script_activity directly."""
+    """Enable script nodes for telemetry tests that call the plugin activity directly."""
     with enable_script_nodes():
         yield
 

@@ -2,10 +2,12 @@
 
 from typing import ClassVar
 
+from syntara.workflow_core.models import NodeType
 from syntara.workflow_runtime.engines.temporal.activities.registry import (
     ACTIVITY_REGISTRY,
     BACKGROUND_ACTIVITY_REGISTRY,
 )
+from syntara.workflow_runtime.engines.temporal.dynamic_workflow import OrchestratorWorkflow
 from syntara.workflows.seed_builtin import _BUILTIN_DEFINITIONS
 
 
@@ -29,8 +31,18 @@ class TestBackgroundActivityRegistry:
 
     def test_does_not_contain_user_executor_activities(self) -> None:
         """User-facing executor activities must not leak into the background registry."""
-        user_activities = {"execute_agentic_activity", "execute_script_activity", "execute_http_request_activity"}
+        user_activities = {
+            "execute_agentic_activity",
+            "execute_plugin_action_activity",
+            "execute_http_request_activity",
+        }
         assert BACKGROUND_ACTIVITY_REGISTRY.keys().isdisjoint(user_activities)
+
+    def test_script_routes_to_generic_plugin_action_activity(self) -> None:
+        """Script dispatch must use the registry-driven plugin activity."""
+        assert OrchestratorWorkflow._EXECUTOR_ACTIVITY_MAP[NodeType.SCRIPT] == "execute_plugin_action_activity"
+        assert "execute_plugin_action_activity" in ACTIVITY_REGISTRY
+        assert "execute_script_activity" not in ACTIVITY_REGISTRY
 
     def test_every_builtin_trigger_type_has_a_registered_background_activity(self) -> None:
         """Ensure all builtin trigger types have registered background activities.

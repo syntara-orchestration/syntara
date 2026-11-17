@@ -14,7 +14,9 @@ from temporalio.client import Client
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
 
-from syntara.workflow_runtime.engines.temporal.activities.ep.ep_dispatch_activity import execute_script_activity
+from syntara.workflow_runtime.engines.temporal.activities.ep.ep_dispatch_activity import (
+    execute_plugin_action_activity,
+)
 from syntara.workflow_runtime.engines.temporal.activities.manual_trigger import manual_trigger
 from syntara.workflow_runtime.engines.temporal.activities.runtime_settings_activity import (
     fetch_workflow_runtime_settings,
@@ -67,7 +69,7 @@ nodes:
     language: bash
     code: echo "Integration test successful"
   settings:
-    timeout: 1
+        timeout: 10
 edges:
 - from: trigger_manual
   to: test_task
@@ -120,7 +122,7 @@ nodes:
     language: bash
     code: echo "Custom ID test"
   settings:
-    timeout: 1
+        timeout: 10
 edges:
 - from: trigger_manual
   to: task1
@@ -170,7 +172,7 @@ nodes:
     language: bash
     code: echo "Hello, $INPUT_NAME!"
   settings:
-    timeout: 1
+        timeout: 10
 edges:
 - from: trigger_manual
   to: use_input
@@ -216,7 +218,7 @@ nodes:
     language: bash
     code: echo "test"
   settings:
-    timeout: 1
+        timeout: 10
 edges: []
 """
         workflow_def = yaml.safe_load(invalid_workflow_yaml)
@@ -257,7 +259,7 @@ nodes:
       sleep 10
       echo "This should not complete"
   settings:
-    timeout: 1
+        timeout: 10
 edges:
 - from: trigger_manual
   to: long_task
@@ -323,7 +325,7 @@ nodes:
     language: bash
     code: echo "Factory test"
   settings:
-    timeout: 1
+        timeout: 10
 edges:
 - from: trigger_manual
   to: task1
@@ -334,7 +336,7 @@ edges:
             temporal_env.client,
             task_queue="test-queue",
             workflows=[OrchestratorWorkflow],
-            activities=[execute_script_activity, manual_trigger, fetch_workflow_runtime_settings],
+            activities=[execute_plugin_action_activity, manual_trigger, fetch_workflow_runtime_settings],
         ):
             workflow_def = yaml.safe_load(workflow_yaml)
             result = await service.start_workflow(

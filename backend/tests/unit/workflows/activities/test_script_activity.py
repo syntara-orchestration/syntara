@@ -21,6 +21,10 @@ WORK_ITEM_ID = uuid5(UUID(EXECUTION_ID), "unit-activity")
 EXECUTION_TARGET_ID = UUID("00000000-0000-0000-0000-000000000030")
 
 
+def _valid_script_output() -> dict[str, dict[str, object]]:
+    return {"output": {"return_code": 0, "stdout": "", "stderr": ""}}
+
+
 class _FakeEPClient:
     """Minimal async transport double for an already-completed work item."""
 
@@ -80,7 +84,7 @@ def mock_activity_context() -> Generator[MagicMock, None, None]:
         yield activity_info
 
 
-class TestScriptActivityValidation:
+class TestPluginActionActivityValidation:
     """Reject invalid requests before making an HTTP call to EP."""
 
     @pytest.mark.asyncio
@@ -97,7 +101,7 @@ class TestScriptActivityValidation:
     async def test_invalid_config_is_non_retryable(self, input_config: dict[str, str]) -> None:
         """Invalid script fields fail before AO contacts the remote service."""
         with pytest.raises(ApplicationError) as exc_info:
-            await activity_module.execute_script_activity(input_config, None, EXECUTION_ID)
+            await activity_module.execute_plugin_action_activity(input_config, None, "script", EXECUTION_ID)
         assert exc_info.value.type == "ConfigError"
         assert exc_info.value.non_retryable is True
         assert _FakeEPClient.submissions == []
@@ -105,12 +109,24 @@ class TestScriptActivityValidation:
     @pytest.mark.asyncio
     async def test_invalid_execution_id_is_non_retryable(self) -> None:
         with pytest.raises(ApplicationError) as exc_info:
-            await activity_module.execute_script_activity({"language": "bash", "code": ":"}, None, "invalid")
+            await activity_module.execute_plugin_action_activity(
+                {"language": "bash", "code": ":"}, None, "script", "invalid"
+            )
         assert exc_info.value.type == "ConfigError"
         assert _FakeEPClient.submissions == []
 
+    @pytest.mark.asyncio
+    async def test_unregistered_node_type_is_non_retryable(self) -> None:
+        with pytest.raises(ApplicationError) as exc_info:
+            await activity_module.execute_plugin_action_activity(
+                {"language": "bash", "code": ":"}, None, "unsupported", EXECUTION_ID
+            )
+        assert exc_info.value.type == "ConfigError"
+        assert exc_info.value.non_retryable is True
+        assert _FakeEPClient.submissions == []
 
-class TestScriptActivityDispatch:
+
+class TestPluginActionActivityDispatch:
     """Exercise the service boundary and stable idempotency behavior."""
 
     def test_future_step_legacy_credential_reference_becomes_ep_binding(self) -> None:
@@ -122,7 +138,9 @@ class TestScriptActivityDispatch:
                 return ("future.plugin.token",)
 
         with patch.object(activity_module, "_PLUGIN_REGISTRY", SingleRecipeRegistry()):
-            invocation = activity_module._build_invocation({"credential_id": credential_ref}, "future-step")
+            invocation = activity_module._build_invocation(
+                {"credential_id": credential_ref}, "future-step", "future-step.v1"
+            )
 
         assert invocation["inputs"] == {}
         assert invocation["credential_bindings"] == [
@@ -144,32 +162,46 @@ class TestScriptActivityDispatch:
         }
 
         with pytest.raises(PluginRegistryError):
-            activity_module._build_invocation(input_config, "future-step")
+            activity_module._build_invocation(input_config, "future-step", "future-step.v1")
 
         assert _FakeEPClient.submissions == []
 
     @pytest.mark.asyncio
-    async def test_completed_response_returns_ep_result(self) -> None:
-        expected = {"output": {"return_code": 0, "stdout": "ok\n"}}
+    async def test_completed_response_waits_for_callback(self) -> None:
+        expected = {"output": {"return_code": 0, "stdout": "ok\n", "stderr": ""}}
         _FakeEPClient.responses = [
             {"id": "00000000-0000-0000-0000-000000000002", "status": "completed", "result": expected}
         ]
 
-        result = await activity_module.execute_script_activity(
-            {"language": "bash", "code": "echo ok"}, None, EXECUTION_ID
-        )
+        with patch.object(activity_module.activity, "raise_complete_async") as complete_async:
+            await activity_module.execute_plugin_action_activity(
+                {"language": "bash", "code": "echo ok"}, None, "script", EXECUTION_ID
+            )
 
-        assert result == expected
+        complete_async.assert_called_once()
         assert len(_FakeEPClient.submissions) == 1
         assert UUID(str(_FakeEPClient.submissions[0].command.payload["work_item_id"])) == WORK_ITEM_ID
 
     @pytest.mark.asyncio
+    async def test_existing_python_script_language_remains_valid(self) -> None:
+        """The unified script node continues to accept its current languages."""
+        _FakeEPClient.responses = [{"id": str(WORK_ITEM_ID), "status": "completed", "result": _valid_script_output()}]
+
+        with patch.object(activity_module.activity, "raise_complete_async"):
+            await activity_module.execute_plugin_action_activity(
+                {"language": "python", "code": "print('ok')"}, None, "script", EXECUTION_ID
+            )
+
+    @pytest.mark.asyncio
     async def test_temporal_retry_reuses_work_item_id(self, mock_activity_context: MagicMock) -> None:
         """Task attempts share an identity without an AO row lookup."""
-        _FakeEPClient.responses = [{"status": "completed", "result": {}} for _ in range(2)]
-        for attempt in (1, 2):
-            mock_activity_context.return_value.attempt = attempt
-            await activity_module.execute_script_activity({"language": "bash", "code": ":"}, None, EXECUTION_ID)
+        _FakeEPClient.responses = [{"status": "completed", "result": _valid_script_output()} for _ in range(2)]
+        with patch.object(activity_module.activity, "raise_complete_async"):
+            for attempt in (1, 2):
+                mock_activity_context.return_value.attempt = attempt
+                await activity_module.execute_plugin_action_activity(
+                    {"language": "bash", "code": ":"}, None, "script", EXECUTION_ID
+                )
 
         assert [UUID(str(message.command.payload["work_item_id"])) for message in _FakeEPClient.submissions] == [
             WORK_ITEM_ID,
@@ -182,20 +214,22 @@ class TestScriptActivityDispatch:
 
     async def test_execution_target_profile_uses_sdk_workload_contract(self) -> None:
         """Route selected targets while submitting the SDK container invocation."""
-        _FakeEPClient.responses = [{"id": str(WORK_ITEM_ID), "status": "completed", "result": {"output": {}}}]
+        _FakeEPClient.responses = [{"id": str(WORK_ITEM_ID), "status": "completed", "result": _valid_script_output()}]
 
-        await activity_module.execute_script_activity(
-            {
-                "language": "bash",
-                "code": ":",
-                "execution_profile": {
-                    "type": "execution_target",
-                    "execution_target_id": str(EXECUTION_TARGET_ID),
+        with patch.object(activity_module.activity, "raise_complete_async"):
+            await activity_module.execute_plugin_action_activity(
+                {
+                    "language": "bash",
+                    "code": ":",
+                    "execution_profile": {
+                        "type": "execution_target",
+                        "execution_target_id": str(EXECUTION_TARGET_ID),
+                    },
                 },
-            },
-            None,
-            EXECUTION_ID,
-        )
+                None,
+                "script",
+                EXECUTION_ID,
+            )
 
         assert len(_FakeEPClient.submissions) == 1
         command_payload = _FakeEPClient.submissions[0].command.payload
@@ -215,10 +249,9 @@ class TestScriptActivityDispatch:
     async def test_pending_response_is_accepted_for_async_completion(self) -> None:
         _FakeEPClient.responses = [{"id": "00000000-0000-0000-0000-000000000002", "status": "pending", "result": None}]
         with patch.object(activity_module.activity, "raise_complete_async") as complete_async:
-            result = await activity_module.execute_script_activity(
-                {"language": "bash", "code": "sleep 1"}, None, EXECUTION_ID
+            await activity_module.execute_plugin_action_activity(
+                {"language": "bash", "code": "sleep 1"}, None, "script", EXECUTION_ID
             )
-        assert result == {}
         complete_async.assert_called_once()
 
     @pytest.mark.asyncio
@@ -237,17 +270,18 @@ class TestScriptActivityDispatch:
             }
         ]
         with patch.object(activity_module.activity, "raise_complete_async") as complete_async:
-            result = await activity_module.execute_script_activity(
-                {"language": "bash", "code": "sleep 1"}, None, EXECUTION_ID
+            await activity_module.execute_plugin_action_activity(
+                {"language": "bash", "code": "sleep 1"}, None, "script", EXECUTION_ID
             )
-        assert result == {}
         complete_async.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_rejected_request_is_non_retryable(self) -> None:
         _FakeEPClient.responses = [ExecutionPlaneRejectedError("request rejected")]
         with pytest.raises(ApplicationError) as exc_info:
-            await activity_module.execute_script_activity({"language": "bash", "code": ":"}, None, EXECUTION_ID)
+            await activity_module.execute_plugin_action_activity(
+                {"language": "bash", "code": ":"}, None, "script", EXECUTION_ID
+            )
         assert exc_info.value.type == "ExecutionPlaneRejected"
         assert exc_info.value.non_retryable is True
 
@@ -255,12 +289,32 @@ class TestScriptActivityDispatch:
     async def test_service_unavailability_retries_same_work_item_id(self) -> None:
         _FakeEPClient.responses = [
             ExecutionPlaneUnavailableError(),
-            {"id": "00000000-0000-0000-0000-000000000002", "status": "completed", "result": {}},
+            {
+                "id": "00000000-0000-0000-0000-000000000002",
+                "status": "completed",
+                "result": _valid_script_output(),
+            },
         ]
         with patch.object(activity_module.asyncio, "sleep", new_callable=AsyncMock):
-            await activity_module.execute_script_activity({"language": "bash", "code": ":"}, None, EXECUTION_ID)
+            with patch.object(activity_module.activity, "raise_complete_async"):
+                await activity_module.execute_plugin_action_activity(
+                    {"language": "bash", "code": ":"}, None, "script", EXECUTION_ID
+                )
         assert len(_FakeEPClient.submissions) == 2
         assert _FakeEPClient.submissions[1] == _FakeEPClient.submissions[0]
+
+    @pytest.mark.asyncio
+    async def test_completed_response_does_not_validate_output_schema(self) -> None:
+        _FakeEPClient.responses = [
+            {"id": str(WORK_ITEM_ID), "status": "completed", "result": {"output": {"return_code": 0}}}
+        ]
+
+        with patch.object(activity_module.activity, "raise_complete_async") as complete_async:
+            await activity_module.execute_plugin_action_activity(
+                {"language": "bash", "code": ":"}, None, "script", EXECUTION_ID
+            )
+
+        complete_async.assert_called_once()
 
 
 class TestScriptNodesGate:
@@ -273,8 +327,8 @@ class TestScriptNodesGate:
         object.__setattr__(settings, "script_nodes_enabled", False)
         try:
             with pytest.raises(ApplicationError) as exc_info:
-                await activity_module.execute_script_activity(
-                    {"language": "bash", "code": "echo hi"}, None, EXECUTION_ID
+                await activity_module.execute_plugin_action_activity(
+                    {"language": "bash", "code": "echo hi"}, None, "script", EXECUTION_ID
                 )
             assert exc_info.value.non_retryable is True
             assert exc_info.value.type == "ScriptNodeDisabled"
@@ -287,10 +341,12 @@ class TestScriptNodesGate:
 async def test_conflict_recovers_existing_work_instead_of_failing_activity():
     conflict = ExecutionPlaneRejectedError("already exists")
     conflict.status_code = 409
-    expected = {"output": {"stdout": "recovered"}}
+    expected = {"output": {"return_code": 0, "stdout": "recovered", "stderr": ""}}
     _FakeEPClient.responses = [conflict, {"id": str(WORK_ITEM_ID), "status": "completed", "result": expected}]
-    result = await activity_module.execute_script_activity({"language": "bash", "code": ":"}, None, EXECUTION_ID)
-    assert result == expected
+    with patch.object(activity_module.activity, "raise_complete_async"):
+        await activity_module.execute_plugin_action_activity(
+            {"language": "bash", "code": ":"}, None, "script", EXECUTION_ID
+        )
     assert len(_FakeEPClient.submissions) == 1
     assert UUID(str(_FakeEPClient.submissions[0].command.payload["work_item_id"])) == WORK_ITEM_ID
     assert _FakeEPClient.submissions[0].command.command_type == "work.execute"

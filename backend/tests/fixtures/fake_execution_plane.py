@@ -14,16 +14,24 @@ from execution_plane_client.commands.work import WorkExecute
 from execution_plane_client.protocol import MessageEnvelope, ResourceReference
 
 if TYPE_CHECKING:
+    from collections.abc import Callable, Coroutine
     from uuid import UUID
 
 
 class FakeExecutionPlaneHttpClient:
     """Return completed EP responses while running representative scripts in tests."""
 
-    def __init__(self, *, timeout: float | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        timeout: float | None = None,
+        on_completion: Callable[[UUID, str, dict[str, Any]], Coroutine[Any, Any, None]] | None = None,
+    ) -> None:
         """Accept the production client's request timeout configuration."""
         self.timeout = timeout
+        self.on_completion = on_completion
         self.work_items: dict[UUID, dict[str, Any]] = {}
+        self._completion_tasks: set[asyncio.Task[None]] = set()
 
     async def __aenter__(self) -> Self:
         """Mirror the production client's async context-manager contract."""
@@ -44,7 +52,12 @@ class FakeExecutionPlaneHttpClient:
 
     async def get_work_item(self, *, work_item_id: UUID) -> dict[str, Any]:
         """Read the separate resource state following a command receipt."""
-        return self.work_items[work_item_id]
+        response = self.work_items[work_item_id]
+        if self.on_completion is not None and response["status"] in {"completed", "failed", "cancelled"}:
+            task = asyncio.create_task(self.on_completion(work_item_id, str(response["status"]), response["result"]))
+            self._completion_tasks.add(task)
+            task.add_done_callback(self._completion_tasks.discard)
+        return response
 
 
 async def execute_fixture_script(payload: dict[str, Any]) -> tuple[dict[str, Any], str]:

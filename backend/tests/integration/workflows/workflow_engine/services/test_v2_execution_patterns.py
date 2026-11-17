@@ -22,7 +22,9 @@ from temporalio.worker import Worker
 
 from syntara.workflow_runtime.engines.temporal.activities.condition import condition
 from syntara.workflow_runtime.engines.temporal.activities.converge import converge
-from syntara.workflow_runtime.engines.temporal.activities.ep.ep_dispatch_activity import execute_script_activity
+from syntara.workflow_runtime.engines.temporal.activities.ep.ep_dispatch_activity import (
+    execute_plugin_action_activity,
+)
 from syntara.workflow_runtime.engines.temporal.activities.loop import loop
 from syntara.workflow_runtime.engines.temporal.activities.manual_trigger import manual_trigger
 from syntara.workflow_runtime.engines.temporal.activities.runtime_settings_activity import (
@@ -34,7 +36,7 @@ from syntara.workflow_runtime.engines.temporal.services.temporal_execution_servi
 from syntara.workflows.models.execution import Execution
 
 _V2_ACTIVITIES: Sequence[Callable[..., Any]] = [
-    execute_script_activity,
+    execute_plugin_action_activity,
     manual_trigger,
     condition,
     converge,

@@ -1267,7 +1267,7 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         NodeType.AAP_WORKFLOW_JOB_TEMPLATE: ActivityName.AAP_WORKFLOW_JOB_TEMPLATE,
         NodeType.HTTP_REQUEST: ActivityName.HTTP_REQUEST,
         NodeType.INTERNAL_ACTIVITY: ActivityName.INTERNAL_ACTIVITY,
-        NodeType.SCRIPT: ActivityName.SCRIPT,
+        NodeType.SCRIPT: ActivityName.PLUGIN,
         NodeType.CONDITION: ActivityName.CONDITION,
         NodeType.SWITCH: ActivityName.SWITCH,
         NodeType.AGENTIC: ActivityName.AGENTIC,
@@ -1786,7 +1786,7 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         if node_type in self._EXECUTOR_ACTIVITY_MAP:
             extra_args: list[Any] | None = None
             if node_type == NodeType.SCRIPT:
-                extra_args = [self.execution_id]
+                extra_args = [node_type, self.execution_id]
             elif node_type in self._AAP_NODE_TYPES:
                 extra_args = [self.execution_id, self._created_by_user_id]
             elif node_type == NodeType.AGENTIC:
