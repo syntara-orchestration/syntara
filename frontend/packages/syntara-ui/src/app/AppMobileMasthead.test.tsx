@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { BrandProvider } from '../providers/brand'
+import { BrandProvider } from '../providers/brand/BrandProvider'
 
 import { AppMobileMasthead } from './AppMobileMasthead'
 import type { DockState } from './useDockState'
