@@ -4,12 +4,10 @@ import type { ReactNode } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { credentialsClient } from '../../../../client'
-import { useSynForm } from '../../../../hooks/useSynForm'
 import { AlertProvider } from '../../../../providers/alerts'
 import { useSelectableProjects } from '../../../access/useAllProjects'
 import type { Credential } from '../credentialConstants'
 
-import { credentialFormSchema } from './credentialFormSchema'
 import {
   asCredentialMutationResult,
   type CredentialTypeFixture,
@@ -101,24 +99,13 @@ function renderCredentialModalHook(options: Partial<HookProps> = {}) {
   }
   return renderHook(
     (props: HookProps) => {
-      const form = useSynForm({
-        schema: credentialFormSchema,
-        defaultValues: {
-          name: '',
-          description: '',
-          project_id: '',
-          credential_type_id: '',
-          inputs: {},
-        },
-        onClose,
-      })
       const modalState = useCredentialFormModal({
-        form,
         isOpen: props.isOpen,
         credentialToEdit: props.credentialToEdit,
         isEditMode: props.isEditMode,
+        onClose,
       })
-      return { form, modalState }
+      return { form: modalState.form, modalState }
     },
     { wrapper, initialProps }
   )

@@ -25,7 +25,7 @@ import { SynScrollableTableContainer } from '../../../components/table/SynScroll
 import { useClientPagination } from '../../../hooks/useClientPagination'
 import { useMutationErrorHandler } from '../../../hooks/useMutationErrorHandler'
 import { useTableSort } from '../../../hooks/useTableSort'
-import { useAlerts, type AlertConfig } from '../../../providers/alerts'
+import { useAlerts } from '../../../providers/alerts'
 import type { FilterConfig, FilterFieldDefinition } from '../../../types/filters'
 import { FilterOperatorEnum, FilterTypeEnum } from '../../../types/filters'
 import { detachPromise } from '../../../utils/detachPromise'
@@ -65,19 +65,6 @@ const identityFilterDefs: FilterFieldDefinition[] = [
     placeholder: 'Filter by provider',
   },
 ]
-
-function useLinkError(showAlert: (config: AlertConfig) => void) {
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    const error = params.get('link_error')
-    if (error) {
-      const url = new URL(window.location.href)
-      url.searchParams.delete('link_error')
-      window.history.replaceState({}, '', url.toString())
-      showAlert({ title: 'Failed to link identity', description: resolveLinkError(error), variant: 'danger' })
-    }
-  }, [showAlert])
-}
 
 function ProviderLink({ name, providerId }: { name: string; providerId: string }) {
   return (
@@ -304,7 +291,17 @@ export function UserIdentitiesPanel({
   )
   const { providers, isLoading: isProvidersLoading } = useAuthProviders()
   const isSelf = userId === currentUserId
-  useLinkError(showAlert)
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const error = params.get('link_error')
+    if (!error) return
+
+    const url = new URL(window.location.href)
+    url.searchParams.delete('link_error')
+    window.history.replaceState({}, '', url.toString())
+    showAlert({ title: 'Failed to link identity', description: resolveLinkError(error), variant: 'danger' })
+  }, [showAlert])
 
   const query = usersClient.useQuery(
     'get',

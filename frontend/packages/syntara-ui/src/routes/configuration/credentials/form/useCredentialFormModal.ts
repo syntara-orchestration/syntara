@@ -8,7 +8,7 @@ import { useAlerts } from '../../../../providers/alerts'
 import { useSelectableProjects } from '../../../access/useAllProjects'
 import type { Credential } from '../credentialConstants'
 
-import type { CredentialFormData } from './credentialFormSchema'
+import { credentialFormSchema, type CredentialFormData } from './credentialFormSchema'
 import {
   buildEditInputs,
   buildExclusiveGroups,
@@ -23,10 +23,10 @@ import {
 } from './credentialFormUtils'
 
 type UseCredentialFormModalOptions = {
-  form: ReturnType<typeof useSynForm<CredentialFormData>>
   isOpen: boolean
   credentialToEdit?: Credential | null
   isEditMode: boolean
+  onClose: () => void
   preSelectedTypeId?: string
   defaultProjectId?: string
   /** When set (e.g. inline create from CredentialSelector), limits type list and default type. */
@@ -35,18 +35,37 @@ type UseCredentialFormModalOptions = {
   onSuccess?: () => void
 }
 
+function getCredentialFormDefaults(
+  credentialToEdit: Credential | null | undefined,
+  defaultProjectId: string | undefined,
+  preSelectedTypeId: string | undefined
+): CredentialFormData {
+  return {
+    name: credentialToEdit?.name ?? '',
+    description: credentialToEdit?.description ?? '',
+    project_id: credentialToEdit?.project_id ?? defaultProjectId ?? '',
+    credential_type_id: credentialToEdit?.credential_type_id ?? preSelectedTypeId ?? '',
+    inputs: credentialToEdit?.inputs ?? {},
+  }
+}
+
 // eslint-disable-next-line max-lines-per-function -- modal state, queries, and submit paths stay in one hook
 export function useCredentialFormModal({
-  form,
   isOpen,
   credentialToEdit,
   isEditMode,
+  onClose,
   preSelectedTypeId,
   defaultProjectId,
   compatibleTypeNames,
   onCreated,
   onSuccess,
 }: UseCredentialFormModalOptions) {
+  const form = useSynForm({
+    schema: credentialFormSchema,
+    defaultValues: getCredentialFormDefaults(credentialToEdit, defaultProjectId, preSelectedTypeId),
+    onClose,
+  })
   const { showAlert } = useAlerts()
   const { projects, isLoading: isLoadingProjects, error: projectsError } = useSelectableProjects()
   const [touchedSecrets, setTouchedSecrets] = useState<Set<string>>(() => new Set())
@@ -281,6 +300,7 @@ export function useCredentialFormModal({
   )
 
   return {
+    form,
     handleSubmit,
     handleClose,
     onSubmit,

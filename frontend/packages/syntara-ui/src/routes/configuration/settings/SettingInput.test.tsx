@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 
 import { SettingInput } from './SettingInput'
+import { getStringPatternError } from './settingValidation'
 
 type RuntimeSetting = SettingsAPI.components['schemas']['RuntimeSettingRead']
 
@@ -318,30 +319,11 @@ describe('SettingInput', () => {
     expect(onStringError).toHaveBeenCalledWith(expect.stringContaining('email'))
   })
 
-  it('calls onStringError with invalid URL on blur', async () => {
-    const user = userEvent.setup()
-    const onStringError = vi.fn()
-    const stringSetting = {
-      ...baseSetting,
-      value_type: 'string' as const,
-      validation_schema: { pattern: 'url' } as unknown as RuntimeSetting['validation_schema'],
-    }
-    render(
-      <SettingInput
-        setting={stringSetting}
-        value="not-a-url"
-        numericBounds={null}
-        numericError={null}
-        onChange={vi.fn()}
-        stringError={null}
-        onStringError={onStringError}
-      />
-    )
-
-    const input = screen.getByDisplayValue('not-a-url')
-    await user.click(input)
-    await user.tab()
-    expect(onStringError).toHaveBeenCalledWith(expect.stringContaining('URL'))
+  it('derives string pattern errors from the current value', () => {
+    expect(getStringPatternError('string', 'not-a-url', 'url')).toBe('Must be a valid URL')
+    expect(getStringPatternError('string', 'https://example.com', 'url')).toBeNull()
+    expect(getStringPatternError('string', 'not-an-email', 'email')).toBe('Invalid email address')
+    expect(getStringPatternError('json', 'not-a-url', 'url')).toBeNull()
   })
 
   it('blur snaps value to max bound', () => {

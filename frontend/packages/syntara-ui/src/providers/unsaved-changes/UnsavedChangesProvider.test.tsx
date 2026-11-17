@@ -1,5 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { useState } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useUnsavedChanges } from '../../app/useUnsavedChanges'
@@ -445,7 +446,25 @@ describe('UnsavedChangesProvider (TanStack router path)', () => {
 
     vi.resetModules()
     vi.doMock('@tanstack/react-router', () => ({
-      useBlocker: vi.fn(() => mockBlockerState),
+      useBlocker: vi.fn(() => {
+        const [status, setStatus] = useState(mockBlockerState.status)
+        return {
+          ...mockBlockerState,
+          status,
+          proceed: mockBlockerState.proceed
+            ? () => {
+                mockProceed()
+                setStatus('idle')
+              }
+            : undefined,
+          reset: mockBlockerState.reset
+            ? () => {
+                mockReset()
+                setStatus('idle')
+              }
+            : undefined,
+        }
+      }),
       useNavigate: () => mockNavigate,
       useRouterState: (opts?: { select?: (s: { location: { pathname: string } }) => unknown }) => {
         const state = { location: { pathname: '/workflow-builder/123' } }

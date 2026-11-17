@@ -227,6 +227,35 @@ describe('TextFilter', () => {
       expect(screen.queryByDisplayValue('test')).not.toBeInTheDocument()
     })
 
+    it('uses the latest definition for the selected field when definitions refresh', async () => {
+      const user = userEvent.setup()
+      const { rerender } = render(<TextFilter {...defaultProps} />)
+
+      await user.click(screen.getByText('Name'))
+      await user.click(screen.getByText('Status'))
+
+      const updatedStatusDefinition = { ...selectFieldDefinition, label: 'Current status' }
+      rerender(<TextFilter {...defaultProps} fieldDefinitions={[textFieldDefinition, updatedStatusDefinition]} />)
+
+      expect(screen.getByRole('button', { name: 'Current status' })).toBeInTheDocument()
+    })
+
+    it('falls back to the first field when the selected definition is removed', async () => {
+      const user = userEvent.setup()
+      const { rerender } = render(<TextFilter {...defaultProps} />)
+
+      await user.click(screen.getByText('Name'))
+      await user.click(screen.getByText('Status'))
+      rerender(<TextFilter {...defaultProps} fieldDefinitions={[textFieldDefinition]} />)
+
+      expect(screen.getByRole('button', { name: 'Name' })).toBeInTheDocument()
+      expect(screen.getByPlaceholderText('Filter by name')).toBeInTheDocument()
+
+      rerender(<TextFilter {...defaultProps} />)
+
+      expect(screen.getByRole('button', { name: 'Status' })).toBeInTheDocument()
+    })
+
     it('selects field based on last filter in filters array', () => {
       // With status filter as the last filter
       const filters = [

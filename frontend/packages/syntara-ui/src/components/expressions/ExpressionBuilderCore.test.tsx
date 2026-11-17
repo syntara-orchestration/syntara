@@ -155,6 +155,7 @@ describe('ExpressionBuilderCore', () => {
     await user.type(rawInput, 'updated')
 
     expect(rawInput).toHaveValue('updated')
+    expect(onChange).toHaveBeenCalled()
   })
 
   it('serializes visual expression when switching to raw mode', async () => {
@@ -177,6 +178,8 @@ describe('ExpressionBuilderCore', () => {
     await waitFor(() => {
       expect(screen.getByRole('button', { name: 'Add condition' })).toBeInTheDocument()
     })
+
+    expect(onChange).not.toHaveBeenCalled()
   })
 
   it('does not emit change when value prop changes to same value', () => {
