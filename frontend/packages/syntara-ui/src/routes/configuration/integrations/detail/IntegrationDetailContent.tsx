@@ -35,7 +35,7 @@ import { useResourcesSave } from './useResourcesSave'
 
 type IntegrationRead = IntegrationsAPI.components['schemas']['IntegrationRead']
 
-export type IntegrationDetailTab = 'details' | 'resources' | 'edit'
+export type IntegrationDetailTab = 'details' | 'resources'
 
 export function IntegrationDetailEarlyShell({ title, children }: Readonly<{ title: string; children: ReactNode }>) {
   return (

@@ -1218,13 +1218,6 @@ describe('IntegrationDetail', () => {
   })
 
   describe('Early exit states', () => {
-    it('renders nothing when activeTab is edit', () => {
-      mockActiveTab = 'edit'
-      const { container } = render(<IntegrationDetail />, { wrapper })
-
-      expect(container).toBeEmptyDOMElement()
-    })
-
     it('shows invalid integration error when integrationId is empty', () => {
       vi.mocked(useParams).mockReturnValue({ integrationId: '' })
       render(<IntegrationDetail />, { wrapper })

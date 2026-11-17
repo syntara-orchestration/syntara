@@ -1,22 +1,14 @@
 import { useParams } from '@tanstack/react-router'
 
-import { AppRoute } from '../../../../app/AppRoute'
 import { integrationsClient } from '../../../../client'
 import { SynErrorState } from '../../../../components/states/SynErrorState'
 import { useQueryState } from '../../../../components/states/useQueryState'
-import { useUrlTab } from '../../../../hooks/useUrlTab'
 import { detachPromise } from '../../../../utils/detachPromise'
 
-import {
-  IntegrationDetailContent,
-  IntegrationDetailEarlyShell,
-  type IntegrationDetailTab,
-} from './IntegrationDetailContent'
+import { IntegrationDetailContent, IntegrationDetailEarlyShell } from './IntegrationDetailContent'
 
 export function IntegrationDetail() {
   const { integrationId }: { integrationId: string } = useParams({ strict: false })
-  const integrationBasePath = AppRoute.Configuration.Integrations.Detail.replace(':integrationId', integrationId)
-  const [activeTab] = useUrlTab<IntegrationDetailTab>(integrationBasePath)
 
   const query = integrationsClient.useQuery(
     'get',
@@ -30,8 +22,6 @@ export function IntegrationDetail() {
     title: 'Error loading integration',
     onRetry: () => detachPromise(query.refetch()),
   })
-
-  if (activeTab === 'edit') return null
 
   if (!integrationId) {
     return (
