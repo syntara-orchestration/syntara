@@ -4,7 +4,7 @@ import { useCallback, useEffect, type Dispatch } from 'react'
 
 import { workflowClient } from '../../../client'
 import { useDialogState } from '../../../hooks/useDialogState'
-import type { AlertMessage } from '../../../providers/alerts'
+import type { AlertMessage } from '../../../providers/alerts/AlertContext'
 import { useWorkflowStore } from '../../../stores/useWorkflowStore'
 import type { WorkflowDefinition } from '../../../stores/workflowStoreTypes'
 import { detachPromise } from '../../../utils/detachPromise'

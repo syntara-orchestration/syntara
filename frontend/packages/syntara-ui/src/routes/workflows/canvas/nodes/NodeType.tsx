@@ -1,6 +1,6 @@
 import { type Node, type NodeTypes } from '@xyflow/react'
 
-import { FlowNodeType } from '../../../../constants'
+import { FlowNodeType } from '../../../../constants/nodeTypes'
 
 import { type ApprovalNode, ApprovalStepComponent } from './ApprovalNode'
 import { type ConditionNode, ConditionStepComponent } from './ConditionNode'

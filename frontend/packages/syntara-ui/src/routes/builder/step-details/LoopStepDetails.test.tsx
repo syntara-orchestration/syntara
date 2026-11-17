@@ -19,7 +19,7 @@ vi.mock('../../../stores/useWorkflowStore', () => ({
 
 // Mock the alerts hook
 const mockShowError = vi.fn()
-vi.mock('../../../providers/alerts', () => ({
+vi.mock('../../../providers/alerts/AlertContext', () => ({
   useAlerts: vi.fn(() => ({
     showSuccess: vi.fn(),
     showError: mockShowError,

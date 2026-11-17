@@ -1,6 +1,6 @@
 import { RhUiUserCheckIcon } from '@patternfly/react-icons'
 
-import { RegistryStepId } from '../../../../constants'
+import { RegistryStepId } from '../../../../constants/registryStepIds'
 import { createApprovalActivity, useWorkflowStore } from '../../../../stores/useWorkflowStore'
 import type { ApprovalFormSubmitData } from '../../step-forms/ApprovalStepForm'
 import { ApprovalStepForm } from '../../step-forms/ApprovalStepForm'

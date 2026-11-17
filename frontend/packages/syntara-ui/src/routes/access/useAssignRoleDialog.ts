@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query'
 
 import { useSynForm } from '../../hooks/useSynForm'
-import { useAlerts } from '../../providers/alerts'
+import { useAlerts } from '../../providers/alerts/AlertContext'
 import { detachPromise } from '../../utils/detachPromise'
 import { buildAssignmentBody, RolePrincipalType } from '../access-management/RoleAssignmentTypes'
 
