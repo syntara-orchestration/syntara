@@ -1,14 +1,14 @@
-import { Alert, Content, ContentVariants, ExpandableSection, Stack, StackItem } from '@patternfly/react-core'
+import { Alert, Content, ContentVariants, ExpandableSection, Stack, StackItem, TextInput } from '@patternfly/react-core'
 import { use, useState } from 'react'
 import { useFormContext, useWatch } from 'react-hook-form'
 
 import { FormLabelWithHelp } from '../../../components/FormLabelWithHelp'
 import { SynFormField } from '../../../components/forms/SynFormField'
-import { SynTextField } from '../../../components/forms/SynTextField'
 import { useCredentialPermissions } from '../../configuration/credentials/useCredentialPermissions'
 import { CredentialSelector } from '../components/CredentialSelector'
 import { useIsVersionView } from '../VersionViewContext'
 
+import { KafkaConsumerSettings } from './KafkaConsumerSettings'
 import { KafkaCredentialConnection } from './KafkaCredentialConnection'
 import { KafkaIntegrationField } from './KafkaIntegrationField'
 import { KafkaSubscribeFilter } from './KafkaSubscribeFilter'
@@ -25,7 +25,8 @@ const KAFKA_CREDENTIAL_TYPES = ['Kafka']
 export function KafkaSubscribeFields({
   workflowId,
   projectId,
-}: Readonly<{ workflowId?: string | null; projectId?: string }>) {
+  triggerId,
+}: Readonly<{ workflowId?: string | null; projectId?: string; triggerId?: string }>) {
   const isReadOnly = useIsVersionView()
   const resources = use(KafkaSubscribeResourceContext)
   const [deliveryExpanded, setDeliveryExpanded] = useState(false)
@@ -49,6 +50,8 @@ export function KafkaSubscribeFields({
     values.topic,
     values.inputSchema,
     values.filterExpression,
+    values.kafkaStart,
+    values.kafkaGroupId,
     resourceErrors,
   ])
 
@@ -69,11 +72,10 @@ export function KafkaSubscribeFields({
           onToggle={(_event, expanded) => setDeliveryExpanded(expanded)}
         >
           <Content component={ContentVariants.p}>
-            Each subscription uses a platform-managed group. Partitions present at first activation start with new
-            messages at the visible-end boundary saved when each partition initializes. Partitions added later start at
-            their earliest retained message. Initialized partitions resume from valid committed offsets. Missing or
-            invalid established checkpoints require recovery; they do not reset automatically. Auto-commit is off.
-            Commit follows durable scheduling or resolution, without waiting for workflow completion.
+            Consumer settings control initial reading positions and offset-gap recovery. Valid committed offsets, saved
+            initialization boundaries, and saved recovery decisions take precedence over policy changes. Consumer groups
+            become fixed after the first successful publication. Auto-commit is off. Commit follows durable scheduling
+            or resolution, without waiting for workflow completion.
           </Content>
         </ExpandableSection>
       </StackItem>
@@ -124,15 +126,33 @@ export function KafkaSubscribeFields({
               </StackItem>
             )}
             <StackItem>
-              <SynTextField
+              <SynFormField<TriggerFormData, 'topic'>
                 name="topic"
                 label="Topic"
                 fieldId="kafka-topic"
                 isRequired
-                isDisabled={isReadOnly}
-                placeholder="orders.created"
                 hint="One exact Kafka topic. Expressions, wildcards, and topic lists are not supported."
-              />
+              >
+                {({ field, fieldState, describedBy }) => (
+                  <TextInput
+                    id="kafka-topic"
+                    name={field.name}
+                    ref={field.ref}
+                    value={field.value ?? ''}
+                    onBlur={field.onBlur}
+                    isRequired
+                    isDisabled={isReadOnly}
+                    placeholder="orders.created"
+                    validated={fieldState.error ? 'error' : 'default'}
+                    aria-describedby={describedBy}
+                    onChange={(_event, value) => {
+                      if (value !== field.value)
+                        setValue('kafkaGroupId', null, { shouldDirty: true, shouldValidate: true })
+                      field.onChange(value)
+                    }}
+                  />
+                )}
+              </SynFormField>
             </StackItem>
             <StackItem>
               <PayloadValidationSection
@@ -155,6 +175,9 @@ export function KafkaSubscribeFields({
       </StackItem>
       <StackItem>
         <KafkaSubscribeFilter isReadOnly={isReadOnly} />
+      </StackItem>
+      <StackItem>
+        <KafkaConsumerSettings workflowId={workflowId} triggerId={triggerId} isReadOnly={isReadOnly} />
       </StackItem>
       <StackItem>
         <KafkaSubscribePreflight

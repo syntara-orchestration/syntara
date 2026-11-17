@@ -49,6 +49,18 @@ export const TriggerTypeEnum = {
 
 export type TriggerType = (typeof TriggerTypeEnum)[keyof typeof TriggerTypeEnum]
 
+/** Approved Kafka consumption policies from the workflow API. */
+export const KafkaStartPositionEnum = {
+  LATEST: 'latest',
+  EARLIEST: 'earliest',
+} as const satisfies Record<string, WorkflowAPI.components['schemas']['KafkaStartPosition']>
+
+export const KafkaOffsetGapPolicyEnum = {
+  FAIL: 'fail',
+  EARLIEST: 'earliest',
+  LATEST: 'latest',
+} as const satisfies Record<string, WorkflowAPI.components['schemas']['KafkaOffsetGapPolicy']>
+
 /**
  * Constants for schedule type discriminators.
  * Matches backend ScheduleType enum.

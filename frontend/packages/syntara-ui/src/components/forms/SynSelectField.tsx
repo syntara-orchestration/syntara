@@ -16,7 +16,9 @@ type SynSelectFieldControlProps<TFieldValues extends FieldValues, TName extends 
   label: string
   options: SynSelectFieldOption[]
   placeholder: string
+  fallbackValue?: string
   isDisabled?: boolean
+  describedBy?: string
 }
 
 function SynSelectFieldControl<TFieldValues extends FieldValues, TName extends FieldPath<TFieldValues>>({
@@ -26,11 +28,13 @@ function SynSelectFieldControl<TFieldValues extends FieldValues, TName extends F
   label,
   options,
   placeholder,
+  fallbackValue,
   isDisabled,
+  describedBy,
 }: Readonly<SynSelectFieldControlProps<TFieldValues, TName>>) {
   const optionLabelByValue = useMemo(() => new Map(options.map((option) => [option.value, option.label])), [options])
 
-  const selectedValue = field.value == null ? '' : String(field.value)
+  const selectedValue = field.value == null ? (fallbackValue ?? '') : String(field.value)
   const displayLabel = optionLabelByValue.get(selectedValue) ?? placeholder
 
   const handleSelect = useCallback(
@@ -52,6 +56,7 @@ function SynSelectFieldControl<TFieldValues extends FieldValues, TName extends F
       selected={selectedValue}
       onSelect={handleSelect}
       isDisabled={isDisabled}
+      describedBy={describedBy}
       closeOnSelect
       shouldFocusToggleOnSelect
       renderOption={(option, isSelected) => (
@@ -97,6 +102,8 @@ export type SynSelectFieldProps<
   options: SynSelectFieldOption[]
   /** Toggle text when no option is selected. Defaults to "Select an option". */
   placeholder?: string
+  /** Selection displayed for an omitted optional value; written to the form only when the user selects an option. */
+  fallbackValue?: string
   /** Disables the select. */
   isDisabled?: boolean
 }
@@ -132,6 +139,7 @@ export function SynSelectField<
   hint,
   options,
   placeholder = 'Select an option',
+  fallbackValue,
   isDisabled,
 }: Readonly<SynSelectFieldProps<TFieldValues, TName>>) {
   const resolvedFieldId = fieldId ?? name
@@ -146,7 +154,7 @@ export function SynSelectField<
       labelHelp={labelHelp}
       hint={hint}
     >
-      {({ field, fieldState }) => (
+      {({ field, fieldState, describedBy }) => (
         <SynSelectFieldControl<TFieldValues, TName>
           field={field}
           fieldState={fieldState}
@@ -154,7 +162,9 @@ export function SynSelectField<
           label={label}
           options={options}
           placeholder={placeholder}
+          fallbackValue={fallbackValue}
           isDisabled={isDisabled}
+          describedBy={describedBy}
         />
       )}
     </SynFormField>

@@ -23,6 +23,7 @@ type SynSelectFieldControlShellProps<TFieldValues extends FieldValues, TName ext
   selected: string | string[]
   onSelect: (_event: React.MouseEvent | undefined, value: string | number | undefined) => void
   isDisabled?: boolean
+  describedBy?: string
   closeOnSelect?: boolean
   shouldFocusToggleOnSelect?: boolean
   renderOption: (option: SynSelectFieldOption, isSelected: boolean) => ReactElement
@@ -38,6 +39,7 @@ export function SynSelectFieldControlShell<TFieldValues extends FieldValues, TNa
   selected,
   onSelect,
   isDisabled,
+  describedBy,
   closeOnSelect = false,
   shouldFocusToggleOnSelect,
   renderOption,
@@ -68,8 +70,9 @@ export function SynSelectFieldControlShell<TFieldValues extends FieldValues, TNa
       onBlur: field.onBlur,
       isDisabled,
       hasError,
+      describedBy,
     }),
-    [displayLabel, field.onBlur, handleToggle, hasError, isDisabled, isOpen, resolvedFieldId]
+    [displayLabel, field.onBlur, handleToggle, hasError, isDisabled, isOpen, resolvedFieldId, describedBy]
   )
 
   const renderToggle = useCallback(

@@ -78,6 +78,7 @@ type MockVersionRecord = {
   workflow_definition: unknown
   change_description: string
   status: string
+  last_published_at?: string | null
   name: string | null
   created_by: { id: string; name: string; type: 'user' | 'service_account' | 'service' | 'system' | 'deleted_user' }
   created_at: string
@@ -1505,6 +1506,7 @@ export const handlers = [
     const storeRecord = versions.find((v) => v.version === version)
     if (storeRecord) {
       storeRecord.status = 'published'
+      storeRecord.last_published_at = mutableWorkflow.updated_at
       storeRecord.name = (body?.name as string) ?? null
     }
 

@@ -163,7 +163,7 @@ function buildWebhookStyleTrigger(
 
 function buildUpdatedTrigger(data: TriggerFormData, trigger: Trigger, name: string | undefined): Trigger {
   if (data.triggerType === TriggerTypeEnum.EVENT_SUBSCRIBE) {
-    return buildKafkaSubscribeTrigger(trigger.id, name ?? 'Kafka Subscribe trigger', data)
+    return buildKafkaSubscribeTrigger(trigger.id, name ?? 'Kafka Subscribe trigger', data, trigger)
   }
   if (data.triggerType === TriggerTypeEnum.MANUAL_TRIGGER) {
     const inputSchema = parseJsonSchema(data.inputSchema)
@@ -299,6 +299,7 @@ export function TriggerNodeDetails({
   return (
     <WorkflowValidationContext value={{ errors: validation.errors, nodeId: trigger.id }}>
       <TriggerNodeForm
+        kafkaTriggerId={trigger.type === TriggerTypeEnum.EVENT_SUBSCRIBE ? trigger.id : undefined}
         workflowId={workflowId}
         projectId={projectId}
         initialData={initialData}

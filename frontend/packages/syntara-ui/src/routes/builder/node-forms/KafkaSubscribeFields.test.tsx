@@ -159,21 +159,14 @@ describe('Kafka Subscribe form', () => {
     expect(screen.getByRole('button', { name: 'Test filter' })).toBeDisabled()
     expect(onSubmit).not.toHaveBeenCalled()
   })
-  it('discloses fixed delivery policies and explains the next publish', async () => {
+  it('discloses saved-progress precedence and explains the next publish', async () => {
     const user = userEvent.setup()
     renderKafka()
     expect(screen.getByText(/Configuration changes apply on the next publish/)).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Message delivery behavior' }))
 
     expect(
-      screen.getByText(
-        'Each subscription uses a platform-managed group. ' +
-          'Partitions present at first activation start with new messages at the visible-end boundary saved when each partition initializes. ' +
-          'Partitions added later start at their earliest retained message. ' +
-          'Initialized partitions resume from valid committed offsets. ' +
-          'Missing or invalid established checkpoints require recovery; they do not reset automatically. ' +
-          'Auto-commit is off. Commit follows durable scheduling or resolution, without waiting for workflow completion.'
-      )
+      screen.getByText(/Consumer settings control initial reading positions and offset-gap recovery/)
     ).toBeInTheDocument()
   })
 
@@ -244,6 +237,34 @@ describe('Kafka Subscribe form', () => {
     expect(screen.getByRole('button', { name: 'Set up connection' })).toBeInTheDocument()
     expect(screen.queryByRole('textbox', { name: 'Kafka runtime credential' })).not.toBeInTheDocument()
     expect(screen.getByRole('textbox', { name: 'Kafka Integration' })).toHaveFocus()
+  })
+
+  it('clears the group on Integration changes while retaining consumption policies', async () => {
+    vi.mocked(integrationsFetchClient.GET).mockResolvedValue({
+      data: { resources: [integration, { ...integration, id: secondId, name: 'Other Kafka' }] },
+      response: new Response(),
+    })
+    const onSubmit = vi.fn()
+    const user = userEvent.setup()
+    renderWithHeader(
+      <TriggerNodeForm
+        initialData={{ ...initialData, kafkaGroupId: 'original-group', kafkaStart: { offset_gap_policy: 'fail' } }}
+        onSubmit={onSubmit}
+      />
+    )
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Kafka Integration' })).toBeEnabled())
+    await user.click(screen.getByRole('button', { name: 'Kafka Integration' }))
+    await user.click(screen.getByRole('option', { name: /Other Kafka/ }))
+    expect(screen.getByRole('textbox', { name: 'Consumer group ID' })).toHaveValue('')
+    expect(screen.getByRole('button', { name: 'Offset gap policy' })).toHaveTextContent('Fail')
+    await submitForm()
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        integrationId: secondId,
+        kafkaGroupId: null,
+        kafkaStart: { offset_gap_policy: 'fail' },
+      })
+    )
   })
 
   it('prevents requests without workflow update permission', async () => {
