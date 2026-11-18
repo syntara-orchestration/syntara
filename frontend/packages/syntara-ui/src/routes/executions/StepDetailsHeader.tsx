@@ -13,6 +13,9 @@ type StepDetailsHeaderProps = {
   elapsedLabel: string | null
   status?: ActivityState['status']
   nodeType?: string
+  replayed?: boolean
+  retainedFailure?: boolean
+  triggerInputReused?: boolean
 }
 
 export function StepDetailsHeader({
@@ -22,6 +25,9 @@ export function StepDetailsHeader({
   elapsedLabel,
   status,
   nodeType,
+  replayed = false,
+  retainedFailure = false,
+  triggerInputReused = false,
 }: Readonly<StepDetailsHeaderProps>) {
   return (
     <StackItem className={styles.headerRow}>
@@ -64,7 +70,13 @@ export function StepDetailsHeader({
               )}
               {status && (
                 <FlexItem>
-                  <ActivityStatusLabel status={status} nodeType={nodeType} />
+                  <ActivityStatusLabel
+                    status={status}
+                    nodeType={nodeType}
+                    replayed={replayed}
+                    retainedFailure={retainedFailure}
+                    triggerInputReused={triggerInputReused}
+                  />
                 </FlexItem>
               )}
             </Flex>

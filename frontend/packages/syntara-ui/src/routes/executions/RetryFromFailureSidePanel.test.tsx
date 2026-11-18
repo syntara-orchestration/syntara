@@ -244,6 +244,45 @@ describe('RetryFromFailureSidePanel', () => {
     ).toBeInTheDocument()
     expect(screen.getByText('This execution is still running.')).toBeInTheDocument()
     expect(screen.getByTestId('retry-from-failure-confirm')).toBeDisabled()
+    expect(screen.getByTestId('retry-from-failure-confirm')).toHaveTextContent('Retry run from failure')
+  })
+
+  it('does not label the disabled retry button as Retry 0 steps', () => {
+    vi.mocked(useRetryFromFailurePreview).mockReturnValue({
+      preview: {
+        eligible: false,
+        reason: 'This execution is still running.',
+        eligible_point_ids: [],
+        total_step_count: 0,
+      },
+      isLoading: false,
+      isError: false,
+    })
+    renderPanel()
+
+    const retryButton = screen.getByTestId('retry-from-failure-confirm')
+    expect(retryButton).toBeDisabled()
+    expect(retryButton).toHaveTextContent('Retry run from failure')
+    expect(retryButton).not.toHaveTextContent('Retry 0 steps')
+  })
+
+  it('keeps a positive step count on the disabled button when only overrides are invalid', () => {
+    vi.mocked(useRetryFromFailurePreview).mockReturnValue({
+      preview: {
+        eligible: false,
+        reason: 'input parameter overrides name keys that do not exist on node step-2: not_a_param',
+        eligible_point_ids: ['step-2'],
+        step_count_by_eligible_point: { 'step-2': 3 },
+        total_step_count: 3,
+      },
+      isLoading: false,
+      isError: false,
+    })
+    renderPanel()
+
+    const retryButton = screen.getByTestId('retry-from-failure-confirm')
+    expect(retryButton).toBeDisabled()
+    expect(retryButton).toHaveTextContent('Retry 3 steps')
   })
 
   it('shows a fallback message when the backend does not include a rejection reason', () => {
@@ -270,6 +309,7 @@ describe('RetryFromFailureSidePanel', () => {
 
     expect(screen.getByRole('heading', { name: 'Warning alert: No retry points found' })).toBeInTheDocument()
     expect(screen.getByTestId('retry-from-failure-confirm')).toBeDisabled()
+    expect(screen.getByTestId('retry-from-failure-confirm')).toHaveTextContent('Retry run from failure')
   })
 
   it('uses fallback labels when the preview omits retry path step counts', () => {

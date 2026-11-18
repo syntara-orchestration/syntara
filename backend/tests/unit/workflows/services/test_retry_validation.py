@@ -1203,6 +1203,9 @@ async def test_validate_retry_rejects_override_with_unknown_parameter_key() -> N
     assert verdict.eligible is False
     assert "not_a_param" in (verdict.reason or "")
     assert "code" in (verdict.reason or "")
+    assert verdict.eligible_point_ids == ["step_2"]
+    assert verdict.step_count_by_eligible_point == {"step_2": 2}
+    assert verdict.total_step_count == 2
 
 
 @pytest.mark.asyncio

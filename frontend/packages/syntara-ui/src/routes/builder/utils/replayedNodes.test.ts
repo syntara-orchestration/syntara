@@ -83,10 +83,10 @@ describe('isReplayedStep', () => {
     ).toBe(false)
   })
 
-  it('does not flag a completed step that started exactly when the retry was created', () => {
+  it('flags a completed step that started exactly when the retry was created', () => {
     expect(
       isReplayedStep(RETRY_CREATED_AT, RETRY_CREATED_AT, ACTIVITY_STATUS.COMPLETED, { nodeType: ACTION_NODE_TYPE })
-    ).toBe(false)
+    ).toBe(true)
   })
 
   it('never flags a trigger node as reused output', () => {

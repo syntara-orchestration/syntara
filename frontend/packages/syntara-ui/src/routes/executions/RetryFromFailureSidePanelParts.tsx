@@ -511,7 +511,7 @@ export function RetryFooter({ onRetry, onCancel, isRetryDisabled, isRetryPending
 }
 
 function getRetryButtonLabel(stepCount: number | undefined): string {
-  if (stepCount === undefined) return 'Retry run from failure'
+  if (stepCount == null || stepCount <= 0) return 'Retry run from failure'
   const stepLabel = stepCount === 1 ? 'step' : 'steps'
   return `Retry ${stepCount} ${stepLabel}`
 }

@@ -31,7 +31,10 @@ function predatesRetry(startedAt: string | null | undefined, replayBaselineAt: s
   const baseline = Date.parse(replayBaselineAt)
   if (Number.isNaN(started) || Number.isNaN(baseline)) return false
 
-  return started < baseline
+  // Inclusive: a timestamp equal to the retry's created_at still belongs to the
+  // source run. This execution's own activities cannot have started before it
+  // was created, and an exact match shows up in tests and near-simultaneous retries.
+  return started <= baseline
 }
 
 /**
