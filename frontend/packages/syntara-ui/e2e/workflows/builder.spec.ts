@@ -18,6 +18,7 @@ import {
   createWorkflowWithTrigger,
   addScriptStep,
   verifyStepVisible,
+  expectCanvasStepTitleVisible,
   waitForUIReady,
   triggerLayout,
 } from '../helpers/workflows'
@@ -32,7 +33,7 @@ test('catalog panel shows available step types organized by category', async ({ 
 
   try {
     await closeStepEditorPanel(app)
-    await expect(app.getByText('Manual trigger')).toBeVisible()
+    await expectCanvasStepTitleVisible(app, 'Manual trigger')
 
     const panel = await clickAddConnectedStep(app)
 
@@ -53,7 +54,7 @@ test('user can add a Script action step to the canvas', async ({ app }) => {
 
   try {
     await closeStepEditorPanel(app)
-    await expect(app.getByText('Manual trigger')).toBeVisible()
+    await expectCanvasStepTitleVisible(app, 'Manual trigger')
 
     await addScriptStep(app, 'Python Hello World', 'print("Hello, World!")')
     await verifyStepVisible(app, 'Python Hello World')
@@ -92,7 +93,7 @@ test('user can add an Approval step to the canvas', async ({ app }) => {
 
   try {
     await closeStepEditorPanel(app)
-    await expect(app.getByText('Manual trigger')).toBeVisible()
+    await expectCanvasStepTitleVisible(app, 'Manual trigger')
 
     await clickAddConnectedStep(app)
     await selectHumanTaskStep(app, 'Approval')
@@ -160,7 +161,7 @@ test('user can add a Logic (Conditional) step to the canvas', async ({ app }) =>
 
   try {
     await closeStepEditorPanel(app)
-    await expect(app.getByText('Manual trigger')).toBeVisible()
+    await expectCanvasStepTitleVisible(app, 'Manual trigger')
 
     const panel = await clickAddConnectedStep(app)
 
@@ -226,7 +227,7 @@ test('multiple steps can be added sequentially', async ({ app }) => {
 
   try {
     await closeStepEditorPanel(app)
-    await expect(app.getByText('Manual trigger')).toBeVisible()
+    await expectCanvasStepTitleVisible(app, 'Manual trigger')
 
     // Add first step - Script action
     await addScriptStep(app, 'Script Step 1', 'print("node1")')
@@ -361,7 +362,7 @@ test('added steps are visible and interactive on the canvas', async ({ app }) =>
 
   try {
     await closeStepEditorPanel(app)
-    await expect(app.getByText('Manual trigger')).toBeVisible()
+    await expectCanvasStepTitleVisible(app, 'Manual trigger')
 
     await addScriptStep(app, 'Interactive Node', 'print("interactive")')
 
@@ -379,7 +380,7 @@ test('nodes are positioned on the canvas after layout', async ({ app }) => {
 
   try {
     await closeStepEditorPanel(app)
-    await expect(app.getByText('Manual trigger')).toBeVisible()
+    await expectCanvasStepTitleVisible(app, 'Manual trigger')
 
     // Add a node
     await addScriptStep(app, 'Positioned Node', 'print("positioned")')
@@ -399,7 +400,7 @@ test('catalog panel can be closed without adding a step', async ({ app }) => {
 
   try {
     await closeStepEditorPanel(app)
-    await expect(app.getByText('Manual trigger')).toBeVisible()
+    await expectCanvasStepTitleVisible(app, 'Manual trigger')
 
     // Open the Add step panel
     const panel = await clickAddConnectedStep(app)
@@ -436,7 +437,7 @@ test('two nodes can be connected with an edge', async ({ app }) => {
 
   try {
     await closeStepEditorPanel(app)
-    await expect(app.getByText('Manual trigger')).toBeVisible()
+    await expectCanvasStepTitleVisible(app, 'Manual trigger')
 
     // Add two nodes using "Add connected step" - this creates edges via the UI
     await addScriptStep(app, 'First Node', 'print("first")')
@@ -458,7 +459,7 @@ test('edge is visually distinguishable on canvas', async ({ app }) => {
 
   try {
     await closeStepEditorPanel(app)
-    await expect(app.getByText('Manual trigger')).toBeVisible()
+    await expectCanvasStepTitleVisible(app, 'Manual trigger')
 
     // Add two nodes - these will auto-connect:
     // Manual trigger -> Source Node -> Target Node
@@ -481,7 +482,7 @@ test('multiple edges can be created sequentially', async ({ app }) => {
 
   try {
     await closeStepEditorPanel(app)
-    await expect(app.getByText('Manual trigger')).toBeVisible()
+    await expectCanvasStepTitleVisible(app, 'Manual trigger')
 
     // Add three steps
     await addScriptStep(app, 'Step 1', 'print("1")')
@@ -507,7 +508,7 @@ test('edge follows connection path between nodes', async ({ app }) => {
 
   try {
     await closeStepEditorPanel(app)
-    await expect(app.getByText('Manual trigger')).toBeVisible()
+    await expectCanvasStepTitleVisible(app, 'Manual trigger')
 
     // Add two nodes - auto-connected: Manual trigger -> Start Node -> End Node
     await addScriptStep(app, 'Start Node', 'print("start")')
@@ -534,7 +535,7 @@ test('connected nodes form a workflow DAG', async ({ app }) => {
 
   try {
     await closeStepEditorPanel(app)
-    await expect(app.getByText('Manual trigger')).toBeVisible()
+    await expectCanvasStepTitleVisible(app, 'Manual trigger')
 
     // Add nodes that will form a linear DAG: Manual Trigger -> Script 1 -> Script 2
     await addScriptStep(app, 'Processing Step', 'print("processing")')

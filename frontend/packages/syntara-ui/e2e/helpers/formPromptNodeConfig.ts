@@ -4,6 +4,7 @@
  */
 import { expect, type Page } from '../fixtures'
 
+import { canvasStepNode } from './canvas-interaction'
 import { scrollFormFieldBuilderIntoView, setFormFieldLabel } from './formFieldBuilder'
 import { addScriptOnHandle, openFormPromptCreateForm } from './v2-steps'
 import { closeStepEditorPanel, triggerLayout } from './workflows'
@@ -19,9 +20,7 @@ export async function openFormPromptNodeFormFromCatalog(page: Page) {
 }
 
 export function formPromptCanvasNode(page: Page, nodeName: string) {
-  return page
-    .locator('[role="group"][aria-roledescription="node"].react-flow__node-form_prompt')
-    .filter({ has: page.getByText(nodeName, { exact: true }) })
+  return canvasStepNode(page, nodeName)
 }
 
 export async function expectFormPromptNodeOnCanvas(page: Page, nodeName: string) {

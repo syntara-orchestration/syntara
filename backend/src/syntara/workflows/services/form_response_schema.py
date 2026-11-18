@@ -19,7 +19,7 @@ from syntara.forms.models.form_fields import (
     StaticOptions,
     TextField,
 )
-from syntara.workflows.json_schema_validation import validate_json_schema_definition
+from syntara.workflow_core.validation import validate_json_schema_definition
 
 _FORM_NODE_TYPES = frozenset({"form_prompt", "form_trigger"})
 _SCALAR_TYPES = ["string", "number", "boolean"]

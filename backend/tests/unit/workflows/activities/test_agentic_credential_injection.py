@@ -6,7 +6,7 @@ Agent Orchestrator via metadata for deferred resolution.
 
 from typing import Any
 
-from syntara.workflows.workflow_engine.activities.agentic_activity import _inject_llm_credential_metadata
+from syntara.workflow_runtime.engines.temporal.activities.agentic_activity import _inject_llm_credential_metadata
 
 
 class TestAgenticCredentialMetadata:

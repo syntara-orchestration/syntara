@@ -10,10 +10,7 @@ import pytest
 from pydantic import ValidationError
 
 from syntara.forms.models.form_fields import FormPromptDefinition, TextField
-from syntara.workflows.models.workflow_definition import (
-    WorkflowDefinition,
-)
-from syntara.workflows.workflow_engine.models.workflow_definition import (
+from syntara.workflow_core.models import (
     ApprovalNodeParameters,
     ConditionNodeParameters,
     ConvergeNodeParameters,
@@ -24,6 +21,7 @@ from syntara.workflows.workflow_engine.models.workflow_definition import (
     SwitchNodeParameters,
     WaitNodeParameters,
 )
+from syntara.workflows.models.workflow_definition import WorkflowDefinition
 
 
 class TestConditionNodeParameters:

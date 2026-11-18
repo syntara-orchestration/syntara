@@ -15,7 +15,7 @@ from uuid import uuid4
 import httpx
 import pytest
 
-from syntara.workflows.clients.form_prompts_client import (
+from syntara.workflow_runtime.clients.form_prompts_client import (
     FormPromptsApiClient,
     FormPromptsApiClientConnectionError,
     FormPromptsApiClientError,

@@ -20,10 +20,10 @@ from temporalio.exceptions import ActivityError, ApplicationError
 from temporalio.exceptions import TimeoutError as TemporalTimeoutError
 
 from syntara.core.exceptions import SafeValueError
-from syntara.workflows.utils.namespace_resolver import NamespaceResolver
-from syntara.workflows.workflow_engine.dynamic_workflow import OrchestratorWorkflow
-from syntara.workflows.workflow_engine.graph import ActivityNode, WorkflowGraph
-from syntara.workflows.workflow_engine.graph_backend import InMemoryGraphBackend
+from syntara.workflow_core.graph import ActivityNode, WorkflowGraph
+from syntara.workflow_core.graph_backend import InMemoryGraphBackend
+from syntara.workflow_core.utils.namespace_resolver import NamespaceResolver
+from syntara.workflow_runtime.engines.temporal.dynamic_workflow import OrchestratorWorkflow
 from tests.unit.workflows.workflow_engine.conftest import init_workflow_runtime
 
 
@@ -32,8 +32,8 @@ def _mock_temporal_workflow() -> Generator[MagicMock]:
     """Mock the Temporal workflow module."""
     mock_logger = MagicMock()
     with (
-        patch("syntara.workflows.workflow_engine.dynamic_workflow.workflow") as mock_wf,
-        patch("syntara.workflows.workflow_engine.form_prompt_mixin.workflow", mock_wf),
+        patch("syntara.workflow_runtime.engines.temporal.dynamic_workflow.workflow") as mock_wf,
+        patch("syntara.workflow_runtime.engines.temporal.form_prompt_mixin.workflow", mock_wf),
     ):
         mock_wf.logger = mock_logger
         mock_wf.info.return_value = MagicMock(workflow_id="test-wf-id", run_id="test-run-id")
@@ -122,7 +122,9 @@ class TestPrepareFormPromptArgs:
         node = ActivityNode("form1", "form_prompt", {}, name="Data Collection")
 
         mock_execute = AsyncMock(return_value={"user_ids": [], "group_ids": []})
-        with patch("syntara.workflows.workflow_engine.form_prompt_mixin.workflow.execute_activity", mock_execute):
+        with patch(
+            "syntara.workflow_runtime.engines.temporal.form_prompt_mixin.workflow.execute_activity", mock_execute
+        ):
             args = await wf._prepare_form_prompt_input(node, graph, node.parameters)
 
         assert set(args) == {
@@ -159,7 +161,9 @@ class TestPrepareFormPromptArgs:
         node = ActivityNode("form1", "form_prompt", {}, name="Data Collection")
 
         mock_execute = AsyncMock(return_value={"user_ids": [], "group_ids": []})
-        with patch("syntara.workflows.workflow_engine.form_prompt_mixin.workflow.execute_activity", mock_execute):
+        with patch(
+            "syntara.workflow_runtime.engines.temporal.form_prompt_mixin.workflow.execute_activity", mock_execute
+        ):
             args = await wf._prepare_form_prompt_input(node, graph, node.parameters)
 
         assert args["prompt_node_id"] == "form1"
@@ -182,7 +186,9 @@ class TestPrepareFormPromptArgs:
         data_team_id = str(uuid4())
 
         mock_execute = AsyncMock(return_value={"user_ids": [alice_id, bob_id], "group_ids": [data_team_id]})
-        with patch("syntara.workflows.workflow_engine.form_prompt_mixin.workflow.execute_activity", mock_execute):
+        with patch(
+            "syntara.workflow_runtime.engines.temporal.form_prompt_mixin.workflow.execute_activity", mock_execute
+        ):
             args = await wf._prepare_form_prompt_input(node, graph, config)
 
         assert args["responder_user_ids"] == [alice_id, bob_id]
@@ -201,7 +207,9 @@ class TestPrepareFormPromptArgs:
         node = ActivityNode("form1", "form_prompt", {"response_window": 1800}, name="Form")
 
         mock_execute = AsyncMock(return_value={"user_ids": [], "group_ids": []})
-        with patch("syntara.workflows.workflow_engine.form_prompt_mixin.workflow.execute_activity", mock_execute):
+        with patch(
+            "syntara.workflow_runtime.engines.temporal.form_prompt_mixin.workflow.execute_activity", mock_execute
+        ):
             args = await wf._prepare_form_prompt_input(node, graph, {"response_window": 1800})
 
         timeout_at = args["timeout_at"]
@@ -225,7 +233,9 @@ class TestPrepareFormPromptArgs:
         node = ActivityNode("my_form", "form_prompt", {})
 
         mock_execute = AsyncMock(return_value={"user_ids": [], "group_ids": []})
-        with patch("syntara.workflows.workflow_engine.form_prompt_mixin.workflow.execute_activity", mock_execute):
+        with patch(
+            "syntara.workflow_runtime.engines.temporal.form_prompt_mixin.workflow.execute_activity", mock_execute
+        ):
             args = await wf._prepare_form_prompt_input(node, graph, node.parameters)
 
         assert args["name"] == "Form prompt for my_form"
@@ -249,7 +259,9 @@ class TestPrepareFormPromptArgs:
         node = ActivityNode("form1", "form_prompt", config, name="Form")
 
         mock_execute = AsyncMock(return_value={"user_ids": [], "group_ids": []})
-        with patch("syntara.workflows.workflow_engine.form_prompt_mixin.workflow.execute_activity", mock_execute):
+        with patch(
+            "syntara.workflow_runtime.engines.temporal.form_prompt_mixin.workflow.execute_activity", mock_execute
+        ):
             args = await wf._prepare_form_prompt_input(node, graph, config)
 
         assert args["form_definition"] == form_def
@@ -264,7 +276,9 @@ class TestPrepareFormPromptArgs:
         node = ActivityNode("form1", "form_prompt", config, name="Form")
 
         mock_execute = AsyncMock(return_value={"user_ids": [], "group_ids": []})
-        with patch("syntara.workflows.workflow_engine.form_prompt_mixin.workflow.execute_activity", mock_execute):
+        with patch(
+            "syntara.workflow_runtime.engines.temporal.form_prompt_mixin.workflow.execute_activity", mock_execute
+        ):
             args = await wf._prepare_form_prompt_input(node, graph, config)
 
         message = args["message"]
@@ -284,7 +298,9 @@ class TestPrepareFormPromptArgs:
         node = ActivityNode("form1", "form_prompt", config, name="Form")
 
         mock_execute = AsyncMock(return_value={"user_ids": [], "group_ids": []})
-        with patch("syntara.workflows.workflow_engine.form_prompt_mixin.workflow.execute_activity", mock_execute):
+        with patch(
+            "syntara.workflow_runtime.engines.temporal.form_prompt_mixin.workflow.execute_activity", mock_execute
+        ):
             args = await wf._prepare_form_prompt_input(node, graph, config)
 
         assert args["submit_label"] == "Send"
@@ -299,7 +315,9 @@ class TestPrepareFormPromptArgs:
 
         mock_execute = AsyncMock(return_value={"user_ids": [], "group_ids": []})
         with (
-            patch("syntara.workflows.workflow_engine.form_prompt_mixin.workflow.execute_activity", mock_execute),
+            patch(
+                "syntara.workflow_runtime.engines.temporal.form_prompt_mixin.workflow.execute_activity", mock_execute
+            ),
             pytest.raises(SafeValueError, match="no submitted successor"),
         ):
             await wf._prepare_form_prompt_input(node, graph, node.parameters)
@@ -344,7 +362,9 @@ class TestPrepareFormPromptArgsDynamicOptions:
         node = self._node({"fields": [self._dynamic_field("dropdown", "choice", "${scan.output.choices}")]})
         mock_execute = AsyncMock(return_value={"user_ids": [], "group_ids": []})
 
-        with patch("syntara.workflows.workflow_engine.form_prompt_mixin.workflow.execute_activity", mock_execute):
+        with patch(
+            "syntara.workflow_runtime.engines.temporal.form_prompt_mixin.workflow.execute_activity", mock_execute
+        ):
             resolved = wf._resolve_node_parameters(node)
             args = await wf._prepare_form_prompt_input(node, graph, resolved)
 
@@ -368,7 +388,7 @@ class TestPrepareFormPromptArgsDynamicOptions:
         node = self._node({"fields": [self._dynamic_field("multi_select", "choices", "${scan.output.choices}")]})
 
         with patch(
-            "syntara.workflows.workflow_engine.form_prompt_mixin.workflow.execute_activity",
+            "syntara.workflow_runtime.engines.temporal.form_prompt_mixin.workflow.execute_activity",
             AsyncMock(return_value={"user_ids": [], "group_ids": []}),
         ):
             args = await wf._prepare_form_prompt_input(node, graph, wf._resolve_node_parameters(node))
@@ -395,7 +415,7 @@ class TestPrepareFormPromptArgsDynamicOptions:
         node = self._node({"fields": [self._dynamic_field("dropdown", "choice", "${scan.output.choices}")]})
 
         with patch(
-            "syntara.workflows.workflow_engine.form_prompt_mixin.workflow.execute_activity",
+            "syntara.workflow_runtime.engines.temporal.form_prompt_mixin.workflow.execute_activity",
             AsyncMock(return_value={"user_ids": [], "group_ids": []}),
         ):
             args = await wf._prepare_form_prompt_input(node, graph, wf._resolve_node_parameters(node))
@@ -426,7 +446,7 @@ class TestPrepareFormPromptArgsDynamicOptions:
         )
 
         with patch(
-            "syntara.workflows.workflow_engine.form_prompt_mixin.workflow.execute_activity",
+            "syntara.workflow_runtime.engines.temporal.form_prompt_mixin.workflow.execute_activity",
             AsyncMock(return_value={"user_ids": [], "group_ids": []}),
         ):
             args = await wf._prepare_form_prompt_input(node, graph, wf._resolve_node_parameters(node))
@@ -450,7 +470,7 @@ class TestPrepareFormPromptArgsDynamicOptions:
         node = self._node(form_definition)
 
         with patch(
-            "syntara.workflows.workflow_engine.form_prompt_mixin.workflow.execute_activity",
+            "syntara.workflow_runtime.engines.temporal.form_prompt_mixin.workflow.execute_activity",
             AsyncMock(return_value={"user_ids": [], "group_ids": []}),
         ):
             args = await wf._prepare_form_prompt_input(node, graph, node.parameters)
@@ -479,7 +499,7 @@ class TestPrepareFormPromptArgsDynamicOptions:
         )
 
         with patch(
-            "syntara.workflows.workflow_engine.form_prompt_mixin.workflow.execute_activity",
+            "syntara.workflow_runtime.engines.temporal.form_prompt_mixin.workflow.execute_activity",
             AsyncMock(return_value={"user_ids": [], "group_ids": []}),
         ):
             args = await wf._prepare_form_prompt_input(node, graph, wf._resolve_node_parameters(node))
@@ -505,7 +525,7 @@ class TestPrepareFormPromptArgsDynamicOptions:
         )
 
         with patch(
-            "syntara.workflows.workflow_engine.form_prompt_mixin.workflow.execute_activity",
+            "syntara.workflow_runtime.engines.temporal.form_prompt_mixin.workflow.execute_activity",
             AsyncMock(return_value={"user_ids": [], "group_ids": []}),
         ):
             args = await wf._prepare_form_prompt_input(node, graph, wf._resolve_node_parameters(node))
@@ -525,7 +545,9 @@ class TestPrepareFormPromptArgsDynamicOptions:
         mock_execute = AsyncMock(return_value={"user_ids": [], "group_ids": []})
 
         with (
-            patch("syntara.workflows.workflow_engine.form_prompt_mixin.workflow.execute_activity", mock_execute),
+            patch(
+                "syntara.workflow_runtime.engines.temporal.form_prompt_mixin.workflow.execute_activity", mock_execute
+            ),
             pytest.raises(SafeValueError, match="region"),
         ):
             await wf._prepare_form_prompt_input(node, graph, wf._resolve_node_parameters(node))
@@ -551,7 +573,9 @@ class TestPrepareFormPromptArgsDynamicOptions:
         mock_execute = AsyncMock(return_value={"user_ids": [], "group_ids": []})
 
         with (
-            patch("syntara.workflows.workflow_engine.form_prompt_mixin.workflow.execute_activity", mock_execute),
+            patch(
+                "syntara.workflow_runtime.engines.temporal.form_prompt_mixin.workflow.execute_activity", mock_execute
+            ),
             pytest.raises(SafeValueError, match="default value 'emea'"),
         ):
             await wf._prepare_form_prompt_input(node, graph, wf._resolve_node_parameters(node))
@@ -568,7 +592,7 @@ class TestPrepareFormPromptArgsDynamicOptions:
         before = copy.deepcopy(node.parameters)
 
         with patch(
-            "syntara.workflows.workflow_engine.form_prompt_mixin.workflow.execute_activity",
+            "syntara.workflow_runtime.engines.temporal.form_prompt_mixin.workflow.execute_activity",
             AsyncMock(return_value={"user_ids": [], "group_ids": []}),
         ):
             await wf._prepare_form_prompt_input(node, graph, wf._resolve_node_parameters(node))
@@ -629,7 +653,9 @@ class TestExecuteFormPromptNode:
 
         with (
             patch.object(wf, "_prepare_form_prompt_input", mock_prep_args),
-            patch("syntara.workflows.workflow_engine.form_prompt_mixin.workflow.execute_activity", mock_execute),
+            patch(
+                "syntara.workflow_runtime.engines.temporal.form_prompt_mixin.workflow.execute_activity", mock_execute
+            ),
         ):
             result = await wf._execute_form_prompt_node(node, graph, {})
 
@@ -664,7 +690,9 @@ class TestExecuteFormPromptNode:
 
         with (
             patch.object(wf, "_prepare_form_prompt_input", mock_prep_args),
-            patch("syntara.workflows.workflow_engine.form_prompt_mixin.workflow.execute_activity", mock_execute),
+            patch(
+                "syntara.workflow_runtime.engines.temporal.form_prompt_mixin.workflow.execute_activity", mock_execute
+            ),
             pytest.raises(ActivityError),
         ):
             await wf._execute_form_prompt_node(node, graph, {})
@@ -688,7 +716,9 @@ class TestExecuteFormPromptNode:
 
         with (
             patch.object(wf, "_prepare_form_prompt_input", mock_prep_args),
-            patch("syntara.workflows.workflow_engine.form_prompt_mixin.workflow.execute_activity", mock_execute),
+            patch(
+                "syntara.workflow_runtime.engines.temporal.form_prompt_mixin.workflow.execute_activity", mock_execute
+            ),
             pytest.raises(ApplicationError, match="Invalid form prompt outcome"),
         ):
             await wf._execute_form_prompt_node(node, graph, {})
@@ -703,7 +733,9 @@ class TestFormPromptCleanupMethods:
         wf = _make_workflow()
         mock_execute = AsyncMock()
 
-        with patch("syntara.workflows.workflow_engine.form_prompt_mixin.workflow.execute_activity", mock_execute):
+        with patch(
+            "syntara.workflow_runtime.engines.temporal.form_prompt_mixin.workflow.execute_activity", mock_execute
+        ):
             await wf._expire_form_prompts("form1", activity_id="expire_form1")
 
         mock_execute.assert_called_once()
@@ -716,7 +748,9 @@ class TestFormPromptCleanupMethods:
         wf = _make_workflow()
         mock_execute = AsyncMock()
 
-        with patch("syntara.workflows.workflow_engine.form_prompt_mixin.workflow.execute_activity", mock_execute):
+        with patch(
+            "syntara.workflow_runtime.engines.temporal.form_prompt_mixin.workflow.execute_activity", mock_execute
+        ):
             await wf._cancel_form_prompts()
 
         mock_execute.assert_called_once()
@@ -729,7 +763,9 @@ class TestFormPromptCleanupMethods:
         wf = _make_workflow()
         mock_execute = AsyncMock()
 
-        with patch("syntara.workflows.workflow_engine.form_prompt_mixin.workflow.execute_local_activity", mock_execute):
+        with patch(
+            "syntara.workflow_runtime.engines.temporal.form_prompt_mixin.workflow.execute_local_activity", mock_execute
+        ):
             await wf._fail_detached_form_prompt_activity("form1")
 
         mock_execute.assert_called_once()

@@ -20,6 +20,7 @@ export function createButtonEdgePlaceholderNode(params: {
     data: {},
     draggable: false,
     selectable: false,
+    style: { pointerEvents: 'none' },
   }
 }
 

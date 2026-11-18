@@ -5,7 +5,7 @@ from pydantic import ValidationError
 
 from syntara.forms.exceptions import FormDefinitionError
 from syntara.forms.models.form_fields import FormDefinition
-from syntara.workflows.workflow_engine.models.workflow_definition import FormTriggerParameters
+from syntara.workflow_core.models import FormTriggerParameters
 
 
 def _text_field(**overrides: object) -> dict[str, object]:

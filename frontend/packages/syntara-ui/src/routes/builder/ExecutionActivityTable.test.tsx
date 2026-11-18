@@ -21,11 +21,15 @@ function state(id: string, overrides: Partial<ActivityState> = {}): [string, Act
 function renderTable({
   states = new Map<string, ActivityState>(),
   order = [],
+  selectedNodeId,
 }: {
   states?: Map<string, ActivityState>
   order?: ActivityOrderItem[]
+  selectedNodeId?: string | null
 } = {}) {
-  return render(<ExecutionActivityTable activityStates={states} activityOrder={order} now={NOW} />)
+  return render(
+    <ExecutionActivityTable activityStates={states} activityOrder={order} now={NOW} selectedNodeId={selectedNodeId} />
+  )
 }
 
 describe('ExecutionActivityTable', () => {
@@ -79,6 +83,25 @@ describe('ExecutionActivityTable', () => {
       const labels = screen.getAllByTestId('activity-status-label')
       expect(labels[0]).toHaveTextContent('completed')
       expect(labels[1]).toHaveTextContent('failed')
+    })
+
+    it('highlights only the selected loop iteration', () => {
+      const order: ActivityOrderItem[] = [
+        { id: 'task-1', name: 'Task (iter 0)' },
+        { id: 'task-1#iter-1', name: 'Task (iter 1)' },
+        { id: 'task-1#iter-2', name: 'Task (iter 2)' },
+      ]
+
+      renderTable({
+        states: new Map(order.map(({ id }) => state(id))),
+        order,
+        selectedNodeId: 'task-1#iter-1',
+      })
+
+      const rows = screen.getAllByRole('row')
+      expect(rows[1]).not.toHaveClass('pf-m-selected')
+      expect(rows[2]).toHaveClass('pf-m-selected')
+      expect(rows[3]).not.toHaveClass('pf-m-selected')
     })
   })
 

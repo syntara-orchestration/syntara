@@ -3,7 +3,7 @@
 Tests the workflow-level handling of form_prompt responses using Temporal's
 test environment. A form prompt suspends via Temporal async activity completion
 (``activity.raise_complete_async()``); the Forms API later resolves it through
-``TemporalExecutionService.complete_async_activity``. These tests drive that same
+``WorkflowExecutionService.complete_async_activity``. These tests drive that same
 path with a stand-in activity so no Forms API call is made.
 """
 
@@ -18,13 +18,15 @@ from temporalio.exceptions import ApplicationError
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
 
-from syntara.workflows.workflow_engine.activities.approver_resolution_activity import resolve_approvers_activity
-from syntara.workflows.workflow_engine.activities.manual_trigger import manual_trigger
-from syntara.workflows.workflow_engine.activities.runtime_settings_activity import fetch_workflow_runtime_settings
-from syntara.workflows.workflow_engine.dynamic_workflow import OrchestratorWorkflow
-from syntara.workflows.workflow_engine.models.form_prompt import FormPromptActivityInput
-from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName
-from syntara.workflows.workflow_engine.services.temporal_execution_service import TemporalExecutionService
+from syntara.workflow_core.models import ActivityName
+from syntara.workflow_runtime.engines.models.form_prompt import FormPromptActivityInput
+from syntara.workflow_runtime.engines.temporal.activities.approver_resolution_activity import resolve_approvers_activity
+from syntara.workflow_runtime.engines.temporal.activities.manual_trigger import manual_trigger
+from syntara.workflow_runtime.engines.temporal.activities.runtime_settings_activity import (
+    fetch_workflow_runtime_settings,
+)
+from syntara.workflow_runtime.engines.temporal.dynamic_workflow import OrchestratorWorkflow
+from syntara.workflow_runtime.execution import WorkflowExecutionService
 
 # Activity IDs of the form prompts the workflow has suspended on, in scheduling order.
 _pending_activity_ids: list[str] = []
@@ -146,7 +148,7 @@ class TestFormPromptSignalIntegration:
                 fetch_workflow_runtime_settings,
             ],
         ):
-            execution_service = TemporalExecutionService(
+            execution_service = WorkflowExecutionService(
                 temporal_client=temporal_env.client,
                 task_queue=task_queue,
             )
@@ -279,7 +281,7 @@ class TestFormPromptSignalIntegration:
                 fetch_workflow_runtime_settings,
             ],
         ):
-            execution_service = TemporalExecutionService(
+            execution_service = WorkflowExecutionService(
                 temporal_client=temporal_env.client,
                 task_queue=task_queue,
             )

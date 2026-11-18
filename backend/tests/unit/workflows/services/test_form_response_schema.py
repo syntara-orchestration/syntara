@@ -7,7 +7,7 @@ import pytest
 from jsonschema import Draft202012Validator, SchemaError
 from pydantic import ValidationError
 
-from syntara.workflows.json_schema_validation import validate_json_schema_definition
+from syntara.workflow_core.validation import validate_json_schema_definition
 from syntara.workflows.services.form_response_schema import (
     generate_form_response_schema,
     prepare_workflow_definition_for_persistence,

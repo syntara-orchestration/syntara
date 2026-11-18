@@ -107,6 +107,16 @@ describe('ThemeMenu', () => {
     expect(highContrast).toHaveAttribute('aria-pressed', 'true')
   })
 
+  it('hides the dock tooltip while the menu is open', async () => {
+    const user = userEvent.setup()
+    renderThemeMenu(true)
+    const themeButton = screen.getByRole('button', { name: THEME_BUTTON })
+
+    await user.click(themeButton)
+    expect(screen.getByRole('group', { name: 'Color scheme' })).toBeInTheDocument()
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
+  })
+
   it('stays open while tabbing between groups and closes when tab leaves the menu', async () => {
     const user = userEvent.setup()
     renderThemeMenu()

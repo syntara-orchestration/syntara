@@ -7,7 +7,7 @@ import { expect, toAppUrl, type Page } from '../fixtures'
 import { isRealBackendE2e } from '../playwrightWebServerEnv'
 import { apiRequest, ensureProject } from '../utils/api'
 
-import { layoutCanvas } from './canvas-interaction'
+import { canvasStepNode, layoutCanvas } from './canvas-interaction'
 import {
   type FormPromptDefinitionField,
   parseFormDefinitionFieldFromApi,
@@ -86,7 +86,7 @@ export async function createFormTriggerWorkflowWithBuilderOpen(
   await addScriptStep(page, 'Next step', 'print("ok")')
   await expect(page.getByRole('button', { name: 'Save workflow' })).toBeEnabled({ timeout: 15_000 })
   await saveWorkflow(page, workflowName, { timeout: FORM_TRIGGER_BUILDER_SAVE_TIMEOUT })
-  const triggerNode = page.getByRole('group').filter({ has: page.getByText(triggerName, { exact: true }) })
+  const triggerNode = canvasStepNode(page, triggerName)
   await expect(triggerNode).toBeVisible({ timeout: isRealBackendE2e ? 30_000 : 15_000 })
   await waitForUIReady(page)
   await openFormTriggerForEditing(page, triggerName)
