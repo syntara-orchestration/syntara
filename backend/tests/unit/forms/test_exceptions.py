@@ -14,6 +14,7 @@ from syntara.forms.exceptions import (
     FormPromptCancelledError,
     FormPromptExpiredError,
     FormPromptNotFoundError,
+    FormPromptNotPendingError,
 )
 from syntara.forms.models.api_models import FormPromptStatus
 
@@ -80,6 +81,17 @@ class TestFormExceptions:
         assert exc.form_prompt_id == prompt_id
         assert str(prompt_id) in exc.message
         assert "cancelled" in exc.message.lower()
+
+    def test_form_prompt_not_pending_error(self) -> None:
+        """Test FormPromptNotPendingError carries the prompt ID and status."""
+        prompt_id = uuid4()
+        exc = FormPromptNotPendingError(prompt_id, FormPromptStatus.EXPIRED)
+
+        assert isinstance(exc, FormError)
+        assert exc.form_prompt_id == prompt_id
+        assert exc.current_status == FormPromptStatus.EXPIRED
+        assert str(prompt_id) in exc.message
+        assert "expired" in exc.message.lower()
 
     def test_form_prompt_already_requested_error_with_loop_path(self) -> None:
         """Test FormPromptAlreadyRequestedError with loop_iteration_path."""

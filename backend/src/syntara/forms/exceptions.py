@@ -94,6 +94,24 @@ class FormPromptAlreadyRequestedError(FormError):
         )
 
 
+@fastapi_exception(handler="syntara.forms.error_handlers.form_prompt_not_pending_handler")
+class FormPromptNotPendingError(FormError):
+    """Raised when a duplicate create matches an existing prompt that is no longer pending.
+
+    A duplicate create for a still-pending prompt is an idempotent replay and succeeds.
+    Once the prompt has been submitted, expired or cancelled, the retry cannot resume it.
+    """
+
+    def __init__(self, form_prompt_id: UUID, current_status: FormPromptStatus) -> None:
+        """Initialize exception with the existing prompt ID and its current status."""
+        self.form_prompt_id = form_prompt_id
+        self.current_status = current_status
+        super().__init__(
+            f"Form prompt {form_prompt_id} already exists with status '{current_status.value}' "
+            "and can no longer be reused"
+        )
+
+
 class FormDefinitionError(FormError):
     """Raised when a form definition is invalid. Carries structured per-field errors."""
 

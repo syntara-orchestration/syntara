@@ -20,6 +20,7 @@ if TYPE_CHECKING:
         FormPromptExpiredError,
         FormPromptNotAuthorizedError,
         FormPromptNotFoundError,
+        FormPromptNotPendingError,
         InvalidResponderReferenceError,
     )
 
@@ -108,6 +109,23 @@ def form_prompt_already_requested_handler(request: Request, exc: "FormPromptAlre
             f"'{exc.prompt_node_id}' with loop_iteration_path {list(exc.loop_iteration_path)}"
         ),
         code="FORM_ALREADY_REQUESTED",
+        retryable=False,
+        instance=str(request.url),
+    )
+
+
+def form_prompt_not_pending_handler(request: Request, exc: "FormPromptNotPendingError") -> JSONResponse:
+    """Handle FormPromptNotPendingError."""
+    logger.error("Duplicate form prompt create for non-pending prompt", exc_info=exc)
+    return create_problem_details_response(
+        status_code=status.HTTP_409_CONFLICT,
+        problem_type=PROBLEM_TYPES["resource_conflict"],
+        title="Form Prompt Not Pending",
+        detail=(
+            f"A form prompt already exists for this execution and prompt node with status "
+            f"'{exc.current_status.value}' and cannot be reused"
+        ),
+        code="FORM_PROMPT_NOT_PENDING",
         retryable=False,
         instance=str(request.url),
     )

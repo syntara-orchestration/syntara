@@ -21,6 +21,7 @@ from syntara.forms.error_handlers import (
     form_prompt_cancelled_handler,
     form_prompt_expired_handler,
     form_prompt_not_found_handler,
+    form_prompt_not_pending_handler,
 )
 from syntara.forms.exceptions import (
     FormDataValidationError,
@@ -29,6 +30,7 @@ from syntara.forms.exceptions import (
     FormPromptCancelledError,
     FormPromptExpiredError,
     FormPromptNotFoundError,
+    FormPromptNotPendingError,
 )
 from syntara.forms.models.api_models import FormPromptStatus
 from syntara.forms.models.form_errors import FormFieldError
@@ -153,6 +155,29 @@ class TestFormPromptAlreadyRequestedHandler:
         assert "A form prompt already exists for this execution and prompt node" in data["detail"]
         assert prompt_node_id in data["detail"]
         assert data["code"] == "FORM_ALREADY_REQUESTED"
+        assert data["retryable"] is False
+
+
+class TestFormPromptNotPendingHandler:
+    """Test suite for form_prompt_not_pending_handler."""
+
+    def test_handles_form_prompt_not_pending_error(self) -> None:
+        """A duplicate create for a resolved prompt is a distinguishable 409."""
+        request = Mock(spec=Request)
+        request.url = "https://api.example.com/api/v1/form_prompts"
+
+        exc = FormPromptNotPendingError(uuid4(), FormPromptStatus.SUBMITTED)
+        response = form_prompt_not_pending_handler(request, exc)
+
+        assert isinstance(response, JSONResponse)
+        assert response.status_code == 409
+        assert response.media_type == "application/problem+json"
+
+        data = json.loads(bytes(response.body).decode())
+        assert data["type"] == PROBLEM_TYPES["resource_conflict"]
+        assert data["title"] == "Form Prompt Not Pending"
+        assert "submitted" in data["detail"]
+        assert data["code"] == "FORM_PROMPT_NOT_PENDING"
         assert data["retryable"] is False
 
 

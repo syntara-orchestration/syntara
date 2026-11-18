@@ -9,9 +9,11 @@ from uuid import UUID, uuid4
 
 import pytest
 from httpx import AsyncClient
+from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from syntara.core.models import User
+from syntara.forms.models.api_models import FormPromptStatus
 from syntara.forms.models.form_fields import DropdownField, ResolvedOptions
 from syntara.forms.models.form_prompt import FormPrompt
 from syntara.workflows.models import Workflow, WorkflowVersion
@@ -235,22 +237,72 @@ class TestFormPromptCreateAPI:
 
         assert response.status_code == 422
 
-    async def test_create_duplicate_form_prompt_returns_409(
+    @pytest.mark.parametrize("loop_iteration_path", [[], [0, 1]])
+    async def test_create_duplicate_pending_form_prompt_is_idempotent(
+        self,
+        jwt_client: AsyncClient,
+        test_execution: Execution,
+        test_db_session: AsyncSession,
+        loop_iteration_path: list[int],
+    ) -> None:
+        """A retry after a lost response returns the original pending prompt instead of failing."""
+        execution_id = test_execution.id
+        payload = _form_prompt_payload(
+            execution_id,
+            test_execution.project_id,
+            prompt_node_id="form1",
+            loop_iteration_path=loop_iteration_path,
+        )
+
+        response1 = await jwt_client.post(FORM_PROMPTS_URL, json=payload)
+        assert response1.status_code == 201
+
+        response2 = await jwt_client.post(FORM_PROMPTS_URL, json=payload)
+        assert response2.status_code == 201
+        assert response2.json()["id"] == response1.json()["id"]
+        assert response2.json()["status"] == "pending"
+
+        rows = (await test_db_session.exec(select(FormPrompt).where(FormPrompt.execution_id == execution_id))).all()
+        assert len(rows) == 1
+
+    async def test_create_duplicate_for_different_activity_returns_409(
         self,
         jwt_client: AsyncClient,
         test_execution: Execution,
     ) -> None:
-        """Creating duplicate form_prompt (same execution_id, prompt_node_id, loop_iteration_path) returns 409."""
-        exec_id = test_execution.id
-        payload = _form_prompt_payload(exec_id, test_execution.project_id, prompt_node_id="form1")
+        """Same key but a different Temporal activity is a real conflict, not a retry."""
+        payload = _form_prompt_payload(test_execution.id, test_execution.project_id, prompt_node_id="form1")
+        assert (await jwt_client.post(FORM_PROMPTS_URL, json=payload)).status_code == 201
 
-        # First request succeeds
+        response = await jwt_client.post(FORM_PROMPTS_URL, json={**payload, "temporal_activity_id": "other_activity"})
+
+        assert response.status_code == 409
+        assert response.json()["code"] == "FORM_ALREADY_REQUESTED"
+
+    @pytest.mark.parametrize("terminal_status", ["submitted", "expired", "cancelled"])
+    async def test_create_duplicate_for_non_pending_form_prompt_returns_409_not_pending(
+        self,
+        jwt_client: AsyncClient,
+        test_execution: Execution,
+        test_db_session: AsyncSession,
+        terminal_status: str,
+    ) -> None:
+        """A retry cannot reuse a prompt that was already submitted, expired or cancelled."""
+        payload = _form_prompt_payload(test_execution.id, test_execution.project_id, prompt_node_id="form1")
         response1 = await jwt_client.post(FORM_PROMPTS_URL, json=payload)
         assert response1.status_code == 201
 
-        # Second request with same keys should fail
+        prompt = await test_db_session.get(FormPrompt, UUID(response1.json()["id"]))
+        assert prompt is not None
+        prompt.status = FormPromptStatus(terminal_status)
+        test_db_session.add(prompt)
+        await test_db_session.commit()
+
         response2 = await jwt_client.post(FORM_PROMPTS_URL, json=payload)
+
         assert response2.status_code == 409
+        assert response2.json()["code"] == "FORM_PROMPT_NOT_PENDING"
+        assert terminal_status in response2.json()["detail"]
 
     async def test_list_form_prompts_by_execution(self, jwt_client: AsyncClient, test_execution: Execution) -> None:
         """List form_prompts filtered by execution_id returns matching prompts."""

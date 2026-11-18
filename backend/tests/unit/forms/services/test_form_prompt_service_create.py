@@ -12,8 +12,8 @@ import pytest
 from sqlalchemy.exc import IntegrityError
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from syntara.forms.exceptions import FormPromptAlreadyRequestedError
-from syntara.forms.models.api_models import FormPromptCreateRequest
+from syntara.forms.exceptions import FormPromptAlreadyRequestedError, FormPromptNotPendingError
+from syntara.forms.models.api_models import FormPromptCreateRequest, FormPromptStatus
 from syntara.forms.models.form_prompt import FormPrompt
 from syntara.forms.services.form_prompt_service import FormPromptService
 
@@ -69,6 +69,44 @@ def _mock_execution_project(session: Mock, project_id: UUID) -> None:
     execution.workflow_id = uuid4()
     execution.created_by = uuid4()
     session.get = AsyncMock(return_value=execution)
+
+
+def _duplicate_request() -> FormPromptCreateRequest:
+    """Create request used by the duplicate-handling tests."""
+    return FormPromptCreateRequest(
+        execution_id=uuid4(),
+        project_id=_TEST_PROJECT_ID,
+        prompt_node_id="form1",
+        name="Form",
+        form_definition=_MINIMAL_FORM_DEFINITION,
+        loop_iteration_path=[],
+        temporal_activity_id="form1",
+    )
+
+
+def _existing_prompt(
+    request: FormPromptCreateRequest,
+    *,
+    status: FormPromptStatus = FormPromptStatus.PENDING,
+    temporal_activity_id: str | None = None,
+) -> FormPrompt:
+    """Build the already-committed prompt that a duplicate create collides with."""
+    return FormPrompt(
+        id=uuid4(),
+        execution_id=request.execution_id,
+        project_id=request.project_id,
+        prompt_node_id=request.prompt_node_id,
+        name=request.name,
+        form_definition=request.form_definition,
+        loop_iteration_path=request.loop_iteration_path,
+        temporal_activity_id=temporal_activity_id or request.temporal_activity_id,
+        status=status,
+    )
+
+
+def _mock_existing_prompt(session: Mock, existing: FormPrompt | None) -> None:
+    """Make the post-rollback duplicate lookup return ``existing``."""
+    session.exec = AsyncMock(return_value=Mock(first=Mock(return_value=existing)))
 
 
 class TestFormPromptServiceCreate:
@@ -158,24 +196,73 @@ class TestFormPromptServiceCreate:
         assert isinstance(added, FormPrompt)
 
     @pytest.mark.asyncio
-    async def test_duplicate_raises_form_prompt_already_requested_error(self, mock_audit_dispatcher: Mock) -> None:
-        """Duplicate (execution_id, prompt_node_id, loop_iteration_path) raises error."""
+    async def test_duplicate_without_existing_row_raises_already_requested(self, mock_audit_dispatcher: Mock) -> None:
+        """A collision whose row cannot be found (e.g. deleted concurrently) still raises 409."""
         service, session = _make_service(raise_integrity_error=True)
-
-        request = FormPromptCreateRequest(
-            execution_id=uuid4(),
-            project_id=_TEST_PROJECT_ID,
-            prompt_node_id="form1",
-            name="Form",
-            form_definition=_MINIMAL_FORM_DEFINITION,
-            loop_iteration_path=[],
-            temporal_activity_id="form1",
-        )
-
+        request = _duplicate_request()
         _mock_execution_project(session, request.project_id)
+        _mock_existing_prompt(session, None)
+
         with pytest.raises(FormPromptAlreadyRequestedError, match="already exists"):
             await service.create(request)
 
+        session.rollback.assert_awaited_once()
+        mock_audit_dispatcher.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_duplicate_for_different_activity_raises_already_requested(self, mock_audit_dispatcher: Mock) -> None:
+        """A pending prompt owned by a different Temporal activity is not a replay."""
+        service, session = _make_service(raise_integrity_error=True)
+        request = _duplicate_request()
+        _mock_execution_project(session, request.project_id)
+        _mock_existing_prompt(session, _existing_prompt(request, temporal_activity_id="some_other_activity"))
+
+        with pytest.raises(FormPromptAlreadyRequestedError, match="already exists"):
+            await service.create(request)
+
+        mock_audit_dispatcher.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_duplicate_for_pending_prompt_of_same_activity_is_idempotent(
+        self, mock_audit_dispatcher: Mock
+    ) -> None:
+        """Retry after a lost response returns the original prompt without repeating side effects."""
+        service, session = _make_service(raise_integrity_error=True)
+        request = _duplicate_request()
+        _mock_execution_project(session, request.project_id)
+        existing = _existing_prompt(request)
+        _mock_existing_prompt(session, existing)
+
+        result = await service.create(request)
+
+        assert result.id == existing.id
+        assert result.status == FormPromptStatus.PENDING
+        assert result.temporal_activity_id == request.temporal_activity_id
+        session.rollback.assert_awaited_once()
+        session.commit.assert_not_awaited()
+        mock_audit_dispatcher.assert_not_called()
+        session.add.assert_called_once()  # only the failed first insert; nothing staged on replay
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "terminal_status",
+        [FormPromptStatus.SUBMITTED, FormPromptStatus.EXPIRED, FormPromptStatus.CANCELLED],
+    )
+    async def test_duplicate_for_non_pending_prompt_raises_not_pending(
+        self, terminal_status: FormPromptStatus, mock_audit_dispatcher: Mock
+    ) -> None:
+        """A retry cannot resume a prompt that was already submitted, expired or cancelled."""
+        service, session = _make_service(raise_integrity_error=True)
+        request = _duplicate_request()
+        _mock_execution_project(session, request.project_id)
+        existing = _existing_prompt(request, status=terminal_status)
+        _mock_existing_prompt(session, existing)
+
+        with pytest.raises(FormPromptNotPendingError) as exc_info:
+            await service.create(request)
+
+        assert exc_info.value.form_prompt_id == existing.id
+        assert exc_info.value.current_status == terminal_status
         mock_audit_dispatcher.assert_not_called()
 
     @pytest.mark.asyncio
