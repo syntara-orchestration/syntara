@@ -37872,6 +37872,13 @@ components:
         form_definition:
           $ref: '#/components/schemas/FormPromptDefinition'
           description: Form definition describing the fields shown to responders.
+        response_schema:
+          anyOf:
+            - additionalProperties: true
+              type: object
+            - type: 'null'
+          title: Response Schema
+          description: Backend-generated JSON Schema for normalized response_data values.
         responder_users:
           anyOf:
             - items:
