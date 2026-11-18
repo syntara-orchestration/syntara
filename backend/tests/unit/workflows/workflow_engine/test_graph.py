@@ -293,7 +293,7 @@ class TestGetNode:
         node = graph.get_node("script1")
         assert node.id == "script1"
         assert node.type == "script_python"
-        assert node.parameters == {"lang": "python"}
+        assert node.parameters == {"code": "print('hello')"}
         assert node.outputs == {"result": "out"}
 
     def test_nonexistent_node_raises(self) -> None:

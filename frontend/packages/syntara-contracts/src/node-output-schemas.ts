@@ -20,6 +20,30 @@ export const NODE_OUTPUT_SCHEMAS: Record<string, OutputFieldDef[]> = {
     },
     { name: 'triggered_at', type: 'string', description: 'ISO 8601 timestamp of when the execution actually started' },
   ],
+  script_python: [
+    { name: 'status', type: 'string', description: 'Script execution completed' },
+    { name: 'return_code', type: 'number', description: 'Script exit code (0 = success)' },
+    { name: 'stdout', type: 'string', description: 'Standard output from script execution' },
+    { name: 'stderr', type: 'string', description: 'Standard error from script execution' },
+    {
+      name: 'stdout_json',
+      type: 'unknown',
+      description:
+        'Parsed JSON from stdout (Python scripts only). Present if stdout contains valid JSON (entire stdout or last line).',
+    },
+  ],
+  script_bash: [
+    { name: 'status', type: 'string', description: 'Script execution completed' },
+    { name: 'return_code', type: 'number', description: 'Script exit code (0 = success)' },
+    { name: 'stdout', type: 'string', description: 'Standard output from script execution' },
+    { name: 'stderr', type: 'string', description: 'Standard error from script execution' },
+    {
+      name: 'stdout_json',
+      type: 'unknown',
+      description:
+        'Parsed JSON from stdout (Python scripts only). Present if stdout contains valid JSON (entire stdout or last line).',
+    },
+  ],
   aap_job_template: [
     { name: 'status', type: 'string', description: 'Execution succeeded' },
     { name: 'job_id', type: 'number', description: 'Ansible Automation Platform job ID' },

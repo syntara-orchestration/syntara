@@ -252,7 +252,10 @@ async def _execute_script_activity(
         raise ApplicationError(msg, type="ScriptNodeDisabled", non_retryable=True)
 
     try:
-        config = parameters_model.model_validate(input_config)
+        # The workflow engine adds internal control fields to the activity
+        # payload. They are consumed during dispatch but are not node parameters.
+        parameters = {key: value for key, value in input_config.items() if not key.startswith("_")}
+        config = parameters_model.model_validate(parameters)
         execution_uuid = uuid.UUID(execution_id)
     except Exception:  # noqa: BLE001
         msg = "Script activity configuration or execution ID is invalid"

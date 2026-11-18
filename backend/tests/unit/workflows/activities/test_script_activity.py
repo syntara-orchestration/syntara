@@ -14,6 +14,7 @@ from temporalio.exceptions import ApplicationError
 from syntara.core.config.base import get_settings
 from syntara.execution_plane.client import ExecutionPlaneRejectedError, ExecutionPlaneUnavailableError
 from syntara.workflow_runtime.engines.temporal.activities.ep import ep_dispatch_activity as activity_module
+from syntara.workflow_runtime.engines.temporal.constants import ENGINE_MAX_OUTPUT_BYTES_KEY, ENGINE_TIMEOUT_SECONDS_KEY
 
 ACTIVITY_INFO_PATH = "syntara.workflow_runtime.engines.temporal.activities.ep.ep_dispatch_activity.activity.info"
 EXECUTION_ID = "00000000-0000-0000-0000-000000000010"
@@ -143,6 +144,27 @@ class TestScriptActivityDispatch:
         assert result == expected
         assert len(_FakeEPClient.submissions) == 1
         assert UUID(str(_FakeEPClient.submissions[0].command.payload["work_item_id"])) == WORK_ITEM_ID
+
+    @pytest.mark.asyncio
+    async def test_engine_control_fields_are_used_but_not_validated_as_parameters(self) -> None:
+        _FakeEPClient.responses = [{"status": "completed", "result": {}}]
+
+        await activity_module.execute_bash_script_activity(
+            {
+                "code": "echo ok",
+                ENGINE_TIMEOUT_SECONDS_KEY: 17,
+                ENGINE_MAX_OUTPUT_BYTES_KEY: 2048,
+            },
+            None,
+            EXECUTION_ID,
+        )
+
+        payload = _FakeEPClient.submissions[0].command.payload
+        assert isinstance(payload, dict)
+        invocation = payload["invocation"]
+        assert isinstance(invocation, dict)
+        assert invocation["inputs"] == {"code": "echo ok", "max_output_bytes": 2048}
+        assert invocation["timeout_seconds"] == 17
 
     @pytest.mark.asyncio
     async def test_temporal_retry_reuses_work_item_id(self, mock_activity_context: MagicMock) -> None:
