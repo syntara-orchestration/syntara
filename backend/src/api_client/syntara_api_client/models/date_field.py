@@ -25,9 +25,11 @@ class DateField:
         placeholder (None | str | Unset):
         help_text (None | str | Unset):
         required (bool | Unset):  Default: False.
-        include_date (bool | Unset): Collect a calendar date. Default: True.
-        include_time (bool | Unset): Collect a 24-hour time in HH:MM format. Default: False.
-        include_timezone (bool | Unset): Collect an IANA timezone name. Default: False.
+        include_date (bool | Unset): Collect a calendar date, either alone or with time and timezone. Default: True.
+        include_time (bool | Unset): Collect a 24-hour time in HH:MM format. A timezone is required; a date may also be
+            collected. Default: False.
+        include_timezone (bool | Unset): Collect an IANA timezone name with a time; a date may also be collected.
+            Default: False.
         default (DateValue | None | Unset): Default value used when the responder submits nothing. Must supply exactly
             the included components.
     """
