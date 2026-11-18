@@ -1,6 +1,5 @@
 import { Button, Content, ContentVariants, Stack, StackItem, TextInput, Title } from '@patternfly/react-core'
 import { KafkaOffsetGapPolicyEnum, KafkaStartPositionEnum } from '@syntara/contracts'
-import { useEffect } from 'react'
 import { useFormContext, useWatch } from 'react-hook-form'
 
 import { FieldHelpPopover } from '../../../components/FieldHelpPopover'
@@ -40,19 +39,13 @@ export function KafkaConsumerSettings({
   triggerId?: string
   isReadOnly: boolean
 }>) {
-  const { control, setValue } = useFormContext<TriggerFormData>()
-  const [integrationId, topic, groupId] = useWatch({ control, name: ['integrationId', 'topic', 'kafkaGroupId'] })
+  const { control } = useFormContext<TriggerFormData>()
+  const [integrationId, topic] = useWatch({ control, name: ['integrationId', 'topic'] })
   const publication = useKafkaPublishedSource(isReadOnly ? undefined : workflowId, triggerId)
   const isPublishedSource = Boolean(
-    publication.source && publication.source.integrationId === integrationId && publication.source.topic === topic
+    publication.source && publication.source.integration_id === integrationId && publication.source.topic === topic
   )
   const isGroupLocked = isReadOnly || publication.isChecking || publication.isError || isPublishedSource
-  useEffect(() => {
-    // Null preserves the established group, including when a draft contains a stale override.
-    if (isPublishedSource && groupId != null) {
-      setValue('kafkaGroupId', null, { shouldValidate: true })
-    }
-  }, [isPublishedSource, groupId, setValue])
   const groupHint = isPublishedSource
     ? 'This source’s consumer group is fixed after its first successful publication. The published group is preserved.'
     : 'Leave blank for an auto-generated ID for a new source. The group becomes fixed after the first successful publication.'
@@ -117,7 +110,7 @@ export function KafkaConsumerSettings({
                 id="kafka-group-id"
                 name={field.name}
                 ref={field.ref}
-                value={isPublishedSource ? (publication.source?.groupId ?? '') : (field.value ?? '')}
+                value={isPublishedSource ? (publication.source?.group_id ?? '') : (field.value ?? '')}
                 placeholder={isPublishedSource ? 'Published group' : 'Auto-generated'}
                 isDisabled={isGroupLocked}
                 aria-describedby={describedBy}
@@ -130,14 +123,14 @@ export function KafkaConsumerSettings({
         </StackItem>
         {publication.isChecking && (
           <StackItem>
-            <Content component={ContentVariants.p}>Checking consumer group publication history…</Content>
+            <Content component={ContentVariants.p}>Checking published consumer groups…</Content>
           </StackItem>
         )}
         {publication.isError && (
           <StackItem>
-            <SynErrorState title="Unable to check consumer group publication history" message={publication.error} />
+            <SynErrorState title="Unable to check published consumer groups" message={publication.error} />
             <Button variant="secondary" onClick={() => detachPromise(publication.refetch())}>
-              Retry publication history
+              Retry published consumer groups
             </Button>
           </StackItem>
         )}

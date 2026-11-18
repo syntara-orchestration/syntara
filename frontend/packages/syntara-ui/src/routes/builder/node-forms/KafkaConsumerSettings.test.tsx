@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { FormProvider, useForm } from 'react-hook-form'
 import { describe, expect, it, vi } from 'vitest'
@@ -56,7 +56,7 @@ function renderSettings({
       </QueryClientProvider>
     )
   }
-  return render(<Wrapper />)
+  return { ...render(<Wrapper />), client }
 }
 
 describe('Kafka consumer settings', () => {
@@ -144,28 +144,15 @@ describe('Kafka consumer settings', () => {
   it('locks a previously published source and unlocks a replacement topic', async () => {
     vi.mocked(workflowFetchClient.GET).mockResolvedValue({
       data: {
-        resources: [
+        kafka_subscription_sources: [
           {
-            id: 'v1',
-            workflow_id: 'workflow-1',
-            version: 1,
-            schema_version: '2.0',
-            created_at: '2026-01-01T00:00:00Z',
-            updated_at: '2026-01-01T00:00:00Z',
-            last_published_at: '2026-01-02T00:00:00Z',
-            workflow_definition: {
-              triggers: [
-                {
-                  id: 'subscribe',
-                  type: 'event_subscribe_trigger',
-                  parameters: {
-                    integration_id: initialData.integrationId,
-                    topic: 'orders',
-                    group_id: 'published-group',
-                  },
-                },
-              ],
-            },
+            trigger_node_id: 'subscribe',
+            source_id: 'source-1',
+            generation: 1,
+            configuration_revision: 1,
+            integration_id: initialData.integrationId,
+            topic: 'orders',
+            group_id: 'published-group',
           },
         ],
       },
@@ -173,13 +160,16 @@ describe('Kafka consumer settings', () => {
     })
     const user = userEvent.setup()
     const onSubmit = vi.fn()
-    renderSettings({ existing: true, data: { kafkaGroupId: 'stale invalid override' }, onSubmit })
+    renderSettings({ existing: true, data: { kafkaGroupId: 'published-group' }, onSubmit })
     const group = screen.getByRole('textbox', { name: GROUP })
     expect(group).toBeDisabled()
     await waitFor(() => expect(group).toHaveValue('published-group'))
     expect(group).toBeDisabled()
     await user.click(screen.getByRole('button', { name: 'Save settings' }))
-    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ kafkaGroupId: null }), expect.anything())
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({ kafkaGroupId: 'published-group' }),
+      expect.anything()
+    )
     await user.type(screen.getByRole('textbox', { name: 'Topic' }), '.new')
     expect(group).toBeEnabled()
     await user.clear(screen.getByRole('textbox', { name: 'Topic' }))
@@ -188,15 +178,72 @@ describe('Kafka consumer settings', () => {
     expect(group).toHaveValue('published-group')
   })
 
+  it('preserves a draft replacement group while cached publication metadata refreshes', async () => {
+    const source = {
+      trigger_node_id: 'subscribe',
+      source_id: 'source-1',
+      generation: 1,
+      configuration_revision: 1,
+      integration_id: initialData.integrationId,
+      topic: 'orders',
+      group_id: 'published-group',
+    }
+    vi.mocked(workflowFetchClient.GET).mockResolvedValue({
+      data: { kafka_subscription_sources: [source] },
+      response: new Response(),
+    })
+    const onSubmit = vi.fn()
+    const user = userEvent.setup()
+    const { client } = renderSettings({ existing: true, data: { kafkaGroupId: 'replacement-draft-group' }, onSubmit })
+    const group = screen.getByRole('textbox', { name: GROUP })
+    await waitFor(() => expect(group).toHaveValue('published-group'))
+    let finish: (() => void) | undefined
+    vi.mocked(workflowFetchClient.GET).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = () =>
+            resolve({
+              data: {
+                kafka_subscription_sources: [
+                  { ...source, source_id: 'source-2', generation: 2, topic: 'other-session-topic' },
+                ],
+              },
+              response: new Response(),
+            })
+        })
+    )
+    let refreshed: Promise<void> | undefined
+    act(() => {
+      refreshed = client.invalidateQueries({ queryKey: ['get', '/workflows/{workflow_id}'] })
+    })
+    expect(await screen.findByText('Checking published consumer groups…')).toBeInTheDocument()
+    expect(group).toHaveValue('replacement-draft-group')
+    expect(group).toBeDisabled()
+    await act(async () => {
+      finish?.()
+      await refreshed
+    })
+    await waitFor(() => expect(group).toBeEnabled())
+    expect(group).toHaveValue('replacement-draft-group')
+    await user.click(screen.getByRole('button', { name: 'Save settings' }))
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({ kafkaGroupId: 'replacement-draft-group' }),
+      expect.anything()
+    )
+  })
+
   it('keeps the group locked on a history failure and provides a working retry', async () => {
     vi.mocked(workflowFetchClient.GET).mockRejectedValue(new Error('Unavailable'))
     const user = userEvent.setup()
     renderSettings({ existing: true })
     expect(
-      await screen.findByRole('heading', { name: 'Unable to check consumer group publication history' })
+      await screen.findByRole('heading', { name: 'Unable to check published consumer groups' })
     ).toBeInTheDocument()
     expect(screen.getByRole('textbox', { name: GROUP })).toBeDisabled()
-    vi.mocked(workflowFetchClient.GET).mockResolvedValue({ data: { resources: [] }, response: new Response() })
+    vi.mocked(workflowFetchClient.GET).mockResolvedValue({
+      data: { kafka_subscription_sources: [] },
+      response: new Response(),
+    })
     await user.click(screen.getByRole('button', { name: /retry/i }))
     await waitFor(() => expect(screen.getByRole('textbox', { name: GROUP })).toBeEnabled())
   })

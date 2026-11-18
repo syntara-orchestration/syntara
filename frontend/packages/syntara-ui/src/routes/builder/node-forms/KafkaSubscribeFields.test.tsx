@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 
-import { credentialsClient, integrationsFetchClient, workflowClient } from '../../../client'
+import { credentialsClient, integrationsFetchClient, workflowClient, workflowFetchClient } from '../../../client'
 import { FormFieldError } from '../../../components/FormFieldError'
 import { submitForm } from '../../../test/submit-form'
 import type { CredentialSelectorProps } from '../components/CredentialSelector'
@@ -22,6 +22,7 @@ const mutate = vi.fn()
 vi.mock('../../../client', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../client')>()),
   integrationsFetchClient: { GET: vi.fn() },
+  workflowFetchClient: { GET: vi.fn() },
   workflowClient: { useMutation: vi.fn() },
   credentialsClient: { useQuery: vi.fn() },
 }))
@@ -157,6 +158,126 @@ describe('Kafka Subscribe form', () => {
     expect(screen.getByRole('button', { name: 'Test filter' })).toBeDisabled()
     expect(onSubmit).not.toHaveBeenCalled()
   })
+
+  it.each(['established-custom', 'stale-draft', null, 'invalid group'])(
+    'preserves the established custom group when updating a draft containing %s',
+    async (kafkaGroupId) => {
+      const source = {
+        trigger_node_id: 'subscribe',
+        source_id: 'source-1',
+        generation: 1,
+        configuration_revision: 1,
+        integration_id: integrationId,
+        topic: initialData.topic,
+        group_id: 'established-custom',
+      }
+      vi.mocked(workflowFetchClient.GET).mockResolvedValue({
+        data: { kafka_subscription_sources: [source] },
+        response: new Response(),
+      })
+      const onSubmit = vi.fn()
+      renderWithHeader(
+        <TriggerNodeForm
+          initialData={{ ...initialData, kafkaGroupId }}
+          kafkaTriggerId="subscribe"
+          workflowId="workflow-1"
+          onSubmit={onSubmit}
+        />
+      )
+      const group = screen.getByRole('textbox', { name: 'Consumer group ID' })
+      await waitFor(() => expect(group).toHaveValue('established-custom'))
+      expect(group).toBeDisabled()
+      await submitForm()
+      await waitFor(() =>
+        expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ kafkaGroupId: 'established-custom' }))
+      )
+      expect(workflowFetchClient.GET).toHaveBeenCalledTimes(2)
+    }
+  )
+
+  it('preserves the raw draft when the publication changes to a replacement before Update', async () => {
+    const source = {
+      trigger_node_id: 'subscribe',
+      source_id: 'source-1',
+      generation: 1,
+      configuration_revision: 1,
+      integration_id: integrationId,
+      topic: initialData.topic,
+      group_id: 'established-custom',
+    }
+    vi.mocked(workflowFetchClient.GET)
+      .mockResolvedValueOnce({ data: { kafka_subscription_sources: [source] }, response: new Response() })
+      .mockResolvedValue({
+        data: {
+          kafka_subscription_sources: [{ ...source, source_id: 'replacement-source', topic: 'another-session-topic' }],
+        },
+        response: new Response(),
+      })
+    const onSubmit = vi.fn()
+    renderWithHeader(
+      <TriggerNodeForm
+        initialData={{ ...initialData, kafkaGroupId: 'replacement-group' }}
+        kafkaTriggerId="subscribe"
+        workflowId="workflow-1"
+        onSubmit={onSubmit}
+      />
+    )
+    await waitFor(() =>
+      expect(screen.getByRole('textbox', { name: 'Consumer group ID' })).toHaveValue('established-custom')
+    )
+    await submitForm()
+    await waitFor(() =>
+      expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ kafkaGroupId: 'replacement-group' }))
+    )
+  })
+
+  it('does not apply an update after its trigger editor is closed during the source lookup', async () => {
+    const metadata = {
+      data: {
+        kafka_subscription_sources: [
+          {
+            trigger_node_id: 'subscribe',
+            source_id: 'source-1',
+            generation: 1,
+            configuration_revision: 1,
+            integration_id: integrationId,
+            topic: initialData.topic,
+            group_id: 'established-custom',
+          },
+        ],
+      },
+      response: new Response(),
+    }
+    vi.mocked(workflowFetchClient.GET).mockResolvedValue(metadata)
+    const onSubmit = vi.fn()
+    const { unmount } = renderWithHeader(
+      <TriggerNodeForm
+        initialData={{ ...initialData, kafkaGroupId: 'draft-B' }}
+        kafkaTriggerId="subscribe"
+        workflowId="workflow-1"
+        onSubmit={onSubmit}
+      />
+    )
+    await waitFor(() =>
+      expect(screen.getByRole('textbox', { name: 'Consumer group ID' })).toHaveValue('established-custom')
+    )
+    let finish: (() => void) | undefined
+    vi.mocked(workflowFetchClient.GET).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = () => resolve(metadata)
+        })
+    )
+    await submitForm()
+    await waitFor(() => expect(workflowFetchClient.GET).toHaveBeenCalledTimes(2))
+    unmount()
+    await act(async () => {
+      finish?.()
+      await Promise.resolve()
+    })
+    expect(onSubmit).not.toHaveBeenCalled()
+  })
+
   it('keeps the saved form present without transient validation rows while resources load', async () => {
     let finishIntegration: (() => void) | undefined
     vi.mocked(integrationsFetchClient.GET).mockImplementationOnce(
