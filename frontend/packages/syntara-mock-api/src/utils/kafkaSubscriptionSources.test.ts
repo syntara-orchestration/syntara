@@ -7,6 +7,7 @@ const source = {
   source_id: 'source-1',
   generation: 1,
   configuration_revision: 1,
+  group_id_is_generated: false,
   integration_id: 'integration-1',
   topic: 'orders',
   group_id: 'published-A',
@@ -38,6 +39,13 @@ describe('mock Kafka projection', () => {
     expect(replacement?.topic).toBe('replacement')
     expect(replacement?.source_id).not.toBe(source.source_id)
     expect(replacement?.group_id).not.toBe(source.group_id)
+  })
+  it('allocates independent automatic groups when a portable definition is copied to a new workflow', () => {
+    const [original] = projectKafkaSources('workflow-1', definition(), [])
+    const [copy] = projectKafkaSources('workflow-2', definition(), [])
+    expect(original?.group_id_is_generated).toBe(true)
+    expect(copy?.group_id_is_generated).toBe(true)
+    expect(copy?.group_id).not.toBe(original?.group_id)
   })
   it('does not expose retired subscriptions after a trigger is removed', () => {
     expect(projectKafkaSources('workflow-1', { triggers: [] }, [source])).toEqual([])

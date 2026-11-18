@@ -20,6 +20,7 @@ it('explains the proposed group replacement, supports cancellation, and has no a
             source_id: 'source-1',
             generation: 1,
             configuration_revision: 1,
+            group_id_is_generated: false,
             integration_id: 'integration-1',
             topic: 'orders',
             group_id: 'published-A',

@@ -54,7 +54,8 @@ function createSidePanelState(overrides: Partial<VersionSidePanelState> = {}): V
     executedVersionNumbers: new Map(),
     onEditVersion: vi.fn(),
     onDuplicateVersion: vi.fn(),
-    publishDialog: { isOpen: false, onClose: vi.fn(), onPublish: vi.fn() },
+    publication: { groupConflicts: undefined, confirmGroups: vi.fn(), cancelGroups: vi.fn() },
+    publishDialog: { isPublishing: false, isOpen: false, onClose: vi.fn(), onPublish: vi.fn() },
     saveBeforeViewDialog: {
       isOpen: false,
       onSave: vi.fn().mockResolvedValue(true),
@@ -120,7 +121,8 @@ describe('VersionHistorySidePanel', () => {
 
   it('renders PublishWorkflowDialog when publishDialog is open', () => {
     const sidePanel = createSidePanelState({
-      publishDialog: { isOpen: true, onClose: vi.fn(), onPublish: vi.fn() },
+      publication: { groupConflicts: undefined, confirmGroups: vi.fn(), cancelGroups: vi.fn() },
+      publishDialog: { isPublishing: false, isOpen: true, onClose: vi.fn(), onPublish: vi.fn() },
     })
     render(<VersionHistorySidePanel sidePanel={sidePanel} isNodeEditorOpen={false} />)
 

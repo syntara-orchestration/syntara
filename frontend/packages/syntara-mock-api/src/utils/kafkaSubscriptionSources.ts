@@ -34,6 +34,7 @@ export function projectKafkaSources(workflowId: string, definition: unknown, pre
         configuration_revision: 1,
         integration_id: integrationId,
         topic,
+        group_id_is_generated: !(typeof groupId === 'string' && groupId),
         group_id: typeof groupId === 'string' && groupId ? groupId : `syntara.mock.${workflowId}.${uuidv4()}`,
       })
     }

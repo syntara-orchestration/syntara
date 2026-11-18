@@ -208,6 +208,7 @@ __all__ = (
     "KafkaSecurityProtocol",
     "KafkaSubscribeParameters",
     "KafkaSubscribeParametersInputSchemaType0",
+    "KafkaSubscriptionSourceRead",
     "KPIDashboard",
     "ListIntegrationCatalogEnabled",
     "ListIntegrationCatalogIntegrationType",

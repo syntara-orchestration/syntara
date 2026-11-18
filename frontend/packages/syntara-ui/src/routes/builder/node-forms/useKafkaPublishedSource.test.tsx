@@ -14,6 +14,7 @@ const source = {
   source_id: 'source-1',
   generation: 2,
   configuration_revision: 3,
+  group_id_is_generated: false,
   integration_id: 'integration-1',
   topic: 'orders',
   group_id: 'effective-custom-group',

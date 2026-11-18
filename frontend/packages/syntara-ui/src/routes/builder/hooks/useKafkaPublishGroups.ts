@@ -99,7 +99,7 @@ export function useKafkaPublishGroups({ workflowId, currentVersion, getDefinitio
 
   const publish = useCallback(
     (name?: string, description?: string, onSettled?: () => void, options?: PublishCallOptions) => {
-      const definition = getDefinition()
+      const definition = options?.versionOverride === undefined ? getDefinition() : undefined
       const triggers: unknown = definition?.triggers ?? useWorkflowStore.getState().currentWorkflow?.triggers
       const hasKafka =
         Array.isArray(triggers) &&

@@ -221,121 +221,237 @@ test.describe('Kafka consumer settings', () => {
     }
   })
 
-  test('offers to carry forward the established group when an older version was published after a newer draft was saved', async ({
-    app,
-  }, testInfo) => {
+  test('keeps automatic mode through Update, republish, export and publication as a new workflow', async ({ app }) => {
     const connection = await createKafkaConnection(app)
-    let workflowId: string | undefined
+    const createdIds: string[] = []
+    const nodes = [
+      { id: 'process', name: 'Process', type: 'script', parameters: { language: 'python', code: 'print(1)' } },
+    ]
+    const edges = [{ from: 'subscribe', to: 'process' }]
+    const definitionSchema = z.looseObject({
+      triggers: z.array(
+        z.looseObject({ id: z.string(), type: z.string(), parameters: z.record(z.string(), z.unknown()) })
+      ),
+    })
+    const detailSchema = z.object({
+      kafka_subscription_sources: z.array(z.object({ group_id: z.string(), group_id_is_generated: z.boolean() })),
+    })
     try {
       const { id, versionNumber } = await createWorkflowViaApi({
         app,
-        name: buildUniqueName('kafka-stale-group'),
-        nodes: [
-          {
-            id: 'process',
-            name: 'Process order',
-            type: 'script',
-            parameters: { language: 'python', code: 'print(1)' },
-          },
-        ],
-        edges: [{ from: 'subscribe', to: 'process' }],
+        name: buildUniqueName('kafka-auto'),
+        nodes,
+        edges,
         triggers: [
           {
             id: 'subscribe',
-            name: 'Orders',
+            name: 'Automatic consumer',
             type: 'event_subscribe_trigger',
             parameters: {
               integration_id: connection.integrationId,
               credential_id: connection.credentialId,
               topic: 'orders',
-              group_id: 'established-A',
+              group_id: null,
             },
           },
         ],
       })
-      workflowId = id
-      const token = await getAuthToken(app)
-      if (!token) throw new Error('Missing authentication token')
-      const currentResponse = await apiRequest(app, 'get', `/workflows/${id}`, { token })
-      expect(currentResponse.ok()).toBe(true)
-      const definitionSchema = z.looseObject({
-        triggers: z.array(z.looseObject({ id: z.string(), parameters: z.record(z.string(), z.unknown()) })),
-      })
-      const current = z
-        .object({ version: z.object({ workflow_definition: definitionSchema }) })
-        .parse(await currentResponse.json())
-      const draft = {
-        ...current.version.workflow_definition,
-        triggers: current.version.workflow_definition.triggers.map((trigger) => ({
-          ...trigger,
-          parameters: { ...trigger.parameters, group_id: 'draft-B' },
-        })),
-      }
-      const savedResponse = await apiRequest(app, 'patch', `/workflows/${id}`, {
-        token,
-        data: { workflow_definition: draft },
-      })
-      expect(savedResponse.ok()).toBe(true)
-      const saved = z.object({ current_version: z.number() }).parse(await savedResponse.json())
+      createdIds.push(id)
       await publishWorkflowViaApi(app, id, versionNumber)
       await app.goto(toAppUrl(`/workflow-builder/${id}`))
-      await expect(app.getByRole('button', { name: 'Publish workflow', exact: true })).toBeEnabled()
-      await app.getByRole('button', { name: 'Publish workflow', exact: true }).click()
-      const publishDialog = app.getByRole('dialog', { name: 'Publish workflow', exact: true })
-      await publishDialog.getByRole('button', { name: 'Publish workflow', exact: true }).click()
-      const groupsDialog = app.getByRole('dialog', { name: 'Use the published consumer groups?', exact: true })
-      await expect(groupsDialog).toBeVisible()
-      await expect(groupsDialog.getByText('draft-B', { exact: true })).toBeVisible()
-      await expect(groupsDialog.getByText('established-A', { exact: true })).toBeVisible()
-      expect(
-        (
-          await new AxeBuilder({ page: app })
-            .include('[role="dialog"]')
-            .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
-            .analyze()
-        ).violations
-      ).toEqual([])
-      await app.screenshot({ path: testInfo.outputPath('kafka-group-carry-forward.png'), fullPage: true })
-      await groupsDialog.getByRole('button', { name: 'Cancel', exact: true }).click()
-      const unchangedResponse = await apiRequest(app, 'get', `/workflows/${id}`, { token })
-      const unchanged = z
-        .object({ current_version: z.number(), version: z.object({ workflow_definition: definitionSchema }) })
-        .parse(await unchangedResponse.json())
-      expect(unchanged.current_version).toBe(saved.current_version)
-      expect(unchanged.version.workflow_definition.triggers[0]?.parameters.group_id).toBe('draft-B')
-      await app.getByRole('button', { name: 'Publish workflow', exact: true }).click()
-      await publishDialog.getByRole('button', { name: 'Publish workflow', exact: true }).click()
-      await expect(groupsDialog).toBeVisible()
-      const published = app.waitForResponse(
-        (response) =>
-          response.request().method() === 'POST' &&
-          response.url().includes(`/workflows/${id}/versions/`) &&
-          response.url().endsWith('/publish')
+      const token = await getAuthToken(app)
+      if (!token) throw new Error('Missing authentication token')
+      const detail = detailSchema.parse(await (await apiRequest(app, 'get', `/workflows/${id}`, { token })).json())
+      const originalGroup = detail.kafka_subscription_sources[0]?.group_id
+      expect(detail.kafka_subscription_sources[0]?.group_id_is_generated).toBe(true)
+      await openNodeForEditing(app, 'Automatic consumer')
+      await expect(app.getByRole('textbox', { name: GROUP, exact: true })).toHaveValue(originalGroup ?? '')
+      await app.getByRole('button', { name: 'Update', exact: true }).click()
+      const saved = app.waitForResponse(
+        (response) => response.request().method() === 'PATCH' && response.url().endsWith(`/workflows/${id}`)
       )
-      await groupsDialog.getByRole('button', { name: 'Use published groups and publish', exact: true }).click()
-      expect((await published).ok()).toBe(true)
-      expect((await published).request().postDataJSON()).toMatchObject({
-        workflow_definition: { triggers: [{ parameters: { group_id: 'established-A' } }] },
+      await clickSaveAndWait(app)
+      expect((await saved).request().postDataJSON()).toMatchObject({
+        workflow_definition: { triggers: [{ parameters: { group_id: null } }] },
       })
-      const finalResponse = await apiRequest(app, 'get', `/workflows/${id}`, { token })
-      const final = z
-        .object({ current_version: z.number(), version: z.object({ workflow_definition: definitionSchema }) })
-        .parse(await finalResponse.json())
-      expect(final.current_version).toBeGreaterThan(saved.current_version)
-      expect(final.version.workflow_definition.triggers[0]?.parameters.group_id).toBe('established-A')
-      const oldResponse = await apiRequest(app, 'get', `/workflows/${id}/versions/${saved.current_version}`, { token })
-      const old = z.object({ workflow_definition: definitionSchema }).parse(await oldResponse.json())
-      expect(old.workflow_definition.triggers[0]?.parameters.group_id).toBe('draft-B')
-      await expect(app.getByRole('heading', { name: 'Success alert: Workflow published', exact: true })).toBeVisible()
+      await app.getByRole('button', { name: 'Publish workflow', exact: true }).click()
+      const published = app.waitForResponse(
+        (response) => response.request().method() === 'POST' && response.url().endsWith('/publish')
+      )
+      await app
+        .getByRole('dialog', { name: 'Publish workflow', exact: true })
+        .getByRole('button', { name: 'Publish workflow', exact: true })
+        .click()
+      expect((await published).ok()).toBe(true)
+      expect((await published).request().postDataJSON()).not.toHaveProperty('workflow_definition')
       await app.getByRole('button', { name: 'Workflow actions', exact: true }).click()
-      const downloadPromise = app.waitForEvent('download')
+      const downloading = app.waitForEvent('download')
       await app.getByRole('menuitem', { name: 'Export workflow', exact: true }).click()
-      const exported = definitionSchema.parse(JSON.parse(await readFile(await (await downloadPromise).path(), 'utf8')))
-      expect(exported.triggers[0]?.parameters.group_id).toBe('established-A')
+      const exported = definitionSchema.parse(JSON.parse(await readFile(await (await downloading).path(), 'utf8')))
+      expect(exported.triggers[0]?.parameters.group_id).toBeNull()
+      const clone = await createWorkflowViaApi({
+        app,
+        name: buildUniqueName('kafka-auto-import'),
+        nodes,
+        edges,
+        triggers: exported.triggers,
+      })
+      createdIds.push(clone.id)
+      await publishWorkflowViaApi(app, clone.id, clone.versionNumber)
+      const cloneDetail = detailSchema.parse(
+        await (await apiRequest(app, 'get', `/workflows/${clone.id}`, { token })).json()
+      )
+      expect(cloneDetail.kafka_subscription_sources[0]?.group_id_is_generated).toBe(true)
+      expect(cloneDetail.kafka_subscription_sources[0]?.group_id).not.toBe(originalGroup)
     } finally {
-      if (workflowId) await deleteWorkflowViaApi(app, workflowId)
+      for (const id of createdIds) await deleteWorkflowViaApi(app, id)
       await deleteIntegrationViaApi(app, connection.integrationId)
       await deleteCredentialViaApi(app, connection.credentialId)
     }
   })
+
+  for (const entry of ['toolbar', 'history']) {
+    test(`offers carry-forward from ${entry} after an older version was published`, async ({ app }, testInfo) => {
+      const connection = await createKafkaConnection(app)
+      let workflowId: string | undefined
+      try {
+        const { id, versionNumber } = await createWorkflowViaApi({
+          app,
+          name: buildUniqueName('kafka-stale-group'),
+          nodes: [
+            {
+              id: 'process',
+              name: 'Process order',
+              type: 'script',
+              parameters: { language: 'python', code: 'print(1)' },
+            },
+          ],
+          edges: [{ from: 'subscribe', to: 'process' }],
+          triggers: [
+            {
+              id: 'subscribe',
+              name: 'Orders',
+              type: 'event_subscribe_trigger',
+              parameters: {
+                integration_id: connection.integrationId,
+                credential_id: connection.credentialId,
+                topic: 'orders',
+                group_id: 'established-A',
+              },
+            },
+          ],
+        })
+        workflowId = id
+        const token = await getAuthToken(app)
+        if (!token) throw new Error('Missing authentication token')
+        const currentResponse = await apiRequest(app, 'get', `/workflows/${id}`, { token })
+        expect(currentResponse.ok()).toBe(true)
+        const definitionSchema = z.looseObject({
+          triggers: z.array(z.looseObject({ id: z.string(), parameters: z.record(z.string(), z.unknown()) })),
+        })
+        const current = z
+          .object({ version: z.object({ workflow_definition: definitionSchema }) })
+          .parse(await currentResponse.json())
+        const draft = {
+          ...current.version.workflow_definition,
+          triggers: current.version.workflow_definition.triggers.map((trigger) => ({
+            ...trigger,
+            parameters: { ...trigger.parameters, group_id: 'draft-B' },
+          })),
+        }
+        const savedResponse = await apiRequest(app, 'patch', `/workflows/${id}`, {
+          token,
+          data: { workflow_definition: draft },
+        })
+        expect(savedResponse.ok()).toBe(true)
+        const saved = z.object({ current_version: z.number() }).parse(await savedResponse.json())
+        await publishWorkflowViaApi(app, id, versionNumber)
+        await app.goto(toAppUrl(`/workflow-builder/${id}`))
+        await expect(app.getByRole('button', { name: 'Publish workflow', exact: true })).toBeEnabled()
+        const openPublish = async () => {
+          if (entry === 'history') {
+            if (
+              !(await app
+                .getByRole('button', { name: `Actions for version ${saved.current_version}`, exact: true })
+                .isVisible())
+            ) {
+              await app.getByRole('button', { name: 'Workflow actions', exact: true }).click()
+              await app.getByRole('menuitem', { name: /Version history/i }).click()
+            }
+            await app.getByRole('button', { name: `Actions for version ${saved.current_version}`, exact: true }).click()
+            await app.getByRole('menuitem', { name: 'Publish this version', exact: true }).click()
+          } else {
+            await app.getByRole('button', { name: 'Publish workflow', exact: true }).click()
+          }
+        }
+        await openPublish()
+        const publishDialog = app.getByRole('dialog', { name: 'Publish workflow', exact: true })
+        await publishDialog.getByRole('button', { name: 'Publish workflow', exact: true }).click()
+        const groupsDialog = app.getByRole('dialog', { name: 'Use the published consumer groups?', exact: true })
+        await expect(groupsDialog).toBeVisible()
+        await expect(groupsDialog.getByText('draft-B', { exact: true })).toBeVisible()
+        await expect(groupsDialog.getByText('established-A', { exact: true })).toBeVisible()
+        expect(
+          (
+            await new AxeBuilder({ page: app })
+              .include('[role="dialog"]')
+              .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+              .analyze()
+          ).violations
+        ).toEqual([])
+        await app.screenshot({ path: testInfo.outputPath('kafka-group-carry-forward.png'), fullPage: true })
+        await groupsDialog.getByRole('button', { name: 'Cancel', exact: true }).click()
+        const unchangedResponse = await apiRequest(app, 'get', `/workflows/${id}`, { token })
+        const unchanged = z
+          .object({ current_version: z.number(), version: z.object({ workflow_definition: definitionSchema }) })
+          .parse(await unchangedResponse.json())
+        expect(unchanged.current_version).toBe(saved.current_version)
+        expect(unchanged.version.workflow_definition.triggers[0]?.parameters.group_id).toBe('draft-B')
+        await openPublish()
+        await publishDialog.getByRole('button', { name: 'Publish workflow', exact: true }).click()
+        await expect(groupsDialog).toBeVisible()
+        const published = app.waitForResponse(
+          (response) =>
+            response.request().method() === 'POST' &&
+            response.url().includes(`/workflows/${id}/versions/`) &&
+            response.url().endsWith('/publish')
+        )
+        await groupsDialog.getByRole('button', { name: 'Use published groups and publish', exact: true }).click()
+        expect((await published).ok()).toBe(true)
+        expect((await published).request().postDataJSON()).toMatchObject({
+          workflow_definition: { triggers: [{ parameters: { group_id: 'established-A' } }] },
+        })
+        const finalResponse = await apiRequest(app, 'get', `/workflows/${id}`, { token })
+        const final = z
+          .object({ current_version: z.number(), version: z.object({ workflow_definition: definitionSchema }) })
+          .parse(await finalResponse.json())
+        expect(final.current_version).toBeGreaterThan(saved.current_version)
+        expect(final.version.workflow_definition.triggers[0]?.parameters.group_id).toBe('established-A')
+        const oldResponse = await apiRequest(app, 'get', `/workflows/${id}/versions/${saved.current_version}`, {
+          token,
+        })
+        const old = z.object({ workflow_definition: definitionSchema }).parse(await oldResponse.json())
+        expect(old.workflow_definition.triggers[0]?.parameters.group_id).toBe('draft-B')
+        await expect(
+          app.getByRole('heading', {
+            name: entry === 'history' ? 'Success alert: Version published' : 'Success alert: Workflow published',
+            exact: true,
+          })
+        ).toBeVisible()
+        if (entry === 'toolbar') {
+          await app.getByRole('button', { name: 'Workflow actions', exact: true }).click()
+          const downloadPromise = app.waitForEvent('download')
+          await app.getByRole('menuitem', { name: 'Export workflow', exact: true }).click()
+          const exported = definitionSchema.parse(
+            JSON.parse(await readFile(await (await downloadPromise).path(), 'utf8'))
+          )
+          expect(exported.triggers[0]?.parameters.group_id).toBe('established-A')
+        }
+      } finally {
+        if (workflowId) await deleteWorkflowViaApi(app, workflowId)
+        await deleteIntegrationViaApi(app, connection.integrationId)
+        await deleteCredentialViaApi(app, connection.credentialId)
+      }
+    })
+  }
 })

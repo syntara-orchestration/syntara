@@ -37,6 +37,10 @@ export function matchingKafkaSource(
   )
 }
 
+export function configuredKafkaGroup(source: KafkaPublishedSource) {
+  return source.group_id_is_generated ? null : source.group_id
+}
+
 export type KafkaGroupConflict = { triggerId: string; draftGroup: string; source: KafkaPublishedSource }
 
 export function reconcileKafkaGroups(definition: Definition, sources: readonly KafkaPublishedSource[]) {
@@ -53,18 +57,31 @@ export function reconcileKafkaGroups(definition: Definition, sources: readonly K
         item.integration_id === parameters.integration_id &&
         item.topic === parameters.topic
     )
-    if (!source || parameters.group_id === source.group_id) return trigger
-    if (typeof parameters.group_id === 'string' && parameters.group_id !== '') {
+    if (!source) return trigger
+    const configuredGroup = configuredKafkaGroup(source)
+    if (parameters.group_id === configuredGroup || (configuredGroup === null && parameters.group_id == null))
+      return trigger
+    if (
+      typeof parameters.group_id === 'string' &&
+      parameters.group_id !== '' &&
+      parameters.group_id !== source.group_id
+    ) {
       conflicts.push({ triggerId: source.trigger_node_id, draftGroup: parameters.group_id, source })
     }
     changed = true
-    return { ...trigger, parameters: { ...parameters, group_id: source.group_id } }
+    return { ...trigger, parameters: { ...parameters, group_id: configuredGroup } }
   })
   return { definition: changed ? { ...definition, triggers } : definition, conflicts, changed }
 }
 
 export function kafkaSourceRevision(sources: readonly KafkaPublishedSource[]) {
   return JSON.stringify(
-    sources.map((source) => [source.source_id, source.generation, source.configuration_revision, source.group_id])
+    sources.map((source) => [
+      source.source_id,
+      source.generation,
+      source.configuration_revision,
+      source.group_id,
+      source.group_id_is_generated,
+    ])
   )
 }

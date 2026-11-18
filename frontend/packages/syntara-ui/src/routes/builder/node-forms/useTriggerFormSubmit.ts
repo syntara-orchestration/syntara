@@ -2,7 +2,12 @@ import { ScheduleTypeEnum, TriggerTypeEnum, WEBHOOK_TRIGGER_TYPES } from '@synta
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import type { ZodType } from 'zod'
 
-import { kafkaPublicationQueryKey, matchingKafkaSource, readKafkaPublication } from './kafkaPublishedGroups'
+import {
+  configuredKafkaGroup,
+  kafkaPublicationQueryKey,
+  matchingKafkaSource,
+  readKafkaPublication,
+} from './kafkaPublishedGroups'
 import { normalizeWebhookPath, type TriggerFormData } from './triggerFormSchema'
 
 function submitData(data: TriggerFormData): TriggerFormData {
@@ -49,7 +54,7 @@ export function useTriggerFormSubmit({ schema, workflowId, triggerId, onSubmit }
         data.integrationId,
         data.topic
       )
-      return { data: source ? { ...data, kafkaGroupId: source.group_id } : data, publication }
+      return { data: source ? { ...data, kafkaGroupId: configuredKafkaGroup(source) ?? undefined } : data, publication }
     },
   })
 

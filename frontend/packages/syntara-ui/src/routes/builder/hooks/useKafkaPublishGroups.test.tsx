@@ -35,11 +35,12 @@ const source = {
   source_id: 'source-1',
   generation: 1,
   configuration_revision: 1,
+  group_id_is_generated: false,
   integration_id: 'integration-1',
   topic: 'orders',
   group_id: 'published-A',
 }
-function response(sources = [source], target = definition) {
+function response(sources = [source], target: Record<string, unknown> = definition) {
   return {
     data: { kafka_subscription_sources: sources, version: { version: 3, workflow_definition: target } },
     response: new Response(),
@@ -170,11 +171,11 @@ describe('Kafka publication group reconciliation', () => {
     })
   })
 
-  it('checks the selected saved version rather than the currently loaded draft', async () => {
+  it('checks the selected saved version even when the editor contains an unsaved draft', async () => {
     vi.mocked(workflowFetchClient.GET)
       .mockResolvedValueOnce(response())
       .mockResolvedValueOnce({ data: { version: 1, workflow_definition: definition }, response: new Response() })
-    const { result, submit } = setup()
+    const { result, submit } = setup(true)
     act(() => result.current.publish(undefined, undefined, undefined, { versionOverride: 1 }))
     await waitFor(() => expect(result.current.groupConflicts).toHaveLength(1))
     expect(workflowFetchClient.GET).toHaveBeenLastCalledWith('/workflows/{workflow_id}/versions/{version}', {
@@ -189,5 +190,55 @@ describe('Kafka publication group reconciliation', () => {
     act(() => result.current.publish())
     await waitFor(() => expect(showError).toHaveBeenCalled())
     expect(submit).not.toHaveBeenCalled()
+  })
+})
+
+describe('automatic consumer groups', () => {
+  it.each([undefined, null])('preserves automatic mode (%s) without a publish override', async (groupId) => {
+    const automatic = { ...source, group_id: 'syntara.source-runtime-id', group_id_is_generated: true }
+    const target = {
+      ...definition,
+      triggers: [
+        { ...definition.triggers[0], parameters: { ...definition.triggers[0]?.parameters, group_id: groupId } },
+      ],
+    }
+    vi.mocked(workflowFetchClient.GET).mockResolvedValue(response([automatic], target))
+    const { result, submit } = setup()
+    act(() => result.current.publish())
+    await waitFor(() => expect(submit).toHaveBeenCalledOnce())
+    expect(submit.mock.calls[0]?.[3]?.workflowDefinition).toBeUndefined()
+    expect(target.triggers[0]?.parameters.group_id).toBe(groupId)
+  })
+
+  it('carries a stale custom override back to automatic mode after confirmation', async () => {
+    vi.mocked(workflowFetchClient.GET).mockResolvedValue(response([{ ...source, group_id_is_generated: true }]))
+    const { result, submit } = setup()
+    act(() => result.current.publish())
+    await waitFor(() => expect(result.current.groupConflicts).toHaveLength(1))
+    act(() => result.current.confirmGroups())
+    await waitFor(() => expect(submit).toHaveBeenCalledOnce())
+    expect(submit.mock.calls[0]?.[3]?.workflowDefinition).toMatchObject({
+      triggers: [{ parameters: { group_id: null } }],
+    })
+  })
+
+  it('does not publish after dismissing the initial dialog while the lookup is pending', async () => {
+    let finish: (() => void) | undefined
+    vi.mocked(workflowFetchClient.GET).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = () => resolve(response([], definition))
+        })
+    )
+    const { result, submit } = setup()
+    act(() => result.current.publish())
+    await waitFor(() => expect(result.current.isCheckingGroups).toBe(true))
+    act(() => result.current.cancelGroups())
+    await act(async () => {
+      finish?.()
+      await Promise.resolve()
+    })
+    expect(submit).not.toHaveBeenCalled()
+    expect(result.current.groupConflicts).toBeUndefined()
   })
 })

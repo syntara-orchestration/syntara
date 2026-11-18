@@ -11,6 +11,7 @@ import { detachPromise } from '../../../utils/detachPromise'
 import { downloadVersionExport } from '../../../utils/downloadWorkflowExport'
 
 import { buildWorkflowVersionsQuery } from './buildWorkflowVersionsQuery'
+import { useKafkaPublishGroups, type PreparedPublishOptions } from './useKafkaPublishGroups'
 import { resolvePublishedVersionName } from './versionHistoryHelpers'
 
 export type VersionStatus = 'draft' | 'published' | 'previously_published'
@@ -99,13 +100,18 @@ export function useVersionHistory({ workflowId, isNew, onVersionUpdated }: UseVe
     [workflowId, showError]
   )
 
-  const publishVersion = useCallback(
-    (version: number, publishName?: string, changeDescription?: string) => {
-      if (!workflowId) return
+  const submitPublish = useCallback(
+    (publishName?: string, changeDescription?: string, onSettled?: () => void, options?: PreparedPublishOptions) => {
+      const version = options?.versionOverride
+      if (!workflowId || version == null) return
       publishMutation.mutate(
         {
           params: { path: { workflow_id: workflowId, version } },
-          body: { name: publishName ?? null, change_description: changeDescription ?? null },
+          body: {
+            name: publishName ?? null,
+            change_description: changeDescription ?? null,
+            ...(options?.workflowDefinition ? { workflow_definition: options.workflowDefinition } : {}),
+          },
         },
         {
           onSuccess: (data) => {
@@ -126,11 +132,20 @@ export function useVersionHistory({ workflowId, isNew, onVersionUpdated }: UseVe
           onError: (error: unknown) => {
             showError({ title: 'Failed to publish version', description: getErrorMessage(error) })
           },
+          onSettled,
         }
       )
     },
     [workflowId, publishMutation, versionsQuery, queryClient, showSuccess, showError, onVersionUpdated]
   )
+
+  const publication = useKafkaPublishGroups({
+    workflowId,
+    getDefinition: () => undefined,
+    submit: submitPublish,
+  })
+  const publishVersion = (version: number, name?: string, description?: string, onSettled?: () => void) =>
+    publication.publish(name, description, onSettled, { versionOverride: version })
 
   const openInNewWindow = useCallback(
     (version: number) => {
@@ -172,6 +187,12 @@ export function useVersionHistory({ workflowId, isNew, onVersionUpdated }: UseVe
     exportVersion,
     openInNewWindow,
     publishVersion,
+    publication: {
+      groupConflicts: publication.groupConflicts,
+      confirmGroups: publication.confirmGroups,
+      cancelGroups: publication.cancelGroups,
+    },
+    isPublishing: publishMutation.isPending || publication.isCheckingGroups,
     updateVersionMetadata,
     updateMetadataMutation,
     paginationFooterProps,

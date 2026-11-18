@@ -8,6 +8,7 @@ const mockRestoreDialogClose = vi.fn()
 const mockRefetch = vi.fn().mockResolvedValue({})
 const mockExportVersion = vi.fn()
 const mockOpenInNewWindow = vi.fn()
+const mockCancelPublication = vi.fn()
 const mockPublishVersion = vi.fn()
 const mockHandleExitVersionView = vi.fn()
 const mockHandleConfirmRestore = vi.fn()
@@ -32,6 +33,8 @@ vi.mock('./useBuilderVersionHistory', () => ({
     exportVersion: mockExportVersion,
     openInNewWindow: mockOpenInNewWindow,
     publishVersion: mockPublishVersion,
+    publication: { cancelGroups: mockCancelPublication, confirmGroups: vi.fn(), groupConflicts: undefined },
+    isPublishing: false,
     isViewingVersion: mockIsViewingVersion,
     viewedVersionDate: mockViewedVersionDate,
     viewedVersionStatus: null,
@@ -371,7 +374,7 @@ describe('useBuilderVersionPanel', () => {
     expect(result.current.versionSidePanel.editDialog.isOpen).toBe(false)
   })
 
-  it('publishDialog.onPublish calls publishVersion and closes dialog', () => {
+  it('publishDialog.onPublish passes a settled callback separately from dismissal', () => {
     const { result } = renderHook(() => useBuilderVersionPanel(createParams()))
 
     act(() => {
@@ -384,8 +387,9 @@ describe('useBuilderVersionPanel', () => {
       result.current.versionSidePanel.publishDialog.onPublish('Release', 'Description')
     })
 
-    expect(mockPublishVersion).toHaveBeenCalledWith(2, 'Release', 'Description')
-    expect(result.current.versionSidePanel.publishDialog.isOpen).toBe(false)
+    expect(mockPublishVersion).toHaveBeenCalledWith(2, 'Release', 'Description', expect.any(Function))
+    expect(result.current.versionSidePanel.publishDialog.isOpen).toBe(true)
+    expect(mockCancelPublication).not.toHaveBeenCalled()
   })
 
   it('publishDialog.onClose closes without publishing', () => {
@@ -401,6 +405,7 @@ describe('useBuilderVersionPanel', () => {
 
     expect(result.current.versionSidePanel.publishDialog.isOpen).toBe(false)
     expect(mockPublishVersion).not.toHaveBeenCalled()
+    expect(mockCancelPublication).toHaveBeenCalledOnce()
   })
 
   it('restoreDialog.onClose calls the close function', () => {

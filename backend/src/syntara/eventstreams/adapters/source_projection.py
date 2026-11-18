@@ -19,6 +19,11 @@ from syntara.eventstreams.core.subscribe_parameters import EventSubscribeParamet
 _GROUP_ID_PREFIX = "syntara"
 
 
+def generated_kafka_group_id(deployment_id: UUID, subscription_id: UUID, generation: int) -> str:
+    """Return the stable automatic group for one source identity."""
+    return f"{_GROUP_ID_PREFIX}.{deployment_id}.{subscription_id}.{generation}"
+
+
 def project_source_configuration(
     parameters: EventSubscribeParameters,
     *,
@@ -33,7 +38,7 @@ def project_source_configuration(
     projected.
     """
     if isinstance(parameters, KafkaSubscribeParameters):
-        group_id = f"{_GROUP_ID_PREFIX}.{deployment_id}.{subscription_id}.{generation}"
+        group_id = generated_kafka_group_id(deployment_id, subscription_id, generation)
         return KafkaSourceConfiguration(topic=parameters.topic, group_id=group_id)
 
     msg = "Unsupported Event Subscribe transport for source projection"

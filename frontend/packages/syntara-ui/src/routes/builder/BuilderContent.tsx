@@ -630,6 +630,7 @@ function BuilderContentBody(props: BuilderContentProps) {
                   handleToggleDetails={handleToggleDetails}
                   handleSaveWorkflow={guardedSaveWorkflow}
                   onPublish={onPublish}
+                  onCancelPublish={cancelGroups}
                   onUnpublish={onUnpublish}
                   onDuplicate={handleDuplicateWorkflow}
                   onPendingImport={setPendingImport}
