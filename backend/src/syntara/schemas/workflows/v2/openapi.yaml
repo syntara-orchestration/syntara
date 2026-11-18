@@ -1145,6 +1145,8 @@ components:
     # Import workflow-specific schemas
     WorkflowRead:
       $ref: ./shared-schemas.yaml#/components/schemas/WorkflowRead
+    KafkaSubscriptionSourceRead:
+      $ref: ./shared-schemas.yaml#/components/schemas/KafkaSubscriptionSourceRead
     WorkflowReadWithVersion:
       $ref: ./shared-schemas.yaml#/components/schemas/WorkflowReadWithVersion
     PublishWorkflowVersionResponse:
