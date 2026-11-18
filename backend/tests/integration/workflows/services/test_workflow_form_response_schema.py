@@ -37,8 +37,49 @@ def _form_definition(value_name: str = "request_title") -> dict[str, Any]:
                 "value_name": value_name,
                 "label": "Request title",
                 "required": True,
-            }
+            },
+            {"type": "email", "value_name": "contact", "label": "Contact"},
+            {"type": "number", "value_name": "count", "label": "Count"},
+            {"type": "checkbox", "value_name": "confirmed", "label": "Confirmed"},
+            {
+                "type": "date",
+                "value_name": "scheduled_at",
+                "label": "Scheduled at",
+                "include_date": True,
+                "include_time": True,
+                "include_timezone": True,
+            },
+            {
+                "type": "dropdown",
+                "value_name": "severity",
+                "label": "Severity",
+                "options": {
+                    "source": "static",
+                    "values": [{"display_label": "Low", "value": "low"}],
+                },
+            },
+            {
+                "type": "multi_select",
+                "value_name": "tags",
+                "label": "Tags",
+                "options": {
+                    "source": "static",
+                    "values": [{"display_label": "One", "value": "one"}],
+                },
+            },
         ]
+    }
+
+
+def _expected_properties(text_value_name: str) -> dict[str, dict[str, Any]]:
+    return {
+        text_value_name: {"type": "string"},
+        "contact": {"type": "string"},
+        "count": {"type": ["number", "null"]},
+        "confirmed": {"type": "boolean"},
+        "scheduled_at": {"type": "string", "format": "date-time"},
+        "severity": {"type": ["string", "null"], "enum": ["low", None]},
+        "tags": {"type": "array", "items": {"type": "string", "enum": ["one"]}},
     }
 
 
@@ -96,12 +137,8 @@ class TestWorkflowFormResponseSchemaPersistence:
         prompt_parameters = version.workflow_definition["nodes"][0]["parameters"]
         trigger_schema = trigger_parameters["response_schema"]
         prompt_schema = prompt_parameters["response_schema"]
-        assert trigger_schema["properties"] == {
-            "request_title": {"type": "string"},
-        }
-        assert prompt_schema["properties"] == {
-            "prompt_title": {"type": "string"},
-        }
+        assert trigger_schema["properties"] == _expected_properties("request_title")
+        assert prompt_schema["properties"] == _expected_properties("prompt_title")
 
         updated_definition = _workflow_definition()
         updated_definition["triggers"][0]["parameters"]["form_definition"] = _form_definition("updated_title")
@@ -117,9 +154,7 @@ class TestWorkflowFormResponseSchemaPersistence:
         assert updated_version is not None
         updated_trigger_parameters = updated_version.workflow_definition["triggers"][0]["parameters"]
         updated_prompt_parameters = updated_version.workflow_definition["nodes"][0]["parameters"]
-        assert updated_trigger_parameters["response_schema"]["properties"] == {
-            "updated_title": {"type": "string"},
-        }
+        assert updated_trigger_parameters["response_schema"]["properties"] == _expected_properties("updated_title")
         assert updated_prompt_parameters["response_schema"] == prompt_schema
 
     @pytest.mark.asyncio
@@ -128,6 +163,26 @@ class TestWorkflowFormResponseSchemaPersistence:
     ) -> None:
         service = WorkflowService(test_db_session, test_user)
         definition = _workflow_definition()
+        definition["triggers"][0]["parameters"]["form_definition"] = {
+            "fields": [
+                {
+                    "type": "text",
+                    "value_name": "request_title",
+                    "label": "Request title",
+                    "required": True,
+                }
+            ]
+        }
+        definition["nodes"][0]["parameters"]["form_definition"] = {
+            "fields": [
+                {
+                    "type": "text",
+                    "value_name": "prompt_title",
+                    "label": "Prompt title",
+                    "required": True,
+                }
+            ]
+        }
         workflow = Workflow(
             name=f"legacy-form-schema-{test_project_id.hex[:8]}",
             current_version=1,

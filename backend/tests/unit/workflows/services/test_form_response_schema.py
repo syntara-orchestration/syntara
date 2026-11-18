@@ -111,6 +111,62 @@ def test_generated_schema_passes_security_validation() -> None:
     validate_json_schema_definition(schema)
 
 
+@pytest.mark.parametrize(
+    ("include_date", "include_time", "include_timezone", "expected_schema"),
+    [
+        (True, False, False, {"type": "string", "format": "date"}),
+        (True, True, False, {"type": "string", "format": "date-time"}),
+        (True, True, True, {"type": "string", "format": "date-time"}),
+        (False, True, False, {"type": "string", "format": "time"}),
+        (False, True, True, {"type": "string", "format": "time"}),
+        (False, False, True, {"type": "string"}),
+    ],
+)
+def test_date_field_schema_matches_collected_components(
+    *,
+    include_date: bool,
+    include_time: bool,
+    include_timezone: bool,
+    expected_schema: dict[str, Any],
+) -> None:
+    definition = {
+        "fields": [
+            {
+                "type": "date",
+                "value_name": "when",
+                "label": "When",
+                "include_date": include_date,
+                "include_time": include_time,
+                "include_timezone": include_timezone,
+            }
+        ]
+    }
+
+    schema = generate_form_response_schema(definition)
+
+    assert schema["properties"]["when"] == expected_schema
+
+
+def test_optional_checkbox_accepts_both_boolean_values() -> None:
+    definition = {
+        "fields": [
+            {
+                "type": "checkbox",
+                "value_name": "confirmed",
+                "label": "Confirmed",
+                "required": False,
+            }
+        ]
+    }
+
+    schema = generate_form_response_schema(definition)
+
+    assert schema["properties"]["confirmed"] == {"type": "boolean"}
+    assert Draft202012Validator(schema).is_valid({"confirmed": False})
+    assert Draft202012Validator(schema).is_valid({"confirmed": True})
+    assert not Draft202012Validator(schema).is_valid({"confirmed": None})
+
+
 def test_dynamic_options_use_conservative_scalar_types() -> None:
     definition = {
         "fields": [
@@ -181,6 +237,48 @@ def test_prepare_keeps_legacy_form_without_schema_unchanged() -> None:
     assert "response_schema" not in prepared["triggers"][0]["parameters"]
 
 
-def test_invalid_form_definition_is_rejected() -> None:
+@pytest.mark.parametrize(
+    "definition",
+    [
+        {"fields": []},
+        {},
+        {
+            "fields": [
+                {"type": "unknown", "value_name": "value", "label": "Value"},
+            ]
+        },
+        {
+            "fields": [
+                {"type": "text", "value_name": "value", "label": "Value"},
+                {"type": "email", "value_name": "value", "label": "Value"},
+            ]
+        },
+        {
+            "fields": [
+                {
+                    "type": "date",
+                    "value_name": "when",
+                    "label": "When",
+                    "include_date": False,
+                    "include_time": False,
+                    "include_timezone": False,
+                }
+            ]
+        },
+        {
+            "fields": [
+                {
+                    "type": "date",
+                    "value_name": "when",
+                    "label": "When",
+                    "include_date": True,
+                    "include_time": False,
+                    "include_timezone": True,
+                }
+            ]
+        },
+    ],
+)
+def test_invalid_form_definition_is_rejected(definition: dict[str, Any]) -> None:
     with pytest.raises(ValidationError):
-        generate_form_response_schema({"fields": [{"type": "unknown", "value_name": "x", "label": "X"}]})
+        generate_form_response_schema(definition)
