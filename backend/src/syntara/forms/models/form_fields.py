@@ -65,6 +65,11 @@ class CheckboxField(FormFieldBase):
 
 # The components a date field can collect, in the order they are reported.
 DATE_COMPONENTS = ("date", "time", "timezone")
+SUPPORTED_DATE_COMPONENTS = (
+    ("date",),
+    ("time", "timezone"),
+    ("date", "time", "timezone"),
+)
 
 
 # Used both for a field's `default` and for the expected submitted response.
@@ -128,26 +133,26 @@ class DateValue(BaseModel):
         return tuple(name for name in DATE_COMPONENTS if getattr(self, name) is not None)
 
 
-# The three include_* toggles decide which components the form asks for. A
-# component that is not included is not collected at all, and every component
-# that is included is mandatory once the responder answers the field. Whether
-# the field may be skipped entirely is the inherited `required` flag, exactly as
-# for every other field type.
+# The three include_* toggles decide which components the form asks for. The
+# supported selections are a date; a time with a timezone; or all three. Every
+# included component is mandatory once the responder answers the field.
+# Whether the field may be skipped entirely is the inherited `required` flag,
+# exactly as for every other field type.
 class DateField(FormFieldBase):
     """Date field collecting a valid combination of date, time, and timezone."""
 
     type: Literal["date"]
     include_date: bool = Field(
         default=True,
-        description="Collect a calendar date.",
+        description="Collect a calendar date, either alone or with time and timezone.",
     )
     include_time: bool = Field(
         default=False,
-        description="Collect a 24-hour time in HH:MM format.",
+        description="Collect a 24-hour time in HH:MM format. A timezone is required; a date may also be collected.",
     )
     include_timezone: bool = Field(
         default=False,
-        description="Collect an IANA timezone name.",
+        description="Collect an IANA timezone name with a time; a date may also be collected.",
     )
     default: DateValue | None = Field(
         default=None,
@@ -170,17 +175,19 @@ class DateField(FormFieldBase):
 
     @model_validator(mode="after")
     def _check_included_components(self) -> DateField:
-        """Require at least one component. Disallow date + timezone combo."""
-        if not self.included_components():
+        """Allow only component combinations with RFC 3339 normalized values."""
+        components = self.included_components()
+        if not components:
             msg = (
                 f"Field '{self.value_name}': at least one of include_date, "
                 "include_time, or include_timezone must be true"
             )
             raise SafeValueError(msg)
-
-        # Disallow date + timezone combination.
-        if self.include_date and self.include_timezone and not self.include_time:
-            msg = f"Field '{self.value_name}': Select a time when both a date and timezone are included."
+        if components not in SUPPORTED_DATE_COMPONENTS:
+            msg = (
+                f"Field '{self.value_name}': unsupported combination of date components. "
+                "Choose a date; a time with a timezone; or a date, time, and timezone."
+            )
             raise SafeValueError(msg)
         return self
 

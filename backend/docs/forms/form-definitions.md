@@ -37,16 +37,13 @@ checked against the same list.
 
 #### Date Fields
 
-The `date` field can collect a date, time, timezone, or a permitted combination. Inputs use ISO
-8601 `YYYY-MM-DD` dates, 24-hour `HH:MM` times, and IANA timezone names. The validator rejects
-impossible dates and unrecognized timezones. A date and timezone can be combined only when a time
-is also selected.
+The `date` field supports a date; a time with a timezone; or all three components. It accepts
+ISO 8601 `YYYY-MM-DD` dates, 24-hour `HH:MM` times, and IANA timezones, and rejects invalid values
+and combinations.
 
-After validation, the selected components are normalized into one string. If the field collects
-time and timezone without a date, the time string uses the timezone's standard UTC offset.
-
-**Planned follow-up:** Align the date field's input and normalized output with JSON Schema
-2020-12 and RFC 3339. The details above describe the current behavior.
+Normalized output follows RFC 3339: `full-date`, `full-time`, or `date-time` for those combinations,
+respectively. Date-time output uses the offset for its date; time with timezone uses the zone's
+standard UTC offset.
 
 ## Form Parameters
 

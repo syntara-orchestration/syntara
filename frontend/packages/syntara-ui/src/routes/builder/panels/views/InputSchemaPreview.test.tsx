@@ -1,9 +1,11 @@
 import type { OutputFieldDef } from '@syntara/contracts'
 import { fireEvent, render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import { axe } from 'vitest-axe'
 
 import { DRAG_TYPE_FIELD } from '../utils/dragTypes'
+import type { PreviewFieldDef } from '../utils/effectiveOutputSchema'
 
 import { InputSchemaPreview } from './InputSchemaPreview'
 
@@ -139,5 +141,127 @@ describe('InputSchemaPreview', () => {
     const { container } = render(<InputSchemaPreview fields={[]} nodeId="step-1" />)
 
     expect(container.innerHTML).toBe('')
+  })
+})
+
+describe('InputSchemaPreview nested fields', () => {
+  const formFields: PreviewFieldDef[] = [
+    { name: 'status', type: 'string', description: 'Form was submitted or timed out' },
+    {
+      name: 'response_data',
+      type: 'object',
+      description: 'Submitted form field values',
+      children: [
+        { name: 'email', type: 'string', description: 'Work address', displayName: 'Email address' },
+        { name: 'age', type: 'number', description: '', displayName: 'age' },
+      ],
+    },
+  ]
+
+  function captureDrag(element: HTMLElement) {
+    const calls: Array<[string, string]> = []
+    const dataTransfer = {
+      setData: (format: string, value: string) => {
+        calls.push([format, value])
+      },
+      effectAllowed: '',
+    }
+    fireEvent.dragStart(element, { dataTransfer })
+    return Object.fromEntries(calls)
+  }
+
+  it('shows nested children expanded by default without user interaction', () => {
+    render(<InputSchemaPreview fields={formFields} nodeId="prompt-1" />)
+
+    expect(screen.getByText('{} response_data')).toBeInTheDocument()
+    expect(screen.getByText('T email')).toBeInTheDocument()
+    expect(screen.getByText('# age')).toBeInTheDocument()
+  })
+
+  it('combines a differing display name with the description as secondary text', () => {
+    render(<InputSchemaPreview fields={formFields} nodeId="prompt-1" />)
+
+    expect(screen.getByText('Email address — Work address')).toBeInTheDocument()
+  })
+
+  it('omits secondary text when the display name matches the name and there is no description', () => {
+    render(<InputSchemaPreview fields={formFields} nodeId="prompt-1" />)
+
+    expect(screen.queryByText('age')).not.toBeInTheDocument()
+  })
+
+  it('carries the full nested path in the drag payload and plain-text expression', () => {
+    render(<InputSchemaPreview fields={formFields} nodeId="prompt-1" />)
+
+    const data = captureDrag(screen.getByText('T email'))
+
+    expect(JSON.parse(data['application/json'])).toStrictEqual({
+      type: DRAG_TYPE_FIELD,
+      nodeId: 'prompt-1',
+      fieldPath: ['response_data', 'email'],
+    })
+    expect(data['text/plain']).toBe('${prompt-1.response_data.email}')
+  })
+
+  it('keeps the top-level path for the parent field', () => {
+    render(<InputSchemaPreview fields={formFields} nodeId="prompt-1" />)
+
+    const data = captureDrag(screen.getByText('{} response_data'))
+
+    expect(JSON.parse(data['application/json'])).toMatchObject({ fieldPath: ['response_data'] })
+    expect(data['text/plain']).toBe('${prompt-1.response_data}')
+  })
+
+  it('offers an accessible copy button for each nested path', () => {
+    render(<InputSchemaPreview fields={formFields} nodeId="prompt-1" />)
+
+    expect(screen.getByRole('button', { name: 'Copy expression ${prompt-1.response_data}' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Copy expression ${prompt-1.response_data.email}' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Copy expression ${prompt-1.response_data.age}' })).toBeInTheDocument()
+  })
+
+  it('copies the complete nested expression to the clipboard', async () => {
+    const user = userEvent.setup()
+    render(<InputSchemaPreview fields={formFields} nodeId="prompt-1" />)
+
+    await user.click(screen.getByRole('button', { name: 'Copy expression ${prompt-1.response_data.email}' }))
+
+    expect(await navigator.clipboard.readText()).toBe('${prompt-1.response_data.email}')
+  })
+
+  it('uses the trigger namespace for form trigger fields', () => {
+    render(<InputSchemaPreview fields={formFields} nodeId="trigger" />)
+
+    expect(screen.getByRole('button', { name: 'Copy expression ${trigger.response_data.email}' })).toBeInTheDocument()
+  })
+
+  it('renders sibling and nested fields that share a name as separate items', () => {
+    const fields: PreviewFieldDef[] = [
+      { name: 'email', type: 'string', description: 'Top-level' },
+      {
+        name: 'response_data',
+        type: 'object',
+        description: '',
+        children: [{ name: 'email', type: 'string', description: '' }],
+      },
+    ]
+    render(<InputSchemaPreview fields={fields} nodeId="prompt-1" />)
+
+    expect(screen.getAllByText('T email')).toHaveLength(2)
+    expect(screen.getByRole('button', { name: 'Copy expression ${prompt-1.email}' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Copy expression ${prompt-1.response_data.email}' })).toBeInTheDocument()
+  })
+
+  it('does not nest anything for a field with an empty children array', () => {
+    const fields: PreviewFieldDef[] = [{ name: 'response_data', type: 'object', description: '', children: [] }]
+    render(<InputSchemaPreview fields={fields} nodeId="prompt-1" />)
+
+    expect(screen.getAllByRole('treeitem')).toHaveLength(1)
+  })
+
+  it('has no accessibility violations with nested fields', async () => {
+    const { container } = render(<InputSchemaPreview fields={formFields} nodeId="prompt-1" />)
+
+    expect(await axe(container)).toHaveNoViolations()
   })
 })

@@ -7,25 +7,22 @@ import type { UpstreamStepInfo } from './hooks/useUpstreamSteps'
 import { InputStepContent, InputPanelStepSection } from './InputStepContent'
 import { getTriggerInputSchemaFields } from './utils/triggerSchemaUtils'
 
-// Mock the getNodeOutputSchema function
-vi.mock('@syntara/contracts', () => ({
-  getNodeOutputSchema: vi.fn((type: string) => {
-    if (type === 'script') {
-      return {
-        stdout: { type: 'string' },
-        return_code: { type: 'number' },
+// Keep the real enums (effectiveOutputSchema needs them) and stub only the output schema lookup
+vi.mock('@syntara/contracts', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@syntara/contracts')>()
+  return {
+    ...actual,
+    getNodeOutputSchema: vi.fn((type: string) => {
+      if (type === 'script') {
+        return [
+          { name: 'stdout', type: 'string', description: 'Standard output' },
+          { name: 'return_code', type: 'number', description: 'Exit code' },
+        ]
       }
-    }
-    return null
-  }),
-  TriggerTypeEnum: {
-    MANUAL_TRIGGER: 'manual_trigger',
-    SCHEDULED: 'scheduled',
-    EVENT: 'event',
-    WEBHOOK_TRIGGER: 'webhook_trigger',
-    EDA_TRIGGER: 'eda_trigger',
-  },
-}))
+      return actual.getNodeOutputSchema(type)
+    }),
+  }
+})
 
 // Mock the view components
 vi.mock('./InputEmptyState', () => ({
@@ -35,9 +32,18 @@ vi.mock('./InputEmptyState', () => ({
 }))
 
 vi.mock('./views/InputSchemaPreview', () => ({
-  InputSchemaPreview: ({ fields, nodeId }: { fields: Record<string, unknown>; nodeId: string }) => (
+  InputSchemaPreview: ({
+    fields,
+    nodeId,
+  }: {
+    fields: { name: string; children?: { name: string }[] }[]
+    nodeId: string
+  }) => (
     <div data-testid="input-schema-preview">
-      Schema preview for {nodeId} with {Object.keys(fields).length} fields
+      Schema preview for {nodeId} with {fields.length} fields
+      <span data-testid="preview-children">
+        {fields.flatMap((field) => field.children?.map((child) => `${field.name}.${child.name}`) ?? []).join(',')}
+      </span>
     </div>
   ),
 }))
@@ -248,8 +254,86 @@ describe('InputStepContent', () => {
     })
   })
 
+  describe('configured form outputs without execution data', () => {
+    const form_definition = {
+      fields: [
+        { type: 'text', value_name: 'email', label: 'Email' },
+        { type: 'number', value_name: 'age', label: 'Age' },
+      ],
+    }
+
+    it('previews configured fields of an upstream form prompt under its actual node id', () => {
+      render(
+        <InputStepContent
+          upstreamNode={{ id: 'prompt-1', name: 'Ask', type: 'form_prompt', parameters: { form_definition } }}
+          hasData={false}
+          mergedExecutionData={null}
+          triggers={undefined}
+          activeView="schema"
+          searchTerm=""
+        />
+      )
+
+      expect(screen.getByText(/Schema preview for prompt-1/)).toBeInTheDocument()
+      expect(screen.getByTestId('preview-children')).toHaveTextContent('response_data.email,response_data.age')
+    })
+
+    it('previews configured fields of an upstream form trigger under the trigger alias', () => {
+      render(
+        <InputStepContent
+          upstreamNode={{ id: 'form-trigger-id', name: 'Form', type: 'form_trigger', parameters: { form_definition } }}
+          hasData={false}
+          mergedExecutionData={null}
+          triggers={undefined}
+          activeView="schema"
+          searchTerm=""
+        />
+      )
+
+      expect(screen.getByText(/Schema preview for trigger/)).toBeInTheDocument()
+      expect(screen.getByTestId('preview-children')).toHaveTextContent('response_data.email,response_data.age')
+    })
+
+    it('keeps the generic preview when the form definition is invalid', () => {
+      render(
+        <InputStepContent
+          upstreamNode={{
+            id: 'prompt-1',
+            name: 'Ask',
+            type: 'form_prompt',
+            parameters: { form_definition: { fields: [] } },
+          }}
+          hasData={false}
+          mergedExecutionData={null}
+          triggers={undefined}
+          activeView="schema"
+          searchTerm=""
+        />
+      )
+
+      expect(screen.getByTestId('input-schema-preview')).toBeInTheDocument()
+      expect(screen.getByTestId('preview-children')).toBeEmptyDOMElement()
+    })
+
+    it('shows real execution data instead of the expected form fields when data exists', () => {
+      render(
+        <InputStepContent
+          upstreamNode={{ id: 'prompt-1', name: 'Ask', type: 'form_prompt', parameters: { form_definition } }}
+          hasData={true}
+          mergedExecutionData={{ 'prompt-1': { response_data: { email: 'a@example.com' } } }}
+          triggers={undefined}
+          activeView="schema"
+          searchTerm=""
+        />
+      )
+
+      expect(screen.getByTestId('input-schema-view')).toBeInTheDocument()
+      expect(screen.queryByTestId('input-schema-preview')).not.toBeInTheDocument()
+    })
+  })
+
   describe('expressionNodeId computation', () => {
-    it.each(['manual_trigger', 'scheduled', 'event', 'webhook_trigger', 'eda_trigger'])(
+    it.each(['manual_trigger', 'form_trigger', 'scheduled_trigger', 'event', 'webhook_trigger', 'eda_trigger'])(
       'sets expressionNodeId to "trigger" for %s type',
       (type) => {
         render(

@@ -251,7 +251,24 @@ _COMMON_CASES: tuple[tuple[str, list[dict[str, Any]], str | None, str, str, int]
         ],
         _VARIANT_CATEGORY,
         "parameters.form_definition.fields.0",
-        "Select a time when both a date and timezone are included.",
+        "unsupported combination of date components",
+        1,
+    ),
+    (
+        "date_time_without_timezone",
+        [
+            {
+                "type": "date",
+                "value_name": "when",
+                "label": "When",
+                "include_date": True,
+                "include_time": True,
+                "include_timezone": False,
+            }
+        ],
+        _VARIANT_CATEGORY,
+        "parameters.form_definition.fields.0",
+        "unsupported combination of date components",
         1,
     ),
     (
@@ -270,8 +287,9 @@ _COMMON_CASES: tuple[tuple[str, list[dict[str, Any]], str | None, str, str, int]
                 "value_name": "when",
                 "label": "When",
                 "include_date": False,
+                "include_time": True,
                 "include_timezone": True,
-                "default": {"timezone": "Mars/Olympus"},
+                "default": {"time": "14:30", "timezone": "Mars/Olympus"},
             }
         ],
         _VARIANT_CATEGORY,
@@ -287,8 +305,9 @@ _COMMON_CASES: tuple[tuple[str, list[dict[str, Any]], str | None, str, str, int]
                 "value_name": "when",
                 "label": "When",
                 "include_date": False,
+                "include_time": True,
                 "include_timezone": True,
-                "default": {},
+                "default": {"time": "14:30"},
             }
         ],
         _VARIANT_CATEGORY,

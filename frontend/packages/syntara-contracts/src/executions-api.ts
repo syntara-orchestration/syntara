@@ -1313,19 +1313,19 @@ export interface components {
       type: 'date'
       /**
        * Include Date
-       * @description Collect a calendar date.
+       * @description Collect a calendar date, either alone or with time and timezone.
        * @default true
        */
       include_date?: boolean
       /**
        * Include Time
-       * @description Collect a 24-hour time in HH:MM format.
+       * @description Collect a 24-hour time in HH:MM format. A timezone is required; a date may also be collected.
        * @default false
        */
       include_time?: boolean
       /**
        * Include Timezone
-       * @description Collect an IANA timezone name.
+       * @description Collect an IANA timezone name with a time; a date may also be collected.
        * @default false
        */
       include_timezone?: boolean

@@ -180,8 +180,10 @@ def test_invalid_timezone_is_reported_at_default_component() -> None:
         "type": "date",
         "value_name": "start_date",
         "label": "Start date",
+        "include_date": False,
+        "include_time": True,
         "include_timezone": True,
-        "default": {"timezone": "Mars/Olympus"},
+        "default": {"time": "14:30", "timezone": "Mars/Olympus"},
     }
 
     finding = _single_finding(_parameters(field))
@@ -205,7 +207,7 @@ def test_date_component_rules_are_reported_on_the_field() -> None:
 
     assert finding.category == ValidationCategory.form_trigger_configuration
     assert finding.field_path == "parameters.form_definition.fields.0"
-    assert "Select a time when both a date and timezone are included." in finding.message
+    assert "unsupported combination of date components" in finding.message
 
 
 def test_default_that_fails_submission_coercion_is_reported_at_default() -> None:
