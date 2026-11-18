@@ -48,7 +48,7 @@ def _make_mock_workflow(
     wv.workflow_definition = {
         "schema_version": "2.0.0",
         "triggers": [{"id": "trigger_1", "type": "manual"}],
-        "nodes": [{"id": nid, "type": "script"} for nid in (node_ids or ["target_node"])],
+        "nodes": [{"id": nid, "type": "script_python"} for nid in (node_ids or ["target_node"])],
         "edges": [],
     }
     return wf, wv
@@ -367,7 +367,7 @@ class TestCreateTestExecution:
         wv.workflow_definition = {
             "schema_version": "2.0.0",
             "triggers": [{"id": "trigger_1", "type": NodeType.WEBHOOK_TRIGGER}],
-            "nodes": [{"id": "target_node", "type": "script"}],
+            "nodes": [{"id": "target_node", "type": "script_python"}],
             "edges": [],
         }
         service, session = _make_service(query_result=(wf, wv), temporal_service=None)
@@ -391,7 +391,7 @@ class TestCreateTestExecution:
         wv.workflow_definition = {
             "schema_version": "2.0.0",
             "triggers": [],
-            "nodes": [{"id": "target_node", "type": "script"}],
+            "nodes": [{"id": "target_node", "type": "script_python"}],
             "edges": [],
         }
         service, session = _make_service(query_result=(wf, wv), temporal_service=None)

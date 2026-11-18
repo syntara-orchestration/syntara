@@ -22,9 +22,8 @@ triggers:
 nodes:
   - id: transient_task
     name: Transient Task
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       environment:
         INPUT_SEED: ${trigger.seed}
       code: |

@@ -110,8 +110,8 @@ class TestWorkflowExecution:
                 {
                     "id": "script_node",
                     "name": "Hello Script",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": "echo 'Hello from execution test'"},
+                    "type": "script_bash",
+                    "parameters": {"code": "echo 'Hello from execution test'"},
                 },
                 edges=[{"from": "trigger_manual", "to": "script_node"}],
             ),
@@ -216,20 +216,20 @@ class TestWorkflowExecution:
                 {
                     "id": "node_a",
                     "name": "First Script",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": "echo 'Output from node A'"},
+                    "type": "script_bash",
+                    "parameters": {"code": "echo 'Output from node A'"},
                 },
                 {
                     "id": "node_b",
                     "name": "Second Script",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": "echo 'Output from node B'"},
+                    "type": "script_bash",
+                    "parameters": {"code": "echo 'Output from node B'"},
                 },
                 {
                     "id": "node_c",
                     "name": "Third Script",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": "echo 'Output from node C'"},
+                    "type": "script_bash",
+                    "parameters": {"code": "echo 'Output from node C'"},
                 },
                 edges=[
                     {"from": "trigger_manual", "to": "node_a"},
@@ -353,8 +353,8 @@ class TestWorkflowExecution:
                 {
                     "id": "script_node",
                     "name": "Conditional Script",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": "echo 'Running script'; exit 0"},
+                    "type": "script_bash",
+                    "parameters": {"code": "echo 'Running script'; exit 0"},
                 },
                 edges=[{"from": "trigger_manual", "to": "script_node"}],
             ),
@@ -380,8 +380,8 @@ class TestWorkflowExecution:
             {
                 "id": "script_node",
                 "name": "Failing Script",
-                "type": "script",
-                "parameters": {"language": "bash", "code": "echo 'This will fail'; exit 1"},
+                "type": "script_bash",
+                "parameters": {"code": "echo 'This will fail'; exit 1"},
             },
             edges=[{"from": "trigger_manual", "to": "script_node"}],
         )
@@ -524,8 +524,8 @@ class TestWorkflowExecution:
                 {
                     "id": "post_approval_script",
                     "name": "Post-Approval Step",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": "echo 'approved path executed'"},
+                    "type": "script_bash",
+                    "parameters": {"code": "echo 'approved path executed'"},
                 },
                 edges=[
                     {"from": "trigger_manual", "to": "approval_gate"},
@@ -616,8 +616,8 @@ class TestWorkflowExecution:
                 {
                     "id": "script_node",
                     "name": "Long Script",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": "sleep 300"},
+                    "type": "script_bash",
+                    "parameters": {"code": "sleep 300"},
                 },
                 edges=[{"from": "trigger_manual", "to": "script_node"}],
             ),
@@ -734,8 +734,8 @@ class TestParallelBranches:
                     {
                         "id": "final",
                         "name": "Final Step",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo 'both branches done'"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo 'both branches done'"},
                     },
                 ],
                 "edges": [
@@ -795,27 +795,27 @@ class TestParallelBranches:
                     {
                         "id": "branch_a",
                         "name": "Branch A",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo A"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo A"},
                     },
                     {
                         "id": "branch_b",
                         "name": "Branch B",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo B"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo B"},
                     },
                     {
                         "id": "branch_c",
                         "name": "Branch C",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo C"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo C"},
                     },
                     {"id": "join", "name": "Converge", "type": "converge", "parameters": {}},
                     {
                         "id": "final",
                         "name": "Final",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo done"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo done"},
                     },
                 ],
                 "edges": [
@@ -883,20 +883,20 @@ class TestNodeFailurePropagation:
                     {
                         "id": "node_a",
                         "name": "Node A — Succeeds",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo 'node A ok'"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo 'node A ok'"},
                     },
                     {
                         "id": "node_b",
                         "name": "Node B — Fails",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo 'node B failing'; exit 1"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo 'node B failing'; exit 1"},
                     },
                     {
                         "id": "node_c",
                         "name": "Node C — Should Not Run",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo 'node C ran (unexpected)'"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo 'node C ran (unexpected)'"},
                     },
                 ],
                 "edges": [
@@ -944,20 +944,20 @@ class TestNodeFailurePropagation:
                     {
                         "id": "fail_first",
                         "name": "Fail First",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "exit 1"},
+                        "type": "script_bash",
+                        "parameters": {"code": "exit 1"},
                     },
                     {
                         "id": "node_b",
                         "name": "Node B",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo B"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo B"},
                     },
                     {
                         "id": "node_c",
                         "name": "Node C",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo C"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo C"},
                     },
                 ],
                 "edges": [
@@ -1001,14 +1001,14 @@ class TestNodeFailurePropagation:
                     {
                         "id": "branch_ok",
                         "name": "Branch OK",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo 'ok branch'"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo 'ok branch'"},
                     },
                     {
                         "id": "branch_fail",
                         "name": "Branch Fail",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "exit 1"},
+                        "type": "script_bash",
+                        "parameters": {"code": "exit 1"},
                     },
                     {
                         "id": "join",

@@ -52,9 +52,10 @@ async def execute_fixture_script(payload: dict[str, Any]) -> tuple[dict[str, Any
     if "invocation" in payload:
         invocation = payload["invocation"]
         input_config = invocation["inputs"]
+        language = "bash" if invocation.get("step_revision_id", "").endswith(".script-bash") else "python"
     else:
         input_config = payload["input_config"]
-    language = input_config.get("language", "python")
+        language = input_config.get("language", "python")
     code = input_config["code"]
     command = ["bash", "-c", code] if language == "bash" else [sys.executable, "-c", code]
     environment = {

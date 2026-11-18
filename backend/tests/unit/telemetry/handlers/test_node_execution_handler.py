@@ -28,7 +28,7 @@ class TestNodeExecutedTelemetryHandler:
         request_id = uuid4()
         domain_event = NodeExecutedDomainEvent(
             execution_id=execution_id,
-            node_type=NodeType.SCRIPT,
+            node_type=NodeType.SCRIPT_PYTHON,
             node_def=SAMPLE_NODE_DEF,
             status=ActivityTerminalStatus.COMPLETED,
             duration_ms=1500,
@@ -41,7 +41,7 @@ class TestNodeExecutedTelemetryHandler:
         event = registry.send_event.call_args[0][0]
         assert isinstance(event, NodeExecutionEvent)
         assert event.workflow_execution_id == execution_id
-        assert event.node_type == NodeType.SCRIPT
+        assert event.node_type == NodeType.SCRIPT_PYTHON
         assert event.status == ActivityTerminalStatus.COMPLETED
         assert event.duration_ms == 1500
         assert event.entitlement_id == "ent-test-789"
@@ -59,7 +59,7 @@ class TestNodeExecutedTelemetryHandler:
         domain_event = NodeExecutedDomainEvent(
             execution_id=uuid4(),
             workflow_id=workflow_id,
-            node_type=NodeType.SCRIPT,
+            node_type=NodeType.SCRIPT_PYTHON,
             node_def=SAMPLE_NODE_DEF,
             status=ActivityTerminalStatus.COMPLETED,
             mode=ExecutionMode.STANDARD,
@@ -79,7 +79,7 @@ class TestNodeExecutedTelemetryHandler:
 
         domain_event = NodeExecutedDomainEvent(
             execution_id=uuid4(),
-            node_type=NodeType.SCRIPT,
+            node_type=NodeType.SCRIPT_PYTHON,
             node_def=SAMPLE_NODE_DEF,
             status=ActivityTerminalStatus.FAILED,
             error_type="ActivityExecutionError",
@@ -99,7 +99,7 @@ class TestNodeExecutedTelemetryHandler:
 
         domain_event = NodeExecutedDomainEvent(
             execution_id=uuid4(),
-            node_type=NodeType.SCRIPT,
+            node_type=NodeType.SCRIPT_PYTHON,
             node_def=SAMPLE_NODE_DEF,
             status=ActivityTerminalStatus.COMPLETED,
         )
@@ -114,7 +114,7 @@ class TestNodeExecutedTelemetryHandler:
 
         domain_event = NodeExecutedDomainEvent(
             execution_id=uuid4(),
-            node_type=NodeType.SCRIPT,
+            node_type=NodeType.SCRIPT_PYTHON,
             node_def=SAMPLE_NODE_DEF,
             status=ActivityTerminalStatus.COMPLETED,
         )

@@ -16,6 +16,7 @@ from syntara.workflow_core.models import (
     AgenticExecutorParameters,
     APIExecutorParameters,
     ApprovalNodeParameters,
+    BashScriptExecutorParameters,
     ConditionNodeParameters,
     ConvergeNodeParameters,
     DoWhileLoopParameters,
@@ -25,7 +26,7 @@ from syntara.workflow_core.models import (
     NodeSettingsCofDisabled,
     NodeSettingsFull,
     NodeSettingsNoRetry,
-    ScriptExecutorParameters,
+    PythonScriptExecutorParameters,
     SwitchNodeParameters,
     WaitNodeParameters,
 )
@@ -86,11 +87,19 @@ class AgenticNode(WorkflowNodeBase):
     settings: NodeSettingsNoRetry | None = None
 
 
-class ScriptNode(WorkflowNodeBase):
-    """Script executor node."""
+class PythonScriptNode(WorkflowNodeBase):
+    """Python script executor node."""
 
-    type: Literal["script"]
-    parameters: ScriptExecutorParameters
+    type: Literal["script_python"]
+    parameters: PythonScriptExecutorParameters
+    settings: NodeSettingsNoRetry | None = None
+
+
+class BashScriptNode(WorkflowNodeBase):
+    """Bash script executor node."""
+
+    type: Literal["script_bash"]
+    parameters: BashScriptExecutorParameters
     settings: NodeSettingsNoRetry | None = None
 
 
@@ -147,7 +156,8 @@ _AllNodeTypes = (
     | AAPWorkflowJobTemplateNode
     | HTTPRequestNode
     | AgenticNode
-    | ScriptNode
+    | PythonScriptNode
+    | BashScriptNode
     | ApprovalNode
     | ConditionNode
     | SwitchNode

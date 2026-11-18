@@ -209,7 +209,7 @@ class ActivityNodeSyncMixin:
             now = datetime.now(UTC)
             for node_id in missing:
                 activity_def = metadata.activity_definitions_map.get(node_id, {})
-                node_type_str = activity_def.get("type", "script")
+                node_type_str = activity_def.get("type", NodeType.INTERNAL_ACTIVITY.value)
 
                 # Safely construct NodeType enum with fallback to INTERNAL_ACTIVITY
                 try:

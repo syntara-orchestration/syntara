@@ -23,9 +23,8 @@ triggers:
 nodes:
   - id: test_multiple_placeholders
     name: Test Multiple Expression Placeholders
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       environment:
         INPUT_GREETING: "Hello, ${trigger.firstName} ${trigger.lastName}!"
       code: |
@@ -33,9 +32,8 @@ nodes:
 
   - id: test_variable_reference
     name: Test Trigger Field Reference
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       environment:
         INPUT_TIMEOUT_VALUE: ${trigger.timeout}
       code: |
@@ -43,9 +41,8 @@ nodes:
 
   - id: test_activity_output_reference
     name: Test Activity Output Reference
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       environment:
         INPUT_PREVIOUS_RESULT: ${test_multiple_placeholders.stdout}
       code: |

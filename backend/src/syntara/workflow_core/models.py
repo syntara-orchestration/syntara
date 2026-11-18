@@ -137,7 +137,8 @@ class ActivityName(StrEnum):
     APPROVAL = "execute_approval_activity"
     HTTP_REQUEST = "execute_http_request_activity"
     INTERNAL_ACTIVITY = "execute_internal_activity"
-    SCRIPT = "execute_script_activity"
+    SCRIPT_PYTHON = "execute_python_script_activity"
+    SCRIPT_BASH = "execute_bash_script_activity"
     # Internal
     CREDENTIAL_RESOLUTION = "resolve_workflow_credentials"
     INTEGRATION_RESOLUTION = "resolve_workflow_integration"
@@ -175,7 +176,8 @@ class NodeType(str, Enum):
     APPROVAL = "approval"
     HTTP_REQUEST = "http_request"
     INTERNAL_ACTIVITY = "internal_activity"
-    SCRIPT = "script"
+    SCRIPT_PYTHON = "script_python"
+    SCRIPT_BASH = "script_bash"
 
 
 def resolve_trigger_node(
@@ -258,13 +260,6 @@ class WorkflowTerminalStatus(str, Enum):
     CANCELLED = "cancelled"
 
 
-class ScriptLanguage(str, Enum):
-    """Supported script languages for script executor."""
-
-    BASH = "bash"
-    PYTHON = "python"
-
-
 class HTTPMethod(str, Enum):
     """Supported HTTP methods for API requests."""
 
@@ -320,7 +315,7 @@ class NodeSettingsCofDisabled(NodeSettingsCof):
 
 
 class NodeSettingsNoRetry(NodeSettingsCofDisabled):
-    """Settings with disabled, continue_on_failure, and timeout (script, agentic, approval)."""
+    """Settings with disabled, continue_on_failure, and timeout (script types, agentic, approval)."""
 
     timeout: int | None = Field(default=None, ge=1)
 
@@ -407,13 +402,15 @@ class CredentialBindingsMixin(BaseModel):
         return value
 
 
-class ScriptExecutorParameters(
+class ScriptExecutorParametersBase(
     ExecutionPlaneMixin,
+    CredentialBindingsMixin,
     TemplateAwareBaseModel,
 ):
-    """Parameters for script executor."""
+    """Shared parameters for isolated Python and Bash script executors."""
 
-    language: ScriptLanguage
+    model_config = ConfigDict(validate_assignment=True, extra="forbid")
+
     code: str = Field(min_length=1, description="Script code to execute")
     environment: dict[str, str] = Field(default_factory=dict, description="Environment variables")
 
@@ -430,6 +427,14 @@ class ScriptExecutorParameters(
         if isinstance(v, dict):
             return {k: val if isinstance(val, str) else json.dumps(val) for k, val in v.items()}
         return v
+
+
+class PythonScriptExecutorParameters(ScriptExecutorParametersBase):
+    """Parameters for Python script executor."""
+
+
+class BashScriptExecutorParameters(ScriptExecutorParametersBase):
+    """Parameters for Bash script executor."""
 
 
 class APIExecutorParameters(CredentialBindingsMixin, TemplateAwareBaseModel):
@@ -1102,7 +1107,8 @@ class WaitOutput(NodeOutput):
 
 
 NODE_OUTPUT_MODELS: dict[str, type[NodeOutput]] = {
-    NodeType.SCRIPT: ScriptOutput,
+    NodeType.SCRIPT_PYTHON: ScriptOutput,
+    NodeType.SCRIPT_BASH: ScriptOutput,
     NodeType.HTTP_REQUEST: HttpRequestOutput,
     NodeType.AAP_JOB_TEMPLATE: AAPJobTemplateOutput,
     NodeType.AAP_WORKFLOW_JOB_TEMPLATE: AAPWorkflowJobTemplateOutput,

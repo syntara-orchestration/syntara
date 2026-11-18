@@ -38,8 +38,8 @@ def _script_workflow_def(name: str, code: str) -> dict[str, object]:
             {
                 "id": "script_node",
                 "name": "Script",
-                "type": "script",
-                "parameters": {"language": "bash", "code": code},
+                "type": "script_bash",
+                "parameters": {"code": code},
             },
         ],
         "edges": [{"from": "trigger", "to": "script_node"}],
@@ -119,14 +119,14 @@ class TestRetryExecution:
                             {
                                 "id": "node_a",
                                 "name": "Node A",
-                                "type": "script",
-                                "parameters": {"language": "bash", "code": "echo a"},
+                                "type": "script_bash",
+                                "parameters": {"code": "echo a"},
                             },
                             {
                                 "id": "node_b",
                                 "name": "Node B",
-                                "type": "script",
-                                "parameters": {"language": "bash", "code": "echo b"},
+                                "type": "script_bash",
+                                "parameters": {"code": "echo b"},
                             },
                         ],
                         "edges": [

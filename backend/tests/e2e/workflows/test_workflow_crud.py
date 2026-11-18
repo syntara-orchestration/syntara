@@ -104,14 +104,14 @@ class TestWorkflowAPI:
                 {
                     "id": "script_node_1",
                     "name": "First Script",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": "echo 'Hello from node 1'"},
+                    "type": "script_bash",
+                    "parameters": {"code": "echo 'Hello from node 1'"},
                 },
                 {
                     "id": "script_node_2",
                     "name": "Second Script",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": "echo 'Hello from node 2'"},
+                    "type": "script_bash",
+                    "parameters": {"code": "echo 'Hello from node 2'"},
                 },
                 edges=[
                     {"from": "trigger_manual", "to": "script_node_1"},
@@ -151,14 +151,13 @@ class TestWorkflowAPI:
         node_1 = definition["nodes"][0]
         assert node_1["id"] == "script_node_1"
         assert node_1["name"] == "First Script"
-        assert node_1["type"] == "script"
-        assert node_1["parameters"]["language"] == "bash"
+        assert node_1["type"] == "script_bash"
         assert node_1["parameters"]["code"] == "echo 'Hello from node 1'"
 
         node_2 = definition["nodes"][1]
         assert node_2["id"] == "script_node_2"
         assert node_2["name"] == "Second Script"
-        assert node_2["type"] == "script"
+        assert node_2["type"] == "script_bash"
 
         assert "edges" in definition
         assert len(definition["edges"]) == 2, "Should have 2 edges"
@@ -230,8 +229,8 @@ class TestWorkflowAPI:
                 {
                     "id": "script_node_1",
                     "name": "Script Node",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": "echo 'test'"},
+                    "type": "script_bash",
+                    "parameters": {"code": "echo 'test'"},
                 },
                 edges=[{"from": "trigger_manual", "to": "script_node_1"}],
                 workflow_name=workflow_name,

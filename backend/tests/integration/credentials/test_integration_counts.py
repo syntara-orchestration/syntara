@@ -177,9 +177,8 @@ class TestGetWorkflowCountsIntegration:
                     {
                         "id": "script",
                         "name": "Run Script",
-                        "type": "script",
+                        "type": "script_python",
                         "parameters": {
-                            "language": "python",
                             "code": "print('done')",
                             "credential_bindings": [
                                 {

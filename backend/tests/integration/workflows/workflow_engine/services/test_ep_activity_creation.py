@@ -6,6 +6,7 @@ completion are doubles; row creation and callback lookups use PostgreSQL.
 
 from collections.abc import Generator
 from datetime import UTC, datetime
+from types import SimpleNamespace
 from typing import Self
 from unittest.mock import AsyncMock, Mock, patch
 from uuid import UUID, uuid4, uuid5
@@ -28,7 +29,7 @@ from syntara.workflows.models.execution import Execution
 
 _NODE_ID = "test_activity"
 _DEFINITIONS = {
-    _NODE_ID: {"type": "script"},
+    _NODE_ID: {"type": "script_python"},
     "other_activity": {"type": "http_request"},
 }
 
@@ -60,6 +61,16 @@ def ep_submission(
     with (
         patch.object(dispatch.activity, "info", return_value=info),
         patch.object(dispatch, "AsyncSessionLocal", test_db_session_factory),
+        patch.object(
+            dispatch,
+            "get_execution_plane_plugin",
+            AsyncMock(
+                return_value=SimpleNamespace(
+                    image_reference="quay.io/example/script-bash:test",
+                    step_identity="syntara.script-bash.script-bash",
+                )
+            ),
+        ),
         patch.object(dispatch, "ExecutionPlaneHttpClient"),
         patch.object(dispatch, "_submit_and_read_work", return_value={"status": "pending"}) as submission,
     ):
@@ -80,9 +91,7 @@ async def test_monitor_and_dispatch_share_identity_in_either_order(
     if monitor_first:
         await monitor._create_all_activities_upfront(test_execution.id, _DEFINITIONS)
 
-    assert (
-        await dispatch._dispatch_to_ep({"language": "bash", "code": "echo ok"}, None, test_execution.id, None) is None
-    )
+    assert await dispatch._dispatch_to_ep({"code": "echo ok"}, None, test_execution.id, None, "script-bash") is None
     work_id = UUID(ep_submission.call_args.args[1].command.payload["work_item_id"])
     assert work_id == uuid5(test_execution.id, _NODE_ID)
 
@@ -128,7 +137,7 @@ async def test_monitor_updates_row_created_after_dispatch(
     test_db_session_factory: async_sessionmaker[AsyncSession],
     ep_submission: AsyncMock,
 ) -> None:
-    await dispatch._dispatch_to_ep({"language": "bash", "code": "echo ok"}, None, test_execution.id, None)
+    await dispatch._dispatch_to_ep({"code": "echo ok"}, None, test_execution.id, None, "script-bash")
     work_id = UUID(ep_submission.call_args.args[1].command.payload["work_item_id"])
     monitor = ActivitySyncService(Mock(), test_db_session_factory, AsyncMock())
     metadata = await monitor._initialize_monitoring(test_execution.id)
@@ -143,7 +152,7 @@ async def test_monitor_updates_row_created_after_dispatch(
     }
     metadata.pending_sync_event_ids.add(1)
     handle = Mock()
-    handle.query = AsyncMock(side_effect=[{"language": "bash", "code": "echo ok"}, {"output": {"stdout": "ok"}}])
+    handle.query = AsyncMock(side_effect=[{"code": "echo ok"}, {"output": {"stdout": "ok"}}])
 
     await monitor._sync_activities_to_db(metadata, handle)
 
@@ -162,7 +171,6 @@ async def test_dispatch_moves_credential_bindings_out_of_inputs(
     first = uuid4()
     second = uuid4()
     input_config = {
-        "language": "bash",
         "code": "echo ok",
         "credential_bindings": [
             {"credential_recipe_id": "acme.echo.api-token", "credential_ref": first},
@@ -170,11 +178,11 @@ async def test_dispatch_moves_credential_bindings_out_of_inputs(
         ],
     }
 
-    await dispatch._dispatch_to_ep(input_config, None, test_execution.id, None)
+    await dispatch._dispatch_to_ep(input_config, None, test_execution.id, None, "script-bash")
 
     first_message = ep_submission.call_args.args[1]
     payload = WorkExecute.model_validate(first_message.command.payload)
-    assert payload.invocation.inputs == {"language": "bash", "code": "echo ok"}
+    assert payload.invocation.inputs == {"code": "echo ok"}
     assert "runtime_context" not in payload.invocation.model_dump()
     assert [
         (binding.credential_recipe_id, binding.credential_ref) for binding in payload.invocation.credential_bindings
@@ -183,7 +191,7 @@ async def test_dispatch_moves_credential_bindings_out_of_inputs(
         ("acme.echo.workspace-token", second),
     ]
 
-    await dispatch._dispatch_to_ep(input_config, None, test_execution.id, None)
+    await dispatch._dispatch_to_ep(input_config, None, test_execution.id, None, "script-bash")
     second_message = ep_submission.call_args.args[1]
     assert second_message.message_id != first_message.message_id
     assert payload.runtime_context == {
@@ -200,7 +208,6 @@ async def test_dispatch_rejects_unresolved_credential_binding_templates(
     ep_submission: AsyncMock,
 ) -> None:
     input_config = {
-        "language": "bash",
         "code": "echo ok",
         "credential_bindings": [
             {
@@ -211,7 +218,7 @@ async def test_dispatch_rejects_unresolved_credential_binding_templates(
     }
 
     with pytest.raises(ApplicationError, match="invalid for the Execution Plane command protocol"):
-        await dispatch._dispatch_to_ep(input_config, None, test_execution.id, None)
+        await dispatch._dispatch_to_ep(input_config, None, test_execution.id, None, "script-bash")
 
     ep_submission.assert_not_called()
 
@@ -233,7 +240,7 @@ async def test_cancellation_uses_base_activity_id_for_active_loop_iteration(
                     id=base_id,
                     execution_id=test_execution.id,
                     activity_name=_NODE_ID,
-                    node_type="script",
+                    node_type="script_python",
                     temporal_activity_id=_NODE_ID,
                     status=ActivityStatus.COMPLETED,
                     iteration=0,
@@ -250,7 +257,7 @@ async def test_cancellation_uses_base_activity_id_for_active_loop_iteration(
                     id=iteration_id,
                     execution_id=test_execution.id,
                     activity_name=f"{_NODE_ID}#iter-1",
-                    node_type="script",
+                    node_type="script_python",
                     temporal_activity_id=f"{_NODE_ID}#iter-1",
                     status=ActivityStatus.RUNNING,
                     iteration=1,
@@ -259,7 +266,7 @@ async def test_cancellation_uses_base_activity_id_for_active_loop_iteration(
                     id=non_derived_id,
                     execution_id=test_execution.id,
                     activity_name="pre-resolved-script",
-                    node_type="script",
+                    node_type="script_python",
                     temporal_activity_id="pre-resolved-script",
                     status=ActivityStatus.COMPLETED,
                 ),
@@ -269,7 +276,11 @@ async def test_cancellation_uses_base_activity_id_for_active_loop_iteration(
 
     client = _FakeExecutionPlaneClient()
     with (
-        patch.object(cancellation, "execution_plane_supported_node_types", return_value=frozenset({"script"})),
+        patch.object(
+            cancellation,
+            "execution_plane_supported_node_types",
+            return_value=frozenset({"script_python", "script_bash"}),
+        ),
         patch.object(cancellation, "ExecutionPlaneHttpClient", return_value=client),
     ):
         async with test_db_session_factory() as session:

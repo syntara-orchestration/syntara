@@ -653,7 +653,7 @@ class TestQueryCredentialCountsRealDB:
             "nodes": [
                 {"id": "node_1", "type": "agentic", "parameters": {"credential_id": cred_id_1}},
                 {"id": "node_2", "type": "http_request", "parameters": {"credential_id": cred_id_2}},
-                {"id": "node_3", "type": "script", "parameters": {"code": "print('hi')"}},
+                {"id": "node_3", "type": "script_python", "parameters": {"code": "print('hi')"}},
             ],
             "edges": [
                 {"from": "trigger_manual", "to": "node_1"},

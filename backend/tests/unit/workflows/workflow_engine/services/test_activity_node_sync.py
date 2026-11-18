@@ -10,8 +10,8 @@ def test_nested_loop_complete_edge_remains_in_outer_body() -> None:
         "nodes": [
             {"id": "outer", "type": NodeType.LOOP},
             {"id": "inner", "type": NodeType.LOOP},
-            {"id": "inner-body", "type": "script"},
-            {"id": "tail", "type": "script"},
+            {"id": "inner-body", "type": "script_python"},
+            {"id": "tail", "type": "script_python"},
         ],
         "edges": [
             {"from": "outer", "from_port": "iterate", "to": "inner"},

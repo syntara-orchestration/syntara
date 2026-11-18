@@ -23,18 +23,16 @@ nodes:
 
   - id: adult_message
     name: Adult Message
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       code: |
         echo "You are an adult (age >= 18)"
         echo "Access granted"
 
   - id: minor_message
     name: Minor Message
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       code: |
         echo "You are a minor (age < 18)"
         echo "Access denied"

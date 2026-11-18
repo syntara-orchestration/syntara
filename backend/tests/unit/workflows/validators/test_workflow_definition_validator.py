@@ -23,7 +23,7 @@ def _valid_definition() -> dict[str, Any]:
         "schema_version": "2.0.0",
         "name": "test-workflow",
         "triggers": [{"id": "t1", "type": "manual_trigger", "parameters": {}}],
-        "nodes": [{"id": "n1", "type": "script", "parameters": {"language": "python", "code": "print(1)"}}],
+        "nodes": [{"id": "n1", "type": "script_python", "parameters": {"code": "print(1)"}}],
         "edges": [{"from": "t1", "to": "n1"}],
     }
 
@@ -128,9 +128,7 @@ class TestCredentialBindings:
             ],
         }
         if node_type == "approval":
-            definition["nodes"].append(
-                {"id": "n2", "type": "script", "parameters": {"language": "python", "code": "pass"}}
-            )
+            definition["nodes"].append({"id": "n2", "type": "script_python", "parameters": {"code": "pass"}})
             definition["edges"] = [
                 {"from": "t1", "to": "n1"},
                 {"from": "n1", "to": "n2", "from_port": "approved"},
@@ -267,7 +265,7 @@ class TestSchemaValidation:
             "schema_version": "2.0.0",
             "name": "test",
             "triggers": [{"id": "t1", "type": "manual_trigger", "parameters": {}}],
-            "nodes": [{"id": "n1", "type": "script"}],
+            "nodes": [{"id": "n1", "type": "script_python"}],
             "edges": [{"from": "t1", "to": "n1"}],
         }
         with pytest.raises(SafeValueError, match="schema validation failed"):
@@ -279,7 +277,7 @@ class TestSchemaValidation:
             "name": "test",
             "triggers": [{"id": "t1", "type": "manual_trigger", "parameters": {}}],
             "nodes": [
-                {"id": "123-bad!", "type": "script", "parameters": {"language": "python", "code": "x"}},
+                {"id": "123-bad!", "type": "script_python", "parameters": {"code": "x"}},
             ],
             "edges": [{"from": "t1", "to": "n1"}],
         }
@@ -291,7 +289,7 @@ class TestSchemaValidation:
             "schema_version": "2.0.0",
             "name": "test",
             "triggers": [{"id": "t1", "type": "manual_trigger", "parameters": {}}],
-            "nodes": [{"id": "n1", "type": "script", "parameters": {"language": "python", "code": "x"}}],
+            "nodes": [{"id": "n1", "type": "script_python", "parameters": {"code": "x"}}],
             "edges": [{"from": "t1", "to": "n1", "color": "red", "weight": 5}],
         }
         with pytest.raises(SafeValueError, match="schema validation failed"):
@@ -317,7 +315,7 @@ class TestEdgeReferences:
             "schema_version": "2.0.0",
             "name": "bad-from",
             "triggers": [{"id": "t1", "type": "manual_trigger", "parameters": {}}],
-            "nodes": [{"id": "n1", "type": "script", "parameters": {"language": "python", "code": "1"}}],
+            "nodes": [{"id": "n1", "type": "script_python", "parameters": {"code": "1"}}],
             "edges": [{"from": "ghost", "to": "n1"}],
         }
         with pytest.raises(SafeValueError, match="non-existent node 'ghost'"):
@@ -328,7 +326,7 @@ class TestEdgeReferences:
             "schema_version": "2.0.0",
             "name": "bad-to",
             "triggers": [{"id": "t1", "type": "manual_trigger", "parameters": {}}],
-            "nodes": [{"id": "n1", "type": "script", "parameters": {"language": "python", "code": "1"}}],
+            "nodes": [{"id": "n1", "type": "script_python", "parameters": {"code": "1"}}],
             "edges": [{"from": "t1", "to": "missing"}],
         }
         with pytest.raises(SafeValueError, match="non-existent node 'missing'"):
@@ -344,9 +342,9 @@ class TestCycleDetection:
             "name": "cycle-test",
             "triggers": [{"id": "t1", "type": "manual_trigger", "parameters": {}}],
             "nodes": [
-                {"id": "a", "type": "script", "parameters": {"language": "python", "code": "1"}},
-                {"id": "b", "type": "script", "parameters": {"language": "python", "code": "2"}},
-                {"id": "c", "type": "script", "parameters": {"language": "python", "code": "3"}},
+                {"id": "a", "type": "script_python", "parameters": {"code": "1"}},
+                {"id": "b", "type": "script_python", "parameters": {"code": "2"}},
+                {"id": "c", "type": "script_python", "parameters": {"code": "3"}},
             ],
             "edges": [
                 {"from": "t1", "to": "a"},
@@ -364,7 +362,7 @@ class TestCycleDetection:
             "name": "self-loop",
             "triggers": [{"id": "t1", "type": "manual_trigger", "parameters": {}}],
             "nodes": [
-                {"id": "a", "type": "script", "parameters": {"language": "python", "code": "1"}},
+                {"id": "a", "type": "script_python", "parameters": {"code": "1"}},
             ],
             "edges": [
                 {"from": "t1", "to": "a"},
@@ -380,9 +378,9 @@ class TestCycleDetection:
             "name": "dag",
             "triggers": [{"id": "t1", "type": "manual_trigger", "parameters": {}}],
             "nodes": [
-                {"id": "a", "type": "script", "parameters": {"language": "python", "code": "1"}},
-                {"id": "b", "type": "script", "parameters": {"language": "python", "code": "2"}},
-                {"id": "c", "type": "script", "parameters": {"language": "python", "code": "3"}},
+                {"id": "a", "type": "script_python", "parameters": {"code": "1"}},
+                {"id": "b", "type": "script_python", "parameters": {"code": "2"}},
+                {"id": "c", "type": "script_python", "parameters": {"code": "3"}},
             ],
             "edges": [
                 {"from": "t1", "to": "a"},
@@ -404,7 +402,7 @@ class TestCycleDetection:
                     "type": "loop",
                     "parameters": {"type": "for_each", "items": "${t1.result.items}"},
                 },
-                {"id": "body", "type": "script", "parameters": {"language": "python", "code": "1"}},
+                {"id": "body", "type": "script_python", "parameters": {"code": "1"}},
             ],
             "edges": [
                 {"from": "t1", "to": "loop_node"},
@@ -445,9 +443,8 @@ class TestTemplateExpressionValidation:
             "nodes": [
                 {
                     "id": "n1",
-                    "type": "script",
+                    "type": "script_python",
                     "parameters": {
-                        "language": "python",
                         "code": "print(1)",
                         "environment": {"X": "${ghost.output}"},
                     },
@@ -469,9 +466,8 @@ class TestTemplateExpressionValidation:
             "nodes": [
                 {
                     "id": "n1",
-                    "type": "script",
+                    "type": "script_python",
                     "parameters": {
-                        "language": "python",
                         "code": "print(1)",
                         "environment": {"X": "${loop.item}"},
                     },
@@ -490,9 +486,8 @@ class TestTemplateExpressionValidation:
             "nodes": [
                 {
                     "id": "n1",
-                    "type": "script",
+                    "type": "script_python",
                     "parameters": {
-                        "language": "python",
                         "code": "print(1)",
                         "environment": {"X": "${loop.item}"},
                     },
@@ -521,8 +516,8 @@ class TestCollectFindings:
             "name": "orphan",
             "triggers": [{"id": "t1", "type": "manual_trigger", "parameters": {}}],
             "nodes": [
-                {"id": "n1", "type": "script", "parameters": {"language": "python", "code": "1"}},
-                {"id": "orphan", "type": "script", "parameters": {"language": "python", "code": "2"}},
+                {"id": "n1", "type": "script_python", "parameters": {"code": "1"}},
+                {"id": "orphan", "type": "script_python", "parameters": {"code": "2"}},
             ],
             "edges": [{"from": "t1", "to": "n1"}],
         }
@@ -554,15 +549,15 @@ class TestCollectFindings:
                 },
                 {
                     "id": "script1",
-                    "type": "script",
+                    "type": "script_python",
                     "name": "Script1",
-                    "parameters": {"language": "python", "code": "print(1)"},
+                    "parameters": {"code": "print(1)"},
                 },
                 {
                     "id": "script3",
-                    "type": "script",
+                    "type": "script_python",
                     "name": "Script3",
-                    "parameters": {"language": "python", "code": "print(3)"},
+                    "parameters": {"code": "print(3)"},
                 },
             ],
             "edges": [
@@ -583,7 +578,7 @@ class TestCollectFindings:
             "schema_version": "2.0.0",
             "name": "test",
             "triggers": [{"id": "t1", "type": "manual_trigger", "parameters": {}}],
-            "nodes": [{"id": "123_bad_id", "type": "script", "name": "Bad ID", "config": {}}],
+            "nodes": [{"id": "123_bad_id", "type": "script_python", "name": "Bad ID", "config": {}}],
             "edges": [{"from": "t1", "to": "123_bad_id"}],
         }
         result = validator.collect_findings(definition)
@@ -598,7 +593,7 @@ class TestCollectFindings:
             "schema_version": "2.0.0",
             "name": "test",
             "triggers": [{"id": "t1", "type": "manual_trigger", "parameters": {}}],
-            "nodes": [{"id": "n1", "type": "script", "config": {}}],
+            "nodes": [{"id": "n1", "type": "script_python", "config": {}}],
             "edges": [{"from": "t1", "to": "n1"}],
         }
         result = validator.collect_findings(definition)
@@ -627,7 +622,7 @@ class TestCollectFindings:
             "schema_version": "2.0.0",
             "name": "test",
             "triggers": [{"id": "t1", "type": "manual_trigger", "parameters": {}}],
-            "nodes": [{"id": "n1", "type": "script", "parameters": {"language": "python", "code": "1"}}],
+            "nodes": [{"id": "n1", "type": "script_python", "parameters": {"code": "1"}}],
             "edges": [{"from": "t1", "to": "ghost"}],
         }
         result = validator.collect_findings(definition)
@@ -642,8 +637,8 @@ class TestCollectFindings:
             "name": "cycle",
             "triggers": [{"id": "t1", "type": "manual_trigger", "parameters": {}}],
             "nodes": [
-                {"id": "a", "type": "script", "parameters": {"language": "python", "code": "1"}},
-                {"id": "b", "type": "script", "parameters": {"language": "python", "code": "2"}},
+                {"id": "a", "type": "script_python", "parameters": {"code": "1"}},
+                {"id": "b", "type": "script_python", "parameters": {"code": "2"}},
             ],
             "edges": [
                 {"from": "t1", "to": "a"},
@@ -663,9 +658,9 @@ class TestCollectFindings:
             "name": "mixed-errors",
             "triggers": [{"id": "t1", "type": "manual_trigger", "parameters": {}}],
             "nodes": [
-                {"id": "n1", "type": "script", "parameters": {"language": "python", "code": "1"}},
-                {"id": "n2", "type": "script", "config": {}},
-                {"id": "orphan", "type": "script", "parameters": {"language": "python", "code": "3"}},
+                {"id": "n1", "type": "script_python", "parameters": {"code": "1"}},
+                {"id": "n2", "type": "script_python", "config": {}},
+                {"id": "orphan", "type": "script_python", "parameters": {"code": "3"}},
             ],
             "edges": [
                 {"from": "t1", "to": "n1"},
@@ -694,12 +689,14 @@ class TestCollectFindings:
         assert len(empty_findings) == 0
 
     def test_unrecognized_node_type_produces_finding(self, validator: WorkflowValidator) -> None:
-        """Unknown node type falls back to the top-level oneOf message."""
+        """The removed generic script type is rejected by the node schema."""
         definition: dict[str, Any] = {
             "schema_version": "2.0.0",
             "name": "test",
             "triggers": [{"id": "t1", "type": "manual_trigger", "parameters": {}}],
-            "nodes": [{"id": "n1", "type": "totally_fake_type", "parameters": {}}],
+            "nodes": [
+                {"id": "n1", "type": "script", "parameters": {"language": "python", "code": "pass"}},
+            ],
             "edges": [{"from": "t1", "to": "n1"}],
         }
         result = validator.collect_findings(definition)
@@ -713,7 +710,7 @@ class TestCollectFindings:
             "schema_version": "2.0.0",
             "name": "test",
             "triggers": [{"id": "t1", "type": "manual_trigger", "parameters": {}}],
-            "nodes": [{"id": "n1", "type": "script", "parameters": {"code": "", "language": "python"}}],
+            "nodes": [{"id": "n1", "type": "script_python", "parameters": {"code": ""}}],
             "edges": [{"from": "t1", "to": "n1"}],
         }
         result = validator.collect_findings(definition)
@@ -727,7 +724,7 @@ class TestCollectFindings:
             "schema_version": "2.0.0",
             "name": "test",
             "triggers": [{"id": "t1", "type": "manual_trigger", "parameters": {}}],
-            "nodes": [{"id": "n1", "type": "script", "parameters": {"language": "python", "code": "1"}}],
+            "nodes": [{"id": "n1", "type": "script_python", "parameters": {"code": "1"}}],
             "edges": [{"from": "t1", "to": "ghost"}],
         }
         result = validator.collect_findings(definition)
@@ -749,7 +746,7 @@ def _converge_definition(
         predecessor_ids = ["branch_a", "branch_b"]
 
     nodes: list[dict[str, Any]] = [
-        {"id": pid, "name": f"Branch {pid}", "type": "script", "parameters": {"language": "python", "code": "pass"}}
+        {"id": pid, "name": f"Branch {pid}", "type": "script_python", "parameters": {"code": "pass"}}
         for pid in predecessor_ids
     ]
     converge_node: dict[str, Any] = {
@@ -899,8 +896,8 @@ class TestConvergeNodeValidation:
             "name": "multi-converge",
             "triggers": [{"id": "t1", "type": "manual_trigger", "parameters": {}}],
             "nodes": [
-                {"id": "a", "type": "script", "parameters": {"language": "python", "code": "pass"}},
-                {"id": "b", "type": "script", "parameters": {"language": "python", "code": "pass"}},
+                {"id": "a", "type": "script_python", "parameters": {"code": "pass"}},
+                {"id": "b", "type": "script_python", "parameters": {"code": "pass"}},
                 {"id": "good_converge", "type": "converge", "parameters": {}},
                 {"id": "bad_converge", "type": "converge", "parameters": {}},
             ],
@@ -944,8 +941,8 @@ def _approval_definition(
             {
                 "id": "after_approve",
                 "name": "After Approve",
-                "type": "script",
-                "parameters": {"language": "python", "code": "pass"},
+                "type": "script_python",
+                "parameters": {"code": "pass"},
             },
         ],
         "edges": [
@@ -1082,7 +1079,7 @@ class TestApprovalPortValidation:
             "triggers": [{"id": "t_manual", "type": "manual_trigger", "parameters": {}}],
             "nodes": [
                 {"id": "ap1", "name": "Review", "type": "approval", "parameters": {"prompt": "approve?"}},
-                {"id": "s1", "type": "script", "parameters": {"language": "bash", "code": "echo next"}},
+                {"id": "s1", "type": "script_bash", "parameters": {"code": "echo next"}},
             ],
             "edges": [
                 {"from": "t_manual", "to": "ap1"},
@@ -1120,9 +1117,7 @@ class TestApprovalPortValidation:
     def test_rejected_only_still_errors(self, validator: WorkflowValidator) -> None:
         """A rejected-only successor does not satisfy the mandatory 'approved' port."""
         definition = self._portless_approval_definition()
-        definition["nodes"].append(
-            {"id": "s2", "type": "script", "parameters": {"language": "bash", "code": "echo rejected"}}
-        )
+        definition["nodes"].append({"id": "s2", "type": "script_bash", "parameters": {"code": "echo rejected"}})
         definition["edges"] = [
             {"from": "t_manual", "to": "ap1"},
             {"from": "ap1", "to": "s2", "from_port": "rejected"},
@@ -1138,9 +1133,7 @@ class TestApprovalPortValidation:
 
     def test_both_ports_present_no_error(self, validator: WorkflowValidator) -> None:
         definition = self._portless_approval_definition()
-        definition["nodes"].append(
-            {"id": "s2", "type": "script", "parameters": {"language": "bash", "code": "echo rejected"}}
-        )
+        definition["nodes"].append({"id": "s2", "type": "script_bash", "parameters": {"code": "echo rejected"}})
         definition["edges"] = [
             {"from": "t_manual", "to": "ap1"},
             {"from": "ap1", "to": "s1", "from_port": "approved"},
@@ -1163,7 +1156,7 @@ class TestApprovalPortValidation:
             "nodes": [
                 {"id": "ap_good", "type": "approval", "parameters": {"prompt": "a?"}},
                 {"id": "ap_bad", "type": "approval", "parameters": {"prompt": "b?"}},
-                {"id": "s1", "type": "script", "parameters": {"language": "bash", "code": "echo 1"}},
+                {"id": "s1", "type": "script_bash", "parameters": {"code": "echo 1"}},
             ],
             "edges": [
                 {"from": "t_manual", "to": "ap_good"},
@@ -1192,7 +1185,7 @@ class TestScheduledTriggerConfigFindings:
             "schema_version": "2.0.0",
             "name": "scheduled-wf",
             "triggers": [{"id": "sched_1", "type": "scheduled_trigger", "parameters": params}],
-            "nodes": [{"id": "n1", "type": "script", "parameters": {"language": "python", "code": "pass"}}],
+            "nodes": [{"id": "n1", "type": "script_python", "parameters": {"code": "pass"}}],
             "edges": [{"from": "sched_1", "to": "n1"}],
         }
 
@@ -1207,7 +1200,7 @@ class TestScheduledTriggerConfigFindings:
                     "parameters": {"schedule_type": "interval", "interval": interval},
                 }
             ],
-            "nodes": [{"id": "n1", "type": "script", "parameters": {"language": "python", "code": "pass"}}],
+            "nodes": [{"id": "n1", "type": "script_python", "parameters": {"code": "pass"}}],
             "edges": [{"from": "sched_1", "to": "n1"}],
         }
 
@@ -1254,7 +1247,7 @@ class TestScheduledTriggerConfigFindings:
                     "parameters": {"schedule_type": "cron", "cron": "0 10 * * *", "timezone": "Fake/B"},
                 },
             ],
-            "nodes": [{"id": "n1", "type": "script", "parameters": {"language": "python", "code": "pass"}}],
+            "nodes": [{"id": "n1", "type": "script_python", "parameters": {"code": "pass"}}],
             "edges": [{"from": "sched_a", "to": "n1"}, {"from": "sched_b", "to": "n1"}],
         }
         result = validator.collect_findings(definition)
@@ -1274,7 +1267,7 @@ class TestBestBranchMessages:
             "schema_version": "2.0.0",
             "name": "test",
             "triggers": [{"id": "t1", "type": "manual_trigger", "parameters": {}}],
-            "nodes": [{"id": "n1", "type": "script", "parameters": {"language": "python", "code": "x"}}],
+            "nodes": [{"id": "n1", "type": "script_python", "parameters": {"code": "x"}}],
             "edges": [{"from": "t1", "to": "n1", "color": "red"}],
         }
         from syntara.workflows.validators.workflow_definition import _get_validator
@@ -1310,8 +1303,8 @@ class TestWebhookServiceAccountSchemaFindings:
             "nodes": [
                 {
                     "id": "log_payload",
-                    "type": "script",
-                    "parameters": {"language": "python", "code": "print(1)"},
+                    "type": "script_python",
+                    "parameters": {"code": "print(1)"},
                 }
             ],
             "edges": [{"from": "snow_trigger", "to": "log_payload"}],
@@ -1339,8 +1332,8 @@ class TestWebhookServiceAccountSchemaFindings:
             "nodes": [
                 {
                     "id": "log_payload",
-                    "type": "script",
-                    "parameters": {"language": "python", "code": "print(1)"},
+                    "type": "script_python",
+                    "parameters": {"code": "print(1)"},
                 }
             ],
             "edges": [{"from": "eda_trigger_1", "to": "log_payload"}],

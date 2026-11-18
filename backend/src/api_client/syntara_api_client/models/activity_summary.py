@@ -20,7 +20,7 @@ class ActivitySummary:
         Attributes:
             id (str): Activity ID from workflow definition
             name (str): Human-readable activity name
-            type_ (str): Activity type (script, approval, agentic, etc.)
+            type_ (str): Activity type (script_python, script_bash, approval, agentic, etc.)
     """
 
     id: str

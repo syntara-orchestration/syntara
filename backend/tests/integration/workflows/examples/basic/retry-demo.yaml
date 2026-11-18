@@ -29,9 +29,8 @@ triggers:
 nodes:
   - id: unreliable_service
     name: Simulate Unreliable Service
-    type: script
+    type: script_python
     parameters:
-      language: python
       environment:
         INPUT_FAILURE_RATE: ${trigger.failure_rate}
         INPUT_SEED: ${trigger.seed}
@@ -73,9 +72,8 @@ nodes:
 
   - id: process_result
     name: Process Successful Result
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       environment:
         INPUT_STATUS: ${unreliable_service.stdout_json.status}
         INPUT_ATTEMPT: ${unreliable_service.stdout_json.attempt}
@@ -93,9 +91,8 @@ nodes:
 
   - id: fixed_backoff_example
     name: Fixed Backoff Example
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       code: |
         echo "This task uses fixed backoff (2 seconds between retries)"
         echo "If it fails, it will retry after exactly 2s, then 2s again"
@@ -112,9 +109,8 @@ nodes:
 
   - id: summary
     name: Retry Summary
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       code: |
         echo ""
         echo "=== Retry Demo Complete ==="

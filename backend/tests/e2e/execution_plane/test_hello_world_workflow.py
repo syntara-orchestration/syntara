@@ -36,8 +36,8 @@ def _hello_world_definition(name: str, marker: str) -> dict[str, Any]:
             {
                 "id": _SCRIPT_NODE_ID,
                 "name": "Hello Script",
-                "type": "script",
-                "parameters": {"code": f"echo 'hello world {marker}'", "language": "bash"},
+                "type": "script_bash",
+                "parameters": {"code": f"echo 'hello world {marker}'"},
             }
         ],
         "edges": [{"from": "trigger", "to": "script_node"}],

@@ -13,8 +13,6 @@ from syntara.workflow_core.models import (
     CredentialBinding,
     IntegrationConnectionConfig,
     NodeType,
-    ScriptExecutorParameters,
-    ScriptLanguage,
     WorkflowTerminalStatus,
 )
 
@@ -31,8 +29,6 @@ __all__ = [
     "CredentialBinding",
     "IntegrationConnectionConfig",
     "NodeType",
-    "ScriptExecutorParameters",
-    "ScriptLanguage",
     "WorkflowResultResponse",
     "WorkflowStartResponse",
     "WorkflowStatusResponse",

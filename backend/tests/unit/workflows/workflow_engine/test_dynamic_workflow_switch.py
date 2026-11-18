@@ -74,9 +74,9 @@ def _build_switch_graph() -> WorkflowGraph:
             },
         },
     )
-    backend.add_node("action_a", {"id": "action_a", "type": "script", "parameters": {}})
-    backend.add_node("action_b", {"id": "action_b", "type": "script", "parameters": {}})
-    backend.add_node("action_c", {"id": "action_c", "type": "script", "parameters": {}})
+    backend.add_node("action_a", {"id": "action_a", "type": "script_python", "parameters": {}})
+    backend.add_node("action_b", {"id": "action_b", "type": "script_python", "parameters": {}})
+    backend.add_node("action_c", {"id": "action_c", "type": "script_python", "parameters": {}})
     backend.add_edge("trigger", "sw", None)
     backend.add_edge("sw", "action_a", {"from_port": "case_0"})
     backend.add_edge("sw", "action_b", {"from_port": "case_1"})
@@ -102,12 +102,12 @@ def _build_switch_with_downstream_graph() -> WorkflowGraph:
             },
         },
     )
-    backend.add_node("a", {"id": "a", "type": "script", "parameters": {}})
-    backend.add_node("b", {"id": "b", "type": "script", "parameters": {}})
-    backend.add_node("c", {"id": "c", "type": "script", "parameters": {}})
-    backend.add_node("a_downstream", {"id": "a_downstream", "type": "script", "parameters": {}})
-    backend.add_node("b_downstream", {"id": "b_downstream", "type": "script", "parameters": {}})
-    backend.add_node("c_downstream", {"id": "c_downstream", "type": "script", "parameters": {}})
+    backend.add_node("a", {"id": "a", "type": "script_python", "parameters": {}})
+    backend.add_node("b", {"id": "b", "type": "script_python", "parameters": {}})
+    backend.add_node("c", {"id": "c", "type": "script_python", "parameters": {}})
+    backend.add_node("a_downstream", {"id": "a_downstream", "type": "script_python", "parameters": {}})
+    backend.add_node("b_downstream", {"id": "b_downstream", "type": "script_python", "parameters": {}})
+    backend.add_node("c_downstream", {"id": "c_downstream", "type": "script_python", "parameters": {}})
     backend.add_edge("trigger", "sw", None)
     backend.add_edge("sw", "a", {"from_port": "case_0"})
     backend.add_edge("sw", "b", {"from_port": "case_1"})

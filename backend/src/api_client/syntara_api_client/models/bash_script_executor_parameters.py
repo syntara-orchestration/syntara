@@ -4,40 +4,37 @@ from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from attrs import define as _attrs_define
-from attrs import field as _attrs_field
 
-from ..models.script_language import ScriptLanguage
 from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
+    from ..models.bash_script_executor_parameters_environment import BashScriptExecutorParametersEnvironment
+    from ..models.credential_binding import CredentialBinding
     from ..models.execution_target_profile import ExecutionTargetProfile
-    from ..models.script_executor_parameters_environment import ScriptExecutorParametersEnvironment
 
 
-T = TypeVar("T", bound="ScriptExecutorParameters")
+T = TypeVar("T", bound="BashScriptExecutorParameters")
 
 
 @_attrs_define
-class ScriptExecutorParameters:
-    """Parameters for script executor.
+class BashScriptExecutorParameters:
+    """Parameters for the Bash script executor.
 
     Attributes:
-        language (ScriptLanguage): Supported script languages for script executor.
         code (str): Script code to execute
         execution_profile (ExecutionTargetProfile | None | Unset): Execution Plane placement profile for this workload.
-        environment (ScriptExecutorParametersEnvironment | Unset): Environment variables
+        environment (BashScriptExecutorParametersEnvironment | Unset): Environment variables
+        credential_bindings (list[CredentialBinding] | Unset): Host-side recipe-to-credential bindings for Execution
+            Plane dispatch.
     """
 
-    language: ScriptLanguage
     code: str
     execution_profile: ExecutionTargetProfile | None | Unset = UNSET
-    environment: ScriptExecutorParametersEnvironment | Unset = UNSET
-    additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
+    environment: BashScriptExecutorParametersEnvironment | Unset = UNSET
+    credential_bindings: list[CredentialBinding] | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         from ..models.execution_target_profile import ExecutionTargetProfile
-
-        language = self.language.value
 
         code = self.code
 
@@ -53,11 +50,17 @@ class ScriptExecutorParameters:
         if not isinstance(self.environment, Unset):
             environment = self.environment.to_dict()
 
+        credential_bindings: list[dict[str, Any]] | Unset = UNSET
+        if not isinstance(self.credential_bindings, Unset):
+            credential_bindings = []
+            for credential_bindings_item_data in self.credential_bindings:
+                credential_bindings_item = credential_bindings_item_data.to_dict()
+                credential_bindings.append(credential_bindings_item)
+
         field_dict: dict[str, Any] = {}
-        field_dict.update(self.additional_properties)
+
         field_dict.update(
             {
-                "language": language,
                 "code": code,
             }
         )
@@ -65,17 +68,18 @@ class ScriptExecutorParameters:
             field_dict["execution_profile"] = execution_profile
         if environment is not UNSET:
             field_dict["environment"] = environment
+        if credential_bindings is not UNSET:
+            field_dict["credential_bindings"] = credential_bindings
 
         return field_dict
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
+        from ..models.bash_script_executor_parameters_environment import BashScriptExecutorParametersEnvironment
+        from ..models.credential_binding import CredentialBinding
         from ..models.execution_target_profile import ExecutionTargetProfile
-        from ..models.script_executor_parameters_environment import ScriptExecutorParametersEnvironment
 
         d = dict(src_dict)
-        language = ScriptLanguage(d.pop("language"))
-
         code = d.pop("code")
 
         def _parse_execution_profile(data: object) -> ExecutionTargetProfile | None | Unset:
@@ -96,34 +100,26 @@ class ScriptExecutorParameters:
         execution_profile = _parse_execution_profile(d.pop("execution_profile", UNSET))
 
         _environment = d.pop("environment", UNSET)
-        environment: ScriptExecutorParametersEnvironment | Unset
+        environment: BashScriptExecutorParametersEnvironment | Unset
         if isinstance(_environment, Unset):
             environment = UNSET
         else:
-            environment = ScriptExecutorParametersEnvironment.from_dict(_environment)
+            environment = BashScriptExecutorParametersEnvironment.from_dict(_environment)
 
-        script_executor_parameters = cls(
-            language=language,
+        _credential_bindings = d.pop("credential_bindings", UNSET)
+        credential_bindings: list[CredentialBinding] | Unset = UNSET
+        if _credential_bindings is not UNSET:
+            credential_bindings = []
+            for credential_bindings_item_data in _credential_bindings:
+                credential_bindings_item = CredentialBinding.from_dict(credential_bindings_item_data)
+
+                credential_bindings.append(credential_bindings_item)
+
+        bash_script_executor_parameters = cls(
             code=code,
             execution_profile=execution_profile,
             environment=environment,
+            credential_bindings=credential_bindings,
         )
 
-        script_executor_parameters.additional_properties = d
-        return script_executor_parameters
-
-    @property
-    def additional_keys(self) -> list[str]:
-        return list(self.additional_properties.keys())
-
-    def __getitem__(self, key: str) -> Any:
-        return self.additional_properties[key]
-
-    def __setitem__(self, key: str, value: Any) -> None:
-        self.additional_properties[key] = value
-
-    def __delitem__(self, key: str) -> None:
-        del self.additional_properties[key]
-
-    def __contains__(self, key: str) -> bool:
-        return key in self.additional_properties
+        return bash_script_executor_parameters

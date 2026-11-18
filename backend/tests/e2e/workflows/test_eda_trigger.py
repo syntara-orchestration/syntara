@@ -75,8 +75,8 @@ class TestEdaTrigger:
                         {
                             "id": "process_event",
                             "name": "Process EDA Event",
-                            "type": "script",
-                            "parameters": {"language": "bash", "code": "echo 'EDA event processed'"},
+                            "type": "script_bash",
+                            "parameters": {"code": "echo 'EDA event processed'"},
                         },
                     ],
                     "edges": [{"from": "eda_trigger_1", "to": "process_event"}],

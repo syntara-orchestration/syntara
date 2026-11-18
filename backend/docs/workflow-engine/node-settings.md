@@ -169,9 +169,8 @@ NodeSettingsBase
 
 ```yaml
 - id: run_script
-  type: script
+  type: script_bash
   parameters:
-    language: bash
     code: echo "hello"
   settings:
     timeout: 120

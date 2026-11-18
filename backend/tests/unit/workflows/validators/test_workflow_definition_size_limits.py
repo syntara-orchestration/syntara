@@ -29,7 +29,7 @@ def _valid_definition() -> dict[str, Any]:
         "schema_version": "2.0.0",
         "name": "test-workflow",
         "triggers": [{"id": "t1", "type": "manual_trigger", "parameters": {}}],
-        "nodes": [{"id": "n1", "type": "script", "parameters": {"language": "python", "code": "print(1)"}}],
+        "nodes": [{"id": "n1", "type": "script_python", "parameters": {"code": "print(1)"}}],
         "edges": [{"from": "t1", "to": "n1"}],
     }
 
@@ -40,8 +40,8 @@ def _many_nodes_definition(node_count: int) -> dict[str, Any]:
     nodes = [
         {
             "id": f"node_{i}",
-            "type": "script",
-            "parameters": {"language": "python", "code": "pass"},
+            "type": "script_python",
+            "parameters": {"code": "pass"},
         }
         for i in range(node_count)
     ]
@@ -69,7 +69,7 @@ def _many_edges_definition(edge_count: int) -> dict[str, Any]:
         "schema_version": "2.0.0",
         "name": f"edges-{edge_count}",
         "triggers": [{"id": trigger_id, "type": "manual_trigger", "parameters": {}}],
-        "nodes": [{"id": "n1", "type": "script", "parameters": {"language": "python", "code": "pass"}}],
+        "nodes": [{"id": "n1", "type": "script_python", "parameters": {"code": "pass"}}],
         "edges": [{"from": trigger_id, "to": "n1"}] * edge_count,
     }
 

@@ -101,7 +101,7 @@ class TestPublishEmptyWorkflow:
             "schema_version": "2.0.0",
             "name": "with-nodes",
             "triggers": [{"id": "t1", "type": "manual_trigger", "parameters": {}}],
-            "nodes": [{"id": "n1", "type": "script", "parameters": {"language": "python", "code": "pass"}}],
+            "nodes": [{"id": "n1", "type": "script_python", "parameters": {"code": "pass"}}],
             "edges": [{"from": "t1", "to": "n1"}],
         }
         mock_version.created_at = None
@@ -121,7 +121,24 @@ class TestPublishEmptyWorkflow:
         assert workflow == mock_workflow
 
     @pytest.mark.asyncio
-    async def test_publish_allows_http_request_credential_bindings(self, mock_service: WorkflowService) -> None:
+    @pytest.mark.parametrize(
+        ("node_type", "node_parameters", "workflow_name"),
+        [
+            (
+                "http_request",
+                {"method": "GET", "url": "https://example.com"},
+                "with-http-request-binding",
+            ),
+            ("script_python", {"code": "pass"}, "with-script-binding"),
+        ],
+    )
+    async def test_publish_allows_credential_bindings(
+        self,
+        mock_service: WorkflowService,
+        node_type: str,
+        node_parameters: dict[str, str],
+        workflow_name: str,
+    ) -> None:
         workflow_id = uuid4()
         mock_workflow = MagicMock()
         mock_workflow.id = workflow_id
@@ -136,15 +153,14 @@ class TestPublishEmptyWorkflow:
         mock_version.version = 1
         mock_version.workflow_definition = {
             "schema_version": "2.0.0",
-            "name": "with-http-request-binding",
+            "name": workflow_name,
             "triggers": [{"id": "t1", "type": "manual_trigger", "parameters": {}}],
             "nodes": [
                 {
                     "id": "n1",
-                    "type": "http_request",
+                    "type": node_type,
                     "parameters": {
-                        "method": "GET",
-                        "url": "https://example.com",
+                        **node_parameters,
                         "credential_bindings": [
                             {
                                 "credential_recipe_id": "acme.echo.api-token",
@@ -192,7 +208,7 @@ class TestPublishEmptyWorkflow:
             "schema_version": "2.0.0",
             "name": "test",
             "triggers": [{"id": "t1", "type": "manual_trigger", "parameters": {}}],
-            "nodes": [{"id": "n1", "type": "script", "parameters": {"language": "python", "code": "pass"}}],
+            "nodes": [{"id": "n1", "type": "script_python", "parameters": {"code": "pass"}}],
             "edges": [{"from": "t1", "to": "n1"}],
         }
 
@@ -239,7 +255,7 @@ class TestPublishEmptyWorkflow:
             "schema_version": "2.0.0",
             "name": "old",
             "triggers": [{"id": "t1", "type": "manual_trigger", "parameters": {}}],
-            "nodes": [{"id": "n1", "type": "script", "parameters": {"language": "python", "code": "pass"}}],
+            "nodes": [{"id": "n1", "type": "script_python", "parameters": {"code": "pass"}}],
             "edges": [{"from": "t1", "to": "n1"}],
         }
 
@@ -247,7 +263,7 @@ class TestPublishEmptyWorkflow:
             "schema_version": "2.0.0",
             "name": "new",
             "triggers": [{"id": "t1", "type": "manual_trigger", "parameters": {}}],
-            "nodes": [{"id": "n1", "type": "script", "parameters": {"language": "python", "code": "print(1)"}}],
+            "nodes": [{"id": "n1", "type": "script_python", "parameters": {"code": "print(1)"}}],
             "edges": [{"from": "t1", "to": "n1"}],
         }
 
@@ -374,7 +390,7 @@ class TestUnpublishWorkflow:
             "schema_version": "2.0.0",
             "name": "test",
             "triggers": [{"id": "t1", "type": "manual_trigger", "parameters": {}}],
-            "nodes": [{"id": "n1", "type": "script", "parameters": {"language": "python", "code": "pass"}}],
+            "nodes": [{"id": "n1", "type": "script_python", "parameters": {"code": "pass"}}],
             "edges": [{"from": "t1", "to": "n1"}],
         }
 
@@ -615,7 +631,7 @@ class TestPublishImplicitUnpublishEvent:
             "schema_version": "2.0.0",
             "name": "test",
             "triggers": [{"id": "t1", "type": "manual_trigger", "parameters": {}}],
-            "nodes": [{"id": "n1", "type": "script", "parameters": {"language": "python", "code": "pass"}}],
+            "nodes": [{"id": "n1", "type": "script_python", "parameters": {"code": "pass"}}],
             "edges": [{"from": "t1", "to": "n1"}],
         }
 
@@ -659,7 +675,7 @@ class TestPublishImplicitUnpublishEvent:
             "schema_version": "2.0.0",
             "name": "test",
             "triggers": [{"id": "t1", "type": "manual_trigger", "parameters": {}}],
-            "nodes": [{"id": "n1", "type": "script", "parameters": {"language": "python", "code": "pass"}}],
+            "nodes": [{"id": "n1", "type": "script_python", "parameters": {"code": "pass"}}],
             "edges": [{"from": "t1", "to": "n1"}],
         }
 
@@ -710,7 +726,7 @@ class TestPublishImplicitUnpublishEvent:
                     "parameters": {"schedule_type": "cron", "cron": "0 * * * *"},
                 },
             ],
-            "nodes": [{"id": "n1", "type": "script", "parameters": {"language": "python", "code": "pass"}}],
+            "nodes": [{"id": "n1", "type": "script_python", "parameters": {"code": "pass"}}],
             "edges": [{"from": "t1", "to": "n1"}],
         }
 
@@ -1218,7 +1234,7 @@ class TestPublishRejectsInvalidScheduledTriggerConfig:
                     },
                 },
             ],
-            "nodes": [{"id": "n1", "type": "script", "parameters": {"language": "python", "code": "pass"}}],
+            "nodes": [{"id": "n1", "type": "script_python", "parameters": {"code": "pass"}}],
             "edges": [{"from": "sched_1", "to": "n1"}],
         }
 
@@ -1268,7 +1284,7 @@ class TestPublishRejectsInvalidScheduledTriggerConfig:
                     },
                 },
             ],
-            "nodes": [{"id": "n1", "type": "script", "parameters": {"language": "python", "code": "pass"}}],
+            "nodes": [{"id": "n1", "type": "script_python", "parameters": {"code": "pass"}}],
             "edges": [{"from": "sched_1", "to": "n1"}],
         }
 
@@ -1313,7 +1329,7 @@ class TestPublishRejectsInvalidScheduledTriggerConfig:
                     },
                 },
             ],
-            "nodes": [{"id": "n1", "type": "script", "parameters": {"language": "python", "code": "pass"}}],
+            "nodes": [{"id": "n1", "type": "script_python", "parameters": {"code": "pass"}}],
             "edges": [{"from": "sched_1", "to": "n1"}],
         }
 
@@ -1420,7 +1436,7 @@ class TestValidateTriggerConfigsSharedContract:
                     },
                 }
             ],
-            "nodes": [{"id": "n1", "type": "script", "parameters": {"language": "python", "code": "pass"}}],
+            "nodes": [{"id": "n1", "type": "script_python", "parameters": {"code": "pass"}}],
             "edges": [{"from": "sched_1", "to": "n1"}],
         }
         findings = collect_scheduled_trigger_config_findings(definition)

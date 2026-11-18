@@ -82,6 +82,7 @@ PRE_RESOLVED_MARKER = "__pre_resolved"
 # get_settings() from workflow code would perform configuration I/O during a
 # deterministic workflow replay.
 _EXECUTION_PLANE_SUPPORTED_NODE_TYPES = execution_plane_supported_node_types()
+_SCRIPT_NODE_TYPES = frozenset({NodeType.SCRIPT_PYTHON, NodeType.SCRIPT_BASH})
 
 
 def _parse_items(items: Any) -> Any:  # noqa: ANN401
@@ -1251,7 +1252,8 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
     # so Temporal's start_to_close_timeout must include the margin.
     _EXECUTOR_TIMEOUT_MARGIN_TYPES: ClassVar[frozenset[str]] = frozenset(
         {
-            NodeType.SCRIPT,
+            NodeType.SCRIPT_PYTHON,
+            NodeType.SCRIPT_BASH,
             NodeType.HTTP_REQUEST,
             NodeType.INTERNAL_ACTIVITY,
             NodeType.AAP_JOB_TEMPLATE,
@@ -1267,7 +1269,8 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         NodeType.AAP_WORKFLOW_JOB_TEMPLATE: ActivityName.AAP_WORKFLOW_JOB_TEMPLATE,
         NodeType.HTTP_REQUEST: ActivityName.HTTP_REQUEST,
         NodeType.INTERNAL_ACTIVITY: ActivityName.INTERNAL_ACTIVITY,
-        NodeType.SCRIPT: ActivityName.SCRIPT,
+        NodeType.SCRIPT_PYTHON: ActivityName.SCRIPT_PYTHON,
+        NodeType.SCRIPT_BASH: ActivityName.SCRIPT_BASH,
         NodeType.CONDITION: ActivityName.CONDITION,
         NodeType.SWITCH: ActivityName.SWITCH,
         NodeType.AGENTIC: ActivityName.AGENTIC,
@@ -1785,7 +1788,7 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
 
         if node_type in self._EXECUTOR_ACTIVITY_MAP:
             extra_args: list[Any] | None = None
-            if node_type == NodeType.SCRIPT:
+            if node_type in _SCRIPT_NODE_TYPES:
                 extra_args = [self.execution_id]
             elif node_type in self._AAP_NODE_TYPES:
                 extra_args = [self.execution_id, self._created_by_user_id]
@@ -1794,7 +1797,7 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
             # Inject the operational timeout BEFORE adding the Temporal margin so
             # activities use the operator-configured deadline, not the Temporal ceiling.
             parameters_with_timeout = {**resolved_parameters, ENGINE_TIMEOUT_SECONDS_KEY: timeout_seconds}
-            if node_type == NodeType.SCRIPT:
+            if node_type in _SCRIPT_NODE_TYPES:
                 parameters_with_timeout[ENGINE_MAX_OUTPUT_BYTES_KEY] = resolve_max_output_bytes(
                     node, self._runtime_settings
                 )

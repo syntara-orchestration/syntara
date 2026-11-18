@@ -36,9 +36,8 @@ async def test_workflow_definition() -> dict[str, Any]:
             {
                 "id": "test_activity",
                 "name": "test_activity",
-                "type": "script",
+                "type": "script_bash",
                 "parameters": {
-                    "language": "bash",
                     "code": "echo 'test'",
                 },
             }
@@ -129,7 +128,7 @@ async def test_activity(
     activity = ActivityExecution(
         execution_id=test_execution.id,
         activity_name="test_activity",
-        node_type="script",
+        node_type="script_python",
         temporal_activity_id="temporal-123",
         status=ActivityStatus.COMPLETED,
         labels={"environment": "test"},

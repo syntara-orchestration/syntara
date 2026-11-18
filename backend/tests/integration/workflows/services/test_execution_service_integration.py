@@ -14,7 +14,7 @@ from temporalio.client import Client
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
 
-from syntara.workflow_runtime.engines.temporal.activities.ep.ep_dispatch_activity import execute_script_activity
+from syntara.workflow_runtime.engines.temporal.activities.ep.ep_dispatch_activity import execute_bash_script_activity
 from syntara.workflow_runtime.engines.temporal.activities.manual_trigger import manual_trigger
 from syntara.workflow_runtime.engines.temporal.activities.runtime_settings_activity import (
     fetch_workflow_runtime_settings,
@@ -62,9 +62,8 @@ triggers:
   type: manual_trigger
 nodes:
 - id: test_task
-  type: script
+  type: script_bash
   parameters:
-    language: bash
     code: echo "Integration test successful"
   settings:
     timeout: 1
@@ -115,9 +114,8 @@ triggers:
   type: manual_trigger
 nodes:
 - id: task1
-  type: script
+  type: script_bash
   parameters:
-    language: bash
     code: echo "Custom ID test"
   settings:
     timeout: 1
@@ -163,11 +161,10 @@ triggers:
   type: manual_trigger
 nodes:
 - id: use_input
-  type: script
+  type: script_bash
   inputs:
     name: ${input.user_name}
   parameters:
-    language: bash
     code: echo "Hello, $INPUT_NAME!"
   settings:
     timeout: 1
@@ -211,9 +208,8 @@ name: invalid-workflow
 description: Missing triggers field
 nodes:
 - id: test_task
-  type: script
+  type: script_bash
   parameters:
-    language: bash
     code: echo "test"
   settings:
     timeout: 1
@@ -250,9 +246,8 @@ triggers:
   type: manual_trigger
 nodes:
 - id: long_task
-  type: script
+  type: script_bash
   parameters:
-    language: bash
     code: |
       sleep 10
       echo "This should not complete"
@@ -318,9 +313,8 @@ triggers:
   type: manual_trigger
 nodes:
 - id: task1
-  type: script
+  type: script_bash
   parameters:
-    language: bash
     code: echo "Factory test"
   settings:
     timeout: 1
@@ -334,7 +328,7 @@ edges:
             temporal_env.client,
             task_queue="test-queue",
             workflows=[OrchestratorWorkflow],
-            activities=[execute_script_activity, manual_trigger, fetch_workflow_runtime_settings],
+            activities=[execute_bash_script_activity, manual_trigger, fetch_workflow_runtime_settings],
         ):
             workflow_def = yaml.safe_load(workflow_yaml)
             result = await service.start_workflow(

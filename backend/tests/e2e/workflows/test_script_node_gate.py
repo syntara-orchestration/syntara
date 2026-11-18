@@ -39,8 +39,8 @@ def _script_workflow_definition(name: str) -> dict[str, Any]:
             {
                 "id": "script_node",
                 "name": "Gate Test Script",
-                "type": "script",
-                "parameters": {"language": "bash", "code": "echo 'gate test'"},
+                "type": "script_bash",
+                "parameters": {"code": "echo 'gate test'"},
             },
         ],
         "edges": [{"from": "trigger", "to": "script_node"}],

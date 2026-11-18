@@ -12,7 +12,7 @@ T = TypeVar("T", bound="NodeSettingsNoRetry")
 
 @_attrs_define
 class NodeSettingsNoRetry:
-    """Settings with disabled, continue_on_failure, and timeout (script, agentic, approval).
+    """Settings with disabled, continue_on_failure, and timeout (script types, agentic, approval).
 
     Attributes:
         continue_on_failure (bool | None | Unset):

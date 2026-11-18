@@ -134,27 +134,24 @@ triggers:
 nodes:
   - id: fetch_users
     name: Fetch Users
-    type: script
+    type: script_python
     config:
-      language: python
       code: |
         import json
         print(json.dumps({"users": 150}))
 
   - id: fetch_orders
     name: Fetch Orders
-    type: script
+    type: script_python
     config:
-      language: python
       code: |
         import json
         print(json.dumps({"orders": 42}))
 
   - id: fetch_inventory
     name: Fetch Inventory
-    type: script
+    type: script_python
     config:
-      language: python
       code: |
         import json
         print(json.dumps({"items": 300}))
@@ -167,9 +164,8 @@ nodes:
 
   - id: summary
     name: Build Summary
-    type: script
+    type: script_python
     config:
-      language: python
       code: |
         print("All data fetched, building summary")
 
@@ -220,27 +216,24 @@ triggers:
 nodes:
   - id: check_db
     name: Check Database
-    type: script
+    type: script_python
     config:
-      language: python
       code: |
         import time; time.sleep(1)
         print("db healthy")
 
   - id: check_cache
     name: Check Cache
-    type: script
+    type: script_python
     config:
-      language: python
       code: |
         import time; time.sleep(2)
         print("cache healthy")
 
   - id: check_storage
     name: Check Storage
-    type: script
+    type: script_python
     config:
-      language: python
       code: |
         import time; time.sleep(30)
         print("storage healthy")
@@ -254,9 +247,8 @@ nodes:
 
   - id: report
     name: Report Status
-    type: script
+    type: script_python
     config:
-      language: python
       code: |
         print("System healthy (2+ checks passed)")
 
