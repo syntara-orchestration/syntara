@@ -155,8 +155,9 @@ See the [backend settings contract](../../backend/docs/event-subscription-contro
 for the `start` and `group_id` parameters.
 
 Opening and saving an unchanged form does not insert default policies. Partial
-`start` objects and explicit null groups survive unrelated edits. Clearing the
-group sends null. Custom IDs accept 1–512 ASCII letters, numbers, dots,
+`start` objects survive unrelated edits. Unpublished drafts retain optional group
+omissions; same-source updates preserve the established group's explicit ID.
+Clearing the group on a new source sends null. Custom IDs accept 1–512 ASCII letters, numbers, dots,
 underscores, or hyphens; whitespace is rejected rather than silently trimmed.
 Groups must be exclusive to their Syntara source. Backend publication remains
 authoritative for group uniqueness and immutability failures.
@@ -167,15 +168,21 @@ Credential-only changes preserve the group. The existing workflow lifecycle
 controls activation: drafts do not affect consumption until publication.
 
 The group becomes fixed at the **first successful publication**, before worker
-activation. The UI checks every page of workflow-version history and uses the
-most recent publication timestamp, rather than the highest version number, to
-identify the last projected source for that trigger. This also covers publication
-of an older version and unpublishing. The group is disabled while this check loads
-or fails, with a retry on failure. Publish/unpublish query invalidation refreshes
-the check. A changed Integration or topic permits a replacement group; returning
-to the published source displays its published group again. An automatically
-managed group's broker ID is not exposed by this API and is not invented by the UI.
+activation. Workflow detail responses expose the current projected Kafka source,
+its generation and revision, and its effective group ID, including while unpublished.
+The UI reads this metadata directly without scanning version history, so large
+histories and definitions that omit the group do not hide the established ID.
+The group is disabled while this check loads or fails, with a retry on failure.
+Background refreshes preserve the raw draft value; Update reconciles against a
+fresh projection. A changed Integration or topic permits a replacement group.
 Saved version views disable all consumption controls.
+
+Publication checks both saved definitions and unsaved changes against fresh source
+metadata. If a draft explicitly requests a different group for the same source,
+the designer can cancel without changing the draft or confirm carrying forward
+the established group into a new saved definition. Confirmation rechecks source
+generation and revision. Backend publication remains authoritative if another
+publication races with the request. Existing saved versions are never rewritten.
 
 Valid committed offsets and saved initialization/recovery decisions take precedence
 over policy changes. Start position is not a replay or manual-reset control.
@@ -266,12 +273,12 @@ top-level envelope fields. Payload schema properties are never flattened onto
 
 Unit/component coverage includes optional/default serialization, partial settings,
 exact CEL persistence, export/import, group validation, source changes, keyboard
-selection, version views, publication pagination, older-version republishing,
-unpublishing, failure/retry, and axe checks. Shared select toggles associate helper
+selection, version views, effective source metadata, long version histories,
+older-version republishing, refresh races, cancellation, failure/retry, and axe checks. Shared select toggles associate helper
 text and validation errors with `aria-describedby`.
 
 `e2e/kafka-consumer-settings.spec.ts` checks draft save/reopen, replacement-topic
-groups, retained CEL, publication locking, and locking after unpublish against the
-mock API. It captures screenshots and audits the consumer-settings region. These
+groups, retained CEL, publication locking, locking after unpublish, and stale-draft
+carry-forward with export preservation against the mock API. It captures screenshots and audits the consumer-settings region and confirmation dialog. These
 checks do not prove broker consumption behavior; real Kafka verification requires
 a configured Kafka runtime environment.
