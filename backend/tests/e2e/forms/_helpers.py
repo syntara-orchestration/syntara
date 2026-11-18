@@ -16,6 +16,7 @@ from orchestrator_test_sdk.e2e.helpers import (
     poll_execution,
     poll_for_pending_form_prompt,
 )
+from pydantic import ValidationError
 from syntara_api_client.api import SyntaraApiRegistry
 from syntara_api_client.models import (
     ExecutionCreate,
@@ -119,13 +120,16 @@ def get_workflow_definition(syntara_api: SyntaraApiRegistry, workflow_id: UUID) 
 
 
 def with_generated_form_response_schema(definition: dict[str, Any], *, node_type: str) -> dict[str, Any]:
-    """Return a copied definition with the server-generated form schema attached."""
+    """Return a copied definition with its generated form schema when the form is valid."""
     expected_definition = copy.deepcopy(definition)
     components = expected_definition["nodes"] if node_type == "form_prompt" else expected_definition["triggers"]
     for component in components:
         if component["type"] == node_type:
             parameters = component["parameters"]
-            parameters["response_schema"] = generate_form_response_schema(parameters["form_definition"])
+            try:
+                parameters["response_schema"] = generate_form_response_schema(parameters["form_definition"])
+            except ValidationError:
+                continue
     return expected_definition
 
 
