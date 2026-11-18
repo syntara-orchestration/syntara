@@ -6,20 +6,7 @@
 
 ## Review request
 
-Please assess whether the isolation and controls below are sufficient for running user-supplied scripts in customer OpenShift clusters. In particular, decide whether a restricted Kubernetes Pod is an acceptable security boundary for arbitrary code, whether the network and credential boundaries are adequate, and which mitigations must block release. Record findings by severity, delivery impact, owner, and release-blocking status.
-
-This document is intentionally limited to Script execution. It does not restate the full AO or EP architecture.
-
-## Review at a glance
-
-**Security question:** Are the proposed controls sufficient to run customer-provided Python and Bash in a per-attempt OpenShift Pod?
-
-Product Security is asked to decide:
-
-- Whether the restricted Pod is an adequate isolation boundary for arbitrary scripts, or stronger isolation is required.
-- Whether customer-cluster egress controls and CNI validation provide an acceptable network boundary.
-- Whether the separation of cluster credentials, workload credentials, service secrets, and script output is sufficient.
-- Which image provenance, gRPC transport, resource, cancellation, retry, and cleanup controls must block release.
+This document describes the Script execution path and its security controls as input to Product Security review. It is focused on the Script step rather than the full AO or EP architecture.
 
 ## Script execution flow
 
@@ -57,7 +44,7 @@ sequenceDiagram
     N->>T: Complete activity with workflow output
 ```
 
-The EP Client is a library supplied by EP for AO to call EP. It is not an additional runtime service and does not execute the script. Its package/version, exact API, authentication, and retry contract must be recorded in AAP-98873.
+The EP Client is a library supplied by EP for AO to call EP. It is not an additional runtime service and does not execute the script. Its integration is covered by AAP-98873.
 
 ## Work item lifecycle
 
@@ -145,51 +132,11 @@ flowchart LR
 
 The SDK has an invocation-scoped credential callback, but the current EP evidence does not establish bound workload-credential delivery for Script. Do not pass workload secrets in `environment` or ordinary workflow inputs.
 
-## Failure behavior
-
-```mermaid
-flowchart TD
-    Start[Attempt starts] --> Submitted{Was SDK Execute submitted?}
-    Submitted -->|No; failure is confirmed| Pre[Clean up partial resources]
-    Pre --> Retry{Retryable and budget remains?}
-    Retry -->|Yes| Pending[Return work item to pending with backoff]
-    Retry -->|No| FailBefore[Persist failed outcome]
-
-    Submitted -->|Yes| Running[Wait for SDK terminal event]
-    Running --> Terminal{Terminal event received?}
-    Terminal -->|Success or failure| Persist[Persist terminal result]
-    Terminal -->|No; outcome uncertain| Unknown[Mark reconciliation required]
-    Unknown --> Fence[Fence the attempt and preserve diagnostics]
-    Fence --> NotifyUnknown[Notify AO that the outcome is uncertain]
-    NotifyUnknown --> NoReplay[Do not automatically replay; operator reconciles]
-
-    Running --> Stop[Timeout or cancellation: send SDK Cancel]
-    Stop --> Grace{Stopped within grace period?}
-    Grace -->|Yes| PersistStop[Persist timed-out or cancelled outcome]
-    Grace -->|No| Delete[Delete the owned Job]
-    Delete --> PersistStop
-
-    Running --> Overflow[Output exceeds configured bound]
-    Overflow --> Truncate[Drain and truncate streams]
-    Truncate --> Fits{Serialized result within SDK limit?}
-    Fits -->|Yes| Persist
-    Fits -->|No| FailResult[Persist bounded failure]
-
-    Persist --> Cleanup[Delete Job and NetworkPolicy]
-    PersistStop --> Cleanup
-    FailResult --> Cleanup
-    Cleanup --> CleanupOK{Cleanup succeeded?}
-    CleanupOK -->|Yes| Notify[Send completion callback to AO]
-    CleanupOK -->|No| CleanupRetry[Keep cleanup visible and retry/reconcile]
-    CleanupRetry --> Notify
-    FailBefore --> Notify
-```
-
 ## Security boundary
 
 The script source and its inputs are untrusted. The intended isolation boundary is one EP-created Kubernetes Job and Pod per work-item attempt. The SDK runtime receives the invocation and starts Python or Bash as a child process inside that Pod.
 
-The child process shares the Pod's container identity, filesystem, and network namespace with the SDK runtime. It is not a separate OS security principal or a general-purpose sandbox. Product Security must decide whether the Pod controls listed below are sufficient for the supported threat model or whether stronger isolation is required.
+The child process shares the Pod's container identity, filesystem, and network namespace with the SDK runtime. It is not a separate OS security principal or a general-purpose sandbox. The documented Pod controls are the proposed isolation boundary; this document does not claim that they provide a general-purpose sandbox.
 
 ### Controls in the EP workload design
 
@@ -200,6 +147,7 @@ The child process shares the Pod's container identity, filesystem, and network n
 | Compute and temporary storage | CPU request 100m and limit 1 CPU; memory request 128 MiB and limit 512 MiB; memory-backed `/tmp` capped at 64 MiB. |
 | Network | Per-attempt NetworkPolicy denies ingress and allows DNS plus configured egress ranges, excluding forbidden ranges. Customer CNI enforcement must be validated. |
 | Workload transport | EP uses the Kubernetes API port-forward to the owned Pod. The SDK gRPC channel must authenticate peers and protect confidentiality; production mTLS wiring must be verified for the target deployment. |
+| Image provenance | EP accepts the caller-supplied image reference and does not independently enforce registry policy or digest pinning. |
 | Result handling | EP persists a terminal result before cleanup. Cleanup status is tracked separately. An uncertain result after Execute submission is reconciled, not automatically replayed. |
 
 These are controls in EP's implementation/design evidence, not a claim that every customer cluster enforces them. The target cluster's CNI, admission policies, quotas, registry access, and supported OpenShift versions require deployment validation.
@@ -224,17 +172,6 @@ These are controls in EP's implementation/design evidence, not a claim that ever
 | Cancellation | EP sends SDK Cancel, waits a bounded grace period, then deletes the owned Job. Script cleanup sends TERM then KILL to the child process group. | Test ignored cancellation and descendants; distinguish cancellation before Execute from cancellation after it may have started. |
 | Retry | EP submits Execute once per attempt. Before submission, confirmed infrastructure failures may be retried. After possible submission, a missing result is uncertain and must not cause automatic replay. | Arbitrary scripts can have external side effects; confirm AO does not silently retry uncertain or non-idempotent executions. |
 | Cleanup | EP deletes the owned Job, then its policy; TTL is a backstop and does not clean policies. A reconciler removes orphan policies only after confirming the Job/Pods are absent. | Confirm cleanup failure remains visible, retryable, and operationally actionable without overwriting a committed result. |
-
-## Open implementation dependencies
-
-The call chain above describes the proposed AO-to-EP Client integration and EP-managed workload lifecycle. AAP-98873 owns the concrete Client package/version, API, authentication, retry contract, and end-to-end evidence; AAP-97389 owns packaging and lifecycle decisions. EP accepts a caller-supplied image reference and does not independently enforce image provenance, so the approved image digest and the component that restricts image selection must be decided before release.
-
-## Decisions requested from Product Security
-
-1. Is the per-attempt Pod, with the listed restrictions, an adequate boundary for arbitrary Python/Bash code? If not, specify the required stronger isolation mechanism and release gate.
-2. Are the customer-controlled egress policy and CNI validation sufficient? Specify the required default-deny behavior and evidence for supported clusters.
-3. Are the credential separation and output handling acceptable? Confirm that Script receives no protected workload credentials and that outputs/errors are treated as potentially sensitive.
-4. Which controls must be verified before release for image provenance, SDK gRPC TLS/mTLS, resource limits, cancellation, uncertain outcomes, and cleanup?
 
 ## Review record
 
