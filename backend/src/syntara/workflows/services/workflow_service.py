@@ -62,6 +62,7 @@ from syntara.workflows.models.validation_finding import (
 )
 from syntara.workflows.models.workflow_definition import WorkflowDefinition
 from syntara.workflows.models.workflow_publish_event import PublishAction, WorkflowPublishEvent
+from syntara.workflows.services.form_response_schema import prepare_workflow_definition_for_persistence
 from syntara.workflows.services.scheduled_trigger_service import ScheduledTriggerService
 from syntara.workflows.services.webhook_trigger_service import WEBHOOK_TRIGGER_TYPES, WebhookTriggerService
 from syntara.workflows.services.workflow_diff import generate_change_summary
@@ -588,6 +589,7 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
             WorkflowNameConflictError: If workflow name already exists
 
         """
+        workflow_definition = prepare_workflow_definition_for_persistence(workflow_definition)
         recorder = get_metrics_recorder()
         component = ComponentLabel.WORKFLOW_ENGINE
         system_cof = await get_system_continue_on_failure()
@@ -1169,6 +1171,9 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
 
         """
         recorder = get_metrics_recorder()
+        previous_version = await self._get_version_or_none(workflow.id, workflow.current_version)
+        previous_definition = previous_version.workflow_definition if previous_version else None
+        workflow_definition = prepare_workflow_definition_for_persistence(workflow_definition, previous_definition)
         system_cof = await get_system_continue_on_failure()
 
         with recorder.time(
@@ -1193,10 +1198,8 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
 
         if workflow.project_id is not None:
             previous_cred_ids: set[str] | None = None
-            if workflow.current_version is not None:
-                prev_version = await self._get_version_or_none(workflow.id, workflow.current_version)
-                if prev_version and prev_version.workflow_definition:
-                    previous_cred_ids = self._extract_credential_ids(prev_version.workflow_definition)
+            if previous_version and previous_version.workflow_definition:
+                previous_cred_ids = self._extract_credential_ids(previous_version.workflow_definition)
             await self._validate_credential_project_scope(workflow_definition, workflow.project_id, previous_cred_ids)
             await self._validate_no_secret_url_conflicts(workflow_definition)
             ref_findings = await validate_workflow_references(self.session, workflow_definition, workflow.project_id)

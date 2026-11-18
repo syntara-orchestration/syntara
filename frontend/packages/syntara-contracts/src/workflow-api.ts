@@ -1878,6 +1878,13 @@ export interface components {
       /** @description Form definition describing the fields shown to responders. */
       form_definition: components['schemas']['FormPromptDefinition']
       /**
+       * Response Schema
+       * @description Backend-generated JSON Schema for normalized response_data values.
+       */
+      response_schema?: {
+        [key: string]: unknown
+      } | null
+      /**
        * Responder Users
        * @description Usernames allowed to respond. Empty/omitted = any user with form_prompt:submit.
        */

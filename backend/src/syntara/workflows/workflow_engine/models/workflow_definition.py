@@ -874,6 +874,10 @@ class BaseFormParameters(BaseModel):
     form_definition: FormDefinition = Field(
         description="Form definition describing the fields shown to responders.",
     )
+    response_schema: dict[str, Any] | None = Field(
+        default=None,
+        description="Backend-generated JSON Schema for normalized response_data values.",
+    )
     submit_label: str | None = Field(
         default=None,
         max_length=FieldLimits.FORM_SUBMIT_LABEL_MAX_LENGTH,

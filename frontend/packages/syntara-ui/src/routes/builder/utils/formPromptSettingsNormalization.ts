@@ -37,6 +37,7 @@ export function formPromptHasFallbackEdge(activityId: string, edges: EdgeConnect
 const FORM_PROMPT_PARAMETER_KEY_SET = {
   message: true,
   form_definition: true,
+  response_schema: true,
   responder_users: true,
   responder_groups: true,
   response_window: true,
