@@ -25,30 +25,11 @@ const TRIM_ON_SUBMIT_FIELD_TYPES: ReadonlySet<FormField['type']> = new Set([
   FormFieldTypeEnum.EMAIL,
 ])
 
-/** Trims date components and text-like answers before empty checks and coercion. */
-function normalizeSubmittedValue(field: FormField, raw: unknown): unknown {
-  if (raw === MISSING) {
+/** Trims leading/trailing whitespace on text-like answers before empty checks and coercion. */
+function normalizeTextLikeSubmission(field: FormField, raw: unknown): unknown {
+  if (raw === MISSING || !TRIM_ON_SUBMIT_FIELD_TYPES.has(field.type) || typeof raw !== 'string') {
     return raw
   }
-
-  if (field.type === FormFieldTypeEnum.DATE && typeof raw === 'object' && raw !== null && !Array.isArray(raw)) {
-    const entries = Object.entries(raw as Record<string, unknown>)
-    const normalized = Object.fromEntries(
-      entries.map(([name, value]) => [name, typeof value === 'string' ? value.trim() : value])
-    )
-    const includedComponents = new Set<string>(includedDateComponents(field))
-    const hasOnlyIncludedComponents = entries.every(([name]) => includedComponents.has(name))
-    const isEmptyDate = Object.values(normalized).every(
-      (value) => value === null || value === undefined || value === ''
-    )
-
-    return hasOnlyIncludedComponents && isEmptyDate ? '' : normalized
-  }
-
-  if (!TRIM_ON_SUBMIT_FIELD_TYPES.has(field.type) || typeof raw !== 'string') {
-    return raw
-  }
-
   return raw.trim()
 }
 
@@ -231,9 +212,6 @@ function toDateComponentEntries(raw: unknown, included: Array<DateComponentName>
   for (const key of Object.keys(entries)) {
     if (!DATE_COMPONENT_NAMES.includes(key as DateComponentName)) {
       throw new Error(`'${key}' is not a date component`)
-    }
-    if (!included.includes(key as DateComponentName)) {
-      throw new Error(`This field does not collect: ${key}`)
     }
   }
   return entries
@@ -425,7 +403,7 @@ function resolveSubmittedRaw(field: FormField, submitted: FormSubmissionInput): 
 }
 
 function validateFieldSubmission(field: FormField, submitted: FormSubmissionInput): FieldSubmissionOutcome {
-  const raw = normalizeSubmittedValue(field, resolveSubmittedRaw(field, submitted))
+  const raw = normalizeTextLikeSubmission(field, resolveSubmittedRaw(field, submitted))
 
   if (raw === MISSING || isEmptyValue(raw)) {
     if (field.required) {

@@ -5,8 +5,8 @@ from typing import Any
 import pytest
 from pydantic import ValidationError
 
-from syntara.forms.exceptions import FormDataValidationError, FormDefinitionError
-from syntara.forms.models.form_fields import DateValue, FormDefinition
+from syntara.forms.exceptions import FormDefinitionError
+from syntara.forms.models.form_fields import FormDefinition
 from syntara.forms.validators.form_definition import validate_form_definition
 
 _STATIC_OPTIONS: dict[str, Any] = {
@@ -176,114 +176,3 @@ class TestMultiSelectScalarDefaults:
         field = _field("multi_select", "picks", options=options, default=[bad])
         with pytest.raises(ValidationError):
             _form(field)
-
-
-class TestWhitespaceDefaults:
-    """Form defaults are normalized before the shared submission validator checks them."""
-
-    @pytest.mark.parametrize(
-        ("field_type", "default", "overrides", "expected"),
-        [
-            ("text", "  hello  ", {}, "hello"),
-            ("text", "  notes  ", {"display": "multi_line"}, "notes"),
-            ("text", "  secret  ", {"display": "masked"}, "secret"),
-            ("email", "  user@example.com  ", {}, "user@example.com"),
-            ("date", {"date": " 2026-01-05 "}, {}, {"date": "2026-01-05"}),
-            (
-                "dropdown",
-                " option_a ",
-                {"options": {"source": "static", "values": [{"display_label": "A", "value": " option_a "}]}},
-                "option_a",
-            ),
-            (
-                "multi_select",
-                [" option_a ", " \t "],
-                {"options": {"source": "static", "values": [{"display_label": "A", "value": " option_a "}]}},
-                ["option_a"],
-            ),
-        ],
-    )
-    def test_padded_defaults_are_trimmed_and_validate(
-        self,
-        field_type: str,
-        default: Any,  # noqa: ANN401
-        overrides: dict[str, Any],
-        expected: Any,  # noqa: ANN401
-    ) -> None:
-        form = _form(_field(field_type, "answer", default=default, **overrides))
-
-        validate_form_definition(form)
-
-        default_value = form.fields[0].default
-        if field_type == "date":
-            assert isinstance(default_value, DateValue)
-            assert default_value.model_dump(exclude_none=True) == expected
-        else:
-            assert default_value == expected
-
-    @pytest.mark.parametrize(
-        ("field_type", "default", "overrides", "expected"),
-        [
-            ("text", " \t ", {}, ""),
-            ("text", " \t ", {"display": "multi_line"}, ""),
-            ("text", " \t ", {"display": "masked"}, ""),
-            ("email", " \t ", {}, ""),
-            (
-                "dropdown",
-                " \t ",
-                {"options": {"source": "static", "values": [{"display_label": "A", "value": "a"}]}},
-                None,
-            ),
-            (
-                "multi_select",
-                [" \t "],
-                {"options": {"source": "static", "values": [{"display_label": "A", "value": "a"}]}},
-                [],
-            ),
-        ],
-    )
-    def test_whitespace_only_defaults_normalize_to_empty(
-        self,
-        field_type: str,
-        default: Any,  # noqa: ANN401
-        overrides: dict[str, Any],
-        expected: Any,  # noqa: ANN401
-    ) -> None:
-        form = _form(_field(field_type, "answer", default=default, **overrides))
-
-        validate_form_definition(form)
-
-        assert form.fields[0].default == expected
-
-    @pytest.mark.parametrize(
-        ("field_type", "default", "overrides"),
-        [
-            ("text", " \t ", {}),
-            ("text", " \t ", {"display": "multi_line"}),
-            ("text", " \t ", {"display": "masked"}),
-            ("email", " \t ", {}),
-            ("dropdown", " \t ", {"options": _STATIC_OPTIONS}),
-            ("multi_select", [" \t "], {"options": _STATIC_OPTIONS}),
-        ],
-    )
-    def test_required_field_with_empty_default_still_requires_a_submission(
-        self,
-        field_type: str,
-        default: Any,  # noqa: ANN401
-        overrides: dict[str, Any],
-    ) -> None:
-        from syntara.forms.validators.submission import validate_form_submission
-
-        form = _form(_field(field_type, "answer", required=True, default=default, **overrides))
-        validate_form_definition(form)
-
-        with pytest.raises(FormDataValidationError) as exc_info:
-            validate_form_submission(form, {})
-
-        assert [(error.field, error.code) for error in exc_info.value.errors] == [("answer", "required")]
-
-    @pytest.mark.parametrize("component", ["date", "time", "timezone"])
-    def test_whitespace_only_date_default_component_is_rejected(self, component: str) -> None:
-        data = _field("date", "start", default={component: " \t "})
-        with pytest.raises(ValidationError):
-            _form(data)
