@@ -587,6 +587,26 @@ class AuditOutboxWorker(PeriodicWorker):
             if pending:
                 logger.warning("audit_outbox_shutdown_incomplete", task_count=len(pending))
 
+    async def drain_writes(self, *, timeout_seconds: float) -> None:
+        """Settle only this process's inserts; never claim or export shared rows."""
+        writes = set(self._pending)
+        if not writes:
+            return
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + timeout_seconds
+        done, pending = await asyncio.wait(writes, timeout=max(0.0, timeout_seconds / 2))
+        for task in pending:
+            task.cancel()
+        if pending:
+            settled, pending = await asyncio.wait(pending, timeout=max(0.0, deadline - loop.time()))
+            done.update(settled)
+        for task in done:
+            self._shutdown_result(task)
+        for task in pending:
+            task.add_done_callback(self._shutdown_result)
+        if pending:
+            logger.warning("audit_outbox_writes_shutdown_incomplete", task_count=len(pending))
+
     @staticmethod
     def _shutdown_result(task: asyncio.Task[None]) -> None:
         """Retrieve late task failures without extending the shutdown deadline."""

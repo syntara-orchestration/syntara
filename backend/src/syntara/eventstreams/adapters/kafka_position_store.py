@@ -235,7 +235,11 @@ class KafkaInitialPositionStore:
             self._identity(source, observation)
             self._partitions(request, observation)
             if row is None:
-                if existing_group_position and source.initialized_at is not None:
+                if (
+                    existing_group_position
+                    and source.initialized_at is not None
+                    and initialization_kind != InitializationKind.ADDED_PARTITION
+                ):
                     msg = GapReason.INITIAL_METADATA_MISSING.value
                     raise KafkaPositionError(msg)
                 if initialization_kind != self.initialization_kind(source.configuration, request.partition):

@@ -75,9 +75,12 @@ still proceeds. Other audit callers and transactional audit writes retain their
 existing behavior.
 
 After consumer draining, the standalone worker bounds audit cleanup by
-`EventWorkerDefaults.HINT_TIMEOUT_SECONDS`. Half the budget permits audit
-draining; the remaining time permits stopping the poller and cancelling pending
-writes. Incomplete cleanup is logged without preventing database disposal.
+`EventWorkerDefaults.HINT_TIMEOUT_SECONDS`. It waits only for inserts started in
+that process, reserving half the budget for cancellation. It never starts the
+shared outbox poller, claims or deletes shared rows, or exports audit events to
+OTLP. The existing platform publisher delivers those rows. A blocked audit
+collector therefore cannot leave an export thread running in the Kafka process.
+Incomplete insert cleanup is logged without preventing database disposal.
 
 Uninspected content and unknown dependency/source state remain held. Local holds
 and skips create no delivery-ledger rows. A restart re-evaluates uncommitted work.
