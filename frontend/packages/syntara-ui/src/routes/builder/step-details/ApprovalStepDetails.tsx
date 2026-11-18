@@ -1,7 +1,7 @@
 import type { Activity } from '@syntara/contracts'
 import type { ReactNode } from 'react'
 
-import { useAlerts } from '../../../providers/alerts'
+import { useAlerts } from '../../../providers/alerts/AlertContext'
 import { useWorkflowStore } from '../../../stores/useWorkflowStore'
 import type { ApprovalFormSubmitData } from '../step-forms/ApprovalStepForm'
 import { ApprovalStepForm } from '../step-forms/ApprovalStepForm'
