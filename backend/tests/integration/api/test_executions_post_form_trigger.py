@@ -20,6 +20,7 @@ from syntara.metrics.types import ComponentLabel, MetricType
 from syntara.workflows.executions_router import get_temporal_execution_service
 from syntara.workflows.models.execution import Execution, ExecutionStatus
 from syntara.workflows.models.workflow_version import WorkflowVersion
+from syntara.workflows.services.form_response_schema import generate_form_response_schema
 from syntara.workflows.workflow_engine.models.responses import WorkflowStartResponse
 from syntara.workflows.workflow_engine.services.temporal_execution_service import TemporalExecutionService
 from tests.integration.helpers.error_data import assert_error_data
@@ -503,7 +504,12 @@ async def test_form_trigger_export_import_round_trip(
     imported_form_parameters = next(
         trigger["parameters"] for trigger in imported_definition["triggers"] if trigger["id"] == "form"
     )
-    assert imported_form_parameters == original_form_parameters
+    assert {key: value for key, value in imported_form_parameters.items() if key != "response_schema"} == (
+        original_form_parameters
+    )
+    assert imported_form_parameters["response_schema"] == generate_form_response_schema(
+        original_form_parameters["form_definition"]
+    )
 
 
 @pytest.mark.asyncio
