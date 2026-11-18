@@ -23,6 +23,36 @@ AO exposes `/api/execution_plane/v1`; target resources are EP `ExecutionTarget` 
 | `PATCH /execution_targets/{target_id}` | 200 target |
 | `DELETE /execution_targets/{target_id}` | 202 `{id, accepted: true}` |
 
+### Permissions
+
+Syntara enforces user permissions before calling EP with its privileged service
+identity. All facade permissions are system-scoped; project membership does not
+grant access to this inventory. Administrators receive all five permissions,
+auditors receive both read permissions, and custom system roles can grant each
+permission independently using the corresponding built-in `:any` policy.
+
+| Operation | Permission |
+| --- | --- |
+| List/get targets, target health, target usage | `execution_target:read` |
+| Create target | `execution_target:create` |
+| Update target (including enabled/default state) | `execution_target:update` |
+| Delete target | `execution_target:delete` |
+| List work items | `work_item:read` |
+
+Target usage exposes only an aggregate workload count under target-read access;
+reading work-item records requires the separate work-item permission. Health
+probes use target-read permission even though Syntara dispatches an EP command.
+EP's service-token scopes are independent of these user-facing permissions.
+
+The facade integration suite uses the existing PostgreSQL/Rego fixtures and
+mocks only EP HTTP responses. The live role-grant/revocation case is
+`tests/e2e/authz/test_execution_plane_permissions.py`; run it with
+`make -C backend test-e2e-ep E2E_TARGET=authz/test_execution_plane_permissions.py`.
+Against an existing deployment, set `APP_BASE_URL` and `EP_API_URL` and use
+`test-e2e` with the same target. The deployment must have an execution target.
+
+### Target payloads
+
 `POST` and `PATCH` accept `name`, `placement`, `labels`, and `is_default`, mapped
 to the corresponding EP `ExecutionTarget` fields. AO supplies `cluster_id` and
 `endpoint` from the installed cluster and sets `backend_type="vanilla_k8s"` on create.
