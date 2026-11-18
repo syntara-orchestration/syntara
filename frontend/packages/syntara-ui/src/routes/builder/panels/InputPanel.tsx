@@ -29,9 +29,10 @@ import { InputEmptyState } from './InputEmptyState'
 import { InputStepContent, InputPanelStepSection } from './InputStepContent'
 import { MockDataEditor } from './MockDataEditor'
 import styles from './panels.module.css'
+import { getEffectiveOutputSchema } from './utils/effectiveOutputSchema'
 import { getUpstreamStepDisplayName } from './utils/getUpstreamStepDisplayName'
 import { buildMockJsonSkeleton } from './utils/mockDataUtils'
-import { getTriggerInputSchemaFields } from './utils/triggerSchemaUtils'
+import { toUpstreamStepInfo } from './utils/toUpstreamStepInfo'
 import { VariablesAndContextTree } from './VariablesAndContextTree'
 import { ViewToggle, type PanelView } from './ViewToggle'
 
@@ -44,32 +45,32 @@ type InputPanelProps = {
   onRunPreviousSteps?: () => void
 }
 
+/** The source node is shown even when unnamed, so its id stands in for a missing name. */
+function toSourceStepInfo(node: { id: string; name?: string; type: string; parameters?: Record<string, unknown> }) {
+  return { ...toUpstreamStepInfo(node), name: node.name ?? node.id }
+}
+
 /** Compute the effective upstream nodes, falling back to source ancestors when direct upstream is empty. */
 function computeEffectiveUpstream(params: {
   upstreamNodes: UpstreamStepInfo[]
   sourceNodeId: string | null | undefined
   sourceAncestors: UpstreamStepInfo[]
-  activities: { id: string; name?: string; type: string }[] | undefined
-  triggers: { id: string; name?: string; type: string }[] | undefined
+  activities: { id: string; name?: string; type: string; parameters?: Record<string, unknown> }[] | undefined
+  triggers: { id: string; name?: string; type: string; parameters?: Record<string, unknown> }[] | undefined
 }): UpstreamStepInfo[] {
   const { upstreamNodes, sourceNodeId, sourceAncestors, activities, triggers } = params
   if (upstreamNodes.length > 0) return upstreamNodes
   if (!sourceNodeId) return []
 
   const activity = activities?.find((a) => a.id === sourceNodeId)
-  if (activity) {
-    return [{ id: activity.id, name: activity.name ?? activity.id, type: activity.type }, ...sourceAncestors]
-  }
+  if (activity) return [toSourceStepInfo(activity), ...sourceAncestors]
 
   const trigger = triggers?.find((t) => t.id === sourceNodeId)
-  if (trigger) {
-    return [{ id: trigger.id, name: trigger.name ?? trigger.id, type: trigger.type }, ...sourceAncestors]
-  }
+  if (trigger) return [toSourceStepInfo(trigger), ...sourceAncestors]
 
   const triggerIndex = parseTriggerIndex(sourceNodeId)
   if (triggerIndex !== undefined && triggers?.[triggerIndex]) {
-    const resolved = triggers[triggerIndex]
-    return [{ id: resolved.id, name: resolved.name ?? resolved.id, type: resolved.type }, ...sourceAncestors]
+    return [toSourceStepInfo(triggers[triggerIndex]), ...sourceAncestors]
   }
 
   return []
@@ -109,7 +110,8 @@ function getInputMockSkeleton(
 ): string {
   const node = effectiveUpstream.find((n) => n.id === predecessorId)
   if (!node) return '{}'
-  return buildMockJsonSkeleton(node.type, getTriggerInputSchemaFields(predecessorId, triggers))
+  const schema = getEffectiveOutputSchema(node, triggers)
+  return buildMockJsonSkeleton(node.type, schema)
 }
 
 /** Track which upstream node sections are expanded, syncing when the upstream set changes. */

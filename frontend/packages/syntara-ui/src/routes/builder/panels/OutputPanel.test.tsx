@@ -335,6 +335,49 @@ describe('OutputPanel', () => {
       expect(screen.getByRole('button', { name: /pin data/i })).toBeInTheDocument()
     })
 
+    it('seeds configured form fields into response_data of the mock editor skeleton', async () => {
+      const user = userEvent.setup()
+      const nodeId = 'prompt-1'
+      vi.mocked(useWorkflowStore).mockReturnValue([
+        {
+          id: nodeId,
+          type: 'form_prompt',
+          name: 'Ask',
+          parameters: {
+            form_definition: {
+              fields: [
+                { type: 'text', value_name: 'email', label: 'Email' },
+                { type: 'text', value_name: 'password', label: 'Password', display: 'masked', default: 'hunter2' },
+              ],
+            },
+          },
+        },
+      ] as never)
+
+      renderWithProviders(<OutputPanel nodeId={nodeId} />)
+      await user.click(screen.getByRole('button', { name: /set mock data/i }))
+
+      const editor = screen.getByRole('textbox', { name: /mock data editor/i })
+      const skeleton = JSON.parse((editor as HTMLTextAreaElement).value) as Record<string, unknown>
+      expect(skeleton.response_data).toStrictEqual({ email: '', password: '' })
+      expect(mockPinOutputMock).not.toHaveBeenCalled()
+    })
+
+    it('keeps the generic response_data placeholder when the form definition is invalid', async () => {
+      const user = userEvent.setup()
+      const nodeId = 'prompt-1'
+      vi.mocked(useWorkflowStore).mockReturnValue([
+        { id: nodeId, type: 'form_prompt', name: 'Ask', parameters: { form_definition: { fields: [] } } },
+      ] as never)
+
+      renderWithProviders(<OutputPanel nodeId={nodeId} />)
+      await user.click(screen.getByRole('button', { name: /set mock data/i }))
+
+      const editor = screen.getByRole('textbox', { name: /mock data editor/i })
+      const skeleton = JSON.parse((editor as HTMLTextAreaElement).value) as Record<string, unknown>
+      expect(skeleton.response_data).toBe('')
+    })
+
     it('uses empty object skeleton when no outputData and no schema', async () => {
       const user = userEvent.setup()
       const nodeId = 'unknown-node'
