@@ -104,7 +104,7 @@ describe('Tasks', () => {
   it('renders the Tasks heading', () => {
     render(<Tasks />)
     expect(screen.getByRole('heading', { level: 1, name: 'Tasks' })).toBeInTheDocument()
-    expectPageTitle(['Tasks'])
+    expectPageTitle('Tasks | Syntara')
   })
 
   it('renders the Form responses tab panel when that tab is active', () => {

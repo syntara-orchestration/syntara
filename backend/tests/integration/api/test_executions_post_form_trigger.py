@@ -17,11 +17,11 @@ from syntara.authz.engine import clear_authz_cache
 from syntara.core.error_handlers import PROBLEM_TYPES
 from syntara.metrics.recorder import MetricsRecorder
 from syntara.metrics.types import ComponentLabel, MetricType
+from syntara.workflow_runtime.engines.models.responses import WorkflowStartResponse
+from syntara.workflow_runtime.execution import WorkflowExecutionService
 from syntara.workflows.executions_router import get_temporal_execution_service
 from syntara.workflows.models.execution import Execution, ExecutionStatus
 from syntara.workflows.models.workflow_version import WorkflowVersion
-from syntara.workflows.workflow_engine.models.responses import WorkflowStartResponse
-from syntara.workflows.workflow_engine.services.temporal_execution_service import TemporalExecutionService
 from tests.integration.helpers.error_data import assert_error_data
 
 if TYPE_CHECKING:
@@ -38,7 +38,7 @@ if TYPE_CHECKING:
 @pytest.fixture
 def mock_temporal_service(session_app: FastAPI) -> Generator[Mock, None, None]:
     """Override Temporal so API tests can inspect the normalized workflow input."""
-    mock_service = Mock(spec=TemporalExecutionService)
+    mock_service = Mock(spec=WorkflowExecutionService)
 
     async def start_workflow(*_: object, **__: object) -> WorkflowStartResponse:
         execution_id = str(uuid.uuid4())

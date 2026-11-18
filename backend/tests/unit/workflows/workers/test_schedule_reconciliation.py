@@ -11,12 +11,12 @@ from uuid import uuid4
 
 import pytest
 
-from syntara.workflows.workers.schedule_reconciliation import (
+from syntara.workflow_runtime.workers.schedule_reconciliation import (
     _extract_expected_schedules,
     reconcile_scheduled_triggers,
 )
 
-_PATCH_SVC = "syntara.workflows.workers.schedule_reconciliation.ScheduledTriggerService"
+_PATCH_SVC = "syntara.workflow_runtime.workers.schedule_reconciliation.ScheduledTriggerService"
 
 
 def _make_triggers(
@@ -212,7 +212,7 @@ class TestReconcileScheduledTriggers:
         with (
             patch(_PATCH_SVC) as mock_svc_cls,
             patch(
-                "syntara.workflows.workers.schedule_reconciliation._RECONCILE_TEMPORAL_TIMEOUT_SECONDS",
+                "syntara.workflow_runtime.workers.schedule_reconciliation._RECONCILE_TEMPORAL_TIMEOUT_SECONDS",
                 0.05,
             ),
         ):
@@ -238,7 +238,7 @@ class TestReconcileScheduledTriggers:
         with (
             patch(_PATCH_SVC) as mock_svc_cls,
             patch(
-                "syntara.workflows.workers.schedule_reconciliation._RECONCILE_TEMPORAL_TIMEOUT_SECONDS",
+                "syntara.workflow_runtime.workers.schedule_reconciliation._RECONCILE_TEMPORAL_TIMEOUT_SECONDS",
                 0.05,
             ),
         ):
@@ -266,7 +266,7 @@ class TestReconcileScheduledTriggers:
         with (
             patch(_PATCH_SVC) as mock_svc_cls,
             patch(
-                "syntara.workflows.workers.schedule_reconciliation._RECONCILE_TEMPORAL_TIMEOUT_SECONDS",
+                "syntara.workflow_runtime.workers.schedule_reconciliation._RECONCILE_TEMPORAL_TIMEOUT_SECONDS",
                 0.05,
             ),
         ):
@@ -394,7 +394,7 @@ class TestGetScheduleReconciliationWorker:
 
     def test_creates_worker_with_correct_config(self) -> None:
         """Should create a PeriodicWorker with the expected name, interval, and coordinate flag."""
-        from syntara.workflows.workers.schedule_reconciliation import (
+        from syntara.workflow_runtime.workers.schedule_reconciliation import (
             get_schedule_reconciliation_worker,
         )
 

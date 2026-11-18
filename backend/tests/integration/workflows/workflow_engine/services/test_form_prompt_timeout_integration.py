@@ -21,14 +21,16 @@ from temporalio import activity
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
 
-from syntara.workflows.workflow_engine.activities.approver_resolution_activity import resolve_approvers_activity
-from syntara.workflows.workflow_engine.activities.converge import converge
-from syntara.workflows.workflow_engine.activities.form_prompt_activity import fail_detached_form_prompt_activity
-from syntara.workflows.workflow_engine.activities.manual_trigger import manual_trigger
-from syntara.workflows.workflow_engine.activities.runtime_settings_activity import fetch_workflow_runtime_settings
-from syntara.workflows.workflow_engine.dynamic_workflow import OrchestratorWorkflow
-from syntara.workflows.workflow_engine.models.form_prompt import FormPromptActivityInput
-from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName
+from syntara.workflow_core.models import ActivityName
+from syntara.workflow_runtime.engines.models.form_prompt import FormPromptActivityInput
+from syntara.workflow_runtime.engines.temporal.activities.approver_resolution_activity import resolve_approvers_activity
+from syntara.workflow_runtime.engines.temporal.activities.converge import converge
+from syntara.workflow_runtime.engines.temporal.activities.form_prompt_activity import fail_detached_form_prompt_activity
+from syntara.workflow_runtime.engines.temporal.activities.manual_trigger import manual_trigger
+from syntara.workflow_runtime.engines.temporal.activities.runtime_settings_activity import (
+    fetch_workflow_runtime_settings,
+)
+from syntara.workflow_runtime.engines.temporal.dynamic_workflow import OrchestratorWorkflow
 
 _expire_calls: list[tuple[str, str | None]] = []
 
@@ -162,7 +164,7 @@ class TestFormPromptTimeoutIntegration:
         task_queue = "form-prompt-timeout-fail-queue"
         _expire_calls.clear()
 
-        from syntara.workflows.workflow_engine.services.temporal_execution_service import TemporalExecutionService
+        from syntara.workflow_runtime.execution import WorkflowExecutionService
 
         async with Worker(
             temporal_env.client,
@@ -177,7 +179,7 @@ class TestFormPromptTimeoutIntegration:
                 fetch_workflow_runtime_settings,
             ],
         ):
-            execution_service = TemporalExecutionService(
+            execution_service = WorkflowExecutionService(
                 temporal_client=temporal_env.client,
                 task_queue=task_queue,
             )
@@ -204,7 +206,7 @@ class TestFormPromptTimeoutIntegration:
         task_queue = "form-prompt-timeout-fallback-queue"
         _expire_calls.clear()
 
-        from syntara.workflows.workflow_engine.services.temporal_execution_service import TemporalExecutionService
+        from syntara.workflow_runtime.execution import WorkflowExecutionService
 
         async with Worker(
             temporal_env.client,
@@ -219,7 +221,7 @@ class TestFormPromptTimeoutIntegration:
                 fetch_workflow_runtime_settings,
             ],
         ):
-            execution_service = TemporalExecutionService(
+            execution_service = WorkflowExecutionService(
                 temporal_client=temporal_env.client,
                 task_queue=task_queue,
             )
@@ -320,7 +322,7 @@ edges:
 """
         workflow_def: dict[str, Any] = yaml.safe_load(workflow_yaml)
 
-        from syntara.workflows.workflow_engine.services.temporal_execution_service import TemporalExecutionService
+        from syntara.workflow_runtime.execution import WorkflowExecutionService
 
         async with Worker(
             temporal_env.client,
@@ -338,7 +340,7 @@ edges:
                 fail_detached_form_prompt_activity,
             ],
         ):
-            execution_service = TemporalExecutionService(
+            execution_service = WorkflowExecutionService(
                 temporal_client=temporal_env.client,
                 task_queue=task_queue,
             )
@@ -417,8 +419,8 @@ edges:
 """
         workflow_def: dict[str, Any] = yaml.safe_load(workflow_yaml)
 
-        from syntara.workflows.workflow_engine.activities.loop import loop
-        from syntara.workflows.workflow_engine.services.temporal_execution_service import TemporalExecutionService
+        from syntara.workflow_runtime.engines.temporal.activities.loop import loop
+        from syntara.workflow_runtime.execution import WorkflowExecutionService
 
         async with Worker(
             temporal_env.client,
@@ -434,7 +436,7 @@ edges:
                 fetch_workflow_runtime_settings,
             ],
         ):
-            execution_service = TemporalExecutionService(
+            execution_service = WorkflowExecutionService(
                 temporal_client=temporal_env.client,
                 task_queue=task_queue,
             )
@@ -481,7 +483,7 @@ edges:
 """
         workflow_def: dict[str, Any] = yaml.safe_load(workflow_yaml)
 
-        from syntara.workflows.workflow_engine.services.temporal_execution_service import TemporalExecutionService
+        from syntara.workflow_runtime.execution import WorkflowExecutionService
 
         async with Worker(
             temporal_env.client,
@@ -494,7 +496,7 @@ edges:
                 fetch_workflow_runtime_settings,
             ],
         ):
-            execution_service = TemporalExecutionService(
+            execution_service = WorkflowExecutionService(
                 temporal_client=temporal_env.client,
                 task_queue=task_queue,
             )

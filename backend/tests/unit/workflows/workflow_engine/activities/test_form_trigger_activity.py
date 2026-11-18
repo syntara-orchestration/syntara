@@ -4,7 +4,7 @@ from typing import Any
 
 import pytest
 
-from syntara.workflows.workflow_engine.activities.form_trigger import form_trigger
+from syntara.workflow_runtime.engines.temporal.activities.form_trigger import form_trigger
 
 
 class TestFormTriggerPassThrough:

@@ -1,4 +1,4 @@
-import type { Activity } from '@syntara/contracts'
+import { EdgeHandleEnum, type Activity } from '@syntara/contracts'
 import { describe, expect, it } from 'vitest'
 
 import type { EdgeConnection } from '../../../types/edge'
@@ -233,6 +233,33 @@ describe('validateVariableReferences', () => {
 
       const warnings = validateVariableReferences(activities, [])
       expect(warnings).toEqual([])
+    })
+  })
+
+  describe('loop references', () => {
+    it('accepts loop.item in a loop body', () => {
+      const activities: Activity[] = [
+        makeActivity({ id: 'loop-1', type: 'loop', parameters: { type: 'for_each', items: '${trigger.items}' } }),
+        makeActivity({ id: 'condition-1', type: 'condition', parameters: { condition: '${loop.item} == 2' } }),
+      ]
+      const edges: EdgeConnection[] = [
+        { id: 'e1', source: 'loop-1', target: 'condition-1', sourceHandle: EdgeHandleEnum.LOOP },
+        { id: 'e2', source: 'condition-1', target: 'loop-1', targetHandle: EdgeHandleEnum.END },
+      ]
+      const context: ValidationContext = { triggers: [makeTriggerWithInputs(['items'])] }
+
+      expect(validateVariableReferences(activities, edges, context)).toEqual([])
+    })
+
+    it('rejects loop.item outside a loop body', () => {
+      const activities: Activity[] = [
+        makeActivity({ id: 'task-1', type: 'script', parameters: { code: '${loop.item}' } }),
+      ]
+
+      const errors = validateVariableReferences(activities, [])
+
+      expect(errors).toHaveLength(1)
+      expect(errors[0].message).toContain('only available inside a loop body')
     })
   })
 

@@ -53,6 +53,7 @@ describe('processMultiHandleNode', () => {
     expect(opts.placeholderNodesToAdd).toHaveLength(2)
     expect(opts.placeholderNodesToAdd[0].id).toBe('placeholder-cond-1-true')
     expect(opts.placeholderNodesToAdd[0].position).toEqual({ x: 300, y: 170 })
+    expect(opts.placeholderNodesToAdd[0].style).toEqual({ pointerEvents: 'none' })
     expect(opts.placeholderNodesToAdd[1].id).toBe('placeholder-cond-1-false')
     expect(opts.placeholderNodesToAdd[1].position).toEqual({ x: 300, y: 230 })
   })

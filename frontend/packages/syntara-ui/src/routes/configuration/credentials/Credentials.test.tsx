@@ -767,7 +767,7 @@ describe('Credentials', () => {
   describe('Page title', () => {
     it('sets the browser tab title', () => {
       render(<Credentials />, { wrapper })
-      expectPageTitle(['Credentials'])
+      expectPageTitle('Credentials | Syntara')
     })
   })
 

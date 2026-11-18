@@ -2,13 +2,13 @@
 
 from typing import ClassVar
 
-from syntara.workflows.seed_builtin import _BUILTIN_DEFINITIONS
-from syntara.workflows.workflow_engine.activities.registry import (
+from syntara.workflow_core.graph import _NODE_SETTINGS_CLASS
+from syntara.workflow_core.models import NODE_OUTPUT_MODELS, ActivityName, NodeType
+from syntara.workflow_runtime.engines.temporal.activities.registry import (
     ACTIVITY_REGISTRY,
     BACKGROUND_ACTIVITY_REGISTRY,
 )
-from syntara.workflows.workflow_engine.graph import _NODE_SETTINGS_CLASS
-from syntara.workflows.workflow_engine.models.workflow_definition import NODE_OUTPUT_MODELS, ActivityName, NodeType
+from syntara.workflows.seed_builtin import _BUILTIN_DEFINITIONS
 
 
 class TestBackgroundActivityRegistry:

@@ -11,8 +11,7 @@ These tests exercise the real ``start_http_server`` call so that:
 No Temporal connection is required — the metrics server is started before
 the Temporal worker attempts to connect, so both paths are independent.
 
-The test file lives in ``tests/integration/workflows/`` because
-``worker_lifecycle.py`` belongs to the ``syntara.workflows`` domain.
+The test file lives in ``tests/integration/workflows/`` to exercise the workflow worker runtime.
 """
 
 from __future__ import annotations
@@ -32,7 +31,7 @@ from syntara.metrics.recorder import MetricsRecorder
 from syntara.metrics.types import ComponentLabel, MetricType
 
 if TYPE_CHECKING:
-    from syntara.workflows.workflow_engine.services.temporal_worker import TemporalWorkerService
+    from syntara.workflow_runtime.engines.temporal.services.temporal_worker import TemporalWorkerService
 
 
 def _free_port() -> int:
@@ -104,7 +103,7 @@ class TestWorkerMetricsServer:
             component=ComponentLabel.WORKFLOW_ENGINE,
         )
 
-        from syntara.workflows.worker_lifecycle import _build_worker_metrics_registry
+        from syntara.workflow_runtime.workers.worker_lifecycle import _build_worker_metrics_registry
 
         registry = _build_worker_metrics_registry(recorder.prometheus.registry)
         server, thread = prometheus_client.start_http_server(port, registry=registry)
@@ -141,8 +140,7 @@ class TestWorkerMetricsServer:
 
         from prometheus_client import CollectorRegistry
 
-        from syntara.metrics.recorder import MetricsRecorder
-        from syntara.workflows.worker_lifecycle import run_worker
+        from syntara.workflow_runtime.workers.worker_lifecycle import run_worker
 
         recorder = MetricsRecorder(prometheus_registry=CollectorRegistry())
         recorder.record(
@@ -171,17 +169,20 @@ class TestWorkerMetricsServer:
 
         with (
             patch(
-                "syntara.workflows.worker_lifecycle.prometheus_client.start_http_server",
+                "syntara.workflow_runtime.workers.worker_lifecycle.prometheus_client.start_http_server",
                 side_effect=_fake_start_http_server,
             ),
-            patch("syntara.workflows.worker_lifecycle.get_metrics_recorder", return_value=recorder),
-            patch("syntara.workflows.worker_lifecycle.set_runtime_settings"),
-            patch("syntara.workflows.worker_lifecycle.apply_runtime_log_level", new_callable=AsyncMock),
             patch(
-                "syntara.workflows.worker_lifecycle.get_runtime_settings",
+                "syntara.workflow_runtime.workers.worker_lifecycle.get_metrics_recorder",
+                return_value=recorder,
+            ),
+            patch("syntara.workflow_runtime.workers.worker_lifecycle.set_runtime_settings"),
+            patch("syntara.workflow_runtime.workers.worker_lifecycle.apply_runtime_log_level", new_callable=AsyncMock),
+            patch(
+                "syntara.workflow_runtime.workers.worker_lifecycle.get_runtime_settings",
                 return_value=Mock(stop_watching=AsyncMock(), start_watching=Mock()),
             ),
-            patch("syntara.workflows.worker_lifecycle.discover_and_register_all_handlers"),
+            patch("syntara.workflow_runtime.workers.worker_lifecycle.discover_and_register_all_handlers"),
         ):
             # Create the coroutine outside pytest.raises so only asyncio.run
             # (the single raising call) is inside the block — satisfies S5778.
@@ -204,7 +205,7 @@ class TestWorkerMetricsServer:
         from prometheus_client import CollectorRegistry
 
         from syntara.metrics.recorder import MetricsRecorder
-        from syntara.workflows.worker_lifecycle import run_worker
+        from syntara.workflow_runtime.workers.worker_lifecycle import run_worker
 
         recorder = MetricsRecorder(prometheus_registry=CollectorRegistry())
         start_called: list[bool] = []
@@ -215,18 +216,18 @@ class TestWorkerMetricsServer:
             raise RuntimeError(msg)
 
         with (
-            patch("syntara.workflows.worker_lifecycle.get_metrics_recorder", return_value=recorder),
+            patch("syntara.workflow_runtime.workers.worker_lifecycle.get_metrics_recorder", return_value=recorder),
             patch(
-                "syntara.workflows.worker_lifecycle._build_worker_metrics_registry",
+                "syntara.workflow_runtime.workers.worker_lifecycle._build_worker_metrics_registry",
                 side_effect=RuntimeError("simulated registry failure"),
             ),
-            patch("syntara.workflows.worker_lifecycle.set_runtime_settings"),
-            patch("syntara.workflows.worker_lifecycle.apply_runtime_log_level", new_callable=AsyncMock),
+            patch("syntara.workflow_runtime.workers.worker_lifecycle.set_runtime_settings"),
+            patch("syntara.workflow_runtime.workers.worker_lifecycle.apply_runtime_log_level", new_callable=AsyncMock),
             patch(
-                "syntara.workflows.worker_lifecycle.get_runtime_settings",
+                "syntara.workflow_runtime.workers.worker_lifecycle.get_runtime_settings",
                 return_value=Mock(stop_watching=AsyncMock(), start_watching=Mock()),
             ),
-            patch("syntara.workflows.worker_lifecycle.discover_and_register_all_handlers"),
+            patch("syntara.workflow_runtime.workers.worker_lifecycle.discover_and_register_all_handlers"),
         ):
             coro = run_worker(_fail_after_start, worker_name="test-worker")
             with pytest.raises(SystemExit):
