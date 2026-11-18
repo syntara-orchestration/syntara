@@ -61,8 +61,7 @@ top-level parameters and contains the form fields users fill in. Other parameter
       "fields": [{"type": "text", "value_name": "details", "label": "Details"}]
     },
     "submit_label": "Submit",
-    "success_message": "Thanks for your response.",
-    "css_override": ".form { color: navy; }"
+    "success_message": "Thanks for your response."
   }
 }
 ```
@@ -73,9 +72,6 @@ Form prompts and form triggers share a base parameter model. The classes `BaseFo
 response-window, and fallback parameters, see
 [Responders](form-prompt-overview.md#responders) and
 [Timeout and Cleanup](form-prompt-overview.md#timeout-and-cleanup) for details.
-
-The shared `css_override` is author-supplied CSS shown to submitters. A security validator rejects
-patterns that could enable data exfiltration or code execution.
 
 Form prompts allow template expressions in supported node parameters and in dynamic option
 expressions inside `form_definition`. The workflow resolves dynamic options when it reaches the

@@ -139,7 +139,6 @@ class TestPrepareFormPromptArgs:
             "message",
             "submit_label",
             "success_message",
-            "css_override",
         }
         assert args["execution_id"] == "exec-456"
         assert args["prompt_node_id"] == "form1"
@@ -275,13 +274,12 @@ class TestPrepareFormPromptArgs:
 
     @pytest.mark.asyncio
     async def test_presentation_fields_passed_through(self) -> None:
-        """submit_label, success_message, and css_override are all passed through."""
+        """submit_label and success_message are passed through."""
         wf = _make_workflow()
         graph = _build_form_prompt_graph()
         config = {
             "submit_label": "Send",
             "success_message": "Thanks!",
-            "css_override": ".form { color: blue; }",
         }
         node = ActivityNode("form1", "form_prompt", config, name="Form")
 
@@ -291,7 +289,6 @@ class TestPrepareFormPromptArgs:
 
         assert args["submit_label"] == "Send"
         assert args["success_message"] == "Thanks!"
-        assert args["css_override"] == ".form { color: blue; }"
 
     @pytest.mark.asyncio
     async def test_missing_submitted_successor_raises(self) -> None:

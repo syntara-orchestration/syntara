@@ -202,11 +202,6 @@ export interface components {
        */
       success_message?: string | null
       /**
-       * Css Override
-       * @description Custom CSS applied to the form view
-       */
-      css_override?: string | null
-      /**
        * Response Data
        * @description Submitted form values
        */
@@ -849,11 +844,6 @@ export interface components {
        * @description Success message after submit
        */
       success_message?: string | null
-      /**
-       * Css Override
-       * @description Custom CSS for form rendering
-       */
-      css_override?: string | null
       /**
        * Responder User Ids
        * @description User IDs who can respond (null = any user with form_prompt:submit permission)

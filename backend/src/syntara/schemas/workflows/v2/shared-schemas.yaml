@@ -2359,13 +2359,6 @@ components:
             - type: 'null'
           title: Success Message
           description: Shown after submission.
-        css_override:
-          anyOf:
-            - type: string
-              maxLength: 10000
-            - type: 'null'
-          title: Css Override
-          description: Custom CSS applied to the form view.
       additionalProperties: false
       type: object
       required:

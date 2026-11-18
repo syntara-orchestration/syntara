@@ -75,11 +75,6 @@
         "type": "string",
         "maxLength": 500,
         "description": "Message shown after successful form submission."
-      },
-      "css_override": {
-        "type": "string",
-        "maxLength": 10000,
-        "description": "Custom CSS applied to the form view."
       }
     },
     "additionalProperties": false

@@ -31,7 +31,6 @@ class FieldLimits:
     FORM_SUBMIT_LABEL_MAX_LENGTH = 64
     FORM_SUCCESS_MESSAGE_MAX_LENGTH = 500
     FORM_TIMEZONE_MAX_LENGTH = 64  # IANA timezone names (~40 chars max)
-    FORM_CSS_OVERRIDE_MAX_LENGTH = 10000
     FORM_MESSAGE_MAX_LENGTH = 2000
 
     # List length limits

@@ -19,7 +19,6 @@ from pydantic.functional_validators import ModelWrapValidatorHandler
 from syntara.aap.models.responses import AAPJobType as AAPJobType  # noqa: PLC0414
 from syntara.core.constants import FieldLimits, WebhookLimits
 from syntara.core.exceptions import SafeValueError
-from syntara.core.utils.security import validate_css_security
 from syntara.forms.models.form_fields import FormDefinition, FormPromptDefinition, FormTriggerDefinition
 from syntara.forms.validators.form_definition import validate_form_definition
 from syntara.workflows.json_schema_validation import validate_json_schema_definition
@@ -888,30 +887,11 @@ class BaseFormParameters(BaseModel):
         max_length=FieldLimits.FORM_SUCCESS_MESSAGE_MAX_LENGTH,
         description="Shown after submission.",
     )
-    css_override: str | None = Field(
-        default=None,
-        max_length=FieldLimits.FORM_CSS_OVERRIDE_MAX_LENGTH,
-        description="Custom CSS applied to the form view.",
-    )
 
     @staticmethod
     def _validate_authored_form_defaults(value: FormDefinition) -> FormDefinition:
         """Validate defaults using the same coercion as form submission."""
         validate_form_definition(value, form_id=None)
-        return value
-
-    @field_validator("css_override")
-    @classmethod
-    def validate_css_override(cls, value: str | None) -> str | None:
-        """Validate CSS for security (reject patterns that enable data exfiltration or code execution)."""
-        if value is None:
-            return value
-
-        try:
-            validate_css_security(value)
-        except ValueError as exc:
-            raise SafeValueError(str(exc)) from exc
-
         return value
 
 
