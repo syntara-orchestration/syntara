@@ -652,13 +652,37 @@ async def test_facade_permission_matrix(
     success: int,
     grant: str,
 ) -> None:
-    """Named roles and single-permission custom roles enforce every facade operation."""
+    """Discover policies and create custom grants via the same APIs as the role editor."""
     user = await user_factory(group_names=[])
     if grant in _PERMISSIONS:
-        role = Role(name=f"ep-role-{uuid4()}", policy_names=[f"{grant}:any"])
-        test_db_session.add(role)
-        await test_db_session.flush()
-        test_db_session.add(RoleAssignment(principal_id=user.id, role_name=role.name))
+        policy_name = f"{grant}:any"
+        catalog = await auth_client.get("/api/v1/policies", params={"name[contains]": policy_name})
+        assert catalog.status_code == 200, catalog.text
+        policies = catalog.json()["resources"]
+        assert len(policies) == 1
+        assert policies[0]["name"] == policy_name
+        assert policies[0]["is_builtin"] is True
+        assert policies[0]["project_id"] is None
+        assert policies[0]["scope"] == "any"
+
+        role = await auth_client.post(
+            "/api/v1/roles",
+            json={
+                "name": f"ep-role-{uuid4()}",
+                "policies": [policies[0]["name"]],
+            },
+        )
+        assert role.status_code == 201, role.text
+        assert role.json()["scope"] == "system"
+        assert role.json()["policies"] == [policy_name]
+        assert role.json()["is_builtin"] is False
+        assignment = await auth_client.post(
+            f"/api/v1/users/{user.id}/role_assignments",
+            json={
+                "role_name": role.json()["name"],
+            },
+        )
+        assert assignment.status_code == 201, assignment.text
     elif grant == "project-admin":
         project = Project(name=f"ep-project-{uuid4()}")
         test_db_session.add(project)
