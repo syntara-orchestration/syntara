@@ -1363,6 +1363,9 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
             raise WorkflowVersionNotFoundError(workflow_id, version)
 
         if workflow_definition is not None:
+            current_version = await self._get_version_or_none(workflow_id, workflow.current_version)
+            previous_definition = current_version.workflow_definition if current_version else None
+            workflow_definition = prepare_workflow_definition_for_persistence(workflow_definition, previous_definition)
             target_version = await self._create_and_flush_version(
                 workflow, target_version, workflow_definition, change_description
             )

@@ -1,4 +1,4 @@
-import { ActivityTypeEnum, EdgeHandleEnum, type Activity, type WorkflowAPI } from '@syntara/contracts'
+import { ActivityTypeEnum, EdgeHandleEnum, TriggerTypeEnum, type Activity, type WorkflowAPI } from '@syntara/contracts'
 
 import { prepareFormDefinitionForCommit, safeParseFormDefinition } from '../../../forms'
 import type { EdgeConnection } from '../types/edge'
@@ -56,6 +56,8 @@ function sanitizeFormPromptParameters(parameters: Record<string, unknown>): Reco
     }
   }
 
+  delete sanitized.response_schema
+
   const rawDefinition = sanitized.form_definition
   if (rawDefinition !== undefined && rawDefinition !== null) {
     const withFields = rawDefinition as { fields?: unknown }
@@ -86,7 +88,9 @@ export function normalizeFormPromptActivityForDefinition(activity: Activity): Ac
 
   const parameters = { ...(activity.parameters ?? {}) } as Record<string, unknown>
   const needsSanitize =
-    'fallback_behavior' in parameters || Object.keys(parameters).some((key) => !FORM_PROMPT_PARAMETER_KEYS.has(key))
+    'fallback_behavior' in parameters ||
+    'response_schema' in parameters ||
+    Object.keys(parameters).some((key) => !FORM_PROMPT_PARAMETER_KEYS.has(key))
   if (!needsSanitize) {
     return activity
   }
@@ -95,4 +99,13 @@ export function normalizeFormPromptActivityForDefinition(activity: Activity): Ac
     ...activity,
     parameters: sanitizeFormPromptParameters(parameters),
   }
+}
+
+export function normalizeFormTriggerForDefinition(trigger: Activity): Activity {
+  if (trigger.type !== TriggerTypeEnum.FORM_TRIGGER) return trigger
+  if (!trigger.parameters || !('response_schema' in trigger.parameters)) return trigger
+
+  const parameters = { ...trigger.parameters }
+  delete parameters.response_schema
+  return { ...trigger, parameters }
 }

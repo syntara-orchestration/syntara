@@ -6,7 +6,10 @@ import { parseTriggerIndex } from '../../../utils/triggerNodeIds'
 import type { EdgeConnection } from '../types/edge'
 
 import { handleToV2Port } from './edgeHelpers'
-import { normalizeFormPromptActivityForDefinition } from './formPromptSettingsNormalization'
+import {
+  normalizeFormPromptActivityForDefinition,
+  normalizeFormTriggerForDefinition,
+} from './formPromptSettingsNormalization'
 
 // Type guard for Activity with inputs property
 function hasInputs(activity: Activity): activity is Activity & { inputs: Record<string, unknown> } {
@@ -253,6 +256,7 @@ export function buildWorkflowDefinition(params: {
   const sanitizedDescription = workflowDescription?.replace(CONTROL_CHAR_PATTERN, '') || undefined
 
   const activitiesForDefinition = activities.map((activity) => normalizeFormPromptActivityForDefinition(activity))
+  const triggersForDefinition = triggers.map((trigger) => normalizeFormTriggerForDefinition(trigger))
 
   validateEntityIds(activitiesForDefinition, triggers, edges)
 
@@ -263,7 +267,7 @@ export function buildWorkflowDefinition(params: {
   for (const a of activitiesForDefinition) {
     knownIds.add(a.id)
   }
-  for (const t of triggers) {
+  for (const t of triggersForDefinition) {
     if (hasId(t)) {
       knownIds.add(t.id)
     }
@@ -273,7 +277,7 @@ export function buildWorkflowDefinition(params: {
     schema_version: '2.0.0' as const,
     name: sanitizedName,
     description: sanitizedDescription,
-    triggers: triggers.map((t) => {
+    triggers: triggersForDefinition.map((t) => {
       validateNameLength(t.name, 'Trigger name')
       const sanitizedTriggerName = t.name?.replace(CONTROL_CHAR_PATTERN, '')
       return {

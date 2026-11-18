@@ -1,4 +1,4 @@
-import { ActivityTypeEnum, EdgeHandleEnum, type Activity } from '@syntara/contracts'
+import { ActivityTypeEnum, EdgeHandleEnum, TriggerTypeEnum, type Activity } from '@syntara/contracts'
 import { describe, expect, it } from 'vitest'
 
 import { createEmptyFormDefinition } from '../../../components/forms/formFieldBuilder/createDefaultField'
@@ -8,6 +8,7 @@ import {
   buildOutgoingPorts,
   formPromptHasFallbackEdge,
   normalizeFormPromptActivityForDefinition,
+  normalizeFormTriggerForDefinition,
 } from './formPromptSettingsNormalization'
 
 function formActivity(id: string, parameters?: Record<string, unknown>, settings?: Activity['settings']): Activity {
@@ -110,6 +111,33 @@ describe('formPromptSettingsNormalization', () => {
     expect(result.parameters).toMatchObject({ form_definition: formDefinition, message: 'Hi' })
     expect(result.parameters).not.toHaveProperty('unknown_key')
     expect(result.parameters).not.toHaveProperty('prompt')
+  })
+
+  it('strips server-generated response schemas from form prompts', () => {
+    const activity = formActivity('form-1', {
+      response_schema: { type: 'object', properties: { title: { type: 'string' } } },
+    })
+
+    const result = normalizeFormPromptActivityForDefinition(activity)
+
+    expect(result.parameters).not.toHaveProperty('response_schema')
+    expect(activity.parameters).toHaveProperty('response_schema')
+  })
+
+  it('strips server-generated response schemas from form triggers', () => {
+    const trigger: Activity = {
+      id: 'form-trigger',
+      type: TriggerTypeEnum.FORM_TRIGGER,
+      parameters: {
+        form_definition: createEmptyFormDefinition(),
+        response_schema: { type: 'object', properties: { title: { type: 'string' } } },
+      },
+    }
+
+    const result = normalizeFormTriggerForDefinition(trigger)
+
+    expect(result.parameters).not.toHaveProperty('response_schema')
+    expect(trigger.parameters).toHaveProperty('response_schema')
   })
 
   it('normalizes form_definition when fields are present', () => {

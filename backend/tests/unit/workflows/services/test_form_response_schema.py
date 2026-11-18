@@ -1,9 +1,10 @@
 """Tests for generated form response JSON Schemas."""
 
 from typing import Any
+from unittest.mock import patch
 
 import pytest
-from jsonschema import Draft202012Validator
+from jsonschema import Draft202012Validator, SchemaError
 from pydantic import ValidationError
 
 from syntara.workflows.json_schema_validation import validate_json_schema_definition
@@ -111,6 +112,13 @@ def test_generated_schema_passes_security_validation() -> None:
     validate_json_schema_definition(schema)
 
 
+def test_generated_schema_is_checked_against_draft_2020_12() -> None:
+    schema_error = SchemaError("invalid generated schema")
+    with patch.object(Draft202012Validator, "check_schema", side_effect=schema_error):
+        with pytest.raises(ValueError, match="Invalid JSON Schema: invalid generated schema"):
+            generate_form_response_schema(_form_definition())
+
+
 @pytest.mark.parametrize(
     ("include_date", "include_time", "include_timezone", "expected_schema"),
     [
@@ -167,6 +175,109 @@ def test_optional_checkbox_accepts_both_boolean_values() -> None:
     assert not Draft202012Validator(schema).is_valid({"confirmed": None})
 
 
+def test_required_fields_reject_empty_values() -> None:
+    definition = {
+        "fields": [
+            {"type": "number", "value_name": "count", "label": "Count", "required": True},
+            {
+                "type": "dropdown",
+                "value_name": "static_choice",
+                "label": "Static choice",
+                "required": True,
+                "options": {
+                    "source": "static",
+                    "values": [{"display_label": "Low", "value": "low"}],
+                },
+            },
+            {
+                "type": "dropdown",
+                "value_name": "dynamic_choice",
+                "label": "Dynamic choice",
+                "required": True,
+                "options": {
+                    "source": "dynamic",
+                    "expression": "${upstream.items}",
+                    "label_key": "label",
+                    "value_key": "value",
+                },
+            },
+            {
+                "type": "multi_select",
+                "value_name": "tags",
+                "label": "Tags",
+                "required": True,
+                "options": {
+                    "source": "static",
+                    "values": [{"display_label": "One", "value": "one"}],
+                },
+            },
+        ]
+    }
+
+    schema = generate_form_response_schema(definition)
+
+    assert schema["properties"]["count"] == {"type": "number"}
+    assert schema["properties"]["static_choice"] == {"type": "string", "enum": ["low"]}
+    assert schema["properties"]["dynamic_choice"] == {"type": ["string", "number", "boolean"]}
+    assert schema["properties"]["tags"] == {
+        "type": "array",
+        "items": {"type": "string", "enum": ["one"]},
+        "minItems": 1,
+    }
+    valid_response = {
+        "count": 1,
+        "static_choice": "low",
+        "dynamic_choice": "dynamic",
+        "tags": ["one"],
+    }
+    assert Draft202012Validator(schema).is_valid(valid_response)
+    for value_name, empty_value in (
+        ("count", None),
+        ("static_choice", None),
+        ("dynamic_choice", None),
+        ("tags", []),
+    ):
+        invalid_response = {**valid_response, value_name: empty_value}
+        assert not Draft202012Validator(schema).is_valid(invalid_response)
+
+
+def test_prepare_handles_malformed_node_type_and_id() -> None:
+    malformed_type_definition = {
+        "schema_version": "2.0.0",
+        "triggers": [],
+        "nodes": [
+            {
+                "id": [],
+                "type": {},
+                "parameters": {"form_definition": _form_definition()},
+            }
+        ],
+        "edges": [],
+    }
+    malformed_id_definition = {
+        "schema_version": "2.0.0",
+        "triggers": [],
+        "nodes": [
+            {
+                "id": [],
+                "type": "form_prompt",
+                "parameters": {"form_definition": _form_definition()},
+            }
+        ],
+        "edges": [],
+    }
+
+    malformed_type_prepared = prepare_workflow_definition_for_persistence(
+        malformed_type_definition, malformed_type_definition
+    )
+    malformed_id_prepared = prepare_workflow_definition_for_persistence(
+        malformed_id_definition, malformed_id_definition
+    )
+
+    assert "response_schema" not in malformed_type_prepared["nodes"][0]["parameters"]
+    assert "response_schema" in malformed_id_prepared["nodes"][0]["parameters"]
+
+
 def test_dynamic_options_use_conservative_scalar_types() -> None:
     definition = {
         "fields": [
@@ -219,11 +330,18 @@ def test_prepare_preserves_schema_for_unchanged_legacy_form() -> None:
     previous = _workflow_definition()
     del previous["triggers"][0]["parameters"]["response_schema"]
     persisted_schema = generate_form_response_schema(_form_definition())
+    persisted_schema["title"] = "Persisted form response schema"
     previous["triggers"][0]["parameters"]["response_schema"] = persisted_schema
 
     prepared = prepare_workflow_definition_for_persistence(definition, previous)
 
-    assert prepared["triggers"][0]["parameters"]["response_schema"] == persisted_schema
+    prepared_schema = prepared["triggers"][0]["parameters"]["response_schema"]
+    regenerated_schema = generate_form_response_schema(_form_definition())
+    client_supplied_schema = definition["triggers"][0]["parameters"]["response_schema"]
+
+    assert prepared_schema == persisted_schema
+    assert prepared_schema != regenerated_schema
+    assert client_supplied_schema != persisted_schema
 
 
 def test_prepare_keeps_legacy_form_without_schema_unchanged() -> None:
