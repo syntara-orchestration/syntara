@@ -1007,6 +1007,84 @@ describe('InputPanel', () => {
     })
   })
 
+  describe('configured form outputs', () => {
+    const form_definition = {
+      fields: [
+        { type: 'text', value_name: 'email', label: 'Email' },
+        { type: 'number', value_name: 'age', label: 'Age' },
+      ],
+    }
+
+    it('previews configured form fields from upstream step parameters', () => {
+      mockUseUpstreamNodes.mockReturnValue([
+        { id: 'prompt-1', name: 'Ask', type: 'form_prompt', parameters: { form_definition } },
+      ] as unknown as { id: string; name: string; type: string }[])
+
+      render(<InputPanel nodeId="node-1" />)
+
+      expect(screen.getByText('T email')).toBeInTheDocument()
+      expect(screen.getByText('# age')).toBeInTheDocument()
+    })
+
+    it('previews configured form fields for a source activity when adding a node', () => {
+      mockUseUpstreamNodes.mockReturnValue([])
+      mockActivities.mockReturnValue([
+        { id: 'prompt-1', name: 'Ask', type: 'form_prompt', parameters: { form_definition } },
+      ] as unknown as { id: string; name: string; type: string }[])
+
+      render(<InputPanel nodeId="" sourceNodeId="prompt-1" />)
+
+      expect(screen.getByText('T email')).toBeInTheDocument()
+      expect(screen.getByText('# age')).toBeInTheDocument()
+    })
+
+    it('previews configured form fields for a source form trigger resolved by actual id', () => {
+      mockUseUpstreamNodes.mockReturnValue([])
+      mockTriggers.mockReturnValue([
+        { id: 'real-form-trigger', name: 'Form', type: 'form_trigger', parameters: { form_definition } },
+      ] as unknown as { id: string; name: string; type: string }[])
+
+      render(<InputPanel nodeId="" sourceNodeId="real-form-trigger" />)
+
+      expect(screen.getByText('T email')).toBeInTheDocument()
+    })
+
+    it('previews configured form fields for a source form trigger resolved by canvas display id', () => {
+      mockUseUpstreamNodes.mockReturnValue([])
+      mockTriggers.mockReturnValue([
+        { id: 'real-form-trigger', name: 'Form', type: 'form_trigger', parameters: { form_definition } },
+      ] as unknown as { id: string; name: string; type: string }[])
+
+      render(<InputPanel nodeId="" sourceNodeId="trigger-0" />)
+
+      expect(screen.getByText('T email')).toBeInTheDocument()
+      expect(screen.getByText('# age')).toBeInTheDocument()
+    })
+
+    it('shows only the fields of each form when two forms are configured differently', () => {
+      mockUseUpstreamNodes.mockReturnValue([
+        {
+          id: 'prompt-a',
+          name: 'First',
+          type: 'form_prompt',
+          parameters: { form_definition: { fields: [{ type: 'text', value_name: 'alpha', label: 'Alpha' }] } },
+        },
+        {
+          id: 'prompt-b',
+          name: 'Second',
+          type: 'form_prompt',
+          parameters: { form_definition: { fields: [{ type: 'text', value_name: 'beta', label: 'Beta' }] } },
+        },
+      ] as unknown as { id: string; name: string; type: string }[])
+
+      render(<InputPanel nodeId="node-1" />)
+
+      // Collapsed sections stay mounted, so a leak would render each field twice
+      expect(screen.getAllByText('T alpha')).toHaveLength(1)
+      expect(screen.getAllByText('T beta')).toHaveLength(1)
+    })
+  })
+
   describe('effectiveUpstream fallback to sourceNodeId', () => {
     it('includes source trigger in effectiveUpstream when no upstream edges exist', () => {
       mockUseUpstreamNodes.mockReturnValue([])
