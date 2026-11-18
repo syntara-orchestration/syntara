@@ -66,6 +66,7 @@ export const executionTargetFormSchema = z.object({
     .trim()
     .min(1, 'Execution target name is required')
     .max(255, 'Execution target name must be 255 characters or fewer'),
+  isDefault: z.boolean(),
   namespace: z
     .string()
     .trim()
@@ -149,6 +150,7 @@ export function toExecutionTargetFormValues(target: ExecutionTargetRead): Execut
   const namespace = placement?.type === 'kubernetes' ? placement.namespace : ''
   return {
     name: target.name,
+    isDefault: target.is_default,
     namespace,
     nodeSelectors: parseNodeSelectorPairs(getNodeSelectors(placement)),
   }
@@ -159,13 +161,15 @@ export function toExecutionTargetCreateBody(data: ExecutionTargetFormData): Exec
   return {
     name: data.name.trim(),
     placement: buildKubernetesPlacement(data),
+    ...(data.isDefault ? { is_default: true } : {}),
   }
 }
 
 /**
  * Build a partial PATCH body from dirty form fields only.
- * `is_default`, `enabled`, and `labels` are intentionally omitted — the configure UI does
- * not expose them, and default promotion remains a separate lifecycle concern.
+ * `enabled` and `labels` are intentionally omitted — the configure UI does not expose them.
+ * `is_default` is included only when promoting a non-default target (the current default
+ * cannot be unchecked in the form; clearing default is a server-side conflict).
  *
  * When placement is rebuilt, pass `existingTarget` so kubernetes kubernetes `tolerations`
  * are preserved (the form does not expose that field).
@@ -179,6 +183,10 @@ export function toExecutionTargetUpdateBody(
 
   if (isExecutionTargetFieldDirty(dirtyFields.name)) {
     body.name = data.name.trim()
+  }
+
+  if (isExecutionTargetFieldDirty(dirtyFields.isDefault) && data.isDefault) {
+    body.is_default = true
   }
 
   const placementDirty =
@@ -226,6 +234,7 @@ export function toExecutionTargetFormErrorField(apiFieldPath: string): Execution
 
 export const EXECUTION_TARGET_FORM_DEFAULT_VALUES: ExecutionTargetFormData = {
   name: '',
+  isDefault: false,
   namespace: '',
   nodeSelectors: [{ key: '', value: '' }],
 }

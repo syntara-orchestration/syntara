@@ -1,8 +1,20 @@
-import { Content, ContentVariants, Spinner, Stack, StackItem } from '@patternfly/react-core'
+import {
+  Button,
+  Content,
+  ContentVariants,
+  Modal,
+  ModalBody,
+  ModalFooter,
+  ModalHeader,
+  Spinner,
+  Stack,
+  StackItem,
+} from '@patternfly/react-core'
 import type { ExecutionPlaneAPI } from '@syntara/contracts'
 import type { ReactNode } from 'react'
 
 import { SynConfirmationDialog } from '../../components/dialogs/SynConfirmationDialog'
+import { useBlurOnOpen } from '../../hooks/useBlurOnOpen'
 import type { DialogState } from '../../hooks/useDialogState'
 
 import type { useExecutionTargetActions } from './useExecutionTargetActions'
@@ -85,7 +97,8 @@ function resolveUsageTargetId(
   deleteDialog: DialogState<ExecutionTarget>,
   disableDialog: DialogState<ExecutionTarget>
 ): string | null {
-  if (deleteDialog.isOpen) {
+  // Default targets cannot be deleted — skip the usage check for that informational dialog.
+  if (deleteDialog.isOpen && !deleteDialog.item?.is_default) {
     return deleteDialog.item?.id ?? null
   }
   if (disableDialog.isOpen) {
@@ -108,6 +121,48 @@ function disableContinuation(count: number): string {
   return 'Those workloads will continue to completion.'
 }
 
+const CANNOT_DELETE_DEFAULT_TITLE_ID = 'cannot-delete-default-execution-target-title'
+const CANNOT_DELETE_DEFAULT_BODY_ID = 'cannot-delete-default-execution-target-body'
+
+function CannotDeleteDefaultExecutionTargetModal({
+  isOpen,
+  onClose,
+  targetName,
+}: Readonly<{
+  isOpen: boolean
+  onClose: () => void
+  targetName: string
+}>) {
+  useBlurOnOpen(isOpen)
+
+  return (
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      variant="small"
+      aria-labelledby={CANNOT_DELETE_DEFAULT_TITLE_ID}
+      aria-describedby={CANNOT_DELETE_DEFAULT_BODY_ID}
+    >
+      <ModalHeader
+        title="Cannot delete default execution target"
+        titleIconVariant="warning"
+        labelId={CANNOT_DELETE_DEFAULT_TITLE_ID}
+      />
+      <ModalBody id={CANNOT_DELETE_DEFAULT_BODY_ID}>
+        <Content component={ContentVariants.p}>
+          Set another execution target as default before deleting <strong>{targetName}</strong>. Edit another target and
+          mark it as the default, then try again.
+        </Content>
+      </ModalBody>
+      <ModalFooter>
+        <Button variant="primary" onClick={onClose}>
+          Close
+        </Button>
+      </ModalFooter>
+    </Modal>
+  )
+}
+
 export function ExecutionTargetDialogs({
   deleteDialog,
   onDelete,
@@ -116,6 +171,10 @@ export function ExecutionTargetDialogs({
 }: ExecutionTargetDialogsProps) {
   const usageTargetId = resolveUsageTargetId(deleteDialog, disableDialog)
   const usage = useExecutionTargetUsage(usageTargetId)
+  const isDeletingDefault = Boolean(deleteDialog.item?.is_default)
+  const isDeleteConfirmOpen = deleteDialog.isOpen && !isDeletingDefault
+  const isCannotDeleteDefaultOpen = deleteDialog.isOpen && isDeletingDefault
+  const defaultTargetName = deleteDialog.item?.name ?? 'this execution target'
 
   return (
     <>
@@ -137,7 +196,7 @@ export function ExecutionTargetDialogs({
       </SynConfirmationDialog>
 
       <SynConfirmationDialog
-        isOpen={deleteDialog.isOpen}
+        isOpen={isDeleteConfirmOpen}
         onClose={deleteDialog.close}
         onConfirm={onDelete}
         title="Delete execution target?"
@@ -157,6 +216,12 @@ export function ExecutionTargetDialogs({
           </Content>
         </ConfirmationBody>
       </SynConfirmationDialog>
+
+      <CannotDeleteDefaultExecutionTargetModal
+        isOpen={isCannotDeleteDefaultOpen}
+        onClose={deleteDialog.close}
+        targetName={defaultTargetName}
+      />
     </>
   )
 }

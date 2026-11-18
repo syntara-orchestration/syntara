@@ -280,20 +280,17 @@ describe('ExecutionPlane', () => {
     expect(screen.getByRole('link', { name: 'Staging OpenShift' })).toBeInTheDocument()
   })
 
-  it('shows an error alert on 409 conflict and keeps the target in the list', async () => {
-    const user = userEvent.setup()
-    const refetch = vi.fn().mockResolvedValue(undefined)
-    mockFacadeQuery({ refetch })
+  it('shows a Default badge next to the default execution target name', async () => {
+    mockFacadeQuery()
+    render(<ExecutionPlane />, { wrapper })
 
-    mockDeleteMutate.mockImplementation(
-      (_params: unknown, callbacks?: { onError?: (error: unknown) => void; onSettled?: () => void }) => {
-        callbacks?.onError?.({
-          status: 409,
-          detail: 'Cannot delete the default execution target; promote another target first',
-        })
-        callbacks?.onSettled?.()
-      }
-    )
+    expect(await screen.findByRole('link', { name: 'Prod OpenShift West' })).toBeInTheDocument()
+    expect(screen.getByText('Default')).toBeInTheDocument()
+  })
+
+  it('opens the cannot-delete modal when deleting the default execution target', async () => {
+    const user = userEvent.setup()
+    mockFacadeQuery()
 
     render(<ExecutionPlane />, { wrapper })
 
@@ -301,15 +298,15 @@ describe('ExecutionPlane', () => {
     await user.click(screen.getByRole('menuitem', { name: /Delete execution target/i }))
 
     const dialog = await screen.findByRole('dialog')
-    await user.click(within(dialog).getByRole('checkbox', { name: /permanently deleted/i }))
-    await user.click(within(dialog).getByRole('button', { name: 'Delete' }))
+    expect(within(dialog).getByText('Cannot delete default execution target')).toBeInTheDocument()
+    expect(within(dialog).getByText(/Set another execution target as default before deleting/)).toBeInTheDocument()
+    expect(within(dialog).getByText('Prod OpenShift West')).toBeInTheDocument()
+    expect(within(dialog).queryByRole('checkbox', { name: /permanently deleted/i })).not.toBeInTheDocument()
+    expect(mockDeleteMutate).not.toHaveBeenCalled()
 
-    expect(await screen.findByText('Delete failed')).toBeInTheDocument()
-    expect(
-      screen.getByText(/Cannot delete the default execution target; promote another target first/)
-    ).toBeInTheDocument()
-    expect(refetch).not.toHaveBeenCalled()
-    expect(screen.getByRole('link', { name: 'Prod OpenShift West' })).toBeInTheDocument()
+    // Modal X also has accessible name "Close"; scope to the footer primary action.
+    await user.click(within(within(dialog).getByRole('contentinfo')).getByRole('button', { name: 'Close' }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
   it('shows an error alert for in-use conflict and keeps the target in the list', async () => {

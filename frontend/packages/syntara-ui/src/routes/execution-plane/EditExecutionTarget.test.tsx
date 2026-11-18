@@ -146,8 +146,44 @@ describe('EditExecutionTarget', () => {
     expect(screen.getByRole('textbox', { name: 'Execution namespace' })).toHaveValue('syntara-workers')
     expect(screen.getByRole('textbox', { name: 'Node selector key 1' })).toHaveValue('workload')
     expect(screen.getByRole('textbox', { name: 'Node selector value 1' })).toHaveValue('automation')
+    expect(screen.getByRole('checkbox', { name: 'Default execution target' })).not.toBeChecked()
+    expect(screen.getByRole('checkbox', { name: 'Default execution target' })).toBeEnabled()
     expect(screen.getByText('prod-openshift-east')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Save execution target' })).toBeDisabled()
+  })
+
+  it('locks the default checkbox when editing the current default target', async () => {
+    vi.mocked(executionPlaneClient.useQuery).mockReturnValue({
+      data: { ...EXISTING_TARGET, is_default: true },
+      isPending: false,
+      isFetching: false,
+      error: null,
+      refetch: vi.fn(),
+    } as ReturnType<typeof executionPlaneClient.useQuery>)
+
+    render(<EditExecutionTarget />, { wrapper })
+
+    const checkbox = await screen.findByRole('checkbox', { name: 'Default execution target' })
+    expect(checkbox).toBeChecked()
+    expect(checkbox).toBeDisabled()
+  })
+
+  it('PATCHes is_default when promoting a non-default target', async () => {
+    const { mockMutate } = setupMocks()
+    const user = userEvent.setup()
+    render(<EditExecutionTarget />, { wrapper })
+
+    await user.click(await screen.findByRole('checkbox', { name: 'Default execution target' }))
+    await user.click(screen.getByRole('button', { name: 'Save execution target' }))
+
+    await waitFor(() => {
+      expect(mockMutate).toHaveBeenCalled()
+    })
+
+    expect(mockMutate.mock.calls[0]?.[0]).toEqual({
+      params: { path: { target_id: 'et-001' } },
+      body: { is_default: true },
+    })
   })
 
   it('PATCHes only the changed name for a partial update', async () => {

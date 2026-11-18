@@ -208,7 +208,11 @@ export function EditExecutionTarget() {
               }}
             >
               <SynForm form={form}>
-                <CreateExecutionTargetFields clusterName={clusterName} isClusterPending={isClusterPending} />
+                <CreateExecutionTargetFields
+                  clusterName={clusterName}
+                  isClusterPending={isClusterPending}
+                  isDefaultLocked={target.is_default}
+                />
               </SynForm>
             </Form>
           </Stack>

@@ -1,5 +1,6 @@
 import {
   Button,
+  Checkbox,
   Content,
   Flex,
   FlexItem,
@@ -19,15 +20,28 @@ import { SynFormField } from '../../components/forms/SynFormField'
 import { SynTextField } from '../../components/forms/SynTextField'
 
 import styles from './CreateExecutionTargetFields.module.css'
-import { executionTargetHelp, OPENSHIFT_NODE_SELECTOR_HINT } from './executionTargetFieldHelp'
+import {
+  DEFAULT_EXECUTION_TARGET_HINT,
+  executionTargetHelp,
+  OPENSHIFT_NODE_SELECTOR_HINT,
+} from './executionTargetFieldHelp'
 import type { ExecutionTargetFormData } from './executionTargetFormSchema'
 
 type CreateExecutionTargetFieldsProps = Readonly<{
   clusterName: string | undefined
   isClusterPending: boolean
+  /** When true, the default checkbox stays checked and cannot be unchecked. */
+  isDefaultLocked: boolean
+  /** Helper text under the default checkbox. Defaults to the shared replace-current-default copy. */
+  defaultCheckboxHint?: string
 }>
 
-export function CreateExecutionTargetFields({ clusterName, isClusterPending }: CreateExecutionTargetFieldsProps) {
+export function CreateExecutionTargetFields({
+  clusterName,
+  isClusterPending,
+  isDefaultLocked,
+  defaultCheckboxHint = DEFAULT_EXECUTION_TARGET_HINT,
+}: CreateExecutionTargetFieldsProps) {
   const { control } = useFormContext<ExecutionTargetFormData>()
   const { fields, append, remove } = useFieldArray({ control, name: 'nodeSelectors' })
 
@@ -44,6 +58,30 @@ export function CreateExecutionTargetFields({ clusterName, isClusterPending }: C
           isRequired
           autoComplete="off"
         />
+        <SynFormField<ExecutionTargetFormData, 'isDefault'>
+          name="isDefault"
+          label="Default execution target"
+          fieldId="execution-target-is-default"
+          hideFormGroupLabel
+          hideFooter
+        >
+          {({ field }) => (
+            <Checkbox
+              id="execution-target-is-default"
+              label="Default execution target"
+              description={defaultCheckboxHint}
+              isChecked={isDefaultLocked || Boolean(field.value)}
+              isDisabled={isDefaultLocked}
+              onChange={(_event, checked) => {
+                if (!isDefaultLocked) {
+                  field.onChange(checked)
+                }
+              }}
+              onBlur={field.onBlur}
+              name={field.name}
+            />
+          )}
+        </SynFormField>
         <FormGroup label="OpenShift Cluster" fieldId="openshift-cluster" isRequired>
           <Content id="openshift-cluster">{clusterDisplay}</Content>
         </FormGroup>

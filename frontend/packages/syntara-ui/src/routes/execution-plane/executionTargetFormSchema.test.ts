@@ -61,6 +61,7 @@ describe('isKubernetesLabelKey / isKubernetesLabelValue', () => {
 describe('executionTargetFormSchema', () => {
   const validData = {
     name: 'corp-internal-target',
+    isDefault: false,
     namespace: 'aao-execution',
     nodeSelectors: [{ key: 'region', value: 'us-east' }],
   }
@@ -122,6 +123,7 @@ describe('toExecutionTargetCreateBody', () => {
   it('maps form data to ExecutionTargetCreate payload', () => {
     const body = toExecutionTargetCreateBody({
       name: ' corp-internal-target ',
+      isDefault: false,
       namespace: ' aao-execution ',
       nodeSelectors: [
         { key: 'region', value: 'us-east' },
@@ -138,9 +140,20 @@ describe('toExecutionTargetCreateBody', () => {
     })
   })
 
+  it('includes is_default when the checkbox is checked', () => {
+    const body = toExecutionTargetCreateBody({
+      name: 'target',
+      isDefault: true,
+      namespace: 'ns',
+      nodeSelectors: EXECUTION_TARGET_FORM_DEFAULT_VALUES.nodeSelectors,
+    })
+    expect(body.is_default).toBe(true)
+  })
+
   it('omits node_selectors when all rows are empty', () => {
     const body = toExecutionTargetCreateBody({
       name: 'target',
+      isDefault: false,
       namespace: 'ns',
       nodeSelectors: EXECUTION_TARGET_FORM_DEFAULT_VALUES.nodeSelectors,
     })
@@ -169,6 +182,7 @@ describe('toExecutionTargetFormValues', () => {
   it('pre-populates name, namespace, and node selectors from a loaded target', () => {
     expect(toExecutionTargetFormValues(makeTarget())).toEqual({
       name: 'corp-internal-target',
+      isDefault: false,
       namespace: 'aao-execution',
       nodeSelectors: [
         { key: 'region', value: 'us-east' },
@@ -186,9 +200,14 @@ describe('toExecutionTargetFormValues', () => {
       )
     ).toEqual({
       name: 'corp-internal-target',
+      isDefault: false,
       namespace: 'ns',
       nodeSelectors: [{ key: '', value: '' }],
     })
+  })
+
+  it('maps is_default onto isDefault', () => {
+    expect(toExecutionTargetFormValues(makeTarget({ is_default: true })).isDefault).toBe(true)
   })
 })
 
@@ -204,6 +223,7 @@ describe('isExecutionTargetFieldDirty', () => {
 describe('toExecutionTargetUpdateBody', () => {
   const formData = {
     name: 'renamed-target',
+    isDefault: false,
     namespace: 'new-ns',
     nodeSelectors: [{ key: 'region', value: 'us-west' }],
   }
@@ -212,6 +232,16 @@ describe('toExecutionTargetUpdateBody', () => {
     expect(toExecutionTargetUpdateBody(formData, { name: true })).toEqual({
       name: 'renamed-target',
     })
+  })
+
+  it('includes is_default when promoting a target to default', () => {
+    expect(toExecutionTargetUpdateBody({ ...formData, isDefault: true }, { isDefault: true })).toEqual({
+      is_default: true,
+    })
+  })
+
+  it('does not clear is_default when the checkbox is unchecked', () => {
+    expect(toExecutionTargetUpdateBody(formData, { isDefault: true })).toEqual({})
   })
 
   it('sends full placement when namespace or node selectors change', () => {
