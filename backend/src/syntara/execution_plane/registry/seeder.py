@@ -12,6 +12,7 @@ import yaml
 from sqlalchemy.dialects.postgresql import insert
 
 from syntara.execution_plane.registry.models import ExecutionPlanePlugin
+from syntara.workflow_core.models import NodeType
 
 if TYPE_CHECKING:
     from sqlmodel.ext.asyncio.session import AsyncSession
@@ -21,12 +22,14 @@ logger = structlog.stdlib.get_logger(__name__)
 _PLUGIN_SEEDS = (
     (
         "script-python",
+        NodeType.SCRIPT_PYTHON,
         "syntara.script-python.script-python",
         "script-python.yaml",
         "quay.io/aap/ansible-automation-platform/ao-python-rhel9:devel",
     ),
     (
         "script-bash",
+        NodeType.SCRIPT_BASH,
         "syntara.script-bash.script-bash",
         "script-bash.yaml",
         "quay.io/aap/ansible-automation-platform/ao-bash-rhel9:devel",
@@ -55,6 +58,7 @@ async def seed_execution_plane_plugins(session: AsyncSession) -> None:
         {
             "id": uuid4(),
             "name": name,
+            "node_type": node_type,
             "step_identity": step_identity,
             "manifest": _load_manifest(filename, name),
             "image_reference": image_reference,
@@ -62,13 +66,14 @@ async def seed_execution_plane_plugins(session: AsyncSession) -> None:
             "updated_at": now,
             "labels": {},
         }
-        for name, step_identity, filename, image_reference in _PLUGIN_SEEDS
+        for name, node_type, step_identity, filename, image_reference in _PLUGIN_SEEDS
     ]
     statement = insert(ExecutionPlanePlugin).values(rows)
     statement = statement.on_conflict_do_update(
         index_elements=[ExecutionPlanePlugin.name],
         set_={
             "step_identity": statement.excluded.step_identity,
+            "node_type": statement.excluded.node_type,
             "manifest": statement.excluded.manifest,
             "image_reference": statement.excluded.image_reference,
             "updated_at": now,

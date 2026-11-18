@@ -9,6 +9,9 @@ from typing import TYPE_CHECKING, Any, cast
 
 import structlog
 from execution_plane_client.commands.work import WorkExecute, WorkloadInvocation
+from execution_plane_client.models.work_item import WorkItemStatus
+from jsonschema import Draft202012Validator
+from jsonschema.exceptions import ValidationError as JsonSchemaValidationError
 from sqlmodel import col, select
 from temporalio import activity
 from temporalio.exceptions import ApplicationError
@@ -22,7 +25,12 @@ from syntara.execution_plane.client import (
     ExecutionPlaneRejectedError,
     ExecutionPlaneUnavailableError,
 )
-from syntara.execution_plane.registry.repository import get_execution_plane_plugin
+from syntara.execution_plane.registry.bindings import legacy_credential_bindings
+from syntara.execution_plane.registry.repository import (
+    execution_plane_plugin_credential_recipe_ids,
+    execution_plane_plugin_input_schema,
+    get_execution_plane_plugin,
+)
 from syntara.execution_plane.utils import execution_plane_work_item_id
 from syntara.workflow_core.models import (
     ActivityName,
@@ -43,35 +51,49 @@ if TYPE_CHECKING:
 
 logger = structlog.stdlib.get_logger(__name__)
 
-__all__ = [
-    "activity",
-    "asyncio",
-    "execute_bash_script_activity",
-    "execute_python_script_activity",
-]
-
 INITIAL_RETRY_DELAY_SECONDS = 0.5
 MAX_RETRY_DELAY_SECONDS = 10.0
 _DEFAULT_TIMEOUT_SECONDS = 300
 _EXECUTION_PROFILE_FIELD = "execution_profile"
 _EXECUTION_TARGET_SELECTOR_FIELD = "_execution_target_id"
 _CREDENTIAL_BINDINGS_FIELD = "credential_bindings"
+_CREDENTIAL_ID_FIELD = "credential_id"
 
 
-def _build_invocation(input_config: dict[str, Any], step_identity: str) -> dict[str, Any]:
-    """Build the versioned SDK request before AO freezes it for activity retries."""
-    inputs = {
+def _workload_inputs(input_config: dict[str, Any]) -> dict[str, Any]:
+    """Return only fields that belong to the plugin action contract."""
+    return {
         key: value
         for key, value in input_config.items()
-        if not key.startswith("_") and key not in {_EXECUTION_PROFILE_FIELD, _CREDENTIAL_BINDINGS_FIELD}
+        if not key.startswith("_")
+        and key not in {_EXECUTION_PROFILE_FIELD, _CREDENTIAL_BINDINGS_FIELD, _CREDENTIAL_ID_FIELD}
     }
+
+
+def _build_invocation(
+    input_config: dict[str, Any], step_identity: str, credential_recipe_ids: tuple[str, ...]
+) -> dict[str, Any]:
+    """Build the versioned SDK request before AO freezes it for activity retries."""
+    explicit_bindings = input_config.get(_CREDENTIAL_BINDINGS_FIELD)
+    legacy_credential_id = input_config.get(_CREDENTIAL_ID_FIELD)
+    if legacy_credential_id is not None and explicit_bindings:
+        message = "Workflow node cannot combine a legacy credential with explicit credential bindings"
+        raise ApplicationError(message, type="ConfigError", non_retryable=True)
+    try:
+        credential_bindings = explicit_bindings or legacy_credential_bindings(
+            legacy_credential_id, credential_recipe_ids
+        )
+    except ValueError as error:
+        raise ApplicationError(str(error), type="ConfigError", non_retryable=True) from error
+
+    inputs = _workload_inputs(input_config)
     max_output_bytes = input_config.get(ENGINE_MAX_OUTPUT_BYTES_KEY)
     if max_output_bytes is not None:
         inputs["max_output_bytes"] = max_output_bytes
     return {
         "step_revision_id": step_identity,
         "inputs": inputs,
-        "credential_bindings": input_config.get(_CREDENTIAL_BINDINGS_FIELD, []),
+        "credential_bindings": credential_bindings,
         "timeout_seconds": int(
             input_config.get(
                 ENGINE_TIMEOUT_SECONDS_KEY,
@@ -79,6 +101,15 @@ def _build_invocation(input_config: dict[str, Any], step_identity: str) -> dict[
             )
         ),
     }
+
+
+def _validate_input_schema(inputs: dict[str, Any], schema: dict[str, Any]) -> None:
+    """Reject an action request before it reaches Execution Plane dispatch."""
+    try:
+        Draft202012Validator(schema).validate(inputs)
+    except JsonSchemaValidationError as error:
+        message = f"Script action input is invalid: {error.message}"
+        raise ApplicationError(message, type="ConfigError", non_retryable=True) from None
 
 
 async def _work_runtime_context(execution_id: uuid.UUID) -> dict[str, object]:
@@ -139,7 +170,7 @@ def _execution_target_id(execution_profile: ExecutionPlaneExecutionProfile | Non
     return None
 
 
-async def _dispatch_to_ep(  # noqa: C901, PLR0915 - service handoff and Temporal retry policy
+async def _dispatch_to_ep(  # noqa: C901, PLR0912, PLR0915 - service handoff and Temporal retry policy
     input_config: dict[str, Any],
     output_config: dict[str, str] | None,
     execution_id: uuid.UUID,
@@ -159,6 +190,13 @@ async def _dispatch_to_ep(  # noqa: C901, PLR0915 - service handoff and Temporal
             raise ApplicationError(msg, type="ConfigError", non_retryable=True)
         image = plugin.image_reference
         step_identity = plugin.step_identity
+        try:
+            input_schema = execution_plane_plugin_input_schema(plugin)
+            credential_recipe_ids = await execution_plane_plugin_credential_recipe_ids(session, plugin)
+        except ValueError as error:
+            raise ApplicationError(str(error), type="ConfigError", non_retryable=True) from error
+
+    _validate_input_schema(_workload_inputs(input_config), input_schema)
 
     if not image:
         msg = f"No Execution Plane image is configured for Action '{plugin_name}'"
@@ -167,7 +205,9 @@ async def _dispatch_to_ep(  # noqa: C901, PLR0915 - service handoff and Temporal
         message = WorkExecute(
             work_item_id=work_item_id,
             runtime_context=await _work_runtime_context(execution_id),
-            invocation=WorkloadInvocation.model_validate(_build_invocation(input_config, step_identity)),
+            invocation=WorkloadInvocation.model_validate(
+                _build_invocation(input_config, step_identity, credential_recipe_ids)
+            ),
             image=image,
             selectors=selectors,
             output_config=output_config,
@@ -211,6 +251,12 @@ async def _dispatch_to_ep(  # noqa: C901, PLR0915 - service handoff and Temporal
             continue
 
         state = str(response["status"])
+        try:
+            WorkItemStatus(state)
+        except ValueError:
+            msg = f"Execution Plane returned unsupported work state '{state}'"
+            raise ApplicationError(msg, type="ExecutionPlaneProtocolError", non_retryable=True) from None
+
         if state == "completed":
             result = response.get("result")
             return result if isinstance(result, dict) else {}
@@ -222,16 +268,6 @@ async def _dispatch_to_ep(  # noqa: C901, PLR0915 - service handoff and Temporal
                 error_message = "Execution Plane work was cancelled before execution"
                 error_type = "ExecutionPlaneWorkCancelled"
             raise ApplicationError(error_message, result, type=error_type, non_retryable=True)
-        if state not in {
-            "pending",
-            "claimed",
-            "dispatched",
-            "running",
-            "reconciliation_required",
-        }:
-            msg = f"Execution Plane returned unsupported work state '{state}'"
-            raise ApplicationError(msg, type="ExecutionPlaneProtocolError", non_retryable=True)
-
         activity.logger.info("Script accepted by Execution Plane work_item_id=%s", work_item_id)
         return None
 
@@ -254,7 +290,9 @@ async def _execute_script_activity(
     try:
         # The workflow engine adds internal control fields to the activity
         # payload. They are consumed during dispatch but are not node parameters.
-        parameters = {key: value for key, value in input_config.items() if not key.startswith("_")}
+        parameters = {
+            key: value for key, value in input_config.items() if not key.startswith("_") and key != _CREDENTIAL_ID_FIELD
+        }
         config = parameters_model.model_validate(parameters)
         execution_uuid = uuid.UUID(execution_id)
     except Exception:  # noqa: BLE001

@@ -17,11 +17,13 @@ from execution_plane_client.commands.work import WorkExecute
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
+from temporalio import activity
 from temporalio.exceptions import ApplicationError
 
 from syntara.execution_plane import cancellation
 from syntara.execution_plane.commands.completion import CompletionCommandHandler
 from syntara.execution_plane.commands.context import AOCommandContext
+from syntara.workflow_core.models import NodeType
 from syntara.workflow_runtime.engines.temporal.activities.ep import ep_dispatch_activity as dispatch
 from syntara.workflow_runtime.engines.temporal.services.activity_sync_service import ActivitySyncService
 from syntara.workflows.models.activity_execution import ActivityExecution, ActivityStatus
@@ -48,6 +50,19 @@ class _FakeExecutionPlaneClient:
         self.cancelled.append(work_item_id)
 
 
+_PLUGIN_MANIFEST = {
+    "spec": {
+        "input": {
+            "kind": "inline",
+            "value": {
+                "type": "object",
+                "properties": {"code": {"type": "string"}},
+            },
+        }
+    }
+}
+
+
 @pytest.fixture
 def ep_submission(
     test_execution: Execution, test_db_session_factory: async_sessionmaker[AsyncSession]
@@ -59,15 +74,18 @@ def ep_submission(
         activity_id=_NODE_ID,
     )
     with (
-        patch.object(dispatch.activity, "info", return_value=info),
+        patch.object(activity, "info", return_value=info),
         patch.object(dispatch, "AsyncSessionLocal", test_db_session_factory),
         patch.object(
             dispatch,
             "get_execution_plane_plugin",
             AsyncMock(
                 return_value=SimpleNamespace(
+                    name="script-bash",
+                    node_type=NodeType.SCRIPT_BASH,
                     image_reference="quay.io/example/script-bash:test",
                     step_identity="syntara.script-bash.script-bash",
+                    manifest=_PLUGIN_MANIFEST,
                 )
             ),
         ),
@@ -96,7 +114,7 @@ async def test_monitor_and_dispatch_share_identity_in_either_order(
     assert work_id == uuid5(test_execution.id, _NODE_ID)
 
     temporal = AsyncMock()
-    result = {"output": {"stdout": "ok"}}
+    result = {"output": {"return_code": 0, "stdout": "ok", "stderr": ""}}
     async with test_db_session_factory() as reader:
         if not monitor_first:
             assert (

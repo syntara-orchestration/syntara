@@ -1,6 +1,8 @@
 """Unit tests for AO's authenticated Execution Plane dispatch activity."""
 
+import asyncio
 from collections.abc import Generator
+from enum import Enum
 from types import SimpleNamespace
 from typing import ClassVar, Self
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -9,6 +11,7 @@ from uuid import UUID, uuid5
 import pytest
 from execution_plane_client.commands.results import TransportReceipt
 from execution_plane_client.protocol import MessageEnvelope, ResourceReference
+from temporalio import activity
 from temporalio.exceptions import ApplicationError
 
 from syntara.core.config.base import get_settings
@@ -65,6 +68,27 @@ class _FakePluginSession:
         return None
 
 
+def _plugin_manifest(*, require_environment: bool = False) -> dict[str, object]:
+    required = ["code", "environment"] if require_environment else ["code"]
+    return {
+        "spec": {
+            "input": {
+                "kind": "inline",
+                "value": {
+                    "type": "object",
+                    "required": required,
+                    "additionalProperties": False,
+                    "properties": {
+                        "code": {"type": "string", "minLength": 1},
+                        "environment": {"type": "object", "additionalProperties": {"type": "string"}},
+                        "max_output_bytes": {"type": "integer", "minimum": 1},
+                    },
+                },
+            }
+        }
+    }
+
+
 @pytest.fixture(autouse=True)
 def mock_activity_context() -> Generator[MagicMock, None, None]:
     """Provide stable Temporal metadata without an activity worker."""
@@ -84,8 +108,10 @@ def mock_activity_context() -> Generator[MagicMock, None, None]:
             "get_execution_plane_plugin",
             AsyncMock(
                 return_value=SimpleNamespace(
+                    name="script-bash",
                     image_reference="quay.io/example/script-bash:test",
                     step_identity="syntara.script-bash.script-bash",
+                    manifest=_plugin_manifest(),
                 )
             ),
         ),
@@ -126,6 +152,29 @@ class TestScriptActivityValidation:
         with pytest.raises(ApplicationError) as exc_info:
             await activity_module.execute_bash_script_activity({"code": ":"}, None, "invalid")
         assert exc_info.value.type == "ConfigError"
+        assert _FakeEPClient.submissions == []
+
+    @pytest.mark.asyncio
+    async def test_registry_input_contract_is_enforced_before_dispatch(self) -> None:
+        """Registry input schemas constrain requests beyond the typed node model."""
+        with patch.object(
+            activity_module,
+            "get_execution_plane_plugin",
+            AsyncMock(
+                return_value=SimpleNamespace(
+                    name="script-bash",
+                    image_reference="quay.io/example/script-bash:test",
+                    step_identity="syntara.script-bash.script-bash",
+                    manifest=_plugin_manifest(require_environment=True),
+                )
+            ),
+        ):
+            with pytest.raises(ApplicationError) as exc_info:
+                await activity_module.execute_bash_script_activity({"code": ":"}, None, EXECUTION_ID)
+
+        assert exc_info.value.type == "ConfigError"
+        assert exc_info.value.non_retryable is True
+        assert "environment" in str(exc_info.value)
         assert _FakeEPClient.submissions == []
 
 
@@ -213,11 +262,95 @@ class TestScriptActivityDispatch:
             "timeout_seconds": 300,
         }
 
+    def test_legacy_credential_reference_becomes_ep_binding(self) -> None:
+        credential_ref = "00000000-0000-0000-0000-000000000040"
+
+        invocation = activity_module._build_invocation(
+            {"credential_id": credential_ref}, "future-step.v1", ("future.plugin.token",)
+        )
+
+        assert invocation["inputs"] == {}
+        assert invocation["credential_bindings"] == [
+            {
+                "credential_recipe_id": "future.plugin.token",
+                "credential_ref": credential_ref,
+            }
+        ]
+
+    def test_legacy_credential_cannot_combine_with_explicit_bindings(self) -> None:
+        input_config = {
+            "credential_id": "00000000-0000-0000-0000-000000000040",
+            "credential_bindings": [
+                {
+                    "credential_recipe_id": "future.plugin.token",
+                    "credential_ref": "00000000-0000-0000-0000-000000000041",
+                }
+            ],
+        }
+
+        with pytest.raises(ApplicationError) as exc_info:
+            activity_module._build_invocation(input_config, "future-step.v1", ("future.plugin.token",))
+
+        assert exc_info.value.type == "ConfigError"
+        assert exc_info.value.non_retryable is True
+
+    @pytest.mark.asyncio
+    async def test_legacy_credential_is_resolved_from_registry(self) -> None:
+        credential_ref = "00000000-0000-0000-0000-000000000040"
+        _FakeEPClient.responses = [{"id": str(WORK_ITEM_ID), "status": "completed", "result": {}}]
+        with (
+            patch.object(
+                activity_module,
+                "get_execution_plane_plugin",
+                AsyncMock(
+                    return_value=SimpleNamespace(
+                        name="script-bash",
+                        image_reference="quay.io/example/script-bash:test",
+                        step_identity="syntara.script-bash.script-bash",
+                        manifest=_plugin_manifest(),
+                    )
+                ),
+            ),
+            patch.object(
+                activity_module,
+                "execution_plane_plugin_credential_recipe_ids",
+                AsyncMock(return_value=("future.plugin.token",)),
+            ),
+        ):
+            await activity_module.execute_bash_script_activity(
+                {"code": ":", "credential_id": credential_ref}, None, EXECUTION_ID
+            )
+
+        invocation = _FakeEPClient.submissions[0].command.payload["invocation"]
+        assert isinstance(invocation, dict)
+        assert invocation["inputs"] == {"code": ":"}
+        assert invocation["credential_bindings"] == [
+            {
+                "credential_recipe_id": "future.plugin.token",
+                "credential_ref": credential_ref,
+            }
+        ]
+
     @pytest.mark.asyncio
     async def test_pending_response_is_accepted_for_async_completion(self) -> None:
         _FakeEPClient.responses = [{"id": "00000000-0000-0000-0000-000000000002", "status": "pending", "result": None}]
-        with patch.object(activity_module.activity, "raise_complete_async") as complete_async:
+        with patch.object(activity, "raise_complete_async") as complete_async:
             result = await activity_module.execute_bash_script_activity({"code": "sleep 1"}, None, EXECUTION_ID)
+        assert result == {}
+        complete_async.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_work_states_are_validated_by_the_sdk_enum(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """New SDK work states remain accepted without duplicating the enum in AO."""
+
+        class ExtendedWorkItemStatus(Enum):
+            QUEUED = "queued"
+
+        monkeypatch.setattr(activity_module, "WorkItemStatus", ExtendedWorkItemStatus)
+        _FakeEPClient.responses = [{"id": str(WORK_ITEM_ID), "status": "queued", "result": None}]
+        with patch.object(activity, "raise_complete_async") as complete_async:
+            result = await activity_module.execute_bash_script_activity({"code": "sleep 1"}, None, EXECUTION_ID)
+
         assert result == {}
         complete_async.assert_called_once()
 
@@ -236,7 +369,7 @@ class TestScriptActivityDispatch:
                 "deletion_requested": deletion_requested,
             }
         ]
-        with patch.object(activity_module.activity, "raise_complete_async") as complete_async:
+        with patch.object(activity, "raise_complete_async") as complete_async:
             result = await activity_module.execute_bash_script_activity({"code": "sleep 1"}, None, EXECUTION_ID)
         assert result == {}
         complete_async.assert_called_once()
@@ -255,7 +388,7 @@ class TestScriptActivityDispatch:
             ExecutionPlaneUnavailableError(),
             {"id": "00000000-0000-0000-0000-000000000002", "status": "completed", "result": {}},
         ]
-        with patch.object(activity_module.asyncio, "sleep", new_callable=AsyncMock):
+        with patch.object(asyncio, "sleep", new_callable=AsyncMock):
             await activity_module.execute_bash_script_activity({"code": ":"}, None, EXECUTION_ID)
         assert len(_FakeEPClient.submissions) == 2
         assert _FakeEPClient.submissions[1] == _FakeEPClient.submissions[0]

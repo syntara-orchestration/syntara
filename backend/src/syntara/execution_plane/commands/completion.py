@@ -9,11 +9,18 @@ from execution_plane_client.commands.control import Completion, CompletionStatus
 from execution_plane_client.errors import ProtocolConflict
 from execution_plane_client.handlers import HandlingResult
 from execution_plane_client.protocol import MessageEnvelope, ResourceReference
+from jsonschema import Draft202012Validator
+from jsonschema.exceptions import ValidationError as JsonSchemaValidationError
 from sqlmodel import col, select
 from temporalio.exceptions import ApplicationError
 
 from syntara.execution_plane.commands.context import AOCommandContext
 from syntara.execution_plane.commands.errors import CommandDependencyUnavailableError, CommandResourceNotFoundError
+from syntara.execution_plane.registry.repository import (
+    execution_plane_plugin_output_schema,
+    get_execution_plane_plugin_by_node_type,
+)
+from syntara.workflow_core.models import NodeType
 from syntara.workflows.models.activity_execution import ActivityExecution
 from syntara.workflows.models.execution import Execution
 
@@ -22,6 +29,36 @@ logger = structlog.stdlib.get_logger(__name__)
 
 class CompletionCommandHandler:
     """Deliver a completion command to its originating Temporal activity."""
+
+    @staticmethod
+    async def _output_validation_error(
+        context: AOCommandContext, node_type: NodeType, result: dict[str, Any]
+    ) -> ApplicationError | None:
+        """Return an error when a completed result violates its action contract."""
+        plugin = await get_execution_plane_plugin_by_node_type(context.session, node_type)
+        if plugin is None:
+            message = f"No Execution Plane plugin is registered for node type '{node_type}'"
+            return ApplicationError(message, type="ExecutionPlaneProtocolError", non_retryable=True)
+
+        try:
+            schema = execution_plane_plugin_output_schema(plugin)
+        except ValueError as error:
+            message = f"Execution Plane completion has no plugin action output contract: {error}"
+            return ApplicationError(message, type="ExecutionPlaneProtocolError", non_retryable=True)
+
+        output = result.get("output")
+        if not isinstance(output, dict):
+            return ApplicationError(
+                "Execution Plane result does not contain an output object",
+                type="ExecutionPlaneProtocolError",
+                non_retryable=True,
+            )
+        try:
+            Draft202012Validator(schema).validate(output)
+        except JsonSchemaValidationError as error:
+            message = f"Execution Plane result violates the plugin action output schema: {error.message}"
+            return ApplicationError(message, type="ExecutionPlaneProtocolError", non_retryable=True)
+        return None
 
     @staticmethod
     def _failure_error(status: CompletionStatus, result: dict[str, Any]) -> ApplicationError:
@@ -61,19 +98,33 @@ class CompletionCommandHandler:
         """Complete or fail the async activity named by a work-item UUID."""
         row = (
             await context.session.exec(
-                select(Execution.temporal_workflow_id, ActivityExecution.temporal_activity_id)
+                select(
+                    Execution.temporal_workflow_id, ActivityExecution.temporal_activity_id, ActivityExecution.node_type
+                )
                 .join(Execution, col(ActivityExecution.execution_id) == col(Execution.id))
                 .where(col(ActivityExecution.id) == work_id)
             )
         ).first()
         if row is None:
             return False
-        temporal_workflow_id, temporal_activity_id = row
+        temporal_workflow_id, temporal_activity_id, raw_node_type = row
+        node_type = NodeType(raw_node_type)
         temporal_service = context.temporal_service
         if temporal_service is None:
             raise CommandDependencyUnavailableError
 
-        if status is CompletionStatus.COMPLETED:
+        output_validation_error = (
+            await self._output_validation_error(context, node_type, result)
+            if status is CompletionStatus.COMPLETED
+            else None
+        )
+        if output_validation_error is not None:
+            await temporal_service.fail_async_activity(
+                temporal_workflow_id=temporal_workflow_id,
+                activity_id=temporal_activity_id,
+                error=output_validation_error,
+            )
+        elif status is CompletionStatus.COMPLETED:
             await temporal_service.complete_async_activity(
                 temporal_workflow_id=temporal_workflow_id,
                 activity_id=temporal_activity_id,
