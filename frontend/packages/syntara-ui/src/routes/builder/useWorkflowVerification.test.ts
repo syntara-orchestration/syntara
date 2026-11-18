@@ -240,6 +240,44 @@ describe('useWorkflowVerification', () => {
     expect(mockPost).not.toHaveBeenCalled()
   })
 
+  it.each(['network', 'http', 'definition'])(
+    'keeps known saved draft issues gated if %s verification fails',
+    async (failure) => {
+      mockGetState.mockReturnValue(workflowState)
+      mockBuildDefinition.mockReturnValue({ nodes: [], edges: [], triggers: [] })
+      if (failure === 'network') mockPost.mockRejectedValue(new Error('Network error'))
+      if (failure === 'http') mockPost.mockResolvedValue({ response: { ok: false }, error: { detail: 'Unavailable' } })
+      if (failure === 'definition')
+        mockBuildDefinition.mockImplementation(() => {
+          throw new Error('Unavailable')
+        })
+      const fallbackErrors = [
+        { nodeId: null, message: 'This saved workflow has validation issues.', severity: 'error' as const },
+      ]
+      const { result } = renderVerificationHook()
+
+      act(() => result.current.handleVerifySilent(undefined, fallbackErrors))
+
+      await waitFor(() => expect(mockSetValidationErrorCount).toHaveBeenLastCalledWith(1))
+      expect(mockDispatch).toHaveBeenCalledWith({ type: 'SET_VALIDATION_ERRORS', payload: fallbackErrors })
+      expect(mockShowError).not.toHaveBeenCalled()
+    }
+  )
+
+  it('clears the saved draft gate when revalidation confirms the workflow is valid', async () => {
+    mockGetState.mockReturnValue(workflowState)
+    mockBuildDefinition.mockReturnValue({ nodes: [], edges: [], triggers: [] })
+    mockPost.mockResolvedValue({ response: { ok: true }, data: { is_valid: true, findings: [] } })
+    const { result } = renderVerificationHook()
+
+    act(() =>
+      result.current.handleVerifySilent(undefined, [{ nodeId: null, message: 'Saved draft issues', severity: 'error' }])
+    )
+
+    await waitFor(() => expect(mockSetValidationErrorCount).toHaveBeenLastCalledWith(0))
+    expect(mockDispatch).toHaveBeenCalledWith({ type: 'CLEAR_VALIDATION_ERRORS' })
+  })
+
   it('shows error when fetch rejects', async () => {
     mockGetState.mockReturnValue(workflowState)
     mockBuildDefinition.mockReturnValue({ nodes: [], edges: [], triggers: [] })

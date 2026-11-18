@@ -10,6 +10,7 @@ type AutoSubmitFn = () => Promise<boolean>
 
 function renderAutoSubmit(
   overrides: {
+    allowIncomplete?: boolean
     defaultValues?: TestFormData
     resolver?: (values: TestFormData) => ResolverResult<TestFormData>
     onSubmit?: (data: TestFormData) => boolean | void | Promise<boolean | void>
@@ -24,7 +25,7 @@ function renderAutoSubmit(
         defaultValues: overrides.defaultValues ?? { name: 'test' },
         resolver: overrides.resolver,
       })
-      useRegisterAutoSubmit(ref, methods, onSubmit)
+      useRegisterAutoSubmit(ref, methods, onSubmit, { allowIncomplete: overrides.allowIncomplete })
       externalRef.current = ref
       return ref
     },
@@ -154,3 +155,22 @@ describe('useRegisterAutoSubmit', () => {
     expect(onSubmit).toHaveBeenCalledOnce()
   })
 })
+
+it.each([true, false])(
+  'advisory auto-submit preserves raw fields and propagates persistence success: %s',
+  async (persisted) => {
+    const onSubmit = vi.fn(() => persisted)
+    const { ref } = renderAutoSubmit({
+      allowIncomplete: true,
+      defaultValues: { name: '' },
+      resolver: () => ({ values: {}, errors: { name: { type: 'required', message: 'Required' } } }),
+      onSubmit,
+    })
+    let succeeded: boolean | undefined
+    await act(async () => {
+      succeeded = await ref.current.current?.()
+    })
+    expect(succeeded).toBe(persisted)
+    expect(onSubmit).toHaveBeenCalledWith({ name: '' })
+  }
+)

@@ -305,7 +305,9 @@ async def test_import_create_uses_destination_reference_checks(
         pytest.raises(SafeValueError, match="not accessible"),
     ):
         await service.create_workflow("Imported", None, {}, definition, destination, is_import=True)
-    credentials.assert_awaited_once_with(definition, destination, allow_incomplete_subscriptions=True)
+    credentials.assert_awaited_once_with(
+        definition, destination, allow_incomplete_subscriptions=True, allow_incomplete_publish=True
+    )
     references.assert_awaited_once_with(
         service.session, definition, destination, is_import=True, allow_incomplete_subscriptions=True
     )

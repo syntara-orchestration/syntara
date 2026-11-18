@@ -61,7 +61,7 @@ test.describe('Kafka transport configuration', () => {
         await expect(app.getByRole('heading', { name: `${name}-updated`, exact: true })).toBeVisible()
         await app.screenshot({ path: `/private/tmp/pr898-kafka-${protocol.toLowerCase()}-detail.png`, fullPage: true })
         await app.goto(toAppUrl('/configuration/integrations'))
-        await expect(app.getByRole('link', { name: `${name}-updated`, exact: true })).toHaveCount(0)
+        await expect(app.getByRole('link', { name: `${name}-updated`, exact: true })).toBeVisible()
         await app.goto(toAppUrl('/configuration/integrations?integration_type=kafka'))
         await expect(app.getByRole('link', { name: `${name}-updated`, exact: true })).toBeVisible()
       } finally {

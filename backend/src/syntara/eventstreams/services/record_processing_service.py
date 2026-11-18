@@ -251,6 +251,7 @@ class EventRecordProcessingService:
         decoded = self._decoder.decode(event, schema=snapshot.model_dump(mode="json")["input_schema"])
         if isinstance(decoded, EventDecodeSuccess) and prepared is not None and view is not None:
             view.payload = FilterPayload(state="decoded", value=decoded.envelope.payload)
+            view.cloudevents = decoded.envelope.cloudevents
             result = prepared.evaluate(view)
             if result.outcome != FilterOutcome.MATCH:
                 return self._skip_filter(snapshot, identity, result)

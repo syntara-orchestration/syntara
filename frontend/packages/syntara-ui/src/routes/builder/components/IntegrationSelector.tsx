@@ -12,15 +12,16 @@ import type { IntegrationsAPI } from '@syntara/contracts'
 import { IntegrationStatusEnum, IntegrationTypeEnum } from '@syntara/contracts'
 import React, { type ReactElement, useCallback, useMemo, useState } from 'react'
 
-import { integrationsClient } from '../../../client'
 import { SynLabel } from '../../../components/labels/SynLabel'
 import { SynSelect } from '../../../components/SynSelect'
 import { detachPromise } from '../../../utils/detachPromise'
-import { projectIdParam } from '../../../utils/queryParams'
 
 import { resolveFormGroupLabelHelp } from './resolveFormGroupLabelHelp'
+import { useAllIntegrations } from './useAllIntegrations'
 
-type IntegrationRead = IntegrationsAPI.components['schemas']['IntegrationRead']
+type IntegrationRead =
+  | IntegrationsAPI.components['schemas']['IntegrationRead']
+  | IntegrationsAPI.components['schemas']['KafkaIntegrationRead']
 type IntegrationStatus = (typeof IntegrationStatusEnum)[keyof typeof IntegrationStatusEnum]
 
 const STATUS_CONFIG: Record<
@@ -46,18 +47,21 @@ function StatusBadge({ status }: Readonly<{ status: IntegrationStatus }>) {
   )
 }
 
-function getIntegrationBaseUrl(integration: IntegrationRead): string {
+function getIntegrationDescription(integration: IntegrationRead): string {
   const config = integration.configuration
+  if (config && 'bootstrap_servers' in config) return config.bootstrap_servers.join(', ')
   if (config && 'base_url' in config) return String(config.base_url ?? '')
   return ''
 }
 
 export type IntegrationSelectorProps = {
+  integrationType?: typeof IntegrationTypeEnum.MCP_SERVER | typeof IntegrationTypeEnum.KAFKA
   value?: string
   onChange: (integrationId: string | undefined) => void
   label?: string
   fieldId?: string
   isDisabled?: boolean
+  isRequired?: boolean
   placeholder?: string
   helpText?: React.ReactNode
   /** When provided, filters integrations to those that are global or assigned to this project. */
@@ -87,22 +91,22 @@ function IntegrationMenuToggle(
       isFullWidth
       status={isError ? 'danger' : undefined}
       aria-label={ariaLabel}
+      aria-busy={isPending || undefined}
     >
-      {isPending ? (
+      {displayText}
+      {isPending && (
         <>
-          <Spinner size="sm" aria-hidden /> Loading integrations...
+          {' '}
+          <Spinner size="sm" aria-hidden />
         </>
-      ) : (
-        displayText
       )}
     </MenuToggle>
   )
 }
 
 /**
- * A PatternFly Select dropdown for choosing an MCP server integration.
- * Fetches integrations from the API filtered to mcp_server type.
- * Displays each integration's name and validation status badge.
+ * Select an MCP server or Kafka integration within the workflow's project scope.
+ * Shows each integration's name, connection details and validation status.
  */
 export function IntegrationSelector({
   value,
@@ -110,32 +114,32 @@ export function IntegrationSelector({
   label = 'MCP server integration',
   fieldId = 'integration-selector',
   isDisabled = false,
+  isRequired = false,
   placeholder = 'Select an MCP server integration...',
   helpText,
   projectId,
   labelHelp,
+  integrationType = IntegrationTypeEnum.MCP_SERVER,
 }: Readonly<IntegrationSelectorProps>) {
   const [isOpen, setIsOpen] = useState(false)
 
-  const { data, isPending, isError, refetch } = integrationsClient.useQuery('get', '/integrations', {
-    params: {
-      query: {
-        integration_type: IntegrationTypeEnum.MCP_SERVER,
-        enabled: true,
-        ...projectIdParam(projectId),
-      },
-    },
-  })
+  const isKafka = integrationType === IntegrationTypeEnum.KAFKA
+  const emptyLabel = isKafka ? 'No Kafka integrations available' : 'No MCP server integrations available'
+  const { data, isPending, isError, refetch } = useAllIntegrations(integrationType, projectId)
+  const hasLoadedOptions = data !== undefined
+  const isInitialPending = isPending && !hasLoadedOptions
+  const isInitialError = isError && !hasLoadedOptions
 
-  const integrations: IntegrationRead[] = useMemo(() => data?.resources ?? [], [data?.resources])
+  const integrations: IntegrationRead[] = useMemo(() => data ?? [], [data])
 
   const selectedIntegration = useMemo(() => integrations.find((i) => i.id === value), [integrations, value])
 
   const toggleLabel = useMemo(() => {
-    if (isPending) return 'Loading integrations...'
-    if (isError) return 'Error loading integrations'
-    return selectedIntegration?.name ?? placeholder
-  }, [isPending, isError, selectedIntegration?.name, placeholder])
+    if (isInitialError) return 'Error loading integrations'
+    return (
+      selectedIntegration?.name ?? (value && hasLoadedOptions ? 'Selected integration is unavailable' : placeholder)
+    )
+  }, [isInitialError, hasLoadedOptions, selectedIntegration?.name, placeholder, value])
 
   const handleSelect = useCallback(
     (_event: React.MouseEvent | undefined, selectedValue: string | number | undefined) => {
@@ -153,45 +157,47 @@ export function IntegrationSelector({
         displayText={toggleLabel}
         isOpen={isOpen}
         isDisabled={isDisabled}
-        isPending={isPending}
+        isPending={isInitialPending}
         isError={isError}
         onClick={() => setIsOpen((prev) => !prev)}
       />
     ),
-    [label, toggleLabel, isOpen, isDisabled, isPending, isError]
+    [label, toggleLabel, isOpen, isDisabled, isInitialPending, isError]
   )
 
   const resolvedLabelHelp = resolveFormGroupLabelHelp(label, labelHelp, helpText)
 
   return (
-    <FormGroup label={label} labelHelp={resolvedLabelHelp} fieldId={fieldId}>
+    <FormGroup label={label} labelHelp={resolvedLabelHelp} fieldId={fieldId} isRequired={isRequired}>
       <SynSelect
         id={fieldId}
         isOpen={isOpen}
-        selected={value ?? NO_INTEGRATION_VALUE}
+        selected={value ?? (isKafka ? undefined : NO_INTEGRATION_VALUE)}
         onSelect={handleSelect}
         onOpenChange={setIsOpen}
         toggle={renderToggle}
         shouldFocusToggleOnSelect
       >
-        <SelectList aria-label="MCP server integration options">
-          <SelectOption value={NO_INTEGRATION_VALUE} isSelected={!value}>
-            No integration (use direct connection)
-          </SelectOption>
+        <SelectList aria-label={`${label} options`}>
+          {!isKafka && (
+            <SelectOption value={NO_INTEGRATION_VALUE} isSelected={!value}>
+              No integration (use direct connection)
+            </SelectOption>
+          )}
           {integrations.map((integration) => (
             <SelectOption
               key={integration.id}
               value={integration.id}
               isSelected={integration.id === value}
-              description={getIntegrationBaseUrl(integration)}
+              description={getIntegrationDescription(integration)}
             >
               <span>{integration.name}</span>{' '}
               {integration.validation_status && <StatusBadge status={integration.validation_status} />}
             </SelectOption>
           ))}
-          {integrations.length === 0 && !isPending && (
+          {integrations.length === 0 && !isInitialPending && (
             <SelectOption isDisabled value="__empty__">
-              {isError ? 'Failed to load integrations' : 'No MCP server integrations available'}
+              {isInitialError ? 'Failed to load integrations' : emptyLabel}
             </SelectOption>
           )}
         </SelectList>

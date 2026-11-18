@@ -92,3 +92,20 @@ it('presents retryable API errors through the shared error state', async () => {
   expect(post).toHaveBeenCalledTimes(2)
   expect(await axe(container)).toHaveNoViolations()
 })
+
+it('waits for initial resources before showing incomplete-configuration guidance', () => {
+  const { rerender } = render(<KafkaSubscribePreflight workflowId="workflow-1" isReadOnly={false} isLoading />, {
+    wrapper,
+  })
+  expect(
+    screen.queryByText(/Select an available Kafka Integration, a compatible runtime credential/)
+  ).not.toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Test runtime access' })).toHaveAttribute('aria-disabled', 'true')
+  rerender(<KafkaSubscribePreflight workflowId="workflow-1" isReadOnly={false} parameters={parameters} />)
+  expect(screen.getByRole('button', { name: 'Test runtime access' })).not.toHaveAttribute('aria-disabled', 'true')
+  expect(
+    screen.queryByText(/Select an available Kafka Integration, a compatible runtime credential/)
+  ).not.toBeInTheDocument()
+  rerender(<KafkaSubscribePreflight workflowId="workflow-1" isReadOnly={false} />)
+  expect(screen.getByText(/Select an available Kafka Integration, a compatible runtime credential/)).toBeInTheDocument()
+})

@@ -6,6 +6,7 @@ from typing import Any, ClassVar, Literal
 from pydantic import ConfigDict, Field, JsonValue
 from sqlmodel import SQLModel
 
+from syntara.eventstreams.core.cloudevents import CloudEventAttributes
 from syntara.eventstreams.core.envelope import RawEvent
 from syntara.eventstreams.core.results import EventDecodeFailure
 from syntara.eventstreams.core.serialization import EventDecodeSuccess
@@ -46,7 +47,7 @@ class EventFilterInput(SQLModel):
     key: FilterTextValue = Field(repr=False)
     source_metadata: dict[str, Any] = Field(alias="metadata", repr=False)
     payload: FilterPayload = Field(repr=False)
-    cloudevents: None = None
+    cloudevents: CloudEventAttributes | None = Field(default=None, repr=False)
 
     model_config: ClassVar[ConfigDict] = ConfigDict(  # type: ignore[assignment]
         extra="forbid", populate_by_name=True, serialize_by_alias=True
@@ -71,5 +72,5 @@ class EventFilterInput(SQLModel):
             key=FilterTextValue.from_bytes(event.key),
             metadata=event.source_metadata.model_dump(mode="json"),
             payload=payload,
-            cloudevents=None,
+            cloudevents=decoded.envelope.cloudevents if isinstance(decoded, EventDecodeSuccess) else None,
         )

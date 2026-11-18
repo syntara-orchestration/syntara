@@ -12,7 +12,8 @@ export function useNodeEditorAutoSubmitRef() {
 export function useRegisterAutoSubmit<T extends FieldValues>(
   autoSubmitRef: MutableRefObject<AutoSubmitFn | null>,
   methods: UseFormReturn<T>,
-  onSubmit: (data: T) => boolean | void | Promise<boolean | void>
+  onSubmit: (data: T) => boolean | void | Promise<boolean | void>,
+  { allowIncomplete = false }: { allowIncomplete?: boolean } = {}
 ) {
   const onSubmitRef = useRef(onSubmit)
   useEffect(() => {
@@ -28,8 +29,11 @@ export function useRegisterAutoSubmit<T extends FieldValues>(
             const result = await onSubmitRef.current(data)
             succeeded = result !== false
           },
-          () => {
-            succeeded = false
+          async () => {
+            if (allowIncomplete) {
+              const result = await onSubmitRef.current(methods.getValues())
+              succeeded = result !== false
+            }
           }
         )()
       } catch {
@@ -40,5 +44,5 @@ export function useRegisterAutoSubmit<T extends FieldValues>(
     return () => {
       autoSubmitRef.current = null
     }
-  }, [autoSubmitRef, methods])
+  }, [autoSubmitRef, methods, allowIncomplete])
 }

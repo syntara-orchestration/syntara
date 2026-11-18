@@ -195,6 +195,41 @@ describe('Integrations Component', () => {
     })
   })
 
+  it('loads the combined catalog so an unfiltered list includes saved Kafka integrations', async () => {
+    vi.mocked(integrationsClient.useQuery).mockReturnValue({
+      data: {
+        resources: [
+          {
+            ...mockIntegrations[0],
+            id: 'kafka-1',
+            name: 'Saved Kafka connection',
+            integration_type: 'kafka',
+            configuration: {
+              integration_type: 'kafka',
+              bootstrap_servers: ['broker.example.com:9093'],
+              security_protocol: 'SSL',
+            },
+          },
+          ...mockIntegrations,
+        ],
+      },
+      isPending: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    })
+    const { container } = render(<Integrations />, { wrapper })
+
+    const catalogCall = vi
+      .mocked(integrationsClient.useQuery)
+      .mock.calls.find(([, path]) => path === '/integrations/catalog')
+    expect(catalogCall?.[2]).toMatchObject({ params: { query: { sort: 'name' } } })
+    const kafkaLink = screen.getByRole('link', { name: 'Saved Kafka connection' })
+    expect(kafkaLink).toHaveAttribute('href', '/configuration/integrations/kafka/kafka-1')
+    expect(screen.getByRole('link', { name: 'Primary MCP Server' })).toBeVisible()
+    expect(await axe(container)).toHaveNoViolations()
+  })
+
   describe('Rendering', () => {
     it('renders without crashing', () => {
       render(<Integrations />, { wrapper })
@@ -750,15 +785,15 @@ describe('Integrations Component', () => {
   })
 
   describe('Kafka catalog selection', () => {
-    it('queries the separate Kafka endpoint when the type filter is Kafka', () => {
+    it('passes the Kafka type filter to the combined catalog', () => {
       mockSearchParams.set('integration_type', 'kafka')
       mockSearchParams.set('name[contains]', 'orders')
       render(<Integrations />, { wrapper })
       const kafkaCall = vi
         .mocked(integrationsClient.useQuery)
-        .mock.calls.find(([, path]) => path === '/kafka_integrations')
+        .mock.calls.find(([, path]) => path === '/integrations/catalog')
       expect(kafkaCall?.[2]).toMatchObject({ params: { query: { 'name[contains]': 'orders' } } })
-      expect(kafkaCall?.[2]).not.toMatchObject({ params: { query: { integration_type: 'kafka' } } })
+      expect(kafkaCall?.[2]).toMatchObject({ params: { query: { integration_type: 'kafka' } } })
     })
 
     it('keeps the type filter available when the default catalog is empty', async () => {
@@ -897,7 +932,7 @@ describe('Integrations Component', () => {
 
       expect(integrationsClient.useQuery).toHaveBeenCalledWith(
         'get',
-        '/integrations',
+        '/integrations/catalog',
         expect.objectContaining({
           params: expect.objectContaining({
             query: expect.objectContaining({
