@@ -19,19 +19,19 @@ if TYPE_CHECKING:
 
 
 class FakeExecutionPlaneHttpClient:
-    """Return completed EP responses while running representative scripts in tests."""
+    """Accept commands, then deliver script results through Temporal async completion."""
 
     def __init__(
         self,
         *,
+        on_completion: Callable[[UUID, str, dict[str, Any]], Coroutine[Any, Any, None]],
+        completion_tasks: list[asyncio.Task[None]],
         timeout: float | None = None,
-        on_completion: Callable[[UUID, str, dict[str, Any]], Coroutine[Any, Any, None]] | None = None,
     ) -> None:
-        """Accept the production client's request timeout configuration."""
+        """Use the fixture's completion handler and retain background completion tasks."""
         self.timeout = timeout
         self.on_completion = on_completion
-        self.work_items: dict[UUID, dict[str, Any]] = {}
-        self._completion_tasks: set[asyncio.Task[None]] = set()
+        self.completion_tasks = completion_tasks
 
     async def __aenter__(self) -> Self:
         """Mirror the production client's async context-manager contract."""
@@ -41,23 +41,18 @@ class FakeExecutionPlaneHttpClient:
         """Close no resources because the test transport is in-process."""
 
     async def submit_command(self, message: MessageEnvelope) -> TransportReceipt:
-        """Execute the shared work command and return its receipt."""
+        """Return acceptance without work state; complete the activity independently."""
         payload = WorkExecute.model_validate(message.command.payload)
-        result, status = await execute_fixture_script(payload.model_dump(mode="json"))
-        self.work_items[payload.work_item_id] = {"id": str(payload.work_item_id), "status": status, "result": result}
+
+        async def complete() -> None:
+            result, status = await execute_fixture_script(payload.model_dump(mode="json"))
+            await self.on_completion(payload.work_item_id, status, result)
+
+        self.completion_tasks.append(asyncio.create_task(complete()))
         return TransportReceipt(
             message_id=message.message_id,
             resource=ResourceReference(kind="work_item", resource_id=payload.work_item_id),
         )
-
-    async def get_work_item(self, *, work_item_id: UUID) -> dict[str, Any]:
-        """Read the separate resource state following a command receipt."""
-        response = self.work_items[work_item_id]
-        if self.on_completion is not None and response["status"] in {"completed", "failed", "cancelled"}:
-            task = asyncio.create_task(self.on_completion(work_item_id, str(response["status"]), response["result"]))
-            self._completion_tasks.add(task)
-            task.add_done_callback(self._completion_tasks.discard)
-        return response
 
 
 async def execute_fixture_script(payload: dict[str, Any]) -> tuple[dict[str, Any], str]:
@@ -83,7 +78,9 @@ async def execute_fixture_script(payload: dict[str, Any]) -> tuple[dict[str, Any
         stderr=asyncio.subprocess.PIPE,
         env=environment,
     )
-    timeout = max(1, int(input_config.get("_engine_timeout_seconds", 300)))
+    timeout = max(
+        1, int(payload.get("invocation", {}).get("timeout_seconds", input_config.get("_engine_timeout_seconds", 300)))
+    )
     try:
         stdout_bytes, stderr_bytes = await asyncio.wait_for(process.communicate(), timeout=timeout)
     except TimeoutError:
@@ -112,8 +109,9 @@ async def execute_fixture_script(payload: dict[str, Any]) -> tuple[dict[str, Any
         "return_code": process.returncode,
         "stdout": stdout,
         "stderr": stderr,
-        "stdout_json": stdout_json,
     }
+    if language == "python":
+        output["stdout_json"] = stdout_json
     output_config = payload.get("output_config")
     if output_config is not None:
         output = {key: output[key] for key in output_config if key in output}

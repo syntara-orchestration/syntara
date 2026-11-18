@@ -4,6 +4,7 @@ import asyncio
 import json
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime
+from types import SimpleNamespace
 from typing import Any
 from unittest.mock import AsyncMock, Mock, call, patch
 from uuid import UUID, uuid4
@@ -384,6 +385,23 @@ class TestActivityEventProcessing:
         """Set up test fixtures."""
         self.service = ActivitySyncService(Mock(), Mock())
         self.metadata = create_test_metadata()
+
+    @pytest.mark.parametrize("node_type", [NodeType.SCRIPT_PYTHON, NodeType.SCRIPT_BASH])
+    def test_ep_overall_deadline_is_not_reported_as_node_timeout(self, node_type: str) -> None:
+        self.metadata.activity_definitions_map = {"script": {"type": node_type}}
+        scheduled = self._create_mock_event(EventType.EVENT_TYPE_ACTIVITY_TASK_SCHEDULED, 1, activity_id="script")
+        attrs = scheduled.activity_task_scheduled_event_attributes
+        # Temporal may normalize start-to-close even when only schedule-to-close
+        # was supplied. The overall deadline remains the source of truth.
+        attrs.start_to_close_timeout = SimpleNamespace(seconds=60, nanos=0)
+        attrs.schedule_to_close_timeout = SimpleNamespace(seconds=600, nanos=0)
+        self.service._process_activity_scheduled(scheduled, self.metadata)
+        timed_out = self._create_mock_event(EventType.EVENT_TYPE_ACTIVITY_TASK_TIMED_OUT, 2, scheduled_event_id=1)
+        self.service._process_activity_timed_out(timed_out, self.metadata)
+        update = self.metadata.pending_activity_updates[1]
+        assert update["configured_timeout_seconds"] == 600
+        assert update["error_details"] == "Execution Plane work did not complete within 600 seconds"
+        assert update["_timeout_info"]["configured_timeout_seconds"] == 600
 
     def _create_mock_event(
         self,

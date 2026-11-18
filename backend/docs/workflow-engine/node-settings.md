@@ -117,7 +117,7 @@ settings:
     backoff_coefficient: 2.0
 ```
 
-**Why only Full tier?** Retry is only applicable to nodes that make HTTP requests where the engine can classify transient vs permanent errors. Other node types either handle retry internally (agentic, approval) or have no retry semantics (script, control nodes).
+**Why only Full tier?** Other nodes use system-level retry handling: EP dispatch uses `APP_EP_DISPATCH_*`; agentic and approval nodes retry internally. Script failures and control nodes are non-retryable.
 
 ## Resolution Order
 

@@ -5,6 +5,7 @@ from typing import Any
 import structlog
 from temporalio.api.history.v1 import HistoryEvent
 
+from syntara.execution_plane.utils import execution_plane_supported_node_types
 from syntara.telemetry.events.workflow_error import RETRY_REASON_MAX_LENGTH
 from syntara.workflow_core.models import ActivityName, NodeType
 from syntara.workflow_runtime.engines.temporal.services.activity_sync_types import ExecutionMonitorMetadata
@@ -65,10 +66,18 @@ class ActivitySyncEventProcessorMixin:
             NodeType.SWITCH,
         )
         configured_timeout_seconds: float | None = None
-        if attrs.start_to_close_timeout and attrs.start_to_close_timeout.seconds > 0:
-            configured_timeout_seconds = attrs.start_to_close_timeout.seconds + (
-                attrs.start_to_close_timeout.nanos / 1e9
-            )
+        duration = attrs.start_to_close_timeout
+        ep_work_deadline = False
+        if (
+            activity_type in execution_plane_supported_node_types()
+            and attrs.schedule_to_close_timeout
+            and isinstance(attrs.schedule_to_close_timeout.seconds, int)
+            and (attrs.schedule_to_close_timeout.seconds > 0 or attrs.schedule_to_close_timeout.nanos > 0)
+        ):
+            duration = attrs.schedule_to_close_timeout
+            ep_work_deadline = True
+        if duration and (duration.seconds > 0 or duration.nanos > 0):
+            configured_timeout_seconds = duration.seconds + duration.nanos / 1e9
 
         metadata.pending_activity_updates[event.event_id] = {
             "activity_id": base_activity_id,
@@ -86,6 +95,8 @@ class ActivitySyncEventProcessorMixin:
             "scheduled_at": ensure_timezone_aware(event.event_time),
             "configured_timeout_seconds": configured_timeout_seconds,
         }
+        if ep_work_deadline:
+            metadata.pending_activity_updates[event.event_id]["_ep_work_deadline"] = True
         metadata.pending_sync_event_ids.add(event.event_id)
 
     def _process_activity_started(self, event: HistoryEvent, metadata: ExecutionMonitorMetadata) -> None:
@@ -211,11 +222,16 @@ class ActivitySyncEventProcessorMixin:
             timed_out_at = ensure_timezone_aware(event.event_time)
             update["completed_at"] = timed_out_at
             activity_def = metadata.activity_definitions_map.get(update["activity_id"], {})
-            update["error_details"] = build_timeout_error_message(
-                step_name=activity_def.get("name") or update["activity_id"],
-                is_agentic=activity_def.get("type") == "agentic",
-                timeout_seconds=update.get("configured_timeout_seconds"),
-            )
+            if update.get("_ep_work_deadline"):
+                update["error_details"] = (
+                    f"Execution Plane work did not complete within {update['configured_timeout_seconds']:g} seconds"
+                )
+            else:
+                update["error_details"] = build_timeout_error_message(
+                    step_name=activity_def.get("name") or update["activity_id"],
+                    is_agentic=activity_def.get("type") == "agentic",
+                    timeout_seconds=update.get("configured_timeout_seconds"),
+                )
 
             start_time = update.get("started_at") or update.get("scheduled_at")
             update["_timeout_info"] = {

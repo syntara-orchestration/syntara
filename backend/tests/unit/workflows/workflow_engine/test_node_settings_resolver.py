@@ -1,5 +1,8 @@
 """Tests for node_settings_resolver pure functions."""
 
+import pytest
+from temporalio.common import RetryPolicy
+
 from syntara.settings.catalog import SETTINGS_CATALOG
 from syntara.workflow_core.graph import ActivityNode
 from syntara.workflow_runtime.engines.temporal.constants import DEFAULT_MAX_OUTPUT_BYTES
@@ -22,7 +25,7 @@ def test_resolve_retry_policy_inline_fallbacks_match_catalog_defaults() -> None:
     catalog entries. If a catalog default is changed without updating the inline
     fallback (or vice versa), this test fails.
     """
-    node = ActivityNode(node_id="n", node_type="script_python", parameters={})
+    node = ActivityNode(node_id="n", node_type="http_request", parameters={})
 
     result_inline = resolve_retry_policy(node, {})
     result_catalog = resolve_retry_policy(node, _catalog_defaults())
@@ -53,3 +56,9 @@ def test_resolve_max_output_bytes_non_script_node() -> None:
     node = ActivityNode(node_id="n", node_type="http_request", parameters={})
     result = resolve_max_output_bytes(node, {"workflow_engine.script_max_output_kb": 512})
     assert result == DEFAULT_MAX_OUTPUT_BYTES
+
+
+@pytest.mark.parametrize("node_type", ["script_python", "script_bash", "agentic", "approval", "wait", "condition"])
+def test_other_nodes_without_retry_settings_keep_single_attempt(node_type: str) -> None:
+    node = ActivityNode(node_id="n", node_type=node_type, parameters={})
+    assert resolve_retry_policy(node, _catalog_defaults()) == RetryPolicy(maximum_attempts=1)

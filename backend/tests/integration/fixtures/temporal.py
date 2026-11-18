@@ -92,6 +92,16 @@ async def _temporal_server() -> AsyncGenerator[WorkflowEnvironment, None]:
     logger.info("Temporal test environment stopped")
 
 
+async def _finish_completion_tasks(completion_tasks: list[asyncio.Task[None]]) -> None:
+    """Cancel pending callbacks and surface errors from completed callbacks."""
+    for task in completion_tasks:
+        task.cancel()
+    results = await asyncio.gather(*completion_tasks, return_exceptions=True)
+    for result in results:
+        if isinstance(result, Exception):
+            raise result
+
+
 @pytest_asyncio.fixture
 async def temporal_env(
     _temporal_server: WorkflowEnvironment,
@@ -100,9 +110,14 @@ async def temporal_env(
     monkeypatch: pytest.MonkeyPatch,
 ) -> AsyncGenerator[WorkflowEnvironment, None]:
     """Pair Temporal with a test double for the independently deployed EP API."""
+    from syntara.core.config.base import get_settings
     from syntara.execution_plane.utils import execution_plane_work_item_id as original_work_item_id
     from syntara.workflow_runtime.engines.temporal.activities.ep import ep_dispatch_activity
 
+    settings = get_settings()
+    original_ep_url = settings.ep_api_url
+    object.__setattr__(settings, "ep_api_url", "https://ep.test")
+    completion_tasks: list[asyncio.Task[None]] = []
     work_item_activity_ids: dict[UUID, tuple[UUID, str, str, NodeType]] = {}
 
     def recorded_work_item_id(execution_id: UUID, activity_id: str) -> UUID:
@@ -155,7 +170,9 @@ async def temporal_env(
             raise RuntimeError(message)
 
     def fake_execution_plane_client(*, timeout: float | None = None) -> FakeExecutionPlaneHttpClient:
-        return FakeExecutionPlaneHttpClient(timeout=timeout, on_completion=deliver_completion)
+        return FakeExecutionPlaneHttpClient(
+            timeout=timeout, on_completion=deliver_completion, completion_tasks=completion_tasks
+        )
 
     database_url = test_db_engine.url
     monkeypatch.setenv("APP_DATABASE_URL", database_url.render_as_string(hide_password=False))
@@ -163,8 +180,12 @@ async def temporal_env(
     monkeypatch.setattr(ep_dispatch_activity, "ExecutionPlaneHttpClient", fake_execution_plane_client)
     monkeypatch.setattr(ep_dispatch_activity, "AsyncSessionLocal", test_db_session_factory)
 
-    with _temporal_server.auto_time_skipping_disabled():
-        yield _temporal_server
+    try:
+        with _temporal_server.auto_time_skipping_disabled():
+            yield _temporal_server
+    finally:
+        object.__setattr__(settings, "ep_api_url", original_ep_url)
+        await _finish_completion_tasks(completion_tasks)
 
 
 @pytest_asyncio.fixture

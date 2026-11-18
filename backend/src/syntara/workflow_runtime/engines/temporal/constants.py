@@ -32,7 +32,8 @@ INTERNAL_ACTIVITY_HEARTBEAT_INTERVAL_SECONDS = 10.0
 INTERNAL_ACTIVITY_HEARTBEAT_TIMEOUT_SECONDS = 30.0
 
 # Key injected by the engine into each activity's input config so the activity
-# can use the already-resolved timeout without re-querying the catalog.
+# can use the already-resolved execution timeout without re-querying the catalog.
+# For EP work this limits the workload invocation, not HTTP delivery or the overall wait.
 # Must be popped by agentic_activity before forwarding config to the orchestrator.
 ENGINE_TIMEOUT_SECONDS_KEY = "_engine_timeout_seconds"
 ENGINE_MAX_OUTPUT_BYTES_KEY = "_engine_max_output_bytes"

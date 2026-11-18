@@ -140,7 +140,8 @@ def resolve_retry_policy(
 
     Returns a single-attempt policy for node types that should never retry
     (Temporal's default is unlimited retries when no policy is provided).
-    Resolution: node.settings.retry_policy fields → global catalog defaults → single attempt.
+    EP handoff retries use a separate infrastructure policy at dispatch.
+    Resolution for retryable nodes: node.settings.retry_policy → global catalog defaults.
     """
     if not isinstance(node.settings, NodeSettingsFull):
         return RetryPolicy(maximum_attempts=1)

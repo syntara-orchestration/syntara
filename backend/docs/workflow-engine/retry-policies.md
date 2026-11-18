@@ -13,14 +13,14 @@ Retry behavior varies by node type. Some nodes expose a configurable `retry_poli
 | `http_request` | Yes | Temporal-level retry on transient HTTP codes | HTTP status codes |
 | `aap_job_template` | Yes | Temporal-level retry on dispatch; poll loop absorbs transient errors | HTTP status codes |
 | `aap_workflow_job_template` | Yes | Same as `aap_job_template` | HTTP status codes |
-| `script` | No | All errors non-retryable | Exit codes (no retry) |
+| `script_python` / `script_bash` | System EP settings only | Temporal retries transient Execution Plane dispatch failures | Transport failures; script failures are non-retryable |
 | `agentic` | No | Client handles retry internally (3 attempts) | N/A |
 | `approval` | No | Client handles retry internally (3 attempts) | N/A |
 | Control nodes | No | No retry semantics | N/A |
 
 ## Default Retryable HTTP Status Codes
 
-Nodes that support retry use these HTTP status codes as the default retryable set:
+HTTP request and AAP nodes use these HTTP status codes as the default retryable set. Script dispatch uses the Execution Plane classification described below:
 
 | Code | Name | Why Retryable |
 |------|------|---------------|
@@ -93,6 +93,30 @@ retry_policy:
 # Intervals: 10s → 10s → 10s
 ```
 
+## Execution Plane Dispatch
+
+These infrastructure settings control AO-to-EP request timeouts, dispatch retries,
+and how long AO waits for EP work to complete. Temporal retries failed dispatch requests on network
+errors, HTTP 429, and HTTP 5xx, independently of `workflow_engine.retry_*`.
+
+| Environment variable | In-code setting | Default | Meaning |
+| --- | --- | --- | --- |
+| `APP_EP_REQUEST_TIMEOUT_SECONDS` | `ep_request_timeout_seconds` | `10` | HTTP timeout per AO-to-EP request |
+| `APP_EP_DISPATCH_MAX_RETRIES` | `ep_dispatch_max_retries` | `3` | Retries after the initial attempt; `0` disables retries |
+| `APP_EP_DISPATCH_INITIAL_BACKOFF_SECONDS` | `ep_dispatch_initial_backoff_seconds` | `0.5` | Initial retry delay; delays double after each failure |
+| `APP_EP_DISPATCH_MAX_BACKOFF_SECONDS` | `ep_dispatch_max_backoff_seconds` | `10` | Maximum retry delay |
+| `APP_EP_WORK_TIMEOUT_SECONDS` | `ep_work_timeout_seconds` | `86400` | Total deadline for dispatch, queueing, startup, execution, and completion |
+
+The workflow node's [`settings.timeout`](node-settings.md#timeout) sets the workload
+execution time limit in seconds.
+When `APP_EP_WORK_TIMEOUT_SECONDS` expires, AO stops waiting for EP and attempts to
+cancel the work.
+
+A valid receipt or HTTP 409 completes dispatch; results arrive only through EP's
+callback. Configuration, validation, protocol, other rejection, and terminal work
+failures are non-retryable. These settings do not retry user automation or control
+EP-to-Kubernetes recovery.
+
 ## Node-Specific Retry Details
 
 ### http_request
@@ -121,9 +145,11 @@ Two-phase execution:
 - Normal timeout: "AAP job {id} timed out after {timeout}s"
 - Poll-failure timeout: "AAP job {id} launched successfully but unable to determine completion status — polling failed repeatedly until timeout ({timeout}s). Last error: {error}"
 
-### script
+### script_python / script_bash
 
-All script errors are non-retryable. The `retry_policy` setting is not available for script nodes.
+Script nodes use [Execution Plane dispatch settings](#execution-plane-dispatch)
+for handoff retries. Script failures are non-retryable; per-node `retry_policy`
+is unavailable.
 
 ### agentic
 

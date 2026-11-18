@@ -1825,6 +1825,44 @@ class WorkflowClientSettings(BaseSettings):
         gt=0,
     )
 
+    ep_dispatch_max_retries: int = Field(
+        default=3,
+        description="AO-to-EP retries after the initial attempt; 0 disables retries. Does not rerun automation.",
+        ge=0,
+    )
+
+    ep_dispatch_initial_backoff_seconds: float = Field(
+        default=0.5,
+        description="Initial delay between AO-to-EP handoff attempts; subsequent delays double up to the maximum.",
+        gt=0,
+        allow_inf_nan=False,
+    )
+
+    ep_dispatch_max_backoff_seconds: float = Field(
+        default=10.0,
+        description="Maximum delay between AO-to-EP handoff attempts.",
+        gt=0,
+        allow_inf_nan=False,
+    )
+
+    ep_work_timeout_seconds: float = Field(
+        default=86400.0,
+        description=(
+            "Overall AO deadline for EP work, including dispatch retries, queueing, startup, execution, and completion "
+            "delivery. Does not reset on retry and is independent of the workload execution timeout."
+        ),
+        gt=0,
+        allow_inf_nan=False,
+    )
+
+    @model_validator(mode="after")
+    def validate_ep_dispatch_backoff(self) -> "WorkflowClientSettings":
+        """Keep EP handoff retry delays ordered."""
+        if self.ep_dispatch_max_backoff_seconds < self.ep_dispatch_initial_backoff_seconds:
+            msg = "ep_dispatch_max_backoff_seconds must be >= ep_dispatch_initial_backoff_seconds"
+            raise SafeValueError(msg)
+        return self
+
     ep_callback_service_cn: str = Field(
         default="execution-plane-callback.ao.svc",
         description="mTLS service identity permitted to deliver EP completion events.",

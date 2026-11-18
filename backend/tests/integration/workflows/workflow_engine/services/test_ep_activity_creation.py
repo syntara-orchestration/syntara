@@ -89,8 +89,13 @@ def ep_submission(
                 )
             ),
         ),
+        patch.object(
+            dispatch,
+            "get_settings",
+            return_value=SimpleNamespace(ep_api_url="https://ep.test", ep_request_timeout_seconds=10),
+        ),
         patch.object(dispatch, "ExecutionPlaneHttpClient"),
-        patch.object(dispatch, "_submit_and_read_work", return_value={"status": "pending"}) as submission,
+        patch.object(dispatch, "_submit_work", return_value=None) as submission,
     ):
         yield submission
 
@@ -109,7 +114,7 @@ async def test_monitor_and_dispatch_share_identity_in_either_order(
     if monitor_first:
         await monitor._create_all_activities_upfront(test_execution.id, _DEFINITIONS)
 
-    assert await dispatch._dispatch_to_ep({"code": "echo ok"}, None, test_execution.id, None, "script-bash") is None
+    await dispatch._dispatch_to_ep({"code": "echo ok"}, None, test_execution.id, None, "script-bash")
     work_id = UUID(ep_submission.call_args.args[1].command.payload["work_item_id"])
     assert work_id == uuid5(test_execution.id, _NODE_ID)
 

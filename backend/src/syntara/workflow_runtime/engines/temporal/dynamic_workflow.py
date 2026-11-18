@@ -42,6 +42,10 @@ with workflow.unsafe.imports_passed_through():
         ENGINE_TIMEOUT_SECONDS_KEY,
         INTERNAL_ACTIVITY_HEARTBEAT_TIMEOUT_SECONDS,
     )
+    from syntara.workflow_runtime.engines.temporal.execution_plane_policy import (
+        EP_POLICY_SNAPSHOT_KEY,
+        build_ep_retry_policy,
+    )
     from syntara.workflow_runtime.engines.temporal.node_settings_resolver import (
         resolve_continue_on_failure,
         resolve_max_iterations,
@@ -1252,8 +1256,6 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
     # so Temporal's start_to_close_timeout must include the margin.
     _EXECUTOR_TIMEOUT_MARGIN_TYPES: ClassVar[frozenset[str]] = frozenset(
         {
-            NodeType.SCRIPT_PYTHON,
-            NodeType.SCRIPT_BASH,
             NodeType.HTTP_REQUEST,
             NodeType.INTERNAL_ACTIVITY,
             NodeType.AAP_JOB_TEMPLATE,
@@ -1285,13 +1287,31 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         timeout_seconds: int,
         extra_args: list[Any] | None = None,
     ) -> dict[str, Any]:
-        """Execute an executor node via the activity map."""
+        """Schedule the node's Temporal activity and await its final result.
+
+        workflow.execute_activity() waits for Temporal to mark the activity complete,
+        not just for its Python function to exit. Normally, returning a value from
+        that function completes the activity with that value.
+
+        For EP-backed nodes, the dispatch function sends the command to EP and exits
+        via raise_complete_async(), leaving the activity incomplete. This method
+        stays at the await. When EP sends its completion callback to AO, AO supplies
+        the result to Temporal. Temporal then resolves the await, and this method
+        returns the result dictionary. Accepting the POST does not end this wait.
+
+        Agentic activities also defer completion, using the Agent Orchestrator's
+        result callback to AO. Activity failures and timeouts raise from the await.
+        EP-backed nodes use the dedicated EP retry and timeout settings below.
+        """
         activity_name = self._EXECUTOR_ACTIVITY_MAP.get(node_type)
         if not activity_name:
             return {"output": {"status": "skipped", "reason": f"Unknown executor type: {node_type}"}}
         args: list[Any] = [resolved_parameters, outputs]
         if extra_args:
             args.extend(extra_args)
+
+        if node_type in _EXECUTION_PLANE_SUPPORTED_NODE_TYPES:
+            return await self._execute_activity_with_ep_settings(node, activity_name, args)
 
         retry_policy = resolve_retry_policy(node, self._runtime_settings)
         # Temporal delivers cancellation to an activity only through its heartbeats,
@@ -1316,6 +1336,43 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
                 retry_policy=retry_policy,
             ),
         )
+
+    async def _execute_activity_with_ep_settings(
+        self, node: ActivityNode, activity_name: str, args: list[Any]
+    ) -> dict[str, Any]:
+        """Await an EP-backed activity using the EP retry and timeout settings.
+
+        The dispatch function exits via raise_complete_async() after EP accepts the
+        command, but the await below remains pending. EP later sends its completion
+        callback to AO; AO gives the result to Temporal, which resolves this await.
+        Only then does this method return the result dictionary. The dispatch
+        function itself never returns that result.
+
+        Activity failures and timeouts raise instead. On timeout, also attempt to
+        cancel the EP work.
+        """
+        ep_settings = self._runtime_settings.get(EP_POLICY_SNAPSHOT_KEY, {})
+        ep_work_timeout_seconds = ep_settings.get("ep_work_timeout_seconds", 86400.0)
+        try:
+            return cast(
+                "dict[str, Any]",
+                await workflow.execute_activity(
+                    activity_name,
+                    args=args,
+                    activity_id=node.id,
+                    # No per-attempt start-to-close timeout: it would also time out
+                    # async completion and resubmit accepted work. This single
+                    # deadline includes all retries and cannot restart on retry.
+                    schedule_to_close_timeout=timedelta(seconds=ep_work_timeout_seconds),
+                    retry_policy=build_ep_retry_policy(ep_settings),
+                ),
+            )
+        except ActivityError as exc:
+            if not isinstance(exc.cause, TemporalTimeoutError):
+                raise
+            await self._cancel_execution_plane_work_nodes([node.id], reason="Execution Plane work deadline exceeded")
+            msg = f"Execution Plane work did not complete within {ep_work_timeout_seconds:g} seconds"
+            raise ApplicationError(msg, type="ExecutionPlaneWorkTimeout", non_retryable=True) from exc
 
     async def _execute_wait_node(
         self,

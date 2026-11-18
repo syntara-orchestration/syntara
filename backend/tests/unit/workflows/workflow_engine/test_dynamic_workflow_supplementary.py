@@ -19,7 +19,8 @@ from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from temporalio.exceptions import ApplicationError
+from temporalio.exceptions import ActivityError, ApplicationError, TimeoutType
+from temporalio.exceptions import TimeoutError as TemporalTimeoutError
 
 from syntara.core.exceptions import SafeValueError
 from syntara.workflow_core.graph import ActivityNode, WorkflowGraph
@@ -37,6 +38,7 @@ from syntara.workflow_runtime.engines.temporal.dynamic_workflow import (
     ALLOWED_TRIGGER_TYPES,
     OrchestratorWorkflow,
 )
+from syntara.workflow_runtime.engines.temporal.execution_plane_policy import EP_POLICY_SNAPSHOT_KEY
 from syntara.workflow_runtime.engines.temporal.node_settings_resolver import get_default_timeout
 from tests.unit.workflows.workflow_engine.conftest import init_workflow_runtime
 
@@ -208,6 +210,73 @@ class TestExecuteExecutorNodeUnknownType:
         assert "totally_unknown" in result["output"]["reason"]
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("node_type", [NodeType.SCRIPT_PYTHON, NodeType.SCRIPT_BASH])
+async def test_script_activity_is_scheduled_with_retries(node_type: str) -> None:
+    wf = _make_workflow()
+    wf._runtime_settings["workflow_engine.retry_max_retries"] = 0
+    wf._runtime_settings[EP_POLICY_SNAPSHOT_KEY] = {
+        "ep_dispatch_max_retries": 5,
+        "ep_dispatch_initial_backoff_seconds": 2.0,
+        "ep_dispatch_max_backoff_seconds": 20.0,
+        "ep_work_timeout_seconds": 900.0,
+    }
+    node = ActivityNode("script", node_type, {})
+    with patch(
+        "syntara.workflow_runtime.engines.temporal.dynamic_workflow.workflow.execute_activity",
+        new_callable=AsyncMock,
+        return_value={},
+    ) as execute_activity:
+        await wf._execute_executor_node(
+            node=node,
+            node_type=node_type,
+            resolved_parameters={"code": "print('ok')"},
+            outputs=None,
+            timeout_seconds=300,
+        )
+    assert execute_activity.await_args is not None
+    kwargs = execute_activity.await_args.kwargs
+    assert kwargs["retry_policy"].maximum_attempts == 6
+    assert kwargs["retry_policy"].initial_interval == timedelta(seconds=2)
+    assert kwargs["retry_policy"].maximum_interval == timedelta(seconds=20)
+    assert kwargs["schedule_to_close_timeout"] == timedelta(seconds=900)
+    assert "start_to_close_timeout" not in kwargs
+    assert kwargs["activity_id"] == node.id
+
+
+@pytest.mark.asyncio
+async def test_ep_deadline_requests_cancellation_and_reports_system_timeout() -> None:
+    wf = _make_workflow()
+    wf._runtime_settings[EP_POLICY_SNAPSHOT_KEY] = {"ep_work_timeout_seconds": 600}
+    node = ActivityNode("script", NodeType.SCRIPT_BASH, {})
+    error = ActivityError(
+        "Activity timed out",
+        scheduled_event_id=1,
+        started_event_id=2,
+        identity="worker",
+        activity_type=ActivityName.SCRIPT_BASH,
+        activity_id=node.id,
+        retry_state=None,
+    )
+    error.__cause__ = TemporalTimeoutError(
+        "Deadline exceeded", type=TimeoutType.SCHEDULE_TO_CLOSE, last_heartbeat_details=[]
+    )
+    with (
+        patch(
+            "syntara.workflow_runtime.engines.temporal.dynamic_workflow.workflow.execute_activity",
+            new_callable=AsyncMock,
+            side_effect=error,
+        ),
+        patch.object(wf, "_cancel_execution_plane_work_nodes", new_callable=AsyncMock) as cancel_work,
+        pytest.raises(ApplicationError) as exc_info,
+    ):
+        await wf._execute_executor_node(node, node.type, {}, None, timeout_seconds=1)
+    assert exc_info.value.type == "ExecutionPlaneWorkTimeout"
+    assert exc_info.value.non_retryable is True
+    assert "600 seconds" in exc_info.value.message
+    cancel_work.assert_awaited_once_with([node.id], reason="Execution Plane work deadline exceeded")
+
+
 class TestExecuteExecutorNodeHeartbeatTimeout:
     """Internal activities must be scheduled with a heartbeat_timeout.
 
@@ -252,7 +321,7 @@ class TestExecuteExecutorNodeHeartbeatTimeout:
         """The other executor activities never beat; a timeout would fail them spuriously."""
         for node_type in (NodeType.HTTP_REQUEST, NodeType.SCRIPT_PYTHON, NodeType.AGENTIC):
             kwargs = await self._schedule(node_type)
-            assert kwargs["heartbeat_timeout"] is None, f"{node_type} must not get a heartbeat timeout"
+            assert kwargs.get("heartbeat_timeout") is None, f"{node_type} must not get a heartbeat timeout"
 
 
 class TestMarkDownstreamEdgeCases:
@@ -939,7 +1008,7 @@ class TestPerNodeTimeout:
         self,
         _mock_temporal_workflow: MagicMock,  # noqa: PT019
     ) -> None:
-        """settings.timeout=60 on a script node → Temporal gets 60 + margin."""
+        """The node timeout reaches the workload without shortening the EP lifecycle deadline."""
         _mock_temporal_workflow.execute_activity = AsyncMock(return_value={"output": {"result": "ok"}})
 
         wf = _make_workflow()
@@ -955,14 +1024,16 @@ class TestPerNodeTimeout:
 
         _mock_temporal_workflow.execute_activity.assert_called_once()
         call_kwargs = _mock_temporal_workflow.execute_activity.call_args
-        assert call_kwargs.kwargs["start_to_close_timeout"] == timedelta(seconds=60 + _TEMPORAL_MARGIN)
+        assert call_kwargs.kwargs["args"][0]["_engine_timeout_seconds"] == 60
+        assert call_kwargs.kwargs["schedule_to_close_timeout"] == timedelta(days=1)
+        assert "start_to_close_timeout" not in call_kwargs.kwargs
 
     @pytest.mark.asyncio
     async def test_default_timeout_used_when_not_specified(
         self,
         _mock_temporal_workflow: MagicMock,  # noqa: PT019
     ) -> None:
-        """Script node with no settings.timeout → catalog default + margin."""
+        """The catalog timeout applies to workload execution; the EP deadline is separate."""
         _mock_temporal_workflow.execute_activity = AsyncMock(return_value={"output": {"result": "ok"}})
 
         wf = _make_workflow()
@@ -973,8 +1044,9 @@ class TestPerNodeTimeout:
 
         _mock_temporal_workflow.execute_activity.assert_called_once()
         call_kwargs = _mock_temporal_workflow.execute_activity.call_args
-        expected = get_default_timeout(NodeType.SCRIPT_PYTHON, wf._runtime_settings) + _TEMPORAL_MARGIN
-        assert call_kwargs.kwargs["start_to_close_timeout"] == timedelta(seconds=expected)
+        expected = get_default_timeout(NodeType.SCRIPT_PYTHON, wf._runtime_settings)
+        assert call_kwargs.kwargs["args"][0]["_engine_timeout_seconds"] == expected
+        assert call_kwargs.kwargs["schedule_to_close_timeout"] == timedelta(days=1)
 
     @pytest.mark.asyncio
     async def test_timeout_preserved_in_config_for_activity(
