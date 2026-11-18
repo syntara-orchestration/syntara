@@ -397,6 +397,39 @@ async def test_retry_converge_raises_timeout_failure_verbatim(mock_wf: MagicMock
     mock_wf.execute_activity.assert_not_called()
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("failure_reason", "should_query_source"),
+    [
+        ("Converge node join timed out after 30s waiting for predecessors", False),
+        ("External service timed out after 3 retries", True),
+    ],
+)
+async def test_retry_converge_timeout_marker_only_matches_converge_failures(
+    mock_wf: MagicMock,
+    failure_reason: str,
+    *,
+    should_query_source: bool,
+) -> None:
+    """Only the space-bounded converge timeout phrase should block replay lookup."""
+    wf = _make_workflow({"retry_from_execution_id": "src-1"})
+    graph = _two_branch_converge_graph("any", 1)
+    node = graph.get_node("join")
+    wf._retry_replay_candidates = {"join"}
+    wf._retry_converge_failure_reasons = {"join": failure_reason}
+    mock_wf.execute_activity = AsyncMock(return_value=None)
+
+    result = await wf._maybe_restore_retry_converge(node, {"strategy": "any", "n_required": 1}, graph)
+
+    assert result is None
+    if should_query_source:
+        mock_wf.execute_activity.assert_awaited_once()
+        assert mock_wf.execute_activity.await_args.args[0] == ActivityName.RETRY_CONVERGE_METADATA
+    else:
+        mock_wf.execute_activity.assert_not_called()
+    assert "join" not in wf._retry_replay_candidates
+
+
 # ---------------------------------------------------------------------------
 # Input parameter overrides
 # ---------------------------------------------------------------------------

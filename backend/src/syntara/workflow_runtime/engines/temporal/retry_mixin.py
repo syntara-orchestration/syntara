@@ -15,9 +15,9 @@ from syntara.workflow_core.graph import ActivityNode, WorkflowGraph
 from syntara.workflow_core.models import ActivityName, ConvergeStrategy, LoopState, NodeType
 from syntara.workflow_core.utils.namespace_resolver import NamespaceResolver
 from syntara.workflow_runtime.engines.temporal.constants import (
-    CONVERGE_TIMEOUT_REASON_MARKER,
     DEFAULT_ACTIVITY_TIMEOUT_SECONDS,
     RESTORABLE_SOURCE_STATUSES,
+    is_converge_timeout_reason,
 )
 from syntara.workflow_runtime.engines.temporal.utils.loop_iteration_ids import (
     approval_temporal_activity_id,
@@ -462,7 +462,7 @@ class WorkflowRetryMixin:
             return None
 
         failure_reason = self._retry_converge_failure_reasons.get(node.id)
-        if failure_reason and CONVERGE_TIMEOUT_REASON_MARKER in failure_reason:
+        if is_converge_timeout_reason(failure_reason, node.id):
             # A timeout means some gate state did not arrive. Planned source rows
             # are not enough to turn that into a successful replay.
             self._retry_replay_candidates.discard(node.id)

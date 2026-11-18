@@ -397,11 +397,13 @@ async def probe_retry_loop_iteration(
             col(ActivityExecution.temporal_activity_id).startswith(prefix, autoescape=True)
             for prefix in child_loop_prefixes
         )
+        # This probe checks whether an iteration was reached, not whether its
+        # entry activity finished. In-flight and cancelled rows are evidence too;
+        # status filtering belongs to the separate state-restoration query.
         found = await session.exec(
             select(ActivityExecution.id)
             .where(
                 ActivityExecution.execution_id == source_execution_id,
-                col(ActivityExecution.status).in_(RESTORABLE_SOURCE_STATUSES),
                 or_(*direct_conditions),
             )
             .limit(1)

@@ -29,9 +29,17 @@ MAX_ENV_VAR_LENGTH = _settings.max_env_var_length
 # executor nodes use _get_default_timeout() for type-appropriate defaults.
 DEFAULT_ACTIVITY_TIMEOUT_SECONDS = 30
 
-# Marker included in converge timeout reasons and shared by retry guards that
-# must distinguish a timeout from other gate failures.
-CONVERGE_TIMEOUT_REASON_MARKER = "timed out after"
+# Space-bounded phrase included in converge timeout reasons. Retry guards also
+# require the expected node-specific prefix via ``is_converge_timeout_reason``.
+CONVERGE_TIMEOUT_REASON_MARKER = " timed out after "
+
+
+def is_converge_timeout_reason(failure_reason: str | None, node_id: str) -> bool:
+    """Whether a failure reason starts with this node's converge-timeout message."""
+    if not failure_reason:
+        return False
+    return failure_reason.startswith(f"Converge node {node_id}{CONVERGE_TIMEOUT_REASON_MARKER}")
+
 
 # Temporal only delivers activity cancellation through heartbeats, and only to an
 # activity that was scheduled with a heartbeat_timeout -- without one the server

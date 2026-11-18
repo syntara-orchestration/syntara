@@ -542,7 +542,7 @@ class WorkflowConvergeMixin:
 
             if timed_out:
                 error_msg = (
-                    f"Converge node {node_id} {CONVERGE_TIMEOUT_REASON_MARKER} "
+                    f"Converge node {node_id}{CONVERGE_TIMEOUT_REASON_MARKER}"
                     f"{timeout_seconds}s waiting for predecessors"
                 )
                 workflow.logger.error(error_msg)
