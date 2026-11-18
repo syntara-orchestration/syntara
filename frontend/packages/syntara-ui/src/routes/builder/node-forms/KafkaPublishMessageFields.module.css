@@ -1,0 +1,56 @@
+.dragHandle {
+  cursor: grab;
+  touch-action: none;
+  color: var(--pf-t--global--icon--color--regular);
+}
+
+.deliveryAlert {
+  /* Reserve space for our controlled toggle through Alert's public padding hook. */
+  --pf-v6-c-alert--PaddingInlineStart: calc(
+    var(--pf-t--global--spacer--lg) + var(--pf-t--global--icon--size--md) + 2 *
+      var(--pf-t--global--spacer--action--horizontal--plain--default)
+  );
+
+  position: relative;
+}
+
+.deliveryToggle {
+  position: absolute;
+  inset-block-start: calc(var(--pf-t--global--spacer--md) - var(--pf-t--global--spacer--control--vertical--plain));
+  inset-inline-start: var(--pf-t--global--spacer--sm);
+}
+
+.deliveryTitle {
+  font: inherit;
+}
+
+.dragHandle:active {
+  cursor: grabbing;
+}
+
+.headerCard {
+  min-inline-size: 0;
+  padding: var(--pf-t--global--spacer--md);
+  border: var(--pf-t--global--border--width--regular) solid var(--pf-t--global--border--color--default);
+}
+
+.toggleIcon {
+  transition: transform var(--pf-t--global--motion--duration--icon--default)
+    var(--pf-t--global--motion--timing-function--default);
+}
+
+.toggleButton[aria-expanded='true'] .toggleIcon {
+  transform: rotate(-180deg);
+}
+
+.dragging {
+  opacity: 0.5;
+}
+
+.dragOverlay {
+  padding: var(--pf-t--global--spacer--sm) var(--pf-t--global--spacer--md);
+  background-color: var(--pf-t--global--background--color--floating--default);
+  border-radius: var(--pf-t--global--border-radius--default);
+  box-shadow: var(--pf-t--global--box-shadow--lg);
+  opacity: 0.9;
+}

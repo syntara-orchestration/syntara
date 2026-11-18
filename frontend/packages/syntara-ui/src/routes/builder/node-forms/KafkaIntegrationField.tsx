@@ -34,7 +34,9 @@ export function KafkaIntegrationField({
   const integrationId = useWatch({ control, name: 'integrationId' })
   const { integrations: query, visibleIntegrations: integrations } = resources
   const selected = integrations.find((item) => item.id === integrationId)
-  const resourceError = kafkaResourceErrors({ triggerType: '', integrationId }, resources).integrationId
+  const resourceError = query.isPending
+    ? undefined
+    : kafkaResourceErrors({ triggerType: '', integrationId }, resources).integrationId
   const visible = integrations.filter((item) => item.name.toLowerCase().includes(filterText.trim().toLowerCase()))
   const errorId = 'kafka-integration-error'
   const changeIntegration = useCallback(
@@ -48,7 +50,7 @@ export function KafkaIntegrationField({
     (ref: Ref<MenuToggleElement>) => (
       <TypeaheadMenuToggle
         toggleRef={ref}
-        displayText={selected?.name ?? (integrationId ? 'Selected Integration unavailable' : '')}
+        displayText={selected?.name ?? (integrationId && !query.isPending ? 'Selected Integration unavailable' : '')}
         ariaLabel="Kafka Integration"
         fieldId="kafka-integration"
         isOpen={isOpen}

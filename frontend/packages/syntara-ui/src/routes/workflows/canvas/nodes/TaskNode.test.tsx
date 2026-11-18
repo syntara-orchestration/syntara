@@ -1,4 +1,4 @@
-import type { TaskActivity } from '@syntara/contracts'
+import { ExecutorTypeEnum, type TaskActivity } from '@syntara/contracts'
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -57,6 +57,33 @@ describe('TaskActivityDetails', () => {
     expect(screen.getByText('REST API')).toBeInTheDocument()
     expect(screen.getByText('GET')).toBeInTheDocument()
     expect(screen.getByText('https://api.example.com')).toBeInTheDocument()
+  })
+
+  it('shows the configured target topic for Kafka Publish', () => {
+    const task: TaskActivity = {
+      type: ExecutorTypeEnum.KAFKA_PUBLISH,
+      id: 'publish-order',
+      name: 'Publish order',
+      parameters: {
+        integration_id: 'kafka-integration',
+        credential_id: 'kafka-credential',
+        topic: 'events.orders',
+        payload: { order_id: 42 },
+      },
+    }
+
+    const { rerender } = render(<TaskActivityDetails data={task} />)
+
+    expect(screen.getByText('Publish order')).toBeInTheDocument()
+    expect(screen.getByText('Kafka Publish')).toBeInTheDocument()
+    expect(screen.getByText('Target topic')).toBeInTheDocument()
+    expect(screen.getByText('events.orders')).toBeInTheDocument()
+
+    rerender(<TaskActivityDetails data={{ ...task, parameters: { ...task.parameters, topic: '' } }} />)
+
+    expect(screen.queryByText('Target topic')).not.toBeInTheDocument()
+    expect(screen.queryByText('events.orders')).not.toBeInTheDocument()
+    expect(screen.getByText('Publish order')).toBeInTheDocument()
   })
 
   it('renders agentic task details correctly', () => {

@@ -126,6 +126,7 @@ function processValidateResponse(
   callbacks: {
     frontendErrors: ValidationError[]
     triggers: Trigger[]
+    failureErrors: ValidationError[]
     onValid?: () => void
     silent: boolean
     showSuccess: (opts: { title: string }) => void
@@ -142,7 +143,7 @@ function processValidateResponse(
     if (extracted) {
       backendErrors = extracted
     } else {
-      applyValidationState(dispatch, callbacks.frontendErrors)
+      applyValidationState(dispatch, callbacks.failureErrors)
       if (!callbacks.silent) {
         callbacks.showError({ title: 'Verification failed', description: getErrorMessage(err) })
       }
@@ -174,8 +175,9 @@ export function useWorkflowVerification({ dispatch }: UseWorkflowVerificationOpt
   const validationErrorCount = useWorkflowStore((state) => state.validationErrorCount)
 
   const handleVerify = useCallback(
-    (onValid?: () => void, options?: { silent?: boolean }) => {
+    (onValid?: () => void, options?: { silent?: boolean; fallbackErrors?: ValidationError[] }) => {
       const silent = options?.silent ?? false
+      const fallbackErrors = options?.fallbackErrors ?? []
       const { currentWorkflow, edges, nodePositions } = useWorkflowStore.getState()
       if (!currentWorkflow) {
         dispatch({ type: 'SET_KEBAB_OPEN', payload: false })
@@ -200,15 +202,14 @@ export function useWorkflowVerification({ dispatch }: UseWorkflowVerificationOpt
           nodePositions,
         })
       } catch (err: unknown) {
-        dispatch({ type: 'CLEAR_VALIDATION_ERRORS' })
-        useWorkflowStore.getState().setValidationErrorCount(0)
+        applyValidationState(dispatch, fallbackErrors)
         if (!silent) {
           showError({ title: 'Verification failed', description: getErrorMessage(err) })
         }
         return
       }
 
-      dispatch({ type: 'CLEAR_VALIDATION_ERRORS' })
+      if (fallbackErrors.length === 0) dispatch({ type: 'CLEAR_VALIDATION_ERRORS' })
 
       const frontendResult = validateWorkflow(activities, edges, { triggers })
       const minimumErrors = validateMinimumWorkflow(activities, edges, triggers)
@@ -218,6 +219,7 @@ export function useWorkflowVerification({ dispatch }: UseWorkflowVerificationOpt
         nodeName: lookupNodeName(e.nodeId ?? null, { activityIdFallback: true }),
         severity: (e.severity ?? 'error') as ValidationSeverity,
       }))
+      const failureErrors = [...allFrontendErrors, ...fallbackErrors]
 
       setIsVerifying(true)
       workflowFetchClient
@@ -230,6 +232,7 @@ export function useWorkflowVerification({ dispatch }: UseWorkflowVerificationOpt
           processValidateResponse(resp, dispatch, {
             frontendErrors: allFrontendErrors,
             triggers,
+            failureErrors,
             onValid,
             silent,
             showSuccess,
@@ -237,7 +240,7 @@ export function useWorkflowVerification({ dispatch }: UseWorkflowVerificationOpt
           })
         })
         .catch((err: unknown) => {
-          applyValidationState(dispatch, allFrontendErrors)
+          applyValidationState(dispatch, failureErrors)
           if (!silent) {
             showError({ title: 'Verification failed', description: getErrorMessage(err) })
           }
@@ -248,7 +251,8 @@ export function useWorkflowVerification({ dispatch }: UseWorkflowVerificationOpt
   )
 
   const handleVerifySilent = useCallback(
-    (onValid?: () => void) => handleVerify(onValid, { silent: true }),
+    (onValid?: () => void, fallbackErrors?: ValidationError[]) =>
+      handleVerify(onValid, { silent: true, fallbackErrors }),
     [handleVerify]
   )
 

@@ -152,8 +152,8 @@ paths:
       security:
         - bearerAuth: []
       x-app-permission:
-        resource: null
-        action: null
+        resource:
+        action:
       requestBody:
         required: true
         content:
@@ -745,14 +745,15 @@ paths:
     post:
       summary: Receive webhook event
       description: >-
-        Receive a webhook event from an external system and trigger the matching workflow. Requires a service account Bearer token. Only POST method is supported; other methods receive 405 Method Not Allowed.
+        Receive a webhook event from an external system and trigger the matching workflow. Requires a service account Bearer
+        token. Only POST method is supported; other methods receive 405 Method Not Allowed.
       operationId: receive_webhook
       tags: [Webhooks]
       security:
         - bearerAuth: []
       x-app-permission:
-        resource: null
-        action: null
+        resource:
+        action:
       parameters:
         - name: webhook_path
           in: path
@@ -809,14 +810,15 @@ paths:
     post:
       summary: Receive EDA webhook event
       description: >-
-        Receive a webhook event from Event-Driven Ansible and trigger the matching workflow. Requires a service account Bearer token. Each EDA trigger node has its own unique webhook path. The payload can be any JSON structure.
+        Receive a webhook event from Event-Driven Ansible and trigger the matching workflow. Requires a service account Bearer
+        token. Each EDA trigger node has its own unique webhook path. The payload can be any JSON structure.
       operationId: receive_eda_webhook
       tags: [Webhooks]
       security:
         - bearerAuth: []
       x-app-permission:
-        resource: null
-        action: null
+        resource:
+        action:
       parameters:
         - name: webhook_path
           in: path
@@ -1495,6 +1497,14 @@ components:
           title: Instance
         validation_result:
           $ref: '#/components/schemas/ValidationResult'
+    KafkaEncodedValue:
+      $ref: ./shared-schemas.yaml#/components/schemas/KafkaEncodedValue
+    KafkaPublishHeader:
+      $ref: ./shared-schemas.yaml#/components/schemas/KafkaPublishHeader
+    KafkaPublishParameters:
+      $ref: ./shared-schemas.yaml#/components/schemas/KafkaPublishParameters
+    KafkaPublishNode:
+      $ref: ./shared-schemas.yaml#/components/schemas/KafkaPublishNode
   securitySchemes:
     bearerAuth:
       type: http

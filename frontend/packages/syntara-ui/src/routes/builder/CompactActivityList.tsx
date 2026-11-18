@@ -7,6 +7,7 @@ import type { ActivityState } from '../workflows/execution/types'
 import { parseCompositeKey } from '../workflows/execution/utils/activityState'
 
 import styles from './CompactActivityList.module.css'
+import { ActivityRunningLongWarning } from './components/RunningLongWarning'
 import type { ActivityOrderItem } from './ExecutionActivityTable'
 import { ActivityStatusLabel } from './ExecutionStatus'
 import { ACTIVITY_STATUS } from './utils/executionState/executionHelpers'
@@ -27,7 +28,7 @@ export function CompactActivityList({
   return (
     <SynScrollableTableContainer caption="Activity list" useFixedLayout={false} variant="compact">
       <Tbody>
-        {activityOrder.map(({ id, name, type }) => {
+        {activityOrder.map(({ id, name, type, expectedDuration }) => {
           const state = activityStates.get(id)
           const hasTimeRange = Boolean(state?.startedAt)
           const { baseId } = parseCompositeKey(id)
@@ -55,6 +56,7 @@ export function CompactActivityList({
               </Td>
               <Td dataLabel="Status" modifier="nowrap" className={styles.statusCell}>
                 <ActivityStatusLabel status={state?.status ?? ACTIVITY_STATUS.PENDING} nodeType={type} />
+                <ActivityRunningLongWarning state={state} nodeType={type} expectedDuration={expectedDuration} />
               </Td>
             </Tr>
           )

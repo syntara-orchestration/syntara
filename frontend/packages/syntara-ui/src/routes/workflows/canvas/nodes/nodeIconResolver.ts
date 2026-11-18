@@ -1,4 +1,4 @@
-import { ExecutorTypeEnum, TriggerTypeEnum, type TaskActivity } from '@syntara/contracts'
+import { ActivityTypeEnum, ExecutorTypeEnum, TriggerTypeEnum, type TaskActivity } from '@syntara/contracts'
 import type { Node } from '@xyflow/react'
 import type { ComponentType } from 'react'
 
@@ -32,6 +32,8 @@ export function getTaskIconDescriptor(taskData: TaskActivity): IconDescriptor {
     iconId = RegistryNodeId.AGENT
   } else if (actualExecutor === ExecutorTypeEnum.HTTP_REQUEST) {
     iconId = RegistryNodeId.ACTION_API
+  } else if (actualExecutor === ActivityTypeEnum.KAFKA_PUBLISH) {
+    iconId = RegistryNodeId.ACTION_KAFKA
   }
   return { icon: executorMeta?.icon, id: iconId }
 }

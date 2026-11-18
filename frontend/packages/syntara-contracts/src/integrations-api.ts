@@ -4,6 +4,26 @@
  */
 
 export interface paths {
+  '/integrations/catalog': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * List integration catalog
+     * @description List integrations of every supported type with filtering and pagination.
+     */
+    get: operations['list_integration_catalog']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/integrations': {
     parameters: {
       query?: never
@@ -412,6 +432,17 @@ export interface components {
     IntegrationProjectAssignmentListResponse: components['schemas']['ResourcesResponseBase'] & {
       /** Resources */
       resources: components['schemas']['IntegrationProjectAssignmentRead'][]
+    }
+    /**
+     * IntegrationCatalogListResponse
+     * @description Paginated integrations of every supported type.
+     */
+    IntegrationCatalogListResponse: components['schemas']['ResourcesResponseBase'] & {
+      /**
+       * Resources
+       * @description Array of resources in current page
+       */
+      resources: (components['schemas']['IntegrationRead'] | components['schemas']['KafkaIntegrationRead'])[]
     }
     /**
      * IntegrationListResponse
@@ -1906,6 +1937,70 @@ export interface components {
 }
 export type $defs = Record<string, never>
 export interface operations {
+  list_integration_catalog: {
+    parameters: {
+      query?: {
+        /** @description Maximum number of results per page */
+        limit?: components['parameters']['limitParam']
+        /** @description Pagination cursor from previous response */
+        cursor?: components['parameters']['cursorParam']
+        /** @description Sort parameter (e.g., 'name', '-created_at') */
+        sort?: components['parameters']['sortParam']
+        /** @description Include total count in response (expensive) */
+        include_total?: components['parameters']['includeTotalParam']
+        /** @description Filter by validation status */
+        validation_status?: (components['schemas']['IntegrationStatus'] | null) & {
+          /** @description Filter by validation status */
+          eq?: components['schemas']['IntegrationStatus'] | null
+        }
+        /** @description Filter by enabled status */
+        enabled?: (boolean | null) & {
+          /** @description Filter by enabled status */
+          eq?: boolean | null
+        }
+        /** @description Filter by visibility scope */
+        scope?: (components['schemas']['IntegrationScope'] | null) & {
+          /** @description Filter by visibility scope */
+          eq?: components['schemas']['IntegrationScope'] | null
+        }
+        /** @description Filter by management credential ID (credential used for admin operations like validation and tool/model discovery) */
+        management_credential_id?: (string | null) & {
+          /** @description Filter by management credential ID */
+          eq?: string | null
+        }
+        /** @description Filter to integrations that are global or assigned to this project. Restricted to projects the user has RBAC access to; querying inaccessible projects returns only global integrations. */
+        project_id?: string | null
+        /** @description Filter by integration type */
+        integration_type?: (('mcp_server' | 'llm_provider' | 'ansible_automation_platform' | 'kafka') | null) & {
+          /** @description Filter by integration type */
+          eq?: ('mcp_server' | 'llm_provider' | 'ansible_automation_platform' | 'kafka') | null
+        }
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['IntegrationCatalogListResponse']
+        }
+      }
+      400: components['responses']['BadRequestError']
+      401: components['responses']['UnauthorizedError']
+      403: components['responses']['ForbiddenError']
+      404: components['responses']['NotFoundError']
+      409: components['responses']['ConflictError']
+      422: components['responses']['ValidationError']
+      429: components['responses']['RateLimitError']
+      500: components['responses']['InternalServerError']
+    }
+  }
   list_integrations: {
     parameters: {
       query?: {

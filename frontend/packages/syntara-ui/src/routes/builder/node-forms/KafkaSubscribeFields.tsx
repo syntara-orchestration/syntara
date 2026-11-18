@@ -34,6 +34,9 @@ export function KafkaSubscribeFields({
   const values = useWatch({ control })
   const parsed = triggerFormSchema.safeParse(values)
   const resourceErrors = resources ? kafkaResourceErrors(values, resources) : {}
+  const resourcesLoading = Boolean(
+    resources?.integrations.isPending || resources?.credentials.isLoading || resources?.types.isPending
+  )
   const ready =
     parsed.success &&
     values.integrationId &&
@@ -95,9 +98,10 @@ export function KafkaSubscribeFields({
                     <KafkaCredentialConnection
                       key={values.integrationId}
                       credentialName={resources?.credentials.credentials.find((item) => item.id === field.value)?.name}
-                      isPending={Boolean(resources?.credentials.isLoading || resources?.types.isPending)}
+                      isPending={resourcesLoading}
                       errorMessage={resourceErrors.runtimeCredentialId ?? fieldState.error?.message}
                       isDisabled={isReadOnly}
+                      isCompact
                     >
                       {(onSelected) => (
                         <CredentialSelector
@@ -113,8 +117,12 @@ export function KafkaSubscribeFields({
                           isRequired
                           isSearchable
                           allowCreate={canCreate && !isReadOnly}
-                          isDisabled={isReadOnly || !values.integrationId}
-                          errorMessage={resourceErrors.runtimeCredentialId ?? fieldState.error?.message}
+                          isDisabled={isReadOnly || !values.integrationId || resourcesLoading}
+                          errorMessage={
+                            resourcesLoading
+                              ? undefined
+                              : (resourceErrors.runtimeCredentialId ?? fieldState.error?.message)
+                          }
                           helpText="Used to authenticate this subscription to Kafka. Select a Kafka credential explicitly; the Integration management credential is not substituted. This does not select the workflow execution identity."
                         />
                       )}
@@ -162,6 +170,7 @@ export function KafkaSubscribeFields({
           workflowId={workflowId}
           projectId={projectId}
           parameters={parameters}
+          isLoading={resourcesLoading}
           isReadOnly={isReadOnly}
         />
       </StackItem>

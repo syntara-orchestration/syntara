@@ -16,6 +16,7 @@ type KafkaSubscribePreflightProps = Readonly<{
   projectId?: string
   parameters?: KafkaSubscribeParameters
   isReadOnly: boolean
+  isLoading?: boolean
 }>
 
 /** Keyed by configuration by its parent so pending or old results cannot describe new fields. */
@@ -24,11 +25,14 @@ export function KafkaSubscribePreflight({
   projectId,
   parameters,
   isReadOnly,
+  isLoading = false,
 }: KafkaSubscribePreflightProps) {
   const permissions = useBuilderPermissions(!workflowId, false, projectId)
   const handleError = useMutationErrorHandler()
   const mutation = workflowClient.useMutation('post', '/workflows/{workflow_id}/event_subscriptions/test')
-  const canTest = Boolean(workflowId && parameters && permissions.canEdit && !isReadOnly && !mutation.isPending)
+  const canTest = Boolean(
+    workflowId && parameters && permissions.canEdit && !isReadOnly && !isLoading && !mutation.isPending
+  )
   const testAccess = () => {
     if (!canTest || !workflowId || !parameters) return
     mutation.mutate(
@@ -57,7 +61,7 @@ export function KafkaSubscribePreflight({
           <Content component={ContentVariants.p}>Save the workflow before testing runtime access.</Content>
         </StackItem>
       )}
-      {workflowId && !parameters && (
+      {workflowId && !parameters && !isLoading && (
         <StackItem>
           <Content component={ContentVariants.p}>
             Select an available Kafka Integration, a compatible runtime credential, and one exact topic before testing.

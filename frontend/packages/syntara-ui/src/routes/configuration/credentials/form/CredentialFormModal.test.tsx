@@ -92,7 +92,7 @@ const mockTypes: CredentialTypeFixture[] = [
   {
     id: 'type-kafka',
     name: 'Kafka',
-    description: 'SASL username and password for connector validation and listener runtime',
+    description: 'Kafka connection credential; SASL_SSL requires a username and password',
     inputs: {
       fields: [
         {
@@ -100,17 +100,18 @@ const mockTypes: CredentialTypeFixture[] = [
           label: 'Username',
           type: 'string',
           secret: false,
-          help_text: 'SASL username used for connector validation and listener runtime.',
+          help_text: 'Required for SASL_SSL. Leave blank for SSL or opted-in PLAINTEXT.',
         },
         {
           id: 'password',
           label: 'Password',
           type: 'string',
           secret: true,
-          help_text: 'Kafka SASL password. Encrypted at rest.',
+          help_text: 'Required for SASL_SSL. Encrypted at rest. Omit for SSL or opted-in PLAINTEXT.',
         },
       ],
-      required: ['username', 'password'],
+      required: [],
+      required_together: [['username', 'password']],
     },
     injectors: {},
     managed: true,
@@ -763,27 +764,51 @@ describe('CredentialFormModal', () => {
       expect(screen.getByLabelText('Password', { selector: 'input' })).toHaveAttribute('type', 'password')
     })
 
-    it('explains that the type is the SASL login for validation and listener runtime', async () => {
+    it('explains which connection modes require SASL fields', async () => {
       const user = userEvent.setup()
       render(<CredentialFormModal isOpen onClose={vi.fn()} />, { wrapper })
 
       await user.click(screen.getByRole('button', { name: 'More info for Credential type' }))
 
-      expect(
-        screen.getByText(/SASL username and password for connector validation and listener runtime/)
-      ).toBeInTheDocument()
+      expect(screen.getByText(/SASL_SSL requires a username and password/)).toBeInTheDocument()
+      expect(screen.getByText(/SSL and opted-in PLAINTEXT do not require SASL fields/)).toBeInTheDocument()
     })
 
-    it('requires username and password', async () => {
+    it('creates a credential with empty inputs for SSL or opted-in PLAINTEXT', async () => {
       const user = userEvent.setup()
       render(<CredentialFormModal isOpen onClose={vi.fn()} defaultProjectId="proj-1" />, { wrapper })
 
       await selectKafkaType(user)
-      await user.type(screen.getByLabelText('Credential name'), 'Kafka Cluster')
+      expect(screen.getByLabelText('Username', { selector: 'input' })).not.toBeRequired()
+      expect(screen.getByLabelText('Password', { selector: 'input' })).not.toBeRequired()
+      await user.type(screen.getByLabelText('Credential name'), 'Kafka TLS runtime')
       await user.click(screen.getByRole('button', { name: 'Create credential' }))
 
-      expect(screen.getByText('Username is required')).toBeInTheDocument()
-      expect(screen.getByText('Password is required')).toBeInTheDocument()
+      await waitFor(() => expect(mockMutate).toHaveBeenCalled())
+      const variables: unknown = mockMutate.mock.calls[0]?.[0]
+      expect(variables).toMatchObject({
+        body: {
+          name: 'Kafka TLS runtime',
+          credential_type_id: 'type-kafka',
+          project_id: 'proj-1',
+        },
+      })
+      expect(variables).toHaveProperty('body.inputs', {})
+    })
+
+    it.each([
+      { field: 'Username', value: 'listener', missing: 'Password' },
+      { field: 'Password', value: 'listener-secret', missing: 'Username' },
+    ])('requires $missing when $field is supplied', async ({ field, value, missing }) => {
+      const user = userEvent.setup()
+      render(<CredentialFormModal isOpen onClose={vi.fn()} defaultProjectId="proj-1" />, { wrapper })
+
+      await selectKafkaType(user)
+      await user.type(screen.getByLabelText('Credential name'), 'Kafka SASL runtime')
+      await user.type(screen.getByLabelText(field, { selector: 'input' }), value)
+      await user.click(screen.getByRole('button', { name: 'Create credential' }))
+
+      expect(await screen.findByText(`${missing} is required`)).toBeInTheDocument()
       expect(mockMutate).not.toHaveBeenCalled()
     })
 

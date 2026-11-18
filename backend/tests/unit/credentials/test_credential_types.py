@@ -69,12 +69,12 @@ class TestGACredentialTypes:
         fields = kafka["inputs"]["fields"]
 
         assert [field["id"] for field in fields] == ["username", "password"]
-        assert kafka["inputs"]["required"] == ["username", "password"]
+        assert kafka["inputs"]["required"] == []
+        assert kafka["inputs"]["required_together"] == [["username", "password"]]
         assert fields[0]["secret"] is False
         assert fields[1]["secret"] is True
         assert kafka["injectors"]["extra_vars"]["auth_type"] == "kafka_connection"
-        assert "connector validation" in kafka["description"]
-        assert "listener runtime" in kafka["description"]
+        assert "SASL_SSL requires a username and password" in kafka["description"]
 
     def test_all_have_injector_sections(self) -> None:
         for type_def in GA_CREDENTIAL_TYPES:
