@@ -57,7 +57,8 @@ Form definitions list the fields a user will fill in. Authors choose each field'
 supported set and configure its label, required status, and other settings. Form parameters
 configure the form itself. Most field, option, and validation rules are
 shared by form prompts and form triggers. See [Form Definitions](form-definitions.md) for the
-full guide, including where the two differ.
+full guide, including where the two differ and how the server generates a schema for the prompt's
+normalized `response_data`.
 
 ## The Form Prompt Step
 

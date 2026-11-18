@@ -21,9 +21,11 @@ and the workflow does not pause while waiting for input.
 - **Execution data:** The form definition determines the validated values stored in `input_data`.
   The trigger activity applies output mapping and returns the result under `response_data` for
   downstream nodes. The API schemas are generic: `ExecutionCreate.input_data` accepts an object,
-  and `resultSchema.response_data` allows arbitrary properties. The form builder can generate a
-  Draft-07 schema for preview and import/export, but the execution API does not use it as its
-  request or response contract. This work is still in progress.
+  and `resultSchema.response_data` allows arbitrary properties. The workflow version stores a
+  server-generated `response_schema` describing the trigger's normalized `response_data`; see
+  [Generated Response Schema](../../forms/form-definitions.md#generated-response-schema). That
+  schema is consumer metadata, not the execution request contract. `input_data` continues to be
+  validated and normalized by the shared form validator.
 
 
 ## Form Definitions, Fields, and Parameters
