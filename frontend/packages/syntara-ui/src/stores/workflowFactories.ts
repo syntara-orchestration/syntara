@@ -1,5 +1,6 @@
 import { ActivityTypeEnum, EdgeHandleEnum, type Activity, type NodeSettings } from '@syntara/contracts'
 
+import { buildScriptExecutionProfile, type ScriptAffinity } from '../routes/builder/utils/scriptExecutionProfile'
 import { PROTOTYPE_POLLUTION_KEYS, safeJSONReviver } from '../utils/jsonSafeParse'
 import { parseJsonEnvironment } from '../utils/parseJsonEnvironment'
 
@@ -36,13 +37,16 @@ export type CreateScriptActivityOptions = {
   code?: string
   credentialId?: string
   environment?: string
+  affinity?: ScriptAffinity
+  executionTargetId?: string
   settings?: NodeSettings
 }
 
 /** Create a script node (v2). */
 export function createScriptActivity(options: CreateScriptActivityOptions): Activity {
-  const { id, name, language, code, credentialId, environment, settings } = options
+  const { id, name, language, code, credentialId, environment, affinity, executionTargetId, settings } = options
   const parsedEnvironment = parseJsonEnvironment(environment)
+  const executionProfile = buildScriptExecutionProfile(affinity, executionTargetId)
 
   return {
     id,
@@ -53,6 +57,7 @@ export function createScriptActivity(options: CreateScriptActivityOptions): Acti
       ...(code !== undefined && { code }),
       ...(credentialId && { credential_id: credentialId }),
       ...(parsedEnvironment && { environment: parsedEnvironment }),
+      ...(executionProfile && { execution_profile: executionProfile }),
     },
     ...(settings && { settings }),
   }

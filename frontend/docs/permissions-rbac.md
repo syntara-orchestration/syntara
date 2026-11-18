@@ -267,10 +267,11 @@ Integration permission gating uses `useIntegrationPermissions` hook checking `in
 
 ### Execution Plane — gated
 
-Execution target permission gating uses `useExecutionTargetPermissions` checking `execution_target:create` and `execution_target:delete`. List/detail read access is gated by nav/`requiredPermissions` (`execution_target:read`); viewer/user are denied the route entirely.
+Execution target permission gating uses `useExecutionTargetPermissions` checking `execution_target:read`, `execution_target:create`, `execution_target:update`, and `execution_target:delete`. List/detail read access is gated by nav/`requiredPermissions` (`execution_target:read`); viewer/user are denied the route entirely. Workflow editors without `execution_target:read` can still edit workflows, but Script affinity **Required target** is disabled with an access explanation and the targets list is not requested.
 
 | Action                           | Permission                | Implementation                                           |
 | -------------------------------- | ------------------------- | -------------------------------------------------------- |
+| Script Required target affinity  | `execution_target:read`   | Option disabled + inline warning; list query not mounted |
 | Empty-state configure CTA        | `execution_target:create` | Hidden when `canCreate` is false                         |
 | Delete execution target (list)   | `execution_target:delete` | `isAriaDisabled` + `tooltipProps` on kebab action        |
 | Delete execution target (detail) | `execution_target:delete` | `isAriaDisabled` + `tooltipProps` on header kebab action |
