@@ -7,6 +7,9 @@ import {
   Divider,
   Form,
   FormGroup,
+  FormHelperText,
+  HelperText,
+  HelperTextItem,
   Title,
 } from '@patternfly/react-core'
 import type { IntegrationsAPI } from '@syntara/contracts'
@@ -43,6 +46,7 @@ import { buildConfiguration, buildEditSchema, editIntegrationSchema } from './ed
 import { EditSecurityFields } from './EditSecurityFields'
 import { ScopeFields } from './form/ScopeFields'
 import { integrationHelp } from './integrationFieldHelp'
+import { EXECUTION_PLANE_SCOPE_HELP } from './integrationFieldHelpText'
 import {
   CREDENTIAL_REQUIRED_TYPES,
   CREDENTIAL_TYPES_BY_INTEGRATION,
@@ -84,6 +88,7 @@ function EditIntegrationFormFields({
   const isCredentialRequired = CREDENTIAL_REQUIRED_TYPES.has(integration.integration_type ?? '')
   const isTestDisabled = (isCredentialRequired && !credentialId) || isTesting
   const isAnsibleAutomationPlatform = integration.integration_type === IntegrationTypeEnum.ANSIBLE_AUTOMATION_PLATFORM
+  const isOpenShift = integration.integration_type === IntegrationTypeEnum.OPENSHIFT
   const isLLM = isLLMProvider(integration)
   const hideBaseUrl = isLLM && PROVIDERS_HIDING_BASE_URL.has(getProviderHint(integration))
 
@@ -134,15 +139,26 @@ function EditIntegrationFormFields({
 
       <EditSecurityFields />
 
-      <ScopeFields<EditIntegrationFormValues>
-        scope={scope}
-        scopeName="scope"
-        projectIdsName="project_ids"
-        idPrefix="edit-integration"
-        onScopeChange={(newScope) => {
-          if (newScope === 'global') setValue('project_ids', [])
-        }}
-      />
+      {isOpenShift ? (
+        <FormGroup label="Scope" fieldId="edit-integration-scope">
+          <Content id="edit-integration-scope">Global</Content>
+          <FormHelperText>
+            <HelperText>
+              <HelperTextItem>{EXECUTION_PLANE_SCOPE_HELP}</HelperTextItem>
+            </HelperText>
+          </FormHelperText>
+        </FormGroup>
+      ) : (
+        <ScopeFields<EditIntegrationFormValues>
+          scope={scope}
+          scopeName="scope"
+          projectIdsName="project_ids"
+          idPrefix="edit-integration"
+          onScopeChange={(newScope) => {
+            if (newScope === 'global') setValue('project_ids', [])
+          }}
+        />
+      )}
 
       <Divider />
 

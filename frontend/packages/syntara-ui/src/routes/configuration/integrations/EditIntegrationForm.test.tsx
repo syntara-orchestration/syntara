@@ -9,6 +9,7 @@ import { integrationsClient } from '../../../client'
 import { AlertProvider } from '../../../providers/alerts'
 
 import { EditIntegrationForm } from './EditIntegrationForm'
+import { EXECUTION_PLANE_SCOPE_HELP } from './integrationFieldHelpText'
 
 vi.mock('../../../client', () => ({
   integrationsClient: {
@@ -804,6 +805,14 @@ describe('EditIntegrationForm', () => {
   describe('Execution plane infrastructure (OpenShift)', () => {
     beforeEach(() => {
       setupMocks({ integration: mockOpenShiftIntegration })
+    })
+
+    it('shows locked Global scope text with execution-plane helper text', () => {
+      render(<EditIntegrationForm />, { wrapper })
+
+      expect(screen.queryByRole('switch', { name: /integration scope/i })).not.toBeInTheDocument()
+      expect(screen.getByText('Global')).toBeInTheDocument()
+      expect(screen.getByText(EXECUTION_PLANE_SCOPE_HELP)).toBeInTheDocument()
     })
 
     it('calls discover with matching openshift integration_type values on test connection', async () => {
