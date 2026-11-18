@@ -25,9 +25,8 @@ nodes:
       indexVariable: index
 
   - id: process_item
-    type: script
+    type: script_python
     parameters:
-      language: python
       environment:
         INPUT_ITEM: ${loop.item}
         INPUT_INDEX: ${loop.index}

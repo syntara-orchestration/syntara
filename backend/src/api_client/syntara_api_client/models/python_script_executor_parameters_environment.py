@@ -6,11 +6,11 @@ from typing import Any, TypeVar
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
-T = TypeVar("T", bound="ScriptExecutorParametersEnvironment")
+T = TypeVar("T", bound="PythonScriptExecutorParametersEnvironment")
 
 
 @_attrs_define
-class ScriptExecutorParametersEnvironment:
+class PythonScriptExecutorParametersEnvironment:
     """Environment variables"""
 
     additional_properties: dict[str, str] = _attrs_field(init=False, factory=dict)
@@ -24,10 +24,10 @@ class ScriptExecutorParametersEnvironment:
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         d = dict(src_dict)
-        script_executor_parameters_environment = cls()
+        python_script_executor_parameters_environment = cls()
 
-        script_executor_parameters_environment.additional_properties = d
-        return script_executor_parameters_environment
+        python_script_executor_parameters_environment.additional_properties = d
+        return python_script_executor_parameters_environment
 
     @property
     def additional_keys(self) -> list[str]:

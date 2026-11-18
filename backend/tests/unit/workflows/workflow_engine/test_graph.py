@@ -35,10 +35,15 @@ def _simple_workflow() -> dict[str, Any]:
         "description": "test",
         "triggers": [{"id": "trigger1", "type": "manual_trigger", "parameters": {"method": "POST"}}],
         "nodes": [
-            {"id": "script1", "type": "script", "parameters": {"lang": "python"}, "outputs": {"result": "out"}},
+            {
+                "id": "script1",
+                "type": "script_python",
+                "parameters": {"code": "print('hello')"},
+                "outputs": {"result": "out"},
+            },
             {"id": "cond1", "type": "condition", "parameters": {"expr": "true"}},
-            {"id": "action_a", "type": "script", "parameters": {}},
-            {"id": "action_b", "type": "script", "parameters": {}},
+            {"id": "action_a", "type": "script_python", "parameters": {}},
+            {"id": "action_b", "type": "script_python", "parameters": {}},
         ],
         "edges": [
             {"from": "trigger1", "to": "script1"},
@@ -58,7 +63,7 @@ def _loop_workflow() -> dict[str, Any]:
         "triggers": [{"id": "t1", "type": "manual_trigger", "parameters": {}}],
         "nodes": [
             {"id": "loop1", "type": "loop", "parameters": {}},
-            {"id": "body1", "type": "script", "parameters": {}},
+            {"id": "body1", "type": "script_python", "parameters": {}},
         ],
         "edges": [
             {"from": "t1", "to": "loop1"},
@@ -78,9 +83,9 @@ class TestActivityNodeFromDict:
     """Tests for ActivityNode.from_dict."""
 
     def test_minimal_dict(self) -> None:
-        node = ActivityNode.from_dict({"id": "n1", "type": "script"})
+        node = ActivityNode.from_dict({"id": "n1", "type": "script_python"})
         assert node.id == "n1"
-        assert node.type == "script"
+        assert node.type == "script_python"
         assert node.name is None
         assert node.parameters == {}
         assert node.outputs is None
@@ -106,7 +111,7 @@ class TestActivityNodeFromDict:
         assert node.name == "Review Deployment"
 
     def test_name_defaults_to_none(self) -> None:
-        node = ActivityNode.from_dict({"id": "step1", "type": "script"})
+        node = ActivityNode.from_dict({"id": "step1", "type": "script_python"})
         assert node.name is None
 
     def test_config_defaults_to_empty_dict(self) -> None:
@@ -119,7 +124,7 @@ class TestActivityNodeFromDict:
 
     def test_missing_id_raises(self) -> None:
         with pytest.raises(KeyError):
-            ActivityNode.from_dict({"type": "script"})
+            ActivityNode.from_dict({"type": "script_python"})
 
     def test_missing_type_raises(self) -> None:
         with pytest.raises(KeyError):
@@ -137,13 +142,13 @@ class TestParseNodeSettings:
         assert settings.retry_policy.max_retries == 5
 
     def test_script_gets_no_retry(self) -> None:
-        settings = _parse_node_settings("script", {"timeout": 60})
+        settings = _parse_node_settings("script_python", {"timeout": 60})
         assert isinstance(settings, NodeSettingsNoRetry)
         assert settings.timeout == 60
 
     def test_script_rejects_retry_policy(self) -> None:
         with pytest.raises(ValidationError):
-            _parse_node_settings("script", {"retry_policy": {"max_retries": 3}})
+            _parse_node_settings("script_python", {"retry_policy": {"max_retries": 3}})
 
     def test_converge_gets_cof(self) -> None:
         settings = _parse_node_settings("converge", {"continue_on_failure": True})
@@ -182,7 +187,7 @@ class TestParseNodeSettings:
             _parse_node_settings("wait", {"timeout": 300})
 
     def test_script_accepts_disabled(self) -> None:
-        settings = _parse_node_settings("script", {"disabled": True})
+        settings = _parse_node_settings("script_python", {"disabled": True})
         assert isinstance(settings, NodeSettingsNoRetry)
         assert settings.disabled is True
 
@@ -191,7 +196,7 @@ class TestActivityNodeToDict:
     """Tests for ActivityNode.to_dict."""
 
     def test_round_trip_without_outputs(self) -> None:
-        original = {"id": "n1", "type": "script", "parameters": {"lang": "bash"}}
+        original = {"id": "n1", "type": "script_python", "parameters": {"lang": "bash"}}
         node = ActivityNode.from_dict(original)
         assert node.to_dict() == original
 
@@ -204,7 +209,7 @@ class TestActivityNodeToDict:
     def test_round_trip_with_outputs(self) -> None:
         original = {
             "id": "n1",
-            "type": "script",
+            "type": "script_python",
             "parameters": {},
             "outputs": {"result": "out"},
         }
@@ -287,8 +292,8 @@ class TestGetNode:
         graph = WorkflowGraph.from_dict(_simple_workflow())
         node = graph.get_node("script1")
         assert node.id == "script1"
-        assert node.type == "script"
-        assert node.parameters == {"lang": "python"}
+        assert node.type == "script_python"
+        assert node.parameters == {"code": "print('hello')"}
         assert node.outputs == {"result": "out"}
 
     def test_nonexistent_node_raises(self) -> None:
@@ -467,8 +472,8 @@ class TestWorkflowGraphValidation:
             "description": "no trigger",
             "triggers": [],
             "nodes": [
-                {"id": "n1", "type": "script", "parameters": {}},
-                {"id": "n2", "type": "script", "parameters": {}},
+                {"id": "n1", "type": "script_python", "parameters": {}},
+                {"id": "n2", "type": "script_python", "parameters": {}},
             ],
             "edges": [{"from": "n1", "to": "n2"}],
         }
@@ -483,8 +488,8 @@ class TestWorkflowGraphValidation:
             "description": "orphan",
             "triggers": [{"id": "t1", "type": "manual_trigger", "parameters": {}}],
             "nodes": [
-                {"id": "n1", "type": "script", "parameters": {}},
-                {"id": "orphan", "type": "script", "parameters": {}},
+                {"id": "n1", "type": "script_python", "parameters": {}},
+                {"id": "orphan", "type": "script_python", "parameters": {}},
             ],
             "edges": [{"from": "t1", "to": "n1"}],
         }

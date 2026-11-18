@@ -53,8 +53,8 @@ def _approval_workflow(name: str, *, with_approved_downstream: bool = True) -> W
             {
                 "id": "post_approval",
                 "name": "Post-Approval Step",
-                "type": "script",
-                "parameters": {"language": "bash", "code": 'echo "approved path executed"'},
+                "type": "script_bash",
+                "parameters": {"code": 'echo "approved path executed"'},
             }
         )
         edges.append({"from": "approval_gate", "to": "post_approval", "from_port": "approved"})
@@ -269,14 +269,14 @@ def _approval_in_loop_workflow(name: str) -> WorkflowDefinition:
                 {
                     "id": "body_script",
                     "name": "Act on server",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": 'echo "iteration body"'},
+                    "type": "script_bash",
+                    "parameters": {"code": 'echo "iteration body"'},
                 },
                 {
                     "id": "after_loop",
                     "name": "After loop",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": 'echo "loop complete"'},
+                    "type": "script_bash",
+                    "parameters": {"code": 'echo "loop complete"'},
                 },
             ],
             "edges": [

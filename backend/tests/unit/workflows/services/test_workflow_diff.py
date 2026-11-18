@@ -32,7 +32,7 @@ class TestGenerateChangeSummary:
 
     def test_no_changes(self) -> None:
         definition = _make_definition(
-            nodes=[{"id": "n1", "type": "script", "parameters": {}}],
+            nodes=[{"id": "n1", "type": "script_python", "parameters": {}}],
             edges=[{"from": "trigger_manual", "to": "n1"}],
         )
         assert generate_change_summary(definition, definition) is None
@@ -51,13 +51,13 @@ class TestGenerateChangeSummary:
         old = _make_definition(nodes=[])
         new = _make_definition(
             nodes=[
-                {"id": "node_a", "type": "script", "parameters": {}},
+                {"id": "node_a", "type": "script_python", "parameters": {}},
                 {"id": "node_b", "type": "approval", "parameters": {}},
             ],
         )
         result = generate_change_summary(old, new)
         assert result is not None
-        assert {"id": "node_a", "type": "script"} in result["nodes_added"]
+        assert {"id": "node_a", "type": "script_python"} in result["nodes_added"]
         assert {"id": "node_b", "type": "approval"} in result["nodes_added"]
 
     def test_node_removed(self) -> None:
@@ -88,15 +88,15 @@ class TestGenerateChangeSummary:
         """AC4: Added edge as 'from -> to' string."""
         old = _make_definition(
             nodes=[
-                {"id": "n1", "type": "script", "parameters": {}},
-                {"id": "n2", "type": "script", "parameters": {}},
+                {"id": "n1", "type": "script_python", "parameters": {}},
+                {"id": "n2", "type": "script_python", "parameters": {}},
             ],
             edges=[],
         )
         new = _make_definition(
             nodes=[
-                {"id": "n1", "type": "script", "parameters": {}},
-                {"id": "n2", "type": "script", "parameters": {}},
+                {"id": "n1", "type": "script_python", "parameters": {}},
+                {"id": "n2", "type": "script_python", "parameters": {}},
             ],
             edges=[{"from": "n1", "to": "n2"}],
         )
@@ -108,15 +108,15 @@ class TestGenerateChangeSummary:
         """AC4: Removed edge as 'from -> to' string."""
         old = _make_definition(
             nodes=[
-                {"id": "n1", "type": "script", "parameters": {}},
-                {"id": "n2", "type": "script", "parameters": {}},
+                {"id": "n1", "type": "script_python", "parameters": {}},
+                {"id": "n2", "type": "script_python", "parameters": {}},
             ],
             edges=[{"from": "n1", "to": "n2"}],
         )
         new = _make_definition(
             nodes=[
-                {"id": "n1", "type": "script", "parameters": {}},
-                {"id": "n2", "type": "script", "parameters": {}},
+                {"id": "n1", "type": "script_python", "parameters": {}},
+                {"id": "n2", "type": "script_python", "parameters": {}},
             ],
             edges=[],
         )
@@ -127,14 +127,14 @@ class TestGenerateChangeSummary:
     def test_combined_changes(self) -> None:
         old = _make_definition(
             nodes=[
-                {"id": "keep", "type": "script", "parameters": {"code": "v1"}},
+                {"id": "keep", "type": "script_python", "parameters": {"code": "v1"}},
                 {"id": "remove_me", "type": "wait", "parameters": {}},
             ],
             edges=[{"from": "trigger_manual", "to": "keep"}, {"from": "keep", "to": "remove_me"}],
         )
         new = _make_definition(
             nodes=[
-                {"id": "keep", "type": "script", "parameters": {"code": "v2"}},
+                {"id": "keep", "type": "script_python", "parameters": {"code": "v2"}},
                 {"id": "new_node", "type": "approval", "parameters": {}},
             ],
             edges=[{"from": "trigger_manual", "to": "keep"}, {"from": "keep", "to": "new_node"}],
@@ -143,7 +143,7 @@ class TestGenerateChangeSummary:
         assert result is not None
         assert {"id": "new_node", "type": "approval"} in result["nodes_added"]
         assert {"id": "remove_me", "type": "wait"} in result["nodes_removed"]
-        assert {"id": "keep", "type": "script"} in result["nodes_modified"]
+        assert {"id": "keep", "type": "script_python"} in result["nodes_modified"]
         assert "keep -> new_node" in result["edges_added"]
         assert "keep -> remove_me" in result["edges_removed"]
 
@@ -161,8 +161,8 @@ class TestGenerateChangeSummary:
         old = _make_definition(nodes=[])
         new = _make_definition(
             nodes=[
-                {"id": "z_node", "type": "script", "parameters": {}},
-                {"id": "a_node", "type": "script", "parameters": {}},
+                {"id": "z_node", "type": "script_python", "parameters": {}},
+                {"id": "a_node", "type": "script_python", "parameters": {}},
             ],
         )
         result = generate_change_summary(old, new)
@@ -172,7 +172,7 @@ class TestGenerateChangeSummary:
 
     def test_all_keys_present(self) -> None:
         old = _make_definition(nodes=[])
-        new = _make_definition(nodes=[{"id": "n1", "type": "script", "parameters": {}}])
+        new = _make_definition(nodes=[{"id": "n1", "type": "script_python", "parameters": {}}])
         result = generate_change_summary(old, new)
         assert result is not None
         assert set(result.keys()) == {"nodes_added", "nodes_removed", "nodes_modified", "edges_added", "edges_removed"}

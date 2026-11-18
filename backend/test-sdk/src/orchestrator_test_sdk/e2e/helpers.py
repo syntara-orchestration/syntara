@@ -280,15 +280,15 @@ _CONDITION_NODE: dict[str, Any] = {
 _ACTION_NODE: dict[str, Any] = {
     "id": "action_node",
     "name": "Run Action",
-    "type": "script",
-    "parameters": {"language": "bash", "code": "echo 'action executed'"},
+    "type": "script_bash",
+    "parameters": {"code": "echo 'action executed'"},
 }
 
 _EXTRA_NODE: dict[str, Any] = {
     "id": "extra_node",
     "name": "Extra Step",
-    "type": "script",
-    "parameters": {"language": "bash", "code": "echo 'extra step'"},
+    "type": "script_bash",
+    "parameters": {"code": "echo 'extra step'"},
 }
 
 

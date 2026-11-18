@@ -9,8 +9,7 @@ from pydantic import Field, ValidationError
 
 from syntara.workflow_core.models import (
     AgenticExecutorParameters,
-    ScriptExecutorParameters,
-    ScriptLanguage,
+    PythonScriptExecutorParameters,
     TemplateAwareBaseModel,
 )
 
@@ -41,8 +40,7 @@ class TestTemplateAwareBaseModel:
 
     def test_string_field_accepts_template(self) -> None:
         """Test string field accepts template expressions."""
-        config = ScriptExecutorParameters(language="${input.lang}", code="${input.script}")  # type: ignore[arg-type]
-        assert config.language == "${input.lang}"
+        config = PythonScriptExecutorParameters(code="${input.script}")
         assert config.code == "${input.script}"
 
     def test_multiple_fields_with_mixed_values(self) -> None:
@@ -61,8 +59,8 @@ class TestTemplateAwareBaseModel:
     def test_mixed_template_expressions_in_single_value(self) -> None:
         """Test that values containing ${...} are treated as templates."""
         # Partial template (mixed with literal text)
-        config = ScriptExecutorParameters(language=ScriptLanguage.BASH, code="echo ${input.message} and ${input.other}")
-        assert config.code == "echo ${input.message} and ${input.other}"
+        config = PythonScriptExecutorParameters(code="print(${input.message} and ${input.other})")
+        assert config.code == "print(${input.message} and ${input.other})"
 
     def test_malformed_template_string_rejected(self) -> None:
         """Test that malformed template strings are treated as literals and rejected."""

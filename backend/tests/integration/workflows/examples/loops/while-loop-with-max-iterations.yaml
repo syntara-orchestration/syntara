@@ -17,9 +17,8 @@ nodes:
       maxIterations: 3
 
   - id: iteration_task
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       code: |
         echo "Iteration executed"
 edges:

@@ -18,10 +18,10 @@ pytestmark = pytest.mark.integration
 async def _seed_activities(session, execution) -> UUID:
     base_id = uuid5(execution.id, "script-node")
     for item_id, name, node_type, iteration in (
-        (base_id, "script-node", "script", None),
-        (uuid4(), "script-node[1]", "script", 1),
+        (base_id, "script-node", "script_python", None),
+        (uuid4(), "script-node[1]", "script_bash", 1),
         (uuid5(execution.id, "http-node"), "http-node", "http_request", None),
-        (uuid4(), "unrelated-node", "script", None),
+        (uuid4(), "unrelated-node", "script_python", None),
     ):
         session.add(
             ActivityExecution(

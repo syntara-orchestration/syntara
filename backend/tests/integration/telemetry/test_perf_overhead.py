@@ -56,8 +56,8 @@ _ACTIVITIES_PER_WORKFLOW = 5
 _ACTIVITY_DEFS: list[dict[str, object]] = [
     {
         "id": f"step-{i}",
-        "type": "script",
-        "parameters": {"language": "bash", "code": "echo ok"},
+        "type": "script_bash",
+        "parameters": {"code": "echo ok"},
     }
     for i in range(_ACTIVITIES_PER_WORKFLOW)
 ]
@@ -109,7 +109,7 @@ async def _run_with_telemetry(registry: TelemetryClientRegistry, iterations: int
             AuditEventDispatcher.dispatch(
                 NodeExecutedEvent(
                     execution_id=wf_id,
-                    node_type=NodeType.SCRIPT,
+                    node_type=NodeType.SCRIPT_PYTHON,
                     node_def=_ACTIVITY_DEFS[i],
                     status=ActivityTerminalStatus.COMPLETED,
                     duration_ms=10,

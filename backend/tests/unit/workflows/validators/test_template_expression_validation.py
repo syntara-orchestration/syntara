@@ -36,9 +36,9 @@ def _base_definition(**overrides: object) -> dict[str, Any]:
 
 
 def _script_node(node_id: str, **extra_params: object) -> dict[str, Any]:
-    params: dict[str, Any] = {"language": "python", "code": "print(1)"}
+    params: dict[str, Any] = {"code": "print(1)"}
     params.update(extra_params)
-    return {"id": node_id, "type": "script", "parameters": params}
+    return {"id": node_id, "type": "script_python", "parameters": params}
 
 
 def _http_node(node_id: str, **extra_params: object) -> dict[str, Any]:

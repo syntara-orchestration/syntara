@@ -36,8 +36,8 @@ class TestAddNode:
 
     def test_add_and_retrieve_node(self) -> None:
         b = InMemoryGraphBackend()
-        b.add_node("n1", {"id": "n1", "type": "script", "parameters": {}})
-        assert b.get_node_data("n1") == {"id": "n1", "type": "script", "parameters": {}}
+        b.add_node("n1", {"id": "n1", "type": "script_python", "parameters": {}})
+        assert b.get_node_data("n1") == {"id": "n1", "type": "script_python", "parameters": {}}
 
     def test_get_nonexistent_node_raises(self) -> None:
         b = InMemoryGraphBackend()

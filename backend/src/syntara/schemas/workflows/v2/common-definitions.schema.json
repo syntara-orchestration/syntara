@@ -76,7 +76,7 @@
     },
     "nodeSettingsNoRetry": {
       "type": "object",
-      "description": "Settings with disabled, continue_on_failure, and timeout (script, agentic, approval). No retry_policy — retry is either not applicable or handled internally by the node's client.",
+      "description": "Settings with disabled, continue_on_failure, and timeout (script types, agentic, approval). No retry_policy — retry is either not applicable or handled internally by the node's client.",
       "properties": {
         "disabled": {
           "type": "boolean",

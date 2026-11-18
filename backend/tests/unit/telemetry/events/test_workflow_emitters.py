@@ -27,7 +27,7 @@ class TestEmitActivities:
         *,
         status: ActivityStatus,
         activity_name: str = "script-1",
-        node_type: str = "script",
+        node_type: str = "script_python",
         started_at: datetime | None = None,
         completed_at: datetime | None = None,
     ) -> MagicMock:
@@ -53,7 +53,7 @@ class TestEmitActivities:
 
         emit_activities(
             execution_id=execution_id,
-            activity_definitions_map={"script-1": {"type": "script", "name": "test"}},
+            activity_definitions_map={"script-1": {"type": "script_python", "name": "test"}},
             updated_activities=[(activity, old_values)],
             request_id=request_id,
         )
@@ -62,7 +62,7 @@ class TestEmitActivities:
         event = mock_dispatcher.dispatch.call_args[0][0]
         assert isinstance(event, NodeExecutedEvent)
         assert event.execution_id == execution_id
-        assert event.node_type == "script"
+        assert event.node_type == "script_python"
         assert event.status == ActivityTerminalStatus.COMPLETED
         assert event.duration_ms is not None
         assert event.error_type is None
@@ -77,7 +77,7 @@ class TestEmitActivities:
 
         emit_activities(
             execution_id=uuid4(),
-            activity_definitions_map={"script-1": {"type": "script"}},
+            activity_definitions_map={"script-1": {"type": "script_python"}},
             updated_activities=[(activity, old_values)],
             workflow_id=workflow_id,
             mode=ExecutionMode.STANDARD,
@@ -94,7 +94,7 @@ class TestEmitActivities:
 
         emit_activities(
             execution_id=uuid4(),
-            activity_definitions_map={"script-1": {"type": "script"}},
+            activity_definitions_map={"script-1": {"type": "script_python"}},
             updated_activities=[(activity, old_values)],
         )
 
@@ -136,7 +136,7 @@ class TestEmitActivities:
 
         emit_activities(
             execution_id=uuid4(),
-            activity_definitions_map={"script-1": {"type": "script"}},
+            activity_definitions_map={"script-1": {"type": "script_python"}},
             updated_activities=[(activity, old_values)],
         )
 

@@ -294,7 +294,6 @@
           ]
         },
         {
-          "$comment": "TEMPORARY: Script node added for initial testing only",
           "allOf": [
             {
               "$ref": "#/$defs/node_base"
@@ -302,10 +301,30 @@
             {
               "properties": {
                 "type": {
-                  "const": "script"
+                  "const": "script_python"
                 },
                 "parameters": {
-                  "$ref": "executors/script.schema.json#/parameterSchema"
+                  "$ref": "executors/script_python.schema.json#/parameterSchema"
+                },
+                "settings": {
+                  "$ref": "common-definitions.schema.json#/$defs/nodeSettingsNoRetry"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/node_base"
+            },
+            {
+              "properties": {
+                "type": {
+                  "const": "script_bash"
+                },
+                "parameters": {
+                  "$ref": "executors/script_bash.schema.json#/parameterSchema"
                 },
                 "settings": {
                   "$ref": "common-definitions.schema.json#/$defs/nodeSettingsNoRetry"

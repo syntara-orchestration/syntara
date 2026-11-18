@@ -89,9 +89,8 @@ class TestWebhookTrigger:
                         {
                             "id": "echo_node",
                             "name": "Echo Trigger Data",
-                            "type": "script",
+                            "type": "script_bash",
                             "parameters": {
-                                "language": "bash",
                                 "code": "echo 'Webhook received'",
                             },
                         }
@@ -207,8 +206,8 @@ class TestWebhookTrigger:
                         {
                             "id": "echo_node",
                             "name": "Echo Node",
-                            "type": "script",
-                            "parameters": {"language": "bash", "code": "echo 'Should not run'"},
+                            "type": "script_bash",
+                            "parameters": {"code": "echo 'Should not run'"},
                         }
                     ],
                     "edges": [{"from": "webhook_trigger_1", "to": "echo_node"}],

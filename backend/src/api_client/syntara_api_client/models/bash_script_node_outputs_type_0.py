@@ -6,11 +6,11 @@ from typing import Any, TypeVar
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
-T = TypeVar("T", bound="ScriptNodeOutputsType0")
+T = TypeVar("T", bound="BashScriptNodeOutputsType0")
 
 
 @_attrs_define
-class ScriptNodeOutputsType0:
+class BashScriptNodeOutputsType0:
     """ """
 
     additional_properties: dict[str, str] = _attrs_field(init=False, factory=dict)
@@ -24,10 +24,10 @@ class ScriptNodeOutputsType0:
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         d = dict(src_dict)
-        script_node_outputs_type_0 = cls()
+        bash_script_node_outputs_type_0 = cls()
 
-        script_node_outputs_type_0.additional_properties = d
-        return script_node_outputs_type_0
+        bash_script_node_outputs_type_0.additional_properties = d
+        return bash_script_node_outputs_type_0
 
     @property
     def additional_keys(self) -> list[str]:

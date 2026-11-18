@@ -17,9 +17,9 @@ function createLargeWorkflowDefinition(name: string): V2WorkflowDefinition {
     triggers: [{ id: 'trigger_1', type: 'manual_trigger', name: 'Manual trigger', parameters: {} }],
     nodes: Array.from({ length: IMPORTED_STEP_COUNT }, (_, index) => ({
       id: `node_${index + 1}`,
-      type: 'script',
+      type: 'script_python',
       name: `Imported step ${index + 1}`,
-      parameters: { language: 'python', code: `print(${index + 1})` },
+      parameters: { code: `print(${index + 1})` },
     })),
     edges: Array.from({ length: IMPORTED_STEP_COUNT }, (_, index) => ({
       from: index === 0 ? 'trigger_1' : `node_${index}`,

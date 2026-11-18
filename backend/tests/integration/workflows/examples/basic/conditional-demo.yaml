@@ -18,9 +18,8 @@ triggers:
 nodes:
   - id: check_temperature
     name: Check Temperature
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       environment:
         INPUT_TEMP: ${trigger.temperature}
       code: |
@@ -35,9 +34,8 @@ nodes:
 
   - id: hot_weather
     name: Hot Weather Action
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       code: |
         echo "🌡️  Hot weather detected!"
         echo "Recommended actions:"
@@ -52,9 +50,8 @@ nodes:
 
   - id: cold_weather
     name: Cold Weather Action
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       code: |
         echo "❄️  Cold weather detected!"
         echo "Recommended actions:"
@@ -64,9 +61,8 @@ nodes:
 
   - id: mild_weather
     name: Mild Weather Action
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       environment:
         INPUT_TEMP: ${trigger.temperature}
       code: |
@@ -77,9 +73,8 @@ nodes:
 
   - id: summary
     name: "Generate Weather Summary Report (${trigger.temperature})"
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       environment:
         INPUT_TEMP: ${trigger.temperature}
       code: |

@@ -1492,31 +1492,11 @@ class WorkflowEngineSettings(BaseSettings):
         ge=1024,
     )
 
-    # SECURITY: Script nodes execute arbitrary user-supplied code (bash/Python)
-    # directly in the Temporal worker process without additional sandboxing. Enabling this
-    # grants any user with workflow:create + execution:run permissions the ability
-    # to run arbitrary commands on the worker infrastructure, with access to all
-    # environment variables.
-    # Enabling Script Node is not recommended for production deployments.
+    # Script nodes execute arbitrary user-supplied code in an isolated
+    # Execution Plane container. The feature gate remains disabled by default.
     script_nodes_enabled: bool = Field(
         default=False,
-        description="Enable Script node execution in workflows (Developer Preview)",
-    )
-
-    # Cold-start Execution Plane node dispatch: the AO activity selects the
-    # container image per node type and writes it into the WorkItem payload; the
-    # EP worker creates a fresh pod from that reference. Keys are workflow node
-    # types (e.g. "script"); values are fully-qualified image refs the target
-    # cluster can pull.
-    #
-    # A non-empty image makes a node type EP-capable for dispatch and cancellation
-    # signalling. Only the script node has an EP-dispatching executor in the first
-    # isolated release.
-    node_container_images: dict[str, str] = Field(
-        default_factory=lambda: {
-            "script": "quay.io/ahetheri/syntara-node-script:migration-test",
-        },
-        description="Node type to container image reference for Execution Plane dispatch",
+        description="Enable Python and Bash script node execution in workflows (Developer Preview)",
     )
 
     agent_orchestrator_base_url: HttpUrl = Field(  # type: ignore[assignment]

@@ -10,9 +10,8 @@ triggers:
 nodes:
   - id: flaky_task_linear
     name: Flaky Task with Linear Backoff
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       code: |
         # This script fails on first 2 attempts, succeeds on 3rd
         ATTEMPT_FILE="/tmp/linear_backoff_attempts_$WORKFLOW_ID"

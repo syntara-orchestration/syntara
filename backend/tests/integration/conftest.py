@@ -80,9 +80,11 @@ async def test_db_template(
 
     # run_seeders also populates users, workflows, groups, etc.  Those must NOT be
     # in the template because tests seed their own per-test data and assume an empty
-    # DB.  Truncate the same tables the old TRUNCATE-based cleanup truncated, leaving
-    # only the four tables that were previously excluded from truncation.
-    preserved = frozenset({"alembic_version", "installation", "runtime_settings", "setting_categories"})
+    # DB. Keep the built-in Execution Plane plugin records as registry configuration
+    # required by script activity integration tests.
+    preserved = frozenset(
+        {"alembic_version", "execution_plane_plugins", "installation", "runtime_settings", "setting_categories"}
+    )
     preparer = test_db_engine.dialect.identifier_preparer
     async with test_db_engine.begin() as conn:
         result = await conn.execute(

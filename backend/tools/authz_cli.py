@@ -703,7 +703,7 @@ def _sample_workflow_definition(name: str, description: str) -> dict:
         "nodes": [
             {
                 "id": "step1",
-                "type": "script",
+                "type": "script_python",
                 "name": f"Run {name}",
                 "config": {
                     "language": "python",

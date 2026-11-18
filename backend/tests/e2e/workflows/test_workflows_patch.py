@@ -213,9 +213,8 @@ class TestWorkflowUpdate:
                     {
                         "id": "step1",
                         "name": "Step 1",
-                        "type": "script",
+                        "type": "script_python",
                         "parameters": {
-                            "language": "python",
                             "code": "print('step 1')",
                         },
                     }
@@ -252,9 +251,8 @@ class TestWorkflowUpdate:
                     {
                         "id": "step1",
                         "name": "Step 1",
-                        "type": "script",
+                        "type": "script_python",
                         "parameters": {
-                            "language": "python",
                             "code": "print('step 1')",
                         },
                     },

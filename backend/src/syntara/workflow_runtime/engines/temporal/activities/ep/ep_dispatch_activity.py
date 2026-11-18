@@ -22,17 +22,18 @@ from syntara.execution_plane.client import (
     ExecutionPlaneRejectedError,
     ExecutionPlaneUnavailableError,
 )
-from syntara.execution_plane.registry.bindings import legacy_credential_bindings
-from syntara.execution_plane.registry.stub import PluginRegistryError, StubPluginRegistry
-from syntara.execution_plane.utils import execution_plane_container_image, execution_plane_work_item_id
+from syntara.execution_plane.registry.repository import get_execution_plane_plugin
+from syntara.execution_plane.utils import execution_plane_work_item_id
 from syntara.workflow_core.models import (
     ActivityName,
+    BashScriptExecutorParameters,
     ExecutionPlaneExecutionProfile,
     ExecutionTargetProfile,
-    ScriptExecutorParameters,
+    PythonScriptExecutorParameters,
+    ScriptExecutorParametersBase,
 )
 from syntara.workflow_runtime.engines.temporal.activities.common import HEARTBEAT_STOP_MONITOR
-from syntara.workflow_runtime.engines.temporal.constants import ENGINE_TIMEOUT_SECONDS_KEY
+from syntara.workflow_runtime.engines.temporal.constants import ENGINE_MAX_OUTPUT_BYTES_KEY, ENGINE_TIMEOUT_SECONDS_KEY
 from syntara.workflows.models.execution import Execution
 
 if TYPE_CHECKING:
@@ -42,39 +43,35 @@ if TYPE_CHECKING:
 
 logger = structlog.stdlib.get_logger(__name__)
 
-__all__ = ["activity", "asyncio", "execute_script_activity"]
+__all__ = [
+    "activity",
+    "asyncio",
+    "execute_bash_script_activity",
+    "execute_python_script_activity",
+]
 
 INITIAL_RETRY_DELAY_SECONDS = 0.5
 MAX_RETRY_DELAY_SECONDS = 10.0
-_NODE_TYPE = "script"
-_STEP_REVISION_ID = "script.v1"
 _DEFAULT_TIMEOUT_SECONDS = 300
 _EXECUTION_PROFILE_FIELD = "execution_profile"
 _EXECUTION_TARGET_SELECTOR_FIELD = "_execution_target_id"
 _CREDENTIAL_BINDINGS_FIELD = "credential_bindings"
-_CREDENTIAL_ID_FIELD = "credential_id"
-_PLUGIN_REGISTRY = StubPluginRegistry()
 
 
-def _build_invocation(input_config: dict[str, Any], node_type: str) -> dict[str, Any]:
+def _build_invocation(input_config: dict[str, Any], step_identity: str) -> dict[str, Any]:
     """Build the versioned SDK request before AO freezes it for activity retries."""
-    explicit_bindings = input_config.get(_CREDENTIAL_BINDINGS_FIELD)
-    legacy_credential_id = input_config.get(_CREDENTIAL_ID_FIELD)
-    if legacy_credential_id is not None and explicit_bindings:
-        message = "Workflow node cannot combine a legacy credential with explicit credential bindings"
-        raise PluginRegistryError(message)
-    credential_bindings = explicit_bindings or legacy_credential_bindings(
-        legacy_credential_id, node_type, _PLUGIN_REGISTRY
-    )
+    inputs = {
+        key: value
+        for key, value in input_config.items()
+        if not key.startswith("_") and key not in {_EXECUTION_PROFILE_FIELD, _CREDENTIAL_BINDINGS_FIELD}
+    }
+    max_output_bytes = input_config.get(ENGINE_MAX_OUTPUT_BYTES_KEY)
+    if max_output_bytes is not None:
+        inputs["max_output_bytes"] = max_output_bytes
     return {
-        "step_revision_id": _STEP_REVISION_ID,
-        "inputs": {
-            key: value
-            for key, value in input_config.items()
-            if not key.startswith("_")
-            and key not in {_EXECUTION_PROFILE_FIELD, _CREDENTIAL_BINDINGS_FIELD, _CREDENTIAL_ID_FIELD}
-        },
-        "credential_bindings": credential_bindings,
+        "step_revision_id": step_identity,
+        "inputs": inputs,
+        "credential_bindings": input_config.get(_CREDENTIAL_BINDINGS_FIELD, []),
         "timeout_seconds": int(
             input_config.get(
                 ENGINE_TIMEOUT_SECONDS_KEY,
@@ -147,7 +144,7 @@ async def _dispatch_to_ep(  # noqa: C901, PLR0915 - service handoff and Temporal
     output_config: dict[str, str] | None,
     execution_id: uuid.UUID,
     execution_target_id: uuid.UUID | None,
-    node_type: str = _NODE_TYPE,
+    plugin_name: str,
 ) -> dict[str, Any] | None:
     """Submit a stable work command and recover existing work after an ambiguous retry."""
     settings = get_settings()
@@ -155,15 +152,22 @@ async def _dispatch_to_ep(  # noqa: C901, PLR0915 - service handoff and Temporal
     work_item_id = execution_plane_work_item_id(execution_id, info.activity_id)
     selectors = _build_work_execute_selectors(execution_target_id)
 
-    image = execution_plane_container_image(node_type)
-    if image is None:
-        msg = f"No Execution Plane container image configured for node type '{node_type}'"
+    async with AsyncSessionLocal() as session:
+        plugin = await get_execution_plane_plugin(session, plugin_name)
+        if plugin is None:
+            msg = f"No Execution Plane plugin is registered for Action '{plugin_name}'"
+            raise ApplicationError(msg, type="ConfigError", non_retryable=True)
+        image = plugin.image_reference
+        step_identity = plugin.step_identity
+
+    if not image:
+        msg = f"No Execution Plane image is configured for Action '{plugin_name}'"
         raise ApplicationError(msg, type="ConfigError", non_retryable=True)
     try:
         message = WorkExecute(
             work_item_id=work_item_id,
             runtime_context=await _work_runtime_context(execution_id),
-            invocation=WorkloadInvocation.model_validate(_build_invocation(input_config, node_type)),
+            invocation=WorkloadInvocation.model_validate(_build_invocation(input_config, step_identity)),
             image=image,
             selectors=selectors,
             output_config=output_config,
@@ -172,7 +176,7 @@ async def _dispatch_to_ep(  # noqa: C901, PLR0915 - service handoff and Temporal
             destination_id=EP_AUDIENCE,
             client_id=EP_CLIENT_ID,
         )
-    except (ValueError, PluginRegistryError):
+    except ValueError:
         msg = "Script invocation is invalid for the Execution Plane command protocol"
         raise ApplicationError(msg, type="ConfigError", non_retryable=True) from None
 
@@ -232,13 +236,15 @@ async def _dispatch_to_ep(  # noqa: C901, PLR0915 - service handoff and Temporal
         return None
 
 
-@activity.defn(name=ActivityName.SCRIPT)
-async def execute_script_activity(
+async def _execute_script_activity(
     input_config: dict[str, Any],
     output_config: dict[str, str] | None,
     execution_id: str,
+    *,
+    parameters_model: type[ScriptExecutorParametersBase],
+    plugin_name: str,
 ) -> dict[str, Any]:
-    """Validate and submit a script, then await AO-owned callback completion."""
+    """Validate and submit one script Action, then await AO-owned callback completion."""
     activity.heartbeat({HEARTBEAT_STOP_MONITOR: True})
 
     if not get_settings().script_nodes_enabled:
@@ -246,7 +252,10 @@ async def execute_script_activity(
         raise ApplicationError(msg, type="ScriptNodeDisabled", non_retryable=True)
 
     try:
-        config = ScriptExecutorParameters.model_validate(input_config)
+        # The workflow engine adds internal control fields to the activity
+        # payload. They are consumed during dispatch but are not node parameters.
+        parameters = {key: value for key, value in input_config.items() if not key.startswith("_")}
+        config = parameters_model.model_validate(parameters)
         execution_uuid = uuid.UUID(execution_id)
     except Exception:  # noqa: BLE001
         msg = "Script activity configuration or execution ID is invalid"
@@ -257,10 +266,42 @@ async def execute_script_activity(
         output_config,
         execution_uuid,
         _execution_target_id(config.execution_profile),
-        _NODE_TYPE,
+        plugin_name,
     )
     if result is None:
         raise_complete_async = cast("Callable[[], Any]", activity.raise_complete_async)
         raise_complete_async()
         return {}
     return result
+
+
+@activity.defn(name=ActivityName.SCRIPT_PYTHON)
+async def execute_python_script_activity(
+    input_config: dict[str, Any],
+    output_config: dict[str, str] | None,
+    execution_id: str,
+) -> dict[str, Any]:
+    """Submit a Python script to the registered Python Action image."""
+    return await _execute_script_activity(
+        input_config,
+        output_config,
+        execution_id,
+        parameters_model=PythonScriptExecutorParameters,
+        plugin_name="script-python",
+    )
+
+
+@activity.defn(name=ActivityName.SCRIPT_BASH)
+async def execute_bash_script_activity(
+    input_config: dict[str, Any],
+    output_config: dict[str, str] | None,
+    execution_id: str,
+) -> dict[str, Any]:
+    """Submit a Bash script to the registered Bash Action image."""
+    return await _execute_script_activity(
+        input_config,
+        output_config,
+        execution_id,
+        parameters_model=BashScriptExecutorParameters,
+        plugin_name="script-bash",
+    )

@@ -104,18 +104,16 @@ async def test_workflow_complete_lifecycle(jwt_client: AsyncClient, test_project
                 {
                     "id": "activity_1",
                     "name": "Activity 1",
-                    "type": "script",
+                    "type": "script_python",
                     "parameters": {
-                        "language": "python",
                         "code": "print('activity 1')",
                     },
                 },
                 {
                     "id": "activity_2",
                     "name": "Activity 2",
-                    "type": "script",
+                    "type": "script_python",
                     "parameters": {
-                        "language": "python",
                         "code": "print('activity 2')",
                     },
                 },

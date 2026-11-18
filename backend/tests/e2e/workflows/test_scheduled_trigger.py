@@ -136,8 +136,8 @@ class TestScheduledTrigger:
             {
                 "id": "nightly_task",
                 "name": "Nightly Task",
-                "type": "script",
-                "parameters": {"language": "bash", "code": "echo 'nightly run'"},
+                "type": "script_bash",
+                "parameters": {"code": "echo 'nightly run'"},
             },
         )
         assert workflow.id is not None
@@ -175,8 +175,8 @@ class TestScheduledTrigger:
             {
                 "id": "hourly_task",
                 "name": "Hourly Task",
-                "type": "script",
-                "parameters": {"language": "bash", "code": "echo 'hourly run'"},
+                "type": "script_bash",
+                "parameters": {"code": "echo 'hourly run'"},
             },
         )
         assert workflow.id is not None

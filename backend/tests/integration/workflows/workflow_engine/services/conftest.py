@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 def _ensure_runtime_settings() -> Generator[None, None, None]:
     """Ensure the SettingsCache singleton is initialised for temporal tests.
 
-    Activities like ``execute_script_activity`` call ``get_runtime_settings()``
+    Script activities call ``get_runtime_settings()``
     which raises ``RuntimeError`` if the singleton has not been set.
     Also enables script nodes since the gate defaults to False.
     """

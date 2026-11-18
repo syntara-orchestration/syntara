@@ -11,7 +11,7 @@
 openapi: 3.1.0
 info:
   title: Syntara API
-  version: 1.9.0
+  version: 1.10.0
   description: A distributed multi-agent workflow orchestration system
 servers:
   - url: /api/v1
@@ -28215,7 +28215,7 @@ components:
         type:
           type: string
           title: Type
-          description: Activity type (script, approval, agentic, etc.)
+          description: Activity type (script_python, script_bash, approval, agentic, etc.)
     ApprovalCreateRequest:
       type: object
       title: ApprovalCreateRequest
@@ -35011,7 +35011,8 @@ components:
         - approval
         - http_request
         - internal_activity
-        - script
+        - script_python
+        - script_bash
     CurrentActivity:
       type: object
       title: CurrentActivity
@@ -35852,7 +35853,8 @@ components:
               - $ref: '#/components/schemas/AAPWorkflowJobTemplateNode'
               - $ref: '#/components/schemas/HTTPRequestNode'
               - $ref: '#/components/schemas/AgenticNode'
-              - $ref: '#/components/schemas/ScriptNode'
+              - $ref: '#/components/schemas/PythonScriptNode'
+              - $ref: '#/components/schemas/BashScriptNode'
               - $ref: '#/components/schemas/ApprovalNode'
               - $ref: '#/components/schemas/ConditionNode'
               - $ref: '#/components/schemas/SwitchNode'
@@ -35870,7 +35872,8 @@ components:
                 converge: '#/components/schemas/ConvergeNode'
                 http_request: '#/components/schemas/HTTPRequestNode'
                 loop: '#/components/schemas/LoopNode'
-                script: '#/components/schemas/ScriptNode'
+                script_python: '#/components/schemas/PythonScriptNode'
+                script_bash: '#/components/schemas/BashScriptNode'
                 switch: '#/components/schemas/SwitchNode'
                 wait: '#/components/schemas/WaitNode'
           maxItems: 200
@@ -36112,7 +36115,7 @@ components:
         - parameters
       title: AgenticNode
       description: Agentic executor node.
-    ScriptNode:
+    PythonScriptNode:
       properties:
         id:
           type: string
@@ -36148,10 +36151,10 @@ components:
           description: Optional UI position hint
         type:
           type: string
-          const: script
+          const: script_python
           title: Type
         parameters:
-          $ref: '#/components/schemas/ScriptExecutorParameters'
+          $ref: '#/components/schemas/PythonScriptExecutorParameters'
         settings:
           anyOf:
             - $ref: '#/components/schemas/NodeSettingsNoRetry'
@@ -36162,8 +36165,60 @@ components:
         - id
         - type
         - parameters
-      title: ScriptNode
-      description: Script executor node.
+      title: PythonScriptNode
+      description: Python script executor node.
+    BashScriptNode:
+      properties:
+        id:
+          type: string
+          pattern: ^[a-zA-Z_][a-zA-Z0-9_]*$
+          title: Id
+          description: Unique identifier for the node within the workflow
+        name:
+          anyOf:
+            - type: string
+              minLength: 1
+            - type: 'null'
+          title: Name
+          description: Human-readable name for the node
+        description:
+          anyOf:
+            - type: string
+              minLength: 1
+            - type: 'null'
+          title: Description
+          description: Human-readable description of the node purpose
+        outputs:
+          anyOf:
+            - additionalProperties:
+                type: string
+              type: object
+            - type: 'null'
+          title: Outputs
+          description: Output extraction mapping
+        position:
+          anyOf:
+            - $ref: '#/components/schemas/NodePosition'
+            - type: 'null'
+          description: Optional UI position hint
+        type:
+          type: string
+          const: script_bash
+          title: Type
+        parameters:
+          $ref: '#/components/schemas/BashScriptExecutorParameters'
+        settings:
+          anyOf:
+            - $ref: '#/components/schemas/NodeSettingsNoRetry'
+            - type: 'null'
+      additionalProperties: true
+      type: object
+      required:
+        - id
+        - type
+        - parameters
+      title: BashScriptNode
+      description: Bash script executor node.
     ApprovalNode:
       properties:
         id:
@@ -36928,7 +36983,7 @@ components:
         - execution_target_id
       title: ExecutionTargetProfile
       description: Execution Plane profile that selects a specific Execution Target.
-    ScriptExecutorParameters:
+    PythonScriptExecutorParameters:
       properties:
         execution_profile:
           anyOf:
@@ -36941,8 +36996,6 @@ components:
             - type: 'null'
           title: Execution Profile
           description: Execution Plane placement profile for this workload.
-        language:
-          $ref: '#/components/schemas/ScriptLanguage'
         code:
           type: string
           minLength: 1
@@ -36954,12 +37007,56 @@ components:
           type: object
           title: Environment
           description: Environment variables
+        credential_bindings:
+          type: array
+          maxItems: 16
+          items:
+            $ref: '#/components/schemas/CredentialBinding'
+          title: Credential Bindings
+          description: Host-side recipe-to-credential bindings for Execution Plane dispatch.
+      additionalProperties: false
       type: object
       required:
-        - language
         - code
-      title: ScriptExecutorParameters
-      description: Parameters for script executor.
+      title: PythonScriptExecutorParameters
+      description: Parameters for Python script executor.
+    BashScriptExecutorParameters:
+      properties:
+        execution_profile:
+          anyOf:
+            - oneOf:
+                - $ref: '#/components/schemas/ExecutionTargetProfile'
+              discriminator:
+                propertyName: type
+                mapping:
+                  execution_target: '#/components/schemas/ExecutionTargetProfile'
+            - type: 'null'
+          title: Execution Profile
+          description: Execution Plane placement profile for this workload.
+        code:
+          type: string
+          minLength: 1
+          title: Code
+          description: Script code to execute
+        environment:
+          additionalProperties:
+            type: string
+          type: object
+          title: Environment
+          description: Environment variables
+        credential_bindings:
+          type: array
+          maxItems: 16
+          items:
+            $ref: '#/components/schemas/CredentialBinding'
+          title: Credential Bindings
+          description: Host-side recipe-to-credential bindings for Execution Plane dispatch.
+      additionalProperties: false
+      type: object
+      required:
+        - code
+      title: BashScriptExecutorParameters
+      description: Parameters for Bash script executor.
     ApprovalNodeParameters:
       properties:
         credential_id:
@@ -37226,7 +37323,7 @@ components:
       additionalProperties: false
       type: object
       title: NodeSettingsNoRetry
-      description: Settings with disabled, continue_on_failure, and timeout (script, agentic, approval).
+      description: Settings with disabled, continue_on_failure, and timeout (script types, agentic, approval).
     NodeSettingsFull:
       properties:
         continue_on_failure:
@@ -37308,13 +37405,6 @@ components:
         - TRACE
       title: HTTPMethod
       description: Supported HTTP methods for API requests.
-    ScriptLanguage:
-      type: string
-      enum:
-        - bash
-        - python
-      title: ScriptLanguage
-      description: Supported script languages for script executor.
     ConvergeStrategy:
       type: string
       enum:

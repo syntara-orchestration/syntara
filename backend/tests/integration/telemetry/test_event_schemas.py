@@ -86,7 +86,7 @@ class TestNodeExecutionEventSchema:
         schema = NodeExecutionEvent.model_json_schema()
         event = NodeExecutionEvent(
             workflow_execution_id=VALID_WORKFLOW_EXECUTION_ID,
-            node_type="script",
+            node_type="script_python",
             node_hash=VALID_NODE_HASH,
             status="completed",
             error_type=None,
@@ -108,7 +108,8 @@ class TestNodeExecutionEventSchema:
             "agentic",
             "approval",
             "http_request",
-            "script",
+            "script_python",
+            "script_bash",
         ]:
             event = NodeExecutionEvent(
                 workflow_execution_id=VALID_WORKFLOW_EXECUTION_ID,

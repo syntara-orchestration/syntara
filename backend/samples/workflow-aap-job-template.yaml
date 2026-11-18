@@ -92,10 +92,9 @@ nodes:
         backoff_coefficient: 2.0
 
   - id: display_results
-    type: script
+    type: script_python
     name: Display Job Results
     parameters:
-      language: python
       code: |
         import json
         import os

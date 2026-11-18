@@ -10,9 +10,8 @@ triggers:
 nodes:
   - id: step1
     name: First Step
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       code: |
         echo "Step 1: Starting"
         sleep 1
@@ -20,9 +19,8 @@ nodes:
 
   - id: step2
     name: Second Step
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       code: |
         echo "Step 2: Starting"
         sleep 1
@@ -30,9 +28,8 @@ nodes:
 
   - id: step3
     name: Third Step
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       code: |
         echo "Step 3: Starting"
         sleep 1

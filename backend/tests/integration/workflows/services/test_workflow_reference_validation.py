@@ -656,7 +656,7 @@ class TestValidationEdgeCases:
         definition = {
             "schema_version": "2.0.0",
             "triggers": [{"id": "trigger-0", "type": "manual_trigger", "parameters": {}}],
-            "nodes": [{"id": "node-1", "type": "script", "parameters": {"language": "python", "script": "pass"}}],
+            "nodes": [{"id": "node-1", "type": "script_python", "parameters": {"code": "pass"}}],
             "edges": [{"from": "trigger-0", "to": "node-1"}],
         }
         findings = await validate_workflow_references(test_db_session, definition, test_project_id)

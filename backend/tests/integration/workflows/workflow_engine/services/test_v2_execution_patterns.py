@@ -22,7 +22,10 @@ from temporalio.worker import Worker
 
 from syntara.workflow_runtime.engines.temporal.activities.condition import condition
 from syntara.workflow_runtime.engines.temporal.activities.converge import converge
-from syntara.workflow_runtime.engines.temporal.activities.ep.ep_dispatch_activity import execute_script_activity
+from syntara.workflow_runtime.engines.temporal.activities.ep.ep_dispatch_activity import (
+    execute_bash_script_activity,
+    execute_python_script_activity,
+)
 from syntara.workflow_runtime.engines.temporal.activities.loop import loop
 from syntara.workflow_runtime.engines.temporal.activities.manual_trigger import manual_trigger
 from syntara.workflow_runtime.engines.temporal.activities.runtime_settings_activity import (
@@ -34,7 +37,8 @@ from syntara.workflow_runtime.engines.temporal.services.temporal_execution_servi
 from syntara.workflows.models.execution import Execution
 
 _V2_ACTIVITIES: Sequence[Callable[..., Any]] = [
-    execute_script_activity,
+    execute_python_script_activity,
+    execute_bash_script_activity,
     manual_trigger,
     condition,
     converge,
@@ -112,13 +116,13 @@ class TestConditionRouting:
                     },
                     {
                         "id": "on_true",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo true_path"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo true_path"},
                     },
                     {
                         "id": "on_false",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo false_path"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo false_path"},
                     },
                 ],
                 "edges": [
@@ -150,13 +154,13 @@ class TestConditionRouting:
                     },
                     {
                         "id": "on_true",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo true_path"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo true_path"},
                     },
                     {
                         "id": "on_false",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo false_path"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo false_path"},
                     },
                 ],
                 "edges": [
@@ -194,13 +198,13 @@ class TestLoopExecution:
                     },
                     {
                         "id": "body",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo iteration"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo iteration"},
                     },
                     {
                         "id": "after_loop",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo done"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo done"},
                     },
                 ],
                 "edges": [
@@ -239,13 +243,13 @@ class TestLoopExecution:
                     },
                     {
                         "id": "body",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo iteration"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo iteration"},
                     },
                     {
                         "id": "after_loop",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo done"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo done"},
                     },
                 ],
                 "edges": [
@@ -294,18 +298,18 @@ class TestSwitchRouting:
                     },
                     {
                         "id": "branch_a",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo A"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo A"},
                     },
                     {
                         "id": "branch_b",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo B"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo B"},
                     },
                     {
                         "id": "branch_default",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo default"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo default"},
                     },
                 ],
                 "edges": [
@@ -344,13 +348,13 @@ class TestSwitchRouting:
                     },
                     {
                         "id": "branch_a",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo A"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo A"},
                     },
                     {
                         "id": "branch_default",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo default"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo default"},
                     },
                 ],
                 "edges": [
@@ -385,13 +389,13 @@ class TestConvergeStrategies:
                 "nodes": [
                     {
                         "id": "branch_a",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo A"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo A"},
                     },
                     {
                         "id": "branch_b",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo B"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo B"},
                     },
                     {
                         "id": "join",
@@ -400,8 +404,8 @@ class TestConvergeStrategies:
                     },
                     {
                         "id": "final",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo done"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo done"},
                     },
                 ],
                 "edges": [
@@ -435,13 +439,13 @@ class TestConvergeStrategies:
                 "nodes": [
                     {
                         "id": "branch_a",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo A"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo A"},
                     },
                     {
                         "id": "branch_b",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo B"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo B"},
                     },
                     {
                         "id": "join",
@@ -450,8 +454,8 @@ class TestConvergeStrategies:
                     },
                     {
                         "id": "final",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo done"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo done"},
                     },
                 ],
                 "edges": [
@@ -497,13 +501,13 @@ class TestConvergeStrategies:
                 "nodes": [
                     {
                         "id": "branch_a",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo A"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo A"},
                     },
                     {
                         "id": "branch_b",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo B"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo B"},
                     },
                     {
                         "id": "join",
@@ -512,13 +516,13 @@ class TestConvergeStrategies:
                     },
                     {
                         "id": "side_action",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo side"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo side"},
                     },
                     {
                         "id": "final",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo done"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo done"},
                     },
                 ],
                 "edges": [
@@ -561,14 +565,13 @@ class TestExpressionResolution:
                 "nodes": [
                     {
                         "id": "script_a",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo hello_from_a"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo hello_from_a"},
                     },
                     {
                         "id": "script_b",
-                        "type": "script",
+                        "type": "script_bash",
                         "parameters": {
-                            "language": "bash",
                             "code": "echo received: ${script_a.stdout}",
                         },
                     },
@@ -607,14 +610,14 @@ class TestContinueOnFailure:
                 "nodes": [
                     {
                         "id": "failing_node",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "exit 1"},
+                        "type": "script_bash",
+                        "parameters": {"code": "exit 1"},
                         "settings": {"continue_on_failure": True},
                     },
                     {
                         "id": "next_node",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo survived"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo survived"},
                     },
                 ],
                 "edges": [
@@ -659,13 +662,13 @@ class TestLoopConvergeInteraction:
                     },
                     {
                         "id": "body",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo iteration"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo iteration"},
                     },
                     {
                         "id": "branch_b",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo parallel"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo parallel"},
                     },
                     {
                         "id": "join",
@@ -674,8 +677,8 @@ class TestLoopConvergeInteraction:
                     },
                     {
                         "id": "final",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo done"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo done"},
                     },
                 ],
                 "edges": [
@@ -727,13 +730,13 @@ class TestLoopConvergeInteraction:
                     },
                     {
                         "id": "body",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo step"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo step"},
                     },
                     {
                         "id": "branch_b",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo fast"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo fast"},
                     },
                     {
                         "id": "join",
@@ -742,8 +745,8 @@ class TestLoopConvergeInteraction:
                     },
                     {
                         "id": "final",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo done"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo done"},
                     },
                 ],
                 "edges": [
@@ -794,13 +797,13 @@ class TestLoopConvergeInteraction:
                     },
                     {
                         "id": "body",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo step"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo step"},
                     },
                     {
                         "id": "fast_branch",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo fast"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo fast"},
                     },
                     {
                         "id": "join",
@@ -809,8 +812,8 @@ class TestLoopConvergeInteraction:
                     },
                     {
                         "id": "final",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo done"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo done"},
                     },
                 ],
                 "edges": [
@@ -859,13 +862,13 @@ class TestLoopConvergeInteraction:
                     },
                     {
                         "id": "body",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo never"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo never"},
                     },
                     {
                         "id": "branch_b",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo fast"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo fast"},
                     },
                     {
                         "id": "join",
@@ -874,8 +877,8 @@ class TestLoopConvergeInteraction:
                     },
                     {
                         "id": "final",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo done"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo done"},
                     },
                 ],
                 "edges": [
@@ -926,13 +929,13 @@ class TestLoopConvergeInteraction:
                     },
                     {
                         "id": "failing_body",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "exit 1"},
+                        "type": "script_bash",
+                        "parameters": {"code": "exit 1"},
                     },
                     {
                         "id": "branch_b",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo ok"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo ok"},
                     },
                     {
                         "id": "join",
@@ -941,8 +944,8 @@ class TestLoopConvergeInteraction:
                     },
                     {
                         "id": "final",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo done"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo done"},
                     },
                 ],
                 "edges": [
@@ -987,13 +990,13 @@ class TestMixedPatterns:
                     },
                     {
                         "id": "para_a",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo A"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo A"},
                     },
                     {
                         "id": "para_b",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo B"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo B"},
                     },
                     {
                         "id": "join",
@@ -1002,13 +1005,13 @@ class TestMixedPatterns:
                     },
                     {
                         "id": "final",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo done"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo done"},
                     },
                     {
                         "id": "skipped_branch",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo never"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo never"},
                     },
                 ],
                 "edges": [

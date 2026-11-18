@@ -21,9 +21,9 @@ from syntara.workflow_core.models import (
     AAPJobTemplateExecutorParameters,
     AgenticExecutorParameters,
     APIExecutorParameters,
+    BashScriptExecutorParameters,
     HTTPMethod,
-    ScriptExecutorParameters,
-    ScriptLanguage,
+    PythonScriptExecutorParameters,
 )
 from syntara.workflow_runtime.engines.models.responses import WorkflowResultResponse
 from syntara.workflows.validators.workflow_definition import WorkflowValidator
@@ -45,8 +45,8 @@ def _minimal_workflow(**overrides: object) -> dict[str, Any]:
         "nodes": [
             {
                 "id": "script_1",
-                "type": "script",
-                "parameters": {"language": "python", "code": "print('hello')"},
+                "type": "script_python",
+                "parameters": {"code": "print('hello')"},
             },
         ],
         "edges": [
@@ -73,13 +73,13 @@ def _multi_node_workflow() -> dict[str, Any]:
             },
             {
                 "id": "script_true",
-                "type": "script",
-                "parameters": {"language": "python", "code": "print('true branch')"},
+                "type": "script_python",
+                "parameters": {"code": "print('true branch')"},
             },
             {
                 "id": "script_false",
-                "type": "script",
-                "parameters": {"language": "python", "code": "print('false branch')"},
+                "type": "script_python",
+                "parameters": {"code": "print('false branch')"},
             },
             {
                 "id": "converge_1",
@@ -199,7 +199,7 @@ class TestWorkflowGraphConstruction:
         defn = {
             "schema_version": "2.0.0",
             "nodes": [
-                {"id": "script_1", "type": "script", "parameters": {"language": "python", "code": "x=1"}},
+                {"id": "script_1", "type": "script_python", "parameters": {"code": "x=1"}},
             ],
             "edges": [],
         }
@@ -210,7 +210,7 @@ class TestWorkflowGraphConstruction:
         """Graph rejects non-trigger nodes with no edges."""
         defn = _minimal_workflow()
         defn["nodes"].append(
-            {"id": "orphan", "type": "script", "parameters": {"language": "python", "code": "x=1"}},
+            {"id": "orphan", "type": "script_python", "parameters": {"code": "x=1"}},
         )
         with pytest.raises(ValueError, match="Orphan node"):
             WorkflowGraph.from_dict(defn)
@@ -304,27 +304,26 @@ class TestTriggerStructure:
 
 
 class TestScriptNodeParameters:
-    """Validate ScriptExecutorParameters contract."""
+    """Validate the separate Python and Bash executor parameter contracts."""
 
     def test_valid_python_script(self) -> None:
-        """Python script with code and language is valid."""
-        config = ScriptExecutorParameters(language=ScriptLanguage.PYTHON, code="print('hi')")
-        assert config.language == ScriptLanguage.PYTHON
+        """Python script parameters contain code without a language selector."""
+        config = PythonScriptExecutorParameters(code="print('hi')")
         assert config.code == "print('hi')"
 
     def test_valid_bash_script(self) -> None:
-        """Bash script is a valid language option."""
-        config = ScriptExecutorParameters(language=ScriptLanguage.BASH, code="echo hi")
-        assert config.language == ScriptLanguage.BASH
+        """Bash scripts use their own parameter model."""
+        config = BashScriptExecutorParameters(code="echo hi")
+        assert config.code == "echo hi"
 
     def test_rejects_empty_code(self) -> None:
         """Script node requires non-empty code."""
         with pytest.raises(ValidationError, match="code"):
-            ScriptExecutorParameters(language=ScriptLanguage.PYTHON, code="")
+            PythonScriptExecutorParameters(code="")
 
     def test_template_expression_bypasses_validation(self) -> None:
         """Template expressions like ${input.code} bypass field validation."""
-        config = ScriptExecutorParameters(language=ScriptLanguage.PYTHON, code="${input.code}")
+        config = PythonScriptExecutorParameters(code="${input.code}")
         assert config.code == "${input.code}"
 
     def test_execution_target_profile_round_trips_through_workflow(self) -> None:
@@ -338,7 +337,7 @@ class TestScriptNodeParameters:
 
         WorkflowValidator().validate_workflow_definition(definition)
         graph = WorkflowGraph.from_dict(definition)
-        config = ScriptExecutorParameters.model_validate(graph.get_node("script_1").parameters)
+        config = PythonScriptExecutorParameters.model_validate(graph.get_node("script_1").parameters)
 
         assert config.execution_profile is not None
         assert config.execution_profile.execution_target_id == execution_target_id
@@ -537,8 +536,8 @@ class TestNodeSettingsValidation:
             "nodes": [
                 {
                     "id": "script_1",
-                    "type": "script",
-                    "parameters": {"language": "python", "code": "print('hello')"},
+                    "type": "script_python",
+                    "parameters": {"code": "print('hello')"},
                     "settings": {"continue_on_failure": True, "timeout": 300},
                 },
             ],
@@ -581,13 +580,13 @@ class TestNodeSettingsValidation:
             "nodes": [
                 {
                     "id": "script_1",
-                    "type": "script",
-                    "parameters": {"language": "python", "code": "print('a')"},
+                    "type": "script_python",
+                    "parameters": {"code": "print('a')"},
                 },
                 {
                     "id": "script_2",
-                    "type": "script",
-                    "parameters": {"language": "python", "code": "print('b')"},
+                    "type": "script_python",
+                    "parameters": {"code": "print('b')"},
                 },
                 {
                     "id": "converge_1",
@@ -670,8 +669,8 @@ class TestNodeSettingsValidation:
             "nodes": [
                 {
                     "id": "script_1",
-                    "type": "script",
-                    "parameters": {"language": "python", "code": "print('hello')"},
+                    "type": "script_python",
+                    "parameters": {"code": "print('hello')"},
                     "settings": {
                         "continue_on_failure": True,
                         "retry_policy": {"max_retries": 3},  # Invalid for script
@@ -692,8 +691,8 @@ class TestNodeSettingsValidation:
             "nodes": [
                 {
                     "id": "script_1",
-                    "type": "script",
-                    "parameters": {"language": "python", "code": "print('a')"},
+                    "type": "script_python",
+                    "parameters": {"code": "print('a')"},
                 },
                 {
                     "id": "converge_1",
@@ -722,8 +721,8 @@ class TestNodeSettingsValidation:
             "nodes": [
                 {
                     "id": "script_1",
-                    "type": "script",
-                    "parameters": {"language": "python", "code": "print('hello')"},
+                    "type": "script_python",
+                    "parameters": {"code": "print('hello')"},
                     # No settings field - should use defaults
                 },
                 {

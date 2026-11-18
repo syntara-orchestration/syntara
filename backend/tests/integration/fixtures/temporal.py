@@ -12,7 +12,10 @@ from temporalio.worker import Worker
 
 from syntara.workflow_runtime.engines.temporal.activities.condition import condition
 from syntara.workflow_runtime.engines.temporal.activities.converge import converge
-from syntara.workflow_runtime.engines.temporal.activities.ep.ep_dispatch_activity import execute_script_activity
+from syntara.workflow_runtime.engines.temporal.activities.ep.ep_dispatch_activity import (
+    execute_bash_script_activity,
+    execute_python_script_activity,
+)
 from syntara.workflow_runtime.engines.temporal.activities.internal_activity import execute_internal_activity
 from syntara.workflow_runtime.engines.temporal.activities.manual_trigger import manual_trigger
 from syntara.workflow_runtime.engines.temporal.activities.runtime_settings_activity import (
@@ -32,7 +35,8 @@ if TYPE_CHECKING:
 logger = structlog.stdlib.get_logger(__name__)
 
 _TEST_WORKER_ACTIVITIES: list[Callable[..., Any]] = [
-    execute_script_activity,
+    execute_python_script_activity,
+    execute_bash_script_activity,
     manual_trigger,
     condition,
     converge,

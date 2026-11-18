@@ -17,9 +17,8 @@ def test_execution_target_profile_is_json_serializable() -> None:
             "nodes": [
                 {
                     "id": "script",
-                    "type": "script",
+                    "type": "script_bash",
                     "parameters": {
-                        "language": "bash",
                         "code": "echo hello",
                         "execution_profile": {"type": "execution_target", "execution_target_id": str(target_id)},
                     },

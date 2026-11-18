@@ -11,34 +11,34 @@ from ..types import UNSET, Unset
 if TYPE_CHECKING:
     from ..models.node_position import NodePosition
     from ..models.node_settings_no_retry import NodeSettingsNoRetry
-    from ..models.script_executor_parameters import ScriptExecutorParameters
-    from ..models.script_node_outputs_type_0 import ScriptNodeOutputsType0
+    from ..models.python_script_executor_parameters import PythonScriptExecutorParameters
+    from ..models.python_script_node_outputs_type_0 import PythonScriptNodeOutputsType0
 
 
-T = TypeVar("T", bound="ScriptNode")
+T = TypeVar("T", bound="PythonScriptNode")
 
 
 @_attrs_define
-class ScriptNode:
-    """Script executor node.
+class PythonScriptNode:
+    """Python script executor node.
 
     Attributes:
         id (str): Unique identifier for the node within the workflow
-        type_ (Literal['script']):
-        parameters (ScriptExecutorParameters): Parameters for script executor.
+        type_ (Literal['script_python']):
+        parameters (PythonScriptExecutorParameters): Parameters for Python script executor.
         name (None | str | Unset): Human-readable name for the node
         description (None | str | Unset): Human-readable description of the node purpose
-        outputs (None | ScriptNodeOutputsType0 | Unset): Output extraction mapping
+        outputs (None | PythonScriptNodeOutputsType0 | Unset): Output extraction mapping
         position (NodePosition | None | Unset): Optional UI position hint
         settings (NodeSettingsNoRetry | None | Unset):
     """
 
     id: str
-    type_: Literal["script"]
-    parameters: ScriptExecutorParameters
+    type_: Literal["script_python"]
+    parameters: PythonScriptExecutorParameters
     name: None | str | Unset = UNSET
     description: None | str | Unset = UNSET
-    outputs: None | ScriptNodeOutputsType0 | Unset = UNSET
+    outputs: None | PythonScriptNodeOutputsType0 | Unset = UNSET
     position: NodePosition | None | Unset = UNSET
     settings: NodeSettingsNoRetry | None | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
@@ -46,7 +46,7 @@ class ScriptNode:
     def to_dict(self) -> dict[str, Any]:
         from ..models.node_position import NodePosition
         from ..models.node_settings_no_retry import NodeSettingsNoRetry
-        from ..models.script_node_outputs_type_0 import ScriptNodeOutputsType0
+        from ..models.python_script_node_outputs_type_0 import PythonScriptNodeOutputsType0
 
         id = self.id
 
@@ -69,7 +69,7 @@ class ScriptNode:
         outputs: dict[str, Any] | None | Unset
         if isinstance(self.outputs, Unset):
             outputs = UNSET
-        elif isinstance(self.outputs, ScriptNodeOutputsType0):
+        elif isinstance(self.outputs, PythonScriptNodeOutputsType0):
             outputs = self.outputs.to_dict()
         else:
             outputs = self.outputs
@@ -116,17 +116,17 @@ class ScriptNode:
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         from ..models.node_position import NodePosition
         from ..models.node_settings_no_retry import NodeSettingsNoRetry
-        from ..models.script_executor_parameters import ScriptExecutorParameters
-        from ..models.script_node_outputs_type_0 import ScriptNodeOutputsType0
+        from ..models.python_script_executor_parameters import PythonScriptExecutorParameters
+        from ..models.python_script_node_outputs_type_0 import PythonScriptNodeOutputsType0
 
         d = dict(src_dict)
         id = d.pop("id")
 
-        type_ = cast(Literal["script"], d.pop("type"))
-        if type_ != "script":
-            raise ValueError(f"type must match const 'script', got '{type_}'")
+        type_ = cast(Literal["script_python"], d.pop("type"))
+        if type_ != "script_python":
+            raise ValueError(f"type must match const 'script_python', got '{type_}'")
 
-        parameters = ScriptExecutorParameters.from_dict(d.pop("parameters"))
+        parameters = PythonScriptExecutorParameters.from_dict(d.pop("parameters"))
 
         def _parse_name(data: object) -> None | str | Unset:
             if data is None:
@@ -146,7 +146,7 @@ class ScriptNode:
 
         description = _parse_description(d.pop("description", UNSET))
 
-        def _parse_outputs(data: object) -> None | ScriptNodeOutputsType0 | Unset:
+        def _parse_outputs(data: object) -> None | PythonScriptNodeOutputsType0 | Unset:
             if data is None:
                 return data
             if isinstance(data, Unset):
@@ -154,12 +154,12 @@ class ScriptNode:
             try:
                 if not isinstance(data, dict):
                     raise TypeError()
-                outputs_type_0 = ScriptNodeOutputsType0.from_dict(data)
+                outputs_type_0 = PythonScriptNodeOutputsType0.from_dict(data)
 
                 return outputs_type_0
             except (TypeError, ValueError, AttributeError, KeyError):
                 pass
-            return cast(None | ScriptNodeOutputsType0 | Unset, data)
+            return cast(None | PythonScriptNodeOutputsType0 | Unset, data)
 
         outputs = _parse_outputs(d.pop("outputs", UNSET))
 
@@ -197,7 +197,7 @@ class ScriptNode:
 
         settings = _parse_settings(d.pop("settings", UNSET))
 
-        script_node = cls(
+        python_script_node = cls(
             id=id,
             type_=type_,
             parameters=parameters,
@@ -208,8 +208,8 @@ class ScriptNode:
             settings=settings,
         )
 
-        script_node.additional_properties = d
-        return script_node
+        python_script_node.additional_properties = d
+        return python_script_node
 
     @property
     def additional_keys(self) -> list[str]:

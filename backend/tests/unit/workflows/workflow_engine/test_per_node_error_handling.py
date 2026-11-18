@@ -466,11 +466,11 @@ class TestContinueOnFailureApproval:
 
     @pytest.mark.asyncio
     async def test_non_approval_node_does_not_set_control_data(self) -> None:
-        """CoF on a non-approval node (e.g., script) leaves node_control_data untouched."""
+        """CoF on a non-approval node (e.g., Bash) leaves node_control_data untouched."""
         wf = _make_workflow()
-        node = ActivityNode("script_1", "script", {"language": "bash", "code": "echo hi"})
+        node = ActivityNode("script_1", "script_bash", {"code": "echo hi"})
         backend = InMemoryGraphBackend()
-        backend.add_node("script_1", {"id": "script_1", "type": "script", "parameters": {}})
+        backend.add_node("script_1", {"id": "script_1", "type": "script_bash", "parameters": {}})
         graph = WorkflowGraph(backend)
 
         await wf._handle_continued_failure("script_1", node, graph, {})

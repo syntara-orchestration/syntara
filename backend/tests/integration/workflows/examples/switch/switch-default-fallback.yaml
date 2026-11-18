@@ -31,23 +31,20 @@ nodes:
 
   - id: handle_approved
     name: Handle Approved
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       code: echo "Approved"
 
   - id: handle_rejected
     name: Handle Rejected
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       code: echo "Rejected"
 
   - id: handle_default
     name: Handle Default
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       code: echo "Default path taken"
 
 edges:

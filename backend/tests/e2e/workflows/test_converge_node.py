@@ -34,8 +34,8 @@ def test_converge_with_single_branch_rejected(syntara_api: SyntaraApiRegistry) -
                 {
                     "id": "action_node",
                     "name": "Run Action",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": "echo 'hello'"},
+                    "type": "script_bash",
+                    "parameters": {"code": "echo 'hello'"},
                 },
                 {"id": "converge_node", "name": "Join", "type": "converge", "parameters": {}},
             ],
@@ -101,20 +101,20 @@ def test_converge_any_2_of_3_strategy(syntara_api: SyntaraApiRegistry):
                 {
                     "id": "branch_a",
                     "name": "Branch A",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": 'echo "Branch A completed"'},
+                    "type": "script_bash",
+                    "parameters": {"code": 'echo "Branch A completed"'},
                 },
                 {
                     "id": "branch_b",
                     "name": "Branch B",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": 'echo "Branch B completed"'},
+                    "type": "script_bash",
+                    "parameters": {"code": 'echo "Branch B completed"'},
                 },
                 {
                     "id": "branch_c",
                     "name": "Branch C (fails)",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": "exit 1"},
+                    "type": "script_bash",
+                    "parameters": {"code": "exit 1"},
                 },
                 {
                     "id": "converge_node",
@@ -128,8 +128,8 @@ def test_converge_any_2_of_3_strategy(syntara_api: SyntaraApiRegistry):
                 {
                     "id": "final_action",
                     "name": "Final Action",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": 'echo "Final action executed"'},
+                    "type": "script_bash",
+                    "parameters": {"code": 'echo "Final action executed"'},
                 },
             ],
             "edges": [
@@ -182,20 +182,20 @@ def test_converge_timeout_continue_on_failure(syntara_api: SyntaraApiRegistry):
                 {
                     "id": "fast_branch",
                     "name": "Fast Branch",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": 'echo "Fast branch done"'},
+                    "type": "script_bash",
+                    "parameters": {"code": 'echo "Fast branch done"'},
                 },
                 {
                     "id": "slow_branch",
                     "name": "Slow Branch",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": 'sleep 15 && echo "Slow branch done"'},
+                    "type": "script_bash",
+                    "parameters": {"code": 'sleep 15 && echo "Slow branch done"'},
                 },
                 {
                     "id": "slow_intermediate",
                     "name": "Slow Intermediate (should be skipped)",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": 'echo "Intermediate"'},
+                    "type": "script_bash",
+                    "parameters": {"code": 'echo "Intermediate"'},
                 },
                 {
                     "id": "converge_node",
@@ -207,8 +207,8 @@ def test_converge_timeout_continue_on_failure(syntara_api: SyntaraApiRegistry):
                 {
                     "id": "final_action",
                     "name": "Final Action",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": 'echo "Executed after CoF"'},
+                    "type": "script_bash",
+                    "parameters": {"code": 'echo "Executed after CoF"'},
                 },
             ],
             "edges": [
@@ -259,20 +259,20 @@ def test_converge_all_strategy(syntara_api: SyntaraApiRegistry):
                 {
                     "id": "branch_a",
                     "name": "Branch A",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": 'echo "Branch A"'},
+                    "type": "script_bash",
+                    "parameters": {"code": 'echo "Branch A"'},
                 },
                 {
                     "id": "branch_b",
                     "name": "Branch B",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": 'echo "Branch B"'},
+                    "type": "script_bash",
+                    "parameters": {"code": 'echo "Branch B"'},
                 },
                 {
                     "id": "branch_c",
                     "name": "Branch C",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": 'echo "Branch C"'},
+                    "type": "script_bash",
+                    "parameters": {"code": 'echo "Branch C"'},
                 },
                 {
                     "id": "converge_node",
@@ -283,8 +283,8 @@ def test_converge_all_strategy(syntara_api: SyntaraApiRegistry):
                 {
                     "id": "final_action",
                     "name": "Final Action",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": 'echo "All branches completed"'},
+                    "type": "script_bash",
+                    "parameters": {"code": 'echo "All branches completed"'},
                 },
             ],
             "edges": [
@@ -343,20 +343,20 @@ def test_converge_timeout_fail_and_skip_downstream(syntara_api: SyntaraApiRegist
                 {
                     "id": "fast_branch",
                     "name": "Fast Branch",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": 'echo "Fast"'},
+                    "type": "script_bash",
+                    "parameters": {"code": 'echo "Fast"'},
                 },
                 {
                     "id": "slow_branch",
                     "name": "Slow Branch",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": 'sleep 15 && echo "Slow"'},
+                    "type": "script_bash",
+                    "parameters": {"code": 'sleep 15 && echo "Slow"'},
                 },
                 {
                     "id": "intermediate",
                     "name": "Intermediate (should be skipped)",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": 'echo "Intermediate"'},
+                    "type": "script_bash",
+                    "parameters": {"code": 'echo "Intermediate"'},
                 },
                 {
                     "id": "converge_node",
@@ -367,8 +367,8 @@ def test_converge_timeout_fail_and_skip_downstream(syntara_api: SyntaraApiRegist
                 {
                     "id": "downstream_action",
                     "name": "Downstream Action (should be skipped)",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": 'echo "This should not execute"'},
+                    "type": "script_bash",
+                    "parameters": {"code": 'echo "This should not execute"'},
                 },
             ],
             "edges": [
@@ -425,20 +425,20 @@ def test_converge_cof_any_strategy_threshold_not_met(syntara_api: SyntaraApiRegi
                 {
                     "id": "success_branch",
                     "name": "Success Branch",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": 'sleep 1 && echo "success"'},
+                    "type": "script_bash",
+                    "parameters": {"code": 'sleep 1 && echo "success"'},
                 },
                 {
                     "id": "failing_branch_a",
                     "name": "Failing Branch A",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": "exit 1"},
+                    "type": "script_bash",
+                    "parameters": {"code": "exit 1"},
                 },
                 {
                     "id": "failing_branch_b",
                     "name": "Failing Branch B",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": "exit 1"},
+                    "type": "script_bash",
+                    "parameters": {"code": "exit 1"},
                 },
                 {
                     "id": "converge_node",
@@ -450,8 +450,8 @@ def test_converge_cof_any_strategy_threshold_not_met(syntara_api: SyntaraApiRegi
                 {
                     "id": "final_action",
                     "name": "Final Action",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": 'echo "downstream executed"'},
+                    "type": "script_bash",
+                    "parameters": {"code": 'echo "downstream executed"'},
                 },
             ],
             "edges": [
@@ -496,14 +496,14 @@ def test_converge_no_timeout_when_all_complete(syntara_api: SyntaraApiRegistry):
                 {
                     "id": "branch_a",
                     "name": "Branch A",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": 'echo "A"'},
+                    "type": "script_bash",
+                    "parameters": {"code": 'echo "A"'},
                 },
                 {
                     "id": "branch_b",
                     "name": "Branch B",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": 'echo "B"'},
+                    "type": "script_bash",
+                    "parameters": {"code": 'echo "B"'},
                 },
                 {
                     "id": "converge_node",
@@ -514,8 +514,8 @@ def test_converge_no_timeout_when_all_complete(syntara_api: SyntaraApiRegistry):
                 {
                     "id": "final_action",
                     "name": "Final Action",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": 'echo "Completed normally"'},
+                    "type": "script_bash",
+                    "parameters": {"code": 'echo "Completed normally"'},
                 },
             ],
             "edges": [
@@ -567,26 +567,26 @@ def test_converge_timeout_multihop_starts_at_fork(syntara_api: SyntaraApiRegistr
                 {
                     "id": "branch_a_step1",
                     "name": "Branch A Step 1 (2s)",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": 'sleep 2 && echo "A1 done"'},
+                    "type": "script_bash",
+                    "parameters": {"code": 'sleep 2 && echo "A1 done"'},
                 },
                 {
                     "id": "branch_a_step2",
                     "name": "Branch A Step 2",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": 'echo "A2 done"'},
+                    "type": "script_bash",
+                    "parameters": {"code": 'echo "A2 done"'},
                 },
                 {
                     "id": "branch_b_step1",
                     "name": "Branch B Step 1 (2s)",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": 'sleep 2 && echo "B1 done"'},
+                    "type": "script_bash",
+                    "parameters": {"code": 'sleep 2 && echo "B1 done"'},
                 },
                 {
                     "id": "branch_b_step2",
                     "name": "Branch B Step 2",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": 'echo "B2 done"'},
+                    "type": "script_bash",
+                    "parameters": {"code": 'echo "B2 done"'},
                 },
                 {
                     "id": "converge_node",
@@ -597,8 +597,8 @@ def test_converge_timeout_multihop_starts_at_fork(syntara_api: SyntaraApiRegistr
                 {
                     "id": "downstream",
                     "name": "Downstream",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": 'echo "downstream"'},
+                    "type": "script_bash",
+                    "parameters": {"code": 'echo "downstream"'},
                 },
             ],
             "edges": [
@@ -654,20 +654,20 @@ def test_converge_one_branch_fails_all_strategy(syntara_api: SyntaraApiRegistry)
                 {
                     "id": "success_branch_a",
                     "name": "Success Branch A",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": 'sleep 1 && echo "Success A"'},
+                    "type": "script_bash",
+                    "parameters": {"code": 'sleep 1 && echo "Success A"'},
                 },
                 {
                     "id": "success_branch_b",
                     "name": "Success Branch B",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": 'sleep 1 && echo "Success B"'},
+                    "type": "script_bash",
+                    "parameters": {"code": 'sleep 1 && echo "Success B"'},
                 },
                 {
                     "id": "failing_branch",
                     "name": "Failing Branch",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": "exit 1"},
+                    "type": "script_bash",
+                    "parameters": {"code": "exit 1"},
                 },
                 {
                     "id": "converge_node",
@@ -678,8 +678,8 @@ def test_converge_one_branch_fails_all_strategy(syntara_api: SyntaraApiRegistry)
                 {
                     "id": "final_action",
                     "name": "Final Action",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": 'echo "Executed"'},
+                    "type": "script_bash",
+                    "parameters": {"code": 'echo "Executed"'},
                 },
             ],
             "edges": [
@@ -729,20 +729,20 @@ def test_converge_branch_failure_any_strategy(syntara_api: SyntaraApiRegistry):
                 {
                     "id": "success_branch",
                     "name": "Success Branch (slow to ensure failures processed first)",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": 'sleep 1 && echo "Success"'},
+                    "type": "script_bash",
+                    "parameters": {"code": 'sleep 1 && echo "Success"'},
                 },
                 {
                     "id": "failing_branch_a",
                     "name": "Failing Branch A",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": "exit 1"},
+                    "type": "script_bash",
+                    "parameters": {"code": "exit 1"},
                 },
                 {
                     "id": "failing_branch_b",
                     "name": "Failing Branch B",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": "exit 1"},
+                    "type": "script_bash",
+                    "parameters": {"code": "exit 1"},
                 },
                 {
                     "id": "converge_node",
@@ -756,8 +756,8 @@ def test_converge_branch_failure_any_strategy(syntara_api: SyntaraApiRegistry):
                 {
                     "id": "final_action",
                     "name": "Final Action (should not execute)",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": 'echo "Should not run"'},
+                    "type": "script_bash",
+                    "parameters": {"code": 'echo "Should not run"'},
                 },
             ],
             "edges": [
@@ -802,20 +802,20 @@ def test_converge_all_branches_fail(syntara_api: SyntaraApiRegistry):
                 {
                     "id": "failing_branch_a",
                     "name": "Failing Branch A",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": "exit 1"},
+                    "type": "script_bash",
+                    "parameters": {"code": "exit 1"},
                 },
                 {
                     "id": "failing_branch_b",
                     "name": "Failing Branch B",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": "exit 1"},
+                    "type": "script_bash",
+                    "parameters": {"code": "exit 1"},
                 },
                 {
                     "id": "failing_branch_c",
                     "name": "Failing Branch C",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": "exit 1"},
+                    "type": "script_bash",
+                    "parameters": {"code": "exit 1"},
                 },
                 {
                     "id": "converge_node",
@@ -826,8 +826,8 @@ def test_converge_all_branches_fail(syntara_api: SyntaraApiRegistry):
                 {
                     "id": "final_action",
                     "name": "Final Action (should not execute)",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": 'echo "Should not run"'},
+                    "type": "script_bash",
+                    "parameters": {"code": 'echo "Should not run"'},
                 },
             ],
             "edges": [

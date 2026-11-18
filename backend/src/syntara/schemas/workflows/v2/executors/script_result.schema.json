@@ -1,75 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://automation.example.com/schemas/workflows/v2/executors/script",
-  "title": "Script Node",
-  "description": "Execute scripts in various languages (TEMPORARY - added for initial testing)",
-  "parameterSchema": {
-    "type": "object",
-    "required": [
-      "language",
-      "code"
-    ],
-    "properties": {
-      "execution_profile": {
-        "anyOf": [
-          {
-            "oneOf": [
-              {
-                "title": "ExecutionTargetProfile",
-                "type": "object",
-                "required": [
-                  "type",
-                  "execution_target_id"
-                ],
-                "properties": {
-                  "type": {
-                    "const": "execution_target"
-                  },
-                  "execution_target_id": {
-                    "type": "string",
-                    "format": "uuid"
-                  }
-                },
-                "additionalProperties": false
-              }
-            ],
-            "discriminator": {
-              "propertyName": "type"
-            }
-          },
-          {
-            "type": "null"
-          }
-        ],
-        "description": "Execution Plane placement profile for this workload.",
-        "default": null
-      },
-      "language": {
-        "type": "string",
-        "enum": [
-          "python",
-          "bash"
-        ],
-        "description": "Script language/runtime"
-      },
-      "code": {
-        "type": "string",
-        "description": "Script code to execute",
-        "minLength": 1
-      },
-      "environment": {
-        "type": "object",
-        "description": "Environment variables to set during script execution",
-        "additionalProperties": {
-          "type": "string"
-        }
-      }
-    },
-    "additionalProperties": false
-  },
-  "settingSchema": {
-    "$ref": "../common-definitions.schema.json#/$defs/nodeSettingsNoRetry"
-  },
+  "$id": "https://automation.example.com/schemas/workflows/v2/executors/script_result",
+  "title": "Script Result",
   "resultSchema": {
     "description": "Result structure available in result namespace (discriminated union)",
     "oneOf": [

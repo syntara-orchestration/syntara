@@ -15,9 +15,8 @@ nodes:
       url: http://test-api.example.com/api/data
 
   - id: process_data
-    type: script
+    type: script_python
     parameters:
-      language: python
       environment:
         INPUT_RAW_DATA: ${fetch_data.body}
       code: |
@@ -29,9 +28,8 @@ nodes:
         print(json.dumps(processed))
 
   - id: validate_data
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       environment:
         INPUT_VALIDATED: ${process_data.stdout_json.processed}
       code: |

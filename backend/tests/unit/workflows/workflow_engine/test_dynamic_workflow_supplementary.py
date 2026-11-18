@@ -87,9 +87,9 @@ def _build_diamond_graph() -> WorkflowGraph:
     """Build: trigger -> A + B -> C (diamond, C has two predecessors)."""
     backend = InMemoryGraphBackend()
     backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
-    backend.add_node("node_a", {"id": "node_a", "type": "script", "parameters": {}})
-    backend.add_node("node_b", {"id": "node_b", "type": "script", "parameters": {}})
-    backend.add_node("node_c", {"id": "node_c", "type": "script", "parameters": {}})
+    backend.add_node("node_a", {"id": "node_a", "type": "script_python", "parameters": {}})
+    backend.add_node("node_b", {"id": "node_b", "type": "script_python", "parameters": {}})
+    backend.add_node("node_c", {"id": "node_c", "type": "script_python", "parameters": {}})
     backend.add_edge("trigger", "node_a", None)
     backend.add_edge("trigger", "node_b", None)
     backend.add_edge("node_a", "node_c", None)
@@ -103,10 +103,10 @@ def _build_chain_graph(node_a_outputs: dict[str, str] | None = None) -> Workflow
     backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
     backend.add_node(
         "node_a",
-        {"id": "node_a", "type": "script", "parameters": {}, "outputs": node_a_outputs},
+        {"id": "node_a", "type": "script_python", "parameters": {}, "outputs": node_a_outputs},
     )
-    backend.add_node("node_b", {"id": "node_b", "type": "script", "parameters": {}})
-    backend.add_node("node_c", {"id": "node_c", "type": "script", "parameters": {}})
+    backend.add_node("node_b", {"id": "node_b", "type": "script_python", "parameters": {}})
+    backend.add_node("node_c", {"id": "node_c", "type": "script_python", "parameters": {}})
     backend.add_edge("trigger", "node_a", None)
     backend.add_edge("node_a", "node_b", None)
     backend.add_edge("node_b", "node_c", None)
@@ -129,7 +129,7 @@ class TestIsUnreachable:
         """A node whose predecessor completed is reachable."""
         backend = InMemoryGraphBackend()
         backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
-        backend.add_node("node_a", {"id": "node_a", "type": "script", "parameters": {}})
+        backend.add_node("node_a", {"id": "node_a", "type": "script_python", "parameters": {}})
         backend.add_edge("trigger", "node_a", None)
         graph = WorkflowGraph(backend)
 
@@ -250,7 +250,7 @@ class TestExecuteExecutorNodeHeartbeatTimeout:
     @pytest.mark.asyncio
     async def test_non_heartbeating_executors_get_no_heartbeat_timeout(self) -> None:
         """The other executor activities never beat; a timeout would fail them spuriously."""
-        for node_type in (NodeType.HTTP_REQUEST, NodeType.SCRIPT, NodeType.AGENTIC):
+        for node_type in (NodeType.HTTP_REQUEST, NodeType.SCRIPT_PYTHON, NodeType.AGENTIC):
             kwargs = await self._schedule(node_type)
             assert kwargs["heartbeat_timeout"] is None, f"{node_type} must not get a heartbeat timeout"
 
@@ -340,8 +340,8 @@ class TestMarkRemainingUnreachableNodes:
         """All trigger types (webhook_trigger, schedule_trigger, etc.) are excluded."""
         backend = InMemoryGraphBackend()
         backend.add_node("trigger", {"id": "trigger", "type": "webhook_trigger", "parameters": {}})
-        backend.add_node("node_a", {"id": "node_a", "type": "script", "parameters": {}})
-        backend.add_node("node_b", {"id": "node_b", "type": "script", "parameters": {}})
+        backend.add_node("node_a", {"id": "node_a", "type": "script_python", "parameters": {}})
+        backend.add_node("node_b", {"id": "node_b", "type": "script_python", "parameters": {}})
         backend.add_edge("trigger", "node_a", None)
         backend.add_edge("node_a", "node_b", None)
         graph = WorkflowGraph(backend)
@@ -372,8 +372,8 @@ class TestUnselectedTriggerSkipping:
         backend = InMemoryGraphBackend()
         backend.add_node("trigger_a", {"id": "trigger_a", "type": "manual_trigger", "parameters": {}})
         backend.add_node("trigger_b", {"id": "trigger_b", "type": "manual_trigger", "parameters": {}})
-        backend.add_node("node_a", {"id": "node_a", "type": "script", "parameters": {}})
-        backend.add_node("node_b", {"id": "node_b", "type": "script", "parameters": {}})
+        backend.add_node("node_a", {"id": "node_a", "type": "script_python", "parameters": {}})
+        backend.add_node("node_b", {"id": "node_b", "type": "script_python", "parameters": {}})
         backend.add_edge("trigger_a", "node_a", None)
         backend.add_edge("trigger_b", "node_b", None)
         graph = WorkflowGraph(backend)
@@ -395,8 +395,8 @@ class TestUnselectedTriggerSkipping:
         backend = InMemoryGraphBackend()
         backend.add_node("trigger_a", {"id": "trigger_a", "type": "manual_trigger", "parameters": {}})
         backend.add_node("trigger_b", {"id": "trigger_b", "type": "manual_trigger", "parameters": {}})
-        backend.add_node("node_a", {"id": "node_a", "type": "script", "parameters": {}})
-        backend.add_node("exclusive_b", {"id": "exclusive_b", "type": "script", "parameters": {}})
+        backend.add_node("node_a", {"id": "node_a", "type": "script_python", "parameters": {}})
+        backend.add_node("exclusive_b", {"id": "exclusive_b", "type": "script_python", "parameters": {}})
         backend.add_edge("trigger_a", "node_a", None)
         backend.add_edge("trigger_b", "exclusive_b", None)
         graph = WorkflowGraph(backend)
@@ -418,7 +418,7 @@ class TestUnselectedTriggerSkipping:
         backend = InMemoryGraphBackend()
         backend.add_node("trigger_a", {"id": "trigger_a", "type": "manual_trigger", "parameters": {}})
         backend.add_node("trigger_b", {"id": "trigger_b", "type": "manual_trigger", "parameters": {}})
-        backend.add_node("shared_node", {"id": "shared_node", "type": "script", "parameters": {}})
+        backend.add_node("shared_node", {"id": "shared_node", "type": "script_python", "parameters": {}})
         backend.add_edge("trigger_a", "shared_node", None)
         backend.add_edge("trigger_b", "shared_node", None)
         graph = WorkflowGraph(backend)
@@ -439,7 +439,7 @@ class TestUnselectedTriggerSkipping:
         """With only one trigger, nothing is skipped."""
         backend = InMemoryGraphBackend()
         backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
-        backend.add_node("node_a", {"id": "node_a", "type": "script", "parameters": {}})
+        backend.add_node("node_a", {"id": "node_a", "type": "script_python", "parameters": {}})
         backend.add_edge("trigger", "node_a", None)
         graph = WorkflowGraph(backend)
 
@@ -458,7 +458,7 @@ class TestUnselectedTriggerSkipping:
         """${input.*} and ${inputs.*} are not registered unless a node uses that id."""
         backend = InMemoryGraphBackend()
         backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
-        backend.add_node("node_a", {"id": "node_a", "type": "script", "parameters": {}})
+        backend.add_node("node_a", {"id": "node_a", "type": "script_python", "parameters": {}})
         backend.add_edge("trigger", "node_a", None)
         graph = WorkflowGraph(backend)
 
@@ -493,7 +493,7 @@ class TestAllowedTriggerTypes:
             "trigger",
             {"id": "trigger", "type": "malicious_trigger", "parameters": {}},
         )
-        backend.add_node("node_a", {"id": "node_a", "type": "script", "parameters": {}})
+        backend.add_node("node_a", {"id": "node_a", "type": "script_python", "parameters": {}})
         backend.add_edge("trigger", "node_a", None)
         graph = WorkflowGraph(backend)
 
@@ -513,10 +513,10 @@ class TestAllowedTriggerTypes:
         backend.add_node("trigger_a", {"id": "trigger_a", "type": "manual_trigger", "parameters": {}})
         backend.add_node("trigger_b", {"id": "trigger_b", "type": "manual_trigger", "parameters": {}})
         backend.add_node("trigger_c", {"id": "trigger_c", "type": "manual_trigger", "parameters": {}})
-        backend.add_node("node_a", {"id": "node_a", "type": "script", "parameters": {}})
-        backend.add_node("exclusive_b", {"id": "exclusive_b", "type": "script", "parameters": {}})
-        backend.add_node("exclusive_c", {"id": "exclusive_c", "type": "script", "parameters": {}})
-        backend.add_node("shared_bc", {"id": "shared_bc", "type": "script", "parameters": {}})
+        backend.add_node("node_a", {"id": "node_a", "type": "script_python", "parameters": {}})
+        backend.add_node("exclusive_b", {"id": "exclusive_b", "type": "script_python", "parameters": {}})
+        backend.add_node("exclusive_c", {"id": "exclusive_c", "type": "script_python", "parameters": {}})
+        backend.add_node("shared_bc", {"id": "shared_bc", "type": "script_python", "parameters": {}})
         backend.add_edge("trigger_a", "node_a", None)
         backend.add_edge("trigger_b", "exclusive_b", None)
         backend.add_edge("trigger_b", "shared_bc", None)
@@ -596,8 +596,8 @@ class TestCheckLoopBodyCompletionGuard:
             "loop_node",
             {"id": "loop_node", "type": "loop", "parameters": {"type": "for_each", "items": ["a"]}},
         )
-        backend.add_node("body_a", {"id": "body_a", "type": "script", "parameters": {}})
-        backend.add_node("body_b", {"id": "body_b", "type": "script", "parameters": {}})
+        backend.add_node("body_a", {"id": "body_a", "type": "script_python", "parameters": {}})
+        backend.add_node("body_b", {"id": "body_b", "type": "script_python", "parameters": {}})
         backend.add_edge("trigger", "loop_node")
         backend.add_edge("loop_node", "body_a", {"from_port": "iterate"})
         backend.add_edge("loop_node", "body_b", {"from_port": "iterate"})
@@ -630,7 +630,7 @@ class TestCheckLoopBodyCompletionGuard:
             "loop_node",
             {"id": "loop_node", "type": "loop", "parameters": {"type": "for_each", "items": ["a", "b"]}},
         )
-        backend.add_node("body", {"id": "body", "type": "script", "parameters": {}})
+        backend.add_node("body", {"id": "body", "type": "script_python", "parameters": {}})
         backend.add_edge("trigger", "loop_node")
         backend.add_edge("loop_node", "body", {"from_port": "iterate"})
         backend.add_edge("body", "loop_node", {"to_port": "iterate"})
@@ -754,7 +754,7 @@ class TestPropagateLoopBodyFailure:
         backend.add_node(
             "loop_node", {"id": "loop_node", "type": "loop", "parameters": {"type": "for_each", "items": ["a"]}}
         )
-        backend.add_node("body", {"id": "body", "type": "script", "parameters": {}})
+        backend.add_node("body", {"id": "body", "type": "script_python", "parameters": {}})
         backend.add_node("join", {"id": "join", "type": "converge", "parameters": {}})
         backend.add_edge("trigger", "loop_node")
         backend.add_edge("loop_node", "body", {"from_port": "iterate"})
@@ -807,10 +807,10 @@ class TestPropagateLoopBodyFailure:
                 "settings": {"continue_on_failure": True},
             },
         )
-        backend.add_node("body", {"id": "body", "type": "script", "parameters": {}})
-        backend.add_node("other", {"id": "other", "type": "script", "parameters": {}})
+        backend.add_node("body", {"id": "body", "type": "script_python", "parameters": {}})
+        backend.add_node("other", {"id": "other", "type": "script_python", "parameters": {}})
         backend.add_node("join", {"id": "join", "type": "converge", "parameters": {"strategy": "all"}})
-        backend.add_node("downstream", {"id": "downstream", "type": "script", "parameters": {}})
+        backend.add_node("downstream", {"id": "downstream", "type": "script_python", "parameters": {}})
         backend.add_edge("trigger", "loop_node")
         backend.add_edge("trigger", "other")
         backend.add_edge("loop_node", "body", {"from_port": "iterate"})
@@ -845,7 +845,7 @@ class TestScheduleSuccessorsSkipBehavior:
         """A successor that already has output should not be re-scheduled."""
         backend = InMemoryGraphBackend()
         backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
-        backend.add_node("node_a", {"id": "node_a", "type": "script", "parameters": {}})
+        backend.add_node("node_a", {"id": "node_a", "type": "script_python", "parameters": {}})
         backend.add_edge("trigger", "node_a", None)
         graph = WorkflowGraph(backend)
 
@@ -945,8 +945,8 @@ class TestPerNodeTimeout:
         wf = _make_workflow()
         node = ActivityNode(
             node_id="node_custom",
-            node_type="script",
-            parameters={"script": "echo hello"},
+            node_type="script_python",
+            parameters={"code": "echo hello"},
             settings=NodeSettingsNoRetry(timeout=60),
         )
         graph = _build_chain_graph()
@@ -966,14 +966,14 @@ class TestPerNodeTimeout:
         _mock_temporal_workflow.execute_activity = AsyncMock(return_value={"output": {"result": "ok"}})
 
         wf = _make_workflow()
-        node = ActivityNode(node_id="node_default", node_type="script", parameters={"script": "echo hello"})
+        node = ActivityNode(node_id="node_default", node_type="script_python", parameters={"code": "print('hello')"})
         graph = _build_chain_graph()
 
         await wf._execute_node(node=node, graph=graph)
 
         _mock_temporal_workflow.execute_activity.assert_called_once()
         call_kwargs = _mock_temporal_workflow.execute_activity.call_args
-        expected = get_default_timeout(NodeType.SCRIPT, wf._runtime_settings) + _TEMPORAL_MARGIN
+        expected = get_default_timeout(NodeType.SCRIPT_PYTHON, wf._runtime_settings) + _TEMPORAL_MARGIN
         assert call_kwargs.kwargs["start_to_close_timeout"] == timedelta(seconds=expected)
 
     @pytest.mark.asyncio
@@ -985,7 +985,9 @@ class TestPerNodeTimeout:
         _mock_temporal_workflow.execute_activity = AsyncMock(return_value={"output": {"result": "ok"}})
 
         wf = _make_workflow()
-        node = ActivityNode(node_id="node_keep", node_type="script", parameters={"timeout": 90, "script": "echo hello"})
+        node = ActivityNode(
+            node_id="node_keep", node_type="script_python", parameters={"timeout": 90, "code": "print('hello')"}
+        )
         graph = _build_chain_graph()
 
         await wf._execute_node(node=node, graph=graph)
@@ -1403,7 +1405,7 @@ class TestPropagateLoopBodyFailureExtended:
             "inner_loop",
             {"id": "inner_loop", "type": "loop", "parameters": {"type": "for_each", "items": ["x"]}},
         )
-        backend.add_node("inner_body", {"id": "inner_body", "type": "script", "parameters": {}})
+        backend.add_node("inner_body", {"id": "inner_body", "type": "script_python", "parameters": {}})
         backend.add_edge("trigger", "outer_loop")
         backend.add_edge("outer_loop", "inner_loop", {"from_port": "iterate"})
         backend.add_edge("inner_loop", "inner_body", {"from_port": "iterate"})
@@ -1433,7 +1435,7 @@ class TestPropagateLoopBodyFailureExtended:
             "loop_node",
             {"id": "loop_node", "type": "loop", "parameters": {"type": "for_each", "items": ["a"]}},
         )
-        backend.add_node("body", {"id": "body", "type": "script", "parameters": {}})
+        backend.add_node("body", {"id": "body", "type": "script_python", "parameters": {}})
         backend.add_edge("trigger", "loop_node")
         backend.add_edge("loop_node", "body", {"from_port": "iterate"})
         backend.add_edge("body", "loop_node", {"to_port": "iterate"})
@@ -1458,7 +1460,7 @@ class TestHandleNodeFailureLoopPropagation:
             "loop_node",
             {"id": "loop_node", "type": "loop", "parameters": {"type": "for_each", "items": ["a"]}},
         )
-        backend.add_node("body", {"id": "body", "type": "script", "parameters": {}})
+        backend.add_node("body", {"id": "body", "type": "script_python", "parameters": {}})
         backend.add_edge("trigger", "loop_node")
         backend.add_edge("loop_node", "body", {"from_port": "iterate"})
         backend.add_edge("body", "loop_node", {"to_port": "iterate"})
@@ -1507,9 +1509,9 @@ class TestArePredecessorsCompleteAnyStrategy:
         """A failed non-CoF predecessor should not block ANY convergence."""
         backend = InMemoryGraphBackend()
         backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
-        backend.add_node("node_a", {"id": "node_a", "type": "script", "parameters": {}})
-        backend.add_node("node_b", {"id": "node_b", "type": "script", "parameters": {}})
-        backend.add_node("node_c", {"id": "node_c", "type": "script", "parameters": {}})
+        backend.add_node("node_a", {"id": "node_a", "type": "script_python", "parameters": {}})
+        backend.add_node("node_b", {"id": "node_b", "type": "script_python", "parameters": {}})
+        backend.add_node("node_c", {"id": "node_c", "type": "script_python", "parameters": {}})
         backend.add_node(
             "converge",
             {"id": "converge", "type": "converge", "parameters": {"strategy": "any", "n_required": 1}},

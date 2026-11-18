@@ -232,7 +232,11 @@ export interface NodeSettings {
 // Parameters Type Aliases (from Pydantic models via OpenAPI spec)
 // ============================================================================
 
-export type ScriptConfig = WorkflowAPI.components['schemas']['ScriptExecutorParameters']
+/** Internal builder representation; API workflow nodes use distinct Python and Bash types. */
+export type ScriptConfig = (
+  | WorkflowAPI.components['schemas']['PythonScriptExecutorParameters']
+  | WorkflowAPI.components['schemas']['BashScriptExecutorParameters']
+) & { language?: string }
 export type HttpRequestConfig = WorkflowAPI.components['schemas']['APIExecutorParameters']
 export type AgenticConfig = WorkflowAPI.components['schemas']['AgenticExecutorParameters']
 export type AAPJobTemplateConfig = WorkflowAPI.components['schemas']['AAPJobTemplateExecutorParameters']
