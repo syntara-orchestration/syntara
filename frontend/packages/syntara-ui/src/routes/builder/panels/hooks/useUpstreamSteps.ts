@@ -4,6 +4,7 @@ import { useWorkflowStore } from '../../../../stores/useWorkflowStore'
 import { selectEdges, selectActivities, selectTriggers } from '../../../../stores/workflowStoreSelectors'
 import { buildTriggerNodeId } from '../../../../utils/triggerNodeIds'
 import { getUpstreamNodeIds } from '../../utils/edgeHelpers'
+import { toUpstreamStepInfo } from '../utils/toUpstreamStepInfo'
 
 export type UpstreamStepInfo = {
   id: string
@@ -37,24 +38,14 @@ export function useUpstreamSteps(nodeId: string): UpstreamStepInfo[] {
 
     if (activities) {
       for (const activity of activities) {
-        nodeMap.set(activity.id, {
-          id: activity.id,
-          name: activity.name,
-          type: activity.type,
-          parameters: activity.parameters,
-        })
+        nodeMap.set(activity.id, toUpstreamStepInfo(activity))
       }
     }
 
     if (triggers) {
       for (let i = 0; i < triggers.length; i++) {
         const trigger = triggers[i]
-        const info: UpstreamStepInfo = {
-          id: trigger.id,
-          name: trigger.name,
-          type: trigger.type,
-          parameters: trigger.parameters,
-        }
+        const info = toUpstreamStepInfo(trigger)
         nodeMap.set(trigger.id, info)
         nodeMap.set(buildTriggerNodeId(i), info)
       }

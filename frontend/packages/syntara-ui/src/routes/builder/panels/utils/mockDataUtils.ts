@@ -8,8 +8,7 @@ import type { PreviewFieldDef } from './effectiveOutputSchema'
  */
 export function buildMockJsonSkeleton(nodeType: string | null, schemaFields: PreviewFieldDef[] | null): string {
   // Prefer a supplied effective schema so configuration-derived form fields survive.
-  const schema = nodeType ? getNodeOutputSchema(nodeType) : null
-  const effectiveSchema = schemaFields ?? schema
+  const effectiveSchema = schemaFields ?? (nodeType ? getNodeOutputSchema(nodeType) : null)
   if (!effectiveSchema) return '{}'
 
   const skeleton = buildSkeletonFields(effectiveSchema)

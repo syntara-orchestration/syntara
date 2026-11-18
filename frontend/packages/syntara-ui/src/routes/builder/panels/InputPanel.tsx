@@ -32,6 +32,7 @@ import styles from './panels.module.css'
 import { getEffectiveOutputSchema } from './utils/effectiveOutputSchema'
 import { getUpstreamStepDisplayName } from './utils/getUpstreamStepDisplayName'
 import { buildMockJsonSkeleton } from './utils/mockDataUtils'
+import { toUpstreamStepInfo } from './utils/toUpstreamStepInfo'
 import { VariablesAndContextTree } from './VariablesAndContextTree'
 import { ViewToggle, type PanelView } from './ViewToggle'
 
@@ -42,6 +43,11 @@ type InputPanelProps = {
   workflowMetadata?: WorkflowMetadata
   workflowId?: string | null
   onRunPreviousSteps?: () => void
+}
+
+/** The source node is shown even when unnamed, so its id stands in for a missing name. */
+function toSourceStepInfo(node: { id: string; name?: string; type: string; parameters?: Record<string, unknown> }) {
+  return { ...toUpstreamStepInfo(node), name: node.name ?? node.id }
 }
 
 /** Compute the effective upstream nodes, falling back to source ancestors when direct upstream is empty. */
@@ -57,33 +63,14 @@ function computeEffectiveUpstream(params: {
   if (!sourceNodeId) return []
 
   const activity = activities?.find((a) => a.id === sourceNodeId)
-  if (activity) {
-    return [
-      { id: activity.id, name: activity.name ?? activity.id, type: activity.type, parameters: activity.parameters },
-      ...sourceAncestors,
-    ]
-  }
+  if (activity) return [toSourceStepInfo(activity), ...sourceAncestors]
 
   const trigger = triggers?.find((t) => t.id === sourceNodeId)
-  if (trigger) {
-    return [
-      { id: trigger.id, name: trigger.name ?? trigger.id, type: trigger.type, parameters: trigger.parameters },
-      ...sourceAncestors,
-    ]
-  }
+  if (trigger) return [toSourceStepInfo(trigger), ...sourceAncestors]
 
   const triggerIndex = parseTriggerIndex(sourceNodeId)
   if (triggerIndex !== undefined && triggers?.[triggerIndex]) {
-    const resolved = triggers[triggerIndex]
-    return [
-      {
-        id: resolved.id,
-        name: resolved.name ?? resolved.id,
-        type: resolved.type,
-        parameters: resolved.parameters,
-      },
-      ...sourceAncestors,
-    ]
+    return [toSourceStepInfo(triggers[triggerIndex]), ...sourceAncestors]
   }
 
   return []
