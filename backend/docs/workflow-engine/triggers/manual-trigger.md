@@ -56,8 +56,8 @@ Manual trigger parameters are defined by the JSON Schema at `src/syntara/schemas
 
 | File | Purpose |
 |------|---------|
-| `src/syntara/workflows/workflow_engine/activities/manual_trigger.py` | Activity: applies output mapping to user input |
-| `src/syntara/workflows/workflow_engine/models/workflow_definition.py` | `resolve_trigger_node()` for trigger selection |
+| `src/syntara/workflow_runtime/engines/temporal/activities/manual_trigger.py` | Activity: applies output mapping to user input |
+| `src/syntara/workflow_core/models.py` | `resolve_trigger_node()` for trigger selection |
 | `src/syntara/workflows/services/execution_service.py` | Execution creation, schema defaults, validation |
 | `src/syntara/schemas/workflows/v2/triggers/manual.schema.json` | JSON Schema for trigger configuration |
 

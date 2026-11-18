@@ -10,10 +10,10 @@ import { addFormPromptNodeWithSubmittedBranch } from './v2-steps'
 import {
   clickSaveAndWait,
   closeStepEditorPanel,
+  openStepForEditing,
   saveAndCloseStepForm,
   saveWorkflow,
   startWorkflowWithTrigger,
-  triggerLayout,
   waitForUIReady,
 } from './workflows'
 
@@ -117,18 +117,7 @@ function formFieldValueNameInput(page: Page, fieldNumber: number, host: FormFiel
 
 /** Open the form_prompt node editor (avoids matching branch script nodes whose names contain the form title). */
 export async function openFormPromptNodeForEditing(page: Page, nodeName: string) {
-  await triggerLayout(page)
-  const node = page
-    .locator('[role="group"][aria-roledescription="node"].react-flow__node-form_prompt')
-    .filter({ has: page.getByText(nodeName, { exact: true }) })
-  await waitForUIReady(page)
-
-  const nameInput = page.getByRole('textbox', { name: 'Name', exact: true })
-  await expect(async () => {
-    await expect(node).toBeVisible({ timeout: 5_000 })
-    await node.dblclick({ force: true, timeout: 5_000 })
-    await expect(nameInput).toHaveValue(nodeName, { timeout: 5_000 })
-  }).toPass({ timeout: 30_000, intervals: [500, 1_000, 2_000] })
+  await openStepForEditing(page, nodeName)
 }
 
 export async function clickAddFormField(page: Page, host: FormFieldBuilderHost = 'form_prompt') {

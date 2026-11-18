@@ -28,7 +28,9 @@ type SynScrollableTableContainerProps = {
   isExpandable?: boolean
   /** Opt out of fixed table layout when not expandable */
   useFixedLayout?: boolean
-  /** PatternFly table density. Use `compact` for dense tables in tight panels. */
+  /** PatternFly compact table density. Defaults to `true` for resource list tables. */
+  isCompact?: boolean
+  /** Direct PatternFly {@link Table} variant override. Prefer {@link isCompact}. */
   variant?: TableProps['variant']
   /** Alternating row colors. Forwarded to PatternFly {@link Table}. */
   isStriped?: boolean
@@ -48,11 +50,13 @@ export function SynScrollableTableContainer({
   caption,
   isExpandable,
   useFixedLayout = true,
+  isCompact = true,
   variant,
   isStriped,
 }: SynScrollableTableContainerProps) {
   const useFixed = !isExpandable && useFixedLayout
   const { scrollRef, wrapperRef } = useScrollOverflow()
+  const tableVariant = variant ?? (isCompact ? 'compact' : undefined)
   const tableClassName = useFixed ? `${styles.table} ${styles.tableFixedLayout}` : styles.table
   const pinnedFooter = footer ? <PaginationFooter {...footer} /> : footerContent
   const scrollWrapperClassName = pinnedFooter
@@ -76,7 +80,7 @@ export function SynScrollableTableContainer({
                 isStickyHeader
                 isExpandable={isExpandable}
                 isStriped={isStriped}
-                variant={variant}
+                variant={tableVariant}
                 className={tableClassName}
               >
                 <Caption className="pf-v6-u-screen-reader">{caption}</Caption>

@@ -32,7 +32,7 @@ export async function submitOpenFormStepAndExpectSuccess(app: Page, formPromptId
       typeof prompt.submit_label === 'string' && prompt.submit_label.trim().length > 0
         ? prompt.submit_label.trim()
         : 'Submit'
-    const submitButton = app.getByRole('button', { name: submitLabel })
+    const submitButton = app.getByRole('button', { name: submitLabel, exact: true })
     await expect(submitButton).toBeVisible({ timeout: 15_000 })
     await clickWhenEnabled(submitButton, { timeout: 15_000 })
   }).toPass({ timeout: FORM_STEP_SUBMIT_WAIT_MS, intervals: [500, 1_000, 2_000] })

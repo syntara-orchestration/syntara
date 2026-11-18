@@ -167,6 +167,16 @@ describe('AppDockedNav', () => {
     expect(screen.getByRole('button', { name: 'Theme, color scheme Light, contrast System' })).toBeInTheDocument()
   })
 
+  it('hides the user menu dock tooltip while the menu is open', async () => {
+    const user = userEvent.setup()
+    renderDockedNav()
+    const userMenuButton = screen.getByRole('button', { name: 'User menu' })
+
+    await user.click(userMenuButton)
+    expect(screen.getByText('My Profile')).toBeInTheDocument()
+    expect(screen.queryAllByRole('tooltip').some((node) => node.textContent === 'Account')).toBe(false)
+  })
+
   it('shows My Profile and Logout in user menu when clicked', async () => {
     const user = userEvent.setup()
     renderDockedNav()

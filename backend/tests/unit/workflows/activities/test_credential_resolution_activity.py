@@ -6,7 +6,9 @@ from uuid import uuid4
 import pytest
 from temporalio.exceptions import ApplicationError
 
-from syntara.workflows.workflow_engine.activities.credential_resolution_activity import _extract_secret_field_ids
+from syntara.workflow_runtime.engines.temporal.activities.credential_resolution_activity import (
+    _extract_secret_field_ids,
+)
 
 
 class TestExtractSecretFieldIds:
@@ -81,8 +83,8 @@ class TestResolveWorkflowCredentials:
     """Tests for resolve_workflow_credentials activity."""
 
     @pytest.mark.asyncio
-    @patch("syntara.workflows.workflow_engine.activities.credential_resolution_activity._session_factory")
-    @patch("syntara.workflows.workflow_engine.activities.credential_resolution_activity.create_secret_service")
+    @patch("syntara.workflow_runtime.engines.temporal.activities.credential_resolution_activity._session_factory")
+    @patch("syntara.workflow_runtime.engines.temporal.activities.credential_resolution_activity.create_secret_service")
     async def test_happy_path_resolves_credential(
         self,
         mock_create_ss: MagicMock,
@@ -91,7 +93,7 @@ class TestResolveWorkflowCredentials:
         mock_credential_type: MagicMock,
     ) -> None:
         """Test successful credential resolution with correct extra_vars."""
-        from syntara.workflows.workflow_engine.activities.credential_resolution_activity import (
+        from syntara.workflow_runtime.engines.temporal.activities.credential_resolution_activity import (
             resolve_workflow_credentials,
         )
 
@@ -121,8 +123,8 @@ class TestResolveWorkflowCredentials:
         assert result[ACTIVITY_ID]["_secret_values"] == ["my-secret-token"]
 
     @pytest.mark.asyncio
-    @patch("syntara.workflows.workflow_engine.activities.credential_resolution_activity._session_factory")
-    @patch("syntara.workflows.workflow_engine.activities.credential_resolution_activity.create_secret_service")
+    @patch("syntara.workflow_runtime.engines.temporal.activities.credential_resolution_activity._session_factory")
+    @patch("syntara.workflow_runtime.engines.temporal.activities.credential_resolution_activity.create_secret_service")
     async def test_secret_values_excludes_non_secret_fields(
         self,
         mock_create_ss: MagicMock,
@@ -130,7 +132,7 @@ class TestResolveWorkflowCredentials:
         mock_credential: MagicMock,
     ) -> None:
         """Test that _secret_values only includes fields marked secret=True."""
-        from syntara.workflows.workflow_engine.activities.credential_resolution_activity import (
+        from syntara.workflow_runtime.engines.temporal.activities.credential_resolution_activity import (
             resolve_workflow_credentials,
         )
 
@@ -169,8 +171,8 @@ class TestResolveWorkflowCredentials:
         assert "admin" not in result[ACTIVITY_ID]["_secret_values"]
 
     @pytest.mark.asyncio
-    @patch("syntara.workflows.workflow_engine.activities.credential_resolution_activity._session_factory")
-    @patch("syntara.workflows.workflow_engine.activities.credential_resolution_activity.create_secret_service")
+    @patch("syntara.workflow_runtime.engines.temporal.activities.credential_resolution_activity._session_factory")
+    @patch("syntara.workflow_runtime.engines.temporal.activities.credential_resolution_activity.create_secret_service")
     async def test_secret_values_excludes_short_values(
         self,
         mock_create_ss: MagicMock,
@@ -179,7 +181,7 @@ class TestResolveWorkflowCredentials:
         mock_credential_type: MagicMock,
     ) -> None:
         """Test that _secret_values excludes values shorter than 4 chars."""
-        from syntara.workflows.workflow_engine.activities.credential_resolution_activity import (
+        from syntara.workflow_runtime.engines.temporal.activities.credential_resolution_activity import (
             resolve_workflow_credentials,
         )
 
@@ -200,8 +202,8 @@ class TestResolveWorkflowCredentials:
         assert result[ACTIVITY_ID]["_secret_values"] == []
 
     @pytest.mark.asyncio
-    @patch("syntara.workflows.workflow_engine.activities.credential_resolution_activity._session_factory")
-    @patch("syntara.workflows.workflow_engine.activities.credential_resolution_activity.create_secret_service")
+    @patch("syntara.workflow_runtime.engines.temporal.activities.credential_resolution_activity._session_factory")
+    @patch("syntara.workflow_runtime.engines.temporal.activities.credential_resolution_activity.create_secret_service")
     async def test_disabled_credential_raises_non_retryable(
         self,
         mock_create_ss: MagicMock,
@@ -209,7 +211,7 @@ class TestResolveWorkflowCredentials:
         mock_credential: MagicMock,
     ) -> None:
         """Test disabled credential raises non-retryable ApplicationError."""
-        from syntara.workflows.workflow_engine.activities.credential_resolution_activity import (
+        from syntara.workflow_runtime.engines.temporal.activities.credential_resolution_activity import (
             resolve_workflow_credentials,
         )
 
@@ -227,15 +229,15 @@ class TestResolveWorkflowCredentials:
             await resolve_workflow_credentials({ACTIVITY_ID: CREDENTIAL_ID})
 
     @pytest.mark.asyncio
-    @patch("syntara.workflows.workflow_engine.activities.credential_resolution_activity._session_factory")
-    @patch("syntara.workflows.workflow_engine.activities.credential_resolution_activity.create_secret_service")
+    @patch("syntara.workflow_runtime.engines.temporal.activities.credential_resolution_activity._session_factory")
+    @patch("syntara.workflow_runtime.engines.temporal.activities.credential_resolution_activity.create_secret_service")
     async def test_missing_credential_raises_non_retryable(
         self,
         mock_create_ss: MagicMock,
         mock_session_local: MagicMock,
     ) -> None:
         """Test missing credential raises non-retryable ApplicationError."""
-        from syntara.workflows.workflow_engine.activities.credential_resolution_activity import (
+        from syntara.workflow_runtime.engines.temporal.activities.credential_resolution_activity import (
             resolve_workflow_credentials,
         )
 
@@ -251,8 +253,8 @@ class TestResolveWorkflowCredentials:
             await resolve_workflow_credentials({ACTIVITY_ID: CREDENTIAL_ID})
 
     @pytest.mark.asyncio
-    @patch("syntara.workflows.workflow_engine.activities.credential_resolution_activity._session_factory")
-    @patch("syntara.workflows.workflow_engine.activities.credential_resolution_activity.create_secret_service")
+    @patch("syntara.workflow_runtime.engines.temporal.activities.credential_resolution_activity._session_factory")
+    @patch("syntara.workflow_runtime.engines.temporal.activities.credential_resolution_activity.create_secret_service")
     async def test_no_secret_id_raises_non_retryable(
         self,
         mock_create_ss: MagicMock,
@@ -260,7 +262,7 @@ class TestResolveWorkflowCredentials:
         mock_credential: MagicMock,
     ) -> None:
         """Test credential with no secret_id raises non-retryable error."""
-        from syntara.workflows.workflow_engine.activities.credential_resolution_activity import (
+        from syntara.workflow_runtime.engines.temporal.activities.credential_resolution_activity import (
             resolve_workflow_credentials,
         )
 
@@ -278,8 +280,8 @@ class TestResolveWorkflowCredentials:
             await resolve_workflow_credentials({ACTIVITY_ID: CREDENTIAL_ID})
 
     @pytest.mark.asyncio
-    @patch("syntara.workflows.workflow_engine.activities.credential_resolution_activity._session_factory")
-    @patch("syntara.workflows.workflow_engine.activities.credential_resolution_activity.create_secret_service")
+    @patch("syntara.workflow_runtime.engines.temporal.activities.credential_resolution_activity._session_factory")
+    @patch("syntara.workflow_runtime.engines.temporal.activities.credential_resolution_activity.create_secret_service")
     async def test_decryption_failure_raises_non_retryable(
         self,
         mock_create_ss: MagicMock,
@@ -288,7 +290,7 @@ class TestResolveWorkflowCredentials:
     ) -> None:
         """Test decryption failure raises non-retryable ApplicationError."""
         from syntara.core.lib.encryption import EncryptionError
-        from syntara.workflows.workflow_engine.activities.credential_resolution_activity import (
+        from syntara.workflow_runtime.engines.temporal.activities.credential_resolution_activity import (
             resolve_workflow_credentials,
         )
 
@@ -312,8 +314,8 @@ class TestCrossProjectCredentialResolution:
     """AAP-79159: credential resolution rejects cross-project references."""
 
     @pytest.mark.asyncio
-    @patch("syntara.workflows.workflow_engine.activities.credential_resolution_activity._session_factory")
-    @patch("syntara.workflows.workflow_engine.activities.credential_resolution_activity.create_secret_service")
+    @patch("syntara.workflow_runtime.engines.temporal.activities.credential_resolution_activity._session_factory")
+    @patch("syntara.workflow_runtime.engines.temporal.activities.credential_resolution_activity.create_secret_service")
     async def test_cross_project_credential_rejected_at_runtime(
         self,
         mock_create_ss: MagicMock,
@@ -321,7 +323,7 @@ class TestCrossProjectCredentialResolution:
         mock_credential: MagicMock,
     ) -> None:
         """Credential from project A must be rejected when workflow belongs to project B."""
-        from syntara.workflows.workflow_engine.activities.credential_resolution_activity import (
+        from syntara.workflow_runtime.engines.temporal.activities.credential_resolution_activity import (
             resolve_workflow_credentials,
         )
 
@@ -340,8 +342,8 @@ class TestCrossProjectCredentialResolution:
             )
 
     @pytest.mark.asyncio
-    @patch("syntara.workflows.workflow_engine.activities.credential_resolution_activity._session_factory")
-    @patch("syntara.workflows.workflow_engine.activities.credential_resolution_activity.create_secret_service")
+    @patch("syntara.workflow_runtime.engines.temporal.activities.credential_resolution_activity._session_factory")
+    @patch("syntara.workflow_runtime.engines.temporal.activities.credential_resolution_activity.create_secret_service")
     async def test_same_project_credential_allowed(
         self,
         mock_create_ss: MagicMock,
@@ -350,7 +352,7 @@ class TestCrossProjectCredentialResolution:
         mock_credential_type: MagicMock,
     ) -> None:
         """Credential from the same project must resolve successfully."""
-        from syntara.workflows.workflow_engine.activities.credential_resolution_activity import (
+        from syntara.workflow_runtime.engines.temporal.activities.credential_resolution_activity import (
             resolve_workflow_credentials,
         )
 
@@ -375,8 +377,8 @@ class TestCrossProjectCredentialResolution:
         assert result[ACTIVITY_ID]["credential_id"] == CREDENTIAL_ID
 
     @pytest.mark.asyncio
-    @patch("syntara.workflows.workflow_engine.activities.credential_resolution_activity._session_factory")
-    @patch("syntara.workflows.workflow_engine.activities.credential_resolution_activity.create_secret_service")
+    @patch("syntara.workflow_runtime.engines.temporal.activities.credential_resolution_activity._session_factory")
+    @patch("syntara.workflow_runtime.engines.temporal.activities.credential_resolution_activity.create_secret_service")
     async def test_no_project_id_allows_resolution_for_backward_compat(
         self,
         mock_create_ss: MagicMock,
@@ -385,7 +387,7 @@ class TestCrossProjectCredentialResolution:
         mock_credential_type: MagicMock,
     ) -> None:
         """When project_id is None (legacy/in-flight), credential resolves without project check."""
-        from syntara.workflows.workflow_engine.activities.credential_resolution_activity import (
+        from syntara.workflow_runtime.engines.temporal.activities.credential_resolution_activity import (
             resolve_workflow_credentials,
         )
 

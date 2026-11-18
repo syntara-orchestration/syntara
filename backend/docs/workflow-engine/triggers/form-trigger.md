@@ -104,7 +104,7 @@ For steps to add a field type or form parameter, see
 
 - [Form Definitions](../../forms/form-definitions.md) — field types, validation and parameters shared
   by form prompts and form triggers
-- [Trigger System Overview](overview.md) — shared trigger behavior, output flow, and multi-trigger resolution  
+- [Trigger System Overview](overview.md) — shared trigger behavior, output flow, and multi-trigger resolution
 - [Form Prompt Overview](../../forms/form-prompt-overview.md) — the sibling collection
   point that pauses a running workflow
 - [Manual Trigger](manual-trigger.md) — another trigger with no external state

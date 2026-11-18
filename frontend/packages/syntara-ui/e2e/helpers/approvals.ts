@@ -84,7 +84,7 @@ export async function dismissConnectionBanner(app: Page): Promise<void> {
 
 /** Bulk Approve/Reject controls live in the list toolbar (not the Compass page header). */
 export function getApprovalsBulkToolbar(app: Page, selectedCount: number): Locator {
-  return app.getByRole('toolbar', { name: `${selectedCount} selected` })
+  return app.getByRole('group', { name: `${selectedCount} selected` })
 }
 
 /**
