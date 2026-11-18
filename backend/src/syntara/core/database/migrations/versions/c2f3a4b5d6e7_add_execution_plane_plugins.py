@@ -1,7 +1,7 @@
 """Add the database-backed Execution Plane plugin registry.
 
 Revision ID: c2f3a4b5d6e7
-Revises: a3f7b8c9d0e1
+Revises: e2f6a8c1d4b7
 Create Date: 2026-11-17
 """
 
@@ -12,7 +12,7 @@ from alembic import op
 from sqlalchemy.dialects import postgresql
 
 revision: str = "c2f3a4b5d6e7"
-down_revision: str | Sequence[str] | None = "a3f7b8c9d0e1"
+down_revision: str | Sequence[str] | None = "e2f6a8c1d4b7"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
