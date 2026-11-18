@@ -17,7 +17,7 @@ This file provides guidance to AI coding assistants when working in the frontend
 | **Before writing or modifying any component, page, or UI code**                                     | `.agents/skills/frontend-patternfly-ux/SKILL.md`                                          |
 | **Before writing or reviewing any test file** (unit, integration, or accessibility)                 | `.agents/skills/frontend-testing-guidelines/SKILL.md`                                     |
 | **Before writing or reviewing any E2E / Playwright test**                                           | `.agents/skills/frontend-playwright-e2e/SKILL.md`                                         |
-| **Before committing code or reporting a task as done**                                              | `.agents/skills/frontend-pr-review/SKILL.md` (self-review against PR checklist)           |
+| **Before committing code or reporting a task as done**                                              | `.agents/skills/frontend-review-pr/SKILL.md` (self-review against PR checklist)           |
 | **Before writing or modifying any component, hook, or pattern**                                     | `.agents/skills/frontend-coding-standards/SKILL.md`                                       |
 | **Before writing code using React, Zod, Zustand, Vitest, Vite, TanStack Query, or TanStack Router** | `.agents/skills/frontend-library-references/SKILL.md` (fetch the relevant `llms.txt` URL) |
 | **Before an accessibility audit or drafting a11y bugs beyond axe-core**                             | `.agents/skills/frontend-a11y-audit/SKILL.md`                                             |
@@ -94,6 +94,12 @@ Items enforced by ESLint at **error** level are omitted -- ESLint is the source 
 - `Page` imported directly from `@playwright/test` in E2E files → E2E `no-restricted-imports`
 - `waitForLoadState('networkidle')` in E2E tests → E2E `no-restricted-syntax`
 - Unnecessary `useEffect` patterns → `reactYouMightNotNeedAnEffect/*` (warn)
+- Raw `fetch()` / `XMLHttpRequest` → `syntara/no-raw-http-calls`
+- `useQueryState` with a plain string instead of `{ title, onRetry }` → `no-restricted-syntax`
+- Inline `Modal` confirmation boilerplate → `syntara/prefer-confirmation-dialog`
+- Missing `<title>` in route page components → `syntara/require-page-title` (use `toPageTitle` from `src/utils/toPageTitle.ts`)
+- `fireEvent` in tests → `testing-library/prefer-user-event`
+- `container.querySelector` / DOM node access in tests → `testing-library/no-container`, `testing-library/no-node-access`
 
 The items below cover patterns ESLint **cannot** catch:
 
@@ -119,19 +125,18 @@ The items below cover patterns ESLint **cannot** catch:
 20. **Never use `eslint-disable`** -- do not add `eslint-disable` or `eslint-disable-next-line` to new or modified code. Every rule catches a real problem; fix the code so the rule passes. Pre-existing suppressions are tech debt being cleaned up. See [`.agents/skills/frontend-coding-standards/SKILL.md`](../.agents/skills/frontend-coding-standards/SKILL.md) §28
 21. **Conditional hook execution uses wrapper components** -- hooks must be called unconditionally per React rules; if a hook's result is used conditionally, extract to a wrapper component that is conditionally rendered (see [`.agents/skills/frontend-coding-standards/SKILL.md`](../.agents/skills/frontend-coding-standards/SKILL.md) §29)
 22. **Leverage existing libraries before custom code** -- all async server state must use TanStack Query (`useQuery`/`useMutation`/`useQueries`), not manual `useEffect` + `useState` + `fetch`; use `refetchInterval` for query polling, not hand-rolled timer/effect loops. Forms must use react-hook-form + Zod; styling must use PatternFly + CSS modules. Do not reimplement what the tech stack already provides (see [`.agents/skills/frontend-coding-standards/SKILL.md`](../.agents/skills/frontend-coding-standards/SKILL.md) §30)
-23. **No `// TODO` comments in shipped code** -- surfaced as a lint warning via `no-warning-comments` (warn, not error; does not block CI but is flagged during review). Deferred work belongs in an issue, not buried in source. If a follow-up is needed, create a ticket and reference it inline (e.g., `// Inline type until #12345`). See [`.agents/skills/frontend-coding-standards/SKILL.md`](../.agents/skills/frontend-coding-standards/SKILL.md) §32
+23. **No `// TODO` comments in shipped code** -- surfaced as a lint warning via `no-warning-comments` (warn, not error; does not block CI but is flagged during review). Deferred work belongs in an issue, not buried in source. If a follow-up is needed, create a ticket and reference it inline (e.g., `// Inline type until #12345`). See [`.agents/skills/frontend-coding-standards/SKILL.md`](../.agents/skills/frontend-coding-standards/SKILL.md) §33
 24. **New routes must set `requiredPermissions` and/or `routePermission`** -- every route with access requirements needs permission fields in `navigationItems.tsx`; create/edit routes need a `routePermission` for `ProtectedRoute` guard (see [`docs/permissions-rbac.md`](docs/permissions-rbac.md))
 25. **New write actions must use `DisabledWithTooltip` + permission hook** -- never expose ungated create/edit/delete buttons; use a domain `use*Permissions` hook and `permissionTooltip()` for copy (see [`docs/permissions-rbac.md`](docs/permissions-rbac.md))
 26. **New permission-gated features need mock handlers** -- add role-aware responses in `packages/syntara-mock-api/src/handlers.ts` `can_i` block for all 4 roles (admin, viewer, auditor, user) and E2E tests in `permission-gating.spec.ts`
-27. **`SynPageHeader` must get `docLink={useDocLink('key')}`** -- hardcoded docs URLs are ESLint (`syntara/no-hardcoded-doc-urls`); still verify the header receives the hook result and new keys land in `docsUrls.json` (see [`.agents/skills/frontend-coding-standards/SKILL.md`](../.agents/skills/frontend-coding-standards/SKILL.md) section 33)
+27. **`SynPageHeader` must get `docLink={useDocLink('key')}`** -- hardcoded docs URLs are ESLint (`syntara/no-hardcoded-doc-urls`); still verify the header receives the hook result and new keys land in `docsUrls.json` (see [`.agents/skills/frontend-coding-standards/SKILL.md`](../.agents/skills/frontend-coding-standards/SKILL.md) §24)
 28. **No `new Date()` in mock API seed data** -- ESLint enforced in `syntara-mock-api`'s `eslint.config.js` for `src/resources/` and `src/utils/`; seed data must use deterministic timestamps from `mockDates.ts`, never `new Date()`. Dynamic timestamps cause visual regression baselines to go stale across CI runs because rendered dates change daily
-29. **New pages must render `<title>{toPageTitle(['...'])}</title>`** -- every top-level page component (default export with `<SynPage>`) must render a `<title>` as its first `<SynPage>` child. Use `toPageTitle` from `src/utils/toPageTitle.ts`
-30. **No new `forwardRef`** -- React 19 passes `ref` as a regular prop; accept `ref` on the props type instead of wrapping with `forwardRef` (see [`.agents/skills/frontend-coding-standards/SKILL.md`](../.agents/skills/frontend-coding-standards/SKILL.md) §38)
-31. **Prefer ref callback cleanup functions** -- when attaching DOM listeners or observers, return a cleanup from the ref callback instead of pairing `useRef` + `useEffect` (see [`.agents/skills/frontend-coding-standards/SKILL.md`](../.agents/skills/frontend-coding-standards/SKILL.md) §38)
-32. **No new `useContext`** -- React 19 reads context with `use(Context)`; do not add `useContext` (see [`.agents/skills/frontend-coding-standards/SKILL.md`](../.agents/skills/frontend-coding-standards/SKILL.md) §39)
-33. **Prefer `useOptimistic` for clear toggle/counter mutations** -- update UI inside a `startTransition` Action with `mutateAsync`; do not hand-roll pending mirror state for simple before/after mutations (see [`.agents/skills/frontend-coding-standards/SKILL.md`](../.agents/skills/frontend-coding-standards/SKILL.md) §40)
-34. **No new barrel files in `src/`** -- do not create a file that only re-exports from other files. Import directly from the source file instead. ESLint enforces this at `error` (`barrel-files/avoid-barrel-files`), scoped to `src/**/*.{ts,tsx}`. Does not apply to `e2e/` or other non-production directories (see [`.agents/skills/frontend-coding-standards/SKILL.md`](../.agents/skills/frontend-coding-standards/SKILL.md) §43)
-35. **Use TanStack Router for URL search state** -- see [URL Search State](../.agents/skills/frontend-coding-standards/SKILL.md#url-search-state) for `validateSearch`, `useSearch`, `useNavigate`, and list-filter patterns
+29. **No new `forwardRef`** -- React 19 passes `ref` as a regular prop; accept `ref` on the props type instead of wrapping with `forwardRef` (see [`.agents/skills/frontend-coding-standards/SKILL.md`](../.agents/skills/frontend-coding-standards/SKILL.md) §38)
+30. **Prefer ref callback cleanup functions** -- when attaching DOM listeners or observers, return a cleanup from the ref callback instead of pairing `useRef` + `useEffect` (see [`.agents/skills/frontend-coding-standards/SKILL.md`](../.agents/skills/frontend-coding-standards/SKILL.md) §38)
+31. **No new `useContext`** -- React 19 reads context with `use(Context)`; do not add `useContext` (see [`.agents/skills/frontend-coding-standards/SKILL.md`](../.agents/skills/frontend-coding-standards/SKILL.md) §39)
+32. **Prefer `useOptimistic` for clear toggle/counter mutations** -- update UI inside a `startTransition` Action with `mutateAsync`; do not hand-roll pending mirror state for simple before/after mutations (see [`.agents/skills/frontend-coding-standards/SKILL.md`](../.agents/skills/frontend-coding-standards/SKILL.md) §40)
+33. **No new barrel files in `src/`** -- do not create a file that only re-exports from other files. Import directly from the source file instead. ESLint enforces this at `error` (`barrel-files/avoid-barrel-files`), scoped to `src/**/*.{ts,tsx}`. Does not apply to `e2e/` or other non-production directories (see [`.agents/skills/frontend-coding-standards/SKILL.md`](../.agents/skills/frontend-coding-standards/SKILL.md) §43)
+34. **Use TanStack Router for URL search state** -- see [URL Search State](../.agents/skills/frontend-coding-standards/SKILL.md#url-search-state) for `validateSearch`, `useSearch`, `useNavigate`, and list-filter patterns
 
 ### Feature Preservation Rules
 
@@ -405,7 +410,7 @@ function MyPage() {
 }
 ```
 
-The key passed to `useDocLink` must exist in `src/utils/docs/docsUrls.json` (flat path string per key). TypeScript enforces this at compile time. Community builds resolve every key to the shared README; extended builds resolve per-key URLs when configured. See [`.agents/skills/frontend-coding-standards/SKILL.md`](../.agents/skills/frontend-coding-standards/SKILL.md) section 33 for full details.
+The key passed to `useDocLink` must exist in `src/utils/docs/docsUrls.json` (flat path string per key). TypeScript enforces this at compile time. Community builds resolve every key to the shared README; extended builds resolve per-key URLs when configured. See [`.agents/skills/frontend-coding-standards/SKILL.md`](../.agents/skills/frontend-coding-standards/SKILL.md) §24 for full details.
 
 ## Critical Development Workflows
 
