@@ -9,6 +9,10 @@ Routes exempted by design:
 - Auth routes (/auth/*) — use dedicated token deps or are public
 - Webhook routes (/webhooks/*) — use service account Bearer token authentication (get_webhook_caller)
 - Public utility routes (resource_actions, validate_name)
+
+Routes guarded by ``require_internal_service`` count as authenticated: they
+accept only allowlisted mTLS service identities and reject bearer tokens, so
+they intentionally do not depend on ``get_current_user``.
 """
 
 from __future__ import annotations
@@ -20,6 +24,7 @@ from fastapi import FastAPI
 
 from syntara.api.constants import API_V1_PATH_PREFIX, EXCLUDED_PATH_PREFIXES, EXCLUDED_PATHS
 from syntara.auth.dependencies import get_current_user
+from syntara.authz.dependencies import require_internal_service
 from syntara.core.router_discovery import discover_and_register_routers, iter_api_routes
 
 pytestmark = [pytest.mark.integration]
@@ -36,6 +41,8 @@ AUTH_EXEMPT_PATHS = frozenset(
     }
 )
 
+_AUTH_DEPENDENCIES = (get_current_user, require_internal_service)
+
 
 def _is_excluded(path: str) -> bool:
     if path in EXCLUDED_PATHS or path in AUTH_EXEMPT_PATHS:
@@ -43,16 +50,20 @@ def _is_excluded(path: str) -> bool:
     return any(path.startswith(p) for p in (*EXCLUDED_PATH_PREFIXES, *AUTH_EXEMPT_PREFIXES))
 
 
-def _has_get_current_user(dependant: object, depth: int = 0) -> bool:
-    """Walk the FastAPI dependency tree looking for ``get_current_user``."""
+def _has_auth_dependency(dependant: object, depth: int = 0) -> bool:
+    """Walk the FastAPI dependency tree looking for an authentication dependency.
+
+    Matches ``get_current_user`` (user and service callers) and
+    ``require_internal_service`` (mTLS-only internal service callers).
+    """
     if depth > 10 or dependant is None:
         return False
     for dep in getattr(dependant, "dependencies", []):
         call = getattr(dep, "call", None)
-        if call is get_current_user:
+        if call in _AUTH_DEPENDENCIES:
             return True
         sub = getattr(dep, "dependency", None) or getattr(dep, "dependant", None)
-        if sub is not None and _has_get_current_user(sub, depth + 1):
+        if sub is not None and _has_auth_dependency(sub, depth + 1):
             return True
         if call is not None and callable(call):
             try:
@@ -70,7 +81,7 @@ def _route_has_auth(route: object) -> bool:
     params = list(sig.parameters.keys()) if sig else []
     if "current_user" in params:
         return True
-    return _has_get_current_user(getattr(route, "dependant", None))
+    return _has_auth_dependency(getattr(route, "dependant", None))
 
 
 @pytest.fixture(scope="module")
