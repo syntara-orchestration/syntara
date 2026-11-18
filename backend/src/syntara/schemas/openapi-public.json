@@ -19197,14 +19197,7 @@
             "content": {
               "application/problem+json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ErrorData"
-                },
-                "example": {
-                  "type": "https://api.example.com/errors/forbidden",
-                  "title": "Forbidden",
-                  "detail": "You do not have permission to access this resource",
-                  "code": "FORBIDDEN",
-                  "retryable": false
+                  "$ref": "#/components/schemas/WorkflowWriteForbiddenProblemDetail"
                 }
               }
             }
@@ -36193,14 +36186,7 @@
             "content": {
               "application/problem+json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ErrorData"
-                },
-                "example": {
-                  "type": "https://api.example.com/errors/forbidden",
-                  "title": "Forbidden",
-                  "detail": "You do not have permission to access this resource",
-                  "code": "FORBIDDEN",
-                  "retryable": false
+                  "$ref": "#/components/schemas/WorkflowWriteForbiddenProblemDetail"
                 }
               }
             }
@@ -36734,14 +36720,7 @@
             "content": {
               "application/problem+json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ErrorData"
-                },
-                "example": {
-                  "type": "https://api.example.com/errors/forbidden",
-                  "title": "Forbidden",
-                  "detail": "You do not have permission to access this resource",
-                  "code": "FORBIDDEN",
-                  "retryable": false
+                  "$ref": "#/components/schemas/WorkflowWriteForbiddenProblemDetail"
                 }
               }
             }
@@ -36906,14 +36885,7 @@
             "content": {
               "application/problem+json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ErrorData"
-                },
-                "example": {
-                  "type": "https://api.example.com/errors/forbidden",
-                  "title": "Forbidden",
-                  "detail": "You do not have permission to access this resource",
-                  "code": "FORBIDDEN",
-                  "retryable": false
+                  "$ref": "#/components/schemas/WorkflowWriteForbiddenProblemDetail"
                 }
               }
             }
@@ -37718,14 +37690,7 @@
             "content": {
               "application/problem+json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ErrorData"
-                },
-                "example": {
-                  "type": "https://api.example.com/errors/forbidden",
-                  "title": "Forbidden",
-                  "detail": "You do not have permission to access this resource",
-                  "code": "FORBIDDEN",
-                  "retryable": false
+                  "$ref": "#/components/schemas/WorkflowWriteForbiddenProblemDetail"
                 }
               }
             }
@@ -37904,14 +37869,7 @@
             "content": {
               "application/problem+json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ErrorData"
-                },
-                "example": {
-                  "type": "https://api.example.com/errors/forbidden",
-                  "title": "Forbidden",
-                  "detail": "You do not have permission to access this resource",
-                  "code": "FORBIDDEN",
-                  "retryable": false
+                  "$ref": "#/components/schemas/WorkflowWriteForbiddenProblemDetail"
                 }
               }
             }
@@ -38085,14 +38043,7 @@
             "content": {
               "application/problem+json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ErrorData"
-                },
-                "example": {
-                  "type": "https://api.example.com/errors/forbidden",
-                  "title": "Forbidden",
-                  "detail": "You do not have permission to access this resource",
-                  "code": "FORBIDDEN",
-                  "retryable": false
+                  "$ref": "#/components/schemas/WorkflowWriteForbiddenProblemDetail"
                 }
               }
             }
@@ -38276,14 +38227,7 @@
             "content": {
               "application/problem+json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ErrorData"
-                },
-                "example": {
-                  "type": "https://api.example.com/errors/forbidden",
-                  "title": "Forbidden",
-                  "detail": "You do not have permission to access this resource",
-                  "code": "FORBIDDEN",
-                  "retryable": false
+                  "$ref": "#/components/schemas/WorkflowWriteForbiddenProblemDetail"
                 }
               }
             }
@@ -46548,6 +46492,156 @@
           "updated_count",
           "skipped_count",
           "updated_at"
+        ]
+      },
+      "BlockedStepType": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "explicit_deny",
+              "no_matching_allow"
+            ],
+            "title": "Reason"
+          },
+          "project": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "label",
+          "reason",
+          "project"
+        ],
+        "title": "BlockedStepType",
+        "description": "A step type the caller cannot author."
+      },
+      "WorkflowWriteForbiddenProblemDetail": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Type",
+            "description": "URI reference identifying the problem type",
+            "examples": [
+              "https://api.example.com/errors/llm-error"
+            ]
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Title",
+            "description": "Short, human-readable summary of the problem",
+            "examples": [
+              "LLM Service Unavailable"
+            ]
+          },
+          "detail": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Detail",
+            "description": "Human-readable explanation specific to this occurrence",
+            "examples": [
+              "OpenRouter API returned error: rate limit exceeded. Please try again in a few moments."
+            ]
+          },
+          "code": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Code",
+            "description": "Machine-readable error code for programmatic handling",
+            "examples": [
+              "RATE_LIMIT_EXCEEDED"
+            ]
+          },
+          "retryable": {
+            "type": "boolean",
+            "title": "Retryable",
+            "description": "Whether this error can be retried by creating a new invocation",
+            "examples": [
+              true
+            ]
+          },
+          "instance": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2048
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instance",
+            "description": "Optional URI reference identifying the specific occurrence",
+            "examples": [
+              "/invocations/550e8400-e29b-41d4-a716-446655440000"
+            ]
+          },
+          "blocked_step_types": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/BlockedStepType"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Blocked Step Types"
+          }
+        },
+        "type": "object",
+        "required": [
+          "type",
+          "title",
+          "detail",
+          "code",
+          "retryable"
+        ],
+        "title": "WorkflowWriteForbiddenProblemDetail",
+        "description": "Standard forbidden response with optional step-type denial details.",
+        "examples": [
+          {
+            "code": "RATE_LIMIT_EXCEEDED",
+            "detail": "OpenRouter API rate limit exceeded. Please try again in a few moments.",
+            "instance": "/invocations/550e8400-e29b-41d4-a716-446655440000",
+            "retryable": true,
+            "title": "LLM Rate Limit Exceeded",
+            "type": "https://api.example.com/errors/llm-error"
+          },
+          {
+            "code": "STREAM_TIMEOUT",
+            "detail": "LLM streaming timed out after 30 seconds",
+            "instance": "/invocations/550e8400-e29b-41d4-a716-446655440000",
+            "retryable": true,
+            "title": "Streaming Timeout",
+            "type": "https://api.example.com/errors/timeout-error"
+          }
         ]
       },
       "ProjectCreate": {

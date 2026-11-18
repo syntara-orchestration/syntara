@@ -7,6 +7,7 @@ import { useDialogState } from '../../../hooks/useDialogState'
 import type { AlertMessage } from '../../../providers/alerts'
 import { useWorkflowStore } from '../../../stores/useWorkflowStore'
 import type { WorkflowDefinition } from '../../../stores/workflowStoreTypes'
+import { getErrorMessage } from '../../../utils/apiErrors'
 import { detachPromise } from '../../../utils/detachPromise'
 import type { BuilderAction } from '../builderReducer'
 import { formatHistoryDateTime } from '../historyDateUtils'
@@ -154,8 +155,8 @@ export function useBuilderVersionHistory({
           )
           showSuccess({ title: 'Version restored', description: `Restored from version ${versionToRestore}` })
         },
-        onError: () => {
-          showError({ title: 'Failed to restore version' })
+        onError: (error) => {
+          showError({ title: 'Failed to restore version', description: getErrorMessage(error) })
         },
       }
     )

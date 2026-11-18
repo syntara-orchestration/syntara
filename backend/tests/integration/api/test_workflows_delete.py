@@ -42,6 +42,15 @@ async def test_delete_workflow_removes_row(
         workflow_definition=create_minimal_workflow_definition(name="delete-test"),
     )
     test_db_session.add(workflow)
+    test_db_session.add(
+        WorkflowVersion(
+            workflow_id=workflow_id,
+            version=1,
+            schema_version="2.0.0",
+            workflow_definition=create_minimal_workflow_definition(name="delete-test"),
+            created_by=test_user.id,
+        )
+    )
     await test_db_session.commit()
 
     response = await auth_client.delete(f"/api/v1/workflows/{workflow_id}")

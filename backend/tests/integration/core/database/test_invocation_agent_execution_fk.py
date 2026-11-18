@@ -54,6 +54,7 @@ class TestInvocationAgentExecutionForeignKey:
         workflow_factory: WorkflowFactory,
         execution_factory: ExecutionFactory,
         invocation_factory: InvocationFactory,
+        allow_all_evaluator,
     ) -> None:
         """Deleting a workflow cascades to its executions without an IntegrityError."""
         workflow, version = await workflow_factory.create()
@@ -65,7 +66,7 @@ class TestInvocationAgentExecutionForeignKey:
         )
         await test_db_session.commit()
 
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
         await service.delete_workflow(workflow.id)
         await test_db_session.commit()
 

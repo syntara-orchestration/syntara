@@ -44,9 +44,9 @@ async def seeded_db(test_db_session: AsyncSession) -> AsyncSession:
 
 
 @pytest.mark.asyncio
-async def test_create_project(seeded_db: AsyncSession, test_user: User) -> None:
+async def test_create_project(seeded_db: AsyncSession, test_user: User, allow_all_evaluator) -> None:
     """Create a project and auto-assign creator as project-admin."""
-    svc = ProjectService(seeded_db, test_user)
+    svc = ProjectService(seeded_db, test_user, opa_client=allow_all_evaluator)
     project = await svc.create_project(
         name="test-project",
         description="A test project",
@@ -64,9 +64,9 @@ async def test_create_project(seeded_db: AsyncSession, test_user: User) -> None:
 
 
 @pytest.mark.asyncio
-async def test_create_project_defaults(seeded_db: AsyncSession, test_user: User) -> None:
+async def test_create_project_defaults(seeded_db: AsyncSession, test_user: User, allow_all_evaluator) -> None:
     """Create a project with only the required name."""
-    svc = ProjectService(seeded_db, test_user)
+    svc = ProjectService(seeded_db, test_user, opa_client=allow_all_evaluator)
     project = await svc.create_project(name="minimal-project")
     assert project.name == "minimal-project"
     assert project.description is None
@@ -74,9 +74,9 @@ async def test_create_project_defaults(seeded_db: AsyncSession, test_user: User)
 
 
 @pytest.mark.asyncio
-async def test_get_project(seeded_db: AsyncSession, test_user: User) -> None:
+async def test_get_project(seeded_db: AsyncSession, test_user: User, allow_all_evaluator) -> None:
     """Get a project by ID."""
-    svc = ProjectService(seeded_db, test_user)
+    svc = ProjectService(seeded_db, test_user, opa_client=allow_all_evaluator)
     created = await svc.create_project(name="get-project")
     fetched = await svc.get_project(created.id)
     assert fetched.id == created.id
@@ -84,17 +84,17 @@ async def test_get_project(seeded_db: AsyncSession, test_user: User) -> None:
 
 
 @pytest.mark.asyncio
-async def test_get_project_not_found(seeded_db: AsyncSession, test_user: User) -> None:
+async def test_get_project_not_found(seeded_db: AsyncSession, test_user: User, allow_all_evaluator) -> None:
     """Getting a non-existent project raises SafeValueError."""
-    svc = ProjectService(seeded_db, test_user)
+    svc = ProjectService(seeded_db, test_user, opa_client=allow_all_evaluator)
     with pytest.raises(ProjectNotFoundError, match="not found"):
         await svc.get_project(uuid4())
 
 
 @pytest.mark.asyncio
-async def test_get_deleted_project_not_found(seeded_db: AsyncSession, test_user: User) -> None:
+async def test_get_deleted_project_not_found(seeded_db: AsyncSession, test_user: User, allow_all_evaluator) -> None:
     """Getting a hard-deleted project raises ProjectNotFoundError."""
-    svc = ProjectService(seeded_db, test_user)
+    svc = ProjectService(seeded_db, test_user, opa_client=allow_all_evaluator)
     project = await svc.create_project(name="deleted-project")
     await svc.delete_project(project.id)
     with pytest.raises(ProjectNotFoundError, match="not found"):
@@ -102,9 +102,9 @@ async def test_get_deleted_project_not_found(seeded_db: AsyncSession, test_user:
 
 
 @pytest.mark.asyncio
-async def test_list_projects_no_filter(seeded_db: AsyncSession, test_user: User) -> None:
+async def test_list_projects_no_filter(seeded_db: AsyncSession, test_user: User, allow_all_evaluator) -> None:
     """List all non-deleted projects."""
-    svc = ProjectService(seeded_db, test_user)
+    svc = ProjectService(seeded_db, test_user, opa_client=allow_all_evaluator)
     await svc.create_project(name="list-p1")
     await svc.create_project(name="list-p2")
     projects = await svc.list_projects()
@@ -114,9 +114,9 @@ async def test_list_projects_no_filter(seeded_db: AsyncSession, test_user: User)
 
 
 @pytest.mark.asyncio
-async def test_list_projects_with_allowed_all(seeded_db: AsyncSession, test_user: User) -> None:
+async def test_list_projects_with_allowed_all(seeded_db: AsyncSession, test_user: User, allow_all_evaluator) -> None:
     """List with all_projects=True returns everything."""
-    svc = ProjectService(seeded_db, test_user)
+    svc = ProjectService(seeded_db, test_user, opa_client=allow_all_evaluator)
     await svc.create_project(name="all-p1")
     allowed = AllowedProjectsResult(all_projects=True, project_ids=[])
     projects = await svc.list_projects(allowed_projects=allowed)
@@ -125,9 +125,11 @@ async def test_list_projects_with_allowed_all(seeded_db: AsyncSession, test_user
 
 
 @pytest.mark.asyncio
-async def test_list_projects_with_allowed_specific(seeded_db: AsyncSession, test_user: User) -> None:
+async def test_list_projects_with_allowed_specific(
+    seeded_db: AsyncSession, test_user: User, allow_all_evaluator
+) -> None:
     """List with specific project IDs only returns those projects."""
-    svc = ProjectService(seeded_db, test_user)
+    svc = ProjectService(seeded_db, test_user, opa_client=allow_all_evaluator)
     p1 = await svc.create_project(name="allowed-p1")
     await svc.create_project(name="not-allowed-p2")
     allowed = AllowedProjectsResult(all_projects=False, project_ids=[p1.id])
@@ -138,9 +140,9 @@ async def test_list_projects_with_allowed_specific(seeded_db: AsyncSession, test
 
 
 @pytest.mark.asyncio
-async def test_list_projects_with_allowed_empty(seeded_db: AsyncSession, test_user: User) -> None:
+async def test_list_projects_with_allowed_empty(seeded_db: AsyncSession, test_user: User, allow_all_evaluator) -> None:
     """List with empty project IDs returns nothing."""
-    svc = ProjectService(seeded_db, test_user)
+    svc = ProjectService(seeded_db, test_user, opa_client=allow_all_evaluator)
     await svc.create_project(name="empty-filter-p1")
     allowed = AllowedProjectsResult(all_projects=False, project_ids=[])
     projects = await svc.list_projects(allowed_projects=allowed)
@@ -153,9 +155,11 @@ async def test_list_projects_with_allowed_empty(seeded_db: AsyncSession, test_us
 
 
 @pytest.mark.asyncio
-async def test_list_projects_cursor_include_total_no_filter(seeded_db: AsyncSession, test_user: User) -> None:
+async def test_list_projects_cursor_include_total_no_filter(
+    seeded_db: AsyncSession, test_user: User, allow_all_evaluator
+) -> None:
     """include_total returns correct count when no authorization filter is applied."""
-    svc = ProjectService(seeded_db, test_user)
+    svc = ProjectService(seeded_db, test_user, opa_client=allow_all_evaluator)
     for i in range(5):
         await svc.create_project(name=f"total-p{i}")
 
@@ -167,10 +171,10 @@ async def test_list_projects_cursor_include_total_no_filter(seeded_db: AsyncSess
 
 @pytest.mark.asyncio
 async def test_list_projects_cursor_include_total_with_allowed_specific(
-    seeded_db: AsyncSession, test_user: User
+    seeded_db: AsyncSession, test_user: User, allow_all_evaluator
 ) -> None:
     """include_total reflects only projects the user is authorized to see."""
-    svc = ProjectService(seeded_db, test_user)
+    svc = ProjectService(seeded_db, test_user, opa_client=allow_all_evaluator)
     p1 = await svc.create_project(name="visible-p1")
     p2 = await svc.create_project(name="visible-p2")
     await svc.create_project(name="hidden-p3")
@@ -185,9 +189,11 @@ async def test_list_projects_cursor_include_total_with_allowed_specific(
 
 
 @pytest.mark.asyncio
-async def test_list_projects_cursor_include_total_with_allowed_empty(seeded_db: AsyncSession, test_user: User) -> None:
+async def test_list_projects_cursor_include_total_with_allowed_empty(
+    seeded_db: AsyncSession, test_user: User, allow_all_evaluator
+) -> None:
     """include_total returns 0 when user has no project access."""
-    svc = ProjectService(seeded_db, test_user)
+    svc = ProjectService(seeded_db, test_user, opa_client=allow_all_evaluator)
     await svc.create_project(name="no-access-p1")
 
     allowed = AllowedProjectsResult(all_projects=False, project_ids=[])
@@ -197,9 +203,11 @@ async def test_list_projects_cursor_include_total_with_allowed_empty(seeded_db: 
 
 
 @pytest.mark.asyncio
-async def test_list_projects_cursor_include_total_with_all_projects(seeded_db: AsyncSession, test_user: User) -> None:
+async def test_list_projects_cursor_include_total_with_all_projects(
+    seeded_db: AsyncSession, test_user: User, allow_all_evaluator
+) -> None:
     """include_total returns full count when all_projects is True."""
-    svc = ProjectService(seeded_db, test_user)
+    svc = ProjectService(seeded_db, test_user, opa_client=allow_all_evaluator)
     for i in range(4):
         await svc.create_project(name=f"all-access-p{i}")
 
@@ -210,9 +218,11 @@ async def test_list_projects_cursor_include_total_with_all_projects(seeded_db: A
 
 
 @pytest.mark.asyncio
-async def test_list_projects_cursor_without_include_total(seeded_db: AsyncSession, test_user: User) -> None:
+async def test_list_projects_cursor_without_include_total(
+    seeded_db: AsyncSession, test_user: User, allow_all_evaluator
+) -> None:
     """Total is None when include_total is False."""
-    svc = ProjectService(seeded_db, test_user)
+    svc = ProjectService(seeded_db, test_user, opa_client=allow_all_evaluator)
     await svc.create_project(name="no-total-p1")
 
     result = await svc.list_projects_cursor(limit=10, include_total=False)
@@ -225,9 +235,9 @@ async def test_list_projects_cursor_without_include_total(seeded_db: AsyncSessio
 
 
 @pytest.mark.asyncio
-async def test_update_project(seeded_db: AsyncSession, test_user: User) -> None:
+async def test_update_project(seeded_db: AsyncSession, test_user: User, allow_all_evaluator) -> None:
     """Update project name, description, and labels."""
-    svc = ProjectService(seeded_db, test_user)
+    svc = ProjectService(seeded_db, test_user, opa_client=allow_all_evaluator)
     project = await svc.create_project(name="update-me", description="original")
     updated = await svc.update_project(
         project.id,
@@ -241,9 +251,9 @@ async def test_update_project(seeded_db: AsyncSession, test_user: User) -> None:
 
 
 @pytest.mark.asyncio
-async def test_update_project_partial(seeded_db: AsyncSession, test_user: User) -> None:
+async def test_update_project_partial(seeded_db: AsyncSession, test_user: User, allow_all_evaluator) -> None:
     """Partial update only changes provided fields."""
-    svc = ProjectService(seeded_db, test_user)
+    svc = ProjectService(seeded_db, test_user, opa_client=allow_all_evaluator)
     project = await svc.create_project(name="partial-update", description="original")
     updated = await svc.update_project(project.id, description="only desc changed")
     assert updated.name == "partial-update"
@@ -251,9 +261,9 @@ async def test_update_project_partial(seeded_db: AsyncSession, test_user: User) 
 
 
 @pytest.mark.asyncio
-async def test_delete_project(seeded_db: AsyncSession, test_user: User) -> None:
+async def test_delete_project(seeded_db: AsyncSession, test_user: User, allow_all_evaluator) -> None:
     """Hard-delete a project."""
-    svc = ProjectService(seeded_db, test_user)
+    svc = ProjectService(seeded_db, test_user, opa_client=allow_all_evaluator)
     project = await svc.create_project(name="delete-me")
     await svc.delete_project(project.id)
     # Should not appear in list
@@ -267,9 +277,11 @@ async def test_delete_project(seeded_db: AsyncSession, test_user: User) -> None:
 
 
 @pytest.mark.asyncio
-async def test_delete_project_cascades_role_assignments(seeded_db: AsyncSession, test_user: User) -> None:
+async def test_delete_project_cascades_role_assignments(
+    seeded_db: AsyncSession, test_user: User, allow_all_evaluator
+) -> None:
     """Deleting a project hard-deletes all user and group role assignments."""
-    svc = ProjectService(seeded_db, test_user)
+    svc = ProjectService(seeded_db, test_user, opa_client=allow_all_evaluator)
     project = await svc.create_project(name="cascade-assignments")
 
     other = User(
@@ -307,9 +319,11 @@ async def test_delete_project_cascades_role_assignments(seeded_db: AsyncSession,
 
 
 @pytest.mark.asyncio
-async def test_delete_project_cascades_custom_roles(seeded_db: AsyncSession, test_user: User) -> None:
+async def test_delete_project_cascades_custom_roles(
+    seeded_db: AsyncSession, test_user: User, allow_all_evaluator
+) -> None:
     """Deleting a project hard-deletes all custom roles scoped to it."""
-    svc = ProjectService(seeded_db, test_user)
+    svc = ProjectService(seeded_db, test_user, opa_client=allow_all_evaluator)
     project = await svc.create_project(name="cascade-roles")
 
     role = Role(
@@ -330,9 +344,11 @@ async def test_delete_project_cascades_custom_roles(seeded_db: AsyncSession, tes
 
 
 @pytest.mark.asyncio
-async def test_delete_project_cascades_custom_policies(seeded_db: AsyncSession, test_user: User) -> None:
+async def test_delete_project_cascades_custom_policies(
+    seeded_db: AsyncSession, test_user: User, allow_all_evaluator
+) -> None:
     """Deleting a project hard-deletes all custom policies scoped to it."""
-    svc = ProjectService(seeded_db, test_user)
+    svc = ProjectService(seeded_db, test_user, opa_client=allow_all_evaluator)
     project = await svc.create_project(name="cascade-policies")
 
     policy = Policy(
@@ -353,9 +369,11 @@ async def test_delete_project_cascades_custom_policies(seeded_db: AsyncSession, 
 
 
 @pytest.mark.asyncio
-async def test_delete_project_hard_deletes_workflows(seeded_db: AsyncSession, test_user: User) -> None:
+async def test_delete_project_hard_deletes_workflows(
+    seeded_db: AsyncSession, test_user: User, allow_all_evaluator
+) -> None:
     """Deleting a project hard-deletes all workflows within it."""
-    svc = ProjectService(seeded_db, test_user)
+    svc = ProjectService(seeded_db, test_user, opa_client=allow_all_evaluator)
     user_id = test_user.id
     project = await svc.create_project(name="cascade-workflows")
 
@@ -369,6 +387,17 @@ async def test_delete_project_hard_deletes_workflows(seeded_db: AsyncSession, te
     await seeded_db.commit()
     wf_id = workflow.id
 
+    seeded_db.add(
+        WorkflowVersion(
+            workflow_id=workflow.id,
+            version=1,
+            schema_version="2.0.0",
+            workflow_definition=create_minimal_workflow_definition(),
+            created_by=user_id,
+        )
+    )
+    await seeded_db.commit()
+
     await svc.delete_project(project.id)
 
     seeded_db.expire_all()
@@ -377,9 +406,11 @@ async def test_delete_project_hard_deletes_workflows(seeded_db: AsyncSession, te
 
 
 @pytest.mark.asyncio
-async def test_delete_project_hard_deletes_executions(seeded_db: AsyncSession, test_user: User) -> None:
+async def test_delete_project_hard_deletes_executions(
+    seeded_db: AsyncSession, test_user: User, allow_all_evaluator
+) -> None:
     """Deleting a project hard-deletes all executions within it."""
-    svc = ProjectService(seeded_db, test_user)
+    svc = ProjectService(seeded_db, test_user, opa_client=allow_all_evaluator)
     user_id = test_user.id
     project = await svc.create_project(name="cascade-executions")
 
@@ -424,11 +455,13 @@ async def test_delete_project_hard_deletes_executions(seeded_db: AsyncSession, t
 
 
 @pytest.mark.asyncio
-async def test_delete_project_blocked_by_active_executions(seeded_db: AsyncSession, test_user: User) -> None:
+async def test_delete_project_blocked_by_active_executions(
+    seeded_db: AsyncSession, test_user: User, allow_all_evaluator
+) -> None:
     """Deleting a project with non-terminal executions raises ProjectHasActiveExecutionsError."""
     from syntara.authz.exceptions import ProjectHasActiveExecutionsError
 
-    svc = ProjectService(seeded_db, test_user)
+    svc = ProjectService(seeded_db, test_user, opa_client=allow_all_evaluator)
     user_id = test_user.id
     project = await svc.create_project(name="active-execs-project")
 
@@ -470,9 +503,11 @@ async def test_delete_project_blocked_by_active_executions(seeded_db: AsyncSessi
 
 
 @pytest.mark.asyncio
-async def test_delete_project_removes_webhook_triggers(seeded_db: AsyncSession, test_user: User) -> None:
+async def test_delete_project_removes_webhook_triggers(
+    seeded_db: AsyncSession, test_user: User, allow_all_evaluator
+) -> None:
     """Deleting a project removes webhook triggers for its workflows."""
-    svc = ProjectService(seeded_db, test_user)
+    svc = ProjectService(seeded_db, test_user, opa_client=allow_all_evaluator)
     user_id = test_user.id
     project = await svc.create_project(name="trigger-cleanup")
 
@@ -496,6 +531,17 @@ async def test_delete_project_removes_webhook_triggers(seeded_db: AsyncSession, 
     await seeded_db.commit()
     trigger_id = trigger.id
 
+    seeded_db.add(
+        WorkflowVersion(
+            workflow_id=workflow.id,
+            version=1,
+            schema_version="2.0.0",
+            workflow_definition=create_minimal_workflow_definition(),
+            created_by=user_id,
+        )
+    )
+    await seeded_db.commit()
+
     await svc.delete_project(project.id)
 
     seeded_db.expire_all()
@@ -505,10 +551,10 @@ async def test_delete_project_removes_webhook_triggers(seeded_db: AsyncSession, 
 
 @pytest.mark.asyncio
 async def test_delete_project_hard_deletes_credentials_and_cleans_secrets(
-    seeded_db: AsyncSession, test_user: User
+    seeded_db: AsyncSession, test_user: User, allow_all_evaluator
 ) -> None:
     """Deleting a project hard-deletes credentials and removes their secrets."""
-    svc = ProjectService(seeded_db, test_user)
+    svc = ProjectService(seeded_db, test_user, opa_client=allow_all_evaluator)
     user_id = test_user.id
     project = await svc.create_project(name="cascade-creds")
 
@@ -562,13 +608,13 @@ async def test_delete_project_hard_deletes_credentials_and_cleans_secrets(
 
 @pytest.mark.asyncio
 async def test_delete_project_blocked_when_credential_referenced_by_integration(
-    seeded_db: AsyncSession, test_user: User
+    seeded_db: AsyncSession, test_user: User, allow_all_evaluator
 ) -> None:
     """Deleting a project fails with 409 when an integration references one of its credentials."""
     from syntara.credentials.exceptions import ProjectCredentialInUseError
     from syntara.integrations.models.integration import Integration
 
-    svc = ProjectService(seeded_db, test_user)
+    svc = ProjectService(seeded_db, test_user, opa_client=allow_all_evaluator)
     user_id = test_user.id
     project = await svc.create_project(name="cascade-blocked")
     project_id = project.id
@@ -626,11 +672,13 @@ async def test_delete_project_blocked_when_credential_referenced_by_integration(
 
 
 @pytest.mark.asyncio
-async def test_delete_project_hard_deletes_approval_requests(seeded_db: AsyncSession, test_user: User) -> None:
+async def test_delete_project_hard_deletes_approval_requests(
+    seeded_db: AsyncSession, test_user: User, allow_all_evaluator
+) -> None:
     """Deleting a project hard-deletes all approval requests within it."""
     from syntara.approvals.models.approval_request import ApprovalRequest
 
-    svc = ProjectService(seeded_db, test_user)
+    svc = ProjectService(seeded_db, test_user, opa_client=allow_all_evaluator)
     user_id = test_user.id
     project = await svc.create_project(name="cascade-approvals")
 
@@ -686,9 +734,11 @@ async def test_delete_project_hard_deletes_approval_requests(seeded_db: AsyncSes
 
 
 @pytest.mark.asyncio
-async def test_delete_project_does_not_affect_other_projects(seeded_db: AsyncSession, test_user: User) -> None:
+async def test_delete_project_does_not_affect_other_projects(
+    seeded_db: AsyncSession, test_user: User, allow_all_evaluator
+) -> None:
     """Deleting one project leaves another project's resources intact."""
-    svc = ProjectService(seeded_db, test_user)
+    svc = ProjectService(seeded_db, test_user, opa_client=allow_all_evaluator)
     user_id = test_user.id
     p1 = await svc.create_project(name="cascade-target")
     p2 = await svc.create_project(name="cascade-survivor")
@@ -702,6 +752,26 @@ async def test_delete_project_does_not_affect_other_projects(seeded_db: AsyncSes
     p1_id = p1.id
     role2_id = role2.id
     wf2_id = wf2.id
+
+    seeded_db.add(
+        WorkflowVersion(
+            workflow_id=wf1.id,
+            version=1,
+            schema_version="2.0.0",
+            workflow_definition=create_minimal_workflow_definition(),
+            created_by=user_id,
+        )
+    )
+    seeded_db.add(
+        WorkflowVersion(
+            workflow_id=wf2.id,
+            version=1,
+            schema_version="2.0.0",
+            workflow_definition=create_minimal_workflow_definition(),
+            created_by=user_id,
+        )
+    )
+    await seeded_db.commit()
 
     await svc.delete_project(p1_id)
 
@@ -719,9 +789,9 @@ async def test_delete_project_does_not_affect_other_projects(seeded_db: AsyncSes
 
 
 @pytest.mark.asyncio
-async def test_delete_project_with_no_resources(seeded_db: AsyncSession, test_user: User) -> None:
+async def test_delete_project_with_no_resources(seeded_db: AsyncSession, test_user: User, allow_all_evaluator) -> None:
     """Deleting a project with no child resources succeeds cleanly."""
-    svc = ProjectService(seeded_db, test_user)
+    svc = ProjectService(seeded_db, test_user, opa_client=allow_all_evaluator)
     project = await svc.create_project(name="empty-cascade")
     await svc.delete_project(project.id)
     with pytest.raises(ProjectNotFoundError):
@@ -734,7 +804,7 @@ async def test_delete_project_with_no_resources(seeded_db: AsyncSession, test_us
 
 
 @pytest.mark.asyncio
-async def test_update_builtin_project_raises(seeded_db: AsyncSession, test_user: User) -> None:
+async def test_update_builtin_project_raises(seeded_db: AsyncSession, test_user: User, allow_all_evaluator) -> None:
     """Updating a builtin project raises BuiltinProtectionError."""
     from syntara.authz.exceptions import BuiltinProtectionError
     from syntara.authz.models.project import Project
@@ -743,13 +813,13 @@ async def test_update_builtin_project_raises(seeded_db: AsyncSession, test_user:
     builtin_project = result.first()
     assert builtin_project is not None, "seed_authz_data should create a built-in project"
 
-    svc = ProjectService(seeded_db, test_user)
+    svc = ProjectService(seeded_db, test_user, opa_client=allow_all_evaluator)
     with pytest.raises(BuiltinProtectionError, match="cannot be modified"):
         await svc.update_project(builtin_project.id, name="renamed")
 
 
 @pytest.mark.asyncio
-async def test_delete_builtin_project_raises(seeded_db: AsyncSession, test_user: User) -> None:
+async def test_delete_builtin_project_raises(seeded_db: AsyncSession, test_user: User, allow_all_evaluator) -> None:
     """Deleting a builtin project raises BuiltinProtectionError."""
     from syntara.authz.exceptions import BuiltinProtectionError
     from syntara.authz.models.project import Project
@@ -758,13 +828,13 @@ async def test_delete_builtin_project_raises(seeded_db: AsyncSession, test_user:
     builtin_project = result.first()
     assert builtin_project is not None
 
-    svc = ProjectService(seeded_db, test_user)
+    svc = ProjectService(seeded_db, test_user, opa_client=allow_all_evaluator)
     with pytest.raises(BuiltinProtectionError, match="cannot be deleted"):
         await svc.delete_project(builtin_project.id)
 
 
 @pytest.mark.asyncio
-async def test_delete_default_project_raises(seeded_db: AsyncSession, test_user: User) -> None:
+async def test_delete_default_project_raises(seeded_db: AsyncSession, test_user: User, allow_all_evaluator) -> None:
     """Deleting the default project raises DefaultProjectProtectionError (AAP-87623)."""
     from syntara.authz.exceptions import DefaultProjectProtectionError
     from syntara.authz.models.project import Project
@@ -774,7 +844,7 @@ async def test_delete_default_project_raises(seeded_db: AsyncSession, test_user:
     assert default_project is not None, "seed_authz_data should create a default project"
     assert default_project.is_builtin is False
 
-    svc = ProjectService(seeded_db, test_user)
+    svc = ProjectService(seeded_db, test_user, opa_client=allow_all_evaluator)
     with pytest.raises(DefaultProjectProtectionError, match="Default project cannot be deleted"):
         await svc.delete_project(default_project.id)
 
@@ -784,18 +854,22 @@ async def test_delete_default_project_raises(seeded_db: AsyncSession, test_user:
 
 
 @pytest.mark.asyncio
-async def test_update_non_builtin_project_succeeds(seeded_db: AsyncSession, test_user: User) -> None:
+async def test_update_non_builtin_project_succeeds(
+    seeded_db: AsyncSession, test_user: User, allow_all_evaluator
+) -> None:
     """Updating a non-builtin project succeeds normally."""
-    svc = ProjectService(seeded_db, test_user)
+    svc = ProjectService(seeded_db, test_user, opa_client=allow_all_evaluator)
     project = await svc.create_project(name="normal-project")
     updated = await svc.update_project(project.id, name="renamed-project")
     assert updated.name == "renamed-project"
 
 
 @pytest.mark.asyncio
-async def test_delete_non_builtin_project_succeeds(seeded_db: AsyncSession, test_user: User) -> None:
+async def test_delete_non_builtin_project_succeeds(
+    seeded_db: AsyncSession, test_user: User, allow_all_evaluator
+) -> None:
     """Deleting a non-builtin project succeeds normally."""
-    svc = ProjectService(seeded_db, test_user)
+    svc = ProjectService(seeded_db, test_user, opa_client=allow_all_evaluator)
     project = await svc.create_project(name="deletable-project")
     await svc.delete_project(project.id)
     with pytest.raises(ProjectNotFoundError):

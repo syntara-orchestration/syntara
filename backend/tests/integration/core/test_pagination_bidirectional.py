@@ -5,6 +5,7 @@ for forward (Next) and backward (Previous) navigation across the entire
 dataset, including edge cases.
 """
 
+from collections.abc import Generator
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
@@ -21,8 +22,17 @@ from tests.helpers.workflow import create_minimal_workflow_definition
 DATASET_SIZE = 25  # Number of workflows created by workflows_dataset fixture
 
 
+@pytest.fixture(autouse=True)
+def _runtime_settings(override_runtime_settings) -> Generator[None, None, None]:
+    """Service-only pagination tests do not start the API's settings cache."""
+    with override_runtime_settings({}):
+        yield
+
+
 @pytest_asyncio.fixture
-async def workflows_dataset(test_db_session: AsyncSession, test_user: User, test_project_id: UUID) -> list[Workflow]:
+async def workflows_dataset(
+    test_db_session: AsyncSession, test_user: User, test_project_id: UUID, allow_all_evaluator
+) -> list[Workflow]:
     """Create a dataset of workflows with predictable timestamps for testing pagination.
 
     Creates DATASET_SIZE workflows with timestamps spaced 1 hour apart, ensuring
@@ -32,12 +42,13 @@ async def workflows_dataset(test_db_session: AsyncSession, test_user: User, test
         test_db_session: Database session
         test_user: Admin user for creating workflows
         test_project_id: Project ID for workflow creation
+        allow_all_evaluator: Evaluator allowing writes for pagination setup
 
     Returns:
         List of created workflows in chronological order (oldest to newest)
 
     """
-    service = WorkflowService(test_db_session, test_user)
+    service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
     workflows = []
 
     # Create DATASET_SIZE workflows with timestamps 1 hour apart
@@ -75,7 +86,9 @@ class TestBidirectionalPagination:
 
     @pytest.mark.asyncio
     @pytest.mark.usefixtures("workflows_dataset")
-    async def test_forward_pagination_full_traversal(self, test_db_session: AsyncSession, test_user: User) -> None:
+    async def test_forward_pagination_full_traversal(
+        self, test_db_session: AsyncSession, test_user: User, allow_all_evaluator
+    ) -> None:
         """Test forward pagination (Next) through entire dataset.
 
         Validates that:
@@ -84,7 +97,7 @@ class TestBidirectionalPagination:
         3. Next cursor advances through the dataset
         4. Last page has no next cursor
         """
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
         page_size = 5
         pages_collected = []
         cursor = None
@@ -139,7 +152,9 @@ class TestBidirectionalPagination:
 
     @pytest.mark.asyncio
     @pytest.mark.usefixtures("workflows_dataset")
-    async def test_backward_pagination_full_traversal(self, test_db_session: AsyncSession, test_user: User) -> None:
+    async def test_backward_pagination_full_traversal(
+        self, test_db_session: AsyncSession, test_user: User, allow_all_evaluator
+    ) -> None:
         """Test backward pagination (Previous) from end to beginning.
 
         Validates that:
@@ -148,7 +163,7 @@ class TestBidirectionalPagination:
         3. Resources on backward pages match forward pages
         4. Reaches beginning (prev=None) correctly
         """
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
         page_size = 5
 
         # Calculate safety limit to prevent infinite loops
@@ -236,13 +251,15 @@ class TestBidirectionalPagination:
 
     @pytest.mark.asyncio
     @pytest.mark.usefixtures("workflows_dataset")
-    async def test_bidirectional_navigation_consistency(self, test_db_session: AsyncSession, test_user: User) -> None:
+    async def test_bidirectional_navigation_consistency(
+        self, test_db_session: AsyncSession, test_user: User, allow_all_evaluator
+    ) -> None:
         """Test that forward and backward navigation are consistent.
 
         Navigates forward 3 pages, then backward 3 pages, and verifies
         we end up at the first page again.
         """
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
         page_size = 5
 
         # Navigate forward 3 pages
@@ -276,7 +293,9 @@ class TestBidirectionalPagination:
 
     @pytest.mark.asyncio
     @pytest.mark.usefixtures("workflows_dataset")
-    async def test_cursor_direction_encoding(self, test_db_session: AsyncSession, test_user: User) -> None:
+    async def test_cursor_direction_encoding(
+        self, test_db_session: AsyncSession, test_user: User, allow_all_evaluator
+    ) -> None:
         """Test that cursors correctly encode pagination direction.
 
         Validates that:
@@ -284,7 +303,7 @@ class TestBidirectionalPagination:
         2. Prev cursors have direction="prev"
         3. Direction affects query results correctly
         """
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
 
         # Get first page
         page1 = await service.list_workflows_cursor(
@@ -314,7 +333,7 @@ class TestBidirectionalPagination:
 
     @pytest.mark.asyncio
     async def test_single_page_dataset(
-        self, test_db_session: AsyncSession, test_user: User, test_project_id: UUID
+        self, test_db_session: AsyncSession, test_user: User, test_project_id: UUID, allow_all_evaluator
     ) -> None:
         """Test pagination with a dataset that fits on a single page.
 
@@ -322,7 +341,7 @@ class TestBidirectionalPagination:
         - prev should be None
         - next should be None
         """
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
 
         # Create just 3 workflows (less than page size)
         for i in range(3):
@@ -349,7 +368,9 @@ class TestBidirectionalPagination:
         assert len(response.resources) == 3, "Should return all 3 workflows"
 
     @pytest.mark.asyncio
-    async def test_empty_dataset_pagination(self, test_db_session: AsyncSession, test_user: User) -> None:
+    async def test_empty_dataset_pagination(
+        self, test_db_session: AsyncSession, test_user: User, allow_all_evaluator
+    ) -> None:
         """Test pagination with an empty dataset.
 
         Empty results should have:
@@ -357,7 +378,7 @@ class TestBidirectionalPagination:
         - next = None
         - resources = []
         """
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
 
         # Query with a filter that matches nothing
         response = await service.list_workflows_cursor(
@@ -373,13 +394,15 @@ class TestBidirectionalPagination:
 
     @pytest.mark.asyncio
     @pytest.mark.usefixtures("workflows_dataset")
-    async def test_pagination_with_asc_sort(self, test_db_session: AsyncSession, test_user: User) -> None:
+    async def test_pagination_with_asc_sort(
+        self, test_db_session: AsyncSession, test_user: User, allow_all_evaluator
+    ) -> None:
         """Test bidirectional pagination with ASC sort order.
 
         Validates that pagination works correctly when sorted in ascending order
         (oldest first instead of newest first).
         """
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
         page_size = 5
 
         # Get first page with ASC sort (oldest first)
@@ -415,7 +438,7 @@ class TestBidirectionalPagination:
 
     @pytest.mark.asyncio
     async def test_page_boundary_timestamps(
-        self, test_db_session: AsyncSession, test_user: User, workflows_dataset: list[Workflow]
+        self, test_db_session: AsyncSession, test_user: User, workflows_dataset: list[Workflow], allow_all_evaluator
     ) -> None:
         """Test pagination handles items with identical timestamps correctly.
 
@@ -423,7 +446,7 @@ class TestBidirectionalPagination:
         1. Use the ID as a tiebreaker for stable ordering
         2. Not skip or duplicate items across page boundaries
         """
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
 
         # Update 5 workflows to have identical timestamps
         same_timestamp = datetime(2025, 6, 15, 12, 0, 0, tzinfo=UTC)
@@ -468,13 +491,15 @@ class TestBidirectionalPagination:
 
     @pytest.mark.asyncio
     @pytest.mark.usefixtures("workflows_dataset")
-    async def test_first_page_prev_cursor_is_null(self, test_db_session: AsyncSession, test_user: User) -> None:
+    async def test_first_page_prev_cursor_is_null(
+        self, test_db_session: AsyncSession, test_user: User, allow_all_evaluator
+    ) -> None:
         """Test that navigating backward to the first page sets prev=None.
 
         This test validates the fix for first page detection during backward navigation.
         When navigating backward to reach the first page, the prev cursor must be None.
         """
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
         page_size = 5
 
         # Get first page (forward)
@@ -518,14 +543,14 @@ class TestBidirectionalPagination:
     @pytest.mark.asyncio
     @pytest.mark.usefixtures("workflows_dataset")
     async def test_backward_navigation_maintains_sort_order(
-        self, test_db_session: AsyncSession, test_user: User
+        self, test_db_session: AsyncSession, test_user: User, allow_all_evaluator
     ) -> None:
         """Test that backward navigation maintains the same sort order as forward navigation.
 
         This test validates the fix for backward pagination result ordering.
         Items should appear in the same order whether navigating forward or backward.
         """
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
         page_size = 5
 
         # Navigate forward to collect pages
@@ -565,14 +590,14 @@ class TestBidirectionalPagination:
     @pytest.mark.asyncio
     @pytest.mark.usefixtures("workflows_dataset")
     async def test_backward_pagination_with_desc_sort_ordering(
-        self, test_db_session: AsyncSession, test_user: User
+        self, test_db_session: AsyncSession, test_user: User, allow_all_evaluator
     ) -> None:
         """Test that DESC sort order is preserved during backward pagination.
 
         When navigating backward with DESC sort, items should still be returned
         in descending order (newest to oldest), not reversed.
         """
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
         page_size = 5
 
         # Get page 1 (should have newest items)
@@ -612,7 +637,9 @@ class TestBidirectionalPagination:
 
     @pytest.mark.asyncio
     @pytest.mark.usefixtures("workflows_dataset")
-    async def test_backward_pagination_page_boundaries(self, test_db_session: AsyncSession, test_user: User) -> None:
+    async def test_backward_pagination_page_boundaries(
+        self, test_db_session: AsyncSession, test_user: User, allow_all_evaluator
+    ) -> None:
         """Test that page boundaries are correct during backward navigation.
 
         Validates that:
@@ -621,7 +648,7 @@ class TestBidirectionalPagination:
         - Last page has next=None
         - Navigating backward from last page returns correct pages
         """
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
         page_size = 5
 
         # Navigate to last page
@@ -672,13 +699,13 @@ class TestBidirectionalPagination:
 
     @pytest.mark.asyncio
     async def test_backward_pagination_single_item_pages(
-        self, test_db_session: AsyncSession, test_user: User, test_project_id: UUID
+        self, test_db_session: AsyncSession, test_user: User, test_project_id: UUID, allow_all_evaluator
     ) -> None:
         """Test backward pagination with single-item pages.
 
         Edge case: When page size is 1, backward navigation should still work correctly.
         """
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
 
         # Create 3 workflows
         for i in range(3):
@@ -734,10 +761,10 @@ class TestBidirectionalPaginationSortByName:
     """Verify cursor pagination works correctly when sorting by name (non-default)."""
 
     async def test_forward_pagination_sort_name_asc_global_order(
-        self, test_db_session: AsyncSession, test_user: User, workflows_dataset: list[Workflow]
+        self, test_db_session: AsyncSession, test_user: User, workflows_dataset: list[Workflow], allow_all_evaluator
     ) -> None:
         """All items collected via forward pagination should be globally sorted by name ASC."""
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
 
         all_names: list[str] = []
         cursor = None
@@ -758,10 +785,10 @@ class TestBidirectionalPaginationSortByName:
         assert len(set(all_names)) == len(all_names), "Duplicates found"
 
     async def test_forward_pagination_sort_name_desc_global_order(
-        self, test_db_session: AsyncSession, test_user: User, workflows_dataset: list[Workflow]
+        self, test_db_session: AsyncSession, test_user: User, workflows_dataset: list[Workflow], allow_all_evaluator
     ) -> None:
         """All items collected via forward pagination should be globally sorted by name DESC."""
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
 
         all_names: list[str] = []
         cursor = None
@@ -782,10 +809,10 @@ class TestBidirectionalPaginationSortByName:
         assert len(set(all_names)) == len(all_names), "Duplicates found"
 
     async def test_bidirectional_sort_name_roundtrip(
-        self, test_db_session: AsyncSession, test_user: User, workflows_dataset: list[Workflow]
+        self, test_db_session: AsyncSession, test_user: User, workflows_dataset: list[Workflow], allow_all_evaluator
     ) -> None:
         """Navigating forward then backward by name returns consistent results."""
-        service = WorkflowService(test_db_session, test_user)
+        service = WorkflowService(test_db_session, test_user, opa_client=allow_all_evaluator)
 
         page1 = await service.list_workflows_cursor(
             limit=5,
