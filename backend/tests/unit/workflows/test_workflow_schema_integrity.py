@@ -20,9 +20,9 @@ def _load_workflow_schemas() -> dict[str, dict[str, object]]:
     """Load all workflow v2 schema files."""
     schema_dir = Path("src/syntara/schemas/workflows/v2")
     schemas = {}
-    for schema_file in schema_dir.glob("*.json"):
+    for schema_file in schema_dir.rglob("*.json"):
         with schema_file.open() as f:
-            schemas[schema_file.name] = json.load(f)
+            schemas[schema_file.relative_to(schema_dir).as_posix()] = json.load(f)
     return schemas
 
 
@@ -85,6 +85,7 @@ class TestWorkflowSchemaReferenceIntegrity:
             "credential_id",
             "retry_policy",
             "nodeSettingsCof",
+            "nodeSettingsCofDisabled",
             "nodeSettingsNoRetry",
             "nodeSettingsFull",
         }
@@ -176,6 +177,7 @@ class TestWorkflowSchemaReferenceIntegrity:
             ("executors/http_request.schema.json", "nodeSettingsFull"),
             ("executors/aap_job_template.schema.json", "nodeSettingsFull"),
             ("executors/aap_workflow_job_template.schema.json", "nodeSettingsFull"),
+            ("executors/form_prompt.schema.json", "nodeSettingsCofDisabled"),
             ("approval.schema.json", "nodeSettingsNoRetry"),
         ]
 
@@ -191,23 +193,34 @@ class TestWorkflowSchemaReferenceIntegrity:
                     f"{filename} should use {expected_tier} tier, but found {settings_ref}"
                 )
 
+    @staticmethod
+    def _get_ref(obj: object) -> str | None:
+        if not isinstance(obj, dict):
+            return None
+        ref_value = obj.get("$ref")
+        return ref_value if isinstance(ref_value, str) else None
+
     def _find_settings_ref(self, obj: object) -> str | None:
-        """Recursively find a settings.$ref in a schema object."""
+        """Recursively find a settings.$ref or settingSchema.$ref in a schema object."""
         if isinstance(obj, dict):
-            if "properties" in obj and "settings" in obj["properties"]:
-                settings_obj = obj["properties"]["settings"]
-                if isinstance(settings_obj, dict):
-                    ref_value = settings_obj.get("$ref")
-                    return ref_value if isinstance(ref_value, str) else None
-            for value in obj.values():
-                result = self._find_settings_ref(value)
-                if result:
-                    return result
+            direct_ref = self._get_ref(obj.get("settingSchema"))
+            if direct_ref:
+                return direct_ref
+            properties = obj.get("properties")
+            if isinstance(properties, dict):
+                direct_ref = self._get_ref(properties.get("settings"))
+                if direct_ref:
+                    return direct_ref
+            children = obj.values()
         elif isinstance(obj, list):
-            for item in obj:
-                result = self._find_settings_ref(item)
-                if result:
-                    return result
+            children = obj
+        else:
+            return None
+
+        for child in children:
+            result = self._find_settings_ref(child)
+            if result:
+                return result
         return None
 
 

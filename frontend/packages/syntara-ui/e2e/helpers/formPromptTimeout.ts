@@ -237,7 +237,6 @@ export async function ensureTimeoutWaitingScenario(app: Page): Promise<TimeoutWa
   const created = await createPendingFormStepWorkflow(app, {
     namePrefix: 'e2e-timeout-waiting',
     formPromptNodeId: 'collect_input',
-    formPromptNodeSettings: { timeout: 1 },
     parameters: {
       message: MOCK_FORM_RESPONSE_SEED.pendingMessage,
       form_definition: SIDE_PANEL_REASON_FORM_DEFINITION,

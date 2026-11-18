@@ -17,6 +17,7 @@ from syntara.workflow_core.models import (
     DoWhileLoopParameters,
     ForEachLoopParameters,
     FormPromptNodeParameters,
+    NodeSettingsCofDisabled,
     SwitchCase,
     SwitchNodeParameters,
     WaitNodeParameters,
@@ -579,9 +580,14 @@ class TestFormPromptNodeParameters:
                         "id": "form_node",
                         "type": "form_prompt",
                         "parameters": {"form_definition": self._minimal_form_definition()},
+                        "settings": {"disabled": True, "continue_on_failure": True},
                     }
                 ],
                 "edges": [],
             }
         )
         assert wf.nodes[0].type == "form_prompt"
+        settings = wf.nodes[0].settings
+        assert isinstance(settings, NodeSettingsCofDisabled)
+        assert settings.disabled is True
+        assert settings.continue_on_failure is True

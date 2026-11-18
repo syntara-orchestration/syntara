@@ -12,7 +12,7 @@ T = TypeVar("T", bound="NodeSettingsCofDisabled")
 
 @_attrs_define
 class NodeSettingsCofDisabled:
-    """Settings with disabled and continue_on_failure (wait).
+    """Settings with disabled and continue_on_failure (wait, form_prompt).
 
     Attributes:
         continue_on_failure (bool | None | Unset):

@@ -1507,6 +1507,16 @@ export interface components {
       success_message?: string | null
     }
     /**
+     * NodeSettingsCofDisabled
+     * @description Settings with disabled and continue_on_failure (wait, form_prompt).
+     */
+    NodeSettingsCofDisabled: {
+      /** Continue On Failure */
+      continue_on_failure?: boolean | null
+      /** Disabled */
+      disabled?: boolean | null
+    }
+    /**
      * FormPromptNode
      * @description Form prompt node — pauses execution to collect structured user input.
      */
@@ -1541,7 +1551,7 @@ export interface components {
        */
       type: 'form_prompt'
       parameters: components['schemas']['FormPromptNodeParameters']
-      settings?: components['schemas']['NodeSettingsNoRetry'] | null
+      settings?: components['schemas']['NodeSettingsCofDisabled'] | null
     } & {
       [key: string]: unknown
     }
@@ -1981,16 +1991,6 @@ export interface components {
        * @description Wait duration in seconds
        */
       duration: number
-    }
-    /**
-     * NodeSettingsCofDisabled
-     * @description Settings with disabled and continue_on_failure (wait).
-     */
-    NodeSettingsCofDisabled: {
-      /** Continue On Failure */
-      continue_on_failure?: boolean | null
-      /** Disabled */
-      disabled?: boolean | null
     }
     /**
      * WaitNode

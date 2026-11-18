@@ -181,6 +181,16 @@ class TestParseNodeSettings:
         with pytest.raises(ValidationError):
             _parse_node_settings("wait", {"timeout": 300})
 
+    def test_form_prompt_gets_cof_disabled(self) -> None:
+        settings = _parse_node_settings("form_prompt", {"disabled": True, "continue_on_failure": True})
+        assert isinstance(settings, NodeSettingsCofDisabled)
+        assert settings.disabled is True
+        assert settings.continue_on_failure is True
+
+    def test_form_prompt_rejects_timeout(self) -> None:
+        with pytest.raises(ValidationError):
+            _parse_node_settings("form_prompt", {"timeout": 60})
+
     def test_script_accepts_disabled(self) -> None:
         settings = _parse_node_settings("script", {"disabled": True})
         assert isinstance(settings, NodeSettingsNoRetry)
