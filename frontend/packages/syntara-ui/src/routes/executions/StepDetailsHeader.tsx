@@ -2,7 +2,6 @@ import { Content, ContentVariants, Flex, FlexItem, StackItem, Title, TitleSizes 
 
 import { ExecutionTimestamp } from '../../components/table/ExecutionTimestamp'
 import { ActivityStatusLabel } from '../builder/ExecutionStatus'
-import { getRetryActivityMarkers } from '../builder/utils/replayedNodes'
 import type { ActivityState } from '../workflows/execution/types'
 
 import styles from './StepExecutionDetailsPanel.module.css'
@@ -14,7 +13,6 @@ type StepDetailsHeaderProps = {
   elapsedLabel: string | null
   status?: ActivityState['status']
   nodeType?: string
-  replayBaselineAt?: string | null
 }
 
 export function StepDetailsHeader({
@@ -24,54 +22,55 @@ export function StepDetailsHeader({
   elapsedLabel,
   status,
   nodeType,
-  replayBaselineAt,
 }: Readonly<StepDetailsHeaderProps>) {
-  const replayMarkers = getRetryActivityMarkers(status ? { startedAt, status } : undefined, replayBaselineAt, nodeType)
-
   return (
     <StackItem className={styles.headerRow}>
-      <Flex justifyContent={{ default: 'justifyContentSpaceBetween' }} alignItems={{ default: 'alignItemsCenter' }}>
+      <Flex
+        justifyContent={{ default: 'justifyContentSpaceBetween' }}
+        alignItems={{ default: 'alignItemsCenter' }}
+        role="group"
+        aria-label="Step details header"
+      >
         <FlexItem>
           <Title headingLevel="h2" size={TitleSizes.md} style={{ margin: 0 }}>
             {stepName}
           </Title>
         </FlexItem>
-        {status && (
-          <FlexItem style={{ display: 'flex', alignItems: 'center' }}>
-            <ActivityStatusLabel
-              status={status}
-              nodeType={nodeType}
-              replayed={replayMarkers.replayed}
-              retainedFailure={replayMarkers.retainedFailure}
-              triggerInputReused={replayMarkers.triggerInputReused}
-            />
+        {(startedAt || completedAt || elapsedLabel || status) && (
+          <FlexItem>
+            <Flex
+              gap={{ default: 'gapMd' }}
+              alignItems={{ default: 'alignItemsCenter' }}
+              role="group"
+              aria-label="Step timing and status"
+            >
+              {(startedAt || completedAt) && (
+                <Content
+                  component={ContentVariants.small}
+                  style={{ color: 'var(--pf-t--global--text--color--subtle)', margin: 0 }}
+                >
+                  {startedAt && <ExecutionTimestamp dateString={startedAt} />}
+                  {startedAt && completedAt && ' - '}
+                  {completedAt && <ExecutionTimestamp dateString={completedAt} />}
+                </Content>
+              )}
+              {elapsedLabel && (
+                <Content
+                  component={ContentVariants.small}
+                  style={{ color: 'var(--pf-t--global--text--color--subtle)', margin: 0 }}
+                >
+                  Elapsed time: {elapsedLabel}
+                </Content>
+              )}
+              {status && (
+                <FlexItem>
+                  <ActivityStatusLabel status={status} nodeType={nodeType} />
+                </FlexItem>
+              )}
+            </Flex>
           </FlexItem>
         )}
       </Flex>
-      {(startedAt || completedAt || elapsedLabel) && (
-        <Flex
-          className={styles.stepTiming}
-          gap={{ default: 'gapMd' }}
-          alignItems={{ default: 'alignItemsBaseline' }}
-          flexWrap={{ default: 'nowrap' }}
-        >
-          {startedAt && (
-            <Content component={ContentVariants.small} className={styles.stepTimingItem}>
-              Started: <ExecutionTimestamp dateString={startedAt} />
-            </Content>
-          )}
-          {completedAt && (
-            <Content component={ContentVariants.small} className={styles.stepTimingItem}>
-              Completed: <ExecutionTimestamp dateString={completedAt} />
-            </Content>
-          )}
-          {elapsedLabel && (
-            <Content component={ContentVariants.small} className={styles.stepTimingItem}>
-              Elapsed time: {elapsedLabel}
-            </Content>
-          )}
-        </Flex>
-      )}
     </StackItem>
   )
 }

@@ -57,8 +57,6 @@ type StepExecutionDetailsPanelProps = {
   stepState?: ActivityState
   /** Step type from workflow definition (e.g. 'aap_job_template'). */
   stepType?: string
-  /** Timestamp replayed steps predate; set only for retry executions. */
-  replayBaselineAt?: string | null
   retryInputOverride?: Omit<RetryInputOverrideDetailsProps, 'resolvedInputs'>
 }
 
@@ -402,7 +400,6 @@ export function StepExecutionDetailsPanel({
   executionId,
   stepState,
   stepType,
-  replayBaselineAt,
   retryInputOverride,
 }: Readonly<StepExecutionDetailsPanelProps>) {
   const [activeTab, setActiveTab] = useState<'io' | 'agent-steps'>('io')
@@ -436,7 +433,6 @@ export function StepExecutionDetailsPanel({
         elapsedLabel={elapsedLabel}
         status={stepState?.status}
         nodeType={stepType}
-        replayBaselineAt={replayBaselineAt}
       />
 
       {/* Approval audit strip (shown only for decided approval steps) */}

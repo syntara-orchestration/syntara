@@ -128,6 +128,12 @@ describe('ActivityStatusLabel', () => {
     expect(screen.queryByTestId('replayed-output-badge')).not.toBeInTheDocument()
   })
 
+  it('does not add a browser-native tooltip to the reused-trigger label', () => {
+    render(<ActivityStatusLabel status="completed" triggerInputReused />)
+
+    expect(screen.queryByTitle(/trigger ran again with input from the source run/i)).not.toBeInTheDocument()
+  })
+
   it('has no accessibility violations when status and retry markers are combined', async () => {
     const { container } = render(<ActivityStatusLabel status="failed" retainedFailure />)
 

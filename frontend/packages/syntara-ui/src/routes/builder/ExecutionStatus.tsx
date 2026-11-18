@@ -115,6 +115,27 @@ export function ActivityStatusLabel({
   return (
     <Stack className={styles.activityStatusDetails} role="group" aria-label="Activity status and retry information">
       <StackItem>{statusLabel}</StackItem>
+      <ActivityStatusRetryMarkers
+        retainedFailure={retainedFailure}
+        replayed={replayed}
+        triggerInputReused={triggerInputReused}
+      />
+    </Stack>
+  )
+}
+
+/** Renders retry markers as StackItems so callers can control their placement. */
+export function ActivityStatusRetryMarkers({
+  replayed = false,
+  retainedFailure = false,
+  triggerInputReused = false,
+}: Readonly<{
+  replayed?: boolean
+  retainedFailure?: boolean
+  triggerInputReused?: boolean
+}>) {
+  return (
+    <>
       {retainedFailure && (
         <StackItem>
           <SynLabel variant="outline" status="warning">
@@ -129,15 +150,11 @@ export function ActivityStatusLabel({
       )}
       {triggerInputReused && (
         <StackItem>
-          <SynLabel
-            variant="outline"
-            icon={<RhUiHistoryIcon />}
-            title="The trigger ran again with input from the source run; its output was generated in this retry."
-          >
+          <SynLabel variant="outline" icon={<RhUiHistoryIcon />}>
             Reused trigger input
           </SynLabel>
         </StackItem>
       )}
-    </Stack>
+    </>
   )
 }
