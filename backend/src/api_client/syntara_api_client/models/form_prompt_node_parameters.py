@@ -10,6 +10,7 @@ from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
     from ..models.form_prompt_definition import FormPromptDefinition
+    from ..models.form_prompt_node_parameters_response_schema_type_0 import FormPromptNodeParametersResponseSchemaType0
 
 
 T = TypeVar("T", bound="FormPromptNodeParameters")
@@ -23,6 +24,8 @@ class FormPromptNodeParameters:
         form_definition (FormPromptDefinition): Authored form definition for a form prompt; resolved snapshots are
             engine-only.
         message (None | str | Unset): Message shown above the form. Supports ${...} template expressions.
+        response_schema (FormPromptNodeParametersResponseSchemaType0 | None | Unset): Backend-generated JSON Schema for
+            normalized response_data values.
         responder_users (list[str] | None | Unset): Usernames allowed to respond. Empty/omitted = any user with
             form_prompt:submit.
         responder_groups (list[str] | None | Unset): Group names whose members may respond. Empty/omitted = any user
@@ -37,6 +40,7 @@ class FormPromptNodeParameters:
 
     form_definition: FormPromptDefinition
     message: None | str | Unset = UNSET
+    response_schema: FormPromptNodeParametersResponseSchemaType0 | None | Unset = UNSET
     responder_users: list[str] | None | Unset = UNSET
     responder_groups: list[str] | None | Unset = UNSET
     response_window: int | None | Unset = UNSET
@@ -45,6 +49,10 @@ class FormPromptNodeParameters:
     success_message: None | str | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
+        from ..models.form_prompt_node_parameters_response_schema_type_0 import (
+            FormPromptNodeParametersResponseSchemaType0,
+        )
+
         form_definition = self.form_definition.to_dict()
 
         message: None | str | Unset
@@ -52,6 +60,14 @@ class FormPromptNodeParameters:
             message = UNSET
         else:
             message = self.message
+
+        response_schema: dict[str, Any] | None | Unset
+        if isinstance(self.response_schema, Unset):
+            response_schema = UNSET
+        elif isinstance(self.response_schema, FormPromptNodeParametersResponseSchemaType0):
+            response_schema = self.response_schema.to_dict()
+        else:
+            response_schema = self.response_schema
 
         responder_users: list[str] | None | Unset
         if isinstance(self.responder_users, Unset):
@@ -106,6 +122,8 @@ class FormPromptNodeParameters:
         )
         if message is not UNSET:
             field_dict["message"] = message
+        if response_schema is not UNSET:
+            field_dict["response_schema"] = response_schema
         if responder_users is not UNSET:
             field_dict["responder_users"] = responder_users
         if responder_groups is not UNSET:
@@ -124,6 +142,9 @@ class FormPromptNodeParameters:
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         from ..models.form_prompt_definition import FormPromptDefinition
+        from ..models.form_prompt_node_parameters_response_schema_type_0 import (
+            FormPromptNodeParametersResponseSchemaType0,
+        )
 
         d = dict(src_dict)
         form_definition = FormPromptDefinition.from_dict(d.pop("form_definition"))
@@ -136,6 +157,23 @@ class FormPromptNodeParameters:
             return cast(None | str | Unset, data)
 
         message = _parse_message(d.pop("message", UNSET))
+
+        def _parse_response_schema(data: object) -> FormPromptNodeParametersResponseSchemaType0 | None | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            try:
+                if not isinstance(data, dict):
+                    raise TypeError()
+                response_schema_type_0 = FormPromptNodeParametersResponseSchemaType0.from_dict(data)
+
+                return response_schema_type_0
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            return cast(FormPromptNodeParametersResponseSchemaType0 | None | Unset, data)
+
+        response_schema = _parse_response_schema(d.pop("response_schema", UNSET))
 
         def _parse_responder_users(data: object) -> list[str] | None | Unset:
             if data is None:
@@ -218,6 +256,7 @@ class FormPromptNodeParameters:
         form_prompt_node_parameters = cls(
             form_definition=form_definition,
             message=message,
+            response_schema=response_schema,
             responder_users=responder_users,
             responder_groups=responder_groups,
             response_window=response_window,

@@ -162,6 +162,7 @@ __all__ = (
     "FormPromptNodeOutputsType0",
     "FormPromptNodeParameters",
     "FormPromptNodeParametersFallbackDecisionType0",
+    "FormPromptNodeParametersResponseSchemaType0",
     "FormPromptRead",
     "FormPromptReadLabels",
     "FormPromptReadResponseDataType0",
