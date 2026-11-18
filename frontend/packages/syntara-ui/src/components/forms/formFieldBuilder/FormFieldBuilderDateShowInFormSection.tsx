@@ -3,18 +3,22 @@ import { RhUiErrorIcon } from '@patternfly/react-icons'
 import type { FormDefinition } from '@syntara/contracts'
 import { useController, useFormContext, useWatch } from 'react-hook-form'
 
-import { FormFieldTypeEnum } from '../../../forms'
+import { FormFieldTypeEnum, formDefinitionInlineFieldMessage } from '../../../forms'
 import {
   coerceDateValueShape,
   DATE_COMPONENT_NAMES,
   dateIncludesFromField,
   isDateFieldDateAndTimezoneWithoutTime,
   isSoleIncludedDateComponent,
+  isUnsupportedRfc3339DateFieldCombination,
   nextDateIncludes,
   normalizeDateDefaultForIncludes,
   type DateComponentName,
 } from '../../../forms/dateFieldUtils'
-import { DATE_FIELD_DATE_AND_TIMEZONE_REQUIRES_TIME_MESSAGE } from '../../../forms/dateFieldValidationMessages'
+import {
+  DATE_FIELD_RFC3339_COMBINATION_MESSAGE,
+  normalizeDateFieldCombinationMessage,
+} from '../../../forms/dateFieldValidationMessages'
 
 import styles from './formFieldBuilder.module.css'
 import { useFormFieldBuilderCommit } from './formFieldBuilderCommitContext'
@@ -35,6 +39,68 @@ const CHECKBOX_LABELS: Record<DateComponentName, string> = {
 
 const SHOW_IN_FORM_LABEL = 'Show in form'
 
+function resolvedFieldMessage(error: { message?: unknown } | undefined): string | undefined {
+  return typeof error?.message === 'string' && error.message.length > 0 ? error.message : undefined
+}
+
+function isDateFieldCombinationErrorMessage(message: string | undefined): boolean {
+  if (message == null) {
+    return false
+  }
+  const inline = formDefinitionInlineFieldMessage(message)
+  if (inline === DATE_FIELD_RFC3339_COMBINATION_MESSAGE) {
+    return true
+  }
+  return normalizeDateFieldCombinationMessage(message) != null
+}
+
+/** Match strict-mode highlighting: combo issues are about which includes are checked, not zod path. */
+function isShowInFormCheckboxInvalidForUnsupportedCombination(
+  name: DateComponentName,
+  options: Readonly<{
+    includes: Record<DateComponentName, boolean>
+    dateAndTimezoneWithoutTime: boolean
+  }>
+): boolean {
+  if (options.dateAndTimezoneWithoutTime) {
+    return name === 'time'
+  }
+  return options.includes[name]
+}
+
+function isShowInFormCheckboxInvalid(
+  name: DateComponentName,
+  options: Readonly<{
+    showCombinationError: boolean
+    includes: Record<DateComponentName, boolean>
+    unsupportedCombination: boolean
+    dateAndTimezoneWithoutTime: boolean
+    isDraftBuilder: boolean
+    resolvedIncludeTimeMessage: string | undefined
+    resolvedIncludeDateMessage: string | undefined
+  }>
+): boolean {
+  if (!options.showCombinationError) {
+    return false
+  }
+
+  const resolvedServerMessage = options.resolvedIncludeTimeMessage ?? options.resolvedIncludeDateMessage
+  const isComboServerMessage = isDateFieldCombinationErrorMessage(resolvedServerMessage)
+
+  if (options.unsupportedCombination && (isComboServerMessage || !options.isDraftBuilder)) {
+    return isShowInFormCheckboxInvalidForUnsupportedCombination(name, options)
+  }
+
+  if (options.resolvedIncludeTimeMessage != null && name === 'time') {
+    return true
+  }
+  if (options.resolvedIncludeDateMessage != null && name === 'date') {
+    return true
+  }
+
+  return false
+}
+
 export function FormFieldBuilderDateShowInFormSection({
   index,
   idPrefix,
@@ -49,11 +115,13 @@ export function FormFieldBuilderDateShowInFormSection({
     control,
     name: `fields.${index}.include_time`,
   })
+  const {
+    fieldState: { error: includeDateFieldError },
+  } = useController({
+    control,
+    name: `fields.${index}.include_date`,
+  })
   const field = useWatch({ control, name: `fields.${index}` })
-  const resolvedIncludeTimeMessage =
-    typeof includeTimeFieldError?.message === 'string' && includeTimeFieldError.message.length > 0
-      ? includeTimeFieldError.message
-      : undefined
 
   if (field?.type !== FormFieldTypeEnum.DATE) {
     return null
@@ -61,10 +129,17 @@ export function FormFieldBuilderDateShowInFormSection({
 
   const includes = dateIncludesFromField(field)
   const dateAndTimezoneWithoutTime = isDateFieldDateAndTimezoneWithoutTime(field)
-  const showCombinationError =
-    (typeof resolvedIncludeTimeMessage === 'string' && resolvedIncludeTimeMessage.length > 0) ||
-    (!isDraftBuilder && dateAndTimezoneWithoutTime)
-  const combinationErrorMessage = resolvedIncludeTimeMessage ?? DATE_FIELD_DATE_AND_TIMEZONE_REQUIRES_TIME_MESSAGE
+  const unsupportedCombination = isUnsupportedRfc3339DateFieldCombination(field)
+  const resolvedIncludeTimeMessage = resolvedFieldMessage(includeTimeFieldError)
+  const resolvedIncludeDateMessage = resolvedFieldMessage(includeDateFieldError)
+  const resolvedServerMessageRaw = resolvedIncludeTimeMessage ?? resolvedIncludeDateMessage
+  const resolvedServerMessage =
+    resolvedServerMessageRaw != null ? formDefinitionInlineFieldMessage(resolvedServerMessageRaw) : undefined
+
+  const showCombinationError = resolvedServerMessage != null || (!isDraftBuilder && unsupportedCombination)
+
+  const combinationErrorMessage =
+    resolvedServerMessage ?? (unsupportedCombination ? DATE_FIELD_RFC3339_COMBINATION_MESSAGE : undefined)
 
   const showInFormFieldId = `${idPrefix}-show-in-form`
   const showInFormGroupLabelId = `${showInFormFieldId}-label`
@@ -113,7 +188,15 @@ export function FormFieldBuilderDateShowInFormSection({
       >
         <List isPlain>
           {DATE_COMPONENT_NAMES.map((name) => {
-            const checkboxInvalid = showCombinationError && name === 'time'
+            const checkboxInvalid = isShowInFormCheckboxInvalid(name, {
+              showCombinationError,
+              includes,
+              unsupportedCombination,
+              dateAndTimezoneWithoutTime,
+              isDraftBuilder,
+              resolvedIncludeTimeMessage,
+              resolvedIncludeDateMessage,
+            })
             return (
               <ListItem key={name}>
                 <Checkbox

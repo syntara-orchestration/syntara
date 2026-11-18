@@ -503,7 +503,7 @@ describe('useWorkflowVerification', () => {
     })
   })
 
-  it('includes trigger nodeName on frontend validation errors', async () => {
+  it('maps frontend canvas errors with nodeName and fieldPath for banner display', async () => {
     mockGetState.mockReturnValue({
       ...workflowState,
       currentWorkflow: {
@@ -513,7 +513,14 @@ describe('useWorkflowVerification', () => {
     })
     mockBuildDefinition.mockReturnValue({ nodes: [], edges: [], triggers: [] })
     mockValidateWorkflow.mockReturnValue({
-      errors: [{ message: 'Webhook path required', nodeId: 'snow_trigger', severity: 'error' }],
+      errors: [
+        {
+          rule: 'webhook-path',
+          message: 'Webhook path required',
+          nodeId: 'snow_trigger',
+          severity: 'error',
+        },
+      ],
     })
     mockPost.mockResolvedValue({
       data: { is_valid: true, findings: [] },
@@ -534,6 +541,8 @@ describe('useWorkflowVerification', () => {
             nodeId: 'snow_trigger',
             nodeName: 'Webhook Trigger',
             severity: 'error',
+            fieldPath: null,
+            rule: 'webhook-path',
           },
         ],
       })

@@ -1,5 +1,5 @@
 import type { FormDefinitionFieldServerError } from '../../../components/forms/formFieldBuilder/formDefinitionFieldServerError'
-import { humanizeFormDefinitionIssueMessage } from '../../../forms'
+import { formDefinitionInlineFieldMessage } from '../../../forms'
 import type { TriggerFormData } from '../step-forms/triggerFormSchema'
 
 import { mapFormTriggerValidationFieldPath } from './mapFormTriggerValidationFieldPath'
@@ -22,7 +22,7 @@ export function partitionFormTriggerServerValidationErrors(errors?: ReadonlyArra
     if (formField) {
       formFieldErrors.push({
         ...formField,
-        message: humanizeFormDefinitionIssueMessage(err.message, err.fieldPath, { includeFieldLocation: false }),
+        message: formDefinitionInlineFieldMessage(err.message, err.fieldPath),
       })
       continue
     }

@@ -2,7 +2,7 @@ import type { FormDefinition } from '@syntara/contracts'
 import { renderHook } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 
-import { DATE_FIELD_DATE_AND_TIMEZONE_REQUIRES_TIME_MESSAGE, FormFieldTypeEnum } from '../../../forms'
+import { DATE_FIELD_RFC3339_COMBINATION_MESSAGE, FormFieldTypeEnum } from '../../../forms'
 
 import { useFormDefinitionFieldServerErrors } from './useFormDefinitionBuilderServerFieldErrors'
 
@@ -20,10 +20,31 @@ const invalidDateDefinition: FormDefinition = {
 }
 
 describe('useFormDefinitionFieldServerErrors', () => {
-  it('supplements banner-only verify errors with local include_time finding', () => {
+  it('maps canvas banner copy with field_path to short inline messages', () => {
     const effectiveServerValidationErrors = [
       {
-        message: 'Form "Survey": Field 1 — Select a time when both date and timezone are selected.',
+        message: `Form "Survey": Due — ${DATE_FIELD_RFC3339_COMBINATION_MESSAGE}`,
+        fieldPath: 'parameters.form_definition.fields.0.include_date',
+      },
+    ]
+
+    const { result } = renderHook(() =>
+      useFormDefinitionFieldServerErrors(invalidDateDefinition, effectiveServerValidationErrors)
+    )
+
+    expect(result.current).toEqual([
+      {
+        fieldIndex: 0,
+        subPath: 'include_date',
+        message: DATE_FIELD_RFC3339_COMBINATION_MESSAGE,
+      },
+    ])
+  })
+
+  it('supplements banner-only verify errors with local include_date finding', () => {
+    const effectiveServerValidationErrors = [
+      {
+        message: `Form "Survey": Due — ${DATE_FIELD_RFC3339_COMBINATION_MESSAGE}`,
         fieldPath: null,
       },
     ]
@@ -35,8 +56,8 @@ describe('useFormDefinitionFieldServerErrors', () => {
     expect(result.current).toEqual([
       {
         fieldIndex: 0,
-        subPath: 'include_time',
-        message: DATE_FIELD_DATE_AND_TIMEZONE_REQUIRES_TIME_MESSAGE,
+        subPath: 'include_date',
+        message: DATE_FIELD_RFC3339_COMBINATION_MESSAGE,
       },
     ])
   })

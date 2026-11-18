@@ -3,7 +3,8 @@ import { z } from 'zod'
 
 import { isValidIsoCalendarDate } from '../utils/isoCalendarDate'
 
-import { DATE_FIELD_DATE_AND_TIMEZONE_REQUIRES_TIME_MESSAGE } from './dateFieldValidationMessages'
+import { isSupportedRfc3339DateFieldCombination } from './dateFieldUtils'
+import { DATE_FIELD_RFC3339_COMBINATION_MESSAGE } from './dateFieldValidationMessages'
 import {
   FORM_DEFINITION_MAX_FIELDS,
   FORM_DEFINITION_MIN_FIELDS,
@@ -138,12 +139,11 @@ const dateFieldSchema = formFieldBaseSchema
       })
     }
 
-    // A timezone only adds meaning to a date when there is also a time.
-    if (included.date && included.timezone && !included.time) {
+    if ((included.date || included.time || included.timezone) && !isSupportedRfc3339DateFieldCombination(included)) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: DATE_FIELD_DATE_AND_TIMEZONE_REQUIRES_TIME_MESSAGE,
-        path: ['include_time'],
+        message: DATE_FIELD_RFC3339_COMBINATION_MESSAGE,
+        path: ['include_date'],
       })
     }
 

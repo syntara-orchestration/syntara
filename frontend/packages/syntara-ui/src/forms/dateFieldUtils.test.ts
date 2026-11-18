@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest'
 import {
   isDateFieldDateAndTimezoneWithoutTime,
   isSoleIncludedDateComponent,
+  isSupportedRfc3339DateFieldCombination,
+  isUnsupportedRfc3339DateFieldCombination,
   normalizeDateDefaultForIncludes,
   nextDateIncludes,
   prepareFormDefinitionForCommit,
@@ -11,6 +13,22 @@ import { safeParseFormDefinition } from './formDefinitionSchema'
 import { FormFieldTypeEnum } from './formFieldTypeEnum'
 
 describe('dateFieldUtils', () => {
+  it('recognizes RFC 3339 include combinations', () => {
+    expect(isSupportedRfc3339DateFieldCombination({ date: true, time: false, timezone: false })).toBe(true)
+    expect(isSupportedRfc3339DateFieldCombination({ date: false, time: true, timezone: true })).toBe(true)
+    expect(isSupportedRfc3339DateFieldCombination({ date: true, time: true, timezone: false })).toBe(false)
+    expect(
+      isUnsupportedRfc3339DateFieldCombination({
+        type: FormFieldTypeEnum.DATE,
+        value_name: 'due',
+        label: 'Due',
+        include_date: true,
+        include_time: true,
+        include_timezone: false,
+      })
+    ).toBe(true)
+  })
+
   it('detects date and timezone without time', () => {
     expect(
       isDateFieldDateAndTimezoneWithoutTime({
@@ -68,7 +86,7 @@ describe('dateFieldUtils', () => {
     })
   })
 
-  it('prepareFormDefinitionForCommit preserves date and time without timezone', () => {
+  it('prepareFormDefinitionForCommit preserves include flags without coercing unsupported combinations', () => {
     const prepared = prepareFormDefinitionForCommit({
       fields: [
         {
@@ -81,14 +99,11 @@ describe('dateFieldUtils', () => {
         },
       ],
     })
-    const parsed = safeParseFormDefinition(prepared)
-    expect(parsed.success).toBe(true)
-    if (parsed.success) {
-      const field = parsed.data.fields[0]
-      expect(field.type).toBe('date')
-      if (field.type === 'date') {
-        expect(field.include_timezone).toBe(false)
-      }
+    expect(safeParseFormDefinition(prepared).success).toBe(false)
+    const field = prepared.fields[0]
+    expect(field.type).toBe('date')
+    if (field.type === 'date') {
+      expect(field.include_timezone).toBe(false)
     }
   })
 })

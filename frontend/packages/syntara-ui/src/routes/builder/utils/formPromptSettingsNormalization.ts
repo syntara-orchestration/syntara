@@ -66,9 +66,9 @@ function sanitizeFormPromptParameters(parameters: Record<string, unknown>): Reco
         rawDefinition as Parameters<typeof prepareFormDefinitionForCommit>[0]
       )
       const parsed = safeParseFormDefinition(prepared)
-      if (parsed.success) {
-        sanitized.form_definition = parsed.data
-      }
+      // Always send the prepared snapshot (including invalid include combos) so workflow save
+      // validation sees the same shape as verify/run; canonical parse output only when valid.
+      sanitized.form_definition = parsed.success ? parsed.data : prepared
     }
   }
 
@@ -87,14 +87,6 @@ export function normalizeFormPromptActivityForDefinition(activity: Activity): Ac
   if (activity.type !== ActivityTypeEnum.FORM_PROMPT) return activity
 
   const parameters = { ...(activity.parameters ?? {}) } as Record<string, unknown>
-  const needsSanitize =
-    'fallback_behavior' in parameters ||
-    'response_schema' in parameters ||
-    Object.keys(parameters).some((key) => !FORM_PROMPT_PARAMETER_KEYS.has(key))
-  if (!needsSanitize) {
-    return activity
-  }
-
   return {
     ...activity,
     parameters: sanitizeFormPromptParameters(parameters),

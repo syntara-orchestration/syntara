@@ -1,6 +1,10 @@
 import { ActivityTypeEnum, type Activity } from '@syntara/contracts'
 
-import { humanizeFormDefinitionValidationError, safeParseFormDefinition } from '../../../../../forms'
+import {
+  humanizeFormDefinitionValidationError,
+  prepareFormDefinitionForCommit,
+  safeParseFormDefinition,
+} from '../../../../../forms'
 import type { EdgeConnection } from '../../../types/edge'
 import type { ValidationContext, ValidationError } from '../types'
 
@@ -18,7 +22,10 @@ export function validateFormPromptFormDefinition(
     if (activity.type !== ActivityTypeEnum.FORM_PROMPT) continue
 
     const raw = (activity.parameters as { form_definition?: unknown } | undefined)?.form_definition
-    const parsed = safeParseFormDefinition(raw)
+    const formDefinitionForLabels = raw ?? { fields: [] }
+    const parsed = safeParseFormDefinition(
+      prepareFormDefinitionForCommit(formDefinitionForLabels as Parameters<typeof prepareFormDefinitionForCommit>[0])
+    )
     if (parsed.success) continue
 
     const nodeName = activity.name ?? activity.id
@@ -27,8 +34,9 @@ export function validateFormPromptFormDefinition(
         id: `form-prompt-definition-${activity.id}-${index}`,
         severity: 'error',
         rule: 'form-prompt-form-definition',
-        message: `Form "${nodeName}": ${humanizeFormDefinitionValidationError(finding)}`,
+        message: `Form "${nodeName}": ${humanizeFormDefinitionValidationError(finding, { formDefinition: formDefinitionForLabels })}`,
         nodeId: activity.id,
+        fieldPath: `parameters.form_definition.${finding.field}`,
       })
     }
   }

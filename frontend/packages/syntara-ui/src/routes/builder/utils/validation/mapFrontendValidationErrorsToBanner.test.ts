@@ -62,6 +62,31 @@ describe('mapUtilsValidationErrorsToBanner', () => {
         nodeName: undefined,
         severity: 'error',
         rule: 'minimum-workflow-no-connection',
+        fieldPath: null,
+      },
+    ])
+  })
+
+  it('forwards form-definition field paths for banner label lookup', () => {
+    const errors: UtilsValidationError[] = [
+      {
+        id: 'e2',
+        severity: 'error',
+        rule: 'form-prompt-form-definition',
+        message: 'Form "Survey": Due — Choose date only, time with timezone, or date and time with timezone.',
+        nodeId: 'form-1',
+        fieldPath: 'parameters.form_definition.fields[0].include_date',
+      },
+    ]
+
+    expect(mapUtilsValidationErrorsToBanner(errors)).toEqual([
+      {
+        message: errors[0].message,
+        nodeId: 'form-1',
+        nodeName: undefined,
+        severity: 'error',
+        rule: 'form-prompt-form-definition',
+        fieldPath: 'parameters.form_definition.fields[0].include_date',
       },
     ])
   })

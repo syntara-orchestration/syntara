@@ -1,6 +1,8 @@
+import { ActivityTypeEnum } from '@syntara/contracts'
 import { renderHook } from '@testing-library/react'
 import { describe, expect, it, vi, beforeEach, type MockedFunction } from 'vitest'
 
+import { FormFieldTypeEnum } from '../../../forms'
 import { useWorkflowStore } from '../../../stores/useWorkflowStore'
 import type { WorkflowDefinition } from '../../../stores/workflowStoreTypes'
 import { expectStringContaining } from '../../../test/test-helpers'
@@ -8,6 +10,10 @@ import { detachPromise } from '../../../utils/detachPromise'
 
 import type { UseBuilderSaveWorkflowParams } from './useBuilderSaveWorkflow'
 import { useBuilderSaveWorkflow } from './useBuilderSaveWorkflow'
+
+vi.mock('./useWorkflowEngineDefaults', () => ({
+  useWorkflowEngineDefaults: () => ({ defaults: { continueOnFailure: false }, isLoading: false }),
+}))
 
 type CreateWorkflow = UseBuilderSaveWorkflowParams['createWorkflow']
 type UpdateWorkflow = UseBuilderSaveWorkflowParams['updateWorkflow']
@@ -310,6 +316,64 @@ describe('useBuilderSaveWorkflow', () => {
     await expect(result.current({ blockOnWarnings: true })).resolves.toBe(false)
     expect(showWarning).toHaveBeenCalledWith(expect.objectContaining({ title: 'Workflow saved with warnings' }))
     expect(onVersionUpdated).toHaveBeenCalledWith(5)
+  })
+
+  it('surfaces frontend form-definition findings when save reports no backend validation issues', async () => {
+    const showWarning = vi.fn()
+    const onValidationFindings = vi.fn()
+    const updateWorkflow = vi.fn((...args: Parameters<UpdateWorkflow>) => {
+      detachPromise(args[1]?.onSuccess?.(updateResponse({ has_validation_issues: false, current_version: 2 })))
+    }) as MockedFunction<UpdateWorkflow>
+
+    useWorkflowStore.setState({
+      currentWorkflow: minimalWorkflow({
+        workflow: {
+          activities: [
+            {
+              type: ActivityTypeEnum.FORM_PROMPT,
+              id: 'form-1',
+              name: 'Survey',
+              parameters: {
+                form_definition: {
+                  fields: [
+                    {
+                      type: FormFieldTypeEnum.DATE,
+                      value_name: 'due',
+                      label: 'Due',
+                      include_date: true,
+                      include_time: true,
+                      include_timezone: false,
+                    },
+                  ],
+                },
+              },
+            },
+          ],
+        },
+      }),
+      edges: [],
+    })
+
+    const { result } = renderHook(() =>
+      useBuilderSaveWorkflow(
+        buildParams({
+          workflowId: 'w1',
+          isNew: false,
+          updateWorkflow,
+          showWarning,
+          onValidationFindings,
+        })
+      )
+    )
+
+    await expect(result.current()).resolves.toBe(true)
+    expect(showWarning).toHaveBeenCalledWith(expect.objectContaining({ title: 'Workflow saved with warnings' }))
+    expect(onValidationFindings).toHaveBeenCalledWith([
+      expect.objectContaining({
+        rule: 'form-prompt-form-definition',
+        nodeId: 'form-1',
+      }),
+    ])
   })
 
   it('shows "saved with warnings", syncs version, and fires onSaveWithValidationIssues when has_validation_issues is true', async () => {

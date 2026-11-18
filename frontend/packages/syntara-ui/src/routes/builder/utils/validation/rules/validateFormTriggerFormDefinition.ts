@@ -1,6 +1,10 @@
 import { TriggerTypeEnum, type Activity } from '@syntara/contracts'
 
-import { humanizeFormDefinitionValidationError, safeParseFormDefinition } from '../../../../../forms'
+import {
+  humanizeFormDefinitionValidationError,
+  prepareFormDefinitionForCommit,
+  safeParseFormDefinition,
+} from '../../../../../forms'
 import type { EdgeConnection } from '../../../types/edge'
 import type { ValidationContext, ValidationError } from '../types'
 
@@ -39,25 +43,31 @@ function readDraftFormFields(raw: unknown): DraftFormField[] | undefined {
   return Array.isArray(fields) && fields.length > 0 ? fields : undefined
 }
 
-function invalidFormDefinitionErrors(
-  nodeName: string,
-  nodeId: string,
-  rule: string,
+type InvalidFormDefinitionErrorsInput = Readonly<{
+  nodeName: string
+  nodeId: string
+  rule: string
+  formDefinitionForLabels: unknown
   parsed: Extract<ReturnType<typeof safeParseFormDefinition>, { success: false }>
-): ValidationError[] {
-  return parsed.errors.map((error, index) => ({
-    id: `${rule}-${nodeId}-${index}`,
+}>
+
+function invalidFormDefinitionErrors(input: InvalidFormDefinitionErrorsInput): ValidationError[] {
+  return input.parsed.errors.map((error, index) => ({
+    id: `${input.rule}-${input.nodeId}-${index}`,
     severity: 'error' as const,
-    rule,
-    message: `Form trigger "${nodeName}": ${humanizeFormDefinitionValidationError(error)}`,
-    nodeId,
+    rule: input.rule,
+    message: `Form trigger "${input.nodeName}": ${humanizeFormDefinitionValidationError(error, { formDefinition: input.formDefinitionForLabels })}`,
+    nodeId: input.nodeId,
+    fieldPath: `parameters.form_definition.${error.field}`,
   }))
 }
 
 function formTriggerDefinitionErrors(trigger: Activity): ValidationError[] {
   const nodeName = trigger.name ?? trigger.id
   const raw = (trigger.parameters as { form_definition?: unknown } | undefined)?.form_definition
-  const parsed = safeParseFormDefinition(raw)
+  const parsed = safeParseFormDefinition(
+    prepareFormDefinitionForCommit((raw ?? { fields: [] }) as Parameters<typeof prepareFormDefinitionForCommit>[0])
+  )
 
   if (parsed.success && parsed.data.fields.length === 0) {
     return [
@@ -80,7 +90,13 @@ function formTriggerDefinitionErrors(trigger: Activity): ValidationError[] {
 
   return [
     ...dynamicErrors,
-    ...invalidFormDefinitionErrors(nodeName, trigger.id, 'form-trigger-form-definition', parsed),
+    ...invalidFormDefinitionErrors({
+      nodeName,
+      nodeId: trigger.id,
+      rule: 'form-trigger-form-definition',
+      formDefinitionForLabels: raw ?? { fields: [] },
+      parsed,
+    }),
   ]
 }
 
@@ -107,7 +123,9 @@ function validateSingleFormTrigger(trigger: Activity): ValidationError[] {
   }
 
   const raw = (trigger.parameters as { form_definition?: unknown } | undefined)?.form_definition
-  const parsed = safeParseFormDefinition(raw)
+  const parsed = safeParseFormDefinition(
+    prepareFormDefinitionForCommit((raw ?? { fields: [] }) as Parameters<typeof prepareFormDefinitionForCommit>[0])
+  )
   if (parsed.success && parsed.data.fields.length > 0) {
     return formTriggerDynamicOptionErrors(trigger.id, nodeName, parsed.data.fields)
   }
