@@ -95,6 +95,43 @@ describe('getEffectiveOutputSchema', () => {
     })
   })
 
+  describe('dynamic options still being configured', () => {
+    // The field builder seeds blank expression/label_key/value_key when a field is switched to dynamic options.
+    const blankDynamicOptions = { source: 'dynamic', expression: '', label_key: '', value_key: '' }
+
+    it.each([
+      ['dropdown', 'unknown'],
+      ['multi_select', 'array'],
+    ])('keeps every field when a %s has blank dynamic options', (type, expectedType) => {
+      const node = formPrompt(
+        formDefinition(textField('email'), {
+          type,
+          value_name: 'region',
+          label: 'Region',
+          options: blankDynamicOptions,
+        })
+      )
+
+      const children = responseDataChildren(getEffectiveOutputSchema(node))
+
+      expect(children?.map((field) => [field.name, field.type])).toStrictEqual([
+        ['email', 'string'],
+        ['region', expectedType],
+      ])
+    })
+
+    it('still rejects the definition when another field is invalid', () => {
+      const node = formPrompt(
+        formDefinition(
+          { type: 'dropdown', value_name: 'region', label: 'Region', options: blankDynamicOptions },
+          { type: 'text', value_name: '1-bad', label: 'Bad' }
+        )
+      )
+
+      expect(responseDataChildren(getEffectiveOutputSchema(node))).toBeUndefined()
+    })
+  })
+
   describe('missing or invalid form definitions', () => {
     it.each([
       ['missing', undefined],

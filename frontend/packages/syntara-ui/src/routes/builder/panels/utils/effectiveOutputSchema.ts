@@ -78,9 +78,42 @@ function formFieldOutputType(field: FormField, property: JsonSchemaProperty | un
   }
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+const BLANK_DYNAMIC_OPTION_PLACEHOLDER = '_'
+
+function fillBlankDynamicOptionKeys(options: Record<string, unknown>): Record<string, unknown> {
+  const filled = { ...options }
+  for (const key of ['expression', 'label_key', 'value_key']) {
+    const value = filled[key]
+    if (typeof value !== 'string' || value.trim() === '') {
+      filled[key] = BLANK_DYNAMIC_OPTION_PLACEHOLDER
+    }
+  }
+  return filled
+}
+
+/**
+ * The field builder seeds blank dynamic option settings while the user is still
+ * configuring a field. Those settings do not affect which fields a form returns,
+ * so they must not invalidate the whole definition for the output preview.
+ */
+function tolerateUnfinishedDynamicOptions(formDefinition: unknown): unknown {
+  if (!isRecord(formDefinition) || !Array.isArray(formDefinition.fields)) return formDefinition
+
+  const fields: unknown[] = formDefinition.fields.map((field: unknown) => {
+    if (!isRecord(field) || !isRecord(field.options) || field.options.source !== 'dynamic') return field
+    return { ...field, options: fillBlankDynamicOptionKeys(field.options) }
+  })
+  return { ...formDefinition, fields }
+}
+
 function formResponseFields(formDefinition: unknown): PreviewFieldDef[] | null {
-  const parsed = safeParseFormDefinition(formDefinition)
-  if (!parsed.success) return null
+  const parsed = safeParseFormDefinition(tolerateUnfinishedDynamicOptions(formDefinition))
+  // An empty field list has nothing to preview; don't rely on the schema's minimum-field rule alone.
+  if (!parsed.success || parsed.data.fields.length === 0) return null
 
   const jsonSchema = formDefinitionToJsonSchema(parsed.data)
   return parsed.data.fields.map((field) => ({
