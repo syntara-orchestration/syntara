@@ -4,6 +4,7 @@ import asyncio
 import re
 from collections import deque
 from collections.abc import Callable
+from contextlib import nullcontext
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime, timedelta
 from typing import TypedDict
@@ -77,6 +78,7 @@ class _Partition:
     held: HeldRecord | None = None
     handoff: PreparedExecution | None = None
     resolved_next_offset: int | None = None
+    local_skip_next_offset: int | None = None
     rewind_offset: int | None = None
     reload_required: bool = False
     pending_failure: PendingContentFailure | None = None
@@ -224,6 +226,11 @@ class KafkaRecordRunner:
             and state.ready
             and state.fence is None
             and self._resolution_open()
+            and (
+                state.handoff is None
+                or state.resolved_next_offset is None
+                or state.resolved_next_offset <= state.handoff.identity.record.offset
+            )
             and (self._drain_deadline is None or asyncio.get_running_loop().time() < self._drain_deadline)
         )
 
@@ -416,6 +423,12 @@ class KafkaRecordRunner:
             async with self._work:
                 if not self._active(state):
                     return
+                if state.handoff is not None and (not state.records or not state.ready or state.reload_required):
+                    # Retry even on an idle partition, before initialization or
+                    # pending-content handling can move its reading boundary.
+                    await self._finish_handoff(state)
+                    if state.handoff is not None:
+                        return
                 if not await self._reconcile_partition(state):
                     return
                 # A delivered head may already have been accepted by Temporal.
@@ -558,6 +571,8 @@ class KafkaRecordRunner:
         elif identity.record.offset == MAX_POSITION_OFFSET:
             state.held = HeldRecord(reason="offset_exhausted")
         else:
+            if isinstance(result, SkippedRecord):
+                state.local_skip_next_offset = identity.record.offset + 1
             self._complete_head(state, event, identity.record.offset)
 
     async def _finish_handoff(self, state: _Partition) -> None:
@@ -877,6 +892,10 @@ class KafkaRecordRunner:
                 if state.task is not None and state.task is not asyncio.current_task() and not state.task.done():
                     await asyncio.shield(state.task)
                 async with self._work:
+                    if state.handoff is not None:
+                        await self._finish_handoff(state)
+                        if state.handoff is not None:
+                            return state.held or self._retry("dependency_unavailable")
                     if apply_filter:
                         return await self._processing.inspect_only(
                             self.snapshot,
@@ -907,6 +926,7 @@ class KafkaRecordRunner:
                 state.held = HeldRecord(reason="offset_exhausted")
             else:
                 state.resolved_next_offset = identity.record.offset + 1
+                state.local_skip_next_offset = identity.record.offset + 1
                 state.held = None
                 await self._resume_after_terminal(state, identity.record.offset)
             return
@@ -1018,12 +1038,39 @@ class KafkaRecordRunner:
             }
             if not offsets:
                 return
+            skip_partitions = {state.partition for state in states if state.local_skip_next_offset is not None}
             try:
                 async with asyncio.timeout(EventStreamLimits.COMMITTED_POSITION_TIMEOUT_SECONDS):
-                    await self._client.commit(offsets, expected_epoch=epoch)
+                    async with (
+                        self._processing.local_skip_commit_guard(self.snapshot)
+                        if skip_partitions.intersection(offsets)
+                        else nullcontext(enter_result=True)
+                    ) as current_revision:
+                        # Ownership, drain deadlines and recovery fences can
+                        # change while the authoritative revision lock waits.
+                        offsets = {
+                            state.partition: offsets[state.partition]
+                            for state in states
+                            if state.partition in offsets
+                            and self._commit_allowed(state)
+                            and (current_revision or state.partition not in skip_partitions)
+                        }
+                        if not offsets:
+                            return
+                        await self._client.commit(offsets, expected_epoch=epoch)
+            except SQLAlchemyError:
+                self._invalidate_gate()
+                return
             except (*_TRANSPORT_ERRORS, TimeoutError, OSError):
                 return
             for state in states:
+                committed = offsets.get(state.partition)
+                if (
+                    committed is not None
+                    and state.local_skip_next_offset is not None
+                    and state.local_skip_next_offset <= committed
+                ):
+                    state.local_skip_next_offset = None
                 if (
                     self._owned(state)
                     and state.epoch == epoch
@@ -1117,6 +1164,14 @@ class KafkaRecordRunner:
                 raise SubscriptionRuntimeError(RuntimeFailureCode.STOP_INCOMPLETE)
             self._stopped = True
 
+    async def _finish_recovery_handoff(self, state: _Partition, boundary: int) -> bool:
+        """Require confirmed persistence for a saved identity below the new checkpoint."""
+        if state.handoff is None or boundary <= state.handoff.identity.record.offset:
+            return True
+        async with self._work:
+            await self._finish_handoff(state)
+        return state.handoff is None
+
     async def close_and_drain(self, request: PositionRequest, *, token: UUID, boundary: int) -> DrainEvidence:
         """Fence local tasks/commits for the upstream explicit gap-recovery service."""
         if not 0 <= boundary <= MAX_POSITION_OFFSET:
@@ -1148,7 +1203,9 @@ class KafkaRecordRunner:
                             self._remember_offsets(state, [state.pending_failure.identity.record.offset])
                     state.records.clear()
                     state.byte_count = 0
-                    await self._inspect_recovery_window(state)
+                    quiescent = await self._finish_recovery_handoff(state, boundary)
+                    if quiescent:
+                        await self._inspect_recovery_window(state)
                 gated = (
                     state.content_gate_unknown
                     or state.pending_failure is not None

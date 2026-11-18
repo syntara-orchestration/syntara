@@ -1,7 +1,7 @@
 """Filter locally before Execution lookup and new Kafka workflow admission."""
 
-from collections.abc import Callable
-from contextlib import suppress
+from collections.abc import AsyncIterator, Callable
+from contextlib import asynccontextmanager, suppress
 from datetime import UTC, datetime, timedelta
 
 import structlog
@@ -107,6 +107,30 @@ class EventRecordProcessingService:
             return False
         except (SyntaraError, ValueError):
             return False
+
+    @asynccontextmanager
+    async def local_skip_commit_guard(self, snapshot: SubscriptionSnapshot) -> AsyncIterator[bool]:
+        """Serialize a skip batch's checkpoint with publication on its source.
+
+        Keep the lifecycle locks until the bounded broker commit settles. A
+        reconciled local gate alone cannot fence a publication it has not seen.
+        Already completed skips may drain after local admission closes.
+        """
+        async with self._sessions() as session, session.begin():
+            lifecycle = await lock_source_lifecycle(session, snapshot.source_id)
+            if lifecycle is None:
+                yield False
+                return
+            subscription, source = lifecycle
+            yield (
+                subscription.id == snapshot.subscription_id
+                and subscription.workflow_id == snapshot.workflow_id
+                and subscription.configuration_revision == snapshot.configuration_revision
+                and subscription.published_version_id == snapshot.published_version_id
+                and subscription.active_source_generation == source.generation == snapshot.source_generation
+                and source.id == snapshot.source_id
+                and source.retired_at is None
+            )
 
     def _scheduled(self, snapshot: SubscriptionSnapshot, result: SchedulingResult) -> ResolvedDelivery | HeldRecord:
         if isinstance(result, ResolvedDelivery):
