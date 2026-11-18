@@ -11,6 +11,7 @@ import pytest
 from pydantic import ValidationError
 
 from syntara.forms.models.form_fields import (
+    SUPPORTED_DATE_COMPONENTS,
     CheckboxField,
     DateField,
     DropdownField,
@@ -441,9 +442,6 @@ class TestDateFieldComponents:
         ("components", "expected"),
         [
             ((True, False, False), ("date",)),
-            ((False, True, False), ("time",)),
-            ((False, False, True), ("timezone",)),
-            ((True, True, False), ("date", "time")),
             ((False, True, True), ("time", "timezone")),
             ((True, True, True), ("date", "time", "timezone")),
         ],
@@ -470,12 +468,15 @@ class TestDateFieldComponents:
             ),
             (
                 (True, False, True),
-                r"Select a time when both a date and timezone are included\.",
+                r"unsupported combination of date components",
             ),
+            ((False, True, False), r"unsupported combination of date components"),
+            ((False, False, True), r"unsupported combination of date components"),
+            ((True, True, False), r"unsupported combination of date components"),
         ],
     )
     def test_invalid_combinations(self, components: tuple[bool, bool, bool], message: str) -> None:
-        """Empty selections and date plus timezone without time are rejected."""
+        """Empty selections and unsupported date component combinations are rejected."""
         include_date, include_time, include_timezone = components
         with pytest.raises(ValidationError, match=message):
             DateField.model_validate(
@@ -485,6 +486,13 @@ class TestDateFieldComponents:
                     include_timezone=include_timezone,
                 )
             )
+
+    def test_supported_combinations_are_exactly_rfc3339_shapes(self) -> None:
+        assert SUPPORTED_DATE_COMPONENTS == (
+            ("date",),
+            ("time", "timezone"),
+            ("date", "time", "timezone"),
+        )
 
 
 class TestDateFieldDefault:
@@ -513,7 +521,9 @@ class TestDateFieldDefault:
     def test_partial_default_rejected(self) -> None:
         """A default is substituted wholesale, so an incomplete one is useless."""
         with pytest.raises(ValidationError, match=r"default is missing timezone"):
-            DateField.model_validate(_date(include_date=False, include_timezone=True, default={}))
+            DateField.model_validate(
+                _date(include_date=False, include_time=True, include_timezone=True, default={"time": "14:30"})
+            )
 
     def test_default_for_uncollected_component_rejected(self) -> None:
         """Defaulting a component the field never asks for is an authoring mistake."""
@@ -548,7 +558,12 @@ class TestDateFieldDefault:
         """Timezones are checked against the IANA database, not just length."""
         with pytest.raises(ValidationError, match=r"Invalid timezone: 'Mars/Olympus'"):
             DateField.model_validate(
-                _date(include_date=False, include_timezone=True, default={"timezone": "Mars/Olympus"})
+                _date(
+                    include_date=False,
+                    include_time=True,
+                    include_timezone=True,
+                    default={"time": "14:30", "timezone": "Mars/Olympus"},
+                )
             )
 
     def test_unknown_component_rejected(self) -> None:

@@ -530,19 +530,14 @@ class TestDateFieldSubmission:
         [
             ({}, {"date": "2026-01-05"}, "2026-01-05"),
             (
-                {"include_time": True},
-                {"date": "2026-01-05", "time": "14:30"},
-                "2026-01-05T14:30:00",
+                {"include_time": True, "include_timezone": True},
+                {"date": "2026-01-05", "time": "14:30", "timezone": "UTC"},
+                "2026-01-05T14:30:00+00:00",
             ),
             (
-                {"include_date": False, "include_time": True},
-                {"time": "14:30"},
-                "14:30:00",
-            ),
-            (
-                {"include_date": False, "include_timezone": True},
-                {"timezone": "America/New_York"},
-                "America/New_York",
+                {"include_date": False, "include_time": True, "include_timezone": True},
+                {"time": "14:30", "timezone": "America/New_York"},
+                "14:30:00-05:00",
             ),
         ],
     )
@@ -599,10 +594,6 @@ class TestDateFieldSubmission:
         with pytest.raises(ValueError, match=r"Missing required components: time, timezone"):
             submission_module._format_time_with_standard_offset(value)
 
-    def test_time_component_formatter_rejects_missing_time(self) -> None:
-        with pytest.raises(ValueError, match=r"Missing required component: time"):
-            submission_module._require_time_component(DateValue())
-
     def test_missing_component_rejected(self) -> None:
         """Every included component is mandatory once the field is answered."""
         form = self._date_form(include_time=True, include_timezone=True)
@@ -656,9 +647,9 @@ class TestDateFieldSubmission:
 
     def test_unknown_timezone_rejected(self) -> None:
         """Timezones are checked against the IANA database at submission time."""
-        form = self._date_form(include_date=False, include_timezone=True)
+        form = self._date_form(include_date=False, include_time=True, include_timezone=True)
 
-        errors = _errors(form, {"start": {"timezone": "Mars/Olympus"}})
+        errors = _errors(form, {"start": {"time": "14:30", "timezone": "Mars/Olympus"}})
 
         assert "Invalid timezone: 'Mars/Olympus'" in errors[0].message
 
