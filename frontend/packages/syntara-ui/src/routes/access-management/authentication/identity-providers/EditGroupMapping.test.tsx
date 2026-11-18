@@ -7,7 +7,7 @@ import { axe } from 'vitest-axe'
 
 import { identityProvidersClient, usersClient } from '../../../../client'
 import { useCanI } from '../../../../hooks/useCanI'
-import { AlertProvider } from '../../../../providers/alerts'
+import { AlertProvider } from '../../../../providers/alerts/AlertProvider'
 import { routerTestState } from '../../../../test/setup'
 import { useAllGroups } from '../../../access/useAllGroups'
 

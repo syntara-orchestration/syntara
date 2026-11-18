@@ -1,6 +1,6 @@
 import { EdgeHandleEnum } from '@syntara/contracts'
 
-import { FlowNodeType } from '../../../constants'
+import { FlowNodeType } from '../../../constants/nodeTypes'
 import type { NodeType } from '../../workflows/canvas/nodes/NodeType'
 import type { FlowPosition, OnAddNodeFromEdge } from '../types'
 import { isSwitchCasePort } from '../utils/switchCaseHelpers'

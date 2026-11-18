@@ -7,7 +7,7 @@ import type { ComponentProps, ReactNode } from 'react'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 
 import { approvalsClient, executionsClient, workflowClient } from '../../client'
-import { AlertProvider } from '../../providers/alerts'
+import { AlertProvider } from '../../providers/alerts/AlertProvider'
 import { FeatureFlagsProvider } from '../../providers/feature-flags-provider'
 import { routerTestState } from '../../test/setup'
 

@@ -35,7 +35,7 @@ executionState/
 The main entry point for all execution state operations. Create a singleton instance and use it to enrich activities and determine edge statuses.
 
 ```typescript
-import { ExecutionStateEnricher } from './utils/executionState'
+import { ExecutionStateEnricher } from './utils/executionState/ExecutionStateEnricher'
 
 // Create singleton instance
 const enricher = new ExecutionStateEnricher()

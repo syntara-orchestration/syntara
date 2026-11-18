@@ -501,7 +501,7 @@ flowchart TB
 **Quick usage:**
 
 ```tsx
-import { useWebSocket } from '../../lib/websocket'
+import { useWebSocket } from '../../lib/websocket/hooks'
 
 function ChatComponent() {
   // Single hook for connect, send, and receive
@@ -1184,7 +1184,6 @@ flowchart LR
 ### FilterBar component
 
 **Location:** `packages/syntara-ui/src/components/filters/FilterBar.tsx`  
-**Barrel:** `packages/syntara-ui/src/components/filters/index.ts`  
 **List layout wrapper:** `SynListPanelToolbar` in `packages/syntara-ui/src/components/panels/list/SynListPanel.tsx`
 
 ```typescript

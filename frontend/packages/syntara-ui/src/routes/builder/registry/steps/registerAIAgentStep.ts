@@ -1,6 +1,6 @@
 import { RhUiRobotIcon } from '@patternfly/react-icons'
 
-import { RegistryStepId } from '../../../../constants'
+import { RegistryStepId } from '../../../../constants/registryStepIds'
 import { createAgenticActivity, useWorkflowStore } from '../../../../stores/useWorkflowStore'
 import { AIAgentStepForm } from '../../step-forms/AIAgentStepForm'
 import type { AIAgentFormSubmitData } from '../../step-forms/AIAgentStepForm'
