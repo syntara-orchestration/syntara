@@ -243,6 +243,7 @@ class AuthFailureType(StrEnum):
     STALE_TOKEN = "stale_token"  # noqa: S105
     DISABLED_SA = "disabled_sa"
     REVOKED_SA_TOKEN = "revoked_sa_token"  # noqa: S105
+    INTERNAL_SERVICE_REQUIRED = "internal_service_required"
 
 
 def _validate_labels(labels: dict[str, str] | None) -> dict[str, str]:

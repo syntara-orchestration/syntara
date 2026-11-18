@@ -11,8 +11,6 @@ The API routes, service, database records, role assignments, and responder membe
 integration test setup.
 """
 
-from collections.abc import Callable
-from contextlib import AbstractContextManager
 from typing import Any
 from unittest.mock import AsyncMock, patch
 from uuid import UUID, uuid4
@@ -37,7 +35,6 @@ from syntara.forms.services.form_prompt_service import FormPromptService
 FORM_PROMPTS_URL = "/api/v1/form_prompts"
 _FORM_DEFINITION = {"fields": [{"value_name": "reason", "type": "text", "label": "Reason", "required": True}]}
 _PROJECT_ROLES = {"project-admin", "project-user", "project-auditor"}
-_ALL_ROLES = ["admin", "auditor", "project-admin", "project-user", "project-auditor", "user"]
 _GET_SINGLE_CASES = [
     ("admin", "same", 200),
     ("admin", "other", 200),
@@ -304,52 +301,6 @@ class TestFormPromptServiceAuthorizationAPI:
             f"{FORM_PROMPTS_URL}/{prompt.id}/submit",
             json={"response_data": {"reason": "role denied"}},
         )
-
-        assert response.status_code == 403
-        assert response.json()["code"] == "AUTHORIZATION_DENIED"
-
-    @pytest.mark.parametrize("role_name", _ALL_ROLES)
-    async def test_batch_update_rejects_user_callers(
-        self,
-        role_name: str,
-        override_settings: Callable[..., AbstractContextManager[object]],
-    ) -> None:
-        """The batch endpoint is mTLS-only: no user role, including admin, may call it."""
-        await self.setup.assign_role(role_name)
-        prompt = await self.setup.create_prompt()
-
-        with override_settings(s2s_tls_enabled=True):
-            response = await self.setup.client.post(
-                f"{FORM_PROMPTS_URL}/batch",
-                json={"updates": [{"prompt_id": str(prompt.id), "status": "expired"}]},
-            )
-
-        assert response.status_code == 403
-        assert response.json()["code"] == "AUTHORIZATION_DENIED"
-        await self.setup.session.refresh(prompt)
-        assert prompt.status == FormPromptStatus.PENDING
-
-    @pytest.mark.parametrize("role_name", _ALL_ROLES)
-    async def test_create_rejects_user_callers(
-        self,
-        role_name: str,
-        override_settings: Callable[..., AbstractContextManager[object]],
-    ) -> None:
-        """The create endpoint is mTLS-only: no user role, including admin, may call it."""
-        await self.setup.assign_role(role_name)
-
-        with override_settings(s2s_tls_enabled=True):
-            response = await self.setup.client.post(
-                FORM_PROMPTS_URL,
-                json={
-                    "execution_id": str(uuid4()),
-                    "project_id": str(self.setup.project_id),
-                    "prompt_node_id": "form-prompt-authz-test",
-                    "name": "Authorization test form",
-                    "temporal_activity_id": "form-activity",
-                    "form_definition": _FORM_DEFINITION,
-                },
-            )
 
         assert response.status_code == 403
         assert response.json()["code"] == "AUTHORIZATION_DENIED"

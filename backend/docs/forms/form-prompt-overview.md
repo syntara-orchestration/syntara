@@ -246,7 +246,9 @@ loaded. Naming responders **narrows** tier 1, never widens it: a listed user sti
 `POST /form_prompts` (create) and `POST /form_prompts/batch` are internal endpoints. They
 are left out of the public API schema and gated by `require_internal_service` rather than
 RBAC. Only allowlisted service identities authenticated with mTLS, such as the Temporal
-worker, can call them. User bearer tokens are rejected whatever the user's roles, and the
+worker, can call them. User bearer tokens are rejected whatever the user's roles. So is any
+request with an `Authorization` header, even with a valid service cert, because a bearer
+token would otherwise take precedence and the request would run as that user. The
 endpoints fail closed when S2S TLS is disabled. See
 [S2S Certificate Authentication](../s2s-cert-authentication.md).
 

@@ -196,6 +196,7 @@ class TestAuthFailureType:
             "stale_token",
             "disabled_sa",
             "revoked_sa_token",
+            "internal_service_required",
         }
         assert {m.value for m in AuthFailureType} == expected
 

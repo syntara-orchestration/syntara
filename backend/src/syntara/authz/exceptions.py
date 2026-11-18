@@ -8,6 +8,7 @@ from fastapi.responses import JSONResponse
 from syntara.core.error_handlers import PROBLEM_TYPES, create_problem_details_response
 from syntara.core.exception_registry import fastapi_exception
 from syntara.core.exceptions import SyntaraError
+from syntara.metrics.types import AuthFailureType
 
 if TYPE_CHECKING:
     from uuid import UUID
@@ -31,6 +32,26 @@ def authorization_denied_handler(
 @fastapi_exception(handler=authorization_denied_handler)
 class AuthorizationDeniedError(SyntaraError):
     """Raised when a user is not authorized to perform an action."""
+
+
+def internal_service_required_handler(
+    request: Request,
+    exc: "InternalServiceRequiredError",
+) -> JSONResponse:
+    """Return the standard 403 and tag it so the metrics middleware counts an auth failure."""
+    response = authorization_denied_handler(request, exc)
+    response.headers["X-Auth-Failure-Type"] = AuthFailureType.INTERNAL_SERVICE_REQUIRED
+    return response
+
+
+@fastapi_exception(handler=internal_service_required_handler)
+class InternalServiceRequiredError(AuthorizationDeniedError):
+    """Raised when a caller other than an mTLS-authenticated internal service hits an internal endpoint."""
+
+    def __init__(self, message: str, *, reason: str) -> None:
+        """Initialize with a short machine-readable rejection reason."""
+        super().__init__(message)
+        self.reason = reason
 
 
 def _not_found_handler(request: Request, exc: SyntaraError) -> JSONResponse:
