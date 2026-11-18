@@ -443,7 +443,11 @@ class WorkflowRetryMixin:
             return False
         if source_predecessor.get("status") not in _RESTORABLE_SOURCE_STATUS_VALUES:
             return False
-        if temporal_activity_id in self._restored_node_timestamps:
+        # Real restores publish a status with the source times. Trigger retry
+        # plants display-only timestamps here with no status, and that node
+        # still executes live — do not treat those entries as restored output.
+        restored = self._restored_node_timestamps.get(temporal_activity_id)
+        if restored is not None and restored.get("status") is not None:
             return True
         if node.type == NodeType.LOOP:
             return self._should_replay_loop(node.id)

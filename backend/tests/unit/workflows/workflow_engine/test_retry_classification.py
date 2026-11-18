@@ -249,6 +249,105 @@ async def test_retry_converge_with_cancelled_source_falls_through_to_live_execut
     assert "join" not in wf._retry_replay_candidates
 
 
+def _trigger_and_branch_converge_graph() -> WorkflowGraph:
+    """Build trigger + b2 -> join so the trigger is a direct converge predecessor."""
+    backend = InMemoryGraphBackend()
+    backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
+    backend.add_node("b2", {"id": "b2", "type": "script", "parameters": {}})
+    backend.add_node(
+        "join",
+        {"id": "join", "type": "converge", "parameters": {"strategy": "all", "n_required": 2}},
+    )
+    backend.add_edge("trigger", "join", None)
+    backend.add_edge("b2", "join", None)
+    return WorkflowGraph(backend)
+
+
+def test_display_only_trigger_timestamps_are_not_a_restore_signal() -> None:
+    """Retry plants trigger source times for display, without restoring trigger output."""
+    wf = _make_workflow({"retry_from_execution_id": "src-1", "eligible_point_ids": ["b2"]})
+    graph = _trigger_and_branch_converge_graph()
+    trigger = graph.get_node("trigger")
+    wf._restored_node_timestamps = {
+        "trigger": {
+            "started_at": "2026-01-01T00:00:00+00:00",
+            "completed_at": "2026-01-01T00:05:00+00:00",
+        }
+    }
+
+    will_replay = wf._converge_predecessor_will_replay(
+        trigger,
+        "trigger",
+        {"status": ActivityStatus.COMPLETED.value, "result_digest": "old"},
+        graph,
+    )
+
+    assert will_replay is False
+
+
+@pytest.mark.asyncio
+async def test_retry_converge_executes_live_when_trigger_predecessor_reran(mock_wf: MagicMock) -> None:
+    """A live trigger with display-only source times must not restore a stale converge."""
+    wf = _make_workflow({"retry_from_execution_id": "src-1", "eligible_point_ids": ["b2"]})
+    graph = _trigger_and_branch_converge_graph()
+    wf._retry_replay_candidates = {"join"}
+    wf._retry_source_statuses = {"trigger": "completed", "b2": "completed", "join": "completed"}
+    wf._retry_source_temporal_statuses = {"trigger": "completed", "b2": "completed", "join": "completed"}
+    wf._restored_node_timestamps = {
+        "trigger": {
+            "started_at": "2026-01-01T00:00:00+00:00",
+            "completed_at": "2026-01-01T00:05:00+00:00",
+        },
+        "b2": {
+            "started_at": "2026-01-01T00:00:00+00:00",
+            "completed_at": "2026-01-01T00:01:00+00:00",
+            "status": ActivityStatus.COMPLETED.value,
+        },
+    }
+    old_trigger_output = {"payload": "old"}
+    new_trigger_output = {"payload": "new"}
+    b2_output = {"v": 2, "status": "completed"}
+    wf.resolver.set_namespace("trigger", new_trigger_output)
+    wf.resolver.set_namespace("b2", b2_output)
+    source_state = {
+        "converge": {
+            "status": ActivityStatus.COMPLETED.value,
+            "input_data": {"strategy": "all", "n_required": 2},
+            "output_branch_count": 2,
+            "gate_metadata": {"strategy": "all", "n_required": 2, "total_branches": 2},
+        },
+        "predecessors": {
+            "trigger": {
+                "status": ActivityStatus.COMPLETED.value,
+                "result_digest": wf._retry_converge_result_digest(old_trigger_output),
+            },
+            "b2": {
+                "status": ActivityStatus.COMPLETED.value,
+                "result_digest": wf._retry_converge_result_digest(b2_output),
+            },
+        },
+    }
+    live_result = {"output": {"status": "completed", "converged": True}, "control": None}
+
+    async def _activity(name: Any, *_args: Any, **_kwargs: Any) -> Any:  # noqa: ANN401
+        if name == ActivityName.RETRY_CONVERGE_METADATA:
+            return source_state
+        if name == ActivityName.CONVERGE:
+            return live_result
+        pytest.fail(f"unexpected activity {name}")
+
+    mock_wf.wait_condition = AsyncMock()
+    mock_wf.execute_activity = AsyncMock(side_effect=_activity)
+
+    result = await wf._execute_converge_node("join", {"strategy": "all", "n_required": 2}, None, graph)
+
+    assert result == live_result
+    activities = [call.args[0] for call in mock_wf.execute_activity.call_args_list]
+    assert ActivityName.CONVERGE in activities
+    assert ActivityName.RETRY_NODE_REPLAY not in activities
+    assert "join" not in wf._retry_replay_candidates
+
+
 @pytest.mark.asyncio
 async def test_retry_converge_restores_when_every_branch_matches_source(mock_wf: MagicMock) -> None:
     """Every predecessor is restored and matches the source, so the converge restores.
