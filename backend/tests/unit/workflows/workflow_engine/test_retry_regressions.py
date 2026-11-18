@@ -17,6 +17,7 @@ from syntara.workflow_core.graph import ActivityNode, WorkflowGraph
 from syntara.workflow_core.graph_backend import InMemoryGraphBackend
 from syntara.workflow_core.utils.namespace_resolver import NamespaceResolver
 from syntara.workflow_runtime.engines.temporal.dynamic_workflow import OrchestratorWorkflow
+from syntara.workflows.models.activity_execution import ActivityStatus
 
 # ---------------------------------------------------------------------------
 # Helpers that build realistic definitions
@@ -890,11 +891,12 @@ def test_metadata_match_rejects_a_non_dict_source_converge() -> None:
     assert wf._retry_converge_metadata_matches({}, preds, {p: p for p in preds}, {"converge": None}, graph) is False
 
 
-def test_metadata_match_rejects_a_non_terminal_source_converge() -> None:
+@pytest.mark.parametrize("status", [ActivityStatus.RUNNING.value, ActivityStatus.CANCELLED.value])
+def test_metadata_match_rejects_source_converge_without_reusable_result(status: str) -> None:
     wf = _wf()
     graph = _two_branch_converge_graph()
     preds = graph.get_predecessors("join")
-    source = {"converge": {"status": "running"}, "predecessors": {}}
+    source = {"converge": {"status": status}, "predecessors": {}}
     assert wf._retry_converge_metadata_matches({}, preds, {p: p for p in preds}, source, graph) is False
 
 

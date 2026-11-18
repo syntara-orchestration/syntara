@@ -516,6 +516,8 @@ class WorkflowRetryMixin:
         source_converge = source_state.get("converge")
         if not isinstance(source_converge, dict):
             return False
+        # CANCELLED rows are interrupted work. Reject them before the strict
+        # require_record replay path so the converge can execute normally.
         if source_converge.get("status") not in {
             ActivityStatus.COMPLETED.value,
             ActivityStatus.FAILED.value,

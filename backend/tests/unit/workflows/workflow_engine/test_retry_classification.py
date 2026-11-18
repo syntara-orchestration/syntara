@@ -220,6 +220,36 @@ async def test_retry_converge_executes_live_when_a_quorum_branch_is_a_rerun(mock
 
 
 @pytest.mark.asyncio
+async def test_retry_converge_with_cancelled_source_falls_through_to_live_execution(mock_wf: MagicMock) -> None:
+    wf = _make_workflow({"retry_from_execution_id": "src-1", "eligible_point_ids": ["b1", "b2"]})
+    graph = _two_branch_converge_graph("any", 1)
+    wf._retry_replay_candidates = {"join"}
+    cancelled_source_state = {
+        "converge": {"status": ActivityStatus.CANCELLED.value},
+        "predecessors": {},
+    }
+    live_result = {"output": {"status": "completed", "converged": True}, "control": None}
+
+    async def _activity(name: Any, *_args: Any, **_kwargs: Any) -> Any:  # noqa: ANN401
+        if name == ActivityName.RETRY_CONVERGE_METADATA:
+            return cancelled_source_state
+        if name == ActivityName.CONVERGE:
+            return live_result
+        pytest.fail(f"unexpected activity {name}")
+
+    mock_wf.wait_condition = AsyncMock()
+    mock_wf.execute_activity = AsyncMock(side_effect=_activity)
+
+    result = await wf._execute_converge_node("join", {"strategy": "any", "n_required": 1}, None, graph)
+
+    assert result == live_result
+    activities = [call.args[0] for call in mock_wf.execute_activity.call_args_list]
+    assert ActivityName.CONVERGE in activities
+    assert ActivityName.RETRY_NODE_REPLAY not in activities
+    assert "join" not in wf._retry_replay_candidates
+
+
+@pytest.mark.asyncio
 async def test_retry_converge_restores_when_every_branch_matches_source(mock_wf: MagicMock) -> None:
     """Every predecessor is restored and matches the source, so the converge restores.
 

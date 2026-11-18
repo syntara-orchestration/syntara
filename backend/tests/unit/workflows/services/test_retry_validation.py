@@ -152,6 +152,24 @@ async def test_validate_retry_rejects_unknown_failure_point() -> None:
 
 
 @pytest.mark.asyncio
+async def test_validate_retry_rejection_does_not_report_result_counts() -> None:
+    execution = _make_execution(ExecutionStatus.FAILED)
+    session = _mock_session(
+        (execution, "one"),
+        ([_make_activity("step_2")], "all"),
+        ([_make_completed_activity("step_1")], "all"),
+        (_make_version(1), "one"),
+    )
+
+    verdict = await validate_retry_from_failure(session, execution.id, ["nope"])
+
+    assert verdict.eligible is False
+    assert verdict.step_count_by_eligible_point == {}
+    assert verdict.total_step_count == 0
+    assert verdict.retained_result_count == 0
+
+
+@pytest.mark.asyncio
 async def test_validate_retry_passes_clean_path() -> None:
     execution = _make_execution(ExecutionStatus.FAILED)
     session = _mock_session(
@@ -932,7 +950,19 @@ async def test_validate_retry_rejects_iteration_suffixed_selection() -> None:
     verdict = await validate_retry_from_failure(_run_session(execution, _definition()), execution.id, ["step_2#iter-1"])
     assert verdict.eligible is False
     assert "base node" in (verdict.reason or "")
-    assert verdict.eligible_point_ids == []
+    assert verdict.eligible_point_ids == ["step_2"]
+
+
+@pytest.mark.asyncio
+async def test_validate_retry_suggests_base_id_for_nested_iteration_selection() -> None:
+    execution = _make_execution(ExecutionStatus.FAILED)
+
+    verdict = await validate_retry_from_failure(
+        _run_session(execution, _definition()), execution.id, ["step_2#iter-1#iter-2"]
+    )
+
+    assert verdict.eligible is False
+    assert verdict.eligible_point_ids == ["step_2"]
 
 
 @pytest.mark.asyncio

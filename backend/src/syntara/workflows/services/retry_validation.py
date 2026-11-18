@@ -593,6 +593,8 @@ def _retry_selection_reason(
         successors,
         sanitized_expansion_seeds=(None if is_default_selection else set(normalized) & replacement_ids),
     )
+    # Report a missing retained-version node before converge mootness: the version
+    # error explains why this retry cannot use its source graph at all.
     reason = version_reason or _converge_reason(snapshot_def, normalized, completed_ids, successors)
     if reason is None:
         reported_selection = sorted(
@@ -639,16 +641,19 @@ def _retry_result_counts(
 
 
 def _normalized_retry_points(retry_point_ids: list[str]) -> tuple[list[str], list[str]]:
-    """Return iteration-suffixed and normalized retry point IDs."""
+    """Return iteration-suffixed IDs and base IDs suitable for UI guidance."""
     suffixed = sorted({point.strip() for point in retry_point_ids if point and LOOP_ITERATION_SEP in point.strip()})
-    normalized = sorted(
-        {
-            point.strip()
-            for point in retry_point_ids
-            if point and point.strip() and LOOP_ITERATION_SEP not in point.strip()
-        }
+    normalized = {
+        point.strip()
+        for point in retry_point_ids
+        if point and point.strip() and LOOP_ITERATION_SEP not in point.strip()
+    }
+    normalized.update(
+        base_id
+        for point in suffixed
+        if (base_id := strip_all_iteration_suffixes(point)) and LOOP_ITERATION_SEP not in base_id
     )
-    return suffixed, normalized
+    return suffixed, sorted(normalized)
 
 
 async def validate_retry_from_failure(
@@ -702,7 +707,7 @@ async def validate_retry_from_failure(
         )
     ).all()
     failed_ids = {strip_iteration_suffix(activity.activity_name) for activity in activities}
-    normalized = normalized_input
+    normalized = sorted(failed_ids) if is_default_selection else normalized_input
 
     completed = (
         await session.exec(
@@ -723,8 +728,6 @@ async def validate_retry_from_failure(
     snapshot = snapshot_result.one_or_none()
 
     snapshot_def = (snapshot.workflow_definition or {}) if snapshot is not None else {}
-    if is_default_selection:
-        normalized = sorted(failed_ids)
     # One adjacency build for the whole validation, shared by every downstream
     # walk below (converge-mootness, sanitized expansion, step counts, eligible
     # points, and the per-failed-node replacement scan).
@@ -747,9 +750,11 @@ async def validate_retry_from_failure(
         successors=successors,
         overrides=overrides,
     )
-    step_counts, total_steps, retained_result_count = _retry_result_counts(
-        snapshot, snapshot_def, reported_selection, completed, successors
-    )
+    step_counts, total_steps, retained_result_count = {}, 0, 0
+    if reason is None:
+        step_counts, total_steps, retained_result_count = _retry_result_counts(
+            snapshot, snapshot_def, reported_selection, completed, successors
+        )
 
     if reason is not None:
         return RetryValidation(
