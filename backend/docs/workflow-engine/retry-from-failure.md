@@ -74,17 +74,19 @@ guards are:
 2. A selected point must be a currently failed activity in the source run, or a
    supported sanitized replacement, and must exist in the source execution's
    retained workflow version. Empty selection defaults to all current failures.
-3. A selected failure is rejected if its nearest downstream converge node has
-   already completed. That means the workflow passed the branch; a failed
-   converge can still be retried from its failed branches.
+3. A selected failure is rejected when every converge node at the nearest
+   downstream distance has completed. That means the workflow passed the
+   branch; a failed converge can still be retried from its failed branches.
 4. The retry uses the exact `WorkflowVersion` recorded on the source execution.
    Edits made to the current workflow after the source run do not change retry
    behavior.
-5. Stored outputs are credential-scrubbed. If a node that will be reused has a
-   redacted field referenced by the retry path, the retry must replay that node
-   to regenerate its output. Validation checks references and field paths so
-   unreferenced redactions do not block the retry. It expands sanitized
-   dependencies transitively and reports replacements and auto-included nodes.
+5. Stored outputs are credential-scrubbed. When a completed upstream node has a
+   redacted field referenced by the retry path, validation auto-includes it as a
+   retry start point so it re-executes. Validation checks references and field
+   paths, so unreferenced redactions do not block the retry. Sanitized
+   dependencies are expanded transitively and reported as replacements and
+   auto-included nodes. Failed and skipped source records are restored as-is;
+   validation does not scan them for redaction markers.
 6. Overrides may target only an existing parameter on a failed node included in
    the re-run closure. An override for an excluded failure or an auto-included
    sanitized node is rejected. At dispatch time, a valid override replaces the
