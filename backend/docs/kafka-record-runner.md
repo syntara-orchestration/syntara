@@ -13,7 +13,7 @@ For each received record:
 2. Evaluate the publication's CEL filter locally. No-match and evaluation-error
    outcomes need no Execution lookup or Temporal call. Before committing a batch
    containing local skips, lock and validate its authoritative subscription
-   revision through the bounded Kafka commit. A republished revision leaves the
+   revision until the Kafka commit settles. A republished revision leaves the
    old batch uncommitted for replay.
 3. For matches, reuse a matching confirmed normal Execution when one exists.
 4. Otherwise check current lifecycle, credentials and capacity, then prepare
@@ -36,6 +36,12 @@ There is no delivery ledger, delivery capacity table, terminal proof cache,
 cleanup worker or independent handoff-recovery scanner. Interrupted handoffs
 remain uncommitted in Kafka. The runner retries saved handoffs even without new
 records; after a restart, repair waits until that same source is consumed again.
+During graceful republish, the old runner retries parked handoffs without
+filtering again or starting another workflow. It retains their original
+arguments across partition revocation and cannot be replaced until Execution
+persistence is confirmed. Failed recovery keeps the subscription draining and
+retries on later reconciliation; this in-memory protection does not survive a
+process crash.
 Duplicate protection lasts while the normal Execution or Temporal
 evidence remains available; deleting both can permit a new start on redelivery.
 
@@ -54,6 +60,12 @@ database source of truth.
 The runner refreshes subscription eligibility between batches. Buffered records
 use shared local gates; matches also check current admission before starting.
 Local skip checkpoints validate the authoritative revision once per commit batch.
+The five-second commit wait bounds only the caller's wait. The retained commit
+task keeps the publication lock until the broker operation settles. An ambiguous
+failure closes the consumer and requires broker-confirmed membership removal
+before releasing the lock. If Kafka is unavailable, publication remains blocked
+until that fence can be confirmed. Shutdown also retains the runner while such a
+commit or fence is outstanding.
 
 Placement loss closes fetching and starts a bounded drain. Already admitted
 handoffs may finish persisting accepted runs. Their resolved offsets may commit

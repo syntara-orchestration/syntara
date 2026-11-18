@@ -12,25 +12,30 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import re
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, Protocol, cast
 
 import structlog
 from aiokafka import AIOKafkaConsumer, TopicPartition
 from aiokafka.abc import ConsumerRebalanceListener
-from aiokafka.client import ConnectionGroup
+from aiokafka.client import ConnectionGroup, CoordinationType
 from aiokafka.coordinator.assignors.roundrobin import RoundRobinPartitionAssignor
 from aiokafka.errors import (
+    IllegalGenerationError,
     IncompatibleBrokerVersion,
     KafkaError,
     KafkaTimeoutError,
     OffsetOutOfRangeError,
+    UnknownMemberIdError,
     UnknownTopicOrPartitionError,
     UnsupportedVersionError,
 )
+from aiokafka.protocol.commit import OffsetCommitRequest, OffsetCommitRequest_v2
 from aiokafka.protocol.fetch import FetchRequest_v0, FetchResponse_v0
+from aiokafka.protocol.group import LeaveGroupRequest
 from aiokafka.structs import OffsetAndMetadata
 
 from syntara.core.config.base import get_settings
+from syntara.core.constants import EventSchedulingDefaults
 from syntara.eventstreams.adapters.kafka_identity import SourceMetadataRequest, decode_source_identity
 from syntara.eventstreams.adapters.kafka_metadata import KafkaSourceMetadata, KafkaTimestampType
 from syntara.eventstreams.core.consumer import (
@@ -76,6 +81,19 @@ def _sanitize(message: str) -> str:
     return _CREDENTIAL_SCRUB.sub(r"\1=***", message)
 
 
+class _CommitMembership(Protocol):
+    """Typed view of fields generated from aiokafka's OffsetCommit schema."""
+
+    consumer_group_generation_id: int
+    consumer_id: str
+
+
+class _LeaveGroupResult(Protocol):
+    """Typed view of the broker's generated LeaveGroup response."""
+
+    error_code: int
+
+
 class _ResetAwareKafkaClient(KafkaPolicyClient):
     """Observe offset errors before aiokafka silently applies its earliest fallback."""
 
@@ -87,6 +105,8 @@ class _ResetAwareKafkaClient(KafkaPolicyClient):
         on_reset: Callable[[int, int], None],
         on_metadata_changed: Callable[[], None] | None = None,
         on_topic_missing: Callable[[], None] | None = None,
+        commit_group_id: str | None = None,
+        commit_uncertain: Callable[[], bool] | None = None,
         **kwargs: object,
     ) -> None:
         """Keep reset signals scoped to this consumer and its assignment epoch."""
@@ -96,6 +116,47 @@ class _ResetAwareKafkaClient(KafkaPolicyClient):
         self._on_reset = on_reset
         self._on_metadata_changed = on_metadata_changed
         self._on_topic_missing = on_topic_missing
+        self._commit_group_id = commit_group_id
+        self._commit_uncertain = commit_uncertain
+        self._commit_members: set[str] = set()
+        self._commits_closed = False
+
+    def confirm_commit(self) -> None:
+        """Clear prior attempts after a successful full checkpoint."""
+        self._commit_members.clear()
+
+    async def close(self) -> None:
+        """Confirm membership removal before releasing an ambiguous commit fence.
+
+        aiokafka's coordinator makes only a best-effort LeaveGroup attempt. Its
+        client is still usable here, after coordination/heartbeats have stopped.
+        Keep it and the caller's revision lock until Kafka acknowledges the leave.
+        """
+        self._commits_closed = True
+        if self._commit_uncertain is not None and self._commit_uncertain():
+            for member in tuple(self._commit_members):
+                await self._fence_member(member)
+                self._commit_members.discard(member)
+        await super().close()
+
+    async def _fence_member(self, member: str) -> None:
+        if self._commit_group_id is None:
+            msg = "Cannot fence a commit without its consumer group"
+            raise KafkaTransportError(msg)
+        request = LeaveGroupRequest(self._commit_group_id, member)
+        while True:
+            try:
+                node = await self.coordinator_lookup(CoordinationType.GROUP, self._commit_group_id)
+                response = await super().send(node, request, group=ConnectionGroup.COORDINATION)
+                if response is not None and cast("_LeaveGroupResult", response).error_code in (
+                    0,
+                    UnknownMemberIdError.errno,
+                ):
+                    return
+            except (KafkaError, OSError):
+                pass  # Neither a timeout nor a closed socket establishes a broker fence.
+            logger.warning("event_kafka_commit_fence_unconfirmed")
+            await asyncio.sleep(EventSchedulingDefaults.TRANSIENT_PROBE_SECONDS)
 
     async def _metadata_update(self, cluster_metadata: ClusterMetadata, topics: Iterable[str] | None) -> bool:
         """Require source verification when the SDK refreshes topic/broker metadata."""
@@ -107,6 +168,13 @@ class _ResetAwareKafkaClient(KafkaPolicyClient):
         self, node_id: int | str, request: Request[Any], *, group: ConnectionGroup = ConnectionGroup.DEFAULT
     ) -> Response | None:
         """Preserve the response while reporting affected partitions to the adapter."""
+        if request.API_KEY == OffsetCommitRequest.API_KEY:
+            commit = cast("_CommitMembership", cast("OffsetCommitRequest", request).build(OffsetCommitRequest_v2))
+            if self._commits_closed or commit.consumer_group_generation_id < 0 or not commit.consumer_id:
+                # An anonymous (-1 generation) commit cannot be fenced by
+                # removing a group member. This adapter always uses membership.
+                raise IllegalGenerationError
+            self._commit_members.add(commit.consumer_id)
         epoch = self._assignment_epoch()
         response = await super().send(node_id, request, group=group)
         if response is not None and request.API_KEY == FetchRequest_v0.API_KEY:
@@ -183,6 +251,9 @@ class KafkaPartitionConsumer:
         self._last_source_identity: SourceIdentityObservation | None = None
         self._topic_missing = False
         self._identity_lock = asyncio.Lock()
+        self._pending_commits = 0
+        self._failed_commit = False
+        self._policy_client: _ResetAwareKafkaClient | None = None
 
     @property
     def assignment(self) -> frozenset[int]:
@@ -280,14 +351,17 @@ class KafkaPartitionConsumer:
         # aiokafka 0.14 has no public client/factory injection. Its constructor
         # has not opened sockets or started tasks yet. Replace the internal
         # client before startup so coordinator and metadata paths use policy too.
-        consumer._client = _ResetAwareKafkaClient(  # noqa: SLF001 - aiokafka has no client injection API
+        self._policy_client = _ResetAwareKafkaClient(
             **connection_options,
             topic=self.topic,
             assignment_epoch=lambda: self._epoch,
             on_reset=self._note_offset_reset,
             on_metadata_changed=self._metadata_changed,
             on_topic_missing=self._note_topic_missing,
+            commit_group_id=self.group_id,
+            commit_uncertain=lambda: self._pending_commits > 0 or self._failed_commit,
         )
+        consumer._client = self._policy_client  # noqa: SLF001 - aiokafka has no client injection API
 
         # Startup can be cancelled by a deadline or shutdown; retain ownership
         # so the runner's cleanup can close a partially started client.
@@ -434,10 +508,23 @@ class KafkaPartitionConsumer:
         await self._verify_metadata_identity(expected_epoch)
 
         offset_map = {self._tp(p): OffsetAndMetadata(o, "") for p, o in offsets.items()}
+        self._pending_commits += 1
+        completed = False
         try:
             await consumer.commit(offset_map)
+            completed = True
         except KafkaError as exc:
             raise KafkaTransportError(_sanitize(str(exc))) from exc
+        finally:
+            self._pending_commits -= 1
+            self._failed_commit |= not completed
+            if self._pending_commits == 0 and not self._failed_commit and self._policy_client is not None:
+                self._policy_client.confirm_commit()
+
+    async def fence_commits(self) -> None:
+        """Stop this generation with broker acknowledgement after an ambiguous commit."""
+        self._failed_commit = True
+        await self.stop()
 
     async def committed(
         self,

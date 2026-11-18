@@ -110,7 +110,8 @@ class EventRecordProcessingService:
     async def local_skip_commit_guard(self, snapshot: SubscriptionSnapshot) -> AsyncIterator[bool]:
         """Serialize a skip batch's checkpoint with publication on its source.
 
-        Keep the lifecycle locks until the bounded broker commit settles. A
+        Keep the lifecycle locks until the broker commit settles or its group
+        membership is fenced, even after the caller stops waiting. A
         reconciled local gate alone cannot fence a publication it has not seen.
         Already completed skips may drain after local admission closes.
         """
