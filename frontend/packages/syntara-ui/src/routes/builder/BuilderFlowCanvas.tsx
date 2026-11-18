@@ -21,7 +21,7 @@ import {
 import { useLayoutEffect, useMemo, useRef } from 'react'
 
 import { SynLabel } from '../../components/labels/SynLabel'
-import { FlowNodeType } from '../../constants'
+import { FlowNodeType } from '../../constants/nodeTypes'
 import { CanvasControls } from '../workflows/canvas/CanvasControls'
 import { type NodeType } from '../workflows/canvas/nodes/NodeType'
 import { SEMANTIC_ZOOM_MAX_SCALE } from '../workflows/canvas/semanticZoom'

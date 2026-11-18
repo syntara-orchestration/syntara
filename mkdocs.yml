@@ -152,6 +152,7 @@ nav:
           - Expression System: backend/workflow-engine/expression-system.md
           - Manual Run and Testing: backend/workflow-engine/manual-run-and-testing.md
           - Node Settings: backend/workflow-engine/node-settings.md
+          - Retry From Failure: backend/workflow-engine/retry-from-failure.md
           - Switch Node: backend/workflow-engine/switch-node.md
           - Triggers:
               - Manual Trigger: backend/workflow-engine/triggers/manual-trigger.md

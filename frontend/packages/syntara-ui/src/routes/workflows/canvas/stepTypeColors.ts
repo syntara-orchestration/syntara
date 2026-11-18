@@ -1,6 +1,7 @@
 import { ActivityTypeEnum, ExecutorTypeEnum, type TaskActivity } from '@syntara/contracts'
 
-import { AAP_STEP_IDS, FlowNodeType, RegistryStepId } from '../../../constants'
+import { FlowNodeType } from '../../../constants/nodeTypes'
+import { AAP_STEP_IDS, RegistryStepId } from '../../../constants/registryStepIds'
 
 import { detectTaskExecutorType, DetectedExecutorType } from './nodes/common/detectTaskExecutorType'
 
