@@ -36,7 +36,6 @@ import { ScriptExecutionTab } from './ScriptExecutionTab'
 import { ActivityNameField } from './shared/ActivityNameField'
 import { stepHelp } from './shared/stepFieldHelp'
 import { StepFormContainer } from './shared/StepFormContainer'
-import stepFormStyles from './shared/stepFormStyles.module.css'
 import { StepFormTabsLayout } from './shared/StepFormTabsLayout'
 import { StepSettingsForm } from './shared/StepSettingsForm'
 
@@ -45,7 +44,6 @@ export type { ActionFormData }
 export { HttpUrlField }
 export type { HttpUrlFieldProps } from './httpCredentialSection'
 export type ExecutorType = ActionFormData['executor']
-export type ScriptLanguage = 'python' | 'bash'
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
 
 type ActionStepFormProps = {
@@ -55,11 +53,6 @@ type ActionStepFormProps = {
   projectId?: string
 }
 
-const SCRIPT_LANGUAGE_OPTIONS: Array<{ label: string; value: ScriptLanguage }> = [
-  { label: 'Python', value: 'python' },
-  { label: 'Bash', value: 'bash' },
-]
-
 const HTTP_METHOD_OPTIONS: Array<{ label: HttpMethod; value: HttpMethod }> = [
   { label: 'GET', value: 'GET' },
   { label: 'POST', value: 'POST' },
@@ -67,51 +60,6 @@ const HTTP_METHOD_OPTIONS: Array<{ label: HttpMethod; value: HttpMethod }> = [
   { label: 'PATCH', value: 'PATCH' },
   { label: 'DELETE', value: 'DELETE' },
 ]
-
-function ScriptLanguageSelect({
-  value,
-  onChange,
-  isDisabled,
-}: {
-  value: string
-  onChange: (value: string) => void
-  isDisabled?: boolean
-}) {
-  const [isOpen, setIsOpen] = useState(false)
-  const selectedLabel = SCRIPT_LANGUAGE_OPTIONS.find((o) => o.value === value)?.label
-  return (
-    <SynSelect
-      id="action-language"
-      isOpen={isOpen}
-      selected={value || undefined}
-      onSelect={(_event, val) => {
-        onChange(String(val))
-        setIsOpen(false)
-      }}
-      onOpenChange={setIsOpen}
-      toggle={(toggleRef: React.Ref<MenuToggleElement>) => (
-        <MenuToggle
-          ref={toggleRef}
-          onClick={() => setIsOpen((prev) => !prev)}
-          isExpanded={isOpen}
-          isFullWidth
-          isDisabled={isDisabled}
-          aria-label="Language"
-        >
-          {selectedLabel ?? value}
-        </MenuToggle>
-      )}
-    >
-      <SelectList>
-        {SCRIPT_LANGUAGE_OPTIONS.map((o) => (
-          <SelectOption key={o.value} value={o.value}>
-            {o.label}
-          </SelectOption>
-        ))}
-      </SelectList>
-    </SynSelect>
-  )
-}
 
 function HttpMethodSelect({
   value,
@@ -213,26 +161,10 @@ function ActionParametersContent({
   const isVersionView = useIsVersionView()
 
   return (
-    <Stack hasGutter className={stepFormStyles.tabContentStack}>
+    <Stack hasGutter style={{ paddingInline: 'var(--pf-t--global--spacer--xs)' }}>
       <input type="hidden" {...register('executor')} />
-      {executor === ExecutorTypeEnum.SCRIPT && (
+      {(executor === ExecutorTypeEnum.SCRIPT_PYTHON || executor === ExecutorTypeEnum.SCRIPT_BASH) && (
         <>
-          <StackItem>
-            <SynFormField
-              name="language"
-              label="Language"
-              labelHelp={stepHelp.scriptLanguage}
-              fieldId="action-language"
-            >
-              {({ field }) => (
-                <ScriptLanguageSelect
-                  value={typeof field.value === 'string' ? field.value : 'python'}
-                  onChange={field.onChange}
-                  isDisabled={isVersionView}
-                />
-              )}
-            </SynFormField>
-          </StackItem>
           <StackItem>
             <SynFormField
               name="code"
@@ -349,9 +281,13 @@ function ActionFormFields({
   } = useFormContext<ActionFormValues>()
   const errors = validationErrors ?? contextErrors
   const executor = useWatch({ control, name: 'executor' })
-  const language = useWatch({ control, name: 'language' })
-  const editorLanguage: 'bash' | 'python' | 'plaintext' =
-    language === 'bash' || language === 'python' ? language : 'plaintext'
+  let editorLanguage: CodeLanguage = 'plaintext'
+  if (executor === ExecutorTypeEnum.SCRIPT_BASH) {
+    editorLanguage = 'bash'
+  } else if (executor === ExecutorTypeEnum.SCRIPT_PYTHON) {
+    editorLanguage = 'python'
+  }
+  const isScriptExecutor = executor === ExecutorTypeEnum.SCRIPT_PYTHON || executor === ExecutorTypeEnum.SCRIPT_BASH
 
   useEffect(() => {
     if (errors.code && scriptEditorRef?.current) scriptEditorRef.current.focus()
@@ -368,7 +304,7 @@ function ActionFormFields({
             ariaLabel="Name"
           />
         </FlexItem>
-        {executor === ExecutorTypeEnum.SCRIPT && (
+        {isScriptExecutor && (
           <FlexItem>
             <Label isCompact color="orange" style={{ fontSize: 'var(--pf-t--global--font--size--sm)' }}>
               Developer Preview
@@ -377,7 +313,7 @@ function ActionFormFields({
         )}
       </Flex>
     ),
-    [control, executor]
+    [control, isScriptExecutor]
   )
 
   useEffect(() => {
@@ -402,10 +338,10 @@ function ActionFormFields({
   )
 
   const isHttpRequest = executor === ExecutorTypeEnum.HTTP_REQUEST
-  const isScript = executor === ExecutorTypeEnum.SCRIPT
-  const timeoutStepType = isHttpRequest ? 'http_request' : 'script'
+  const executionContent = isScriptExecutor ? <ScriptExecutionTab /> : undefined
+  // Script timeout defaults are shared by both runtime images in the settings API.
+  const timeoutStepType = isHttpRequest ? ExecutorTypeEnum.HTTP_REQUEST : 'script'
   const settingsContent = <StepSettingsForm timeoutStepType={timeoutStepType} supportsRetryPolicy={isHttpRequest} />
-  const executionContent = isScript ? <ScriptExecutionTab /> : undefined
 
   return (
     <StepFormTabsLayout
@@ -419,10 +355,9 @@ function ActionFormFields({
 export function ActionStepForm(props: Readonly<ActionStepFormProps>) {
   const defaultValues: ActionFormValues = {
     name: '',
-    executor: props.initialData?.executor ?? ExecutorTypeEnum.SCRIPT,
+    executor: props.initialData?.executor ?? ExecutorTypeEnum.SCRIPT_PYTHON,
     code: '',
     url: '',
-    language: 'python',
     method: 'GET',
     affinity: ScriptAffinityEnum.NONE,
     settings: {},
@@ -430,27 +365,36 @@ export function ActionStepForm(props: Readonly<ActionStepFormProps>) {
   }
 
   const handleSubmit = (data: ActionFormValues) => {
-    const isScript = data.executor === ExecutorTypeEnum.SCRIPT
     // Clean up data based on executor type (schema type is assignable to registry type)
+    const settings = { ...data.settings }
+    if (data.executor !== ExecutorTypeEnum.HTTP_REQUEST) {
+      delete settings.retry_policy
+    }
+
     const cleanedData: RegistryActionFormData = {
       name: data.name,
       executor: data.executor,
-      language: isScript ? data.language : undefined,
-      code: isScript ? data.code : undefined,
+      code:
+        data.executor === ExecutorTypeEnum.SCRIPT_PYTHON || data.executor === ExecutorTypeEnum.SCRIPT_BASH
+          ? data.code
+          : undefined,
       method: data.executor === ExecutorTypeEnum.HTTP_REQUEST ? data.method : undefined,
       url: data.executor === ExecutorTypeEnum.HTTP_REQUEST ? data.url : undefined,
       headers: data.executor === ExecutorTypeEnum.HTTP_REQUEST ? data.headers : undefined,
       body: data.executor === ExecutorTypeEnum.HTTP_REQUEST ? data.body : undefined,
       parameters: data.parameters ?? undefined,
       requiresApproval: props.initialData?.requiresApproval,
-      credential_id: data.credential_id ?? undefined,
-      affinity: isScript ? data.affinity : undefined,
+      credential_id: data.executor === ExecutorTypeEnum.HTTP_REQUEST ? data.credential_id : undefined,
+      affinity:
+        data.executor === ExecutorTypeEnum.SCRIPT_PYTHON || data.executor === ExecutorTypeEnum.SCRIPT_BASH
+          ? data.affinity
+          : undefined,
       execution_target_id:
-        isScript && data.affinity === ScriptAffinityEnum.REQUIRED_TARGET ? data.execution_target_id : undefined,
-      settings: {
-        ...data.settings,
-        retry_policy: data.executor === ExecutorTypeEnum.HTTP_REQUEST ? data.settings?.retry_policy : undefined,
-      },
+        (data.executor === ExecutorTypeEnum.SCRIPT_PYTHON || data.executor === ExecutorTypeEnum.SCRIPT_BASH) &&
+        data.affinity === ScriptAffinityEnum.REQUIRED_TARGET
+          ? data.execution_target_id
+          : undefined,
+      settings: Object.keys(settings).length > 0 ? settings : undefined,
     }
     props.onSubmit(cleanedData)
   }

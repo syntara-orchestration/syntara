@@ -21,7 +21,8 @@ export type Workflow = WithId<WorkflowAPI.components['schemas']['WorkflowRead']>
  * In v2, executor types are first-class node types — no 'task' wrapper.
  */
 export const ActivityTypeEnum = {
-  SCRIPT: 'script',
+  SCRIPT_PYTHON: 'script_python',
+  SCRIPT_BASH: 'script_bash',
   HTTP_REQUEST: 'http_request',
   AGENTIC: 'agentic',
   AAP_JOB_TEMPLATE: 'aap_job_template',
@@ -86,7 +87,8 @@ export const WEBHOOK_TRIGGER_TYPES: ReadonlySet<string> = new Set([
  * In v2, executor types are the node type directly — no task.executor wrapper.
  */
 export const ExecutorTypeEnum = {
-  SCRIPT: 'script',
+  SCRIPT_PYTHON: 'script_python',
+  SCRIPT_BASH: 'script_bash',
   HTTP_REQUEST: 'http_request',
   AGENTIC: 'agentic',
   AAP_JOB_TEMPLATE: 'aap_job_template',
@@ -232,11 +234,8 @@ export interface NodeSettings {
 // Parameters Type Aliases (from Pydantic models via OpenAPI spec)
 // ============================================================================
 
-/** Internal builder representation; API workflow nodes use distinct Python and Bash types. */
-export type ScriptConfig = (
-  | WorkflowAPI.components['schemas']['PythonScriptExecutorParameters']
-  | WorkflowAPI.components['schemas']['BashScriptExecutorParameters']
-) & { language?: string }
+export type PythonScriptConfig = WorkflowAPI.components['schemas']['PythonScriptExecutorParameters']
+export type BashScriptConfig = WorkflowAPI.components['schemas']['BashScriptExecutorParameters']
 export type HttpRequestConfig = WorkflowAPI.components['schemas']['APIExecutorParameters']
 export type AgenticConfig = WorkflowAPI.components['schemas']['AgenticExecutorParameters']
 export type AAPJobTemplateConfig = WorkflowAPI.components['schemas']['AAPJobTemplateExecutorParameters']
@@ -265,7 +264,7 @@ interface ActivityBase {
   metadata?: Record<string, unknown>
   // SECURITY NOTE: Index signature allows arbitrary properties but TypedActivity interfaces
   // provide type safety for known activity types. Always use TypedActivity discriminated union
-  // (ScriptActivity, HttpRequestActivity, etc.) instead of generic Activity type.
+  // (PythonScriptActivity, BashScriptActivity, HttpRequestActivity, etc.) instead of generic Activity type.
   // The index signature is kept for backward compatibility with existing code.
   [key: string]: unknown
 }
@@ -274,10 +273,16 @@ interface ActivityBase {
 // Typed Activity Interfaces (one per node type)
 // ============================================================================
 
-/** Script execution node */
-export interface ScriptActivity extends ActivityBase {
-  type: 'script'
-  parameters: ScriptConfig & { [key: string]: unknown }
+/** Python script execution node */
+export interface PythonScriptActivity extends ActivityBase {
+  type: 'script_python'
+  parameters: PythonScriptConfig & { [key: string]: unknown }
+}
+
+/** Bash script execution node */
+export interface BashScriptActivity extends ActivityBase {
+  type: 'script_bash'
+  parameters: BashScriptConfig & { [key: string]: unknown }
 }
 
 /** HTTP request node */
@@ -351,17 +356,19 @@ export interface WaitActivity extends ActivityBase {
  *
  * @example
  * function processActivity(activity: TypedActivity) {
- *   if (activity.type === 'script') {
- *     // activity.parameters is now ScriptConfig
- *     const language = activity.parameters.language  // ✅ Type-safe!
+ *   if (activity.type === 'script_python') {
+ *     // activity.parameters is now PythonScriptConfig
+ *     const code = activity.parameters.code
  *   }
  * }
  *
  * @example
  * function getExecutor(activity: TypedActivity): string {
  *   switch (activity.type) {
- *     case 'script':
- *       return `${activity.parameters.language} script`  // ✅ parameters is ScriptConfig
+ *     case 'script_python':
+ *       return 'Python script'  // ✅ parameters is PythonScriptConfig
+ *     case 'script_bash':
+ *       return 'Bash script'  // ✅ parameters is BashScriptConfig
  *     case 'http_request':
  *       return `HTTP ${activity.parameters.method}`  // ✅ parameters is HttpRequestConfig
  *     // ... TypeScript ensures all cases are handled
@@ -369,7 +376,8 @@ export interface WaitActivity extends ActivityBase {
  * }
  */
 export type TypedActivity =
-  | ScriptActivity
+  | PythonScriptActivity
+  | BashScriptActivity
   | HttpRequestActivity
   | AgenticActivity
   | AAPJobTemplateActivity
@@ -409,4 +417,9 @@ export interface Activity {
 
 /** Executor nodes (nodes that perform work) */
 export type TaskActivity =
-  ScriptActivity | HttpRequestActivity | AgenticActivity | AAPJobTemplateActivity | AAPWorkflowJobTemplateActivity
+  | PythonScriptActivity
+  | BashScriptActivity
+  | HttpRequestActivity
+  | AgenticActivity
+  | AAPJobTemplateActivity
+  | AAPWorkflowJobTemplateActivity

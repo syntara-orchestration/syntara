@@ -2447,7 +2447,7 @@ export const handlers = [
           timeout_at: null,
           approver_users: [],
           approver_groups: [],
-          next_step_approved: { id: 'script_1', name: 'Approved action', type: 'script' },
+          next_step_approved: { id: 'script_1', name: 'Approved action', type: 'script_python' },
           next_step_rejected: null,
           workflow_context: {
             workflow_id: body.workflow_id,

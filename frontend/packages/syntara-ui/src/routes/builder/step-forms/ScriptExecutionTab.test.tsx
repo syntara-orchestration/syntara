@@ -72,7 +72,8 @@ function renderTab(defaultValues?: Partial<ActionFormValues>) {
     const methods = useForm<ActionFormValues>({
       defaultValues: {
         name: 'Script',
-        executor: 'script',
+        executor: ExecutorTypeEnum.SCRIPT_PYTHON,
+        code: 'print("hello")',
         affinity: ScriptAffinityEnum.NONE,
         ...defaultValues,
       },
@@ -276,8 +277,9 @@ describe('ScriptExecutionTab', () => {
     expectScriptFormValid(form.getValues())
     // Contrast: clearing the ID while leaving Required target would block save.
     expectRequiredTargetMissing({
-      executor: ExecutorTypeEnum.SCRIPT,
+      executor: ExecutorTypeEnum.SCRIPT_PYTHON,
       name: 'Script',
+      code: 'print("hello")',
       affinity: ScriptAffinityEnum.REQUIRED_TARGET,
       execution_target_id: undefined,
     })

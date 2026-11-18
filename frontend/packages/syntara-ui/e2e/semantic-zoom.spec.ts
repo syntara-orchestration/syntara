@@ -59,7 +59,7 @@ test('large workflow remains usable across semantic zoom after adding a step', a
 
   const panel = await clickAddConnectedStep(app)
   await panel.getByRole('button', { name: 'Action', exact: true }).click()
-  await panel.getByRole('button', { name: 'Script', exact: true }).click()
+  await panel.getByRole('button', { name: 'Python Script', exact: true }).click()
   await app.getByRole('textbox', { name: 'Name', exact: true }).fill('Step added after import')
   await fillCodeEditor(app, { value: 'print("added")' })
   await app.getByRole('button', { name: 'Create', exact: true }).click()
@@ -69,7 +69,7 @@ test('large workflow remains usable across semantic zoom after adding a step', a
   // past the threshold they render a full card with a heading instead — hence the two locators below.
   const addedStepSemanticZoomButton = app
     .locator('.react-flow')
-    .getByRole('button', { name: 'Step added after import, Script' })
+    .getByRole('button', { name: 'Step added after import, Python Script' })
   const addedStepHeading = app.locator('.react-flow').getByRole('heading', { name: 'Step added after import' })
   await expect(addedStepSemanticZoomButton, 'the large imported workflow should start in semantic zoom').toBeVisible()
 

@@ -1,3 +1,5 @@
+import { ExecutorTypeEnum } from '@syntara/contracts'
+
 import type { FilterFieldDefinition } from '../../types/filters'
 import { FilterOperatorEnum, FilterTypeEnum } from '../../types/filters'
 import { executorMetadata, stepMetadata } from '../workflows/canvas/nodes/stepMetadata'
@@ -11,7 +13,8 @@ const ACTIVITY_STATUS_OPTIONS = Object.entries(activityStatusDisplayLabels).map(
 
 const ACTIVITY_NODE_TYPES = ['condition', 'loop', 'converge', 'switch', 'wait'] as const
 const ACTIVITY_EXECUTOR_TYPES = [
-  'script',
+  ExecutorTypeEnum.SCRIPT_PYTHON,
+  ExecutorTypeEnum.SCRIPT_BASH,
   'agentic',
   'http_request',
   'aap_job_template',

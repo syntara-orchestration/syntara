@@ -2,6 +2,8 @@
 
 > **Status: COMPLETED.** The v2 migration is done. The UI now uses the v2 flat schema (`schema_version: '2.0.0'` with `triggers[]`, `nodes[]`, `edges[]`). The old nested format and `WorkflowTransform` class have been removed. This document is kept as historical reference.
 
+> **Current script node contract:** The original migration examples below describe an earlier generic script node. Current workflows use separate `script_python` and `script_bash` node types with `parameters.code` and no `language` parameter. The UI leaves legacy `script` nodes unsupported and does not rewrite saved workflows.
+
 ## Migration Flow (Historical)
 
 ```
@@ -101,7 +103,7 @@ Every API call is type-checked at compile time. If the backend changes a field n
 
 **5. Step types are hardcoded in the UI**
 
-The available step types (Script, REST API, Task Agent, etc.) are defined in the UI's `StepRegistry` (`src/routes/builder/registry/steps/register*.ts`), not derived from the contracts. Each registration wires up the icon, form component, and factory function.
+The available step types (Python Script, Bash Script, REST API, Task Agent, etc.) are defined in the UI's `StepRegistry` (`src/routes/builder/registry/steps/register*.ts`), not derived from the contracts. Each registration wires up the icon, form component, and factory function.
 
 ### What changes for v2
 

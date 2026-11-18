@@ -16,7 +16,7 @@
 
 import { type Page } from './fixtures'
 import { test, expect, toAppUrl } from './fixtures'
-import { addScriptStep } from './helpers/v2-steps'
+import { addPythonScriptStep } from './helpers/v2-steps'
 import { buildUniqueName, createBasicWorkflowViaApi, deleteWorkflow, openWorkflowInBuilder } from './helpers/workflows'
 
 /** Locate the undo/redo toolbar rendered by UndoRedoControls. */
@@ -36,7 +36,7 @@ test('undo/redo add step via toolbar buttons', async ({ app }) => {
 
   try {
     await openWorkflowInBuilder(app, workflowName, id)
-    await addScriptStep(app, stepName)
+    await addPythonScriptStep(app, stepName)
     await expect(app.getByText(stepName)).toBeVisible()
 
     await undoButton(app).click()
@@ -57,7 +57,7 @@ test('undo/redo add step via keyboard shortcuts', async ({ app }) => {
 
   try {
     await openWorkflowInBuilder(app, workflowName, id)
-    await addScriptStep(app, stepName)
+    await addPythonScriptStep(app, stepName)
     await expect(app.getByText(stepName)).toBeVisible()
 
     await app.keyboard.press('ControlOrMeta+z')
@@ -92,7 +92,7 @@ test('undo history resets when navigating away from the builder', async ({ app }
 
   try {
     await openWorkflowInBuilder(app, workflowName, id)
-    await addScriptStep(app, stepName)
+    await addPythonScriptStep(app, stepName)
     await expect(undoButton(app)).toBeEnabled()
 
     await app.goto(toAppUrl('/workflows'))

@@ -8,8 +8,8 @@ describe('validateConditionConnections', () => {
   it('returns no errors for condition with both branches connected', () => {
     const activities: Activity[] = [
       { type: 'condition', id: 'C1', name: 'Condition 1', parameters: { condition: 'x > 10' } },
-      { type: 'script', id: 'T1', name: 'Task 1', parameters: { language: 'python', code: '' } },
-      { type: 'script', id: 'T2', name: 'Task 2', parameters: { language: 'python', code: '' } },
+      { type: 'script_python', id: 'T1', name: 'Task 1', parameters: { code: '' } },
+      { type: 'script_python', id: 'T2', name: 'Task 2', parameters: { code: '' } },
     ]
 
     const edges: EdgeConnection[] = [
@@ -24,7 +24,7 @@ describe('validateConditionConnections', () => {
   it('detects missing Then branch connection', () => {
     const activities: Activity[] = [
       { type: 'condition', id: 'C1', name: 'Condition 1', parameters: { condition: 'x > 10' } },
-      { type: 'script', id: 'T1', name: 'Task 1', parameters: { language: 'python', code: '' } },
+      { type: 'script_python', id: 'T1', name: 'Task 1', parameters: { code: '' } },
     ]
 
     const edges: EdgeConnection[] = [
@@ -42,7 +42,7 @@ describe('validateConditionConnections', () => {
   it('allows missing Else branch connection (else is optional)', () => {
     const activities: Activity[] = [
       { type: 'condition', id: 'C1', name: 'Condition 1', parameters: { condition: 'x > 10' } },
-      { type: 'script', id: 'T1', name: 'Task 1', parameters: { language: 'python', code: '' } },
+      { type: 'script_python', id: 'T1', name: 'Task 1', parameters: { code: '' } },
     ]
 
     const edges: EdgeConnection[] = [
@@ -72,9 +72,9 @@ describe('validateConditionConnections', () => {
     const activities: Activity[] = [
       { type: 'condition', id: 'C1', name: 'Condition 1', parameters: { condition: 'x > 10' } },
       { type: 'condition', id: 'C2', name: 'Condition 2', parameters: { condition: 'y < 5' } },
-      { type: 'script', id: 'T1', name: 'Task 1', parameters: { language: 'python', code: '' } },
-      { type: 'script', id: 'T2', name: 'Task 2', parameters: { language: 'python', code: '' } },
-      { type: 'script', id: 'T3', name: 'Task 3', parameters: { language: 'python', code: '' } },
+      { type: 'script_python', id: 'T1', name: 'Task 1', parameters: { code: '' } },
+      { type: 'script_python', id: 'T2', name: 'Task 2', parameters: { code: '' } },
+      { type: 'script_python', id: 'T3', name: 'Task 3', parameters: { code: '' } },
     ]
 
     const edges: EdgeConnection[] = [
@@ -89,8 +89,8 @@ describe('validateConditionConnections', () => {
 
   it('ignores non-condition nodes', () => {
     const activities: Activity[] = [
-      { type: 'script', id: 'T1', name: 'Task 1', parameters: { language: 'python', code: '' } },
-      { type: 'script', id: 'T2', name: 'Task 2', parameters: { language: 'python', code: '' } },
+      { type: 'script_python', id: 'T1', name: 'Task 1', parameters: { code: '' } },
+      { type: 'script_python', id: 'T2', name: 'Task 2', parameters: { code: '' } },
     ]
 
     const edges: EdgeConnection[] = [

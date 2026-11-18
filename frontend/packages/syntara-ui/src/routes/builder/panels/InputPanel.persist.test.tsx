@@ -22,7 +22,7 @@ vi.mock('../../../stores/useWorkflowStore', () => ({
     }),
 }))
 
-const upstreamNodes = [{ id: 'script-a', name: 'Script A', type: 'script' }]
+const upstreamNodes = [{ id: 'script-a', name: 'Script A', type: 'script_python' }]
 
 describe('InputPanel pinned mock persistence', () => {
   beforeEach(() => {

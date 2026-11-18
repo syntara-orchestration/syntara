@@ -42,7 +42,7 @@ test.describe('Approval Side Panel', () => {
       const triggers = [{ id: 'trigger_1', type: 'manual_trigger', name: 'Manual trigger', parameters: {} }]
       const nodes = [
         { id: 'approval_1', type: 'approval', name: approvalName, parameters: {} },
-        { id: 'post_1', type: 'script', name: 'Post Approval', parameters: { language: 'python', code: 'pass' } },
+        { id: 'post_1', type: 'script_python', name: 'Post Approval', parameters: { code: 'pass' } },
       ]
       const edges = [
         { from: 'trigger_1', to: 'approval_1' },
@@ -213,7 +213,7 @@ test.describe('Approval Side Panel', () => {
       const triggers = [{ id: 'trigger_1', type: 'manual_trigger', name: 'Manual trigger', parameters: {} }]
       const nodes = [
         { id: 'approval_1', type: 'approval', name: localApprovalName, parameters: {} },
-        { id: 'post_1', type: 'script', name: 'Post Approval', parameters: { language: 'python', code: 'pass' } },
+        { id: 'post_1', type: 'script_python', name: 'Post Approval', parameters: { code: 'pass' } },
       ]
       const edges = [
         { from: 'trigger_1', to: 'approval_1' },
@@ -260,7 +260,7 @@ test.describe('Approval Side Panel', () => {
       const triggers = [{ id: 'trigger_1', type: 'manual_trigger', name: 'Manual trigger', parameters: {} }]
       const nodes = [
         { id: 'approval_1', type: 'approval', name: localApprovalName, parameters: {} },
-        { id: 'post_1', type: 'script', name: 'Post Approval', parameters: { language: 'python', code: 'pass' } },
+        { id: 'post_1', type: 'script_python', name: 'Post Approval', parameters: { code: 'pass' } },
       ]
       const edges = [
         { from: 'trigger_1', to: 'approval_1' },

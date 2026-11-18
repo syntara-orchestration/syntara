@@ -23,6 +23,11 @@ import { resolveIconForType } from './utils/stepIcons'
 
 export type StepTypeOption = Pick<StepTypeDefinition | StepSubtypeDefinition, 'id' | 'label' | 'icon' | 'description'>
 
+const SCRIPT_PREVIEW_STEP_IDS = new Set<string>([
+  RegistryStepId.ACTION_SCRIPT_PYTHON,
+  RegistryStepId.ACTION_SCRIPT_BASH,
+])
+
 type StepTypeOptionsListProps = {
   stepTypes: StepTypeOption[]
   onSelect: (stepTypeId: string) => void
@@ -69,14 +74,14 @@ export function StepTypeOptionsList(props: StepTypeOptionsListProps) {
                   <Flex
                     alignItems={{ default: 'alignItemsCenter' }}
                     gap={{ default: 'gapSm' }}
-                    flexWrap={{ default: 'nowrap' }}
+                    flexWrap={{ default: 'wrap' }}
                   >
                     <FlexItem flex={{ default: 'flexNone' }}>
                       <Title headingLevel="h3" size="md">
                         {stepType.label}
                       </Title>
                     </FlexItem>
-                    {stepType.id === RegistryStepId.ACTION_SCRIPT && (
+                    {SCRIPT_PREVIEW_STEP_IDS.has(stepType.id) && (
                       <FlexItem>
                         <Label isCompact color="orange" style={{ fontSize: 'var(--pf-t--global--font--size--sm)' }}>
                           Developer Preview

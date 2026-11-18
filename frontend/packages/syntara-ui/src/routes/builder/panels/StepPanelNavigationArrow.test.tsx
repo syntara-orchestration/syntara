@@ -12,11 +12,23 @@ function MockNavIcon() {
   return <svg data-testid="mock-nav-icon" />
 }
 
-const singleStep: UpstreamStepInfo[] = [{ id: 'node-a', name: 'Create ServiceNOW Ticket', type: 'script' }]
+const singleStep: UpstreamStepInfo[] = [{ id: 'node-a', name: 'Create ServiceNOW Ticket', type: 'script_python' }]
 
 const multipleSteps: UpstreamStepInfo[] = [
-  { id: 'node-a', name: 'Task A', type: 'script', icon: MockNavIcon, iconId: RegistryStepId.ACTION_SCRIPT },
-  { id: 'node-b', name: 'Task B', type: 'script', icon: MockNavIcon, iconId: RegistryStepId.ACTION_SCRIPT },
+  {
+    id: 'node-a',
+    name: 'Task A',
+    type: 'script_python',
+    icon: MockNavIcon,
+    iconId: RegistryStepId.ACTION_SCRIPT_PYTHON,
+  },
+  {
+    id: 'node-b',
+    name: 'Task B',
+    type: 'script_python',
+    icon: MockNavIcon,
+    iconId: RegistryStepId.ACTION_SCRIPT_PYTHON,
+  },
 ]
 
 describe('StepPanelNavigationArrow', () => {
@@ -66,7 +78,7 @@ describe('StepPanelNavigationArrow', () => {
   it('falls back to type labels in multi-target dropdown when names are empty', async () => {
     const user = userEvent.setup()
     const unnamed: UpstreamStepInfo[] = [
-      { id: 'node-a', name: '', type: 'script' },
+      { id: 'node-a', name: '', type: 'script_python' },
       { id: 'node-b', name: '   ', type: 'wait' },
     ]
 
@@ -74,7 +86,7 @@ describe('StepPanelNavigationArrow', () => {
 
     await user.click(screen.getByRole('button', { name: /Previous step/i }))
 
-    expect(screen.getByRole('menuitem', { name: 'Script' })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: 'Python Script' })).toBeInTheDocument()
     expect(screen.getByRole('menuitem', { name: 'Wait' })).toBeInTheDocument()
   })
 
@@ -94,7 +106,7 @@ describe('StepPanelNavigationArrow', () => {
   it('renders dropdown step names without icons when steps have no icon or iconId', async () => {
     const user = userEvent.setup()
     const stepsWithoutIcons: UpstreamStepInfo[] = [
-      { id: 'node-a', name: 'Task A', type: 'script' },
+      { id: 'node-a', name: 'Task A', type: 'script_python' },
       { id: 'node-b', name: 'Task B', type: 'wait' },
     ]
 

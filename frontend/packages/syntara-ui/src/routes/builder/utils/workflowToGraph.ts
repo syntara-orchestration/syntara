@@ -56,7 +56,8 @@ export function extractTaskActivities(activities: Activity[]): Activity[] {
     // In v2, executor types are direct activity types
     // Also include 'generic' type for placeholder nodes (UI-only concept)
     if (
-      activity.type === ActivityTypeEnum.SCRIPT ||
+      activity.type === ActivityTypeEnum.SCRIPT_PYTHON ||
+      activity.type === ActivityTypeEnum.SCRIPT_BASH ||
       activity.type === ActivityTypeEnum.HTTP_REQUEST ||
       activity.type === ActivityTypeEnum.AGENTIC ||
       activity.type === ActivityTypeEnum.AAP_JOB_TEMPLATE ||

@@ -10,9 +10,8 @@ triggers:
 nodes:
   - id: setup
     name: Setup
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       code: |
         echo "Setting up pipeline"
 
@@ -21,16 +20,14 @@ nodes:
     type: fork
 
   - id: process_a
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       code: |
         echo "Processing A"
 
   - id: process_b
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       code: |
         echo "Processing B"
 
@@ -39,9 +36,8 @@ nodes:
 
   - id: cleanup
     name: Cleanup
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       code: |
         echo "Cleaning up pipeline"
 edges:

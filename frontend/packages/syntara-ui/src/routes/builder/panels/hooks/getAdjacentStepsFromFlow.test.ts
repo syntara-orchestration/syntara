@@ -8,7 +8,7 @@ import { getAdjacentStepsFromFlow } from './getAdjacentStepsFromFlow'
 
 const FLOW_NODE_TYPES = new Set(['condition', 'loop', 'converge', 'switch', 'wait', 'approval'])
 
-function makeNode(id: string, name: string, type = 'script'): Node {
+function makeNode(id: string, name: string, type = 'script_python'): Node {
   return {
     id,
     type: FLOW_NODE_TYPES.has(type) ? type : 'task',
@@ -44,7 +44,7 @@ describe('getAdjacentStepsFromFlow', () => {
 
     expect(result.upstream).toEqual([])
     expect(result.downstream).toMatchObject([
-      { id: 'check-value', name: 'Check Value', type: 'script', iconId: RegistryStepId.ACTION_SCRIPT },
+      { id: 'check-value', name: 'Check Value', type: 'script_python', iconId: RegistryStepId.ACTION_SCRIPT_PYTHON },
     ])
     expect(result.downstream[0]?.icon).toBeDefined()
   })
@@ -78,8 +78,18 @@ describe('getAdjacentStepsFromFlow', () => {
 
     expect(result.downstream).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ id: 'task-a', name: 'Task A', type: 'script', iconId: RegistryStepId.ACTION_SCRIPT }),
-        expect.objectContaining({ id: 'task-b', name: 'Task B', type: 'script', iconId: RegistryStepId.ACTION_SCRIPT }),
+        expect.objectContaining({
+          id: 'task-a',
+          name: 'Task A',
+          type: 'script_python',
+          iconId: RegistryStepId.ACTION_SCRIPT_PYTHON,
+        }),
+        expect.objectContaining({
+          id: 'task-b',
+          name: 'Task B',
+          type: 'script_python',
+          iconId: RegistryStepId.ACTION_SCRIPT_PYTHON,
+        }),
       ])
     )
     expect(result.downstream).toHaveLength(2)
@@ -95,7 +105,7 @@ describe('getAdjacentStepsFromFlow', () => {
     const result = getAdjacentStepsFromFlow('trigger-0', edges, nodes)
 
     expect(result.downstream).toMatchObject([
-      { id: 'check-value', name: 'Check Value', type: 'script', iconId: RegistryStepId.ACTION_SCRIPT },
+      { id: 'check-value', name: 'Check Value', type: 'script_python', iconId: RegistryStepId.ACTION_SCRIPT_PYTHON },
     ])
     expect(result.downstream[0]?.icon).toBeDefined()
   })
@@ -107,7 +117,7 @@ describe('getAdjacentStepsFromFlow', () => {
     const result = getAdjacentStepsFromFlow('node-c', edges, nodes)
 
     expect(result.upstream).toMatchObject([
-      { id: 'node-b', name: 'B', type: 'script', iconId: RegistryStepId.ACTION_SCRIPT },
+      { id: 'node-b', name: 'B', type: 'script_python', iconId: RegistryStepId.ACTION_SCRIPT_PYTHON },
     ])
     expect(result.upstream[0]?.icon).toBeDefined()
   })
@@ -138,7 +148,7 @@ describe('getAdjacentStepsFromFlow', () => {
         { type: 'condition', iconId: RegistryStepId.LOGIC_CONDITION },
         { type: 'loop', iconId: RegistryStepId.LOGIC_LOOP },
         { type: 'converge', iconId: RegistryStepId.LOGIC_CONVERGE },
-        { type: ExecutorTypeEnum.SCRIPT, iconId: RegistryStepId.ACTION_SCRIPT },
+        { type: ExecutorTypeEnum.SCRIPT_PYTHON, iconId: RegistryStepId.ACTION_SCRIPT_PYTHON },
         { type: ExecutorTypeEnum.HTTP_REQUEST, iconId: RegistryStepId.ACTION_API },
         { type: ExecutorTypeEnum.AGENTIC, iconId: RegistryStepId.AGENT },
         { type: ExecutorTypeEnum.AAP_JOB_TEMPLATE, iconId: RegistryStepId.AAP_EXECUTION },

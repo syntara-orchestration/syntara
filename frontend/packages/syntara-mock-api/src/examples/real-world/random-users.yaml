@@ -39,9 +39,8 @@ nodes:
 
   - id: process_users
     name: Process User Data
-    type: script
+    type: script_python
     parameters:
-      language: python
       environment:
         INPUT_USERS: ${fetch_users.body.results}
       code: |

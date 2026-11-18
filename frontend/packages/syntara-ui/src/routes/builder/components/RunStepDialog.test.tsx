@@ -1530,7 +1530,7 @@ describe('RunStepDialog', () => {
             {
               id: 'script_1',
               name: 'Script Task',
-              type: 'script',
+              type: 'script_python',
               portTowardTarget: 'output',
             },
           ],

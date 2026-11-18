@@ -88,7 +88,7 @@ describe('useBuilderSaveWorkflow', () => {
     useWorkflowStore.setState({
       currentWorkflow: minimalWorkflow({
         workflow: {
-          activities: [{ type: 'script', id: 'script3', name: 'Orphan Script', parameters: {} }],
+          activities: [{ type: 'script_python', id: 'script3', name: 'Orphan Script', parameters: {} }],
         },
       }),
     })
@@ -867,7 +867,9 @@ describe('tool selection sync from backend', () => {
     useWorkflowStore.setState({
       currentWorkflow: minimalWorkflow({
         workflow: {
-          activities: [{ id: 'node-1', type: 'script', name: 'Script', parameters: { language: 'python' } }],
+          activities: [
+            { id: 'node-1', type: 'script_python', name: 'Python Script', parameters: { code: 'print(1)' } },
+          ],
         },
       }),
     })
@@ -883,7 +885,7 @@ describe('tool selection sync from backend', () => {
                 schema_version: '2.0.0',
                 name: 'test-wf',
                 triggers: [],
-                nodes: [{ id: 'node-1', parameters: { language: 'python' } }],
+                nodes: [{ id: 'node-1', parameters: { code: 'print(1)' } }],
                 edges: [],
               },
             },
@@ -900,7 +902,8 @@ describe('tool selection sync from backend', () => {
     const activity = useWorkflowStore.getState().currentWorkflow?.workflow.activities[0] as {
       parameters?: Record<string, unknown>
     }
-    expect(activity?.parameters?.language).toBe('python')
+    expect(activity?.parameters?.code).toBe('print(1)')
+    expect(activity?.parameters).not.toHaveProperty('language')
     expect(activity?.parameters?.tool_selections).toBeUndefined()
   })
 })

@@ -13,8 +13,8 @@ describe('ExecutionStateEnricher', () => {
       const activity: Activity = {
         id: 'task-1',
         name: 'Task 1',
-        type: 'script',
-        parameters: { language: 'python', code: '' },
+        type: 'script_python',
+        parameters: { code: '' },
       }
       const edges: EdgeConnection[] = []
       const activityStates = new Map<string, ActivityState>()
@@ -34,8 +34,8 @@ describe('ExecutionStateEnricher', () => {
       const activity: Activity = {
         id: 'task-1',
         name: 'Task 1',
-        type: 'script',
-        parameters: { language: 'python', code: '' },
+        type: 'script_python',
+        parameters: { code: '' },
       }
       const edges: EdgeConnection[] = []
       const activityStates = new Map<string, ActivityState>()
@@ -56,8 +56,8 @@ describe('ExecutionStateEnricher', () => {
       const activity = {
         id: 'task-1',
         name: 'Task 1',
-        type: 'script',
-        parameters: { language: 'python', code: '' },
+        type: 'script_python',
+        parameters: { code: '' },
         metadata: { customProp: 'value' },
       } as unknown as Activity
       const edges: EdgeConnection[] = []
@@ -80,8 +80,8 @@ describe('ExecutionStateEnricher', () => {
       const activity: Activity = {
         id: 'task-1',
         name: 'Task 1',
-        type: 'script',
-        parameters: { language: 'python', code: '' },
+        type: 'script_python',
+        parameters: { code: '' },
       }
       const edges: EdgeConnection[] = []
       const activityStates = new Map<string, ActivityState>([
@@ -293,8 +293,8 @@ describe('ExecutionStateEnricher', () => {
       const activity: Activity = {
         id: 'task-false',
         name: 'Task False',
-        type: 'script',
-        parameters: { language: 'python', code: '' },
+        type: 'script_python',
+        parameters: { code: '' },
       }
       const edges: EdgeConnection[] = [
         { id: '1', source: 'cond-1', target: 'task-true', sourceHandle: 'true', targetHandle: 'target' },
@@ -335,8 +335,8 @@ describe('ExecutionStateEnricher', () => {
       const activity: Activity = {
         id: 'task-false',
         name: 'Task False',
-        type: 'script',
-        parameters: { language: 'python', code: '' },
+        type: 'script_python',
+        parameters: { code: '' },
       }
       const edges: EdgeConnection[] = [
         { id: '1', source: 'cond-1', target: 'task-true', sourceHandle: 'true', targetHandle: 'target' },
@@ -382,8 +382,8 @@ describe('ExecutionStateEnricher', () => {
       const activity: Activity = {
         id: 'task-new',
         name: 'New Task',
-        type: 'script',
-        parameters: { language: 'python', code: '' },
+        type: 'script_python',
+        parameters: { code: '' },
       }
       const edges: EdgeConnection[] = [
         { id: '1', source: 'task-1', target: 'task-new', sourceHandle: 'source', targetHandle: 'target' },
@@ -520,8 +520,8 @@ describe('ExecutionStateEnricher', () => {
       const activity: Activity = {
         id: 'task-1',
         name: 'Task 1',
-        type: 'script',
-        parameters: { language: 'python', code: '' },
+        type: 'script_python',
+        parameters: { code: '' },
       }
       const edges: EdgeConnection[] = []
       const activityStates = new Map<string, ActivityState>()
@@ -606,8 +606,8 @@ describe('ExecutionStateEnricher', () => {
       const activity: Activity = {
         id: 'task-1',
         name: 'Task 1',
-        type: 'script',
-        parameters: { language: 'python', code: '' },
+        type: 'script_python',
+        parameters: { code: '' },
       }
       const preResolvedNodes = new Set(['task-1'])
       const activityStates = new Map<string, ActivityState>([
@@ -639,8 +639,8 @@ describe('ExecutionStateEnricher', () => {
       const activity: Activity = {
         id: 'task-1',
         name: 'Task 1',
-        type: 'script',
-        parameters: { language: 'python', code: '' },
+        type: 'script_python',
+        parameters: { code: '' },
       }
       const preResolvedNodes = new Set(['task-1'])
       const activityStates = new Map<string, ActivityState>()
@@ -662,8 +662,8 @@ describe('ExecutionStateEnricher', () => {
       const activity: Activity = {
         id: 'task-1',
         name: 'Task 1',
-        type: 'script',
-        parameters: { language: 'python', code: '' },
+        type: 'script_python',
+        parameters: { code: '' },
       }
       const preResolvedNodes = new Set(['task-1'])
       const activityStates = new Map<string, ActivityState>([
@@ -695,8 +695,8 @@ describe('ExecutionStateEnricher', () => {
       const activity: Activity = {
         id: 'task-2',
         name: 'Task 2',
-        type: 'script',
-        parameters: { language: 'python', code: '' },
+        type: 'script_python',
+        parameters: { code: '' },
       }
       const preResolvedNodes = new Set(['task-1'])
       const activityStates = new Map<string, ActivityState>()

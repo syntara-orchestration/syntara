@@ -47,7 +47,7 @@ describe('resolveStepDocKey', () => {
         resolveStepDocKey({
           mode: 'add',
           stepTypeId: RegistryStepId.ACTION,
-          stepSubtypeId: RegistryStepId.ACTION_SCRIPT,
+          stepSubtypeId: RegistryStepId.ACTION_SCRIPT_PYTHON,
           selectedNode: null,
         })
       ).toBeNull()
@@ -173,7 +173,7 @@ describe('resolveStepDocKey', () => {
           mode: 'edit',
           stepTypeId: null,
           stepSubtypeId: null,
-          selectedNode: makeNode(FlowNodeType.TASK, { type: ExecutorTypeEnum.SCRIPT, name: 'Task' }),
+          selectedNode: makeNode(FlowNodeType.TASK, { type: ExecutorTypeEnum.SCRIPT_PYTHON, name: 'Task' }),
         })
       ).toBeNull()
     })
@@ -185,7 +185,7 @@ describe('resolveStepDocKey', () => {
           stepTypeId: null,
           stepSubtypeId: null,
           selectedNode: makeNode(FlowNodeType.TASK_REVERSED, {
-            type: ExecutorTypeEnum.SCRIPT,
+            type: ExecutorTypeEnum.SCRIPT_PYTHON,
             name: 'Task',
           }),
         })

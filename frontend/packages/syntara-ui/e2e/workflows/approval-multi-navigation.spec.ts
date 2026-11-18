@@ -22,7 +22,7 @@ test('multi-approval navigation: Previous/Next buttons and deep-link counter', a
   const triggers = [{ id: 'trigger_1', type: 'manual_trigger', name: 'Manual trigger', parameters: {} }]
   const nodes = approvalNames.flatMap((name, i) => [
     { id: `approval_${i + 1}`, type: 'approval', name, parameters: {} },
-    { id: `post_${i + 1}`, type: 'script', name: `Post ${name}`, parameters: { language: 'python', code: 'pass' } },
+    { id: `post_${i + 1}`, type: 'script_python', name: `Post ${name}`, parameters: { code: 'pass' } },
   ])
   const edges = approvalNames.flatMap((_, i) => [
     { from: 'trigger_1', to: `approval_${i + 1}` },

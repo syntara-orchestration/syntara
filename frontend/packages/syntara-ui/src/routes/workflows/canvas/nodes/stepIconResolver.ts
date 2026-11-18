@@ -18,7 +18,7 @@ export function getTaskIconDescriptor(taskData: TaskActivity): IconDescriptor {
   const { detectedExecutorType, actualExecutor } = detectTaskExecutorType(taskData)
   // In v2, activity.type IS the executor — use it directly for metadata lookup
   const executorMeta = executorMetadata[actualExecutor] ?? executorMetadata[taskData.type ?? '']
-  let iconId: RegistryStepIdUnion = RegistryStepId.ACTION_SCRIPT
+  let iconId: RegistryStepIdUnion = RegistryStepId.ACTION_SCRIPT_PYTHON
 
   if (
     detectedExecutorType === DetectedExecutorType.AAP ||
@@ -32,6 +32,8 @@ export function getTaskIconDescriptor(taskData: TaskActivity): IconDescriptor {
     iconId = RegistryStepId.AGENT
   } else if (actualExecutor === ExecutorTypeEnum.HTTP_REQUEST) {
     iconId = RegistryStepId.ACTION_API
+  } else if (actualExecutor === ExecutorTypeEnum.SCRIPT_BASH) {
+    iconId = RegistryStepId.ACTION_SCRIPT_BASH
   }
   return { icon: executorMeta?.icon, id: iconId }
 }

@@ -214,14 +214,14 @@ describe('InputPanel', () => {
   it('shows type-label section headers when upstream activity names are empty', () => {
     mockUseUpstreamNodes.mockReturnValue([
       { id: 'up-1', name: '', type: 'converge' },
-      { id: 'up-2', name: '   ', type: 'script' },
-      { id: 'up-3', name: 'Custom Name', type: 'script' },
+      { id: 'up-2', name: '   ', type: 'script_python' },
+      { id: 'up-3', name: 'Custom Name', type: 'script_python' },
     ])
 
     render(<InputPanel nodeId="node-1" />)
 
     expect(screen.getByRole('button', { name: 'Converge' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Script' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Python Script' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Custom Name' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Variables and context/i })).toBeInTheDocument()
   })
@@ -230,7 +230,7 @@ describe('InputPanel', () => {
     const user = userEvent.setup()
     mockUseUpstreamNodes.mockReturnValue([
       { id: 'up-1', name: '', type: 'converge' },
-      { id: 'up-2', name: '', type: 'script' },
+      { id: 'up-2', name: '', type: 'script_python' },
     ])
 
     render(<InputPanel nodeId="node-1" />)
@@ -238,7 +238,7 @@ describe('InputPanel', () => {
     await user.click(screen.getByRole('button', { name: /Set mock data/i }))
 
     expect(screen.getByRole('menuitem', { name: 'Converge' })).toBeInTheDocument()
-    expect(screen.getByRole('menuitem', { name: 'Script' })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: 'Python Script' })).toBeInTheDocument()
   })
 
   it('opens mock editor with type-label predecessor name for unnamed upstream', async () => {

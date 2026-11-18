@@ -117,10 +117,13 @@ describe('stepMetadata', () => {
 
 describe('executorMetadata', () => {
   describe('executor types', () => {
-    it('has metadata for script executor', () => {
-      expect(executorMetadata.script).toBeDefined()
-      expect(executorMetadata.script.label).toBe('Script')
-      expect(executorMetadata.script.icon).toBeDefined()
+    it('has metadata for Python and Bash script executors', () => {
+      expect(executorMetadata.script_python).toBeDefined()
+      expect(executorMetadata.script_python.label).toBe('Python Script')
+      expect(executorMetadata.script_python.icon).toBeDefined()
+      expect(executorMetadata.script_bash).toBeDefined()
+      expect(executorMetadata.script_bash.label).toBe('Bash Script')
+      expect(executorMetadata.script_bash.icon).toBeDefined()
     })
 
     it('has metadata for agentic executor', () => {

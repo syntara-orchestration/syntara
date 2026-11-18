@@ -36,12 +36,12 @@ The only transformation between API and builder is **port name mapping** (e.g., 
 {
   schema_version: '2.0.0',
   triggers: [
-    { id: 'manual_trigger', type: 'manual_trigger', config: {} }
+    { id: 'manual_trigger', type: 'manual_trigger', parameters: {} }
   ],
   nodes: [
-    { id: 'condition-1', type: 'condition', config: { expression: '...' } },
-    { id: 'task-1', type: 'script', config: { language: 'python', code: '...' } },
-    { id: 'task-2', type: 'http_request', config: { url: '...' } }
+    { id: 'condition-1', type: 'condition', parameters: { condition: '...' } },
+    { id: 'task-1', type: 'script_python', parameters: { code: '...' } },
+    { id: 'task-2', type: 'http_request', parameters: { url: '...' } }
   ],
   edges: [
     { from: 'manual_trigger', to: 'condition-1' },

@@ -70,9 +70,7 @@ describe('useWorkflowVerification', () => {
       name: 'Test',
       description: 'desc',
       workflow: {
-        activities: [
-          { type: 'script', id: 'n1', name: 'Step 1', parameters: { language: 'python', code: 'print(1)' } },
-        ],
+        activities: [{ type: 'script_python', id: 'n1', name: 'Step 1', parameters: { code: 'print(1)' } }],
       },
       triggers: [{ type: 'manual_trigger', id: 't1' }],
     },
@@ -393,7 +391,7 @@ describe('useWorkflowVerification', () => {
       currentWorkflow: {
         ...workflowState.currentWorkflow,
         workflow: {
-          activities: [{ type: 'script', id: 'script_no_name', parameters: { language: 'python', code: 'print(1)' } }],
+          activities: [{ type: 'script_python', id: 'script_no_name', parameters: { code: 'print(1)' } }],
         },
       },
     })
@@ -758,7 +756,7 @@ describe('frontend and backend error merging', () => {
       name: 'Test',
       description: 'desc',
       workflow: {
-        activities: [{ type: 'script', id: 'n1', name: 'Step 1', parameters: {} }],
+        activities: [{ type: 'script_python', id: 'n1', name: 'Step 1', parameters: {} }],
       },
       triggers: [{ type: 'manual_trigger', id: 't1' }],
     },
@@ -907,7 +905,7 @@ describe('extractValidationErrorsFromUnknown', () => {
     mockGetState.mockReturnValue({
       currentWorkflow: {
         workflow: {
-          activities: [{ id: 'script3', name: 'Orphan Script', type: 'script' }],
+          activities: [{ id: 'script3', name: 'Orphan Script', type: 'script_python' }],
         },
       },
     })
@@ -993,8 +991,8 @@ describe('verification of incomplete nodes', () => {
       description: 'desc',
       workflow: {
         activities: [
-          { id: 'script-1', name: 'Empty Script', type: 'script', parameters: {} },
-          { id: 'script-2', name: 'Empty Script2', type: 'script', parameters: {} },
+          { id: 'script-1', name: 'Empty Script', type: 'script_python', parameters: {} },
+          { id: 'script-2', name: 'Empty Script2', type: 'script_python', parameters: {} },
         ],
       },
       triggers: [{ id: 'trigger-1', type: 'manual_trigger', parameters: {} }],

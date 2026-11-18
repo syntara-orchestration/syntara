@@ -47,7 +47,7 @@ function minimalWorkflow(overrides: Partial<WorkflowDefinition> = {}): WorkflowD
     description: 'd',
     workflow: {
       activities: [
-        { type: 'script', id: 'task-1', name: 'Task 1', parameters: { language: 'python', code: 'print("hello")' } },
+        { type: 'script_python', id: 'task-1', name: 'Task 1', parameters: { code: 'print("hello")' } },
       ] as Activity[],
     },
     triggers: [{ type: 'manual', id: 'trigger-1', parameters: {} }],

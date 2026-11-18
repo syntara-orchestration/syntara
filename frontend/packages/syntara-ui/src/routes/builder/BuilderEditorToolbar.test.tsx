@@ -16,7 +16,7 @@ vi.mock('../../stores/useWorkflowStore', () => ({
     selector({
       currentWorkflow: {
         workflow: {
-          activities: [{ id: 'n1', type: 'script', name: 'Step', parameters: {} }],
+          activities: [{ id: 'n1', type: 'script_python', name: 'Step', parameters: {} }],
         },
       },
     }),

@@ -8,9 +8,8 @@ triggers:
 nodes:
   - id: pre_check
     name: Pre-deployment Check
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       code: |
         echo "Running pre-deployment checks..."
         echo "All checks passed"
@@ -26,9 +25,8 @@ nodes:
 
   - id: deploy
     name: Deploy to Production
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       code: echo "Deploying to production..."
 edges:
   - from: trigger_manual

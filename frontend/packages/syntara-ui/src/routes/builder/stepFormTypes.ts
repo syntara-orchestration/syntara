@@ -1,4 +1,4 @@
-import type { MissedSchedulePolicy, NodeSettings } from '@syntara/contracts'
+import { ExecutorTypeEnum, type MissedSchedulePolicy, type NodeSettings } from '@syntara/contracts'
 
 import type { ScriptAffinity } from './utils/scriptExecutionProfile'
 
@@ -19,9 +19,8 @@ export type TriggerFormData = {
 
 export type ActionFormData = {
   name: string
-  executor: 'script' | 'http_request'
-  // Allow legacy or custom values to round-trip existing data.
-  language?: string
+  executor:
+    typeof ExecutorTypeEnum.SCRIPT_PYTHON | typeof ExecutorTypeEnum.SCRIPT_BASH | typeof ExecutorTypeEnum.HTTP_REQUEST
   code?: string
   method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
   url?: string

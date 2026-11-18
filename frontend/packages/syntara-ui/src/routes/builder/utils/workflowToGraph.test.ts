@@ -25,8 +25,8 @@ describe('workflowToGraph', () => {
 
     it('extracts script activities from flat array', () => {
       const activities: Activity[] = [
-        { id: 'task-1', type: 'script', name: 'Task 1', parameters: { language: 'python', code: '' } },
-        { id: 'task-2', type: 'script', name: 'Task 2', parameters: { language: 'python', code: '' } },
+        { id: 'task-1', type: 'script_python', name: 'Task 1', parameters: { code: '' } },
+        { id: 'task-2', type: 'script_bash', name: 'Task 2', parameters: { code: '' } },
       ]
       const tasks = extractTaskActivities(activities)
       expect(tasks).toHaveLength(2)
@@ -36,7 +36,7 @@ describe('workflowToGraph', () => {
 
     it('includes executor and approval activities but skips control flow nodes', () => {
       const activities: Activity[] = [
-        { id: 'task-1', type: 'script', name: 'Task 1', parameters: { language: 'python', code: '' } },
+        { id: 'task-1', type: 'script_python', name: 'Task 1', parameters: { code: '' } },
         { id: 'approval-1', type: 'approval', name: 'Approval', parameters: {} },
         { id: 'cond-1', type: 'condition', name: 'Condition', parameters: { condition: 'true' } },
         { id: 'loop-1', type: 'loop', name: 'Loop', parameters: { type: 'for_each', items: '${items}' } },
@@ -85,6 +85,14 @@ describe('workflowToGraph', () => {
       const activities = [{ id: 'unknown-1', type: 'unknown_type', name: 'Unknown', parameters: {} }] as Activity[]
       const tasks = extractTaskActivities(activities)
       expect(tasks).toHaveLength(0)
+    })
+
+    it('leaves legacy generic Script nodes unsupported', () => {
+      const activities = [
+        { id: 'legacy-script', type: 'script', name: 'Legacy Script', parameters: { code: 'print(1)' } },
+      ] as Activity[]
+
+      expect(extractTaskActivities(activities)).toEqual([])
     })
   })
 

@@ -9,8 +9,8 @@ import { buildRegistryActionInitialData, buildRegistryActivityUpdate, safeJSONRe
 const baseTask: TaskActivity = {
   id: 'task-1',
   name: 'Task',
-  type: ExecutorTypeEnum.SCRIPT,
-  parameters: { language: 'python', code: 'print(1)' },
+  type: ExecutorTypeEnum.SCRIPT_PYTHON,
+  parameters: { code: 'print(1)' },
 }
 
 describe('taskStepSubmitHelpers', () => {
@@ -33,13 +33,13 @@ describe('taskStepSubmitHelpers', () => {
 
   describe('buildRegistryActionInitialData', () => {
     it('maps script executor fields', () => {
-      const data = buildRegistryActionInitialData(ExecutorTypeEnum.SCRIPT, { language: 'ruby', code: '1' }, baseTask)
+      const data = buildRegistryActionInitialData(ExecutorTypeEnum.SCRIPT_PYTHON, { code: '1' }, baseTask)
       expect(data).toMatchObject({
         name: 'Task',
-        executor: ExecutorTypeEnum.SCRIPT,
-        language: 'ruby',
+        executor: ExecutorTypeEnum.SCRIPT_PYTHON,
         code: '1',
       })
+      expect(data).not.toHaveProperty('language')
     })
 
     it('maps http_request executor with object headers and object body', () => {
@@ -80,8 +80,8 @@ describe('taskStepSubmitHelpers', () => {
 
     it('populates parameters from environment for script executor', () => {
       const data = buildRegistryActionInitialData(
-        ExecutorTypeEnum.SCRIPT,
-        { language: 'python', code: 'pass', environment: { MY_VAR: 'hello' } },
+        ExecutorTypeEnum.SCRIPT_PYTHON,
+        { code: 'pass', environment: { MY_VAR: 'hello' } },
         baseTask
       )
       expect(data.parameters).toContain('MY_VAR')
@@ -89,11 +89,7 @@ describe('taskStepSubmitHelpers', () => {
     })
 
     it('omits parameters when no environment for script executor', () => {
-      const data = buildRegistryActionInitialData(
-        ExecutorTypeEnum.SCRIPT,
-        { language: 'python', code: 'pass' },
-        baseTask
-      )
+      const data = buildRegistryActionInitialData(ExecutorTypeEnum.SCRIPT_PYTHON, { code: 'pass' }, baseTask)
       expect(data.parameters).toBeUndefined()
     })
 
@@ -103,9 +99,8 @@ describe('taskStepSubmitHelpers', () => {
         settings: { timeout: 120 },
       }
       const data = buildRegistryActionInitialData(
-        ExecutorTypeEnum.SCRIPT,
+        ExecutorTypeEnum.SCRIPT_PYTHON,
         {
-          language: 'python',
           code: 'pass',
           execution_profile: { type: 'execution_target', execution_target_id: 'target-1' },
         },
@@ -115,27 +110,68 @@ describe('taskStepSubmitHelpers', () => {
       expect(data.execution_target_id).toBe('target-1')
       expect(data.settings).toEqual({ timeout: 120 })
     })
+
+    it('hydrates Bash execution profile fields', () => {
+      const data = buildRegistryActionInitialData(
+        ExecutorTypeEnum.SCRIPT_BASH,
+        { code: 'echo hello', execution_profile: { type: 'execution_target', execution_target_id: 'target-2' } },
+        { ...baseTask, type: ExecutorTypeEnum.SCRIPT_BASH }
+      )
+
+      expect(data.executor).toBe(ExecutorTypeEnum.SCRIPT_BASH)
+      expect(data.affinity).toBe(ScriptAffinityEnum.REQUIRED_TARGET)
+      expect(data.execution_target_id).toBe('target-2')
+    })
   })
 
   describe('buildRegistryActivityUpdate', () => {
     it('builds script activity config', () => {
       const data: ActionFormData = {
         name: 'S',
-        executor: ExecutorTypeEnum.SCRIPT,
-        language: 'python',
+        executor: ExecutorTypeEnum.SCRIPT_PYTHON,
         code: 'pass',
       }
       const activity = buildRegistryActivityUpdate(baseTask, data)
-      expect(activity.type).toBe(ExecutorTypeEnum.SCRIPT)
+      expect(activity.type).toBe(ExecutorTypeEnum.SCRIPT_PYTHON)
       expect(activity.name).toBe('S')
       expect((activity.parameters as { code: string }).code).toBe('pass')
+      expect(activity.parameters).not.toHaveProperty('language')
+    })
+
+    it('builds Bash nodes with the Bash type and preserves backend configuration', () => {
+      const bashTask: TaskActivity = {
+        id: 'bash-task',
+        name: 'Bash Task',
+        type: ExecutorTypeEnum.SCRIPT_BASH,
+        parameters: {
+          code: 'echo before',
+          execution_profile: { type: 'execution_target', execution_target_id: 'target-1' },
+          credential_bindings: [{ credential_recipe_id: 'registry/pull', credential_ref: 'credential-1' }],
+        },
+      }
+      const data: ActionFormData = {
+        name: 'Updated Bash',
+        executor: ExecutorTypeEnum.SCRIPT_BASH,
+        code: 'echo after',
+        affinity: ScriptAffinityEnum.REQUIRED_TARGET,
+        execution_target_id: 'target-1',
+      }
+
+      const activity = buildRegistryActivityUpdate(bashTask, data)
+
+      expect(activity.type).toBe(ExecutorTypeEnum.SCRIPT_BASH)
+      expect(activity.parameters).toEqual({
+        code: 'echo after',
+        execution_profile: { type: 'execution_target', execution_target_id: 'target-1' },
+        credential_bindings: [{ credential_recipe_id: 'registry/pull', credential_ref: 'credential-1' }],
+      })
+      expect(activity.parameters).not.toHaveProperty('language')
     })
 
     it('persists execution_profile and settings for required_target affinity', () => {
       const data: ActionFormData = {
         name: 'S',
-        executor: ExecutorTypeEnum.SCRIPT,
-        language: 'python',
+        executor: ExecutorTypeEnum.SCRIPT_PYTHON,
         code: 'pass',
         affinity: ScriptAffinityEnum.REQUIRED_TARGET,
         execution_target_id: 'target-1',
@@ -152,15 +188,13 @@ describe('taskStepSubmitHelpers', () => {
       const taskWithProfile: TaskActivity = {
         ...baseTask,
         parameters: {
-          language: 'python',
           code: 'pass',
           execution_profile: { type: 'execution_target', execution_target_id: 'target-1' },
         },
       }
       const data: ActionFormData = {
         name: 'S',
-        executor: ExecutorTypeEnum.SCRIPT,
-        language: 'python',
+        executor: ExecutorTypeEnum.SCRIPT_PYTHON,
         code: 'pass',
         affinity: ScriptAffinityEnum.NONE,
       }
@@ -243,8 +277,7 @@ describe('taskStepSubmitHelpers', () => {
     it('includes environment when script has valid parameters JSON', () => {
       const data: ActionFormData = {
         name: 'S',
-        executor: ExecutorTypeEnum.SCRIPT,
-        language: 'python',
+        executor: ExecutorTypeEnum.SCRIPT_PYTHON,
         code: 'pass',
         parameters: '{"MY_VAR": "value"}',
       }
@@ -257,8 +290,7 @@ describe('taskStepSubmitHelpers', () => {
     it('omits environment when script has no parameters', () => {
       const data: ActionFormData = {
         name: 'S',
-        executor: ExecutorTypeEnum.SCRIPT,
-        language: 'python',
+        executor: ExecutorTypeEnum.SCRIPT_PYTHON,
         code: 'pass',
       }
       const activity = buildRegistryActivityUpdate(baseTask, data)
@@ -268,8 +300,7 @@ describe('taskStepSubmitHelpers', () => {
     it('omits environment when script parameters is invalid JSON', () => {
       const data: ActionFormData = {
         name: 'S',
-        executor: ExecutorTypeEnum.SCRIPT,
-        language: 'python',
+        executor: ExecutorTypeEnum.SCRIPT_PYTHON,
         code: 'pass',
         parameters: 'not json',
       }

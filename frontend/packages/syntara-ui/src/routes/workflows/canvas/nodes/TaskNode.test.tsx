@@ -21,13 +21,12 @@ vi.mock('./hooks/useCredentialName', () => ({
 import { TaskActivityDetails } from './TaskNode'
 
 describe('TaskActivityDetails', () => {
-  it('renders script task details correctly', () => {
+  it('renders Python script task details without a language field', () => {
     const mockScriptTask = {
-      type: 'script',
+      type: 'script_python',
       id: 'task-1',
       name: 'Script Task',
       parameters: {
-        language: 'python',
         code: 'print("hello")',
       },
     } as TaskActivity
@@ -35,9 +34,23 @@ describe('TaskActivityDetails', () => {
     render(<TaskActivityDetails data={mockScriptTask} />)
 
     expect(screen.getByText('Script Task')).toBeInTheDocument()
-    expect(screen.getByText('Script')).toBeInTheDocument()
-    expect(screen.getByText('Language')).toBeInTheDocument()
-    expect(screen.getByText('python')).toBeInTheDocument()
+    expect(screen.getByText('Python Script')).toBeInTheDocument()
+    expect(screen.queryByText('Language')).not.toBeInTheDocument()
+  })
+
+  it('renders Bash script task details without a language field', () => {
+    const mockScriptTask = {
+      type: 'script_bash',
+      id: 'task-bash',
+      name: 'Bash Task',
+      parameters: { code: 'echo hello' },
+    } as TaskActivity
+
+    render(<TaskActivityDetails data={mockScriptTask} />)
+
+    expect(screen.getByText('Bash Task')).toBeInTheDocument()
+    expect(screen.getByText('Bash Script')).toBeInTheDocument()
+    expect(screen.queryByText('Language')).not.toBeInTheDocument()
   })
 
   it('renders http_request task details correctly', () => {

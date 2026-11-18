@@ -16,8 +16,8 @@ export async function createWorkflowViaApi(page: Page, name: string): Promise<{ 
           {
             id: 'step1',
             name: 'Step 1',
-            type: 'script',
-            parameters: { language: 'python', code: 'print("v1")' },
+            type: 'script_python',
+            parameters: { code: 'print("v1")' },
           },
         ],
         edges: [{ from: 'trigger_1', to: 'step1' }],
@@ -40,8 +40,8 @@ export async function updateWorkflowViaApi(page: Page, workflowId: string, descr
           {
             id: 'step1',
             name: 'Step 1',
-            type: 'script',
-            parameters: { language: 'python', code: `print("${description}")` },
+            type: 'script_python',
+            parameters: { code: `print("${description}")` },
           },
         ],
         edges: [{ from: 'trigger_1', to: 'step1' }],
@@ -71,8 +71,8 @@ export async function simulateConcurrentSave(page: Page, workflowId: string) {
           {
             id: 'concurrent_step',
             name: 'Concurrent Step',
-            type: 'script',
-            parameters: { language: 'python', code: 'print("concurrent")' },
+            type: 'script_python',
+            parameters: { code: 'print("concurrent")' },
           },
         ],
         edges: [{ from: 'trigger_1', to: 'concurrent_step' }],

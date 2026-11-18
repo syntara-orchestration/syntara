@@ -26,7 +26,7 @@ export type StepTypeColorKey = keyof typeof STEP_TYPE_COLORS
 
 /**
  * Returns the color token for the colored bar at the top of a workflow step.
- * In v2, task step type maps to its executor (e.g. 'script', 'http_request', 'agentic', 'aap_job_template', 'approval').
+ * In v2, task step type maps to its executor (e.g. script_python, script_bash, http_request).
  */
 export function getStepTypeColor(nodeType: string, data?: { type?: string }): string {
   if (nodeType === FlowNodeType.TRIGGER) {
@@ -58,7 +58,7 @@ function getTaskStepColor(data: TaskActivity | undefined): string {
     return STEP_TYPE_COLORS.actionDefault
   }
   const { actualExecutor } = detectTaskExecutorType(data)
-  if (actualExecutor === ExecutorTypeEnum.SCRIPT) {
+  if (actualExecutor === ExecutorTypeEnum.SCRIPT_PYTHON || actualExecutor === ExecutorTypeEnum.SCRIPT_BASH) {
     return STEP_TYPE_COLORS.actionScript
   }
   if (actualExecutor === ExecutorTypeEnum.HTTP_REQUEST) {
@@ -96,7 +96,8 @@ const ADD_PANEL_LOGIC_IDS: ReadonlySet<string> = new Set([
 
 const ADD_PANEL_ACTION_IDS: ReadonlySet<string> = new Set([
   RegistryStepId.ACTION,
-  RegistryStepId.ACTION_SCRIPT,
+  RegistryStepId.ACTION_SCRIPT_PYTHON,
+  RegistryStepId.ACTION_SCRIPT_BASH,
   RegistryStepId.ACTION_API,
 ])
 

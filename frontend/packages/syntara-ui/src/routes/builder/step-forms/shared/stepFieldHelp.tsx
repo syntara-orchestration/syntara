@@ -15,7 +15,6 @@ export const stepHelp = {
   backoffCoefficient: createFieldHelp('Backoff coefficient', T.SETTINGS_BACKOFF_HELP),
 
   // Script / HTTP
-  scriptLanguage: createFieldHelp('Language', T.SCRIPT_LANGUAGE_HELP),
   scriptCode: createFieldHelp('Script', T.SCRIPT_CODE_HELP),
   scriptEnvVars: createFieldHelp('Environment variables', T.SCRIPT_ENV_VARS_HELP),
   scriptAffinity: createFieldHelp('Affinity', T.SCRIPT_AFFINITY_HELP),

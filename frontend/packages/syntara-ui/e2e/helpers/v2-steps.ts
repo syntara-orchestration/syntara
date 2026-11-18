@@ -3,7 +3,7 @@
  *
  * V2 step types:
  *   Trigger:      manual, webhook, eda, scheduled
- *   Executors:    script, http_request, agentic, aap_job_template, approval
+ *   Executors:    script_python, script_bash, http_request, agentic, aap_job_template, approval
  *   Control flow: condition, loop (basic)
  *
  * Converge helpers live in v2-steps-converge.ts.
@@ -149,10 +149,23 @@ export async function addEdaTrigger(page: Page, name: string, webhookPath: strin
 // Executor steps
 // ---------------------------------------------------------------------------
 
-/** Add a script step (v2 type: "script"). */
-export async function addScriptStep(page: Page, name: string, code = 'print("hello")') {
+/** Add a script step (v2 type: "script_python"). */
+export async function addPythonScriptStep(page: Page, name: string, code = 'print("hello")') {
   await openAddStepPanel(page)
-  await selectCategoryAndStepType(page, 'Action', 'Script')
+  await selectCategoryAndStepType(page, 'Action', 'Python Script')
+  const nameInput = page.getByRole('textbox', { name: 'Name', exact: true })
+  await expect(nameInput).toBeVisible({ timeout: 10_000 })
+  await expect(nameInput).toBeEditable({ timeout: 5_000 })
+  await nameInput.fill(name)
+  await fillCodeEditor(page, { value: code })
+  await page.getByRole('button', { name: 'Create', exact: true }).click()
+  await closeStepEditorPanel(page)
+}
+
+/** Add a Bash script step (v2 type: "script_bash"). */
+export async function addBashScriptStep(page: Page, name: string, code = 'echo hello') {
+  await openAddStepPanel(page)
+  await selectCategoryAndStepType(page, 'Action', 'Bash Script')
   const nameInput = page.getByRole('textbox', { name: 'Name', exact: true })
   await expect(nameInput).toBeVisible({ timeout: 10_000 })
   await expect(nameInput).toBeEditable({ timeout: 5_000 })
@@ -289,13 +302,13 @@ export async function addApprovalStep(page: Page, name: string) {
  * This creates a valid workflow that can be saved.
  * The "rejected" branch is optional per validation rules.
  *
- * Uses `addScriptStepOnHandle` (layout + fit-view retries) instead of `getByText`
+ * Uses `addPythonScriptStepOnHandle` (layout + fit-view retries) instead of `getByText`
  * on the canvas label — React Flow semantic zoom hides step label text once the
  * graph is large enough that fit-view drops below SEMANTIC_ZOOM_MAX_SCALE.
  */
 export async function addApprovalStepWithBranch(page: Page, name: string) {
   await addApprovalStep(page, name)
-  await addScriptStepOnHandle(page, 'approved', `${name} - approved action`, 'print("approved")')
+  await addPythonScriptStepOnHandle(page, 'approved', `${name} - approved action`, 'print("approved")')
 }
 
 // ---------------------------------------------------------------------------
@@ -390,13 +403,13 @@ export async function addConditionStepWithBranch(page: Page, name: string, expre
 
   // Add a step on the "true" branch to satisfy validation
   // The "false" branch is optional
-  await addScriptStepOnHandle(page, 'true', `${name} - true action`, 'print("condition is true")')
+  await addPythonScriptStepOnHandle(page, 'true', `${name} - true action`, 'print("condition is true")')
 }
 
 /** Add a Script step from a specific edge stub (e.g. unused condition `false`). */
-export async function addScriptStepOnHandle(page: Page, handle: string, name: string, code: string) {
+export async function addPythonScriptStepOnHandle(page: Page, handle: string, name: string, code: string) {
   await openAddStepPanel(page, handle)
-  await selectCategoryAndStepType(page, 'Action', 'Script')
+  await selectCategoryAndStepType(page, 'Action', 'Python Script')
   const nameInput = page.getByRole('textbox', { name: 'Name', exact: true })
   await expect(nameInput).toBeVisible({ timeout: 10_000 })
   await expect(nameInput).toBeEditable({ timeout: 5_000 })
@@ -490,7 +503,7 @@ export async function addLoopStepWithBody(page: Page, name: string, items = '${t
   await page.getByRole('button', { name: 'Add step…' }).click()
   await page.getByRole('menuitem', { name: 'In loop' }).click()
   await expect(addStepPanel(page)).toHaveCount(1)
-  await selectCategoryAndStepType(page, 'Action', 'Script')
+  await selectCategoryAndStepType(page, 'Action', 'Python Script')
   await page.getByRole('textbox', { name: 'Name', exact: true }).fill(`${name} - loop body`)
   await fillCodeEditor(page, { value: 'print("processing item")' })
   await page.getByRole('button', { name: 'Create', exact: true }).click()

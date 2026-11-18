@@ -8,7 +8,7 @@ import type { ActivityOrderItem } from './ExecutionActivityTable'
 import { useActivityFilters } from './useActivityFilters'
 
 const ACTIVITIES: ActivityOrderItem[] = [
-  { id: 'node-1', name: 'Process data', type: 'script' },
+  { id: 'node-1', name: 'Process data', type: 'script_python' },
   { id: 'node-2', name: 'Check condition', type: 'condition' },
   { id: 'node-3', name: 'Send notification', type: 'http_request' },
   { id: 'node-4', name: 'Merge branches', type: 'converge' },
@@ -122,7 +122,7 @@ describe('useActivityFilters', () => {
   })
 
   it('uses activity id as fallback when name is undefined', () => {
-    const activitiesWithoutName: ActivityOrderItem[] = [{ id: 'my-task-node', type: 'script' }]
+    const activitiesWithoutName: ActivityOrderItem[] = [{ id: 'my-task-node', type: 'script_python' }]
     const states = new Map<string, ActivityState>([['my-task-node', { activityId: 'my-task-node', status: 'running' }]])
     const { result } = renderHook(() => useActivityFilters(activitiesWithoutName, states))
 

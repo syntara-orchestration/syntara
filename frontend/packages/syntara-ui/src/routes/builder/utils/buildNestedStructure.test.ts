@@ -12,7 +12,7 @@ describe('buildNestedConditionStructure (v2)', () => {
     it('returns flat activities unchanged', () => {
       const activities: Activity[] = [
         { type: 'condition', id: 'A', name: 'Condition A', parameters: { condition: 'input.value > 10' } },
-        { type: 'script', id: 'B', name: 'Task B', parameters: { language: 'python', code: 'print("B")' } },
+        { type: 'script_python', id: 'B', name: 'Task B', parameters: { code: 'print("B")' } },
       ]
       const edges = [{ id: 'A-B', source: 'A', target: 'B', sourceHandle: 'true', targetHandle: 'target' }]
 
@@ -26,8 +26,8 @@ describe('buildNestedConditionStructure (v2)', () => {
     it('returns all activities for then and else branches', () => {
       const activities: Activity[] = [
         { type: 'condition', id: 'A', name: 'Condition A', parameters: { condition: 'input.value > 10' } },
-        { type: 'script', id: 'B', name: 'Task B', parameters: { language: 'python', code: 'print("B")' } },
-        { type: 'script', id: 'C', name: 'Task C', parameters: { language: 'python', code: 'print("C")' } },
+        { type: 'script_python', id: 'B', name: 'Task B', parameters: { code: 'print("B")' } },
+        { type: 'script_python', id: 'C', name: 'Task C', parameters: { code: 'print("C")' } },
       ]
       const edges = [
         { id: 'A-B', source: 'A', target: 'B', sourceHandle: 'true', targetHandle: 'target' },
@@ -45,7 +45,7 @@ describe('buildNestedConditionStructure (v2)', () => {
       const activities: Activity[] = [
         { type: 'condition', id: 'A', name: 'Condition A', parameters: { condition: 'input.a > 10' } },
         { type: 'condition', id: 'B', name: 'Condition B', parameters: { condition: 'input.b > 20' } },
-        { type: 'script', id: 'C', name: 'Task C', parameters: { language: 'python', code: 'print("C")' } },
+        { type: 'script_python', id: 'C', name: 'Task C', parameters: { code: 'print("C")' } },
       ]
       const edges = [
         { id: 'A-B', source: 'A', target: 'B', sourceHandle: 'true', targetHandle: 'target' },
@@ -65,9 +65,9 @@ describe('buildNestedConditionStructure (v2)', () => {
     it('returns all independent conditions and tasks', () => {
       const activities: Activity[] = [
         { type: 'condition', id: 'A', name: 'Condition A', parameters: { condition: 'input.a > 10' } },
-        { type: 'script', id: 'B', name: 'Task B', parameters: { language: 'python', code: 'print("B")' } },
+        { type: 'script_python', id: 'B', name: 'Task B', parameters: { code: 'print("B")' } },
         { type: 'condition', id: 'C', name: 'Condition C', parameters: { condition: 'input.c > 20' } },
-        { type: 'script', id: 'D', name: 'Task D', parameters: { language: 'python', code: 'print("D")' } },
+        { type: 'script_python', id: 'D', name: 'Task D', parameters: { code: 'print("D")' } },
       ]
       const edges = [
         { id: 'A-B', source: 'A', target: 'B', sourceHandle: 'true', targetHandle: 'target' },
@@ -84,7 +84,7 @@ describe('buildNestedConditionStructure (v2)', () => {
     it('returns loop and body activities flat', () => {
       const activities: Activity[] = [
         { type: 'loop', id: 'loop1', name: 'Process Items', parameters: { type: 'for_each', items: '${input.items}' } },
-        { type: 'script', id: 'task1', name: 'Process Item', parameters: { language: 'bash', code: 'echo $item' } },
+        { type: 'script_python', id: 'task1', name: 'Process Item', parameters: { code: 'echo $item' } },
       ]
       const edges = [
         { id: 'loop1-task1', source: 'loop1', target: 'task1', sourceHandle: 'loop', targetHandle: 'target' },
@@ -100,10 +100,10 @@ describe('buildNestedConditionStructure (v2)', () => {
 
     it('round-trips loop with incoming and outgoing edges', () => {
       const activities: Activity[] = [
-        { type: 'script', id: 'task1', name: 'Before Loop', parameters: { language: 'bash', code: 'echo before' } },
+        { type: 'script_python', id: 'task1', name: 'Before Loop', parameters: { code: 'echo before' } },
         { type: 'loop', id: 'loop1', name: 'Process Items', parameters: { type: 'for_each', items: '${input.items}' } },
-        { type: 'script', id: 'task2', name: 'Inside Loop', parameters: { language: 'bash', code: 'echo inside' } },
-        { type: 'script', id: 'task3', name: 'After Loop', parameters: { language: 'bash', code: 'echo after' } },
+        { type: 'script_python', id: 'task2', name: 'Inside Loop', parameters: { code: 'echo inside' } },
+        { type: 'script_python', id: 'task3', name: 'After Loop', parameters: { code: 'echo after' } },
       ]
 
       const edges = [

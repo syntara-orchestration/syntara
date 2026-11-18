@@ -1,7 +1,7 @@
 ---
 schema_version: "2.0.0"
-name: error-unsupported-language
-description: Test error when task uses unsupported script language
+name: error-script-language-parameter
+description: Test that script language cannot be configured as a parameter
 
 triggers:
   - id: trigger_manual
@@ -9,8 +9,8 @@ triggers:
 
 nodes:
   - id: python_task
-    name: Task With Unsupported Language
-    type: script
+    name: Task With Language Parameter
+    type: script_python
     parameters:
       language: python
       code: |

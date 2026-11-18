@@ -23,9 +23,8 @@ nodes:
 
   - id: enable_feature
     name: Enable Feature
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       code: |
         echo "Feature enabled"
         echo "Initializing feature..."

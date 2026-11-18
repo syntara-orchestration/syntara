@@ -6,11 +6,10 @@ import { DetectedExecutorType, detectTaskNodeType, type TaskActivityWithMetadata
 describe('detectTaskNodeType', () => {
   const createBaseTask = (overrides: Partial<TaskActivity> = {}): TaskActivity =>
     ({
-      type: 'script',
+      type: 'script_python',
       id: 'test-task-1',
       name: 'Test Task',
       parameters: {
-        language: 'python',
         code: 'print("hello")',
       },
       ...overrides,
@@ -22,9 +21,9 @@ describe('detectTaskNodeType', () => {
       const result = detectTaskNodeType(task)
 
       expect(result).toEqual({
-        detectedExecutorType: 'script',
+        detectedExecutorType: 'script_python',
         connectorData: null,
-        actualExecutor: 'script',
+        actualExecutor: 'script_python',
       })
     })
 
@@ -74,9 +73,9 @@ describe('detectTaskNodeType', () => {
 
       // SECURITY: Invalid executor types are rejected, falls back to task.type
       expect(result).toEqual({
-        detectedExecutorType: 'script',
+        detectedExecutorType: 'script_python',
         connectorData: null,
-        actualExecutor: 'script',
+        actualExecutor: 'script_python',
       })
     })
 
@@ -108,7 +107,14 @@ describe('detectTaskNodeType', () => {
     })
 
     it('accepts all valid executor types from ExecutorTypeEnum', () => {
-      const validTypes = ['script', 'http_request', 'agentic', 'aap_job_template', 'approval'] as const
+      const validTypes = [
+        'script_python',
+        'script_bash',
+        'http_request',
+        'agentic',
+        'aap_job_template',
+        'approval',
+      ] as const
 
       for (const executorType of validTypes) {
         const task = createBaseTask() as TaskActivityWithMetadata
@@ -310,13 +316,13 @@ describe('detectTaskNodeType', () => {
         },
       }) as TaskActivityWithMetadata
 
-      task.metadata = { __executorType: 'script' }
+      task.metadata = { __executorType: 'script_python' }
 
       const result = detectTaskNodeType(task)
 
       // Valid override should win over AAP detection
-      expect(result.detectedExecutorType).toBe('script')
-      expect(result.actualExecutor).toBe('script')
+      expect(result.detectedExecutorType).toBe('script_python')
+      expect(result.actualExecutor).toBe('script_python')
     })
 
     it('invalid metadata override is rejected and AAP connector is detected', () => {

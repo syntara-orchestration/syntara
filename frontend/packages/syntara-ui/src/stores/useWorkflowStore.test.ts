@@ -1,3 +1,4 @@
+import { ActivityTypeEnum } from '@syntara/contracts'
 import { describe, expect, it, beforeEach } from 'vitest'
 
 import type { EdgeConnection } from '../routes/builder/types/edge'
@@ -6,7 +7,7 @@ import {
   useWorkflowStore,
   createManualTrigger,
   createConvergeActivity,
-  createScriptActivity,
+  createPythonScriptActivity,
   createGenericActivity,
 } from './useWorkflowStore'
 import { wrappedUndo, wrappedRedo } from './workflowStoreSelectors'
@@ -158,7 +159,7 @@ describe('useWorkflowStore', () => {
 
       it('removes edges connected to deleted trigger', () => {
         const workflow = makeWorkflow('Test', [
-          createScriptActivity({ id: 'activity-1', name: 'Script', language: 'python', code: '' }),
+          createPythonScriptActivity({ id: 'activity-1', name: 'Script', code: '' }),
         ])
         const trigger1 = createManualTrigger('test-trigger-1', false)
         const trigger2 = createManualTrigger('test-trigger-2', true)
@@ -191,7 +192,7 @@ describe('useWorkflowStore', () => {
 
       it('removes edge when trigger is deleted from middle', () => {
         const workflow = makeWorkflow('Test', [
-          createScriptActivity({ id: 'activity-1', name: 'Script', language: 'python', code: '' }),
+          createPythonScriptActivity({ id: 'activity-1', name: 'Script', code: '' }),
         ])
         const trigger1 = createManualTrigger('test-trigger-1', false)
         const trigger2 = createManualTrigger('test-trigger-2', true)
@@ -233,7 +234,7 @@ describe('useWorkflowStore', () => {
 
       it('handles edges with trigger as target', () => {
         const workflow = makeWorkflow('Test', [
-          createScriptActivity({ id: 'activity-1', name: 'Script', language: 'python', code: '' }),
+          createPythonScriptActivity({ id: 'activity-1', name: 'Script', code: '' }),
         ])
         const trigger1 = createManualTrigger('test-trigger-1', false)
         const trigger2 = createManualTrigger('test-trigger-2', true)
@@ -285,7 +286,7 @@ describe('useWorkflowStore', () => {
 
     describe('addActivity', () => {
       it('adds activity to empty array', () => {
-        const activity = createScriptActivity({ id: 'A', name: 'Task A', language: 'python', code: 'print("A")' })
+        const activity = createPythonScriptActivity({ id: 'A', name: 'Task A', code: 'print("A")' })
 
         useWorkflowStore.getState().addActivity(activity)
 
@@ -295,8 +296,8 @@ describe('useWorkflowStore', () => {
       })
 
       it('adds multiple activities', () => {
-        const activity1 = createScriptActivity({ id: 'A', name: 'Task A', language: 'python', code: 'print("A")' })
-        const activity2 = createScriptActivity({ id: 'B', name: 'Task B', language: 'python', code: 'print("B")' })
+        const activity1 = createPythonScriptActivity({ id: 'A', name: 'Task A', code: 'print("A")' })
+        const activity2 = createPythonScriptActivity({ id: 'B', name: 'Task B', code: 'print("B")' })
 
         useWorkflowStore.getState().addActivity(activity1)
         useWorkflowStore.getState().addActivity(activity2)
@@ -309,8 +310,8 @@ describe('useWorkflowStore', () => {
 
     describe('removeActivity', () => {
       it('removes activity from flat list', () => {
-        const activity1 = createScriptActivity({ id: 'A', name: 'Task A', language: 'python', code: 'print("A")' })
-        const activity2 = createScriptActivity({ id: 'B', name: 'Task B', language: 'python', code: 'print("B")' })
+        const activity1 = createPythonScriptActivity({ id: 'A', name: 'Task A', code: 'print("A")' })
+        const activity2 = createPythonScriptActivity({ id: 'B', name: 'Task B', code: 'print("B")' })
 
         useWorkflowStore.getState().addActivity(activity1)
         useWorkflowStore.getState().addActivity(activity2)
@@ -322,8 +323,8 @@ describe('useWorkflowStore', () => {
       })
 
       it('removes converge activity from flat list', () => {
-        const activityB = createScriptActivity({ id: 'B', name: 'Task B', language: 'python', code: 'print("B")' })
-        const activityC = createScriptActivity({ id: 'C', name: 'Task C', language: 'python', code: 'print("C")' })
+        const activityB = createPythonScriptActivity({ id: 'B', name: 'Task B', code: 'print("B")' })
+        const activityC = createPythonScriptActivity({ id: 'C', name: 'Task C', code: 'print("C")' })
         const convergeActivity = createConvergeActivity('J', 'Converge J')
 
         useWorkflowStore.setState({
@@ -351,8 +352,8 @@ describe('useWorkflowStore', () => {
           name: 'Condition A',
           parameters: { condition: 'input.value > 10' },
         }
-        const activityB = createScriptActivity({ id: 'B', name: 'Task B', language: 'python', code: 'print("B")' })
-        const activityC = createScriptActivity({ id: 'C', name: 'Task C', language: 'python', code: 'print("C")' })
+        const activityB = createPythonScriptActivity({ id: 'B', name: 'Task B', code: 'print("B")' })
+        const activityC = createPythonScriptActivity({ id: 'C', name: 'Task C', code: 'print("C")' })
 
         useWorkflowStore.setState({
           currentWorkflow: makeWorkflow('Test', [conditionActivity, activityB, activityC]),
@@ -372,7 +373,7 @@ describe('useWorkflowStore', () => {
 
     describe('updateActivity', () => {
       it('updates activity in flat list', () => {
-        const activity = createScriptActivity({ id: 'A', name: 'Task A', language: 'python', code: 'print("A")' })
+        const activity = createPythonScriptActivity({ id: 'A', name: 'Task A', code: 'print("A")' })
 
         useWorkflowStore.getState().addActivity(activity)
         useWorkflowStore.getState().updateActivity('A', { name: 'Updated Task A' })
@@ -405,9 +406,9 @@ describe('useWorkflowStore', () => {
 
   describe('moveActivityBefore', () => {
     it('moves activity before target', () => {
-      const activity1 = createScriptActivity({ id: 'A', name: 'Task A', language: 'python', code: 'print("A")' })
-      const activity2 = createScriptActivity({ id: 'B', name: 'Task B', language: 'python', code: 'print("B")' })
-      const activity3 = createScriptActivity({ id: 'C', name: 'Task C', language: 'python', code: 'print("C")' })
+      const activity1 = createPythonScriptActivity({ id: 'A', name: 'Task A', code: 'print("A")' })
+      const activity2 = createPythonScriptActivity({ id: 'B', name: 'Task B', code: 'print("B")' })
+      const activity3 = createPythonScriptActivity({ id: 'C', name: 'Task C', code: 'print("C")' })
 
       useWorkflowStore.setState({
         currentWorkflow: makeWorkflow('Test', [activity1, activity2, activity3]),
@@ -422,8 +423,8 @@ describe('useWorkflowStore', () => {
     })
 
     it('does nothing if activity is already before target', () => {
-      const activity1 = createScriptActivity({ id: 'A', name: 'Task A', language: 'python', code: 'print("A")' })
-      const activity2 = createScriptActivity({ id: 'B', name: 'Task B', language: 'python', code: 'print("B")' })
+      const activity1 = createPythonScriptActivity({ id: 'A', name: 'Task A', code: 'print("A")' })
+      const activity2 = createPythonScriptActivity({ id: 'B', name: 'Task B', code: 'print("B")' })
 
       useWorkflowStore.setState({
         currentWorkflow: makeWorkflow('Test', [activity1, activity2]),
@@ -440,9 +441,9 @@ describe('useWorkflowStore', () => {
 
   describe('moveActivityAfter', () => {
     it('moves activity after target', () => {
-      const activity1 = createScriptActivity({ id: 'A', name: 'Task A', language: 'python', code: 'print("A")' })
-      const activity2 = createScriptActivity({ id: 'B', name: 'Task B', language: 'python', code: 'print("B")' })
-      const activity3 = createScriptActivity({ id: 'C', name: 'Task C', language: 'python', code: 'print("C")' })
+      const activity1 = createPythonScriptActivity({ id: 'A', name: 'Task A', code: 'print("A")' })
+      const activity2 = createPythonScriptActivity({ id: 'B', name: 'Task B', code: 'print("B")' })
+      const activity3 = createPythonScriptActivity({ id: 'C', name: 'Task C', code: 'print("C")' })
 
       useWorkflowStore.setState({
         currentWorkflow: makeWorkflow('Test', [activity1, activity2, activity3]),
@@ -457,8 +458,8 @@ describe('useWorkflowStore', () => {
     })
 
     it('does nothing if activity is already after target', () => {
-      const activity1 = createScriptActivity({ id: 'A', name: 'Task A', language: 'python', code: 'print("A")' })
-      const activity2 = createScriptActivity({ id: 'B', name: 'Task B', language: 'python', code: 'print("B")' })
+      const activity1 = createPythonScriptActivity({ id: 'A', name: 'Task A', code: 'print("A")' })
+      const activity2 = createPythonScriptActivity({ id: 'B', name: 'Task B', code: 'print("B")' })
 
       useWorkflowStore.setState({
         currentWorkflow: makeWorkflow('Test', [activity1, activity2]),
@@ -543,7 +544,7 @@ describe('useWorkflowStore', () => {
     })
 
     it('appends a clone with a new ID and marks dirty', () => {
-      const original = createScriptActivity({ id: 'act-1', name: 'Script', language: 'python', code: 'print(1)' })
+      const original = createPythonScriptActivity({ id: 'act-1', name: 'Script', code: 'print(1)' })
       useWorkflowStore.getState().addActivity(original)
 
       const newId = useWorkflowStore.getState().duplicateActivity('act-1')
@@ -558,7 +559,7 @@ describe('useWorkflowStore', () => {
     })
 
     it('names the clone "Copy of <original name>"', () => {
-      const original = createScriptActivity({ id: 'act-1', name: 'My Script', language: 'python', code: 'print(1)' })
+      const original = createPythonScriptActivity({ id: 'act-1', name: 'My Script', code: 'print(1)' })
       useWorkflowStore.getState().addActivity(original)
 
       useWorkflowStore.getState().duplicateActivity('act-1')
@@ -568,8 +569,8 @@ describe('useWorkflowStore', () => {
     })
 
     it('generates a unique name when "Copy of…" already exists', () => {
-      const original = createScriptActivity({ id: 'act-1', name: 'Script', language: 'python', code: 'print(1)' })
-      const copy1 = createScriptActivity({ id: 'act-2', name: 'Copy of Script', language: 'python', code: 'print(1)' })
+      const original = createPythonScriptActivity({ id: 'act-1', name: 'Script', code: 'print(1)' })
+      const copy1 = createPythonScriptActivity({ id: 'act-2', name: 'Copy of Script', code: 'print(1)' })
       useWorkflowStore.getState().addActivity(original)
       useWorkflowStore.getState().addActivity(copy1)
 
@@ -580,19 +581,19 @@ describe('useWorkflowStore', () => {
     })
 
     it('preserves the original activity type and config', () => {
-      const original = createScriptActivity({ id: 'act-1', name: 'Script', language: 'python', code: 'print("hello")' })
+      const original = createPythonScriptActivity({ id: 'act-1', name: 'Script', code: 'print("hello")' })
       useWorkflowStore.getState().addActivity(original)
 
       const newId = useWorkflowStore.getState().duplicateActivity('act-1')
 
       const activities = useWorkflowStore.getState().currentWorkflow?.workflow.activities ?? []
       const clone = activities.find((a) => a.id === newId)
-      expect(clone?.type).toBe('script')
+      expect(clone?.type).toBe(ActivityTypeEnum.SCRIPT_PYTHON)
       expect(clone?.parameters).toEqual(original.parameters)
     })
 
     it('does not share object references between original and clone', () => {
-      const original = createScriptActivity({ id: 'act-1', name: 'Script', language: 'python', code: 'print(1)' })
+      const original = createPythonScriptActivity({ id: 'act-1', name: 'Script', code: 'print(1)' })
       useWorkflowStore.getState().addActivity(original)
 
       const newId = useWorkflowStore.getState().duplicateActivity('act-1')
@@ -611,8 +612,8 @@ describe('useWorkflowStore', () => {
     })
 
     it('replaces the activity in place and marks dirty', () => {
-      const original = createScriptActivity({ id: 'act-1', name: 'Script', language: 'python', code: 'print(1)' })
-      const replacement = createScriptActivity({ id: 'tmp-id', name: 'REST API', language: 'python', code: 'print(2)' })
+      const original = createPythonScriptActivity({ id: 'act-1', name: 'Script', code: 'print(1)' })
+      const replacement = createPythonScriptActivity({ id: 'tmp-id', name: 'REST API', code: 'print(2)' })
       useWorkflowStore.getState().addActivity(original)
 
       useWorkflowStore.getState().replaceActivity('act-1', { ...replacement, id: 'act-1' })
@@ -631,10 +632,9 @@ describe('useWorkflowStore', () => {
         name: 'My Condition',
         parameters: { condition: 'some.expr' },
       }
-      const scriptActivity = createScriptActivity({
+      const scriptActivity = createPythonScriptActivity({
         id: 'tmp-id',
         name: 'Script Node',
-        language: 'python',
         code: 'print(1)',
       })
       useWorkflowStore.getState().addActivity(conditionActivity)
@@ -643,20 +643,20 @@ describe('useWorkflowStore', () => {
 
       const activities = useWorkflowStore.getState().currentWorkflow?.workflow.activities ?? []
       const replaced = activities[0] as Record<string, unknown>
-      expect(replaced.type).toBe('script')
-      // v2: condition expression is inside config, so replaced activity should have script config
+      expect(replaced.type).toBe(ActivityTypeEnum.SCRIPT_PYTHON)
+      // The condition expression belongs to the old node type, not the replacement script parameters.
       expect((replaced.parameters as Record<string, unknown>).condition).toBeUndefined()
     })
 
     it('preserves list order when replacing a non-first activity', () => {
-      const act1 = createScriptActivity({ id: 'act-1', name: 'First', language: 'python', code: '' })
-      const act2 = createScriptActivity({ id: 'act-2', name: 'Second', language: 'python', code: '' })
-      const act3 = createScriptActivity({ id: 'act-3', name: 'Third', language: 'python', code: '' })
+      const act1 = createPythonScriptActivity({ id: 'act-1', name: 'First', code: '' })
+      const act2 = createPythonScriptActivity({ id: 'act-2', name: 'Second', code: '' })
+      const act3 = createPythonScriptActivity({ id: 'act-3', name: 'Third', code: '' })
       useWorkflowStore.getState().addActivity(act1)
       useWorkflowStore.getState().addActivity(act2)
       useWorkflowStore.getState().addActivity(act3)
 
-      const replacement = createScriptActivity({ id: 'tmp', name: 'Replaced', language: 'python', code: '' })
+      const replacement = createPythonScriptActivity({ id: 'tmp', name: 'Replaced', code: '' })
       useWorkflowStore.getState().replaceActivity('act-2', { ...replacement, id: 'act-2' })
 
       const ids = (useWorkflowStore.getState().currentWorkflow?.workflow.activities ?? []).map((a) => a.id)
@@ -665,7 +665,7 @@ describe('useWorkflowStore', () => {
 
     it('does nothing when the workflow is not loaded', () => {
       useWorkflowStore.setState({ currentWorkflow: null })
-      const scriptActivity = createScriptActivity({ id: 'tmp', name: 'Script', language: 'python', code: '' })
+      const scriptActivity = createPythonScriptActivity({ id: 'tmp', name: 'Script', code: '' })
       useWorkflowStore.getState().replaceActivity('any-id', scriptActivity)
       expect(useWorkflowStore.getState().currentWorkflow).toBeNull()
     })
@@ -686,10 +686,9 @@ describe('useWorkflowStore', () => {
         ] as EdgeConnection[],
       })
 
-      const scriptActivity = createScriptActivity({
+      const scriptActivity = createPythonScriptActivity({
         id: 'tmp',
         name: 'Script Node',
-        language: 'python',
         code: 'print(1)',
       })
       useWorkflowStore.getState().replaceActivity('cond-1', { ...scriptActivity, id: 'cond-1' })
@@ -714,10 +713,9 @@ describe('useWorkflowStore', () => {
         ] as EdgeConnection[],
       })
 
-      const scriptActivity = createScriptActivity({
+      const scriptActivity = createPythonScriptActivity({
         id: 'tmp',
         name: 'Script Node',
-        language: 'python',
         code: 'print(1)',
       })
       useWorkflowStore.getState().replaceActivity('appr-1', { ...scriptActivity, id: 'appr-1' })
@@ -742,10 +740,9 @@ describe('useWorkflowStore', () => {
         ] as EdgeConnection[],
       })
 
-      const scriptActivity = createScriptActivity({
+      const scriptActivity = createPythonScriptActivity({
         id: 'tmp',
         name: 'Script Node',
-        language: 'python',
         code: 'print(1)',
       })
       useWorkflowStore.getState().replaceActivity('loop-1', { ...scriptActivity, id: 'loop-1' })
@@ -755,7 +752,7 @@ describe('useWorkflowStore', () => {
     })
 
     it('preserves compatible edges when replacing a node with the same type', () => {
-      const act1 = createScriptActivity({ id: 'act-1', name: 'Script', language: 'python', code: 'print(1)' })
+      const act1 = createPythonScriptActivity({ id: 'act-1', name: 'Script', code: 'print(1)' })
       useWorkflowStore.getState().addActivity(act1)
       useWorkflowStore.setState({
         edges: [
@@ -764,7 +761,7 @@ describe('useWorkflowStore', () => {
         ] as EdgeConnection[],
       })
 
-      const replacement = createScriptActivity({ id: 'tmp', name: 'REST API', language: 'python', code: 'print(2)' })
+      const replacement = createPythonScriptActivity({ id: 'tmp', name: 'REST API', code: 'print(2)' })
       useWorkflowStore.getState().replaceActivity('act-1', { ...replacement, id: 'act-1' })
 
       const edges = useWorkflowStore.getState().edges
@@ -772,11 +769,11 @@ describe('useWorkflowStore', () => {
     })
 
     it('bumps workflowVersion and preserves undo history on replace', () => {
-      const act1 = createScriptActivity({ id: 'act-1', name: 'Script', language: 'python', code: 'print(1)' })
+      const act1 = createPythonScriptActivity({ id: 'act-1', name: 'Script', code: 'print(1)' })
       useWorkflowStore.getState().addActivity(act1)
       const versionBefore = useWorkflowStore.getState().workflowVersion
 
-      const replacement = createScriptActivity({ id: 'tmp', name: 'REST API', language: 'python', code: 'print(2)' })
+      const replacement = createPythonScriptActivity({ id: 'tmp', name: 'REST API', code: 'print(2)' })
       useWorkflowStore.getState().replaceActivity('act-1', { ...replacement, id: 'act-1' })
 
       const state = useWorkflowStore.getState()
@@ -960,9 +957,7 @@ describe('useWorkflowStore', () => {
       const workflow = makeWorkflow('Test')
       useWorkflowStore.getState().loadWorkflowWithEdges(workflow, [])
 
-      useWorkflowStore
-        .getState()
-        .addActivity(createScriptActivity({ id: 'a1', name: 'Step 1', language: 'python', code: 'pass' }))
+      useWorkflowStore.getState().addActivity(createPythonScriptActivity({ id: 'a1', name: 'Step 1', code: 'pass' }))
       completeTemporalBatch()
       expect(useWorkflowStore.getState().currentWorkflow?.workflow.activities).toHaveLength(1)
 
@@ -974,9 +969,7 @@ describe('useWorkflowStore', () => {
       const workflow = makeWorkflow('Test')
       useWorkflowStore.getState().loadWorkflowWithEdges(workflow, [])
 
-      useWorkflowStore
-        .getState()
-        .addActivity(createScriptActivity({ id: 'a1', name: 'Step 1', language: 'python', code: 'pass' }))
+      useWorkflowStore.getState().addActivity(createPythonScriptActivity({ id: 'a1', name: 'Step 1', code: 'pass' }))
       completeTemporalBatch()
 
       useWorkflowStore.temporal.getState().undo()
@@ -990,9 +983,7 @@ describe('useWorkflowStore', () => {
       const workflow = makeWorkflow('Test')
       useWorkflowStore.getState().loadWorkflowWithEdges(workflow, [])
 
-      useWorkflowStore
-        .getState()
-        .addActivity(createScriptActivity({ id: 'a1', name: 'Step 1', language: 'python', code: 'pass' }))
+      useWorkflowStore.getState().addActivity(createPythonScriptActivity({ id: 'a1', name: 'Step 1', code: 'pass' }))
       completeTemporalBatch()
 
       // Simulate useNodePositioning placing the node (skipTracking keeps it out of undo stack)
@@ -1022,9 +1013,7 @@ describe('useWorkflowStore', () => {
       // Simulate CanvasControls Layout click (markDirty: true → clearNodePositions)
       useWorkflowStore.getState().clearNodePositions()
 
-      useWorkflowStore
-        .getState()
-        .addActivity(createScriptActivity({ id: 'a1', name: 'Step 1', language: 'python', code: 'pass' }))
+      useWorkflowStore.getState().addActivity(createPythonScriptActivity({ id: 'a1', name: 'Step 1', code: 'pass' }))
       completeTemporalBatch()
 
       // wrappedUndo sets _preserveHistoryOnLayout so clearUndoHistory skips temporal.clear()
@@ -1072,9 +1061,7 @@ describe('useWorkflowStore', () => {
       useWorkflowStore.getState().loadWorkflowWithEdges(makeWorkflow('Test'), [])
 
       useWorkflowStore.getState().markDirty()
-      useWorkflowStore
-        .getState()
-        .addActivity(createScriptActivity({ id: 'a1', name: 'Step 1', language: 'python', code: 'pass' }))
+      useWorkflowStore.getState().addActivity(createPythonScriptActivity({ id: 'a1', name: 'Step 1', code: 'pass' }))
       completeTemporalBatch()
 
       wrappedUndo()
@@ -1176,7 +1163,7 @@ describe('useWorkflowStore', () => {
       useWorkflowStore.getState().loadWorkflowWithEdges(original, [])
 
       const replacement = makeWorkflow('Replacement', [
-        createScriptActivity({ id: 'a1', name: 'Step', language: 'python', code: 'pass' }),
+        createPythonScriptActivity({ id: 'a1', name: 'Step', code: 'pass' }),
       ])
       const newEdges: EdgeConnection[] = [
         { id: 'e1', source: 'a', target: 'b', sourceHandle: 'source', targetHandle: 'target' },

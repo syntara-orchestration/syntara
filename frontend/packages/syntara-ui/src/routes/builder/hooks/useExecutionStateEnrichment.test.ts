@@ -29,7 +29,7 @@ vi.mock('../../../stores/useWorkflowStore', () => ({
 }))
 
 const baseNode = { id: 'task-1', position: { x: 0, y: 0 }, data: {} } as NodeType
-const sampleActivity = { id: 'task-1', type: 'script', name: 'Task', parameters: {} }
+const sampleActivity = { id: 'task-1', type: 'script_python', name: 'Task', parameters: {} }
 
 const sampleWorkflow = {
   workflow: { activities: [sampleActivity] },

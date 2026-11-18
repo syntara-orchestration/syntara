@@ -125,9 +125,8 @@ describe('StepRawDataView Component', () => {
             id: 'nested-task',
             name: 'Nested Task',
             task: {
-              executor: 'script',
+              executor: 'script_python',
               parameters: {
-                language: 'python',
                 code: 'print("nested")',
               },
             },
@@ -142,7 +141,7 @@ describe('StepRawDataView Component', () => {
     const preElement = screen.getByText(/Complex Condition/)
     expect(preElement.textContent).toContain('"condition": "input.value > 10"')
     expect(preElement.textContent).toContain('"then"')
-    expect(preElement.textContent).toContain('"executor": "script"')
+    expect(preElement.textContent).toContain('"executor": "script_python"')
   })
 
   it('applies correct styling classes', () => {
