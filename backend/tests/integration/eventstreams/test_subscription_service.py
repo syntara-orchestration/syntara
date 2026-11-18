@@ -17,12 +17,18 @@ from sqlalchemy.exc import IntegrityError
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from syntara.audit.dispatcher import AuditEventDispatcher
+from syntara.audit.outbox.models import AuditOutboxRecord
 from syntara.authz.models import Project
 from syntara.core.exceptions import SafeValueError
 from syntara.core.models import User
 from syntara.credentials.models.credential import Credential
 from syntara.credentials.models.credential_type import CredentialType
 from syntara.eventstreams.adapters.kafka_initial_position import KafkaPartitionInitialPosition
+from syntara.eventstreams.audit.subscription_lifecycle import (
+    EventSubscriptionStateChangedEvent,
+    EventSubscriptionStateChangedHandler,
+)
 from syntara.eventstreams.exceptions import EventSubscriptionInUseError
 from syntara.eventstreams.models.source import EventSubscriptionSource
 from syntara.eventstreams.models.subscription import EventSubscription
@@ -158,6 +164,53 @@ async def _sources(session: AsyncSession, subscription_id: UUID) -> list[EventSu
 # ---------------------------------------------------------------------------
 # Publication create / update / identity preservation
 # ---------------------------------------------------------------------------
+
+
+async def test_subscription_transitions_stage_audit_events_in_publication_transaction(
+    test_db_session: AsyncSession,
+    test_user: User,
+    workflow: Workflow,
+    kafka_integration: Integration,
+    runtime_credential: Credential,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(AuditEventDispatcher, "_registry", {})
+    AuditEventDispatcher.register({EventSubscriptionStateChangedEvent: EventSubscriptionStateChangedHandler()})
+    service = EventSubscriptionService(test_db_session, test_user)
+    version = await _make_version(
+        test_db_session,
+        workflow,
+        test_user,
+        [_trigger_node(node_id="incoming", integration_id=kafka_integration.id, credential_id=runtime_credential.id)],
+        version=1,
+    )
+
+    created = await service.sync_from_published_definition(workflow, version, enabled=True)
+    await service.sync_from_published_definition(workflow, version, enabled=True)
+    await service.sync_from_published_definition(workflow, enabled=False)
+    await service.sync_from_published_definition(workflow, enabled=False)
+    await service.sync_from_published_definition(workflow, version, enabled=True)
+    empty_version = await _make_version(test_db_session, workflow, test_user, [], version=2)
+    await service.sync_from_published_definition(workflow, empty_version, enabled=True)
+
+    outbox = await test_db_session.exec(
+        select(AuditOutboxRecord).where(
+            col(AuditOutboxRecord.event_payload)["workflow_id"].as_string() == str(workflow.id),
+            col(AuditOutboxRecord.event_payload)["source_component"].as_string() == "syntara.eventstreams.subscription",
+        )
+    )
+    payloads = [record.event_payload for record in outbox.all()]
+    assert sorted(payload["event_action"] for payload in payloads) == [
+        "event_subscription_created",
+        "event_subscription_disabled",
+        "event_subscription_enabled",
+        "event_subscription_retired",
+    ]
+    for payload in payloads:
+        assert payload["actor_id"] == str(test_user.id)
+        data = payload["structured_data"]
+        assert data["subscription_id"] == str(created.created[0].subscription_id)
+        assert {"topic", "configuration", "runtime_credential_id"}.isdisjoint(data)
 
 
 async def test_publish_creates_subscription_and_source(

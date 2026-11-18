@@ -14,7 +14,9 @@ from temporalio.client import WorkflowExecutionStatus, WorkflowQueryRejectedErro
 from temporalio.exceptions import ApplicationError
 from temporalio.service import RPCError, RPCStatusCode
 
+from syntara.audit.dispatcher import AuditEventDispatcher
 from syntara.core.exceptions import SafeValueError
+from syntara.workflows.audit.kafka_publish import KafkaPublishAcknowledgedEvent, KafkaPublishAcknowledgedHandler
 from syntara.workflows.models.activity_execution import ActivityExecution, ActivityStatus
 from syntara.workflows.models.execution import Execution, ExecutionStatus
 from syntara.workflows.workflow_engine.activities.internal import register_activity_monitoring
@@ -1792,7 +1794,7 @@ class TestActivitySyncTerminalCleanup:
         activity.updated_at = None
         return activity
 
-    def _mock_session_with_activities(self, activities: list[Mock]) -> Mock:
+    def _mock_session_with_activities(self, activities: list[Mock], execution: Mock | None = None) -> Mock:
         """Create a mock session that returns the given activities and a mock execution."""
         from syntara.workflows.models.execution import Execution
 
@@ -1801,7 +1803,7 @@ class TestActivitySyncTerminalCleanup:
         mock_activity_result.all.return_value = activities
 
         # Mock for the execution query (used to update last_processed_event_id)
-        mock_execution = Mock(spec=Execution)
+        mock_execution = execution if execution is not None else Mock(spec=Execution)
         mock_execution.id = self.execution_id
         mock_execution.last_processed_event_id = 0
         mock_execution_result = Mock()
@@ -1841,6 +1843,46 @@ class TestActivitySyncTerminalCleanup:
 
         handle.execute_update = AsyncMock(side_effect=mock_update)
         return handle
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("status", [ActivityStatus.COMPLETED, ActivityStatus.RETRYING, ActivityStatus.FAILED])
+    async def test_audits_only_acknowledged_kafka_publish(self, status: ActivityStatus) -> None:
+        activity = self._create_mock_activity_execution(activity_name="publish-node")
+        activity.id = uuid4()
+        activity.node_type = NodeType.KAFKA_PUBLISH
+        execution = Mock(spec=Execution, workflow_id=uuid4(), created_by=uuid4())
+        session = self._mock_session_with_activities([activity], execution=execution)
+        metadata = create_test_metadata(
+            execution_id=self.execution_id,
+            activity_index_map={"publish-node": 0},
+            pending_activity_updates={
+                10: {
+                    "activity_id": "publish-node",
+                    "status": status,
+                    "started_at": None,
+                    "completed_at": datetime.now(UTC),
+                    "error_details": None,
+                    "retry_count": 1,
+                },
+            },
+        )
+        handle = self._create_mock_handle(output_data={"topic": "private-topic", "offset": "123"})
+
+        with patch.object(AuditEventDispatcher, "dispatch") as dispatch:
+            await self.service._sync_activities_to_db(metadata, handle)
+
+        events = [call for call in dispatch.call_args_list if isinstance(call.args[0], KafkaPublishAcknowledgedEvent)]
+        if status != ActivityStatus.COMPLETED:
+            assert not events
+            return
+        assert len(events) == 1
+        assert events[0].kwargs["session"] is session.sync_session
+        event = KafkaPublishAcknowledgedHandler().handle(events[0].args[0])
+        assert event.execution_id == self.execution_id
+        assert event.workflow_id == execution.workflow_id
+        assert event.activity_id == "publish-node"
+        assert event.actor_id == execution.created_by
+        assert {"topic", "offset", "output_data"}.isdisjoint(event.structured_data.model_dump())
 
     @pytest.mark.asyncio
     async def test_completed_activity_cleared_from_pending(self) -> None:

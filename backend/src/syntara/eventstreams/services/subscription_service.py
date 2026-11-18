@@ -15,7 +15,7 @@ release references only after retained evidence and recovery dependencies permit
 """
 
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar, Literal
 from uuid import UUID
 
 import structlog
@@ -25,6 +25,7 @@ from sqlalchemy.sql.elements import ColumnElement
 from sqlmodel import SQLModel, col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from syntara.audit.dispatcher import AuditEventDispatcher
 from syntara.core.exceptions import SafeValueError
 from syntara.core.models import User
 from syntara.core.models.installation import Installation
@@ -35,6 +36,7 @@ from syntara.eventstreams.adapters.source_projection import (
     source_address_identity,
 )
 from syntara.eventstreams.adapters.subscribe_parameters import validate_event_subscribe_parameters
+from syntara.eventstreams.audit.subscription_lifecycle import EventSubscriptionStateChangedEvent
 from syntara.eventstreams.exceptions import EventStreamError, EventSubscriptionInUseError
 from syntara.eventstreams.models.source import EventSubscriptionSource
 from syntara.eventstreams.models.subscription import EventSubscription
@@ -165,6 +167,7 @@ class EventSubscriptionService(BaseService):
                     sub.configuration_revision += 1
                     sub.updated_by = self.user.id
                     changeset.disabled.append(sub.id)
+                    self._audit_state_change(workflow.id, sub.id, sub.configuration_revision, "disabled")
             await self.session.flush()
             return changeset
 
@@ -188,19 +191,47 @@ class EventSubscriptionService(BaseService):
                     workflow, version, node_id, integration, parameters, deployment_id
                 )
                 changeset.created.append(snapshot)
+                self._audit_state_change(
+                    workflow.id, snapshot.subscription_id, snapshot.configuration_revision, "created"
+                )
             else:
+                was_inactive = not existing_sub.desired_enabled or existing_sub.paused
                 snapshot = await self._update_subscription(
                     existing_sub, version, integration, parameters, deployment_id
                 )
                 changeset.updated.append(snapshot)
+                if was_inactive:
+                    self._audit_state_change(
+                        workflow.id, snapshot.subscription_id, snapshot.configuration_revision, "enabled"
+                    )
 
         # Any non-retired subscription whose trigger node is gone is retired.
         for stale_sub in existing_by_node.values():
             await self._retire_subscription(stale_sub)
             changeset.retired.append(stale_sub.id)
+            self._audit_state_change(workflow.id, stale_sub.id, stale_sub.configuration_revision, "retired")
 
         await self.session.flush()
         return changeset
+
+    def _audit_state_change(
+        self,
+        workflow_id: UUID,
+        subscription_id: UUID,
+        configuration_revision: int,
+        action: Literal["created", "enabled", "disabled", "retired"],
+    ) -> None:
+        """Stage audit evidence in the same transaction as the desired state."""
+        AuditEventDispatcher.dispatch(
+            EventSubscriptionStateChangedEvent(
+                workflow_id=workflow_id,
+                subscription_id=subscription_id,
+                actor_id=self.user.id,
+                action=action,
+                configuration_revision=configuration_revision,
+            ),
+            session=self.session.sync_session,
+        )
 
     async def _create_subscription(
         self,

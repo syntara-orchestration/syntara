@@ -8,10 +8,14 @@ from typing import Any
 
 import structlog
 from sqlmodel import select
+from sqlmodel.ext.asyncio.session import AsyncSession
 from temporalio.client import WorkflowHandle
 
-from syntara.workflows.models.activity_execution import ActivityExecution
+from syntara.audit.dispatcher import AuditEventDispatcher
+from syntara.workflows.audit.kafka_publish import KafkaPublishAcknowledgedEvent
+from syntara.workflows.models.activity_execution import ActivityExecution, ActivityStatus
 from syntara.workflows.models.execution import Execution
+from syntara.workflows.workflow_engine.models.workflow_definition import NodeType
 from syntara.workflows.workflow_engine.services.activity_sync_types import ExecutionMonitorMetadata
 
 logger = structlog.stdlib.get_logger(__name__)
@@ -77,6 +81,7 @@ class ActivityExecutionSynchronizer:
                 execution = exec_result.one_or_none()
                 if execution:
                     execution.last_processed_event_id = metadata.last_processed_event_id
+                    self._audit_kafka_publish_acknowledgements(session, execution, updated_activities)
 
                 new_execution_status, approval_pending_changed = self.host._update_execution_flags(
                     execution, updated_activities, list(existing_activities.values())
@@ -106,3 +111,27 @@ class ActivityExecutionSynchronizer:
                     "Error syncing activities to database for execution", execution_id=metadata.execution_id
                 )
                 raise
+
+    @staticmethod
+    def _audit_kafka_publish_acknowledgements(
+        session: AsyncSession,
+        execution: Execution,
+        updated_activities: list[tuple[ActivityExecution, dict[str, Any]]],
+    ) -> None:
+        """Stage the audit event with the completed activity's database update."""
+        for activity, old_values in updated_activities:
+            if (
+                activity.node_type == NodeType.KAFKA_PUBLISH
+                and activity.status == ActivityStatus.COMPLETED
+                and old_values["status"] != ActivityStatus.COMPLETED
+            ):
+                AuditEventDispatcher.dispatch(
+                    KafkaPublishAcknowledgedEvent(
+                        workflow_id=execution.workflow_id,
+                        execution_id=execution.id,
+                        activity_execution_id=activity.id,
+                        activity_id=activity.activity_name,
+                        execution_principal_id=execution.created_by,
+                    ),
+                    session=session.sync_session,
+                )
