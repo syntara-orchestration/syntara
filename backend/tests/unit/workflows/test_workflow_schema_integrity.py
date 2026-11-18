@@ -211,9 +211,9 @@ class TestWorkflowSchemaReferenceIntegrity:
                 direct_ref = self._get_ref(properties.get("settings"))
                 if direct_ref:
                     return direct_ref
-            children = obj.values()
+            children = list(obj.values())
         elif isinstance(obj, list):
-            children = obj
+            children = list(obj)
         else:
             return None
 
