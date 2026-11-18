@@ -208,7 +208,7 @@ def _extend_with_defaults(
 
         yield from validate_properties(validator, properties, instance, schema)
 
-    return validators.extend(validator_class, {"properties": set_defaults})  # type: ignore[no-any-return]
+    return validators.extend(validator_class, {"properties": set_defaults})  # type: ignore[no-untyped-call,no-any-return,unused-ignore]
 
 
 _DefaultFillingDraft7Validator: type[jsonschema.protocols.Validator] = _extend_with_defaults(
