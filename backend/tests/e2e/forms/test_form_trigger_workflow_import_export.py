@@ -16,7 +16,12 @@ from syntara_api_client.models.execution_status import ExecutionStatus
 from syntara_api_client.models.validation_result import ValidationResult
 from syntara_api_client.models.workflow_read_with_version import WorkflowReadWithVersion
 
-from ._helpers import create_workflow, export_workflow_definition, get_workflow_definition
+from ._helpers import (
+    create_workflow,
+    export_workflow_definition,
+    get_workflow_definition,
+    with_generated_form_response_schema,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -203,7 +208,8 @@ def test_form_trigger_workflow_export_import_round_trip_executes(
     assert source.has_validation_issues is False
 
     exported_definition = export_workflow_definition(syntara_api, UUID(str(source.id)))
-    assert exported_definition["triggers"] == source_definition["triggers"]
+    expected_source_definition = with_generated_form_response_schema(source_definition, node_type="form_trigger")
+    assert exported_definition["triggers"] == expected_source_definition["triggers"]
     assert exported_definition["nodes"] == source_definition["nodes"]
     assert exported_definition["edges"] == source_definition["edges"]
 
@@ -366,6 +372,7 @@ def test_import_handcrafted_form_trigger_workflow_executes(
     """Import and execute a hand-authored Form Trigger workflow without exporting a source."""
     name = unique_name("e2e-form-trigger-handcrafted")
     definition = _form_trigger_workflow_definition(name)
+    expected_definition = with_generated_form_response_schema(definition, node_type="form_trigger")
     workflow = create_workflow(
         syntara_api,
         cleanup_workflows,
@@ -378,7 +385,7 @@ def test_import_handcrafted_form_trigger_workflow_executes(
     assert workflow.has_validation_issues is False
 
     persisted_definition = get_workflow_definition(syntara_api, UUID(str(workflow.id)))
-    assert persisted_definition == definition
+    assert persisted_definition == expected_definition
     assert len(persisted_definition["triggers"]) == 1
     assert persisted_definition["triggers"][0]["type"] == "form_trigger"
     assert [node["id"] for node in persisted_definition["nodes"]] == ["consume"]
