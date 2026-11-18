@@ -17,7 +17,6 @@ export type TriggerFormData = {
   message?: string
   submit_label?: string
   success_message?: string
-  css_override?: string
 }
 
 export type ActionFormData = {

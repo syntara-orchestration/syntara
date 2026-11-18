@@ -2,7 +2,7 @@
  * Form step — SynDynamicForm responder rendering gaps
  *
  * - UI-4: Multi-field required validation in the execution detail panel
- * - UI-7: Custom submit label, success message, and CSS overrides on the rendered form
+ * - UI-7: Custom submit label and success message on the rendered form
  * - UI-8: Run published workflow from the Workflows list (no pre-run modal), then respond in panel
  */
 import { test, expect, toAppUrl } from '../fixtures'
@@ -21,9 +21,6 @@ import { apiRequest } from '../utils/api'
 const CUSTOM_SUBMIT_LABEL = 'Send form step'
 const CUSTOM_SUCCESS_MESSAGE = 'Form step saved for this run.'
 const CUSTOM_FORM_MESSAGE = 'Please complete the form step fields below.'
-/** Backend publish validation rejects attribute selectors in css_override. */
-const FORM_STEP_CSS_OVERRIDE = '.form-step-response-form label { color: rgb(170, 0, 0) !important; }'
-
 test.describe('Form step — SynDynamicForm rendering', { tag: '@pr-check' }, () => {
   test('UI-4: blocks submit until required fields are filled across multiple field types', async ({ app }) => {
     const created = await createPendingFormStepWorkflow(app, {
@@ -55,7 +52,7 @@ test.describe('Form step — SynDynamicForm rendering', { tag: '@pr-check' }, ()
     }
   })
 
-  test('UI-7: shows customized submit label, success message, and CSS overrides', async ({ app }) => {
+  test('UI-7: shows customized submit label and success message', async ({ app }) => {
     const created = await createPendingFormStepWorkflow(app, {
       namePrefix: 'e2e-form-customization',
       parameters: {
@@ -63,7 +60,6 @@ test.describe('Form step — SynDynamicForm rendering', { tag: '@pr-check' }, ()
         form_definition: MULTI_FIELD_FORM_DEFINITION,
         submit_label: CUSTOM_SUBMIT_LABEL,
         success_message: CUSTOM_SUCCESS_MESSAGE,
-        css_override: FORM_STEP_CSS_OVERRIDE,
       },
     })
 
@@ -73,8 +69,6 @@ test.describe('Form step — SynDynamicForm rendering', { tag: '@pr-check' }, ()
       })
 
       await expect(app.getByRole('button', { name: CUSTOM_SUBMIT_LABEL })).toBeVisible()
-
-      await expect(app.getByText('Summary', { exact: true })).toHaveCSS('color', 'rgb(170, 0, 0)')
 
       await app.getByRole('textbox', { name: 'Summary' }).fill('Customization probe')
       await app.getByRole('button', { name: CUSTOM_SUBMIT_LABEL }).click()

@@ -14,7 +14,6 @@ import { useWorkflowStore } from '../../../stores/useWorkflowStore'
 import { detachPromise } from '../../../utils/detachPromise'
 import { useEffectiveFormDefinitionServerValidationErrors } from '../hooks/useEffectiveFormDefinitionServerValidationErrors'
 import { StepEditorAutoSubmitContext, useRegisterAutoSubmit } from '../hooks/useStepEditorAutoSubmit'
-import { useWorkflowEngineDefaults } from '../hooks/useWorkflowEngineDefaults'
 import { useIsVersionView } from '../VersionViewContext'
 
 import { ApproverMultiSelect } from './ApproverMultiSelect'
@@ -65,7 +64,6 @@ export type FormPromptFormSubmitData = {
   fallback_decision?: 'submit' | 'fallback' | null
   submit_label?: string | null
   success_message?: string | null
-  css_override?: string | null
   settings?: NodeSettings
 }
 
@@ -189,7 +187,6 @@ function FormPromptFormFields({
   const formDefinition = useWatch({ control, name: 'form_definition' })
   const message = useWatch({ control, name: 'message' })
   const submitLabel = useWatch({ control, name: 'submit_label' })
-  const cssOverrideSource = useWatch({ control, name: 'css_override' })
   const builderCommitRef = use(FormFieldBuilderCommitRefContext)
   const storeProjectId = useWorkflowStore((state) => state.projectId)
   const effectiveProjectId = projectId ?? storeProjectId
@@ -324,7 +321,6 @@ function FormPromptFormFields({
           registerCommit={registerBuilderCommit}
           isDisabled={isVersionView}
           previewSubmitLabel={submitLabel}
-          previewCssOverrideSource={cssOverrideSource}
           previewDescription={message}
         />
       </StackItem>
@@ -354,7 +350,6 @@ function FormPromptFormFields({
         formDefinition={resolvedDefinition}
         message={message}
         submitLabel={submitLabel}
-        cssOverrideSource={cssOverrideSource}
       />
     </>
   )
@@ -362,9 +357,7 @@ function FormPromptFormFields({
 
 export function FormPromptNodeForm(props: Readonly<FormPromptNodeFormProps>) {
   const { onSubmit, initialData, onHeaderContentChange, projectId, serverValidationErrors } = props
-  const { defaults } = useWorkflowEngineDefaults()
   const defaultValues = getFormPromptNodeFormDefaultValues(initialData)
-  const systemContinueOnFailure = defaults?.continueOnFailure ?? null
   const builderHandlersRef = useRef<FormFieldBuilderCommitHandlers | null>(null)
 
   const form = useSynForm({
@@ -397,9 +390,9 @@ export function FormPromptNodeForm(props: Readonly<FormPromptNodeFormProps>) {
 
   const handleSubmit = useCallback(
     (data: FormPromptFormData) => {
-      onSubmit(mapFormPromptFormDataToSubmit(data, systemContinueOnFailure))
+      onSubmit(mapFormPromptFormDataToSubmit(data))
     },
-    [onSubmit, systemContinueOnFailure]
+    [onSubmit]
   )
 
   const submitWithFlush = useCallback(

@@ -7,7 +7,6 @@ export type FormTriggerActivityParameterInput = {
   message?: string | null
   submit_label?: string | null
   success_message?: string | null
-  css_override?: string | null
 }
 
 function appendOptionalString(target: Record<string, unknown>, key: string, value: string | null | undefined): void {
@@ -26,6 +25,5 @@ export function buildFormTriggerActivityParameters(input: FormTriggerActivityPar
   appendOptionalString(result, 'message', input.message)
   appendOptionalString(result, 'submit_label', input.submit_label)
   appendOptionalString(result, 'success_message', input.success_message)
-  appendOptionalString(result, 'css_override', input.css_override)
   return result
 }

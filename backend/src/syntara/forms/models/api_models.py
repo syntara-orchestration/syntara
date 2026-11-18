@@ -116,9 +116,6 @@ class FormPromptCreateRequest(SQLModel):
     success_message: str | None = Field(
         default=None, max_length=FieldLimits.FORM_SUCCESS_MESSAGE_MAX_LENGTH, description="Success message after submit"
     )
-    css_override: str | None = Field(
-        default=None, max_length=FieldLimits.FORM_CSS_OVERRIDE_MAX_LENGTH, description="Custom CSS for form rendering"
-    )
     # FK validation: UUIDs must exist in users/groups tables (enforced at service layer)
     responder_user_ids: list[UUID] | None = Field(
         None,

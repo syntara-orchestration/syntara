@@ -23,7 +23,6 @@ type TriggerLike = {
     message?: string | null
     submit_label?: string | null
     success_message?: string | null
-    css_override?: string | null
   }
 }
 

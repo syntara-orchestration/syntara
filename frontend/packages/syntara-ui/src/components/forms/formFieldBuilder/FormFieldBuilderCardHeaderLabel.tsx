@@ -12,7 +12,7 @@ type FormFieldBuilderCardHeaderLabelProps = {
   idPrefix: string
   fieldType: FormDefinition['fields'][number]['type']
   isDisabled?: boolean
-  /** Called after the label value changes so the parent can sync generated value names. */
+  /** Called before the label updates in react-hook-form so the parent can sync generated value names. */
   onLabelChange: (nextLabel: string) => void
 }
 
@@ -45,8 +45,8 @@ export function FormFieldBuilderCardHeaderLabel({
           validated={fieldState.error ? 'error' : 'default'}
           isDisabled={isDisabled}
           onChange={(_event, value) => {
-            field.onChange(value)
             onLabelChange(value)
+            field.onChange(value)
           }}
           onBlur={field.onBlur}
         />

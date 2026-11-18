@@ -108,7 +108,13 @@ export function getAddStepPanelColor(registryStepId: string): string | undefined
   if (!registryStepId) return undefined
   if (ADD_PANEL_TRIGGER_IDS.has(registryStepId)) return undefined
   if (ADD_PANEL_LOGIC_IDS.has(registryStepId)) return STEP_TYPE_COLORS.logic
-  if (registryStepId === RegistryStepId.APPROVAL) return STEP_TYPE_COLORS.approval
+  if (
+    registryStepId === RegistryStepId.HUMAN_TASKS ||
+    registryStepId === RegistryStepId.APPROVAL ||
+    registryStepId === RegistryStepId.FORM_PROMPT
+  ) {
+    return STEP_TYPE_COLORS.approval
+  }
   if (ADD_PANEL_ACTION_IDS.has(registryStepId)) return STEP_TYPE_COLORS.actionScript
   if (registryStepId === RegistryStepId.AGENT) return STEP_TYPE_COLORS.actionAgentic
   // AAP category and all AAP subtypes use the same color

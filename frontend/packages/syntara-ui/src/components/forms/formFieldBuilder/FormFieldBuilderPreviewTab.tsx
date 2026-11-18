@@ -13,17 +13,12 @@ import { SynFormDefinitionPreview } from '../SynFormDefinitionPreview'
 
 type FormFieldBuilderPreviewTabProps = Readonly<{
   submitLabel?: string | null
-  cssOverrideSource?: string | null
   description?: string | null
 }>
 
 const FORM_BUILDER_PREVIEW_FALLBACK_DESCRIPTION = 'Preview of the configured form.'
 
-export function FormFieldBuilderPreviewTab({
-  submitLabel,
-  cssOverrideSource,
-  description,
-}: FormFieldBuilderPreviewTabProps) {
+export function FormFieldBuilderPreviewTab({ submitLabel, description }: FormFieldBuilderPreviewTabProps) {
   const { control } = useFormContext<FormDefinition>()
   const fields = useWatch({ control, name: 'fields' })
 
@@ -57,12 +52,7 @@ export function FormFieldBuilderPreviewTab({
         </StackItem>
       ) : null}
       <StackItem>
-        <SynFormDefinitionPreview
-          definition={parsed.data}
-          description={previewDescription}
-          submitLabel={submitLabel}
-          cssOverrideSource={cssOverrideSource}
-        />
+        <SynFormDefinitionPreview definition={parsed.data} description={previewDescription} submitLabel={submitLabel} />
       </StackItem>
     </Stack>
   )

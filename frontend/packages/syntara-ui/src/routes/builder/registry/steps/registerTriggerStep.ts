@@ -91,7 +91,6 @@ export default function registerTriggerStep() {
                 message: data.message,
                 submit_label: data.submit_label,
                 success_message: data.success_message,
-                css_override: data.css_override,
               })
             )
             useWorkflowStore.getState().addTrigger(trigger)

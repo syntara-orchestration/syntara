@@ -256,14 +256,6 @@ def test_non_static_options_report_schema_findings(
     assert all(finding.category == ValidationCategory.schema_violation for finding in findings)
 
 
-def test_unsafe_css_is_reported_on_css_override() -> None:
-    finding = _single_finding(_parameters(_text_field(), css_override=".form { background: url(x); }"))
-
-    assert finding.category == ValidationCategory.form_trigger_configuration
-    assert finding.field_path == "parameters.css_override"
-    assert "url()" in finding.message
-
-
 def test_template_expression_is_reported_by_save_time_workflow_validation() -> None:
     finding = _single_finding(_parameters(_text_field(label="${upstream.label}")))
 

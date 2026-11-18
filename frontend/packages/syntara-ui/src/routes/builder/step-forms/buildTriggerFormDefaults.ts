@@ -20,7 +20,6 @@ const STATIC_TRIGGER_DEFAULTS: Omit<TriggerFormData, 'timezone' | 'form_definiti
   message: '',
   submit_label: '',
   success_message: '',
-  css_override: '',
 }
 
 function baseTriggerFormValues(initialData?: Partial<TriggerFormData>): TriggerFormData {

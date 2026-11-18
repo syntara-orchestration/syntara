@@ -1498,11 +1498,6 @@ export interface components {
        * @description Shown after submission.
        */
       success_message?: string | null
-      /**
-       * Css Override
-       * @description Custom CSS applied to the form view.
-       */
-      css_override?: string | null
     }
     /**
      * FormPromptNode
