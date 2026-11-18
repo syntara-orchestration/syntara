@@ -1,4 +1,5 @@
 import { workflowFilterFindings, workflowFilterProblem } from './utils/workflowFilterFindings'
+import { projectKafkaSources } from './utils/kafkaSubscriptionSources'
 import { http, HttpResponse } from 'msw'
 import { v4 as uuidv4 } from 'uuid'
 import { mockDate } from './resources/mockDates'
@@ -1165,7 +1166,7 @@ export const handlers = [
         { status: 404 }
       )
     }
-    return HttpResponse.json(body)
+    return HttpResponse.json({ ...body, kafka_subscription_sources: body.kafka_subscription_sources ?? [] })
   }),
   http.patch('/api/v1/workflows/:workflowId', async (request) => {
     const workflowId = request.params.workflowId
@@ -1453,6 +1454,7 @@ export const handlers = [
       name?: string | null
       change_description?: string | null
       expected_version?: number | null
+      workflow_definition?: Record<string, unknown>
     }
 
     const currentVersionNum = workflow.version?.version ?? workflow.current_version ?? 1
@@ -1479,7 +1481,9 @@ export const handlers = [
         { status: 400 }
       )
     }
-    if (!workflow.version || workflow.version.version !== version) {
+    const versions = getOrCreateVersionStore(String(workflowId), workflow)
+    const savedVersion = versions.find((item) => item.version === version)
+    if (!savedVersion) {
       return HttpResponse.json(
         {
           type: 'https://api.example.com/errors/version-not-found',
@@ -1491,21 +1495,55 @@ export const handlers = [
         { status: 404 }
       )
     }
+    const definition = body.workflow_definition ?? savedVersion.workflow_definition
+    let sources: WorkflowAPI.components['schemas']['KafkaSubscriptionSourceRead'][]
+    try {
+      sources = projectKafkaSources(String(workflowId), definition, workflow.kafka_subscription_sources ?? [])
+    } catch (error) {
+      return HttpResponse.json(
+        { detail: error instanceof Error ? error.message : 'Invalid consumer group', code: 'VALIDATION_ERROR' },
+        { status: 400 }
+      )
+    }
     const mutableWorkflow = workflow as MutableWorkflowWithVersion
-    const versionObj = mutableWorkflow.version as Record<string, unknown>
+    let publishedVersion = savedVersion
+    if (body.workflow_definition) {
+      const nextVersion = Math.max(...versions.map((item) => item.version)) + 1
+      publishedVersion = {
+        ...savedVersion,
+        id: uuidv4(),
+        version: nextVersion,
+        workflow_definition: body.workflow_definition,
+      }
+      versions.push(publishedVersion)
+      mutableWorkflow.current_version = nextVersion
+      mutableWorkflow.version = {
+        ...publishedVersion,
+        schema_version: '2.0.0',
+        workflow_definition: body.workflow_definition,
+      }
+    }
+    mutableWorkflow.kafka_subscription_sources = sources
+    const versionObj = publishedVersion
     versionObj.name = body?.name ?? null
     versionObj.change_description = body?.change_description ?? null
     versionObj.status = WorkflowVersionStatusEnum.PUBLISHED
-    mutableWorkflow.published_version_id = (versionObj.id as string) ?? null
-    ;(mutableWorkflow as Record<string, unknown>).published_version_number = version
+    if (mutableWorkflow.version?.version === publishedVersion.version) {
+      mutableWorkflow.version = {
+        ...mutableWorkflow.version,
+        status: WorkflowVersionStatusEnum.PUBLISHED,
+        name: versionObj.name,
+      }
+    }
+    mutableWorkflow.published_version_id = versionObj.id
+    mutableWorkflow.published_version_number = publishedVersion.version
     mutableWorkflow.is_enabled = true
     mutableWorkflow.updated_at = new Date().toISOString()
 
-    const versions = getOrCreateVersionStore(String(workflowId), workflow)
     for (const v of versions) {
       if (v.status === 'published') v.status = 'previously_published'
     }
-    const storeRecord = versions.find((v) => v.version === version)
+    const storeRecord = publishedVersion
     if (storeRecord) {
       storeRecord.status = 'published'
       storeRecord.last_published_at = mutableWorkflow.updated_at
