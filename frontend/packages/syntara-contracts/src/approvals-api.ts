@@ -222,7 +222,7 @@ export interface components {
       name: string
       /**
        * Type
-       * @description Activity type (script, approval, agentic, etc.)
+       * @description Activity type (script_python, script_bash, approval, agentic, etc.)
        */
       type: string
     } & {
