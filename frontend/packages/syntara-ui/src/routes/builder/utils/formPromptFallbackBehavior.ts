@@ -12,7 +12,7 @@ function formPromptFallbackBehaviorFromDecision(
 export function formPromptFallbackDecisionFromBehavior(
   fallbackBehavior: string | null | undefined
 ): 'submit' | 'fallback' {
-  return fallbackBehavior === 'fallback' ? 'fallback' : 'submit'
+  return fallbackBehavior === 'fail' ? 'submit' : 'fallback'
 }
 
 /** Match backend `_resolve_form_prompt_fallback_behavior` for validation. */

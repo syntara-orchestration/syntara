@@ -14,7 +14,6 @@ import { useWorkflowStore } from '../../../stores/useWorkflowStore'
 import { detachPromise } from '../../../utils/detachPromise'
 import { useEffectiveFormDefinitionServerValidationErrors } from '../hooks/useEffectiveFormDefinitionServerValidationErrors'
 import { StepEditorAutoSubmitContext, useRegisterAutoSubmit } from '../hooks/useStepEditorAutoSubmit'
-import { useWorkflowEngineDefaults } from '../hooks/useWorkflowEngineDefaults'
 import { useIsVersionView } from '../VersionViewContext'
 
 import { ApproverMultiSelect } from './ApproverMultiSelect'
@@ -358,9 +357,7 @@ function FormPromptFormFields({
 
 export function FormPromptNodeForm(props: Readonly<FormPromptNodeFormProps>) {
   const { onSubmit, initialData, onHeaderContentChange, projectId, serverValidationErrors } = props
-  const { defaults } = useWorkflowEngineDefaults()
   const defaultValues = getFormPromptNodeFormDefaultValues(initialData)
-  const systemContinueOnFailure = defaults?.continueOnFailure ?? null
   const builderHandlersRef = useRef<FormFieldBuilderCommitHandlers | null>(null)
 
   const form = useSynForm({
@@ -393,9 +390,9 @@ export function FormPromptNodeForm(props: Readonly<FormPromptNodeFormProps>) {
 
   const handleSubmit = useCallback(
     (data: FormPromptFormData) => {
-      onSubmit(mapFormPromptFormDataToSubmit(data, systemContinueOnFailure))
+      onSubmit(mapFormPromptFormDataToSubmit(data))
     },
-    [onSubmit, systemContinueOnFailure]
+    [onSubmit]
   )
 
   const submitWithFlush = useCallback(
