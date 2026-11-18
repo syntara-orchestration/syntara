@@ -99,71 +99,83 @@ def validate_form_submission(
     errors: list[FormFieldError] = []
     cleaned: dict[str, Any] = {}
 
-    # Process each field in definition order
     for field in form.fields:
-        raw = submitted.get(field.value_name, _MISSING)
+        result = _validate_single_field(field, submitted)
+        if isinstance(result, FormFieldError):
+            errors.append(result)
+        else:
+            cleaned[field.value_name] = result
 
-        # Step 2: Apply defaults only when the key is absent. An explicitly
-        # submitted empty value clears the field instead of selecting its default.
-        if raw is _MISSING and field.default is not None:
-            raw = field.default
+    errors.extend(_unknown_field_errors(form, submitted))
 
-        # Step 3: Required fields must resolve to a non-empty value. Optional
-        # absent or explicitly empty fields get a type-compatible empty output.
-        if raw is _MISSING or _is_empty(raw):
-            if field.required:
-                errors.append(
-                    FormFieldError(
-                        field=field.value_name,
-                        label=field.label,
-                        code="required",
-                        message="This field is required",
-                    )
-                )
-            else:
-                cleaned[field.value_name] = _empty_value_for_field(field)
-            continue
+    if errors:
+        raise FormDataValidationError(errors)
 
-        # Step 4: Coerce to correct type
-        try:
-            coerced = coerce_field(field, raw)
-        except (TypeError, ValueError) as exc:
-            errors.append(
-                FormFieldError(
-                    field=field.value_name,
-                    label=field.label,
-                    code="invalid_format" if isinstance(exc, _FormatError) else "type",
-                    message=str(exc),
-                )
-            )
-            continue
+    return cleaned
 
-        # Step 4b: A required checkbox must be checked (terms-of-service pattern).
-        # Distinct from "required": CheckboxField.default is a concrete False, so
-        # the default always fills an absent value and the required check above
-        # never fires for a checkbox. An unticked box is reported here instead.
-        if isinstance(field, CheckboxField) and field.required and not coerced:
-            errors.append(
-                FormFieldError(
-                    field=field.value_name,
-                    label=field.label,
-                    code="must_be_checked",
-                    message="This checkbox must be checked",
-                )
-            )
-            continue
 
-        # Step 5: Check option membership for dropdowns/multi-selects
-        option_error = _check_option_membership(field, coerced)
-        if option_error is not None:
-            errors.append(option_error)
-            continue
+def _validate_single_field(field: FormField, submitted: Mapping[str, Any]) -> Any | FormFieldError:  # noqa: ANN401
+    """Validate one field and return its cleaned value or validation error."""
+    raw = _prepare_field_value(field, submitted)
+    if raw is _MISSING or _is_empty(raw):
+        return _empty_submission_result(field)
 
-        cleaned[field.value_name] = coerced
+    try:
+        coerced = coerce_field(field, raw)
+    except (TypeError, ValueError) as exc:
+        return FormFieldError(
+            field=field.value_name,
+            label=field.label,
+            code="invalid_format" if isinstance(exc, _FormatError) else "type",
+            message=str(exc),
+        )
 
-    # Check for unknown fields in submission
-    known_names = {f.value_name for f in form.fields}
-    errors.extend(
+    if _is_unchecked_required_checkbox(field, coerced):
+        return FormFieldError(
+            field=field.value_name,
+            label=field.label,
+            code="must_be_checked",
+            message="This checkbox must be checked",
+        )
+
+    option_error = _check_option_membership(field, coerced)
+    if option_error is not None:
+        return option_error
+    return coerced
+
+
+def _prepare_field_value(field: FormField, submitted: Mapping[str, Any]) -> Any:  # noqa: ANN401
+    """Resolve the submitted value or default and normalize text-like values."""
+    raw = submitted.get(field.value_name, _MISSING)
+    if raw is _MISSING and field.default is not None:
+        raw = field.default
+
+    if isinstance(field, (TextField, EmailField)) and isinstance(raw, str):
+        return raw.strip()
+    return raw
+
+
+def _empty_submission_result(field: FormField) -> Any | FormFieldError:  # noqa: ANN401
+    """Return the required error or canonical empty value for a field."""
+    if field.required:
+        return FormFieldError(
+            field=field.value_name,
+            label=field.label,
+            code="required",
+            message="This field is required",
+        )
+    return _empty_value_for_field(field)
+
+
+def _is_unchecked_required_checkbox(field: FormField, coerced: Any) -> bool:  # noqa: ANN401
+    """Return whether a required checkbox was left unchecked."""
+    return isinstance(field, CheckboxField) and field.required and not coerced
+
+
+def _unknown_field_errors(form: FormDefinition, submitted: Mapping[str, Any]) -> list[FormFieldError]:
+    """Return errors for submitted keys that are not defined by the form."""
+    known_names = {field.value_name for field in form.fields}
+    return [
         FormFieldError(
             field=submitted_key,
             label=submitted_key,
@@ -172,12 +184,7 @@ def validate_form_submission(
         )
         for submitted_key in submitted
         if submitted_key not in known_names
-    )
-
-    if errors:
-        raise FormDataValidationError(errors)
-
-    return cleaned
+    ]
 
 
 def _is_empty(value: Any) -> bool:  # noqa: ANN401
