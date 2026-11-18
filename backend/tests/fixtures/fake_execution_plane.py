@@ -57,6 +57,9 @@ class FakeExecutionPlaneHttpClient:
             task = asyncio.create_task(self.on_completion(work_item_id, str(response["status"]), response["result"]))
             self._completion_tasks.add(task)
             task.add_done_callback(self._completion_tasks.discard)
+            # Let the callback complete the Temporal activity instead of racing
+            # it with an immediate result that bypasses output validation.
+            return {"id": response["id"], "status": "running", "result": None}
         return response
 
 
@@ -108,12 +111,13 @@ async def execute_fixture_script(payload: dict[str, Any]) -> tuple[dict[str, Any
         except json.JSONDecodeError:
             with contextlib.suppress(json.JSONDecodeError):
                 stdout_json = json.loads([line for line in stdout.splitlines() if line.strip()][-1])
-    output = {
+    output: dict[str, Any] = {
         "return_code": process.returncode,
         "stdout": stdout,
         "stderr": stderr,
-        "stdout_json": stdout_json,
     }
+    if language == "python":
+        output["stdout_json"] = stdout_json
     output_config = payload.get("output_config")
     if output_config is not None:
         output = {key: output[key] for key in output_config if key in output}
