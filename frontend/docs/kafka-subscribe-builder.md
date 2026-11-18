@@ -7,13 +7,96 @@ the message payload. Publishing activates the subscription; later changes take e
 
 Kafka credentials authenticate to the broker. Workflow execution identity is
 provided by the platform. The UI does not offer or serialize an execution-account
-selector, webhook authorization, group IDs, offset overrides, tuning, filters, or
+selector, webhook authorization, group IDs, offset overrides, tuning, or
 CloudEvents controls. The Integration's management credential is never used as a
 fallback for a missing runtime credential.
 
 Save/reopen uses flat `event_subscribe_trigger` parameters: `integration_id`,
-`credential_id`, `topic`, and optional `input_schema`. Leaving the schema blank
+`credential_id`, `topic`, optional `input_schema`, and optional `filter`. Leaving the schema blank
 omits it instead of inserting an empty schema or a default.
+
+## Optional CEL filter
+
+Use **Filter expression (CEL)** to author one complete boolean CEL expression. The editor
+preserves every non-empty expression exactly, including spaces, line breaks,
+parentheses and explicit condition composition. The limit is 16,384 characters.
+Removing the filter, clearing it, or entering only whitespace serializes `filter: null`;
+no filter accepts every otherwise valid message. Changes affect the active
+subscription on the next publication. Saved workflow version views show the
+expression read-only. Save/reopen, unrelated trigger edits and import/export use
+the same unchanged source text.
+
+The help icon beside **Filter expression (CEL)** gives a brief introduction, one example,
+and a documentation link. The step panel uses the same Kafka Subscribe documentation key.
+Clear the expression to remove the filter; the editor stays visible and retains focus.
+
+### Input fields and CEL reference
+
+The only root variable is `input`, bound directly to the supplied message object.
+A boolean `true` passes the message; `false` filters it out. Combine conditions
+explicitly with `&&`, `||`, `!`, and parentheses; the UI adds no implicit conditions.
+Supported comparisons include `==`, `!=`, `<`, `<=`, `>`, `>=`, and `in`.
+String methods include `contains()`, `startsWith()`, `endsWith()`, and `matches()`.
+
+- `input.key` and each header value have `kind` (`text`, `binary`, or `null`),
+  `base64`, and `text` when UTF-8 decoding succeeds.
+- `input.headers` uses case-sensitive names. Duplicate header values are lists in
+  occurrence order. An absent header is different from a present null value.
+- `input.metadata` includes `transport`, `topic`, `partition`, string `offset`,
+  `timestamp_ms`, and `timestamp_type`. Timestamps may be null.
+- `input.payload.state` is `decoded`, `not_decoded`, or `decode_error`. Decoded JSON
+  is in `input.payload.value`, which may be null. Check the state and value before
+  reading its properties.
+- After successful CloudEvents decoding, `input.cloudevents` contains normalized
+  attributes for Kafka binary and structured JSON modes, such as `type`, `source`,
+  and `extensions.priority`. It is null before decoding, on decode failure, and
+  for ordinary JSON. Guard attribute access with `input.cloudevents != null`;
+  event data remains under `input.payload.value`. The sample tester binds the
+  supplied JSON directly and does not perform CloudEvents decoding.
+
+Use `has()` or `in` to check presence. A present null still needs a null check;
+check value types before applying type-specific operations. Missing map keys
+produce No match, while incompatible types can produce Evaluation error.
+`matches()` uses RE2 search semantics: anchor with `^` and `$` for whole-string
+matching. Backreferences and lookarounds are unsupported.
+
+Each line below is a separate expression. Compose your complete condition explicitly:
+
+```cel
+input.key.kind == "text" && input.key.text.startsWith("order-")
+"region" in input.headers && input.headers["region"].exists(h, h.kind == "text" && h.text == "eu")
+input.metadata.topic == "orders" && input.metadata.partition == 0
+input.payload.state == "decoded" && input.payload.value != null && has(input.payload.value.status) && input.payload.value.status == "ready"
+input.key.kind == "text" && input.key.text.matches("^order-[0-9]+$")
+```
+
+### Sample testing
+
+Expand **Test filter expression** to edit sample JSON in the syntax-highlighted JSON code editor, then choose **Test filter**.
+Collapsing the tester preserves the sample. **Test filter** submits the current unsaved expression and editable sample JSON to
+`POST /api/v1/filtering/test` through the typed filtering client. No saved workflow,
+Integration, topic or credential selection is needed. The sample is bound directly
+as `input`: the endpoint does not decode Kafka messages, validate payload schemas,
+consume messages or trigger workflows. One matching sample does not establish
+that every message will evaluate successfully. This action is separate from
+**Test runtime access**.
+
+Testing distinguishes **Match**, **No match**, **Evaluation error**, configuration
+errors (plain-language compiler messages and line/column when provided), and compact inline request failures
+retried with **Test filter**. The help icon beside **Test filter** explains its scope and limitations. Invalid JSON is rejected before submission. Editing either input
+discards results, including pending responses. Server validation still runs on
+Save, Verify, and publication; a successful sample cannot bypass it. CEL workflow findings identify `parameters.filter.expression`, appear beside the relevant trigger filter, and retain the expression for correction. Correcting the expression hides its previous field finding; rerun Save or Verify to refresh workflow findings. Existing draft-save and publication behavior is unchanged.
+
+The mock API uses canned fixtures rather than a CEL engine: `true` matches;
+`false` and `input.missing` do not match. Missing map keys produce no match in the
+backend evaluator. With the Kafka-shaped sample, `input` returns an evaluation
+error (`filter_non_boolean`) because the input object is not boolean. `input.`
+returns a configuration error; unsupported mock fixtures return an evaluation
+error placeholder. Use the real backend for arbitrary CEL evaluation.
+Component tests cover all outcomes, JSON and
+length validation, safe errors, retry, stale responses and accessibility. The
+focused `e2e/kafka-subscribe-filter.spec.ts` covers unsaved testing, exact
+save/reopen preservation, unrelated edits and removal against the mock API.
 
 ## Backend dependency and requirement differences
 
@@ -84,8 +167,11 @@ acceptance prerequisites for this frontend story.
 
 ## Implementation verification
 
-- Affected UI tests: 353 passing across 14 files; mock API checks: 9 passing.
-- New Kafka UI/helper coverage: 91.57% statements and 85.38% branches.
+- Run `npm run check` and `TZ=UTC npm test` from `frontend/` for static analysis,
+  UI tests, coverage, and mock API contract checks.
+- Six focused CEL browser scenarios cover outcomes, keyboard/accessibility,
+  rejected saves, Verify field feedback, compact failure/retry, exact persistence, unrelated edits, removal, stale responses,
+  and a browser export/import round trip.
 - Frontend `npm run check` and production build pass. Existing repository lint
   warnings remain; the Kafka files introduce no warnings.
 - Browser verification against the isolated mock API covered creating the trigger,
@@ -131,7 +217,7 @@ The delayed-response layout regression can be run with:
 npm --prefix frontend/packages/syntara-ui run e2e -- e2e/kafka-subscribe-loading.spec.ts
 ```
 
-Delivery defaults are available under **Show message delivery details**; preflight
+Delivery defaults are available under **Message delivery behavior**; preflight
 scope is available in contextual help. Trigger output references use the Kafka
 envelope: `trigger.payload.order_id` reads an `order_id` payload property, while
 `trigger.metadata`, `trigger.original` and `trigger.envelope_version` remain

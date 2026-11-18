@@ -5,7 +5,7 @@ import {
   TriggerTypeEnum,
   WEBHOOK_TRIGGER_TYPES,
 } from '@syntara/contracts'
-import { useMemo, type ReactNode } from 'react'
+import { use, useMemo, type ReactNode } from 'react'
 
 import { useAlerts } from '../../../providers/alerts'
 import { useWorkflowStoreActions } from '../../../stores/useWorkflowStore'
@@ -15,6 +15,7 @@ import { isValidWebhookPath, normalizeWebhookPath } from '../../../utils/webhook
 import { buildKafkaSubscribeTrigger, kafkaSubscribeFormDefaults } from '../node-forms/kafkaSubscribeMapping'
 import type { TriggerFormData } from '../node-forms/TriggerNodeForm'
 import { TriggerNodeForm } from '../node-forms/TriggerNodeForm'
+import { WorkflowValidationContext } from '../WorkflowValidationContext'
 
 /**
  * Deep equality check for triggers to prevent marking workflow dirty when no changes are made.
@@ -215,6 +216,7 @@ export function TriggerNodeDetails({
   onHeaderContentChange,
 }: TriggerNodeDetailsProps) {
   const { showError } = useAlerts()
+  const validation = use(WorkflowValidationContext)
   // Use action accessor - component won't re-render when store state changes
   const { updateTrigger } = useWorkflowStoreActions()
 
@@ -295,12 +297,14 @@ export function TriggerNodeDetails({
   }
 
   return (
-    <TriggerNodeForm
-      workflowId={workflowId}
-      projectId={projectId}
-      initialData={initialData}
-      onSubmit={handleSubmit}
-      onHeaderContentChange={onHeaderContentChange}
-    />
+    <WorkflowValidationContext value={{ errors: validation.errors, nodeId: trigger.id }}>
+      <TriggerNodeForm
+        workflowId={workflowId}
+        projectId={projectId}
+        initialData={initialData}
+        onSubmit={handleSubmit}
+        onHeaderContentChange={onHeaderContentChange}
+      />
+    </WorkflowValidationContext>
   )
 }

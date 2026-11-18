@@ -22,6 +22,7 @@ from syntara.eventstreams.adapters.subscribe_parameters import (
     validate_event_subscribe_draft_parameters,
     validate_event_subscribe_parameters,
 )
+from syntara.filtering.exceptions import FilterValidationCode, FilterValidationError
 from syntara.schemas import SCHEMA_DIR
 from syntara.workflows.json_schema_validation import validate_json_schema_definition
 from syntara.workflows.models.validation_finding import (
@@ -503,6 +504,41 @@ def collect_scheduled_trigger_config_findings(
     return findings
 
 
+_FILTER_MESSAGES = {
+    FilterValidationCode.INVALID_EXPRESSION: "Enter a valid CEL expression that returns true or false",
+    FilterValidationCode.INVALID_SYNTAX: "Syntax error",
+    FilterValidationCode.UNSUPPORTED_VARIABLE: "Use input as the message variable",
+    FilterValidationCode.UNSUPPORTED_FUNCTION: "This CEL function is not supported",
+    FilterValidationCode.UNSUPPORTED_CONSTRUCT: "This CEL construct is not supported",
+    FilterValidationCode.INVALID_MACRO: "Check the arguments to this CEL macro",
+    FilterValidationCode.NON_BOOLEAN: "This expression must return true or false",
+}
+
+
+def _filter_validation_finding(exc: ValueError, node_id: str | None) -> ValidationFinding | None:
+    """Recover safe compiler categories without including submitted values or parser diagnostics."""
+    causes = (
+        [error.get("ctx", {}).get("error") for error in exc.errors()] if isinstance(exc, ValidationError) else [exc]
+    )
+    for cause in causes:
+        if isinstance(cause, FilterValidationError):
+            message = _FILTER_MESSAGES[cause.code]
+            if cause.line is not None:
+                message += f" at line {cause.line}"
+                if cause.column is not None:
+                    message += f", column {cause.column}"
+            elif cause.column is not None:
+                message += f" at column {cause.column}"
+            return ValidationFinding(
+                severity=ValidationSeverity.error,
+                category=ValidationCategory.schema_violation,
+                message=f"CEL filter: {message}.",
+                node_id=node_id,
+                field_path="parameters.filter.expression",
+            )
+    return None
+
+
 def collect_event_subscribe_config_findings(
     workflow_definition: dict[str, Any],
     *,
@@ -520,7 +556,11 @@ def collect_event_subscribe_config_findings(
             config = validate_parameters(trigger.get("parameters", {}))
             if config.input_schema is not None:
                 validate_json_schema_definition(config.input_schema)
-        except (TypeError, ValueError):
+        except (TypeError, ValueError) as exc:
+            filter_finding = _filter_validation_finding(exc, trigger.get("id")) if isinstance(exc, ValueError) else None
+            if filter_finding is not None:
+                findings.append(filter_finding)
+                continue
             # Do not include input values or schema contents in operational findings/logs.
             findings.append(
                 ValidationFinding(

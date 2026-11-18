@@ -487,6 +487,7 @@ function TriggerNodeFormContent(props: TriggerNodeFormProps) {
       integrationId: isKafka ? data.integrationId : undefined,
       runtimeCredentialId: isKafka ? data.runtimeCredentialId : undefined,
       topic: isKafka ? data.topic : undefined,
+      filterExpression: isKafka ? data.filterExpression : undefined,
       authorizedServiceAccountIds: isWebhookStyle ? data.authorizedServiceAccountIds : undefined,
     }
     props.onSubmit(cleanedData)

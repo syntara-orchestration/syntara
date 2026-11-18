@@ -1,10 +1,14 @@
 import { TriggerTypeEnum } from '@syntara/contracts'
 import { describe, expect, it } from 'vitest'
 
+import { parseImportedDefinition } from '../utils/parseImportedDefinition'
+import { buildWorkflowDefinition } from '../utils/workflowDefinitionBuilder'
+
 import {
   buildKafkaSubscribeTrigger,
   kafkaSubscribeFormDefaults,
   kafkaSubscribeParameters,
+  hasKafkaFilterExpression,
 } from './kafkaSubscribeMapping'
 import { triggerFormSchema } from './triggerFormSchema'
 
@@ -18,12 +22,62 @@ const data = {
 }
 
 describe('Kafka Subscribe configuration', () => {
+  it('matches backend Unicode whitespace normalization without dropping a non-empty BOM', () => {
+    expect(hasKafkaFilterExpression('\u0085\u001c\u001d\u001e\u001f')).toBe(false)
+    expect(hasKafkaFilterExpression('\uFEFF')).toBe(true)
+    expect(kafkaSubscribeParameters({ ...data, filterExpression: '\uFEFF' }).filter).toStrictEqual({
+      expression: '\uFEFF',
+    })
+    expect(kafkaSubscribeParameters({ ...data, filterExpression: '\u0085' }).filter).toBeNull()
+  })
+  it('preserves exact CEL through serialization, reopening and unrelated edits', () => {
+    const expression = '  (input.key.kind == "text")\n && (true || false)  '
+    const trigger = buildKafkaSubscribeTrigger('subscribe', 'Orders', { ...data, filterExpression: expression })
+    const exported = buildWorkflowDefinition({
+      workflowName: 'Orders',
+      workflowDescription: '',
+      activities: [],
+      triggers: [trigger],
+      edges: [],
+    })
+    const imported = parseImportedDefinition(exported)
+    const importedTrigger = imported.workflowDef.triggers?.[0]
+    expect(importedTrigger).toBeDefined()
+    if (!importedTrigger) throw new Error('Kafka trigger was discarded during import')
+    const reopened = kafkaSubscribeFormDefaults(importedTrigger)
+    expect(reopened.filterExpression).toBe(expression)
+    expect(
+      buildKafkaSubscribeTrigger('subscribe', 'Renamed', { ...reopened, topic: 'other' }).parameters?.filter
+    ).toStrictEqual({ expression })
+    expect(kafkaSubscribeParameters(reopened).filter).toStrictEqual({ expression })
+  })
+
+  it.each([undefined, '', '  \n\t'])('normalizes an absent or cleared expression to null: %s', (filterExpression) => {
+    expect(
+      buildKafkaSubscribeTrigger('subscribe', 'Orders', { ...data, filterExpression }).parameters?.filter
+    ).toBeNull()
+    expect(kafkaSubscribeParameters({ ...data, filterExpression }).filter).toBeNull()
+  })
+
+  it('enforces the expression limit without changing source', () => {
+    const filterExpression = ' '.repeat(16_380) + 'true'
+    expect(triggerFormSchema.parse({ ...data, filterExpression }).filterExpression).toBe(filterExpression)
+    const result = triggerFormSchema.safeParse({ ...data, filterExpression: `${filterExpression} ` })
+    expect(result.success).toBe(false)
+    if (!result.success)
+      expect(result.error.issues).toContainEqual(
+        expect.objectContaining({
+          path: ['filterExpression'],
+          message: 'CEL expression must be 16,384 characters or fewer',
+        })
+      )
+  })
   it('round-trips an incomplete draft without inserting empty strings or runtime-only fields', () => {
     const trigger = buildKafkaSubscribeTrigger('draft', 'Draft', {
       triggerType: TriggerTypeEnum.EVENT_SUBSCRIBE,
       topic: '',
     })
-    expect(trigger.parameters).toEqual({})
+    expect(trigger.parameters).toEqual({ filter: null })
     expect(buildKafkaSubscribeTrigger('draft', 'Draft', kafkaSubscribeFormDefaults(trigger))).toEqual(trigger)
     expect(() => kafkaSubscribeParameters(kafkaSubscribeFormDefaults(trigger))).toThrow()
   })

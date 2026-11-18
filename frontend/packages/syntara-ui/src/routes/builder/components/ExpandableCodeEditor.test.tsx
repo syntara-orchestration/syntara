@@ -2,6 +2,7 @@ import { fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
 import { describe, expect, it, vi } from 'vitest'
+import { axe } from 'vitest-axe'
 
 import { ExpandableCodeEditor } from './ExpandableCodeEditor'
 
@@ -162,6 +163,29 @@ describe('ExpandableCodeEditor', () => {
     await user.click(screen.getByTestId('expand-button'))
 
     expect(screen.getByText('Edit script')).toBeInTheDocument()
+  })
+
+  it('describes the focused inline and expanded editors with text inside their own container', async () => {
+    const user = userEvent.setup()
+    const description = 'The sample is bound directly as input.'
+    const { container } = render(
+      <ExpandableCodeEditor {...defaultProps} ariaLabel="Sample JSON" description={description} />
+    )
+    const inline = screen.getByRole('textbox', { name: 'Sample JSON' })
+    await user.click(inline)
+    expect(inline).toHaveFocus()
+    expect(inline).toHaveAccessibleDescription(description)
+    expect(await axe(container)).toHaveNoViolations()
+
+    await user.click(screen.getByRole('button', { name: 'Open in new window' }))
+    const dialog = screen.getByRole('dialog')
+    const expanded = within(dialog).getByRole('textbox', { name: 'Sample JSON expanded' })
+    await user.click(expanded)
+    expect(expanded).toHaveFocus()
+    expect(expanded).toHaveAccessibleDescription(description)
+    expect(within(dialog).getByText(description, { exact: true })).toBeInTheDocument()
+    expect(expanded.getAttribute('aria-describedby')).not.toBe(inline.getAttribute('aria-describedby'))
+    expect(await axe(dialog)).toHaveNoViolations()
   })
 
   it('uses custom modal title when provided', async () => {

@@ -1,4 +1,5 @@
 {
   "communityBaseUrl": "https://github.com/syntara-orchestration/syntara/blob/devel/README.md",
+  "communityPaths": { "kafkaSubscribeTrigger": "frontend/docs/kafka-subscribe-builder.md" },
   "version": "2.5"
 }

@@ -1,3 +1,4 @@
+import { workflowFilterFindings, workflowFilterProblem } from './utils/workflowFilterFindings'
 import { http, HttpResponse } from 'msw'
 import { v4 as uuidv4 } from 'uuid'
 import { mockDate } from './resources/mockDates'
@@ -6,7 +7,7 @@ import type * as ApprovalsAPI from '@syntara/contracts/src/approvals-api.js'
 import type * as ExecutionsAPI from '@syntara/contracts/src/executions-api.js'
 import type * as ToolManagerAPI from '@syntara/contracts/src/tool-manager.js'
 import type * as WorkflowAPI from '@syntara/contracts/src/workflow-api.js'
-import type { Approval, Tool, WorkflowWithVersion, WorkflowsResponse } from '@syntara/contracts'
+import type { Approval, FilteringAPI, Tool, WorkflowWithVersion, WorkflowsResponse } from '@syntara/contracts'
 import {
   ExecutionStatusEnum,
   IntegrationStatusEnum,
@@ -357,6 +358,41 @@ const knownFileMetadata: Record<
 }
 
 export const handlers = [
+  // Canned CEL fixtures only. Real expression compilation/evaluation belongs to the backend.
+  http.post('/api/v1/filtering/test', async ({ request }) => {
+    const body = (await request.json()) as FilteringAPI.components['schemas']['FilterTestRequest']
+    const expression = body.expression ?? ''
+    if (Array.from(expression).length > 16_384 || expression === 'input.') {
+      return HttpResponse.json<FilteringAPI.components['schemas']['FilterValidationProblem']>(
+        {
+          type: 'https://api.example.com/errors/validation-error',
+          title: 'Invalid CEL filter expression',
+          detail: 'filter_invalid_syntax',
+          code: 'filter_invalid_syntax',
+          retryable: false,
+          line: 1,
+          column: 7,
+        },
+        { status: 422 }
+      )
+    }
+    const fixtures: Record<string, FilteringAPI.components['schemas']['FilterResult']> = {
+      true: { outcome: 'match' },
+      false: { outcome: 'no_match' },
+      'input.missing': { outcome: 'no_match' },
+      input: { outcome: 'evaluation_error', error_code: 'filter_non_boolean' },
+      'input.payload.state == "decoded" && input.payload.value.status == "ready"': { outcome: 'match' },
+    }
+    const fixture = Object.hasOwn(fixtures, expression.trim()) ? fixtures[expression.trim()] : undefined
+    return HttpResponse.json<FilteringAPI.components['schemas']['FilterResult']>(
+      !expression.trim()
+        ? { outcome: 'match' }
+        : (fixture ?? {
+            outcome: 'evaluation_error',
+            error_code: 'filter_evaluation_failed',
+          })
+    )
+  }),
   http.get('/api/v1/tools', ({ request }) => {
     const url = new URL(request.url)
     const statusFilter = url.searchParams.get('status')
@@ -1008,6 +1044,8 @@ export const handlers = [
       labels?: Record<string, string>
       project_id?: string
     }
+    const filterProblem = workflowFilterProblem(body.workflow_definition)
+    if (filterProblem) return HttpResponse.json(filterProblem, { status: 422 })
     const now = new Date().toISOString()
     const workflowId = uuidv4()
     const labelRecord = body.labels ?? {}
@@ -1065,7 +1103,8 @@ export const handlers = [
       )
     }
 
-    const errors: Array<{ message: string; node_id: string | null }> = []
+    const errors: Array<{ message: string; node_id?: string | null; field_path?: string | null }> =
+      workflowFilterFindings(definition)
     if (!Array.isArray(definition.triggers) || definition.triggers.length === 0) {
       errors.push({ message: 'Workflow must have at least one trigger', node_id: null })
     }
@@ -1096,7 +1135,7 @@ export const handlers = [
         category: 'schema_violation' as const,
         message: e.message,
         node_id: e.node_id,
-        field_path: null,
+        field_path: e.field_path ?? null,
       }))
       return HttpResponse.json({
         is_valid: false,
@@ -1145,6 +1184,8 @@ export const handlers = [
     }
 
     const body = (await request.request.json()) as UpdateWorkflowBody & { expected_version?: number | null }
+    const filterProblem = workflowFilterProblem(body.workflow_definition)
+    if (filterProblem) return HttpResponse.json(filterProblem, { status: 422 })
     const now = new Date().toISOString()
     const currentVersionNum = workflow.version?.version ?? workflow.current_version ?? 1
 
