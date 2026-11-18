@@ -55,7 +55,7 @@ export function ApprovalsBulkActions({
 
   return (
     <Flex
-      role="toolbar"
+      role="group"
       aria-label={hasSelection ? `${selectedCount} selected` : 'Approval actions'}
       gap={{ default: 'gapMd' }}
       alignItems={{ default: 'alignItemsCenter' }}
