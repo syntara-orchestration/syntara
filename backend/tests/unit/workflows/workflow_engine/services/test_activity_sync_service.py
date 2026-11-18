@@ -2832,6 +2832,82 @@ class TestSyncNodesToTerminalStatus:
         assert activity.input_data == fallback_inputs["rest-api"]
 
     @pytest.mark.asyncio
+    async def test_already_failed_row_backfills_empty_inputs_without_changing_status(self) -> None:
+        """A Temporal-failed row with empty inputs still receives the completion-payload fallback."""
+        activity = self._create_mock_activity_execution("rest-api", status=ActivityStatus.FAILED)
+        activity.error_details = "Failed to decrypt credential"
+        activity.input_data = {}
+        session = self._session_with_result([activity])
+        self.mock_session_factory.side_effect = [self._session_context(session)]
+        metadata = self._create_metadata(activity_index_map={"rest-api": 0})
+        fallback_inputs = {"rest-api": {"method": "GET", "credential_id": "[REDACTED]"}}
+
+        await self.service._sync_nodes_to_terminal_status(
+            metadata,
+            ["rest-api"],
+            ActivityStatus.FAILED,
+            error_map={"rest-api": "expression fallback must not replace Temporal error"},
+            input_data_map=fallback_inputs,
+        )
+
+        assert activity.status == ActivityStatus.FAILED
+        assert activity.error_details == "Failed to decrypt credential"
+        assert activity.completed_at is None
+        assert activity.input_data == fallback_inputs["rest-api"]
+        session.commit.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_already_failed_row_keeps_existing_inputs(self) -> None:
+        """Backfill must not overwrite inputs Temporal already persisted on a FAILED row."""
+        existing_inputs = {"method": "POST", "url": "https://example.com"}
+        activity = self._create_mock_activity_execution("rest-api", status=ActivityStatus.FAILED)
+        activity.error_details = "HTTP 500"
+        activity.input_data = existing_inputs
+        session = self._session_with_result([activity])
+        self.mock_session_factory.side_effect = [self._session_context(session)]
+        metadata = self._create_metadata(activity_index_map={"rest-api": 0})
+
+        await self.service._sync_nodes_to_terminal_status(
+            metadata,
+            ["rest-api"],
+            ActivityStatus.FAILED,
+            error_map={"rest-api": "must not replace Temporal error"},
+            input_data_map={"rest-api": {"method": "GET"}},
+        )
+
+        assert activity.status == ActivityStatus.FAILED
+        assert activity.error_details == "HTTP 500"
+        assert activity.input_data == existing_inputs
+        session.commit.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_completed_row_is_not_backfilled_from_failed_input_map(self) -> None:
+        """Completed earlier iterations must keep their own inputs when a later occurrence fails."""
+        completed = self._create_mock_activity_execution("rest-api#iter-0", status=ActivityStatus.COMPLETED)
+        completed.input_data = {"method": "GET", "url": "https://example.com/item-0"}
+        failed = self._create_mock_activity_execution("rest-api#iter-1", status=ActivityStatus.FAILED)
+        failed.error_details = "Key 'host' not found"
+        failed.input_data = {}
+        session = self._session_with_result([completed, failed])
+        self.mock_session_factory.side_effect = [self._session_context(session)]
+        metadata = self._create_metadata(activity_index_map={"rest-api#iter-0": 0, "rest-api#iter-1": 1})
+        fallback_inputs = {"rest-api": {"method": "GET", "url": "https://example.com/${loop.item.host}"}}
+
+        await self.service._sync_nodes_to_terminal_status(
+            metadata,
+            ["rest-api"],
+            ActivityStatus.FAILED,
+            error_map={"rest-api": "Key 'host' not found"},
+            input_data_map=fallback_inputs,
+        )
+
+        assert completed.status == ActivityStatus.COMPLETED
+        assert completed.input_data == {"method": "GET", "url": "https://example.com/item-0"}
+        assert failed.status == ActivityStatus.FAILED
+        assert failed.error_details == "Key 'host' not found"
+        assert failed.input_data == fallback_inputs["rest-api"]
+
+    @pytest.mark.asyncio
     async def test_retry_converge_failure_uses_current_run_timestamp(self) -> None:
         """A converge that fails instead of replaying keeps the retry's timestamp."""
         activity = self._create_mock_activity_execution("converge_1")

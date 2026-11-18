@@ -802,6 +802,86 @@ class TestFanInConverge:
         assert wf.failed_nodes["rest-api"]
         assert wf.get_activity_input("rest-api") == parameters
 
+    def test_later_loop_occurrence_failure_records_configured_inputs(self) -> None:
+        """A later loop body that fails before recording must not keep the prior iteration's inputs."""
+        wf = _make_workflow()
+        backend = InMemoryGraphBackend()
+        prior_inputs = {"method": "GET", "url": "https://example.com/item-0"}
+        current_params = {"method": "GET", "url": "https://example.com/${loop.item.host}"}
+        backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
+        backend.add_node("loop", {"id": "loop", "type": "loop", "parameters": {"type": "for_each"}})
+        backend.add_node("rest-api", {"id": "rest-api", "type": "http_request", "parameters": current_params})
+        backend.add_edge("trigger", "loop", None)
+        backend.add_edge("loop", "rest-api", None)
+        graph = WorkflowGraph(backend)
+        rest_node = graph.get_node("rest-api")
+
+        wf.loop_body_map = {"rest-api": "loop"}
+        wf.node_control_data["loop"] = {"current_index": 0}
+        wf._record_input_history(rest_node, prior_inputs)
+        wf.node_control_data["loop"] = {"current_index": 1}
+
+        wf._handle_node_failure("rest-api", Exception("Key 'host' not found in namespace path"), graph)
+
+        assert wf.get_activity_input("rest-api") == current_params
+        assert wf.get_activity_input("rest-api_iter_0") == prior_inputs
+        assert wf.get_activity_input("rest-api_iter_1") == current_params
+        result = wf._build_result("exec-1", include_node_results=False)
+        assert result["failed_activity_inputs"]["rest-api"] == current_params
+
+    def test_current_loop_occurrence_keeps_already_recorded_inputs(self) -> None:
+        """A failure after resolution must keep this occurrence's resolved inputs."""
+        wf = _make_workflow()
+        backend = InMemoryGraphBackend()
+        resolved = {"method": "GET", "url": "https://example.com/item-1"}
+        backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
+        backend.add_node("loop", {"id": "loop", "type": "loop", "parameters": {"type": "for_each"}})
+        backend.add_node(
+            "rest-api",
+            {
+                "id": "rest-api",
+                "type": "http_request",
+                "parameters": {"method": "GET", "url": "https://example.com/${loop.item}"},
+            },
+        )
+        backend.add_edge("trigger", "loop", None)
+        backend.add_edge("loop", "rest-api", None)
+        graph = WorkflowGraph(backend)
+
+        wf.loop_body_map = {"rest-api": "loop"}
+        wf.node_control_data["loop"] = {"current_index": 1}
+        wf._record_input_history(graph.get_node("rest-api"), resolved)
+
+        wf._handle_node_failure("rest-api", Exception("HTTP 500"), graph)
+
+        assert wf.get_activity_input("rest-api") == resolved
+        assert wf.get_activity_input("rest-api_iter_1") == resolved
+
+    def test_later_loop_converge_failure_records_configured_inputs(self) -> None:
+        """A nested converge gate failure must snapshot this occurrence, not the previous one."""
+        wf = _make_workflow()
+        graph = _build_fanin_graph()
+        converge_node = graph.get_node("converge_node")
+        converge_node.parameters = {"strategy": "any", "n_required": 2, "wait_duration": 30}
+        prior_inputs = {"strategy": "all", "wait_duration": 45}
+
+        wf.loop_body_map = {"converge_node": "loop"}
+        wf.node_control_data["loop"] = {"current_index": 0}
+        wf._record_input_history(converge_node, prior_inputs)
+        wf.node_control_data["loop"] = {"current_index": 1}
+
+        wf._fail_converge_node(
+            "converge_node",
+            "gate failed",
+            graph,
+            pending_tasks=None,
+            input_parameters=converge_node.parameters,
+        )
+
+        assert wf.get_activity_input("converge_node") == converge_node.parameters
+        assert wf.get_activity_input("converge_node_iter_0") == prior_inputs
+        assert wf.get_activity_input("converge_node_iter_1") == converge_node.parameters
+
     def test_fail_converge_node_preserves_valid_output_mapping(self) -> None:
         """Converge failure fallback keeps mapped aliases for recovery steps."""
         wf = _make_workflow()

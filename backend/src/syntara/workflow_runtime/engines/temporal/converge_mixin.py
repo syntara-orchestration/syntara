@@ -62,6 +62,8 @@ class WorkflowConvergeMixin:
 
     def _record_input_history(self, node: ActivityNode, resolved_parameters: dict[str, Any]) -> None: ...
 
+    def _inputs_recorded_for_current_occurrence(self, node: ActivityNode) -> bool: ...  # type: ignore[empty-body]
+
     @staticmethod
     def _build_failure_output(
         output_model_class: type[NodeOutput], output_config: dict[str, str] | None
@@ -442,9 +444,11 @@ class WorkflowConvergeMixin:
         """
         node = graph.get_node(node_id)
         # Gate/timeout can fail before `_execute_single_node` records inputs.
-        # If the converge already ran far enough to publish resolved parameters,
-        # keep those instead of overwriting them with the unresolved definition.
-        if input_parameters is not None and node_id not in self.node_inputs:
+        # If this occurrence already published resolved parameters, keep those
+        # instead of overwriting them with the unresolved definition. Canvas ID
+        # membership is not enough: a nested converge can fail on a later loop
+        # iteration while ``node_inputs`` still holds the previous occurrence.
+        if input_parameters is not None and not self._inputs_recorded_for_current_occurrence(node):
             self._record_input_history(node, input_parameters)
 
         cof = resolve_continue_on_failure(node, self._runtime_settings)

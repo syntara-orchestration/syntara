@@ -21,6 +21,19 @@ PRE_RESOLVED_ACTIVITY_ID_PREFIX = "pre-resolved-"
 _COMPOSITE_ITER_SEP = "#iter-"
 
 
+def _input_data_for_activity(
+    input_data_map: dict[str, dict[str, Any]] | None,
+    activity_name: str,
+) -> dict[str, Any] | None:
+    """Return mapped inputs for an activity name, falling back to its canvas ID."""
+    if not input_data_map:
+        return None
+    if activity_name in input_data_map:
+        return input_data_map[activity_name]
+    base_name = activity_name.split(_COMPOSITE_ITER_SEP)[0]
+    return input_data_map.get(base_name)
+
+
 class ActivityNodeSyncMixin:
     """Sync skipped, detached, failed, and pre-resolved workflow nodes."""
 
@@ -337,6 +350,9 @@ class ActivityNodeSyncMixin:
         Fetches all activities matching node_ids, then skips any that are already
         in a terminal status. This prevents overwriting one terminal state with
         another (e.g. a COMPLETED activity should not be changed to SKIPPED).
+        Already-FAILED rows with empty ``input_data`` still receive a backfill
+        from ``input_data_map`` so a completion-payload fallback can fill inputs
+        after Temporal already marked the row failed.
 
         Args:
             metadata: Monitoring metadata containing execution and activity index map
@@ -378,7 +394,21 @@ class ActivityNodeSyncMixin:
             updated_activities: list[tuple[ActivityExecution, dict[str, Any]]] = []
             now = datetime.now(UTC)
             for activity in activities:
+                input_data = _input_data_for_activity(input_data_map, activity.activity_name)
                 if activity.status in TERMINAL_ACTIVITY_STATUSES:
+                    if activity.status == ActivityStatus.FAILED and not activity.input_data and input_data is not None:
+                        old_values = {
+                            "status": activity.status,
+                            "started_at": activity.started_at,
+                            "completed_at": activity.completed_at,
+                            "error_details": activity.error_details,
+                            "output_data": activity.output_data,
+                            "iteration": activity.iteration,
+                            "input_data": activity.input_data,
+                        }
+                        activity.input_data = input_data
+                        activity.updated_at = now
+                        updated_activities.append((activity, old_values))
                     continue
                 old_values = {
                     "status": activity.status,
@@ -393,10 +423,8 @@ class ActivityNodeSyncMixin:
                 activity.completed_at = now
                 if error_map is not None:
                     activity.error_details = error_map.get(base_name)
-                if input_data_map is not None:
-                    input_data = input_data_map.get(base_name)
-                    if input_data is not None:
-                        activity.input_data = input_data
+                if input_data is not None:
+                    activity.input_data = input_data
                 activity.updated_at = now
                 updated_activities.append((activity, old_values))
 
