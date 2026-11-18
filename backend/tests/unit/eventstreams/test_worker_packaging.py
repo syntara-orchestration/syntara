@@ -8,6 +8,7 @@ import sys
 from pathlib import Path
 from uuid import UUID
 
+import pytest
 import yaml
 
 from syntara.core.config.base import Settings
@@ -21,12 +22,54 @@ from syntara.integrations.models.integration_configuration import KafkaConfigura
 ROOT = Path(__file__).resolve().parents[4]
 
 
+def _published_tcp_ports(mapping: str | int | dict[str, str | int]) -> range:
+    """Read fixed host TCP ports from Compose short or long syntax."""
+    if isinstance(mapping, dict) and mapping.get("protocol", "tcp") != "tcp":
+        return range(0)
+    specification = mapping.get("published") if isinstance(mapping, dict) else mapping
+    if specification is None:
+        return range(0)
+    specification = re.sub(r"\$\{\w+:-([^}]+)\}", r"\1", str(specification))
+    specification, _, protocol = specification.partition("/")
+    if protocol and protocol != "tcp":
+        return range(0)
+    if not isinstance(mapping, dict):
+        parts = specification.rsplit(":", 2)
+        if len(parts) < 2:
+            return range(0)
+        specification = parts[-2]
+    if not specification:
+        return range(0)
+    first, _, last = specification.partition("-")
+    return range(int(first), int(last or first) + 1)
+
+
+@pytest.mark.parametrize(
+    ("mapping", "expected"),
+    [
+        ("8768", []),
+        (8768, []),
+        ("8000:80/tcp", [8000]),
+        ("8000-8001:80-81", [8000, 8001]),
+        ("127.0.0.1:8767-8769:8000-8002/tcp", [8767, 8768, 8769]),
+        ("[::1]:8000:80", [8000]),
+        ("${PORT:-8000}:80", [8000]),
+        ("8000:80/udp", []),
+        ("127.0.0.1::80", []),
+        ({"target": 8768}, []),
+        ({"published": "8000-8001", "target": 80}, [8000, 8001]),
+        ({"published": 8000, "target": 80, "protocol": "udp"}, []),
+    ],
+)
+def test_compose_published_tcp_ports(mapping, expected):
+    assert list(_published_tcp_ports(mapping)) == expected
+
+
 def test_probe_listener_does_not_conflict_with_local_compose_ports():
     compose = yaml.safe_load((ROOT / "podman-compose.yml").read_text())
     for service in compose["services"].values():
         for mapping in service.get("ports", []):
-            resolved = re.sub(r"\$\{\w+:-([^}]+)\}", r"\1", str(mapping))
-            assert int(resolved.rsplit(":", 2)[-2]) != HEALTH_PORT, mapping
+            assert HEALTH_PORT not in _published_tcp_ports(mapping), mapping
 
 
 def test_environment_examples_omit_event_tuning_and_compose_uses_code_defaults():

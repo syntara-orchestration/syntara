@@ -74,8 +74,9 @@ def main() -> int:
     """Return a conventional exec-probe exit code without loading app settings."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("mode", choices=("live", "ready"))
+    parser.add_argument("--port", type=int, default=HEALTH_PORT)
     args = parser.parse_args()
-    return 0 if probe(args.mode) else 1
+    return 0 if probe(args.mode, port=args.port) else 1
 
 
 if __name__ == "__main__":

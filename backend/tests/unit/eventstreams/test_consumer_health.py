@@ -66,27 +66,26 @@ def test_unresponsive_process_fails_within_probe_deadline(monkeypatch):
 
 @pytest.mark.parametrize("mode", ["live", "ready"])
 @pytest.mark.parametrize("healthy", [False, True])
-def test_exec_probe_exit_codes(monkeypatch, mode, healthy):
+@pytest.mark.parametrize("port", [None, 12345])
+def test_exec_probe_exit_codes(monkeypatch, mode, healthy, port):
     check = MagicMock(return_value=healthy)
     monkeypatch.setattr(health_module, "probe", check)
-    monkeypatch.setattr(sys, "argv", ["consumer_health", mode])
+    arguments = ["consumer_health", mode]
+    if port is not None:
+        arguments += ["--port", str(port)]
+    monkeypatch.setattr(sys, "argv", arguments)
     assert health_module.main() == (0 if healthy else 1)
-    check.assert_called_once_with(mode)
+    check.assert_called_once_with(mode, port=health_module.HEALTH_PORT if port is None else port)
 
 
-async def test_packaged_module_works_from_a_separate_process():
-    server = EventWorkerHealth()
-    await server.start()
-    try:
-        for mode, expected in [("live", 0), ("ready", 1)]:
-            process = await asyncio.create_subprocess_exec(
-                sys.executable, "-m", "syntara.eventstreams.consumer_health", mode
-            )
-            assert await asyncio.wait_for(process.wait(), timeout=5) == expected
-        server.set_readiness(lambda: True)
+async def test_packaged_module_works_from_a_separate_process(health):
+    for mode, expected in [("live", 0), ("ready", 1)]:
         process = await asyncio.create_subprocess_exec(
-            sys.executable, "-m", "syntara.eventstreams.consumer_health", "ready"
+            sys.executable, "-m", "syntara.eventstreams.consumer_health", mode, "--port", str(health.port)
         )
-        assert await asyncio.wait_for(process.wait(), timeout=5) == 0
-    finally:
-        await server.stop()
+        assert await asyncio.wait_for(process.wait(), timeout=5) == expected
+    health.set_readiness(lambda: True)
+    process = await asyncio.create_subprocess_exec(
+        sys.executable, "-m", "syntara.eventstreams.consumer_health", "ready", "--port", str(health.port)
+    )
+    assert await asyncio.wait_for(process.wait(), timeout=5) == 0

@@ -46,8 +46,11 @@ def test_termination_grace_includes_actual_drain_and_cleanup(grace, drain, valid
     if valid:
         entrypoint._validate_termination_grace(grace, drain)
     else:
-        with pytest.raises(ValueError, match="drain deadline and cleanup allowance"):
+        with pytest.raises(ValueError, match="Termination grace") as error:
             entrypoint._validate_termination_grace(grace, drain)
+        assert f"grace ({grace}s)" in str(error.value)
+        assert f"drain deadline ({drain:g}s)" in str(error.value)
+        assert f"cleanup allowance ({EventWorkerDefaults.SHUTDOWN_CLEANUP_ALLOWANCE_SECONDS}s)" in str(error.value)
 
 
 @pytest.mark.parametrize("grace", [None, 60, 90])
@@ -67,7 +70,7 @@ async def test_unsafe_termination_grace_fails_before_external_startup(monkeypatc
     monkeypatch.setattr(entrypoint, "engine", SimpleNamespace(dispose=dispose))
     monkeypatch.setattr(entrypoint, "start_loggers", MagicMock())
     monkeypatch.setattr(entrypoint, "stop_loggers", MagicMock())
-    with pytest.raises(ValueError, match="drain deadline and cleanup allowance"):
+    with pytest.raises(ValueError, match="Termination grace"):
         await entrypoint.main(termination_grace_seconds=41)
     connect.assert_not_awaited()
     dispose.assert_awaited_once()

@@ -89,10 +89,12 @@ async def _connect_temporal(shutdown: asyncio.Event) -> TemporalExecutionService
 
 def _validate_termination_grace(grace_seconds: int | None, drain_seconds: float) -> None:
     """Leave shutdown headroom when a deployment supplies its pod grace period."""
-    if grace_seconds is not None and grace_seconds <= (
-        drain_seconds + EventWorkerDefaults.SHUTDOWN_CLEANUP_ALLOWANCE_SECONDS
-    ):
-        msg = "Termination grace must exceed the event drain deadline and cleanup allowance"
+    cleanup_seconds = EventWorkerDefaults.SHUTDOWN_CLEANUP_ALLOWANCE_SECONDS
+    if grace_seconds is not None and grace_seconds <= drain_seconds + cleanup_seconds:
+        msg = (
+            f"Termination grace ({grace_seconds}s) must exceed the event drain deadline "
+            f"({drain_seconds:g}s) plus cleanup allowance ({cleanup_seconds}s)"
+        )
         raise ValueError(msg)
 
 
