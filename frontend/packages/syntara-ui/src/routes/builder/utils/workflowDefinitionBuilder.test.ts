@@ -58,6 +58,59 @@ describe('buildWorkflowDefinition', () => {
     expect(result.description).toBeUndefined()
   })
 
+  it('serializes form nodes without server-generated response schemas', () => {
+    const formDefinition = {
+      fields: [
+        {
+          type: 'text',
+          value_name: 'notes',
+          label: 'Notes',
+          required: false,
+        },
+      ],
+    }
+    const responseSchema = { type: 'object', properties: { notes: { type: 'string' } } }
+    const activities: Activity[] = [
+      {
+        id: 'form-prompt',
+        name: 'Collect details',
+        type: ActivityTypeEnum.FORM_PROMPT,
+        parameters: {
+          form_definition: formDefinition,
+          response_schema: responseSchema,
+        },
+      },
+      activity('finish'),
+    ]
+    const triggers: Activity[] = [
+      {
+        id: 'form-trigger',
+        name: 'Start form',
+        type: TriggerTypeEnum.FORM_TRIGGER,
+        parameters: {
+          form_definition: formDefinition,
+          response_schema: responseSchema,
+        },
+      },
+    ]
+
+    const result = buildWorkflowDefinition({
+      workflowName: 'Test',
+      workflowDescription: '',
+      activities,
+      triggers,
+      edges: [
+        { id: 'e-start', source: 'trigger-0', target: 'form-prompt' },
+        { id: 'e-submitted', source: 'form-prompt', target: 'finish', sourceHandle: 'submitted' },
+      ],
+    })
+
+    expect(result.triggers[0].parameters).not.toHaveProperty('response_schema')
+    expect(result.triggers[0].parameters).toMatchObject({ form_definition: formDefinition })
+    expect(result.nodes[0].parameters).not.toHaveProperty('response_schema')
+    expect(result.nodes[0].parameters).toMatchObject({ form_definition: formDefinition })
+  })
+
   describe('Trigger mapping', () => {
     it('maps triggers with all properties', () => {
       const triggers: Activity[] = [

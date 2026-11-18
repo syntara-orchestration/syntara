@@ -589,7 +589,6 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
             WorkflowNameConflictError: If workflow name already exists
 
         """
-        workflow_definition = prepare_workflow_definition_for_persistence(workflow_definition)
         recorder = get_metrics_recorder()
         component = ComponentLabel.WORKFLOW_ENGINE
         system_cof = await get_system_continue_on_failure()
@@ -598,6 +597,7 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
             MetricType.WORKFLOW_VALIDATION_DURATION,
             labels={"component": component.value, "operation": "create"},
         ):
+            workflow_definition = prepare_workflow_definition_for_persistence(workflow_definition)
             result = workflow_validator.collect_findings(
                 workflow_definition,
                 system_continue_on_failure=system_cof,
@@ -1173,13 +1173,13 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
         recorder = get_metrics_recorder()
         previous_version = await self._get_version_or_none(workflow.id, workflow.current_version)
         previous_definition = previous_version.workflow_definition if previous_version else None
-        workflow_definition = prepare_workflow_definition_for_persistence(workflow_definition, previous_definition)
         system_cof = await get_system_continue_on_failure()
 
         with recorder.time(
             MetricType.WORKFLOW_VALIDATION_DURATION,
             labels={"component": ComponentLabel.WORKFLOW_ENGINE.value, "operation": "version_update"},
         ):
+            workflow_definition = prepare_workflow_definition_for_persistence(workflow_definition, previous_definition)
             result = workflow_validator.collect_findings(
                 workflow_definition,
                 system_continue_on_failure=system_cof,

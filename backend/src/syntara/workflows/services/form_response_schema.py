@@ -7,6 +7,8 @@ from typing import Any, assert_never
 
 from pydantic import ValidationError
 
+from syntara.core.constants import JsonbLimits
+from syntara.core.jsonb_limits import validate_jsonb_size
 from syntara.forms.models.form_fields import (
     CheckboxField,
     DateField,
@@ -25,7 +27,9 @@ _FORM_NODE_TYPES = frozenset({"form_prompt", "form_trigger"})
 _SCALAR_TYPES = ["string", "number", "boolean"]
 
 
-def _text_schema(_field: TextField | EmailField) -> dict[str, Any]:
+def _text_schema(field: TextField | EmailField) -> dict[str, Any]:
+    if field.required:
+        return {"type": "string", "minLength": 1}
     return {"type": "string"}
 
 
@@ -126,6 +130,11 @@ def prepare_workflow_definition_for_persistence(
             except ValidationError:
                 continue
 
+    validate_jsonb_size(
+        prepared,
+        field_name="workflow_definition",
+        max_bytes=JsonbLimits.MAX_WORKFLOW_DEFINITION_BYTES,
+    )
     return prepared
 
 

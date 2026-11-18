@@ -2,15 +2,19 @@
 
 from __future__ import annotations
 
-from copy import deepcopy
+from collections.abc import Generator
+from contextlib import contextmanager
+from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock, patch
 
 import pytest
 
 from syntara.core.constants import JsonbLimits
+from syntara.core.exceptions import SafeValueError
 from syntara.core.jsonb_limits import serialized_json_size
 from syntara.workflows.models import Workflow, WorkflowCreate, WorkflowUpdate, WorkflowVersion
+from syntara.workflows.services.form_response_schema import prepare_workflow_definition_for_persistence
 from syntara.workflows.services.workflow_service import WorkflowService
 
 if TYPE_CHECKING:
@@ -76,7 +80,7 @@ def _form_definition(value_name: str = "request_title") -> dict[str, Any]:
 
 def _expected_properties(text_value_name: str) -> dict[str, dict[str, Any]]:
     return {
-        text_value_name: {"type": "string"},
+        text_value_name: {"type": "string", "minLength": 1},
         "contact": {"type": "string"},
         "count": {"type": ["number", "null"]},
         "confirmed": {"type": "boolean"},
@@ -200,6 +204,56 @@ class TestWorkflowFormResponseSchemaPersistence:
         updated_prompt_parameters = updated_version.workflow_definition["nodes"][0]["parameters"]
         assert updated_trigger_parameters["response_schema"]["properties"] == _expected_properties("updated_title")
         assert updated_prompt_parameters["response_schema"] == prompt_schema
+
+    @pytest.mark.asyncio
+    async def test_form_preparation_is_included_in_validation_metrics(
+        self, test_db_session: AsyncSession, test_user: User, test_project_id: UUID
+    ) -> None:
+        service = WorkflowService(test_db_session, test_user)
+        events: list[str] = []
+
+        @contextmanager
+        def record_time(*_args: object, **_kwargs: object) -> Generator[None, None, None]:
+            events.append("timer-enter")
+            try:
+                yield
+            finally:
+                events.append("timer-exit")
+
+        def tracked_prepare(
+            definition: dict[str, Any],
+            previous_definition: dict[str, Any] | None = None,
+        ) -> dict[str, Any]:
+            events.append("prepare")
+            return prepare_workflow_definition_for_persistence(definition, previous_definition)
+
+        recorder = SimpleNamespace(time=record_time, record=lambda *_args, **_kwargs: None)
+        with (
+            patch("syntara.workflows.services.workflow_service.get_metrics_recorder", return_value=recorder),
+            patch(
+                "syntara.workflows.services.workflow_service.prepare_workflow_definition_for_persistence",
+                side_effect=tracked_prepare,
+            ),
+        ):
+            workflow, _initial_version, _validation_result = await service.create_workflow(
+                name=f"form-schema-metrics-{test_project_id.hex[:8]}",
+                description=None,
+                labels={},
+                workflow_definition=_workflow_definition(),
+                project_id=test_project_id,
+            )
+            assert events == ["timer-enter", "prepare", "timer-exit"]
+
+            events.clear()
+            updated_definition = _workflow_definition()
+            updated_definition["triggers"][0]["parameters"]["form_definition"] = _form_definition("updated_title")
+            await service.create_workflow_version(
+                workflow,
+                workflow_definition=updated_definition,
+                change_description="Update form",
+            )
+
+        assert events == ["timer-enter", "prepare", "timer-exit"]
 
     @pytest.mark.asyncio
     async def test_legacy_definition_without_schema_is_not_retroactively_changed(
@@ -327,7 +381,7 @@ class TestWorkflowFormResponseSchemaPersistence:
         assert workflow.has_validation_issues is True
 
     @pytest.mark.asyncio
-    async def test_round_trip_update_with_large_static_options(
+    async def test_large_generated_schema_fails_fast_on_create(
         self, test_db_session: AsyncSession, test_user: User, test_project_id: UUID
     ) -> None:
         service = WorkflowService(test_db_session, test_user)
@@ -343,37 +397,69 @@ class TestWorkflowFormResponseSchemaPersistence:
             }
         )
         assert create_request.workflow_definition is not None
+        assert serialized_json_size(definition) < JsonbLimits.MAX_WORKFLOW_DEFINITION_BYTES
 
-        workflow, initial_version, validation_result = await service.create_workflow(
-            name=f"large-form-schema-{test_project_id.hex[:8]}",
+        with pytest.raises(SafeValueError, match="workflow_definition exceeds maximum serialized size"):
+            await service.create_workflow(
+                name=f"large-form-schema-{test_project_id.hex[:8]}",
+                description=None,
+                labels={},
+                workflow_definition=definition,
+                project_id=test_project_id,
+            )
+
+    @pytest.mark.asyncio
+    async def test_large_generated_schema_fails_fast_on_update(
+        self, test_db_session: AsyncSession, test_user: User, test_project_id: UUID
+    ) -> None:
+        service = WorkflowService(test_db_session, test_user)
+        workflow, _initial_version, _validation_result = await service.create_workflow(
+            name=f"large-form-update-{test_project_id.hex[:8]}",
             description=None,
             labels={},
-            workflow_definition=definition,
+            workflow_definition=_workflow_definition(),
             project_id=test_project_id,
         )
-
-        assert not validation_result.error_count
-        assert serialized_json_size(definition) < JsonbLimits.MAX_WORKFLOW_DEFINITION_BYTES
-        assert serialized_json_size(initial_version.workflow_definition) > JsonbLimits.MAX_WORKFLOW_DEFINITION_BYTES
-
-        round_trip_definition = deepcopy(initial_version.workflow_definition)
-        round_trip_definition["description"] = "Unrelated edit"
+        definition = _large_static_option_workflow_definition()
+        definition["name"] = "large-form-schema-workflow"
+        definition["description"] = "Updated with large static option values"
         update_request = WorkflowUpdate.model_validate(
             {
                 "name": workflow.name,
                 "description": workflow.description,
-                "workflow_definition": round_trip_definition,
-                "change_description": "Unrelated edit",
+                "workflow_definition": definition,
+                "change_description": "Expand static options",
             }
         )
         assert update_request.workflow_definition is not None
 
-        updated_version, updated_validation = await service.create_workflow_version(
-            workflow,
-            workflow_definition=round_trip_definition,
-            change_description="Unrelated edit",
-        )
+        with pytest.raises(SafeValueError, match="workflow_definition exceeds maximum serialized size"):
+            await service.create_workflow_version(
+                workflow,
+                workflow_definition=definition,
+                change_description="Expand static options",
+            )
 
-        assert not updated_validation.error_count
-        assert updated_version is not None
-        assert "response_schema" in updated_version.workflow_definition["triggers"][0]["parameters"]
+    @pytest.mark.asyncio
+    async def test_large_generated_schema_fails_fast_on_inline_publish(
+        self, test_db_session: AsyncSession, test_user: User, test_project_id: UUID
+    ) -> None:
+        service = WorkflowService(test_db_session, test_user)
+        workflow, initial_version, _validation_result = await service.create_workflow(
+            name=f"large-form-publish-{test_project_id.hex[:8]}",
+            description=None,
+            labels={},
+            workflow_definition=_workflow_definition(),
+            project_id=test_project_id,
+        )
+        definition = _large_static_option_workflow_definition()
+        definition["name"] = "large-form-schema-workflow"
+        definition["description"] = "Published with large static option values"
+
+        with pytest.raises(SafeValueError, match="workflow_definition exceeds maximum serialized size"):
+            await service.publish_workflow_version(
+                workflow_id=workflow.id,
+                version=initial_version.version,
+                workflow_definition=definition,
+                change_description="Publish large static options",
+            )

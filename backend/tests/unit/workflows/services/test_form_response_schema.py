@@ -80,7 +80,7 @@ def test_generated_schema_matches_normalized_response_data() -> None:
         "severity",
         "tags",
     ]
-    assert schema["properties"]["title"] == {"type": "string"}
+    assert schema["properties"]["title"] == {"type": "string", "minLength": 1}
     assert schema["properties"]["contact"] == {"type": "string"}
     assert schema["properties"]["count"] == {"type": ["number", "null"]}
     assert schema["properties"]["accepted"] == {"const": True}
@@ -95,7 +95,39 @@ def test_generated_schema_matches_normalized_response_data() -> None:
     }
     assert Draft202012Validator(schema).is_valid(
         {
+            "title": "Request title",
+            "contact": "",
+            "count": None,
+            "accepted": True,
+            "scheduled_at": "",
+            "severity": None,
+            "tags": [],
+        }
+    )
+
+    assert not Draft202012Validator(schema).is_valid(
+        {
             "title": "",
+            "contact": "",
+            "count": None,
+            "accepted": True,
+            "scheduled_at": "",
+            "severity": None,
+            "tags": [],
+        }
+    )
+
+
+def test_required_email_schema_rejects_empty_string() -> None:
+    form_definition = _form_definition()
+    form_definition["fields"][1]["required"] = True
+
+    schema = generate_form_response_schema(form_definition)
+
+    assert schema["properties"]["contact"] == {"type": "string", "minLength": 1}
+    assert not Draft202012Validator(schema).is_valid(
+        {
+            "title": "Request title",
             "contact": "",
             "count": None,
             "accepted": True,

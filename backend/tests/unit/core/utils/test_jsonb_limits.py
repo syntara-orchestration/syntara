@@ -97,7 +97,15 @@ class TestValidateWorkflowDefinitionJson:
         }
 
         assert serialized_json_size(definition) > JsonbLimits.MAX_WORKFLOW_DEFINITION_BYTES
-        assert validate_workflow_definition_json(definition) is definition
+        result = validate_workflow_definition_json(definition)
+
+        assert result is not definition
+        assert "response_schema" not in result["nodes"][0]["parameters"]
+        assert "response_schema" in definition["nodes"][0]["parameters"]
+        assert (
+            result["nodes"][0]["parameters"]["form_definition"]
+            is definition["nodes"][0]["parameters"]["form_definition"]
+        )
 
     def test_skips_non_dict_values(self) -> None:
         assert validate_workflow_definition_json(None) is None

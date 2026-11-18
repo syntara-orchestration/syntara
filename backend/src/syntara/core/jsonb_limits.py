@@ -3,8 +3,7 @@
 from __future__ import annotations
 
 import json
-from copy import deepcopy
-from typing import Annotated, Any
+from typing import Annotated, Any, cast
 
 from pydantic import BeforeValidator
 
@@ -107,24 +106,43 @@ def validate_workflow_definition_json[T](value: T) -> T:
         )
         raise SafeValueError(msg)
 
-    return value
+    return cast("T", authored_value)
 
 
 def _without_generated_form_response_schemas(value: dict[str, Any]) -> dict[str, Any]:
     if not _contains_generated_form_response_schema(value):
         return value
 
-    authored_value = deepcopy(value)
+    authored_value = {**value}
     for collection_name in ("triggers", "nodes"):
         items = authored_value.get(collection_name, [])
         if not isinstance(items, list):
             continue
+
+        filtered_items: list[Any] = []
         for item in items:
-            if not isinstance(item, dict) or not _is_form_node(item):
+            if (
+                isinstance(item, dict)
+                and _is_form_node(item)
+                and isinstance(item.get("parameters"), dict)
+                and "response_schema" in item["parameters"]
+            ):
+                parameters = item["parameters"]
+                filtered_items.append(
+                    {
+                        **item,
+                        "parameters": {
+                            key: parameter_value
+                            for key, parameter_value in parameters.items()
+                            if key != "response_schema"
+                        },
+                    }
+                )
                 continue
-            parameters = item.get("parameters")
-            if isinstance(parameters, dict):
-                parameters.pop("response_schema", None)
+
+            filtered_items.append(item)
+
+        authored_value[collection_name] = filtered_items
     return authored_value
 
 
