@@ -34,6 +34,7 @@ export function TriggerNodeComponent(props: NodeProps<TriggerNode>) {
   const isScheduled = triggerType === TriggerTypeEnum.SCHEDULED
   const isWebhook = triggerType === TriggerTypeEnum.WEBHOOK_TRIGGER
   const isEda = triggerType === TriggerTypeEnum.EDA_TRIGGER
+  const isSubworkflow = triggerType === TriggerTypeEnum.SUBWORKFLOW_TRIGGER
 
   let metadata = nodeMetadata.trigger
   let iconId = 'trigger-manual'
@@ -46,6 +47,9 @@ export function TriggerNodeComponent(props: NodeProps<TriggerNode>) {
   } else if (isEda) {
     metadata = nodeMetadata.edaTrigger
     iconId = 'trigger-eda'
+  } else if (isSubworkflow) {
+    metadata = nodeMetadata.subWorkflowTrigger
+    iconId = 'trigger-subworkflow'
   }
   const iconNode = renderNodeIcon(metadata.icon, iconId)
   // 75px border-radius is a layout constraint (pill shape), not a spacing value — no semantic token applies
@@ -85,6 +89,8 @@ export function TriggerNodeComponent(props: NodeProps<TriggerNode>) {
     triggerTypeLabel = 'Webhook trigger'
   } else if (isEda) {
     triggerTypeLabel = 'Event-Driven Ansible trigger'
+  } else if (isSubworkflow) {
+    triggerTypeLabel = 'Workflow trigger'
   }
 
   return (

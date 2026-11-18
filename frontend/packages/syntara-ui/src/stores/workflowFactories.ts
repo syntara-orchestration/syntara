@@ -10,6 +10,7 @@ export {
   createEventTrigger,
   createManualTrigger,
   createScheduledTrigger,
+  createSubworkflowTrigger,
   createWebhookTrigger,
 } from './triggerFactories'
 

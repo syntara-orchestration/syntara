@@ -45,6 +45,7 @@ export const TriggerTypeEnum = {
   EVENT: 'event',
   WEBHOOK_TRIGGER: 'webhook_trigger',
   EDA_TRIGGER: 'eda_trigger',
+  SUBWORKFLOW_TRIGGER: 'subworkflow_trigger',
 } as const
 
 export type TriggerType = (typeof TriggerTypeEnum)[keyof typeof TriggerTypeEnum]

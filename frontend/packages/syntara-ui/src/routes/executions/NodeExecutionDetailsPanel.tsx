@@ -9,9 +9,6 @@ import {
   Spinner,
   Stack,
   StackItem,
-  Tab,
-  Tabs,
-  TabTitleText,
   Title,
   TitleSizes,
 } from '@patternfly/react-core'
@@ -22,7 +19,7 @@ import {
   RhUiWarningFillIcon,
 } from '@patternfly/react-icons'
 import { ActivityTypeEnum } from '@syntara/contracts'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 
 import { SynCodeBlock } from '../../components/details/SynCodeBlock'
 import { SynLabel } from '../../components/labels/SynLabel'
@@ -38,6 +35,8 @@ import { ActivityStatusLabel } from '../builder/ExecutionStatus'
 import { InputSchemaView } from '../builder/panels/views/InputSchemaView'
 import { InputTableView } from '../builder/panels/views/InputTableView'
 import { ViewToggle, type PanelView } from '../builder/panels/ViewToggle'
+import { extractSubWorkflowChild } from '../workflows/execution/subWorkflowChild'
+import { SubWorkflowRunLink } from '../workflows/execution/SubWorkflowRunLink'
 import type { ActivityState } from '../workflows/execution/types'
 import { extractApprovalAudit, type ApprovalAudit } from '../workflows/execution/utils/activityState'
 
@@ -45,6 +44,8 @@ import { extractAgentTrace } from './agentTraceTypes'
 import { AgentTraceView } from './AgentTraceView'
 import { useNodeExecutionDetails } from './hooks/useNodeExecutionDetails'
 import styles from './NodeExecutionDetailsPanel.module.css'
+import { NodeDetailTabBar } from './NodeExecutionDetailsViews'
+import { nodeTabPanelAttrs } from './nodeTabPanel'
 import { extractUsedTools, type UsedTool } from './utils/extractUsedTools'
 
 type NodeExecutionDetailsPanelProps = {
@@ -250,20 +251,34 @@ function NodeDetailsHeader({
   nodeCompleted,
   nodeElapsedLabel,
   status,
+  subWorkflowChild,
 }: Readonly<{
   nodeName: string
   nodeStarted: string | null
   nodeCompleted: string | null
   nodeElapsedLabel?: string
   status?: ActivityState['status']
+  subWorkflowChild?: { childExecutionId: string; childName: string | null } | null
 }>) {
   return (
     <StackItem className={styles.headerRow}>
       <Flex justifyContent={{ default: 'justifyContentSpaceBetween' }} alignItems={{ default: 'alignItemsCenter' }}>
         <FlexItem>
-          <Title headingLevel="h2" size={TitleSizes.md} style={{ margin: 0 }}>
-            {nodeName}
-          </Title>
+          <Stack>
+            <StackItem>
+              <Title headingLevel="h2" size={TitleSizes.md} className={styles.nodeTitle}>
+                {nodeName}
+              </Title>
+            </StackItem>
+            {subWorkflowChild && (
+              <StackItem>
+                <SubWorkflowRunLink
+                  childExecutionId={subWorkflowChild.childExecutionId}
+                  childName={subWorkflowChild.childName}
+                />
+              </StackItem>
+            )}
+          </Stack>
         </FlexItem>
         <FlexItem>
           <Flex gap={{ default: 'gapMd' }} alignItems={{ default: 'alignItemsCenter' }}>
@@ -370,6 +385,14 @@ export function NodeExecutionDetailsPanel({
 }: Readonly<NodeExecutionDetailsPanelProps>) {
   const [activeTab, setActiveTab] = useState<'io' | 'agent-steps'>('io')
   const isAgenticNode = nodeType === ActivityTypeEnum.AGENTIC
+  const isSubWorkflowNode = nodeType === ActivityTypeEnum.SUB_WORKFLOW
+  // Tab/panel wiring: the Input/Output and Agent steps tabs render their content in a
+  // shared region below. Give that region role="tabpanel" with an aria-label (the active
+  // tab's key); PatternFly's tab-button ids carry an unpredictable internal counter, so
+  // aria-labelledby cannot reference them reliably. The tab points at this region via
+  // aria-controls (nodeTabPanelId).
+  const hasNodeTabs = isAgenticNode
+  const tabsBaseId = useId()
   const { inputData, outputData, isLoading, error, refetch } = useNodeExecutionDetails(
     nodeId,
     executionId,
@@ -386,6 +409,11 @@ export function NodeExecutionDetailsPanel({
   const { elapsedMs } = useElapsedTime(nodeStarted, nodeCompleted, nodeIsRunning)
   const nodeElapsedLabel = elapsedMs === undefined ? undefined : formatElapsedTime(elapsedMs)
 
+  // Link to the child execution for a sub-workflow node. runtimeMetadata comes from the live
+  // execution store (updated over the WebSocket while the node is still RUNNING, with no status
+  // change), so the link appears during the child's run; outputData is the terminal-state fallback.
+  const subWorkflowChild = isSubWorkflowNode ? extractSubWorkflowChild(nodeState?.runtimeMetadata, outputData) : null
+
   return (
     <Stack className={styles.contentContainer}>
       <NodeDetailsHeader
@@ -394,6 +422,7 @@ export function NodeExecutionDetailsPanel({
         nodeCompleted={nodeCompleted}
         nodeElapsedLabel={nodeElapsedLabel}
         status={nodeState?.status}
+        subWorkflowChild={subWorkflowChild}
       />
 
       {/* Approval audit strip (shown only for decided approval nodes) */}
@@ -407,21 +436,21 @@ export function NodeExecutionDetailsPanel({
 
       <AAPJobLink outputData={outputData} nodeType={nodeType} />
 
-      {/* Tab bar for agentic nodes */}
-      {isAgenticNode && (
-        <StackItem className={styles.tabBar}>
-          <Tabs
-            activeKey={activeTab}
-            onSelect={(_e, key) => setActiveTab(key as 'io' | 'agent-steps')}
-            variant="default"
-          >
-            <Tab eventKey="io" title={<TabTitleText>Input/Output</TabTitleText>} />
-            <Tab eventKey="agent-steps" title={<TabTitleText>Agent steps</TabTitleText>} />
-          </Tabs>
-        </StackItem>
+      {/* Tab bar for agentic nodes (Input/Output | Agent steps). Input/Output stays the default. */}
+      {hasNodeTabs && (
+        <NodeDetailTabBar
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+          isAgenticNode={isAgenticNode}
+          idBase={tabsBaseId}
+        />
       )}
 
-      <StackItem isFilled style={{ minHeight: 0, overflow: 'hidden' }}>
+      <StackItem
+        isFilled
+        className={styles.nodeContentRegion}
+        {...nodeTabPanelAttrs(hasNodeTabs, tabsBaseId, activeTab)}
+      >
         <NodeContentArea
           nodeId={nodeId}
           inputData={inputData}

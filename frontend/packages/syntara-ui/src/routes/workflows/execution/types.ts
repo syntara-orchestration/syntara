@@ -122,6 +122,8 @@ export type ActivityState = {
   errorDetails?: string | null
   /** Activity output data (API response body, status code, etc.) */
   outputData?: Record<string, unknown> | null
+  /** Intermediate, UI-relevant metadata available while the activity runs (distinct from the final output) */
+  runtimeMetadata?: Record<string, unknown> | null
   /** When activity started execution */
   startedAt?: string | null
   /** When activity reached terminal state */

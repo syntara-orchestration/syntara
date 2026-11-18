@@ -28,6 +28,7 @@ _NODE_SETTINGS_CLASS: dict[str, type[NodeSettingsBase]] = {
     NodeType.WAIT: NodeSettingsCofDisabled,
     NodeType.CONVERGE: NodeSettingsCof,
     NodeType.LOOP: NodeSettingsCof,
+    NodeType.SUB_WORKFLOW: NodeSettingsNoRetry,
     NodeType.CONDITION: NodeSettingsBase,
     NodeType.SWITCH: NodeSettingsBase,
 }

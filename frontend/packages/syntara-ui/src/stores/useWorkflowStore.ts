@@ -630,6 +630,7 @@ export {
   createEventTrigger,
   createWebhookTrigger,
   createEdaTrigger,
+  createSubworkflowTrigger,
   createScriptActivity,
   createApiActivity,
   createAgenticActivity,

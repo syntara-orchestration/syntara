@@ -483,6 +483,10 @@ export interface components {
       published_version_id: string
       /** Published Version */
       published_version: number
+      /** Published Version Name */
+      published_version_name?: string | null
+      /** Published Version Created At */
+      published_version_created_at?: string | null
       /** Is Eligible */
       is_eligible: boolean
       /** Triggers */
@@ -2459,6 +2463,10 @@ export interface components {
       iteration?: number | null
       /** Output Data */
       output_data?: {
+        [key: string]: unknown
+      } | null
+      /** Runtime Metadata */
+      runtime_metadata?: {
         [key: string]: unknown
       } | null
       /** Started At */

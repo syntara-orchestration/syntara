@@ -146,6 +146,7 @@ class ActivityExecutionSyncMixin:
         output_data: dict[str, Any] | None,
         *,
         is_loop_control: bool = False,
+        preserve_io: bool = False,
     ) -> dict[str, Any]:
         """Update an ActivityExecution record with new data from Temporal events.
 
@@ -157,6 +158,9 @@ class ActivityExecutionSyncMixin:
             input_data: Scrubbed input data
             output_data: Scrubbed output data
             is_loop_control: Whether this is a loop control node
+            preserve_io: When True, leave ``input_data``/``output_data`` untouched
+                (the sub-workflow setup path: those columns are owned by
+                ``_persist_parent_node_io`` and must not be clobbered)
 
         Returns:
             Dictionary of old field values before the update
@@ -169,14 +173,20 @@ class ActivityExecutionSyncMixin:
             "error_details": existing.error_details,
             "retry_count": existing.retry_count,
             "output_data": existing.output_data,
+            "runtime_metadata": existing.runtime_metadata,
             "iteration": existing.iteration,
         }
 
         existing.status = activity_data["status"]
         existing.started_at = activity_data["started_at"] or (existing.started_at if is_loop_control else None)
         existing.completed_at = activity_data["completed_at"]
-        existing.input_data = input_data or {}
-        existing.output_data = output_data
+        if not preserve_io:
+            existing.input_data = input_data or {}
+            existing.output_data = output_data
+        # Preserve runtime_metadata when a partial update omits the key; an explicit
+        # null (key present, value None) clears it. No populator sets it yet (C1).
+        if "runtime_metadata" in activity_data:
+            existing.runtime_metadata = activity_data["runtime_metadata"]
         existing.error_details = activity_data["error_details"]
         existing.retry_count = activity_data["retry_count"]
         if activity_data.get("iteration") is not None and not is_loop_control:
@@ -329,6 +339,10 @@ class ActivityExecutionSyncMixin:
         """
         activity_id = activity_data["activity_id"]
 
+        # Sub-workflow setup: keyed to the canvas node, not a normal activity.
+        if activity_data.get("_subworkflow_setup"):
+            return self._sync_subworkflow_setup(activity_data, existing_activities, metadata, session)
+
         # Skip internal activities (defense in depth)
         if activity_id.startswith("__internal__"):
             return None
@@ -396,6 +410,113 @@ class ActivityExecutionSyncMixin:
         )
         return existing, old_values, is_new
 
+    def _sync_subworkflow_setup(
+        self,
+        activity_data: dict[str, Any],
+        existing_activities: dict[str, ActivityExecution],
+        metadata: ExecutionMonitorMetadata,
+        session: AsyncSession,
+    ) -> tuple[ActivityExecution, dict[str, Any], bool] | None:
+        """Sync a sub-workflow node's lifecycle + I/O from its setup activity.
+
+        Keyed to the canvas node's aggregate row (created upfront). This is the sole
+        writer of the node's ``input_data``/``output_data`` (reconstructed from the
+        setup result in ``_subworkflow_io``); there is no direct activity-side
+        writer. Behaviour:
+
+        - STARTED (no payload yet): status RUNNING + started_at only; I/O preserved
+          (``preserve_io=True``).
+        - COMPLETED (payload present): writes the reconstructed I/O summaries and
+          the child link (``runtime_metadata``) through the shared writer. A
+          non-looped node keeps its single aggregate row; a ``for_each`` node
+          resolves one run-details row per iteration (``{canvas}#iter-{n}``),
+          each populated from its own setup result so it links to that
+          iteration's distinct child execution. The synchronizer
+          applies pending events in ascending Temporal scheduled-event-id order,
+          and each iteration maps to its own row by explicit index, so the
+          result is independent of event ordering.
+        - Terminal row: an I/O-only, set-if-empty backfill (see
+          ``_backfill_terminal_subworkflow_io``) — never touches status/timestamps/
+          error_details/runtime_metadata and never overwrites non-empty I/O, so a
+          node terminalized mid-setup still shows its invocation I/O with no
+          terminal-state regression.
+
+        Reuses the shared writer/publisher so deltas are emitted like any other
+        activity update.
+        """
+        activity_id = activity_data["activity_id"]
+        iteration_chain = activity_data.get("_subworkflow_iteration_chain")
+        if iteration_chain is None:
+            # Defensive fallback for any update that predates the chain field:
+            # treat the innermost index as a single-level chain.
+            inner = activity_data.get("_subworkflow_iteration")
+            iteration_chain = [] if inner is None else [inner]
+        existing, is_new = self._get_or_create_subworkflow_iteration_record(
+            activity_id, iteration_chain, existing_activities, metadata, session
+        )
+        if existing is None:
+            return None
+
+        io_summary = activity_data.get("_subworkflow_io")
+
+        if existing.status in TERMINAL_ACTIVITY_STATUSES:
+            return self._backfill_terminal_subworkflow_io(existing, io_summary)
+
+        if io_summary is not None:
+            old_values = self._update_activity_record(
+                existing,
+                activity_data,
+                io_summary["input"],
+                io_summary["output"],
+                preserve_io=False,
+            )
+        else:
+            old_values = self._update_activity_record(
+                existing,
+                activity_data,
+                existing.input_data,
+                existing.output_data,
+                preserve_io=True,
+            )
+        return existing, old_values, is_new
+
+    @staticmethod
+    def _backfill_terminal_subworkflow_io(
+        existing: ActivityExecution,
+        io_summary: dict[str, dict[str, Any]] | None,
+    ) -> tuple[ActivityExecution, dict[str, Any], bool] | None:
+        """I/O-only, set-if-empty backfill for a sub-workflow row already terminal.
+
+        Never modifies status/started_at/completed_at/error_details/runtime_metadata
+        and never overwrites non-empty input/output, so a node terminalized
+        mid-setup (e.g. parent cancel / converge detach) still shows its invocation
+        I/O without any terminal-state regression. Idempotent: a second application
+        is a no-op. Committed by the existing synchronizer transaction — not a new
+        writer.
+        """
+        if io_summary is None:
+            return None
+        old_output = existing.output_data
+        wrote = False
+        if existing.input_data in (None, {}) and io_summary["input"]:
+            existing.input_data = io_summary["input"]
+            wrote = True
+        if existing.output_data is None and io_summary["output"]:
+            existing.output_data = io_summary["output"]
+            wrote = True
+        if not wrote:
+            return None
+        old_values = {
+            "status": existing.status,
+            "started_at": existing.started_at,
+            "completed_at": existing.completed_at,
+            "error_details": existing.error_details,
+            "output_data": old_output,
+            "runtime_metadata": existing.runtime_metadata,
+            "iteration": existing.iteration,
+        }
+        return existing, old_values, False
+
     @staticmethod
     def _io_after_query_failure(
         existing: ActivityExecution,
@@ -441,6 +562,92 @@ class ActivityExecutionSyncMixin:
             except (TemporalError, ValueError):
                 return self._io_after_query_failure(existing, activity_data)
         return existing.input_data, activity_data.get("output_data")
+
+    @staticmethod
+    def _get_or_create_subworkflow_iteration_record(
+        canvas_id: str,
+        iteration_chain: list[int],
+        existing_activities: dict[str, ActivityExecution],
+        metadata: ExecutionMonitorMetadata,
+        session: AsyncSession,
+    ) -> tuple[ActivityExecution | None, bool]:
+        """Resolve the ActivityExecution row for a sub-workflow setup event.
+
+        ``iteration_chain`` is the full loop-index chain (outermost first) for
+        this setup event: ``[]`` for a non-looped node, ``[i]`` inside a single
+        loop, ``[o, i]`` inside a nested loop. A non-looped node and the first
+        iteration (all-zero chain) both reuse the canvas node's upfront aggregate
+        row, so the common case is unchanged. Every other iteration gets a
+        deterministic per-iteration row keyed ``{canvas_id}#iter-{token}`` where
+        ``token`` joins the whole chain (``"1"``, ``"0-1"``, ``"1-0"``...). Keying
+        by the complete chain -- not the innermost index -- is what keeps distinct
+        nested iterations from colliding, while still being a pure function of the
+        Temporal activity id: duplicate, retried or out-of-order setup events for
+        the same iteration always map to the same row, and no iteration can create
+        a duplicate row or overwrite another iteration's child link. Single-loop
+        keys are unchanged (the token is the single index).
+
+        Returns ``(row, is_new)``; ``row`` is None only when the upfront aggregate
+        row is missing (logged, matching the previous behaviour).
+        """
+        original = existing_activities.get(canvas_id)
+        if original is None:
+            logger.warning(
+                "Sub-workflow node row not found for setup sync (should exist upfront)",
+                activity_id=canvas_id,
+                execution_id=metadata.execution_id,
+            )
+            return None, False
+
+        # Non-looped, or the first iteration (all-zero chain): the upfront
+        # aggregate row is row 0. This keeps single-loop iter-0 and nested
+        # [0, 0] on the canvas node's own row, exactly as before.
+        if not iteration_chain:
+            return original, False
+        if all(index == 0 for index in iteration_chain):
+            if original.iteration is None:
+                original.iteration = 0
+            return original, False
+
+        # Later iterations: key by the full chain so nested iterations that
+        # share an innermost index (e.g. [0, 1] and [1, 1]) stay distinct.
+        iteration_token = "-".join(str(index) for index in iteration_chain)
+        iteration_number = iteration_chain[-1]
+        composite_key = f"{canvas_id}{_COMPOSITE_ITER_SEP}{iteration_token}"
+        existing = existing_activities.get(composite_key)
+        if existing is not None:
+            return existing, False
+
+        # First event for this iteration: materialise its row. The original row
+        # becomes iteration 0 (the publisher emits the matching replace op).
+        if original.iteration is None:
+            original.iteration = 0
+        new_activity = ActivityExecution(
+            execution_id=metadata.execution_id,
+            activity_name=composite_key,
+            node_type=original.node_type,
+            temporal_activity_id=composite_key,
+            status=ActivityStatus.PENDING,
+            started_at=None,
+            completed_at=None,
+            input_data={},
+            output_data=None,
+            error_details=None,
+            retry_count=0,
+            iteration=iteration_number,
+        )
+        session.add(new_activity)
+        existing_activities[composite_key] = new_activity
+        metadata.activity_index_map[composite_key] = metadata.next_activity_index
+        metadata.next_activity_index += 1
+        logger.debug(
+            "Created per-iteration sub-workflow ActivityExecution record",
+            activity_id=canvas_id,
+            composite_key=composite_key,
+            iteration=iteration_number,
+            execution_id=metadata.execution_id,
+        )
+        return new_activity, True
 
     @staticmethod
     def _get_or_create_iteration_record(

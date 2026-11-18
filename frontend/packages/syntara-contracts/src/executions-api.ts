@@ -108,6 +108,26 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/executions/{execution_id}/children': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * List child executions
+     * @description Retrieve child (sub-workflow) executions spawned by a parent execution.
+     */
+    get: operations['list_child_executions']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/executions/{execution_id}/activities/{activity_id}/signal': {
     parameters: {
       query?: never
@@ -300,6 +320,13 @@ export interface components {
         [key: string]: unknown
       } | null
       /**
+       * Runtime Metadata
+       * @description Intermediate, UI-relevant execution metadata available before the final output
+       */
+      runtime_metadata?: {
+        [key: string]: unknown
+      } | null
+      /**
        * Error Details
        * @description Error information if failed
        */
@@ -331,6 +358,10 @@ export interface components {
       iteration?: number | null
       /** Output Data */
       output_data?: {
+        [key: string]: unknown
+      } | null
+      /** Runtime Metadata */
+      runtime_metadata?: {
         [key: string]: unknown
       } | null
       /** Started At */
@@ -2258,6 +2289,47 @@ export interface operations {
         }
         content: {
           'application/json': components['schemas']['ActivityExecutionListResponse']
+        }
+      }
+      400: components['responses']['BadRequestError']
+      401: components['responses']['UnauthorizedError']
+      403: components['responses']['ForbiddenError']
+      404: components['responses']['NotFoundError']
+      409: components['responses']['ConflictError']
+      422: components['responses']['ValidationError']
+      429: components['responses']['RateLimitError']
+      500: components['responses']['InternalServerError']
+    }
+  }
+  list_child_executions: {
+    parameters: {
+      query?: {
+        /** @description Maximum number of results per page */
+        limit?: components['parameters']['limitParam']
+        /** @description Pagination cursor from previous response */
+        cursor?: components['parameters']['cursorParam']
+        /** @description Sort parameter (e.g., 'name', '-created_at') */
+        sort?: components['parameters']['sortParam']
+        /** @description Include total count in response (expensive) */
+        include_total?: components['parameters']['includeTotalParam']
+        /** @description Filter by parent sub-workflow node ID. */
+        node_id?: string | null
+      }
+      header?: never
+      path: {
+        execution_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ExecutionListResponse']
         }
       }
       400: components['responses']['BadRequestError']

@@ -430,6 +430,7 @@ class ActivityData(SQLModel):
     status: str
     error_details: str | None = None
     output_data: dict[str, Any] | None = None
+    runtime_metadata: dict[str, Any] | None = None
     started_at: datetime | None = None
     completed_at: datetime | None = None
     iteration: int | None = None

@@ -54,6 +54,12 @@ export const nodeMetadata: Record<string, NodeMetadata> = {
     disableTarget: true,
     expandable: false,
   },
+  subWorkflowTrigger: {
+    icon: RhUiNetworkIcon,
+    label: 'Trigger',
+    disableTarget: true,
+    expandable: false,
+  },
   task: {
     label: 'Task',
     expandable: true,

@@ -74,7 +74,7 @@ function FormWithHeader(props: Partial<React.ComponentProps<typeof SubWorkflowNo
 
 async function selectChildWorkflow(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByPlaceholderText('Search for a published workflow...'))
-  await user.click(await screen.findByText('Child workflow (v3)'))
+  await user.click(await screen.findByText('Child workflow'))
 }
 
 describe('SubWorkflowNodeForm', () => {

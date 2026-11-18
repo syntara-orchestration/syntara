@@ -185,6 +185,7 @@ function WorkflowSelectionFields({
               errorMessage={invocation.errorMessage}
               errorVariant={invocation.errorVariant}
               onRetry={invocation.retryFailedLookups}
+              hasProject={invocation.hasProject}
               labelHelp={nodeHelp.subworkflowWorkflow}
               triggerLabelHelp={nodeHelp.subworkflowTrigger}
               isRequired
@@ -337,18 +338,14 @@ export function SubWorkflowNodeForm({
     [control]
   )
 
-  // Pattern shared across all node forms - pass header content to parent for builder UI
-  // eslint-disable-next-line reactYouMightNotNeedAnEffect/no-pass-data-to-parent -- project-wide pattern, refactor all node forms together
+  // Pass header content to parent for builder UI, clearing it on unmount or when
+  // the content changes (single effect with cleanup, matching the other node forms).
   useEffect(() => {
     onHeaderContentChange?.(headerContent)
-  }, [headerContent, onHeaderContentChange])
-
-  useEffect(
-    () => () => {
+    return () => {
       onHeaderContentChange?.(null)
-    },
-    [onHeaderContentChange]
-  )
+    }
+  }, [headerContent, onHeaderContentChange])
 
   const parametersContent = (
     <Stack hasGutter>
