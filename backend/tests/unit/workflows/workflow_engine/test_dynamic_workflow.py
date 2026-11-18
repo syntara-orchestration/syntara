@@ -764,6 +764,44 @@ class TestFanInConverge:
         assert wf.failed_nodes["converge_node"]
         assert wf.get_activity_input("converge_node") == converge_node.parameters
 
+    def test_timeout_does_not_overwrite_already_recorded_converge_inputs(
+        self, mock_timeout_workflow: MagicMock
+    ) -> None:
+        """A timeout after dispatch must keep the resolved parameters already recorded."""
+        wf = _make_workflow()
+        graph = _build_fanin_graph()
+        converge_node = graph.get_node("converge_node")
+        converge_node.parameters = {"strategy": "all", "wait_duration": "${settings.wait}"}
+        resolved_inputs = {"strategy": "all", "wait_duration": 45}
+        wf._record_input_history(converge_node, resolved_inputs)
+        wf.resolver.set_namespace("node_a", {"result": "a_done"})
+
+        loop = asyncio.new_event_loop()
+        try:
+            loop.run_until_complete(
+                wf._converge_timeout_handler("converge_node", graph, timeout_seconds=10, pending_tasks={})
+            )
+        finally:
+            loop.close()
+
+        assert "converge_node" in wf.failed_nodes
+        assert wf.get_activity_input("converge_node") == resolved_inputs
+
+    def test_pre_activity_failure_preserves_configured_inputs_for_executor_nodes(self) -> None:
+        """HTTP/script setup failures that never record inputs still expose configured parameters."""
+        wf = _make_workflow()
+        backend = InMemoryGraphBackend()
+        parameters = {"method": "GET", "url": "https://example.com/${missing.host}"}
+        backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
+        backend.add_node("rest-api", {"id": "rest-api", "type": "http_request", "parameters": parameters})
+        backend.add_edge("trigger", "rest-api", None)
+        graph = WorkflowGraph(backend)
+
+        wf._handle_node_failure("rest-api", Exception("Key 'host' not found in namespace path"), graph)
+
+        assert wf.failed_nodes["rest-api"]
+        assert wf.get_activity_input("rest-api") == parameters
+
     def test_fail_converge_node_preserves_valid_output_mapping(self) -> None:
         """Converge failure fallback keeps mapped aliases for recovery steps."""
         wf = _make_workflow()

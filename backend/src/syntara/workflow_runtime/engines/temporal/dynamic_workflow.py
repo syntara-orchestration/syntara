@@ -539,6 +539,13 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
         error_message = self._resolve_failure_message(node_id, error, app_error, graph)
         is_cancellation = app_error is not None and app_error.type == "InvocationCancelledError"
 
+        # Expression/setup failures can abort before `_record_input_history`.
+        # Keep the configured parameters so activity sync can persist them the
+        # same way credential/reference failures do after resolution.
+        if node_id not in self.node_inputs:
+            failed_node = graph.get_node(node_id)
+            self._record_input_history(failed_node, failed_node.parameters)
+
         namespace_entry = self._failure_namespace_entry(app_error, restored_output)
 
         # If no output from executor (e.g. parameters resolution failed), build empty output from model

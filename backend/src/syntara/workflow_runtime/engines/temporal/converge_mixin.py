@@ -43,6 +43,7 @@ class WorkflowConvergeMixin:
     failed_nodes: dict[str, str]
     skipped_nodes: set[str]
     resolver: NamespaceResolver
+    node_inputs: dict[str, dict[str, Any]]
     node_control_data: dict[str, dict[str, Any]]
     _runtime_settings: dict[str, Any]
     _cof_failed_nodes: set[str]
@@ -440,10 +441,10 @@ class WorkflowConvergeMixin:
         skipped (via ``_timed_out_converge_nodes``).
         """
         node = graph.get_node(node_id)
-        if input_parameters is not None:
-            # Gate failures can happen before the converge is scheduled as an
-            # activity. Preserve its configured inputs so activity sync and retry
-            # review can still show the parameters that governed the gate.
+        # Gate/timeout can fail before `_execute_single_node` records inputs.
+        # If the converge already ran far enough to publish resolved parameters,
+        # keep those instead of overwriting them with the unresolved definition.
+        if input_parameters is not None and node_id not in self.node_inputs:
             self._record_input_history(node, input_parameters)
 
         cof = resolve_continue_on_failure(node, self._runtime_settings)
