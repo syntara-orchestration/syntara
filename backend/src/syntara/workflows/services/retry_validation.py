@@ -750,7 +750,9 @@ async def validate_retry_from_failure(
         successors=successors,
         overrides=overrides,
     )
-    step_counts, total_steps, retained_result_count = {}, 0, 0
+    step_counts: dict[str, int] = {}
+    total_steps = 0
+    retained_result_count = 0
     if reason is None:
         step_counts, total_steps, retained_result_count = _retry_result_counts(
             snapshot, snapshot_def, reported_selection, completed, successors
