@@ -31,11 +31,15 @@ and `fail` leaves the affected partition unresolved without moving its position.
 Healthy partitions can continue under every policy.
 
 For a new source without established history, persist the verified first
-partition set and adopt an existing group offset before confirming initialization.
-Never overwrite that offset with a preferred start position. The store rechecks
-that the source is not established and that the partition has no retained
-Execution evidence before adopting. Missing initialization history on an
-established source remains blocked rather than being treated as a new source.
+partition set and check current bounds before adopting an existing group offset.
+An expired or out-of-range broker offset on a genuinely new partition uses its
+configured first-start or added-partition policy, including when the gap policy
+is `fail`. Saved partition history still uses the recovery path; it is never
+overwritten by this first-start fallback.
+Never overwrite a valid offset with a preferred start position. The store
+rechecks source and partition history and requires no retained Execution evidence
+before adoption. Missing initialization history on an established first-set
+partition remains blocked rather than being treated as a new partition.
 
 The Kafka client uses `auto_offset_reset="earliest"`. Its transport observes
 out-of-range fetch responses before the SDK can hide them through an automatic

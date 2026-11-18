@@ -268,7 +268,10 @@ class KafkaInitialPositionService:
         self._source(winner)
         if winner.position is not None:
             return winner.position
-        if winner.source_initialized_at is None:
+        if winner.source_initialized_at is None or (
+            winner.configuration.initial_partition_ids is not None
+            and request.partition not in winner.configuration.initial_partition_ids
+        ):
             configuration = await self._store.capture_initial_partitions(request, observation)
             self._assigned(request)
             kind = KafkaInitialPositionStore.initialization_kind(configuration, request.partition)
@@ -282,16 +285,41 @@ class KafkaInitialPositionService:
             raise KafkaPositionError(msg) from exc
 
     async def _new_position(
-        self, request: PositionRequest, committed: CommittedPositionResult, observation: SourceIdentityObservation
+        self,
+        request: PositionRequest,
+        committed: CommittedPositionResult,
+        observation: SourceIdentityObservation,
+        context: PositionContext,
     ) -> KafkaPartitionInitialPosition:
-        if committed.status == BrokerPositionStatus.VERIFIED and committed.offset is not None:
+        if (
+            context.source_initialized_at is not None
+            and context.configuration.initial_partition_ids is None
+            and committed.status == BrokerPositionStatus.VERIFIED
+            and committed.offset is not None
+        ):
+            # Unknown history must be persisted before attempting to capture a
+            # first set. Capture correctly refuses to invent established history.
             return await self._existing_group_position(request, committed.offset, observation)
-        if committed.status != BrokerPositionStatus.ABSENT:
-            msg = "committed_position_uncertain"
-            raise KafkaPositionError(msg)
         configuration = await self._store.capture_initial_partitions(request, observation)
         self._assigned(request)
         bounds = await self._bounds(request)
+        if committed.status == BrokerPositionStatus.VERIFIED and committed.offset is not None:
+            if bounds[0] <= committed.offset <= bounds[1]:
+                return await self._existing_group_position(request, committed.offset, observation)
+            # A completed source's missing first-partition history is still a
+            # recovery problem. A genuinely new partition uses its start policy.
+            context = await self._store.read(request)
+            self._source(context)
+            if context.position is not None:
+                return context.position
+            if context.source_initialized_at is not None and (
+                context.configuration.initial_partition_ids is None
+                or request.partition in context.configuration.initial_partition_ids
+            ):
+                return await self._existing_group_position(request, committed.offset, observation)
+        elif committed.status != BrokerPositionStatus.ABSENT:
+            msg = "committed_position_uncertain"
+            raise KafkaPositionError(msg)
         kind = KafkaInitialPositionStore.initialization_kind(configuration, request.partition)
         policy = (
             configuration.start.position
@@ -331,7 +359,7 @@ class KafkaInitialPositionService:
         observation = await self._observe_identity(request)
         committed = await self._committed(request)
         if row is None:
-            row = await self._new_position(request, committed, observation)
+            row = await self._new_position(request, committed, observation, context)
             if row.gap_detected_at is not None:
                 return self._gap_result(request, row)
             # Reload the winner's committed progress rather than overwriting it.
@@ -352,7 +380,13 @@ class KafkaInitialPositionService:
             msg = "recovery_incomplete"
             raise KafkaPositionError(msg)
         established = row.initial_commit_confirmed_at is not None or row.recovery_confirmed_at is not None
-        if committed.status == BrokerPositionStatus.ABSENT:
+        stale_initial_commit = (
+            not established
+            and committed.status == BrokerPositionStatus.VERIFIED
+            and committed.offset is not None
+            and not bounds[0] <= committed.offset <= bounds[1]
+        )
+        if committed.status == BrokerPositionStatus.ABSENT or stale_initial_commit:
             if established:
                 raise KafkaPositionError(GapReason.MISSING_COMMIT.value, PositionStatus.RECOVERY_GAP)
             boundary = row.initial_next_offset

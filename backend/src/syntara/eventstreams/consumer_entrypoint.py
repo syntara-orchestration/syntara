@@ -5,7 +5,7 @@ import signal
 
 import structlog
 
-from syntara.audit.lifecycle import start_audit_outbox_worker, stop_audit_outbox_worker
+from syntara.audit.outbox.worker import AuditOutboxWorker, get_outbox_worker
 from syntara.audit.registration import discover_and_register_all_handlers
 from syntara.core.config.base import get_encryption_key, get_settings, validate_encryption_key_at_startup
 from syntara.core.constants import EventWorkerDefaults
@@ -90,13 +90,14 @@ async def main() -> None:
     loop = asyncio.get_running_loop()
     installed: list[signal.Signals] = []
     temporal: TemporalExecutionService | None = None
+    audit_writer: AuditOutboxWorker | None = None
     try:
         if not get_settings().eventstream_enabled:
             logger.info("event_worker_disabled")
             return
         try:
+            audit_writer = get_outbox_worker()
             discover_and_register_all_handlers()
-            start_audit_outbox_worker()
         except Exception:
             logger.exception("event_worker_audit_start_unavailable")
         validate_encryption_key_at_startup()
@@ -120,7 +121,10 @@ async def main() -> None:
         temporal = None
         try:
             try:
-                await stop_audit_outbox_worker(timeout_seconds=EventWorkerDefaults.HINT_TIMEOUT_SECONDS)
+                # This process only enqueues audit rows. The platform publisher
+                # owns shared outbox SELECT/DELETE and OTLP delivery.
+                if audit_writer is not None:
+                    await audit_writer.drain_writes(timeout_seconds=EventWorkerDefaults.HINT_TIMEOUT_SECONDS)
             except Exception:  # noqa: BLE001 - optional audit cleanup cannot skip database disposal
                 logger.warning("event_worker_audit_close_incomplete")
             finally:

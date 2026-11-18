@@ -2,12 +2,14 @@
 
 import asyncio
 import signal
+import subprocess
+import sys
+from textwrap import dedent
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from syntara.audit import lifecycle as audit_module
 from syntara.audit.outbox.worker import AuditOutboxWorker
 from syntara.core.config.base import get_settings
 from syntara.core.constants import EventWorkerDefaults
@@ -27,13 +29,52 @@ from tests.unit.eventstreams.test_consumer_service import eventually
 manager_context = consumer_tests.manager_context
 
 
+def test_process_exits_when_audit_export_would_block() -> None:
+    code = dedent("""
+        import asyncio
+        import time
+        from types import SimpleNamespace
+        from unittest.mock import AsyncMock, MagicMock
+        from syntara.audit import lifecycle
+        from syntara.audit.outbox.worker import AuditOutboxWorker
+        from syntara.eventstreams import consumer_entrypoint as entrypoint
+
+        def blocked_export(*args):
+            time.sleep(60)
+
+        worker = AuditOutboxWorker(name="producer-only", interval_seconds=1, coordinate=False)
+        exporter = MagicMock()
+        exporter.export.side_effect = blocked_export
+        worker._exporter = exporter
+        worker._get_pending_outbox_count = AsyncMock(return_value=1)
+        entrypoint.get_outbox_worker = lambda: worker
+        lifecycle.get_outbox_worker = lambda: worker
+        entrypoint.start_loggers = lambda: None
+        entrypoint.stop_loggers = lambda: None
+        entrypoint.get_settings = lambda: SimpleNamespace(eventstream_enabled=True)
+        entrypoint.validate_encryption_key_at_startup = lambda: None
+        entrypoint.get_encryption_key = lambda: SimpleNamespace(get_secret_value=lambda: "a" * 64)
+        entrypoint.discover_and_register_all_handlers = lambda: None
+        entrypoint._connect_temporal = AsyncMock(return_value=None)
+        entrypoint.engine = SimpleNamespace(dispose=AsyncMock())
+        asyncio.run(entrypoint.main())
+        exporter.export.assert_not_called()
+        worker._get_pending_outbox_count.assert_not_awaited()
+        assert worker._task is None
+    """)
+    result = subprocess.run(  # noqa: S603 - fixed Python test code, no shell or user input
+        [sys.executable, "-c", code], capture_output=True, text=True, timeout=15, check=False
+    )
+    assert result.returncode == 0, result.stderr
+
+
 @pytest.fixture(autouse=True)
 def audit_lifecycle(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
     """Isolate process-owned audit startup and draining from external services."""
-    audit = SimpleNamespace(register=MagicMock(), start=MagicMock(), stop=AsyncMock())
+    writer = MagicMock(spec=AuditOutboxWorker)
+    audit = SimpleNamespace(register=MagicMock(), start=writer.start, stop=writer.drain_writes)
     monkeypatch.setattr(entrypoint, "discover_and_register_all_handlers", audit.register)
-    monkeypatch.setattr(entrypoint, "start_audit_outbox_worker", audit.start)
-    monkeypatch.setattr(entrypoint, "stop_audit_outbox_worker", audit.stop)
+    monkeypatch.setattr(entrypoint, "get_outbox_worker", lambda: writer)
     return audit
 
 
@@ -143,7 +184,7 @@ async def test_main_uses_existing_signed_tls_client_and_disposes_database_after_
     assert type(connect.call_args.kwargs["interceptors"][0]).__name__ == "WorkflowAuthClientInterceptor"
     assert trace == ["drained", "audit_closed", "database_closed"]
     audit_lifecycle.register.assert_called_once()
-    audit_lifecycle.start.assert_called_once()
+    audit_lifecycle.start.assert_not_called()
     audit_lifecycle.stop.assert_awaited_once_with(timeout_seconds=EventWorkerDefaults.HINT_TIMEOUT_SECONDS)
     stop_logs.assert_called_once()
 
@@ -159,7 +200,7 @@ async def test_audit_start_failure_does_not_prevent_consumption(monkeypatch, aud
     monkeypatch.setattr(entrypoint, "_run_connected", run)
     dispose = AsyncMock()
     monkeypatch.setattr(entrypoint, "engine", SimpleNamespace(dispose=dispose))
-    audit_lifecycle.start.side_effect = RuntimeError("audit unavailable")
+    audit_lifecycle.register.side_effect = RuntimeError("audit unavailable")
 
     await entrypoint.main()
 
@@ -190,24 +231,23 @@ async def test_audit_shutdown_cannot_prevent_database_and_logger_cleanup(monkeyp
             cancelled.set()
 
     worker = AuditOutboxWorker(name="consumer-audit-shutdown", interval_seconds=1, coordinate=False)
-    stop = AsyncMock()
-    monkeypatch.setattr(worker, "drain", stalled_drain)
-    monkeypatch.setattr(worker, "stop", stop)
-    monkeypatch.setattr(audit_module, "get_outbox_worker", lambda: worker)
-    monkeypatch.setattr(audit_module, "_state", audit_module.AuditLifecycleState.RUNNING)
-    monkeypatch.setattr(entrypoint, "stop_audit_outbox_worker", audit_module.stop_audit_outbox_worker)
+    insert = asyncio.create_task(stalled_drain())
+    worker._pending.add(insert)
+    await asyncio.sleep(0)
+    monkeypatch.setattr(entrypoint, "get_outbox_worker", lambda: worker)
     if audit_failure == "shutdown_error":
-        monkeypatch.setattr(worker, "shutdown", AsyncMock(side_effect=OSError("audit unavailable")))
+        monkeypatch.setattr(worker, "drain_writes", AsyncMock(side_effect=OSError("audit unavailable")))
 
     async with asyncio.timeout(1):
         await entrypoint.main()
 
     dispose.assert_awaited_once()
     stop_logs.assert_called_once()
-    assert audit_module._state == audit_module.AuditLifecycleState.STOPPED
     if audit_failure == "stalled_drain":
         assert cancelled.is_set()
-        stop.assert_awaited_once()
+    else:
+        insert.cancel()
+        await asyncio.gather(insert, return_exceptions=True)
 
 
 @pytest.mark.parametrize("sig", [signal.SIGINT, signal.SIGTERM])

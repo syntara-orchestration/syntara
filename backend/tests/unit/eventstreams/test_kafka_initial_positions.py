@@ -195,7 +195,7 @@ class Harness:
     ) -> KafkaPartitionInitialPosition:
         self.trace.append("save_initial")
         if existing_group_position:
-            assert self.source_initialized_at is None
+            assert self.source_initialized_at is None or initialization_kind == InitializationKind.ADDED_PARTITION
         self.position = row(confirmed=False, boundary=boundary)
         self.position.partition = value.partition
         self.position.initialization_kind = initialization_kind.value
@@ -343,6 +343,97 @@ async def test_new_source_resumes_existing_group_without_overwriting_its_offset(
     assert h.position.initial_commit_confirmed_at is not None
     assert h.initial_partition_ids == (0, 1)
     h.store.record_missing_initial.assert_not_awaited()
+    h.client.commit.assert_not_awaited()
+
+
+async def test_new_added_partition_can_adopt_a_valid_group_offset() -> None:
+    h = Harness(committed=75, initial_partition_ids=(0,), source_initialized_at=NOW)
+    result = await h.service.initialize(request(1))
+    assert result.status == PositionStatus.READY
+    assert result.next_offset == 75
+    assert h.position is not None
+    assert h.position.initialization_kind == InitializationKind.ADDED_PARTITION
+    h.client.commit.assert_not_awaited()
+
+
+@pytest.mark.parametrize("offset", [5, 150])
+@pytest.mark.parametrize(("policy", "boundary"), [("earliest", 20), ("latest", 100)])
+@pytest.mark.parametrize("added", [False, True])
+async def test_stale_group_offset_uses_first_start_policy_without_recovery(
+    offset: int, policy: str, boundary: int, *, added: bool
+) -> None:
+    h = Harness(
+        committed=offset,
+        source_initialized_at=NOW if added else None,
+        initial_partition_ids=(0,) if added else None,
+        start=KafkaStartConfiguration.model_validate(
+            {"position": policy, "added_partition_position": policy, "offset_gap_policy": "fail"}
+        ),
+    )
+    partition = 1 if added else 0
+    result = await h.service.initialize(request(partition))
+    assert result.status == PositionStatus.READY
+    assert result.next_offset == boundary
+    assert h.position is not None
+    assert h.position.initial_next_offset == boundary
+    assert h.position.gap_detected_at is None
+    assert h.trace.index("read_bounds") < h.trace.index("save_initial")
+    h.client.commit.assert_awaited_once_with({partition: boundary}, expected_epoch=7)
+    h.store.begin_recovery.assert_not_awaited()
+
+
+async def test_stale_offset_does_not_reset_saved_partition_history() -> None:
+    h = Harness(
+        position=row(), committed=5, start=KafkaStartConfiguration.model_validate({"offset_gap_policy": "fail"})
+    )
+    result = await h.service.initialize(request())
+    assert result.status == PositionStatus.RECOVERY_GAP
+    h.client.commit.assert_not_awaited()
+    h.store.choose_initial.assert_not_awaited()
+
+
+async def test_stale_offset_with_missing_established_history_remains_a_gap() -> None:
+    h = Harness(committed=5, source_initialized_at=NOW, initial_partition_ids=(0, 1))
+    result = await h.service.initialize(request())
+    assert result.status == PositionStatus.RECOVERY_GAP
+    assert result.reason == GapReason.INITIAL_METADATA_MISSING.value
+    h.client.commit.assert_not_awaited()
+    h.store.choose_initial.assert_not_awaited()
+
+
+@pytest.mark.parametrize("offset", [5, 75, 150])
+async def test_unknown_established_history_is_recorded_before_first_set_capture(offset: int) -> None:
+    h = Harness(committed=offset, source_initialized_at=NOW, initial_partition_ids=None)
+    # Match the real store: a first set cannot be reconstructed after initialization.
+    h.store.capture_initial_partitions.side_effect = KafkaPositionError(
+        GapReason.INITIALIZATION_HISTORY_UNAVAILABLE.value
+    )
+    result = await h.service.initialize(request())
+    assert result.status == PositionStatus.RECOVERY_GAP
+    assert result.reason == GapReason.INITIAL_METADATA_MISSING.value
+    assert result.recovery_revision == 0
+    assert h.position is not None
+    assert h.position.initial_metadata_missing
+    assert h.position.initial_next_offset is None
+    assert h.position.observed_group_next_offset == offset
+    h.store.record_missing_initial.assert_awaited_once_with(request(), offset)
+    h.store.capture_initial_partitions.assert_not_awaited()
+    h.client.seek.assert_not_awaited()
+    h.client.commit.assert_not_awaited()
+
+
+async def test_unknown_history_storage_failure_is_reported_without_capturing_first_set() -> None:
+    h = Harness(committed=75, source_initialized_at=NOW, initial_partition_ids=None)
+    h.store.capture_initial_partitions.side_effect = KafkaPositionError(
+        GapReason.INITIALIZATION_HISTORY_UNAVAILABLE.value
+    )
+    h.store.record_missing_initial.side_effect = SQLAlchemyError("storage unavailable")
+    result = await h.service.initialize(request())
+    assert result.status == PositionStatus.BLOCKED
+    assert result.reason == "storage_unavailable"
+    assert h.position is None
+    h.store.capture_initial_partitions.assert_not_awaited()
+    h.client.seek.assert_not_awaited()
     h.client.commit.assert_not_awaited()
 
 
