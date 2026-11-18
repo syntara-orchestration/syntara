@@ -3,9 +3,12 @@
 import pytest
 
 from syntara.settings.catalog import SETTINGS_CATALOG
-from syntara.workflows.workflow_engine.constants import DEFAULT_MAX_OUTPUT_BYTES
-from syntara.workflows.workflow_engine.graph import ActivityNode
-from syntara.workflows.workflow_engine.node_settings_resolver import resolve_max_output_bytes, resolve_retry_policy
+from syntara.workflow_core.graph import ActivityNode
+from syntara.workflow_runtime.engines.temporal.constants import DEFAULT_MAX_OUTPUT_BYTES
+from syntara.workflow_runtime.engines.temporal.node_settings_resolver import (
+    resolve_max_output_bytes,
+    resolve_retry_policy,
+)
 
 
 def _catalog_defaults() -> dict[str, object]:
@@ -56,7 +59,7 @@ def test_resolve_max_output_bytes_non_script_node() -> None:
 
 def test_resolve_form_prompt_response_window_from_node() -> None:
     """Node parameter value is used when present."""
-    from syntara.workflows.workflow_engine.node_settings_resolver import resolve_form_prompt_response_window
+    from syntara.workflow_runtime.engines.temporal.node_settings_resolver import resolve_form_prompt_response_window
 
     node = ActivityNode(node_id="n", node_type="form_prompt", parameters={"response_window": 7200})
     result = resolve_form_prompt_response_window(node, {})
@@ -65,7 +68,7 @@ def test_resolve_form_prompt_response_window_from_node() -> None:
 
 def test_resolve_form_prompt_response_window_from_catalog() -> None:
     """Catalog value is used when node value is absent."""
-    from syntara.workflows.workflow_engine.node_settings_resolver import resolve_form_prompt_response_window
+    from syntara.workflow_runtime.engines.temporal.node_settings_resolver import resolve_form_prompt_response_window
 
     node = ActivityNode(node_id="n", node_type="form_prompt", parameters={})
     result = resolve_form_prompt_response_window(node, {"workflow_engine.form_prompt_response_window_seconds": 3600})
@@ -74,7 +77,7 @@ def test_resolve_form_prompt_response_window_from_catalog() -> None:
 
 def test_resolve_form_prompt_response_window_fallback() -> None:
     """Falls back to 86400 when no catalog value."""
-    from syntara.workflows.workflow_engine.node_settings_resolver import resolve_form_prompt_response_window
+    from syntara.workflow_runtime.engines.temporal.node_settings_resolver import resolve_form_prompt_response_window
 
     node = ActivityNode(node_id="n", node_type="form_prompt", parameters={})
     result = resolve_form_prompt_response_window(node, {})
@@ -85,7 +88,7 @@ def test_resolve_form_prompt_response_window_non_integer_raises() -> None:
     """Non-integer response_window raises ConfigError."""
     from temporalio.exceptions import ApplicationError
 
-    from syntara.workflows.workflow_engine.node_settings_resolver import resolve_form_prompt_response_window
+    from syntara.workflow_runtime.engines.temporal.node_settings_resolver import resolve_form_prompt_response_window
 
     node = ActivityNode(node_id="n", node_type="form_prompt", parameters={"response_window": "not_an_int"})
     with pytest.raises(ApplicationError, match="ConfigError"):

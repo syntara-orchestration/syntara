@@ -22,6 +22,13 @@ from syntara.core.exceptions import SafeValueError
 from syntara.forms.exceptions import FormDefinitionError
 from syntara.forms.models.form_fields import FORM_FIELD_TYPES, OPTIONS_SOURCES
 from syntara.schemas import SCHEMA_DIR
+from syntara.workflow_core.graph_backend import InMemoryGraphBackend
+from syntara.workflow_core.models import (
+    FormPromptNodeParameters,
+    FormTriggerParameters,
+    NodeType,
+    ScheduledTriggerConfig,
+)
 from syntara.workflows.models.validation_finding import (
     ValidationCategory,
     ValidationFinding,
@@ -29,13 +36,6 @@ from syntara.workflows.models.validation_finding import (
     ValidationSeverity,
 )
 from syntara.workflows.validators.template_expressions import check_template_expressions
-from syntara.workflows.workflow_engine.graph_backend import InMemoryGraphBackend
-from syntara.workflows.workflow_engine.models.workflow_definition import (
-    FormPromptNodeParameters,
-    FormTriggerParameters,
-    NodeType,
-    ScheduledTriggerConfig,
-)
 
 _SCHEMA_DIR = SCHEMA_DIR / "workflows" / "v2"
 _BASE_URI = "https://automation.example.com/schemas/workflows/v2/"

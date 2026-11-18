@@ -210,8 +210,8 @@ export function ThemeMenu(props: Readonly<{ showTooltip: boolean }>) {
           </MenuSearch>
         </SelectGroup>
       </SynSelect>
-      {props.showTooltip && (
-        <Tooltip aria="none" aria-live="off" triggerRef={toggleRef} content={toggleName} position="right" />
+      {props.showTooltip && !isOpen && (
+        <Tooltip aria="none" aria-live="off" triggerRef={toggleRef} content="Theme" position="right" />
       )}
     </>
   )

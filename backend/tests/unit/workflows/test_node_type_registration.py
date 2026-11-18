@@ -16,9 +16,9 @@ from typing import Any, cast
 import pytest
 
 from syntara.schemas import SCHEMA_DIR
+from syntara.workflow_core.graph import _NODE_SETTINGS_CLASS
+from syntara.workflow_core.models import NODE_OUTPUT_MODELS, NodeType
 from syntara.workflows.models.workflow_definition import WorkflowDefinition
-from syntara.workflows.workflow_engine.graph import _NODE_SETTINGS_CLASS
-from syntara.workflows.workflow_engine.models.workflow_definition import NODE_OUTPUT_MODELS, NodeType
 
 
 @pytest.fixture

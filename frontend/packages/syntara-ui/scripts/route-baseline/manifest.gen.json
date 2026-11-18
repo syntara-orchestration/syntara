@@ -135,12 +135,6 @@
       "kind": "page",
       "parameters": [],
       "sources": ["appRoute", "navigation", "router"],
-      "template": "/support/glossary"
-    },
-    {
-      "kind": "page",
-      "parameters": [],
-      "sources": ["appRoute", "navigation", "router"],
       "template": "/system-administration/access-management"
     },
     {

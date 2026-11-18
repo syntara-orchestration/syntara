@@ -32,7 +32,7 @@ export function FormPromptNodeComponent(props: NodeProps<FormPromptNode>) {
   })
 
   const iconColor = getStepTypeColor(ActivityTypeEnum.FORM_PROMPT)
-  const iconNode = renderStepIcon(metadata.icon, RegistryStepId.FORM_PROMPT, 'canvas', iconColor)
+  const iconNode = renderStepIcon(metadata.icon, RegistryStepId.FORM_PROMPT, 'header', iconColor)
   const semanticZoomIcon = renderStepIcon(metadata.icon, RegistryStepId.FORM_PROMPT, 'semanticZoom', iconColor)
   const taskExecutor = metadata.label
 
@@ -89,6 +89,7 @@ export function FormPromptNodeComponent(props: NodeProps<FormPromptNode>) {
         { id: EdgeHandleEnum.FALLBACK, ariaLabel: 'Fallback branch output' },
       ]}
       semanticZoomIcon={semanticZoomIcon}
+      semanticZoomPreviewIcon={iconNode}
       semanticZoomMenuActions={menuActions}
     >
       <>

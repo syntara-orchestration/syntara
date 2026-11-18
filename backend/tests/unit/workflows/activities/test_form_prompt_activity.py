@@ -8,14 +8,14 @@ from uuid import uuid4
 import pytest
 from temporalio.activity import _CompleteAsyncError as CompleteAsyncError
 
-from syntara.workflows.workflow_engine.activities.form_prompt_activity import (
+from syntara.workflow_runtime.engines.models.form_prompt import FormPromptActivityInput
+from syntara.workflow_runtime.engines.temporal.activities.form_prompt_activity import (
     FormPromptActivityError,
     cancel_form_prompts_activity,
     create_form_prompt_activity,
     expire_form_prompts_activity,
     fail_detached_form_prompt_activity,
 )
-from syntara.workflows.workflow_engine.models.form_prompt import FormPromptActivityInput
 
 
 def _form_prompt_input(overrides: dict[str, Any] | None = None) -> FormPromptActivityInput:
@@ -42,7 +42,7 @@ def _form_prompt_input(overrides: dict[str, Any] | None = None) -> FormPromptAct
 @pytest.fixture(autouse=True)
 def _mock_heartbeat() -> Generator[None, None, None]:
     """Mock temporalio.activity.heartbeat for all tests."""
-    with patch("syntara.workflows.workflow_engine.activities.form_prompt_activity.activity.heartbeat"):
+    with patch("syntara.workflow_runtime.engines.temporal.activities.form_prompt_activity.activity.heartbeat"):
         yield
 
 
@@ -58,7 +58,7 @@ class TestCreateFormPromptActivity:
 
         with (
             patch(
-                "syntara.workflows.workflow_engine.activities.form_prompt_activity.FormPromptsApiClient",
+                "syntara.workflow_runtime.engines.temporal.activities.form_prompt_activity.FormPromptsApiClient",
                 return_value=mock_client,
             ),
             pytest.raises(CompleteAsyncError),
@@ -79,11 +79,11 @@ class TestCreateFormPromptActivity:
 
         with (
             patch(
-                "syntara.workflows.workflow_engine.activities.form_prompt_activity.activity.heartbeat",
+                "syntara.workflow_runtime.engines.temporal.activities.form_prompt_activity.activity.heartbeat",
                 mock_heartbeat,
             ),
             patch(
-                "syntara.workflows.workflow_engine.activities.form_prompt_activity.FormPromptsApiClient",
+                "syntara.workflow_runtime.engines.temporal.activities.form_prompt_activity.FormPromptsApiClient",
                 return_value=mock_client,
             ),
             pytest.raises(CompleteAsyncError),
@@ -106,7 +106,7 @@ class TestCreateFormPromptActivity:
 
     async def test_client_error_wrapped_in_form_prompt_activity_error(self):
         """FormPromptsApiClientError is wrapped in FormPromptActivityError."""
-        from syntara.workflows.clients.form_prompts_client import FormPromptsApiClientError
+        from syntara.workflow_runtime.clients.form_prompts_client import FormPromptsApiClientError
 
         mock_client = AsyncMock()
         mock_client.__aenter__.return_value = mock_client
@@ -115,7 +115,7 @@ class TestCreateFormPromptActivity:
 
         with (
             patch(
-                "syntara.workflows.workflow_engine.activities.form_prompt_activity.FormPromptsApiClient",
+                "syntara.workflow_runtime.engines.temporal.activities.form_prompt_activity.FormPromptsApiClient",
                 return_value=mock_client,
             ),
             pytest.raises(FormPromptActivityError) as exc_info,
@@ -133,7 +133,7 @@ class TestCreateFormPromptActivity:
 
         with (
             patch(
-                "syntara.workflows.workflow_engine.activities.form_prompt_activity.FormPromptsApiClient",
+                "syntara.workflow_runtime.engines.temporal.activities.form_prompt_activity.FormPromptsApiClient",
                 return_value=mock_client,
             ),
             pytest.raises(FormPromptActivityError) as exc_info,
@@ -154,7 +154,7 @@ class TestCreateFormPromptActivity:
 
         with (
             patch(
-                "syntara.workflows.workflow_engine.activities.form_prompt_activity.FormPromptsApiClient",
+                "syntara.workflow_runtime.engines.temporal.activities.form_prompt_activity.FormPromptsApiClient",
                 return_value=mock_client,
             ),
             pytest.raises(CompleteAsyncError),
@@ -208,7 +208,7 @@ class TestExpireFormPromptsActivity:
         mock_client.batch_expire = AsyncMock(return_value={"total_success": 2, "total_failed": 0})
 
         with patch(
-            "syntara.workflows.workflow_engine.activities.form_prompt_activity.FormPromptsApiClient",
+            "syntara.workflow_runtime.engines.temporal.activities.form_prompt_activity.FormPromptsApiClient",
             return_value=mock_client,
         ):
             result = await expire_form_prompts_activity(exec_id)
@@ -232,7 +232,7 @@ class TestExpireFormPromptsActivity:
         mock_client.batch_expire = AsyncMock(return_value={"total_success": 2, "total_failed": 0})
 
         with patch(
-            "syntara.workflows.workflow_engine.activities.form_prompt_activity.FormPromptsApiClient",
+            "syntara.workflow_runtime.engines.temporal.activities.form_prompt_activity.FormPromptsApiClient",
             return_value=mock_client,
         ):
             await expire_form_prompts_activity(exec_id, node_id="form1")
@@ -249,7 +249,7 @@ class TestExpireFormPromptsActivity:
         mock_client.list_form_prompts_by_execution = AsyncMock(return_value=[])
 
         with patch(
-            "syntara.workflows.workflow_engine.activities.form_prompt_activity.FormPromptsApiClient",
+            "syntara.workflow_runtime.engines.temporal.activities.form_prompt_activity.FormPromptsApiClient",
             return_value=mock_client,
         ):
             result = await expire_form_prompts_activity(str(uuid4()))
@@ -273,7 +273,7 @@ class TestCancelFormPromptsActivity:
         mock_client.batch_cancel = AsyncMock(return_value={"total_success": 1, "total_failed": 0})
 
         with patch(
-            "syntara.workflows.workflow_engine.activities.form_prompt_activity.FormPromptsApiClient",
+            "syntara.workflow_runtime.engines.temporal.activities.form_prompt_activity.FormPromptsApiClient",
             return_value=mock_client,
         ):
             result = await cancel_form_prompts_activity(exec_id)
@@ -288,7 +288,7 @@ class TestCancelFormPromptsActivity:
         mock_client.list_form_prompts_by_execution = AsyncMock(return_value=[])
 
         with patch(
-            "syntara.workflows.workflow_engine.activities.form_prompt_activity.FormPromptsApiClient",
+            "syntara.workflow_runtime.engines.temporal.activities.form_prompt_activity.FormPromptsApiClient",
             return_value=mock_client,
         ):
             result = await cancel_form_prompts_activity(str(uuid4()))
@@ -308,7 +308,7 @@ class TestFailDetachedFormPromptActivity:
         mock_sync_service.temporal_client = mock_temporal_client
 
         with patch(
-            "syntara.workflows.workflow_engine.activities.form_prompt_activity.get_activity_sync_service",
+            "syntara.workflow_runtime.engines.temporal.activities.form_prompt_activity.get_activity_sync_service",
             return_value=mock_sync_service,
         ):
             await fail_detached_form_prompt_activity("wf_id", "run_id", "form1_iter_0")
@@ -327,7 +327,7 @@ class TestFailDetachedFormPromptActivity:
         mock_sync_service.temporal_client = mock_temporal_client
 
         with patch(
-            "syntara.workflows.workflow_engine.activities.form_prompt_activity.get_activity_sync_service",
+            "syntara.workflow_runtime.engines.temporal.activities.form_prompt_activity.get_activity_sync_service",
             return_value=mock_sync_service,
         ):
             # Should not raise
@@ -347,7 +347,7 @@ class TestFailDetachedFormPromptActivity:
         mock_sync_service.temporal_client = mock_temporal_client
 
         with patch(
-            "syntara.workflows.workflow_engine.activities.form_prompt_activity.get_activity_sync_service",
+            "syntara.workflow_runtime.engines.temporal.activities.form_prompt_activity.get_activity_sync_service",
             return_value=mock_sync_service,
         ):
             # Should not raise
@@ -366,7 +366,7 @@ class TestFailDetachedFormPromptActivity:
 
         with (
             patch(
-                "syntara.workflows.workflow_engine.activities.form_prompt_activity.get_activity_sync_service",
+                "syntara.workflow_runtime.engines.temporal.activities.form_prompt_activity.get_activity_sync_service",
                 return_value=mock_sync_service,
             ),
             pytest.raises(RPCError),
