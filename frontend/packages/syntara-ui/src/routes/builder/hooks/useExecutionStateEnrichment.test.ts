@@ -103,6 +103,32 @@ describe('useExecutionStateEnrichment', () => {
     expect((updated[0].data as Record<string, unknown>).__executionState).toEqual({ status: 'running' })
   })
 
+  it('does not clear execution state when enricher omits it', () => {
+    const setNodes = vi.fn()
+    mockEnrichActivity.mockReturnValue({ label: 'Task', metadata: { __showExecutionBadge: true } })
+
+    const nodeWithState = {
+      ...baseNode,
+      data: { label: 'Task', __executionState: { status: 'running' } },
+    } as NodeType
+
+    renderHook(() =>
+      useExecutionStateEnrichment({
+        effectiveExecutionStatus: 'running',
+        isInitialized: true,
+        currentWorkflow: sampleWorkflow,
+        activityStates: new Map([['task-1', runningActivityState('task-1')]]),
+        preResolvedNodes: new Set(),
+        setNodes,
+      })
+    )
+
+    expect(setNodes).toHaveBeenCalledTimes(1)
+    const updater = setNodes.mock.calls[0][0] as (nodes: NodeType[]) => NodeType[]
+    const updated = updater([nodeWithState])
+    expect((updated[0].data as Record<string, unknown>).__executionState).toEqual({ status: 'running' })
+  })
+
   it('skips enrichment when activityStates is empty', () => {
     const setNodes = vi.fn()
     renderHook(() =>

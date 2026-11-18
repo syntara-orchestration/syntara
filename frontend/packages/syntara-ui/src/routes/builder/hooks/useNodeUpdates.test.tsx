@@ -47,6 +47,22 @@ describe('mergeNodesPreservingPositions', () => {
     expect((placeholder as { position: { x: number; y: number } }).position).toEqual({ x: 100, y: 100 })
   })
 
+  it('preserves __executionState when enriched graph omits it', () => {
+    const prevNodes = [
+      {
+        id: 'node-1',
+        data: { __executionState: { status: 'running' }, name: 'A' },
+        position: { x: 10, y: 20 },
+      },
+    ] as never[]
+    const initialNodes = [{ id: 'node-1', data: { name: 'A', metadata: { __showExecutionBadge: true } } }] as never[]
+
+    const result = mergeNodesPreservingPositions(prevNodes, initialNodes)
+
+    const node1 = result.find((n) => (n as { id: string }).id === 'node-1')
+    expect((node1 as { data: Record<string, unknown> }).data.__executionState).toEqual({ status: 'running' })
+  })
+
   it('preserves __validationError flag from existing nodes', () => {
     const prevNodes = [
       {

@@ -54,6 +54,9 @@ const STATUS_ORDER: Record<string, number> = {
   skipped: 3,
 }
 
+const ACTIVELY_IN_FLIGHT_ACTIVITY_STATUSES = new Set<ActivityStatus>(['running', 'retrying', 'waiting'])
+const TERMINAL_ACTIVITY_MERGE_STATUSES = new Set<ActivityStatus>(['completed', 'failed', 'cancelled', 'skipped'])
+
 /**
  * Merge incoming activity states with existing, preserving the most advanced
  * status per-activity. This prevents stale REST/snapshot data from regressing
@@ -77,7 +80,13 @@ function mergeActivityStates(
     } else {
       const existingOrder = STATUS_ORDER[existingState.status] ?? 0
       const incomingOrder = STATUS_ORDER[incomingState.status] ?? 0
-      if (incomingOrder > existingOrder) {
+      if (
+        incomingOrder > existingOrder &&
+        !(
+          ACTIVELY_IN_FLIGHT_ACTIVITY_STATUSES.has(existingState.status) &&
+          TERMINAL_ACTIVITY_MERGE_STATUSES.has(incomingState.status)
+        )
+      ) {
         merged.set(id, incomingState)
       } else if (incomingOrder === existingOrder) {
         // Preserve non-null timestamps/errors from either side so a same-rank
@@ -482,7 +491,6 @@ export const useExecutionStore = create<ExecutionStore>((set, get) => ({
 
   setActivityExecutions: (activities: ActivityInput[]) => {
     if (activities.length === 0) {
-      set({ activityStates: new Map(), activityErrors: new Map() })
       return
     }
 
