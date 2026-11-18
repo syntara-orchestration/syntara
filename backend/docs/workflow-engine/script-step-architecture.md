@@ -59,6 +59,132 @@ sequenceDiagram
 
 The EP Client is a library supplied by EP for AO to call EP. It is not an additional runtime service and does not execute the script. Its package/version, exact API, authentication, and retry contract must be recorded in AAP-98873.
 
+## Work item lifecycle
+
+The work item is EP's durable record of a requested execution. A retry before the SDK `Execute` call may return the item to `pending`; after execution may have started, an uncertain outcome requires reconciliation instead of automatic replay.
+
+```mermaid
+stateDiagram-v2
+    [*] --> pending
+    pending --> claimed: worker claims item
+    claimed --> dispatched: target selected and resources requested
+    dispatched --> running: SDK Execute submitted
+    claimed --> pending: retryable failure before Execute
+    dispatched --> pending: confirmed failure before Execute
+    pending --> failed: no eligible target or retry budget exhausted
+    running --> completed: successful terminal result
+    running --> failed: terminal execution failure
+    running --> cancelled: cancellation confirmed
+    running --> reconciliation_required: Execute may have started; result unavailable
+    completed --> [*]
+    failed --> [*]
+    cancelled --> [*]
+    reconciliation_required --> [*]
+```
+
+## Execution lifecycle
+
+Each work item attempt gets one fresh Job/Pod and one SDK `Execute` invocation. EP records the terminal result before deleting its owned Kubernetes resources; cleanup status does not replace the execution result.
+
+```mermaid
+flowchart LR
+    Claim[EP claims attempt] --> Policy[Install per-attempt NetworkPolicy]
+    Policy --> Job[Create one-shot Job]
+    Job --> Pod[Pod becomes ready]
+    Pod --> Health[SDK Health and revision check]
+    Health --> Execute[Submit one SDK Execute stream]
+    Execute --> Script[Run Python or Bash process]
+    Script --> Result[Receive terminal result]
+    Result --> Persist[Persist result in EP]
+    Persist --> Cleanup[Delete owned Job and policy]
+    Cleanup --> Notify[Notify AO through completion callback]
+```
+
+## Trust boundaries
+
+The Script process is untrusted and shares its Pod's identity, filesystem, and network namespace with the SDK runtime. The OpenShift cluster credential authorizes EP to create and manage the Pod; it is not a Script input. Control-plane secrets remain in AO or EP secret stores. Script output returns through EP and AO and may contain sensitive data.
+
+```mermaid
+flowchart LR
+    subgraph AO[AO control plane]
+        Workflow[Workflow and Script inputs]
+        Resolver[Cluster credential resolver]
+        AOSecrets[AO service secrets]
+    end
+    subgraph EP[EP control plane]
+        Client[EP-supplied Client / EP API]
+        Store[(Work store and results)]
+        Worker[EP worker]
+        EPSecrets[EP service secrets]
+    end
+    subgraph Cluster[Customer OpenShift cluster]
+        Kube[Kubernetes API]
+        Policy[Per-attempt NetworkPolicy]
+        Pod[Restricted workload Pod]
+        Runtime[SDK runtime]
+        Code[Untrusted Python or Bash]
+    end
+
+    Workflow -->|work.execute: code and ordinary inputs| Client
+    Client --> Store
+    Store --> Worker
+    Worker -->|credential.resolve reference| Resolver
+    Resolver -->|short-lived cluster credential| Worker
+    Worker -->|HTTPS: create, inspect, delete| Kube
+    Kube --> Policy
+    Kube --> Pod
+    Pod --> Runtime
+    Runtime --> Code
+    Code -->|bounded result, possibly sensitive| Runtime
+    Runtime -->|SDK gRPC result| Worker
+    Worker --> Store
+    Store -->|completion callback| Workflow
+    AOSecrets -. service-only .-> Resolver
+    EPSecrets -. service-only .-> Worker
+```
+
+The SDK has an invocation-scoped credential callback, but the current EP evidence does not establish bound workload-credential delivery for Script. Do not pass workload secrets in `environment` or ordinary workflow inputs.
+
+## Failure behavior
+
+```mermaid
+flowchart TD
+    Start[Attempt starts] --> Submitted{Was SDK Execute submitted?}
+    Submitted -->|No; failure is confirmed| Pre[Clean up partial resources]
+    Pre --> Retry{Retryable and budget remains?}
+    Retry -->|Yes| Pending[Return work item to pending with backoff]
+    Retry -->|No| FailBefore[Persist failed outcome]
+
+    Submitted -->|Yes| Running[Wait for SDK terminal event]
+    Running --> Terminal{Terminal event received?}
+    Terminal -->|Success or failure| Persist[Persist terminal result]
+    Terminal -->|No; outcome uncertain| Unknown[Mark reconciliation required]
+    Unknown --> Fence[Fence the attempt and preserve diagnostics]
+    Fence --> NotifyUnknown[Notify AO that the outcome is uncertain]
+    NotifyUnknown --> NoReplay[Do not automatically replay; operator reconciles]
+
+    Running --> Stop[Timeout or cancellation: send SDK Cancel]
+    Stop --> Grace{Stopped within grace period?}
+    Grace -->|Yes| PersistStop[Persist timed-out or cancelled outcome]
+    Grace -->|No| Delete[Delete the owned Job]
+    Delete --> PersistStop
+
+    Running --> Overflow[Output exceeds configured bound]
+    Overflow --> Truncate[Drain and truncate streams]
+    Truncate --> Fits{Serialized result within SDK limit?}
+    Fits -->|Yes| Persist
+    Fits -->|No| FailResult[Persist bounded failure]
+
+    Persist --> Cleanup[Delete Job and NetworkPolicy]
+    PersistStop --> Cleanup
+    FailResult --> Cleanup
+    Cleanup --> CleanupOK{Cleanup succeeded?}
+    CleanupOK -->|Yes| Notify[Send completion callback to AO]
+    CleanupOK -->|No| CleanupRetry[Keep cleanup visible and retry/reconcile]
+    CleanupRetry --> Notify
+    FailBefore --> Notify
+```
+
 ## Security boundary
 
 The script source and its inputs are untrusted. The intended isolation boundary is one EP-created Kubernetes Job and Pod per work-item attempt. The SDK runtime receives the invocation and starts Python or Bash as a child process inside that Pod.
@@ -99,11 +225,9 @@ These are controls in EP's implementation/design evidence, not a claim that ever
 | Retry | EP submits Execute once per attempt. Before submission, confirmed infrastructure failures may be retried. After possible submission, a missing result is uncertain and must not cause automatic replay. | Arbitrary scripts can have external side effects; confirm AO does not silently retry uncertain or non-idempotent executions. |
 | Cleanup | EP deletes the owned Job, then its policy; TTL is a backstop and does not clean policies. A reconciler removes orphan policies only after confirming the Job/Pods are absent. | Confirm cleanup failure remains visible, retryable, and operationally actionable without overwriting a committed result. |
 
-## Current implementation gap
+## Open implementation dependencies
 
-The Syntara `feat/ANSTRAT-2523` base includes a direct AO-worker-to-OpenShift Script path. The target flow in this review uses the EP-provided Client and EP-managed workload lifecycle. The AO-to-EP Client integration and a shared-cluster AO→EP→Script trace are not demonstrated by this document. AAP-98873 must link that implementation and end-to-end evidence before the target flow is treated as shipped.
-
-EP selects the image supplied by the caller; EP's current design does not independently enforce image provenance. AO/packaging must provide a release-approved immutable image digest and prevent workflow authors from selecting arbitrary images or target namespaces. The client/API contract and trusted image mapping remain open integration decisions.
+The call chain above describes the proposed AO-to-EP Client integration and EP-managed workload lifecycle. AAP-98873 owns the concrete Client package/version, API, authentication, retry contract, and end-to-end evidence; AAP-97389 owns packaging and lifecycle decisions. EP accepts a caller-supplied image reference and does not independently enforce image provenance, so the approved image digest and the component that restricts image selection must be decided before release.
 
 ## Decisions requested from Product Security
 
