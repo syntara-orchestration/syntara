@@ -1,5 +1,6 @@
 """Shared API and workflow helpers for form-prompt and Form Trigger E2E tests."""
 
+import copy
 import json
 import time
 from collections.abc import Callable, Collection, Mapping
@@ -15,6 +16,7 @@ from orchestrator_test_sdk.e2e.helpers import (
     poll_execution,
     poll_for_pending_form_prompt,
 )
+from pydantic import ValidationError
 from syntara_api_client.api import SyntaraApiRegistry
 from syntara_api_client.models import (
     ExecutionCreate,
@@ -32,6 +34,8 @@ from syntara_api_client.models.activity_data_output_data_type_0 import ActivityD
 from syntara_api_client.models.error_data import ErrorData
 from syntara_api_client.models.execution_status import ExecutionStatus
 from syntara_api_client.types import Response, Unset
+
+from syntara.workflows.services.form_response_schema import generate_form_response_schema
 
 from ._workflows import (
     DEFAULT_CONSUMER_CODE,
@@ -113,6 +117,20 @@ def get_workflow_definition(syntara_api: SyntaraApiRegistry, workflow_id: UUID) 
     )
     workflow = cast("WorkflowReadWithVersion", response.assert_and_get())
     return workflow.version.workflow_definition.to_dict()
+
+
+def with_generated_form_response_schema(definition: dict[str, Any], *, node_type: str) -> dict[str, Any]:
+    """Return a copied definition with its generated form schema when the form is valid."""
+    expected_definition = copy.deepcopy(definition)
+    components = expected_definition["nodes"] if node_type == "form_prompt" else expected_definition["triggers"]
+    for component in components:
+        if component["type"] == node_type:
+            parameters = component["parameters"]
+            try:
+                parameters["response_schema"] = generate_form_response_schema(parameters["form_definition"])
+            except ValidationError:
+                continue
+    return expected_definition
 
 
 def create_form_trigger_workflow(

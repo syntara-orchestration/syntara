@@ -58,6 +58,14 @@ class TestValidateJsonSchemaDefinition:
         with pytest.raises(ValueError, match="Invalid JSON Schema"):
             validate_json_schema_definition(schema)
 
+    def test_draft_2020_12_meta_schema_validation_rejects_invalid_keywords(self) -> None:
+        """Draft 2020-12 keyword shapes must be checked by their own meta-schema."""
+        schema = {"$schema": "https://json-schema.org/draft/2020-12/schema", "prefixItems": {"type": "string"}}
+
+        validate_json_schema_definition(schema)
+        with pytest.raises(ValueError, match="Invalid JSON Schema"):
+            validate_json_schema_definition(schema, draft="draft-2020-12")
+
     def test_ref_at_top_level_rejected(self) -> None:
         """A $ref at the top level should be rejected."""
         schema = {"$ref": "http://internal-service/secret"}

@@ -4,7 +4,7 @@ Provides definition-time and runtime validation of JSON schemas.
 Wraps the ``jsonschema`` library and adds guards that it does not
 provide natively:
 
-- Structurally invalid schemas (via Draft-07 meta-schema validation)
+- Structurally invalid schemas (via selected draft meta-schema validation)
 - SSRF via ``$ref`` keys that cause the validator to fetch remote resources
 - ReDoS via ``pattern`` values with nested quantifiers
 
@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import copy
 import re
-from typing import Any, NoReturn
+from typing import Any, Literal, NoReturn
 
 import jsonschema
 from jsonschema import validators
@@ -60,6 +60,8 @@ def has_dangerous_pattern(pattern: str) -> bool:
 
 
 _has_dangerous_pattern = has_dangerous_pattern
+
+JsonSchemaDraft = Literal["draft-7", "draft-2020-12"]
 
 
 # ---------------------------------------------------------------------------
@@ -140,26 +142,27 @@ def _check_regex_pattern(pattern: str, context: str) -> None:
 # ---------------------------------------------------------------------------
 
 
-def validate_json_schema_definition(schema: dict[str, Any]) -> None:
+def validate_json_schema_definition(schema: dict[str, Any], *, draft: JsonSchemaDraft = "draft-7") -> None:
     """Validate a JSON Schema at definition time (workflow create/update).
 
     Checks:
-    1. Structural validity against the Draft-07 meta-schema.
+    1. Structural validity against the selected JSON Schema draft.
     2. No ``$ref`` keys anywhere in the schema tree.
     3. All ``pattern`` values are syntactically valid regexes without
        nested quantifiers.
 
     Args:
         schema: The JSON Schema dict to validate.
+        draft: JSON Schema draft whose meta-schema should validate ``schema``.
 
     Raises:
         ValueError: If the schema is invalid, contains ``$ref``, or has
             dangerous regex patterns.
 
     """
-    # 1. Meta-schema validation
+    validator_class = jsonschema.Draft202012Validator if draft == "draft-2020-12" else jsonschema.Draft7Validator
     try:
-        jsonschema.Draft7Validator.check_schema(schema)
+        validator_class.check_schema(schema)
     except jsonschema.SchemaError as e:
         msg = f"Invalid JSON Schema: {e.message}"
         raise ValueError(msg) from e
@@ -205,7 +208,7 @@ def _extend_with_defaults(
 
         yield from validate_properties(validator, properties, instance, schema)
 
-    return validators.extend(validator_class, {"properties": set_defaults})  # type: ignore[no-untyped-call,no-any-return]
+    return validators.extend(validator_class, {"properties": set_defaults})  # type: ignore[no-untyped-call,no-any-return,unused-ignore]
 
 
 _DefaultFillingDraft7Validator: type[jsonschema.protocols.Validator] = _extend_with_defaults(

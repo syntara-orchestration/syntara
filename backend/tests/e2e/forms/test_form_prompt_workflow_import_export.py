@@ -27,6 +27,7 @@ from ._helpers import (
     get_workflow_definition,
     submit_form_prompt,
     wait_for_form_prompt_paused,
+    with_generated_form_response_schema,
 )
 
 if TYPE_CHECKING:
@@ -297,7 +298,8 @@ def test_form_prompt_workflow_export_import_round_trip_executes(
     assert source.has_validation_issues is False
 
     exported_definition = export_workflow_definition(syntara_api, UUID(str(source.id)))
-    assert exported_definition["nodes"] == source_definition["nodes"]
+    expected_exported_definition = with_generated_form_response_schema(source_definition, node_type="form_prompt")
+    assert exported_definition["nodes"] == expected_exported_definition["nodes"]
     assert exported_definition["edges"] == source_definition["edges"]
 
     delete_response = syntara_api.workflows.delete(workflow_id=source.id)
@@ -488,9 +490,10 @@ def test_form_prompt_import_reports_save_time_validation_findings(
         ), f"Unknown source reference missing from {prompt_findings!r}"
 
     saved_definition = get_workflow_definition(syntara_api, UUID(str(workflow.id)))
+    expected_definition = with_generated_form_response_schema(definition, node_type="form_prompt")
     assert (
         _node_by_id(saved_definition, "form_prompt")["parameters"]
-        == _node_by_id(definition, "form_prompt")["parameters"]
+        == _node_by_id(expected_definition, "form_prompt")["parameters"]
     )
     saved = syntara_api.workflows.get(workflow_id=UUID(str(workflow.id))).assert_and_get()
     assert isinstance(saved, WorkflowReadWithVersion)
@@ -579,6 +582,7 @@ def test_import_handcrafted_form_prompt_workflow_executes(
     """
     name = unique_name("e2e-form-prompt-handcrafted")
     definition = _handcrafted_workflow_definition(name, form_prompt_responder)
+    expected_definition = with_generated_form_response_schema(definition, node_type="form_prompt")
     workflow = create_workflow(
         syntara_api,
         cleanup_workflows,
@@ -591,7 +595,7 @@ def test_import_handcrafted_form_prompt_workflow_executes(
     assert workflow.has_validation_issues is False
 
     persisted_definition = get_workflow_definition(syntara_api, UUID(str(workflow.id)))
-    assert persisted_definition == definition
+    assert persisted_definition == expected_definition
     assert {node["type"] for node in persisted_definition["nodes"]} == {"script", "form_prompt"}
     prompt_parameters = _node_by_id(persisted_definition, "form_prompt")["parameters"]
     assert prompt_parameters["response_window"] == 30

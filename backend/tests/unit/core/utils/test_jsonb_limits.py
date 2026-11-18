@@ -88,6 +88,25 @@ class TestValidateWorkflowDefinitionJson:
         with pytest.raises(SafeValueError, match="workflow_definition exceeds maximum"):
             validate_workflow_definition_json(definition)
 
+    def test_size_check_ignores_generated_form_response_schemas(self) -> None:
+        definition = _minimal_workflow_definition()
+        definition["nodes"][0]["type"] = "form_prompt"
+        definition["nodes"][0]["parameters"] = {
+            "form_definition": {"fields": []},
+            "response_schema": {"enum": ["x" * JsonbLimits.MAX_WORKFLOW_DEFINITION_BYTES]},
+        }
+
+        assert serialized_json_size(definition) > JsonbLimits.MAX_WORKFLOW_DEFINITION_BYTES
+        result = validate_workflow_definition_json(definition)
+
+        assert result is not definition
+        assert "response_schema" not in result["nodes"][0]["parameters"]
+        assert "response_schema" in definition["nodes"][0]["parameters"]
+        assert (
+            result["nodes"][0]["parameters"]["form_definition"]
+            is definition["nodes"][0]["parameters"]["form_definition"]
+        )
+
     def test_skips_non_dict_values(self) -> None:
         assert validate_workflow_definition_json(None) is None
 

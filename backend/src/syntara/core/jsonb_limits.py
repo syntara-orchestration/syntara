@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import json
-from typing import Annotated, Any
+from typing import Annotated, Any, cast
 
 from pydantic import BeforeValidator
 
 from syntara.core.constants import FieldLimits, JsonbLimits, ValidationMessages
 from syntara.core.exceptions import SafeValueError
+
+_FORM_NODE_TYPES = frozenset({"form_prompt", "form_trigger"})
 
 
 def serialized_json_size(value: Any) -> int:  # noqa: ANN401
@@ -81,13 +83,14 @@ def validate_workflow_definition_json[T](value: T) -> T:
     if value is None or not isinstance(value, dict):
         return value
 
+    authored_value = _without_generated_form_response_schemas(value)
     validate_jsonb_size(
-        value,
+        authored_value,
         field_name="workflow_definition",
         max_bytes=JsonbLimits.MAX_WORKFLOW_DEFINITION_BYTES,
     )
 
-    nodes = value.get("nodes", [])
+    nodes = authored_value.get("nodes", [])
     node_count = len(nodes) if isinstance(nodes, list) else 0
     if node_count > JsonbLimits.MAX_WORKFLOW_NODES:
         msg = (
@@ -95,7 +98,7 @@ def validate_workflow_definition_json[T](value: T) -> T:
         )
         raise SafeValueError(msg)
 
-    edges = value.get("edges", [])
+    edges = authored_value.get("edges", [])
     edge_count = len(edges) if isinstance(edges, list) else 0
     if edge_count > JsonbLimits.MAX_WORKFLOW_EDGES:
         msg = (
@@ -103,7 +106,63 @@ def validate_workflow_definition_json[T](value: T) -> T:
         )
         raise SafeValueError(msg)
 
-    return value
+    return cast("T", authored_value)
+
+
+def _without_generated_form_response_schemas(value: dict[str, Any]) -> dict[str, Any]:
+    if not _contains_generated_form_response_schema(value):
+        return value
+
+    authored_value = {**value}
+    for collection_name in ("triggers", "nodes"):
+        items = authored_value.get(collection_name, [])
+        if not isinstance(items, list):
+            continue
+
+        filtered_items: list[Any] = []
+        for item in items:
+            if (
+                isinstance(item, dict)
+                and _is_form_node(item)
+                and isinstance(item.get("parameters"), dict)
+                and "response_schema" in item["parameters"]
+            ):
+                parameters = item["parameters"]
+                filtered_items.append(
+                    {
+                        **item,
+                        "parameters": {
+                            key: parameter_value
+                            for key, parameter_value in parameters.items()
+                            if key != "response_schema"
+                        },
+                    }
+                )
+                continue
+
+            filtered_items.append(item)
+
+        authored_value[collection_name] = filtered_items
+    return authored_value
+
+
+def _contains_generated_form_response_schema(value: dict[str, Any]) -> bool:
+    for collection_name in ("triggers", "nodes"):
+        items = value.get(collection_name, [])
+        if not isinstance(items, list):
+            continue
+        for item in items:
+            if not isinstance(item, dict) or not _is_form_node(item):
+                continue
+            parameters = item.get("parameters")
+            if isinstance(parameters, dict) and "response_schema" in parameters:
+                return True
+    return False
+
+
+def _is_form_node(item: dict[str, Any]) -> bool:
+    node_type = item.get("type")
+    return isinstance(node_type, str) and node_type in _FORM_NODE_TYPES
 
 
 # Reusable annotated field types / validators: apply at the field's type annotation

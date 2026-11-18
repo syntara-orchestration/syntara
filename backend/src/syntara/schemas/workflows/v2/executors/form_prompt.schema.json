@@ -36,6 +36,10 @@
           }
         }
       },
+      "response_schema": {
+        "type": "object",
+        "description": "Backend-generated JSON Schema for normalized response_data values."
+      },
       "responder_users": {
         "type": "array",
         "items": {
