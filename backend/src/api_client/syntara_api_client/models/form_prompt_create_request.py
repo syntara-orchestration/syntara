@@ -36,7 +36,6 @@ class FormPromptCreateRequest:
             timeout_at (datetime.datetime | None | Unset): When this prompt expires (null = no timeout)
             submit_label (None | str | Unset): Submit button label
             success_message (None | str | Unset): Success message after submit
-            css_override (None | str | Unset): Custom CSS for form rendering
             responder_user_ids (list[UUID] | None | Unset): User IDs who can respond (null = any user with
                 form_prompt:submit permission)
             responder_group_ids (list[UUID] | None | Unset): Group IDs whose members can respond
@@ -53,7 +52,6 @@ class FormPromptCreateRequest:
     timeout_at: datetime.datetime | None | Unset = UNSET
     submit_label: None | str | Unset = UNSET
     success_message: None | str | Unset = UNSET
-    css_override: None | str | Unset = UNSET
     responder_user_ids: list[UUID] | None | Unset = UNSET
     responder_group_ids: list[UUID] | None | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
@@ -101,12 +99,6 @@ class FormPromptCreateRequest:
         else:
             success_message = self.success_message
 
-        css_override: None | str | Unset
-        if isinstance(self.css_override, Unset):
-            css_override = UNSET
-        else:
-            css_override = self.css_override
-
         responder_user_ids: list[str] | None | Unset
         if isinstance(self.responder_user_ids, Unset):
             responder_user_ids = UNSET
@@ -153,8 +145,6 @@ class FormPromptCreateRequest:
             field_dict["submit_label"] = submit_label
         if success_message is not UNSET:
             field_dict["success_message"] = success_message
-        if css_override is not UNSET:
-            field_dict["css_override"] = css_override
         if responder_user_ids is not UNSET:
             field_dict["responder_user_ids"] = responder_user_ids
         if responder_group_ids is not UNSET:
@@ -225,15 +215,6 @@ class FormPromptCreateRequest:
 
         success_message = _parse_success_message(d.pop("success_message", UNSET))
 
-        def _parse_css_override(data: object) -> None | str | Unset:
-            if data is None:
-                return data
-            if isinstance(data, Unset):
-                return data
-            return cast(None | str | Unset, data)
-
-        css_override = _parse_css_override(d.pop("css_override", UNSET))
-
         def _parse_responder_user_ids(data: object) -> list[UUID] | None | Unset:
             if data is None:
                 return data
@@ -290,7 +271,6 @@ class FormPromptCreateRequest:
             timeout_at=timeout_at,
             submit_label=submit_label,
             success_message=success_message,
-            css_override=css_override,
             responder_user_ids=responder_user_ids,
             responder_group_ids=responder_group_ids,
         )
