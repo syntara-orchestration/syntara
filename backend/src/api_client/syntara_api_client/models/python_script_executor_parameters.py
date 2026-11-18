@@ -18,7 +18,7 @@ T = TypeVar("T", bound="PythonScriptExecutorParameters")
 
 @_attrs_define
 class PythonScriptExecutorParameters:
-    """Parameters for the Python script executor.
+    """Parameters for Python script executor.
 
     Attributes:
         code (str): Script code to execute

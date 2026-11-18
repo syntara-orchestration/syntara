@@ -25,7 +25,7 @@ class BashScriptNode:
     Attributes:
         id (str): Unique identifier for the node within the workflow
         type_ (Literal['script_bash']):
-        parameters (BashScriptExecutorParameters): Parameters for the Bash script executor.
+        parameters (BashScriptExecutorParameters): Parameters for Bash script executor.
         name (None | str | Unset): Human-readable name for the node
         description (None | str | Unset): Human-readable description of the node purpose
         outputs (BashScriptNodeOutputsType0 | None | Unset): Output extraction mapping

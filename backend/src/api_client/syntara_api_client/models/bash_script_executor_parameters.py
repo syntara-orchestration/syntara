@@ -18,7 +18,7 @@ T = TypeVar("T", bound="BashScriptExecutorParameters")
 
 @_attrs_define
 class BashScriptExecutorParameters:
-    """Parameters for the Bash script executor.
+    """Parameters for Bash script executor.
 
     Attributes:
         code (str): Script code to execute

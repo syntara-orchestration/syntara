@@ -25,7 +25,7 @@ class PythonScriptNode:
     Attributes:
         id (str): Unique identifier for the node within the workflow
         type_ (Literal['script_python']):
-        parameters (PythonScriptExecutorParameters): Parameters for the Python script executor.
+        parameters (PythonScriptExecutorParameters): Parameters for Python script executor.
         name (None | str | Unset): Human-readable name for the node
         description (None | str | Unset): Human-readable description of the node purpose
         outputs (None | PythonScriptNodeOutputsType0 | Unset): Output extraction mapping

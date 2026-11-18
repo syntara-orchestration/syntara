@@ -11,7 +11,7 @@
 openapi: 3.1.0
 info:
   title: Syntara API
-  version: 1.9.0
+  version: 1.10.0
   description: A distributed multi-agent workflow orchestration system
 servers:
   - url: /api/v1
@@ -36844,7 +36844,6 @@ components:
             $ref: '#/components/schemas/CredentialBinding'
           title: Credential Bindings
           description: Host-side recipe-to-credential bindings for Execution Plane dispatch.
-      additionalProperties: false
       type: object
       required:
         - method
@@ -37020,7 +37019,7 @@ components:
       required:
         - code
       title: PythonScriptExecutorParameters
-      description: Parameters for the Python script executor.
+      description: Parameters for Python script executor.
     BashScriptExecutorParameters:
       properties:
         execution_profile:
@@ -37057,7 +37056,7 @@ components:
       required:
         - code
       title: BashScriptExecutorParameters
-      description: Parameters for the Bash script executor.
+      description: Parameters for Bash script executor.
     ApprovalNodeParameters:
       properties:
         credential_id:
