@@ -39,6 +39,7 @@ class ActivitySyncMonitorMixin:
     _sync_activities_to_db: Any
     _update_execution_to_running: Any
     _sync_failed_nodes: Any
+    _sync_nodes_to_terminal_status: Any
     _sync_skipped_nodes: Any
     _sync_detached_nodes: Any
     _update_execution_status_from_event: Any
@@ -47,6 +48,7 @@ class ActivitySyncMonitorMixin:
     _process_synthetic_partial_output: Any
     _TRIGGER_ACTIVITY_TYPES: Any
     _extract_failed_activities_from_event: Any
+    _extract_failed_activity_inputs_from_event: Any
     temporal_client: Any
     _initialize_monitoring: Any
     _process_activity_scheduled: Any
@@ -193,9 +195,16 @@ class ActivitySyncMonitorMixin:
             # which marks any remaining PENDING activities as SKIPPED. By syncing first,
             # converge nodes that were failed in the workflow (via _fail_converge_node)
             # are already FAILED in the DB, so _finalize_non_terminal_activities skips them.
-            failed_node_map = await self._sync_failed_nodes(metadata, handle)
+            event_failed_node_map = self._extract_failed_activities_from_event(event)
+            event_failed_node_inputs = self._extract_failed_activity_inputs_from_event(event)
+            failed_node_map = await self._sync_failed_nodes(
+                metadata,
+                handle,
+                fallback_failed_nodes=event_failed_node_map,
+                fallback_input_data=event_failed_node_inputs,
+            )
             if failed_node_map is None:
-                failed_node_map = self._extract_failed_activities_from_event(event)
+                failed_node_map = event_failed_node_map
             await self._sync_skipped_nodes(metadata, handle)
             await self._sync_detached_nodes(metadata, handle)
             await self._update_execution_status_from_event(metadata, event, failed_node_map)

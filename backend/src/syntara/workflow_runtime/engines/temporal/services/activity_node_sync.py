@@ -247,6 +247,9 @@ class ActivityNodeSyncMixin:
         self,
         metadata: ExecutionMonitorMetadata,
         handle: WorkflowHandle[Any, Any],
+        *,
+        fallback_failed_nodes: dict[str, str] | None = None,
+        fallback_input_data: dict[str, dict[str, Any]] | None = None,
     ) -> dict[str, str] | None:
         """Query workflow for failed nodes and update them in database.
 
@@ -254,6 +257,8 @@ class ActivityNodeSyncMixin:
         resolution errors) have no Temporal events, so their ActivityExecution
         records remain PENDING. Nodes that already have a non-PENDING status
         (synced via Temporal events) are left untouched.
+        When completion-time queries are rejected, failed nodes and their scrubbed
+        inputs are recovered from the workflow completion result.
 
         Returns:
             Map of node ID to error message for failed nodes, or ``None`` when
@@ -262,11 +267,53 @@ class ActivityNodeSyncMixin:
         """
         try:
             failed_node_map: dict[str, str] = await handle.query("get_failed_nodes")
+        except Exception:  # noqa: BLE001
+            logger.warning(
+                "Could not query failed nodes; using workflow completion data",
+                execution_id=metadata.execution_id,
+                exc_info=True,
+            )
+            if fallback_failed_nodes:
+                try:
+                    await self._sync_nodes_to_terminal_status(
+                        metadata,
+                        node_ids=list(fallback_failed_nodes),
+                        target_status=ActivityStatus.FAILED,
+                        error_map=fallback_failed_nodes,
+                        input_data_map=fallback_input_data,
+                    )
+                except Exception:
+                    logger.exception(
+                        "Error syncing failed nodes from workflow completion data",
+                        execution_id=metadata.execution_id,
+                    )
+            return None
+
+        try:
+            if fallback_failed_nodes:
+                failed_node_map.update(fallback_failed_nodes)
+            failed_node_inputs = dict(fallback_input_data or {})
+            for node_id in failed_node_map:
+                base_node_id = node_id.split(_COMPOSITE_ITER_SEP, maxsplit=1)[0]
+                try:
+                    input_data = await handle.query("get_activity_input", base_node_id)
+                except Exception:  # noqa: BLE001
+                    logger.warning(
+                        "Could not query inputs for failed node",
+                        activity_id=node_id,
+                        execution_id=metadata.execution_id,
+                        exc_info=True,
+                    )
+                    continue
+                if input_data is not None:
+                    failed_node_inputs.setdefault(base_node_id, input_data)
+
             await self._sync_nodes_to_terminal_status(
                 metadata,
                 node_ids=list(failed_node_map.keys()),
                 target_status=ActivityStatus.FAILED,
                 error_map=failed_node_map,
+                input_data_map=failed_node_inputs,
             )
         except Exception:
             logger.exception(
@@ -283,6 +330,7 @@ class ActivityNodeSyncMixin:
         node_ids: list[str],
         target_status: ActivityStatus,
         error_map: dict[str, str] | None = None,
+        input_data_map: dict[str, dict[str, Any]] | None = None,
     ) -> None:
         """Update ActivityExecution records to a terminal status and publish patches.
 
@@ -295,6 +343,8 @@ class ActivityNodeSyncMixin:
             node_ids: Node IDs to update
             target_status: Terminal status to set (SKIPPED, FAILED, etc.)
             error_map: Optional mapping of node ID to error message
+            input_data_map: Optional mapping of failed node IDs to inputs that were
+                recorded without a Temporal activity event.
 
         """
         if not node_ids:
@@ -338,11 +388,15 @@ class ActivityNodeSyncMixin:
                     "output_data": activity.output_data,
                     "iteration": activity.iteration,
                 }
+                base_name = activity.activity_name.split(_COMPOSITE_ITER_SEP)[0]
                 activity.status = target_status
                 activity.completed_at = now
                 if error_map is not None:
-                    base_name = activity.activity_name.split(_COMPOSITE_ITER_SEP)[0]
                     activity.error_details = error_map.get(base_name)
+                if input_data_map is not None:
+                    input_data = input_data_map.get(base_name)
+                    if input_data is not None:
+                        activity.input_data = input_data
                 activity.updated_at = now
                 updated_activities.append((activity, old_values))
 

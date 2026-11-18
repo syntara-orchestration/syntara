@@ -431,9 +431,10 @@ class TestFanInConverge:
         assert "converge_node" in wf.failed_nodes
 
     def test_timeout_marks_converge_node_failed(self, mock_timeout_workflow: MagicMock) -> None:
-        """Timeout marks the converge node as failed and skips downstream."""
+        """Timeout marks the converge node failed, retains inputs, and skips downstream."""
         wf = _make_workflow()
         graph = _build_fanin_graph()
+        graph.get_node("converge_node").parameters = {"strategy": "all", "wait_duration": 30}
         wf.resolver.set_namespace("node_a", {"result": "a_done"})
 
         loop = asyncio.new_event_loop()
@@ -445,6 +446,7 @@ class TestFanInConverge:
             loop.close()
 
         assert "converge_node" in wf.failed_nodes
+        assert wf.get_activity_input("converge_node") == graph.get_node("converge_node").parameters
         assert "node_c" in wf.skipped_nodes
         assert "node_b" in wf.skipped_nodes
 
@@ -749,6 +751,18 @@ class TestFanInConverge:
         assert "converge_node" in wf.failed_nodes
         assert wf._has_unhandled_failure is True
         assert "node_c" in wf.skipped_nodes
+
+    def test_failed_converge_gate_preserves_configured_inputs(self) -> None:
+        """A gate failure before dispatch still exposes converge parameters to activity sync."""
+        wf = _make_workflow(failed_nodes={"node_a": "branch failed", "node_b": "branch failed"})
+        graph = _build_fanin_graph()
+        converge_node = graph.get_node("converge_node")
+        converge_node.parameters = {"strategy": "any", "n_required": 2, "wait_duration": 30}
+
+        wf._evaluate_converge_failure("converge_node", converge_node, graph)
+
+        assert wf.failed_nodes["converge_node"]
+        assert wf.get_activity_input("converge_node") == converge_node.parameters
 
     def test_fail_converge_node_preserves_valid_output_mapping(self) -> None:
         """Converge failure fallback keeps mapped aliases for recovery steps."""
@@ -1486,6 +1500,23 @@ class TestBuildResultStatus:
         wf.resolver.set_namespace("trigger", {})
         result = wf._build_result("exec-1", include_node_results=False)
         assert result["status"] == "completed"
+
+    def test_failed_inputs_are_included_without_full_node_results(self) -> None:
+        """Completion payload keeps only scrubbed inputs for failed nodes in normal runs."""
+        from syntara.workflow_core.utils.credential_scrubber import REDACTED
+
+        wf = _make_workflow(failed_nodes={"rest-api": "credential resolution failed"})
+        wf.node_inputs = {
+            "rest-api": {"url": "https://example.com", "bearer_token": "secret-token"},
+            "successful-node": {"value": "not included"},
+        }
+
+        result = wf._build_result("exec-1", include_node_results=False)
+
+        assert result["activity_inputs"] == {}
+        assert result["failed_activity_inputs"] == {
+            "rest-api": {"url": "https://example.com", "bearer_token": REDACTED}
+        }
 
     def test_failed_when_unhandled_failure(self) -> None:
         wf = _make_workflow(failed_nodes={"node_a": "boom"})

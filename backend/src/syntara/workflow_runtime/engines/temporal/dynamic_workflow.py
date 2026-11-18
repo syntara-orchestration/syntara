@@ -873,6 +873,11 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
             "activity_inputs": (
                 {k: self._scrub_data(v) for k, v in self.node_inputs.items()} if include_node_results else {}
             ),
+            "failed_activity_inputs": {
+                node_id: self._scrub_data(self.node_inputs[node_id])
+                for node_id in self.failed_nodes
+                if node_id in self.node_inputs
+            },
             "completed_activities": list(node_outputs.keys()),
             "failed_activities": self.failed_nodes,
         }
