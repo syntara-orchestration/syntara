@@ -18,6 +18,7 @@ type SynSelectFieldControlShellProps<TFieldValues extends FieldValues, TName ext
   fieldState: ControllerFieldState
   resolvedFieldId: string
   label: string
+  ariaLabel?: string
   options: SynSelectFieldOption[]
   displayLabel: string
   selected: string | string[]
@@ -34,6 +35,7 @@ export function SynSelectFieldControlShell<TFieldValues extends FieldValues, TNa
   fieldState,
   resolvedFieldId,
   label,
+  ariaLabel,
   options,
   displayLabel,
   selected,
@@ -64,6 +66,7 @@ export function SynSelectFieldControlShell<TFieldValues extends FieldValues, TNa
   const toggleState = useMemo<SynSelectFieldToggleState>(
     () => ({
       fieldId: resolvedFieldId,
+      ariaLabel,
       displayLabel,
       isOpen,
       onToggle: handleToggle,
@@ -72,7 +75,7 @@ export function SynSelectFieldControlShell<TFieldValues extends FieldValues, TNa
       hasError,
       describedBy,
     }),
-    [displayLabel, field.onBlur, handleToggle, hasError, isDisabled, isOpen, resolvedFieldId, describedBy]
+    [displayLabel, field.onBlur, handleToggle, hasError, isDisabled, isOpen, resolvedFieldId, ariaLabel, describedBy]
   )
 
   const renderToggle = useCallback(

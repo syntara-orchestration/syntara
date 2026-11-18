@@ -19,8 +19,8 @@ if TYPE_CHECKING:
     from ..models.execution_read_execution_metadata_type_0 import ExecutionReadExecutionMetadataType0
     from ..models.execution_read_input_data import ExecutionReadInputData
     from ..models.execution_read_labels import ExecutionReadLabels
+    from ..models.execution_read_workflow_definition_type_0 import ExecutionReadWorkflowDefinitionType0
     from ..models.user_reference import UserReference
-    from ..models.workflow_definition import WorkflowDefinition
 
 
 T = TypeVar("T", bound="ExecutionRead")
@@ -62,8 +62,8 @@ class ExecutionRead:
             labels (ExecutionReadLabels | Unset):
             approval_pending (bool | Unset):  Default: False.
             current_activities (list[CurrentActivity] | Unset): Currently executing activities
-            workflow_definition (None | Unset | WorkflowDefinition): Workflow definition from the executed version. Only
-                included when requested via ?include=workflow_definition query parameter.
+            workflow_definition (ExecutionReadWorkflowDefinitionType0 | None | Unset): Workflow definition from the executed
+                version. Only included when requested via ?include=workflow_definition query parameter.
             activities (list[ActivityData] | None | Unset): List of activities with their current status. Only included when
                 requested via ?include=activities query parameter.
     """
@@ -94,14 +94,14 @@ class ExecutionRead:
     labels: ExecutionReadLabels | Unset = UNSET
     approval_pending: bool | Unset = False
     current_activities: list[CurrentActivity] | Unset = UNSET
-    workflow_definition: None | Unset | WorkflowDefinition = UNSET
+    workflow_definition: ExecutionReadWorkflowDefinitionType0 | None | Unset = UNSET
     activities: list[ActivityData] | None | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         from ..models.execution_read_execution_metadata_type_0 import ExecutionReadExecutionMetadataType0
+        from ..models.execution_read_workflow_definition_type_0 import ExecutionReadWorkflowDefinitionType0
         from ..models.user_reference import UserReference
-        from ..models.workflow_definition import WorkflowDefinition
 
         id = str(self.id)
 
@@ -226,7 +226,7 @@ class ExecutionRead:
         workflow_definition: dict[str, Any] | None | Unset
         if isinstance(self.workflow_definition, Unset):
             workflow_definition = UNSET
-        elif isinstance(self.workflow_definition, WorkflowDefinition):
+        elif isinstance(self.workflow_definition, ExecutionReadWorkflowDefinitionType0):
             workflow_definition = self.workflow_definition.to_dict()
         else:
             workflow_definition = self.workflow_definition
@@ -304,8 +304,8 @@ class ExecutionRead:
         from ..models.execution_read_execution_metadata_type_0 import ExecutionReadExecutionMetadataType0
         from ..models.execution_read_input_data import ExecutionReadInputData
         from ..models.execution_read_labels import ExecutionReadLabels
+        from ..models.execution_read_workflow_definition_type_0 import ExecutionReadWorkflowDefinitionType0
         from ..models.user_reference import UserReference
-        from ..models.workflow_definition import WorkflowDefinition
 
         d = dict(src_dict)
         id = UUID(d.pop("id"))
@@ -512,7 +512,7 @@ class ExecutionRead:
 
                 current_activities.append(current_activities_item)
 
-        def _parse_workflow_definition(data: object) -> None | Unset | WorkflowDefinition:
+        def _parse_workflow_definition(data: object) -> ExecutionReadWorkflowDefinitionType0 | None | Unset:
             if data is None:
                 return data
             if isinstance(data, Unset):
@@ -520,12 +520,12 @@ class ExecutionRead:
             try:
                 if not isinstance(data, dict):
                     raise TypeError()
-                workflow_definition_type_0 = WorkflowDefinition.from_dict(data)
+                workflow_definition_type_0 = ExecutionReadWorkflowDefinitionType0.from_dict(data)
 
                 return workflow_definition_type_0
             except (TypeError, ValueError, AttributeError, KeyError):
                 pass
-            return cast(None | Unset | WorkflowDefinition, data)
+            return cast(ExecutionReadWorkflowDefinitionType0 | None | Unset, data)
 
         workflow_definition = _parse_workflow_definition(d.pop("workflow_definition", UNSET))
 

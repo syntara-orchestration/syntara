@@ -39,7 +39,9 @@ describe('registerActionNode', () => {
     expect(registration?.id).toBe(RegistryNodeId.ACTION)
     expect(registration?.label).toBe('Action')
     expect(registration?.category).toBe('action')
-    expect(registration?.description).toBe('Execute scripts or make API calls')
+    expect(registration?.description).toBe(
+      'Run scripts, make API calls, invoke another published workflow, or publish messages to Kafka.'
+    )
   })
 
   it('registers with correct order', () => {

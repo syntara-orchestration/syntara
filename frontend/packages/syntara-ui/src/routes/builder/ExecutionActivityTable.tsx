@@ -11,6 +11,7 @@ import { formatElapsedTime } from '../../utils/dateUtils'
 import type { ActivityState } from '../workflows/execution/types'
 import { parseCompositeKey } from '../workflows/execution/utils/activityState'
 
+import { ActivityRunningLongWarning } from './components/RunningLongWarning'
 import { ActivityStatusLabel } from './ExecutionStatus'
 import { ACTIVITY_STATUS } from './utils/executionState/executionHelpers'
 
@@ -34,6 +35,7 @@ export type ActivityOrderItem = {
   id: string
   name?: string
   type?: string
+  expectedDuration?: number
 }
 
 type ExecutionActivityTableProps = {
@@ -89,6 +91,7 @@ function ActivityRow({
   onRowClick,
   isSelected,
   hasAAPColumn,
+  expectedDuration,
 }: Readonly<{
   id: string
   name?: string
@@ -99,6 +102,7 @@ function ActivityRow({
   onRowClick?: (nodeId: string, nodeName: string) => void
   isSelected?: boolean
   hasAAPColumn: boolean
+  expectedDuration?: number
 }>) {
   const elapsedMs = computeActivityDurationMs(state, now) ?? undefined
   const displayName = name ?? id
@@ -118,6 +122,7 @@ function ActivityRow({
         <Td dataLabel="Elapsed time">{elapsedMs === undefined ? DASH : formatElapsedTime(elapsedMs)}</Td>
         <Td dataLabel="Status" modifier="nowrap">
           <ActivityStatusLabel status={state?.status ?? 'pending'} nodeType={type} />
+          <ActivityRunningLongWarning state={state} nodeType={type} expectedDuration={expectedDuration} />
         </Td>
         {hasAAPColumn && <Td dataLabel="AAP Job">{jobUrl ? <AAPJobLink url={jobUrl} /> : null}</Td>}
       </Tr>
@@ -157,12 +162,13 @@ export function ExecutionActivityTable({
         </Tr>
       </Thead>
       <Tbody>
-        {activityOrder.map(({ id, name, type }) => (
+        {activityOrder.map(({ id, name, type, expectedDuration }) => (
           <ActivityRow
             key={id}
             id={id}
             name={name}
             type={type}
+            expectedDuration={expectedDuration}
             state={activityStates.get(id)}
             now={now}
             executionError={executionError}

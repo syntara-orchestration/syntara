@@ -1,5 +1,6 @@
 import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { FormProvider } from 'react-hook-form'
 import { describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 import { z } from 'zod'
@@ -33,6 +34,58 @@ describe('SynTextField', () => {
     ))
 
     expect(screen.getByPlaceholderText('Enter group name')).toBeInTheDocument()
+  })
+
+  it('focuses the input when React Hook Form calls setFocus with an explicit control', async () => {
+    const user = userEvent.setup()
+    renderWithForm<FormData>({ schema, defaultValues: { name: '', email: '' } }, ({ control, setFocus }) => (
+      <>
+        <SynTextField name="name" control={control} label="Group name" />
+        <button type="button" onClick={() => setFocus('name')}>
+          Focus name
+        </button>
+      </>
+    ))
+
+    await user.click(screen.getByRole('button', { name: 'Focus name' }))
+
+    expect(screen.getByRole('textbox', { name: 'Group name' })).toHaveFocus()
+  })
+
+  it('focuses the first invalid input from form context and advances after it is corrected', async () => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn()
+    renderWithForm<FormData>({ schema, defaultValues: { name: '', email: 'invalid' } }, (form) => (
+      <FormProvider {...form}>
+        <SynTextField name="name" label="Group name" />
+        <SynTextField name="email" label="Email" type="email" />
+        <button type="button" onClick={form.handleSubmit(onSubmit)}>
+          Submit
+        </button>
+      </FormProvider>
+    ))
+    const name = screen.getByRole('textbox', { name: 'Group name' })
+    const email = screen.getByRole('textbox', { name: 'Email' })
+    const submit = screen.getByRole('button', { name: 'Submit' })
+
+    await user.click(submit)
+    await screen.findByText('Name is required')
+    await waitFor(() => expect(name).toHaveFocus())
+    expect(name).toHaveAccessibleDescription(/Name is required/)
+    expect(onSubmit).not.toHaveBeenCalled()
+
+    await user.type(name, 'my-group')
+    await user.click(submit)
+    await waitFor(() => expect(email).toHaveFocus())
+    expect(email).toHaveAccessibleDescription(/Invalid email/)
+    expect(onSubmit).not.toHaveBeenCalled()
+
+    await user.clear(email)
+    await user.type(email, 'user@example.com')
+    await user.click(submit)
+    await waitFor(() =>
+      expect(onSubmit).toHaveBeenCalledWith({ name: 'my-group', email: 'user@example.com' }, expect.anything())
+    )
   })
 
   it('shows required indicator', () => {
