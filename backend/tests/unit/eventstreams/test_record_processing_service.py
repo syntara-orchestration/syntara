@@ -13,6 +13,7 @@ from syntara.eventstreams.core.processing import HeldRecord, InspectedRecord, Re
 from syntara.eventstreams.core.results import EventDecodeFailure, EventFailureCode
 from syntara.eventstreams.core.serialization import EventDecodeSuccess
 from syntara.eventstreams.models.subscription_snapshot import SubscriptionSnapshot
+from syntara.eventstreams.services import record_processing_service
 from syntara.eventstreams.services.admission_service import EventAdmissionService
 from syntara.eventstreams.services.record_processing_service import EventRecordProcessingService
 from tests.unit.eventstreams.test_execution_preparation_service import PreparationContext, preparation_context
@@ -43,6 +44,11 @@ def processing_context(
     admission.recover_accepted.return_value = None
     admission.schedule.return_value = terminal(context.identity)
     service = EventRecordProcessingService(lambda: context.session, context.service, admission)
+    monkeypatch.setattr(
+        record_processing_service,
+        "lock_source_lifecycle",
+        AsyncMock(return_value=(context.subscription, context.source)),
+    )
     event = RawEvent(value=b'{"count":2}', source_metadata=context.envelope.source_metadata)
     return context, service, admission, event
 
@@ -161,14 +167,14 @@ async def test_attempted_handoff_retains_original_arguments_on_retry(monkeypatch
     assert all(call.args[0].workflow_arguments() == arguments for call in admission.schedule.await_args_list)
 
 
-async def test_invalid_message_is_held_without_execution_or_discard(monkeypatch) -> None:
+async def test_invalid_message_is_held_after_checking_accepted_work(monkeypatch) -> None:
     context, service, admission, event = processing_context(monkeypatch)
     monkeypatch.setattr(service, "admission_eligible", AsyncMock(return_value=True))
     result = await service.process(context.snapshot, context.identity, event.model_copy(update={"value": b"invalid"}))
     assert isinstance(result, HeldRecord)
     assert result.permanent_content_error
     admission.lookup_execution.assert_not_awaited()
-    admission.recover_accepted.assert_not_awaited()
+    admission.recover_accepted.assert_awaited_once_with(context.identity)
     admission.schedule.assert_not_awaited()
     context.session.add.assert_not_called()
 
@@ -205,3 +211,76 @@ async def test_storage_failure_closes_shared_resolution_gate(monkeypatch) -> Non
     result = await service.process(context.snapshot, context.identity, event)
     assert isinstance(result, HeldRecord)
     gate.dependency_failed.assert_called_once_with(context.snapshot)
+
+
+@pytest.mark.parametrize("failure", ["decode", "schema"])
+@pytest.mark.parametrize("entrypoint", ["process", "inspection", "filtered_inspection"])
+@pytest.mark.parametrize("accepted", [True, False])
+async def test_content_failure_recovers_original_acceptance_before_a_permanent_hold(
+    monkeypatch, failure, entrypoint, *, accepted
+) -> None:
+    context, service, admission, event = processing_context(monkeypatch)
+    revised = SubscriptionSnapshot.model_validate(
+        {
+            **context.snapshot.model_dump(mode="json"),
+            "configuration_revision": context.snapshot.configuration_revision + 1,
+            "published_version_id": str(context.snapshot.source_id),
+            "filter": {"expression": "true"},
+            "input_schema": {"$schema": "http://json-schema.org/draft-07/schema#", "required": ["new_field"]},
+        }
+    )
+    if failure == "decode":
+        event = event.model_copy(update={"value": b"invalid"})
+    admission.recover_accepted.return_value = terminal(context.identity) if accepted else None
+    result: ResolvedDelivery | HeldRecord | SkippedRecord | InspectedRecord
+    if entrypoint == "process":
+        result = await service.process(revised, context.identity, event)
+    else:
+        result = await service.inspect_only(
+            revised, context.identity, event, apply_filter=entrypoint == "filtered_inspection"
+        )
+    admission.recover_accepted.assert_awaited_once_with(context.identity)
+    if accepted:
+        assert isinstance(result, ResolvedDelivery)
+        assert result.terminal.execution_id == context.identity.execution_id
+    else:
+        assert isinstance(result, HeldRecord)
+        assert result.permanent_content_error
+    admission.schedule.assert_not_awaited()
+
+
+@pytest.mark.parametrize(
+    "failure", [SchedulingFailureCode.STORAGE_UNAVAILABLE, SchedulingFailureCode.TEMPORAL_UNAVAILABLE]
+)
+async def test_unavailable_acceptance_on_content_failure_keeps_a_retryable_hold(monkeypatch, failure) -> None:
+    context, service, admission, event = processing_context(monkeypatch)
+    admission.recover_accepted.return_value = RetryDelivery(
+        error_code=failure, next_attempt_at=datetime.now(UTC), circuit_open=False
+    )
+    result = await service.process(context.snapshot, context.identity, event.model_copy(update={"value": b"invalid"}))
+    assert isinstance(result, HeldRecord)
+    assert not result.permanent_content_error
+    assert result.retry_at is not None
+    assert result.reason == failure.value
+
+
+@pytest.mark.parametrize("change", ["revision", "version", "generation", "retired", "missing"])
+async def test_local_skip_commit_guard_rejects_authoritative_source_changes(monkeypatch, change) -> None:
+    context, service, admission, _event = processing_context(monkeypatch)
+    lifecycle = AsyncMock(return_value=(context.subscription, context.source))
+    monkeypatch.setattr(record_processing_service, "lock_source_lifecycle", lifecycle)
+    subscription, source = context.subscription, context.source
+    if change == "revision":
+        subscription.configuration_revision += 1
+    elif change == "version":
+        subscription.published_version_id = context.snapshot.source_id
+    elif change == "generation":
+        subscription.active_source_generation += 1
+    elif change == "retired":
+        source.retired_at = datetime.now(UTC)
+    else:
+        lifecycle.return_value = None
+    async with service.local_skip_commit_guard(context.snapshot) as current:
+        assert current is False
+    admission.lookup_execution.assert_not_awaited()
+    admission.recover_accepted.assert_not_awaited()

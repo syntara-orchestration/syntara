@@ -1,6 +1,7 @@
 """Filter locally before Execution lookup and new Kafka workflow admission."""
 
-from collections.abc import Callable
+from collections.abc import AsyncIterator, Callable
+from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
 
 import structlog
@@ -105,6 +106,30 @@ class EventRecordProcessingService:
         except (SyntaraError, ValueError):
             return False
 
+    @asynccontextmanager
+    async def local_skip_commit_guard(self, snapshot: SubscriptionSnapshot) -> AsyncIterator[bool]:
+        """Serialize a skip batch's checkpoint with publication on its source.
+
+        Keep the lifecycle locks until the bounded broker commit settles. A
+        reconciled local gate alone cannot fence a publication it has not seen.
+        Already completed skips may drain after local admission closes.
+        """
+        async with self._sessions() as session, session.begin():
+            lifecycle = await lock_source_lifecycle(session, snapshot.source_id)
+            if lifecycle is None:
+                yield False
+                return
+            subscription, source = lifecycle
+            yield (
+                subscription.id == snapshot.subscription_id
+                and subscription.workflow_id == snapshot.workflow_id
+                and subscription.configuration_revision == snapshot.configuration_revision
+                and subscription.published_version_id == snapshot.published_version_id
+                and subscription.active_source_generation == source.generation == snapshot.source_generation
+                and source.id == snapshot.source_id
+                and source.retired_at is None
+            )
+
     def _scheduled(self, snapshot: SubscriptionSnapshot, result: SchedulingResult) -> ResolvedDelivery | HeldRecord:
         if isinstance(result, ResolvedDelivery):
             return result
@@ -162,8 +187,19 @@ class EventRecordProcessingService:
         if isinstance(decoded, SkippedRecord):
             return decoded if self._admission_open(snapshot, guard) else self._hold("admission_closed")
         if isinstance(decoded, EventDecodeFailure):
-            return HeldRecord(reason="activity_log_unavailable", permanent_content_error=True)
+            return await self._recover_content_failure(snapshot, identity)
         return await self._process_match(snapshot, identity, decoded, guard)
+
+    async def _recover_content_failure(
+        self, snapshot: SubscriptionSnapshot, identity: DeliveryIdentity
+    ) -> ResolvedDelivery | HeldRecord:
+        """Repair accepted work using its original input before holding new content."""
+        accepted = await self._accepted(snapshot, identity, recover=True)
+        return (
+            accepted
+            if accepted is not None
+            else HeldRecord(reason="activity_log_unavailable", permanent_content_error=True)
+        )
 
     async def _process_match(
         self,
@@ -203,12 +239,12 @@ class EventRecordProcessingService:
         guard: Callable[[], bool] | None,
     ) -> RecordResult:
         if isinstance(decoded, EventDecodeFailure):
-            return HeldRecord(reason="activity_log_unavailable", permanent_content_error=True)
+            return await self._recover_content_failure(snapshot, identity)
         if not self._admission_open(snapshot, guard):
             return self._hold("admission_closed")
         prepared = await self._preparation.prepare_delivery(snapshot, identity, decoded.envelope)
         if isinstance(prepared, EventDecodeFailure):
-            return HeldRecord(reason="activity_log_unavailable", permanent_content_error=True)
+            return await self._recover_content_failure(snapshot, identity)
         if not isinstance(prepared, PreparedExecution):
             return self._hold(prepared.reason)
         if not self._admission_open(snapshot, guard):
@@ -237,7 +273,7 @@ class EventRecordProcessingService:
                 return decoded if self._admission_open(snapshot, admission_guard) else self._hold("admission_closed")
             return InspectedRecord(identity=identity)
         if isinstance(decoded, EventDecodeFailure):
-            return HeldRecord(reason="activity_log_unavailable", permanent_content_error=True)
+            return await self._recover_content_failure(snapshot, identity)
         accepted = await self._accepted(snapshot, identity, recover=not apply_filter)
         return accepted if accepted is not None else InspectedRecord(identity=identity)
 

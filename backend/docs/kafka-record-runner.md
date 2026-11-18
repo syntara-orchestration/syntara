@@ -10,24 +10,33 @@ For each received record:
 
 1. Derive the stable Execution UUID and Temporal workflow ID from the deployment,
    integration, source generation, workflow, subscription and Kafka coordinates.
-2. Reuse a matching confirmed normal Execution when one exists.
-3. Otherwise look up the stable Temporal workflow ID and verify its signed
-   start arguments. Recover an accepted run using its original version, input,
-   principal and timestamps.
-4. Only confirmed absence permits current lifecycle, credential, payload and
-   capacity checks, followed by preparation in memory.
+2. Evaluate the publication's CEL filter locally. No-match and evaluation-error
+   outcomes need no Execution lookup or Temporal call. Before committing a batch
+   containing local skips, lock and validate its authoritative subscription
+   revision through the bounded Kafka commit. A republished revision leaves the
+   old batch uncommitted for replay.
+3. For matches, reuse a matching confirmed normal Execution when one exists.
+4. Otherwise check current lifecycle, credentials and capacity, then prepare
+   the matching record in memory.
 5. Start Temporal outside a database transaction. After acceptance, persist the
    normal Execution and scheduling confirmation in a short transaction.
 6. Advance the resolved prefix only after that transaction commits.
 
-A failed or ambiguous start creates no pre-start Execution. A failed database
-write retries the same accepted arguments in a fresh transaction, without
-cancelling or starting another workflow. Existing Execution status is preserved.
+Decode or schema failures check confirmed Execution or verified Temporal
+acceptance before applying a permanent content hold. This lets redelivery repair
+an earlier accepted run with its original input even after a schema change.
+
+A failed or ambiguous start creates no pre-start Execution. Handoff recovery
+looks up the stable Temporal workflow ID and verifies its signed start arguments.
+A failed database write retries the same accepted arguments in a fresh
+transaction, using the original version, input, principal and timestamps.
+Existing Execution status is preserved.
 
 There is no delivery ledger, delivery capacity table, terminal proof cache,
 cleanup worker or independent handoff-recovery scanner. Interrupted handoffs
-remain uncommitted in Kafka. Repair waits until that same source is consumed
-again. Duplicate protection lasts while the normal Execution or Temporal
+remain uncommitted in Kafka. The runner retries saved handoffs even without new
+records; after a restart, repair waits until that same source is consumed again.
+Duplicate protection lasts while the normal Execution or Temporal
 evidence remains available; deleting both can permit a new start on redelivery.
 
 ## Ownership and shared gates
@@ -42,8 +51,9 @@ Kafka identity is verified again. Recovery tokens fence only their partition.
 Redis carries reconciliation hints only; losing a hint does not change the
 database source of truth.
 
-The runner reads current subscription eligibility on every processing advance.
-It does not reuse an eligibility result for a timed interval.
+The runner refreshes subscription eligibility between batches. Buffered records
+use shared local gates; matches also check current admission before starting.
+Local skip checkpoints validate the authoritative revision once per commit batch.
 
 Placement loss closes fetching and starts a bounded drain. Already admitted
 handoffs may finish persisting accepted runs. Their resolved offsets may commit
@@ -76,6 +86,9 @@ Valid group commits govern normal resumption. Missing or out-of-range offsets
 recover automatically from retained beginning. A partition token and revision
 keep the selected boundary stable across interruptions. Local tasks must drain,
 and source identity and assignment must remain verified.
+Any saved handoff below the recovery boundary must have confirmed Execution
+persistence before recovery can advance. Normal commits and oversized-record
+handling also cannot cross an unresolved saved handoff.
 
 See [initialization](eventstreams/kafka-initialization.md),
 [connection testing](event-subscription-controls.md) and

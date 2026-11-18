@@ -32,12 +32,13 @@ from syntara.eventstreams.core.deduplication import DeliveryIdentity
 from syntara.eventstreams.core.envelope import RawEvent, RawEventHeader
 from syntara.eventstreams.core.handler import ResolvedDelivery, RetryDelivery, SchedulingFailureCode
 from syntara.eventstreams.core.preparation import PreparedExecution
-from syntara.eventstreams.core.processing import HeldRecord, InspectedRecord, RecordProcessingGate
+from syntara.eventstreams.core.processing import HeldRecord, InspectedRecord, RecordProcessingGate, SkippedRecord
 from syntara.eventstreams.core.results import EventDecodeFailure
 from syntara.eventstreams.core.runtime import RuntimeState, SubscriptionRuntimeError
 from syntara.eventstreams.core.serialization import JsonEventDecoder
 from syntara.eventstreams.exceptions import KafkaTransportError
 from syntara.eventstreams.models.subscription_snapshot import SubscriptionSnapshot
+from syntara.eventstreams.services import record_processing_service
 from syntara.eventstreams.services.admission_service import EventAdmissionService
 from syntara.eventstreams.services.execution_preparation_service import EventExecutionPreparationService
 from syntara.eventstreams.services.record_processing_service import EventRecordProcessingService
@@ -56,6 +57,7 @@ async def harness(monkeypatch: pytest.MonkeyPatch) -> AsyncIterator[SimpleNamesp
     client.epoch, client.assignment = 7, frozenset({0, 1})
     client.fetch.return_value = {}
     processing = MagicMock(spec=EventRecordProcessingService)
+    processing.local_skip_commit_guard.return_value.__aenter__.return_value = True
     processing.admission_eligible.return_value = True
     processing.process.side_effect = lambda _snapshot, identity, _event: terminal(identity)
     processing.hold_content_failure.return_value = HeldRecord(
@@ -1247,6 +1249,7 @@ async def test_filter_error_log_failure_does_not_prevent_offset_commit(harness, 
     state.ready = state.eligible = True
     await runner._enqueue({2: [record]}, 7)
     await runner._advance(state)
+    assert context.session.mock_calls == []
     await runner._commit_positions((state,))
     assert state.held is None
     eligible = processing.admission_eligible
@@ -1254,7 +1257,6 @@ async def test_filter_error_log_failure_does_not_prevent_offset_commit(harness, 
     eligible.assert_not_awaited()
     admission.lookup_execution.assert_not_awaited()
     admission.recover_accepted.assert_not_awaited()
-    assert context.session.mock_calls == []
     logs.error.assert_called_once()
     admission.schedule.assert_not_awaited()
     harness.client.commit.assert_awaited_once_with({2: 6}, expected_epoch=7)
@@ -1284,6 +1286,7 @@ async def test_matching_record_commits_only_after_handoff_retry_confirms_executi
     harness.client.seek.assert_awaited_with(2, 5, expected_epoch=7)
 
     admission.recover_accepted.return_value = terminal(context.identity)
+    admission.lookup_execution.return_value = terminal(context.identity)
     runner._start_due_tasks()
     assert state.task is not None
     await state.task
@@ -1339,26 +1342,22 @@ async def test_reload_finishes_original_handoff_before_processing_a_different_re
     harness.positions.initialize.side_effect = lambda request: PositionResult(
         status=PositionStatus.READY, next_offset=41, assignment_epoch=request.assignment_epoch
     )
+    admission.recover_accepted.side_effect = [retry, terminal(attempted_identity)]
     state.held = None
     await runner._advance(state)
-    refetched = earlier.model_copy(
-        update={"source_metadata": earlier.source_metadata.model_copy(update={"offset": str(refetched_offset)})}
-    )
-    admission.recover_accepted.side_effect = [retry, terminal(attempted_identity)]
-    await runner._enqueue({2: [refetched]}, 7)
-    await runner._advance(state)
     assert state.handoff is not None
-    assert state.handoff.workflow_arguments() == arguments
     assert state.resolved_next_offset == 42
     await runner._commit_positions((state,))
     assert all(call.args == ({2: 42},) for call in harness.client.commit.await_args_list)
 
     state.held = None
-    await runner._enqueue({2: [refetched]}, 7)
     await runner._advance(state)
     assert state.handoff is None
-    assert list(state.records) == [refetched]
-    assert state.resolved_next_offset == 42
+    assert state.ready
+    refetched = earlier.model_copy(
+        update={"source_metadata": earlier.source_metadata.model_copy(update={"offset": str(refetched_offset)})}
+    )
+    await runner._enqueue({2: [refetched]}, 7)
     await runner._advance(state)
     admission.schedule.assert_awaited_once()
     assert admission.schedule.await_args.args[0].workflow_arguments() == arguments
@@ -1410,8 +1409,8 @@ async def test_finishing_a_different_handoff_preserves_commit_guards(harness, mo
     admission.schedule.assert_not_awaited()
 
 
-@pytest.mark.parametrize("refetched_offset", [3, 6], ids=["earlier-boundary", "boundary-skips-handoff"])
-async def test_gap_recovery_preserves_handoff_for_divergent_refetch(harness, monkeypatch, refetched_offset) -> None:
+async def test_gap_recovery_preserves_handoff_before_its_offset(harness, monkeypatch) -> None:
+    refetched_offset = 3
     context, processing, admission, record, _logs = filtered_context(
         monkeypatch, {"expression": "input.payload.value.count == 2"}
     )
@@ -1686,3 +1685,237 @@ async def test_unbufferable_record_with_closed_admission_retries_before_filterin
     admission.schedule.assert_not_awaited()
     (logs.info if expression == "false" else logs.error).assert_called_once()
     harness.client.commit.assert_awaited_once_with({2: 6}, expected_epoch=7)
+
+
+@pytest.mark.parametrize("expression", ["false", "input.payload.value.count"])
+@pytest.mark.parametrize("oversized", [False, True])
+async def test_republish_before_skip_checkpoint_leaves_the_batch_uncommitted(
+    harness, monkeypatch, expression, *, oversized
+) -> None:
+    context, processing, admission, record, _logs = filtered_context(monkeypatch, {"expression": expression})
+    runner = harness.runner
+    runner.snapshot, runner._processing = context.snapshot, processing
+    harness.client.assignment = frozenset({2})
+    await runner.on_partitions_assigned(frozenset({2}), 7)
+    state = runner._partitions[2]
+    state.ready = state.eligible = True
+    if oversized:
+        harness.settings.event_queue_max_bytes = 1
+    await runner._enqueue({2: [record]}, 7)
+    # Publish on the same source while the old runner's local gate is open.
+    context.subscription.configuration_revision += 1
+    context.subscription.filter = {"expression": "true"}
+    await runner._advance(state)
+    assert state.resolved_next_offset == 6
+    await runner._commit_positions((state,))
+    harness.client.commit.assert_not_awaited()
+    assert state.resolved_next_offset == 6
+    admission.lookup_execution.assert_not_awaited()
+    admission.recover_accepted.assert_not_awaited()
+    admission.schedule.assert_not_awaited()
+
+
+async def test_skip_batch_holds_publication_lock_until_broker_commit_finishes(harness, monkeypatch) -> None:
+    context, processing, admission, record, _logs = filtered_context(monkeypatch, {"expression": "false"})
+    lifecycle = AsyncMock(return_value=(context.subscription, context.source))
+    monkeypatch.setattr(record_processing_service, "lock_source_lifecycle", lifecycle)
+    runner = harness.runner
+    runner.snapshot, runner._processing = context.snapshot, processing
+    harness.client.assignment = frozenset({2})
+    await runner.on_partitions_assigned(frozenset({2}), 7)
+    state = runner._partitions[2]
+    state.ready = state.eligible = True
+    tail = record.model_copy(update={"source_metadata": record.source_metadata.model_copy(update={"offset": "6"})})
+    context.events.clear()
+    await runner._enqueue({2: [record, tail]}, 7)
+    await runner._run_partition(state)
+    assert context.events == []
+    entered, release = asyncio.Event(), asyncio.Event()
+
+    async def commit(_offsets: dict[int, int], *, expected_epoch: int) -> None:
+        assert expected_epoch == 7
+        assert context.events == ["begin"]
+        context.transaction.__aexit__.assert_not_awaited()
+        entered.set()
+        await release.wait()
+
+    harness.client.commit.side_effect = commit
+    task = asyncio.create_task(runner._commit_positions((state,)))
+    try:
+        await asyncio.wait_for(entered.wait(), timeout=1)
+        assert context.events == ["begin"]
+    finally:
+        release.set()
+        await task
+    assert context.events == ["begin", "commit"]
+    lifecycle.assert_awaited_once_with(context.session, context.snapshot.source_id)
+    assert state.local_skip_next_offset is None
+    admission.lookup_execution.assert_not_awaited()
+    admission.recover_accepted.assert_not_awaited()
+
+
+async def test_skip_fence_survives_failed_commit_and_later_execution_completion(harness, monkeypatch) -> None:
+    context, processing, admission, record, _logs = filtered_context(
+        monkeypatch, {"expression": "input.payload.value.count == 2"}
+    )
+    runner = harness.runner
+    runner.snapshot, runner._processing = context.snapshot, processing
+    harness.client.assignment = frozenset({2})
+    await runner.on_partitions_assigned(frozenset({2}), 7)
+    state = runner._partitions[2]
+    state.ready = state.eligible = True
+    skipped = record.model_copy(update={"value": b'{"count":0}'})
+    matched = record.model_copy(update={"source_metadata": record.source_metadata.model_copy(update={"offset": "6"})})
+    admission.lookup_execution.return_value = terminal(runner._identity(matched))
+    await runner._enqueue({2: [skipped, matched]}, 7)
+    await runner._advance(state)
+    harness.client.commit.side_effect = KafkaTransportError("Commit unavailable")
+    await runner._commit_positions((state,))
+    assert state.local_skip_next_offset == 6
+    await runner._advance(state)
+    assert state.resolved_next_offset == 7
+    context.subscription.configuration_revision += 1
+    harness.client.commit.reset_mock(side_effect=True)
+    await runner._commit_positions((state,))
+    harness.client.commit.assert_not_awaited()
+
+
+@pytest.mark.parametrize("checkpoint", ["normal", "recovery", "recovery_with_tail", "oversized", "idle"])
+async def test_unresolved_handoff_blocks_every_checkpoint_crossing_its_offset(harness, monkeypatch, checkpoint) -> None:
+    context, processing, admission, record, _logs = filtered_context(
+        monkeypatch, {"expression": "input.payload.value.count == 2"}
+    )
+    prepared = await context.prepare()
+    assert isinstance(prepared, PreparedExecution)
+    runner = harness.runner
+    runner.snapshot, runner._processing = context.snapshot, processing
+    runner._placement_authority = lambda: True
+    harness.settings.event_drain_timeout_seconds = 1
+    harness.settings.event_fetch_timeout_ms = 1000
+    harness.client.assignment = frozenset({2})
+    await runner.on_partitions_assigned(frozenset({2}), 7)
+    state = runner._partitions[2]
+    state.ready = state.eligible = True
+    state.handoff = prepared
+    admission.recover_accepted.return_value = RetryDelivery(
+        error_code=SchedulingFailureCode.STORAGE_UNAVAILABLE,
+        next_attempt_at=datetime.now(UTC) - timedelta(seconds=1),
+        circuit_open=False,
+    )
+    if checkpoint == "normal":
+        state.resolved_next_offset = 6
+    elif checkpoint in {"recovery", "recovery_with_tail"}:
+        if checkpoint == "recovery_with_tail":
+            later = record.model_copy(
+                update={
+                    "value": b"invalid",
+                    "source_metadata": record.source_metadata.model_copy(update={"offset": "6"}),
+                }
+            )
+            await runner._enqueue({2: [later]}, 7)
+        request, token = runner._request(state), uuid4()
+        evidence = await runner.close_and_drain(request, token=token, boundary=6)
+        assert not evidence.quiescent
+        admission.recover_accepted.assert_awaited_once_with(prepared.identity)
+        if checkpoint == "recovery_with_tail":
+            assert state.content_gate_unknown
+            assert state.inspection_next_offset == state.inspection_end_offset == 6
+    elif checkpoint == "oversized":
+        harness.settings.event_queue_max_bytes = 1
+        later = record.model_copy(
+            update={
+                "value": b'{"count":0}',
+                "source_metadata": record.source_metadata.model_copy(update={"offset": "6"}),
+            }
+        )
+        await runner._enqueue({2: [later]}, 7)
+        admission.recover_accepted.assert_awaited_once_with(prepared.identity)
+    else:
+        state.ready = False
+        runner._start_due_tasks()
+        assert state.task is not None
+        await state.task
+        admission.recover_accepted.assert_awaited_once_with(prepared.identity)
+        harness.positions.initialize.assert_not_awaited()
+        harness.client.fetch.assert_not_awaited()
+    await runner._commit_positions((state,))
+    harness.client.commit.assert_not_awaited()
+    assert state.handoff is prepared
+    admission.schedule.assert_not_awaited()
+
+
+async def test_recovery_persists_saved_handoff_before_allowing_a_later_boundary(harness, monkeypatch) -> None:
+    context, processing, admission, _record, _logs = filtered_context(monkeypatch, {"expression": "true"})
+    prepared = await context.prepare()
+    assert isinstance(prepared, PreparedExecution)
+    runner = harness.runner
+    runner.snapshot, runner._processing = context.snapshot, processing
+    harness.settings.event_drain_timeout_seconds = 1
+    harness.client.assignment = frozenset({2})
+    await runner.on_partitions_assigned(frozenset({2}), 7)
+    state = runner._partitions[2]
+    state.ready = state.eligible = True
+    state.handoff = prepared
+    admission.recover_accepted.return_value = terminal(prepared.identity)
+    evidence = await runner.close_and_drain(runner._request(state), token=uuid4(), boundary=6)
+    assert evidence.quiescent
+    assert not evidence.permanent_content_error
+    assert state.handoff is None
+    admission.recover_accepted.assert_awaited_once_with(prepared.identity)
+    admission.schedule.assert_not_awaited()
+
+
+@pytest.mark.parametrize("failure", ["epoch", "fence", "dependency", "deadline"])
+async def test_skip_checkpoint_rechecks_local_safety_after_waiting_for_revision_lock(
+    harness, monkeypatch, failure
+) -> None:
+    context, processing, _admission, record, _logs = filtered_context(monkeypatch, {"expression": "false"})
+    runner = harness.runner
+    runner.snapshot, runner._processing = context.snapshot, processing
+    harness.client.assignment = frozenset({2})
+    await runner.on_partitions_assigned(frozenset({2}), 7)
+    state = runner._partitions[2]
+    state.ready = state.eligible = True
+    await runner._enqueue({2: [record]}, 7)
+    await runner._advance(state)
+
+    async def lock(_session: object, _source_id: object) -> object:
+        if failure == "epoch":
+            harness.client.epoch += 1
+        elif failure == "fence":
+            state.fence = uuid4()
+        elif failure == "dependency":
+            gate = Mock()
+            gate.resolution_open.return_value = False
+            runner._gate = gate
+        else:
+            runner._drain_deadline = asyncio.get_running_loop().time() - 1
+        return context.subscription, context.source
+
+    monkeypatch.setattr(record_processing_service, "lock_source_lifecycle", AsyncMock(side_effect=lock))
+    await runner._commit_positions((state,))
+    harness.client.commit.assert_not_awaited()
+    assert state.resolved_next_offset == 6
+
+
+async def test_new_skip_during_commit_keeps_its_revision_fence(harness) -> None:
+    runner = harness.runner
+    state = runner._partitions[0]
+    harness.processing.process.side_effect = lambda snapshot, identity, _event: SkippedRecord(
+        identity=identity, configuration_revision=snapshot.configuration_revision, outcome="no_match"
+    )
+    await runner._enqueue({0: [event(harness, 5), event(harness, 6)]}, 7)
+    await runner._advance(state)
+
+    async def commit(offsets: dict[int, int], *, expected_epoch: int) -> None:
+        assert offsets == {0: 6}
+        assert expected_epoch == 7
+        await runner._advance(state)
+
+    harness.client.commit.side_effect = commit
+    await runner._commit_positions((state,))
+    assert state.resolved_next_offset == state.local_skip_next_offset == 7
+    harness.processing.local_skip_commit_guard.return_value.__aenter__.return_value = False
+    harness.client.commit.reset_mock(side_effect=True)
+    await runner._commit_positions((state,))
+    harness.client.commit.assert_not_awaited()

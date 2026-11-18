@@ -191,8 +191,9 @@ async def test_runtime_filters_cloudevents_before_scheduling(monkeypatch, struct
     event = event.model_copy(update={"value": value, "key": b"order-123", "headers": tuple(headers)})
     before = event.model_copy(deep=True)
     result = await service.process(context.snapshot, context.identity, event)
-    admission.recover_accepted.assert_awaited_once_with(context.identity)
+    admission.recover_accepted.assert_not_awaited()
     if event_type == "order.created":
+        admission.lookup_execution.assert_awaited_once_with(context.identity)
         assert isinstance(result, ResolvedDelivery)
         prepared = admission.schedule.call_args.args[0]
         assert isinstance(prepared, PreparedExecution)
@@ -201,6 +202,7 @@ async def test_runtime_filters_cloudevents_before_scheduling(monkeypatch, struct
         assert prepared.input_data["cloudevents"]["extensions"] == {"priority": "3"}
         logs.info.assert_not_called()
     else:
+        admission.lookup_execution.assert_not_awaited()
         assert isinstance(result, SkippedRecord)
         assert result.outcome == "no_match"
         admission.schedule.assert_not_awaited()
