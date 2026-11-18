@@ -212,7 +212,6 @@ class WorkflowFormPromptMixin:
         # Get presentation fields
         submit_label = resolved_parameters.get("submit_label")
         success_message = resolved_parameters.get("success_message")
-        css_override = resolved_parameters.get("css_override")
 
         return {
             "execution_id": self.execution_id,
@@ -232,7 +231,6 @@ class WorkflowFormPromptMixin:
             "message": message_text,
             "submit_label": submit_label,
             "success_message": success_message,
-            "css_override": css_override,
         }
 
     async def _execute_form_prompt_node(

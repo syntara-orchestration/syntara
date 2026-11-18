@@ -32,13 +32,11 @@ class TestFormTriggerParameters:
                 message="Please provide the requested information.",
                 submit_label="Send",
                 success_message="Thanks for your response.",
-                css_override=".form { color: blue; }",
             )
         )
         assert full.message == "Please provide the requested information."
         assert full.submit_label == "Send"
         assert full.success_message == "Thanks for your response."
-        assert full.css_override == ".form { color: blue; }"
 
     def test_all_shared_field_types_are_accepted(self) -> None:
         fields: list[dict[str, object]] = [
@@ -140,11 +138,6 @@ class TestFormTriggerParameters:
         ]
         parameters = _parameters(*fields)
         with pytest.raises(FormDefinitionError, match="invalid field definition"):
-            FormTriggerParameters.model_validate(parameters)
-
-    def test_unsafe_css_is_rejected(self) -> None:
-        parameters = _parameters(_text_field(), css_override=".form { background: url(x); }")
-        with pytest.raises(ValidationError, match=r"url\(\)"):
             FormTriggerParameters.model_validate(parameters)
 
     def test_unknown_parameters_are_rejected(self) -> None:

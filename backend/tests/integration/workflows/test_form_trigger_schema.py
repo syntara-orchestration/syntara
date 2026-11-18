@@ -50,7 +50,6 @@ def test_valid_minimal_and_full_configs(form_schema: dict[str, Any]) -> None:
         "message": "Provide account details.",
         "submit_label": "Continue",
         "success_message": "Your response was received.",
-        "css_override": ".form { color: blue; }",
     }
     _validate_parameters(full, form_schema)
 

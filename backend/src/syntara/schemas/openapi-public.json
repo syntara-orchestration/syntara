@@ -44211,19 +44211,6 @@
             "title": "Success Message",
             "description": "Message shown after successful form submission"
           },
-          "css_override": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 10000
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Css Override",
-            "description": "Custom CSS applied to the form view"
-          },
           "response_data": {
             "anyOf": [
               {
@@ -45556,19 +45543,6 @@
             ],
             "title": "Success Message",
             "description": "Success message after submit"
-          },
-          "css_override": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 10000
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Css Override",
-            "description": "Custom CSS for form rendering"
           },
           "responder_user_ids": {
             "anyOf": [
@@ -55919,19 +55893,6 @@
             ],
             "title": "Success Message",
             "description": "Shown after submission."
-          },
-          "css_override": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 10000
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Css Override",
-            "description": "Custom CSS applied to the form view."
           }
         },
         "additionalProperties": false,

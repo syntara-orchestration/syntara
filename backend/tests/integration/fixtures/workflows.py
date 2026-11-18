@@ -125,7 +125,6 @@ async def form_trigger_workflow_definition() -> dict[str, Any]:
                     },
                     "submit_label": "Submit request",
                     "success_message": "Request submitted.",
-                    "css_override": "form { color: #333; }",
                 },
             },
             {

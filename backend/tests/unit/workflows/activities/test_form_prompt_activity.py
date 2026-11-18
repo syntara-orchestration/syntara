@@ -33,7 +33,6 @@ def _form_prompt_input(overrides: dict[str, Any] | None = None) -> FormPromptAct
         "message": None,
         "submit_label": None,
         "success_message": None,
-        "css_override": None,
     }
     if overrides:
         payload.update(overrides)
@@ -174,7 +173,6 @@ class TestCreateFormPromptActivity:
                         "message": "Please fill this out",
                         "submit_label": "Submit",
                         "success_message": "Done!",
-                        "css_override": ".form { color: red; }",
                     }
                 ),
             )
@@ -190,7 +188,6 @@ class TestCreateFormPromptActivity:
         assert call_args["message"] == "Please fill this out"
         assert call_args["submit_label"] == "Submit"
         assert call_args["success_message"] == "Done!"
-        assert call_args["css_override"] == ".form { color: red; }"
 
 
 class TestExpireFormPromptsActivity:
