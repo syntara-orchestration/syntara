@@ -86,6 +86,10 @@ Both AAP and approval cancellation follow the same principle: propagate cancella
 
 ## Retry Execution
 
+Retry from selected failure points has a separate preview and replay path. See
+[Retry From Failure](retry-from-failure.md) for validation, replay, loop, and
+input-override behavior.
+
 ### How It Works
 
 ```mermaid

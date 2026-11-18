@@ -2,7 +2,7 @@ import { useState } from 'react'
 
 import { approvalsClient } from '../../client'
 import { useMutationErrorHandler } from '../../hooks/useMutationErrorHandler'
-import { useAlerts } from '../../providers/alerts'
+import { useAlerts } from '../../providers/alerts/AlertContext'
 
 type DecisionType = 'approved' | 'rejected'
 
