@@ -368,19 +368,13 @@ describe('ActionStepForm', () => {
     expect(parametersField).toHaveValue('${trigger.tier}')
   })
 
-  it('shows Developer Preview label for script executor', () => {
-    renderWithHeader(
-      <ActionStepForm onSubmit={mockOnSubmit} initialData={{ executor: ExecutorTypeEnum.SCRIPT_PYTHON }} />
-    )
-
-    expect(screen.getByText('Developer Preview')).toBeInTheDocument()
-  })
-
-  it('does not show Developer Preview label for HTTP request executor', () => {
-    renderWithHeader(<ActionStepForm onSubmit={mockOnSubmit} initialData={{ executor: 'http_request' }} />)
-
-    expect(screen.queryByText('Developer Preview')).not.toBeInTheDocument()
-  })
+  it.each([ExecutorTypeEnum.SCRIPT_PYTHON, ExecutorTypeEnum.SCRIPT_BASH])(
+    'does not show Developer Preview label for %s executor',
+    (executor) => {
+      renderWithHeader(<ActionStepForm onSubmit={mockOnSubmit} initialData={{ executor }} />)
+      expect(screen.queryByText('Developer Preview')).not.toBeInTheDocument()
+    }
+  )
 
   describe('Secret URL credential — URL field locking', () => {
     const mockSecretUrlType = {

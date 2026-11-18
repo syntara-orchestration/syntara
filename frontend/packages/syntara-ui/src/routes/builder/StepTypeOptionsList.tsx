@@ -3,7 +3,6 @@ import {
   ContentVariants,
   Flex,
   FlexItem,
-  Label,
   Split,
   SplitItem,
   Stack,
@@ -22,11 +21,6 @@ import styles from './StepTypeOptionsList.module.css'
 import { resolveIconForType } from './utils/stepIcons'
 
 export type StepTypeOption = Pick<StepTypeDefinition | StepSubtypeDefinition, 'id' | 'label' | 'icon' | 'description'>
-
-const SCRIPT_PREVIEW_STEP_IDS = new Set<string>([
-  RegistryStepId.ACTION_SCRIPT_PYTHON,
-  RegistryStepId.ACTION_SCRIPT_BASH,
-])
 
 type StepTypeOptionsListProps = {
   stepTypes: StepTypeOption[]
@@ -81,13 +75,6 @@ export function StepTypeOptionsList(props: StepTypeOptionsListProps) {
                         {stepType.label}
                       </Title>
                     </FlexItem>
-                    {SCRIPT_PREVIEW_STEP_IDS.has(stepType.id) && (
-                      <FlexItem>
-                        <Label isCompact color="orange" style={{ fontSize: 'var(--pf-t--global--font--size--sm)' }}>
-                          Developer Preview
-                        </Label>
-                      </FlexItem>
-                    )}
                   </Flex>
                 </SplitItem>
               </Split>
