@@ -14,7 +14,7 @@ import pytest_asyncio
 from aiokafka.errors import AuthenticationFailedError, KafkaConnectionError, KafkaTimeoutError
 
 from syntara.core.config.base import get_settings
-from syntara.core.constants import EventStreamLimits
+from syntara.core.constants import EventSchedulingDefaults, EventStreamLimits
 from syntara.eventstreams.adapters import kafka_record_runner as module
 from syntara.eventstreams.adapters.kafka_consumer import KafkaPartitionConsumer
 from syntara.eventstreams.adapters.kafka_initial_position import (
@@ -31,7 +31,7 @@ from syntara.eventstreams.adapters.kafka_record_runner import KafkaRecordRunner,
 from syntara.eventstreams.core.consumer import MAX_POSITION_OFFSET
 from syntara.eventstreams.core.deduplication import DeliveryIdentity
 from syntara.eventstreams.core.envelope import RawEvent, RawEventHeader
-from syntara.eventstreams.core.handler import ResolvedDelivery, RetryDelivery, SchedulingFailureCode
+from syntara.eventstreams.core.handler import BlockedDelivery, ResolvedDelivery, RetryDelivery, SchedulingFailureCode
 from syntara.eventstreams.core.preparation import PreparedExecution
 from syntara.eventstreams.core.processing import HeldRecord, InspectedRecord, RecordProcessingGate, SkippedRecord
 from syntara.eventstreams.core.results import EventDecodeFailure
@@ -60,7 +60,7 @@ async def harness(monkeypatch: pytest.MonkeyPatch) -> AsyncIterator[SimpleNamesp
     processing = MagicMock(spec=EventRecordProcessingService)
     processing.local_skip_commit_guard.return_value.__aenter__.return_value = True
     processing.admission_eligible.return_value = True
-    processing.process.side_effect = lambda _snapshot, identity, _event: terminal(identity)
+    processing.process.side_effect = lambda _snapshot, identity, _event, **_kwargs: terminal(identity)
     processing.hold_content_failure.return_value = HeldRecord(
         reason="activity_log_unavailable", permanent_content_error=True
     )
@@ -270,7 +270,7 @@ async def test_record_larger_than_queue_is_held_without_scheduling_or_commit(har
 async def test_busy_partition_releases_queue_capacity_and_healthy_partition_continues(harness) -> None:
     runner = harness.runner
 
-    async def process(_snapshot, identity, _record) -> ResolvedDelivery | HeldRecord:
+    async def process(_snapshot, identity, _record, **_kwargs: object) -> ResolvedDelivery | HeldRecord:
         if identity.record.partition == 0:
             return HeldRecord(reason="claim_busy", retry_at=datetime.now(UTC) + timedelta(seconds=60))
         return terminal(identity)
@@ -291,7 +291,7 @@ async def test_downstream_concurrency_is_bounded_and_fetch_stays_responsive(harn
     entered, release = asyncio.Event(), asyncio.Event()
     active = maximum = 0
 
-    async def process(_snapshot, identity, _record) -> ResolvedDelivery:
+    async def process(_snapshot, identity, _record, **_kwargs: object) -> ResolvedDelivery:
         nonlocal active, maximum
         active += 1
         maximum = max(maximum, active)
@@ -344,7 +344,7 @@ async def test_revocation_drains_only_while_ownership_permits_commit(harness, lo
     runner = harness.runner
     entered, release = asyncio.Event(), asyncio.Event()
 
-    async def process(_snapshot, identity, _record) -> ResolvedDelivery:
+    async def process(_snapshot, identity, _record, **_kwargs: object) -> ResolvedDelivery:
         entered.set()
         await release.wait()
         return terminal(identity)
@@ -369,7 +369,7 @@ async def test_revocation_drains_only_while_ownership_permits_commit(harness, lo
 async def test_drain_deadline_cancels_unfinished_task_without_committing(harness) -> None:
     entered = asyncio.Event()
 
-    async def process(*_args: object) -> None:
+    async def process(*_args: object, **_kwargs: object) -> None:
         entered.set()
         await asyncio.Event().wait()
 
@@ -495,7 +495,7 @@ async def test_blocked_head_rewinds_after_outstanding_fetch_not_before(harness) 
         trace.append("fetch_settled")
         return {0: [event(harness, 44)]}
 
-    async def process(*_args: object) -> HeldRecord:
+    async def process(*_args: object, **_kwargs: object) -> HeldRecord:
         await fetch_entered.wait()
         return HeldRecord(reason="claim_busy", retry_at=datetime.now(UTC) + timedelta(seconds=60))
 
@@ -516,6 +516,89 @@ async def test_blocked_head_rewinds_after_outstanding_fetch_not_before(harness) 
     assert trace == ["fetch_settled", 41]
     assert runner.queued_records == 0
     assert runner._partitions[0].rewind_offset is None
+    harness.client.commit.assert_not_awaited()
+
+
+async def test_reservation_rewinds_evicted_tail_before_processing_a_later_fetch(harness, monkeypatch) -> None:
+    context, processing, admission, head, _logs = filtered_context(monkeypatch, {"expression": "true"})
+    prepared = await context.prepare()
+    assert isinstance(prepared, PreparedExecution)
+    runner = harness.runner
+    runner.snapshot, runner._processing = context.snapshot, processing
+    harness.client.assignment = frozenset({2})
+    await runner.on_partitions_assigned(harness.client.assignment, 7)
+    state = runner._partitions[2]
+    state.ready = state.eligible = True
+    tail = event(harness, 6, 2, b"{}" + b" " * 256)
+    later = event(harness, 7, 2)
+    harness.settings.event_queue_max_bytes = prepared.encoded_arguments_size() + raw_event_size(head) + 64
+    fetching, reserved, finish_start = asyncio.Event(), asyncio.Event(), asyncio.Event()
+
+    async def fetch(*_args: object, **_kwargs: object) -> dict[int, list[RawEvent]]:
+        fetching.set()
+        await reserved.wait()
+        return {2: [later]}
+
+    async def lookup(identity: DeliveryIdentity) -> ResolvedDelivery | None:
+        if identity != context.identity:
+            return terminal(identity)
+        await fetching.wait()
+        return None
+
+    async def schedule(attempt: PreparedExecution) -> ResolvedDelivery:
+        reserved.set()
+        await finish_start.wait()
+        return terminal(attempt.identity)
+
+    admission.lookup_execution.side_effect = lookup
+    admission.schedule.side_effect = schedule
+    harness.client.fetch.side_effect = fetch
+    await runner._enqueue({2: [head, tail]}, 7)
+    try:
+        await asyncio.wait_for(runner._tick(), timeout=1)
+        assert list(state.records) == [head]
+        harness.client.seek.assert_awaited_once_with(2, 6, expected_epoch=7)
+    finally:
+        finish_start.set()
+        if state.task is not None:
+            await state.task
+    await runner._commit_positions((state,))
+    harness.client.commit.assert_awaited_once_with({2: 6}, expected_epoch=7)
+    await runner._enqueue({2: [tail, later]}, 7)
+    await runner._run_partition(state)
+    await runner._commit_positions((state,))
+    assert harness.client.commit.await_args.args == ({2: 8},)
+    assert [call.args[0].record.offset for call in admission.lookup_execution.await_args_list] == [5, 6, 7]
+
+
+@pytest.mark.parametrize("reservation_fits", [False, True], ids=["parked-queue", "evicted-tail"])
+async def test_recovery_inspects_delivered_tail_dropped_for_reservation(
+    harness, monkeypatch, *, reservation_fits
+) -> None:
+    context, processing, _admission, head, _logs = filtered_context(monkeypatch, {"expression": "true"})
+    prepared = await context.prepare()
+    assert isinstance(prepared, PreparedExecution)
+    runner = harness.runner
+    runner.snapshot, runner._processing = context.snapshot, processing
+    harness.settings.event_drain_timeout_seconds = 1
+    harness.client.assignment = frozenset({2})
+    await runner.on_partitions_assigned(harness.client.assignment, 7)
+    state = runner._partitions[2]
+    state.ready = state.eligible = True
+    tail = event(harness, 6, 2, b"invalid" + b" " * 256)
+    harness.settings.event_queue_max_bytes = (
+        prepared.encoded_arguments_size() + raw_event_size(head) + 64
+        if reservation_fits
+        else raw_event_size(head) + raw_event_size(tail)
+    )
+    await runner._enqueue({2: [head, tail]}, 7)
+    await runner._advance(state)
+    assert not state.records
+    assert state.inspection_end_offset == 6
+    harness.client.fetch.return_value = {2: [tail]}
+    evidence = await runner.close_and_drain(runner._request(state), token=uuid4(), boundary=8)
+    assert evidence.permanent_content_error
+    harness.client.fetch.assert_awaited_once()
     harness.client.commit.assert_not_awaited()
 
 
@@ -592,7 +675,7 @@ async def test_failed_overflow_seek_reloads_committed_progress_before_later_reco
             status=PositionStatus.READY, next_offset=cursor, assignment_epoch=request.assignment_epoch
         )
 
-    async def process(_snapshot, identity, _event) -> ResolvedDelivery:
+    async def process(_snapshot, identity, _event, **_kwargs: object) -> ResolvedDelivery:
         trace.append(identity.record.offset)
         processed.append(identity.record.offset)
         return terminal(identity)
@@ -637,7 +720,7 @@ async def test_admission_closing_during_empty_queue_fetch_rewinds_before_resume(
         nonlocal cursor
         cursor = offset
 
-    async def process(_snapshot, identity, _event) -> ResolvedDelivery:
+    async def process(_snapshot, identity, _event, **_kwargs: object) -> ResolvedDelivery:
         processed.append(identity.record.offset)
         return terminal(identity)
 
@@ -836,7 +919,7 @@ async def test_completion_behind_recovery_fence_cannot_restore_old_commit_positi
     runner = harness.runner
     entered, release = asyncio.Event(), asyncio.Event()
 
-    async def process(_snapshot, identity, _record) -> ResolvedDelivery:
+    async def process(_snapshot, identity, _record, **_kwargs: object) -> ResolvedDelivery:
         entered.set()
         await release.wait()
         return terminal(identity)
@@ -1097,6 +1180,7 @@ async def test_supervised_startup_keeps_admission_closed_until_explicit_authoriz
     await runner._enqueue({0: [event(harness, 41)]}, 7)
     assert runner.queued_records == 0
     assert runner.open_admission()
+    await runner._rewind(runner._partitions[0])
     await runner._enqueue({0: [event(harness, 41)]}, 7)
     assert runner.queued_records == 1
     permitted[0] = False
@@ -1115,7 +1199,7 @@ async def test_placement_loss_preserves_admitted_handoff_and_assignment_checked_
     entered, release = asyncio.Event(), asyncio.Event()
     admitted = []
 
-    async def complete(_snapshot, identity, _record, *, admission_guard) -> ResolvedDelivery:
+    async def complete(_snapshot, identity, _record, *, admission_guard, **_kwargs: object) -> ResolvedDelivery:
         assert admission_guard()
         admitted.append(identity)
         entered.set()
@@ -1278,6 +1362,7 @@ async def test_matching_record_commits_only_after_handoff_retry_confirms_executi
     await runner.on_partitions_assigned(frozenset({2}), 7)
     state = runner._partitions[2]
     state.ready = state.eligible = True
+    harness.settings.event_queue_max_records = 1
     admission.schedule.return_value = RetryDelivery(
         error_code=SchedulingFailureCode.STORAGE_UNAVAILABLE,
         next_attempt_at=datetime.now(UTC) - timedelta(seconds=1),
@@ -1290,6 +1375,8 @@ async def test_matching_record_commits_only_after_handoff_retry_confirms_executi
     await runner._commit_positions((state,))
     harness.client.commit.assert_not_awaited()
     assert not state.records  # The existing park path rewinds and releases the raw bytes.
+    assert runner.queued_records == 1
+    assert runner.queued_bytes == state.handoff.encoded_arguments_size()
     harness.client.seek.assert_awaited_with(2, 5, expected_epoch=7)
 
     admission.recover_accepted.return_value = terminal(context.identity)
@@ -1303,8 +1390,70 @@ async def test_matching_record_commits_only_after_handoff_retry_confirms_executi
     admission.schedule.assert_awaited_once()
     assert admission.schedule.await_args.args[0].workflow_arguments() == arguments
     assert state.handoff is None
+    assert runner.queued_records == runner.queued_bytes == 0
     await runner._commit_positions((state,))
     harness.client.commit.assert_awaited_once_with({2: 6}, expected_epoch=7)
+
+
+@pytest.mark.parametrize("rejected", [False, True])
+async def test_drain_distinguishes_cancelled_accepted_start_from_rejection(harness, monkeypatch, *, rejected) -> None:
+    context, processing, admission, record, _logs = filtered_context(monkeypatch, {"expression": "true"})
+    runner = harness.runner
+    runner.snapshot, runner._processing = context.snapshot, processing
+    harness.client.assignment = frozenset({2})
+    await runner.on_partitions_assigned(frozenset({2}), 7)
+    state = runner._partitions[2]
+    state.ready = state.eligible = True
+    starting = asyncio.Event()
+
+    async def schedule(prepared: PreparedExecution) -> BlockedDelivery:
+        assert runner._handoffs[prepared.identity.digest].prepared is prepared
+        assert runner.queued_records == 1
+        assert runner.queued_bytes == raw_event_size(record) + prepared.encoded_arguments_size()
+        starting.set()
+        if rejected:
+            return BlockedDelivery(error_code=SchedulingFailureCode.TEMPORAL_UNAVAILABLE, start_rejected=True)
+        # Temporal accepted; Execution persistence is still pending.
+        return await asyncio.Future[BlockedDelivery]()
+
+    admission.schedule.side_effect = schedule
+    await runner._enqueue({2: [record]}, 7)
+    state.task = asyncio.create_task(runner._advance(state))
+    await asyncio.wait_for(starting.wait(), timeout=1)
+    if rejected:
+        await state.task
+        await runner.stop()
+        admission.recover_accepted.assert_not_awaited()
+    else:
+        with pytest.raises(SubscriptionRuntimeError, match="stop_incomplete"):
+            await runner.stop()
+        assert state.task.cancelled()
+        assert state.handoff is not None
+        admission.recover_accepted.return_value = terminal(context.identity)
+        await runner.stop()
+        admission.recover_accepted.assert_awaited_with(context.identity)
+    assert runner._stopped
+    assert not runner._handoffs
+    harness.client.commit.assert_not_awaited()
+
+
+async def test_full_handoff_byte_budget_prevents_new_temporal_start(harness, monkeypatch) -> None:
+    context, processing, admission, record, _logs = filtered_context(monkeypatch, {"expression": "true"})
+    runner = harness.runner
+    runner.snapshot, runner._processing = context.snapshot, processing
+    harness.client.assignment = frozenset({2})
+    await runner.on_partitions_assigned(frozenset({2}), 7)
+    state = runner._partitions[2]
+    state.ready = state.eligible = True
+    harness.settings.event_queue_max_bytes = raw_event_size(record)
+    await runner._enqueue({2: [record]}, 7)
+    await runner._advance(state)
+    assert state.held.reason == "queue_capacity"
+    admission.schedule.assert_not_awaited()
+    assert runner.queued_bytes == 0
+    assert not runner._handoffs
+    await runner._commit_positions((state,))
+    harness.client.commit.assert_not_awaited()
 
 
 @pytest.mark.parametrize("refetched_offset", [41, 45], ids=["earlier-checkpoint", "later-compacted-record"])
@@ -1417,7 +1566,8 @@ async def test_finishing_a_different_handoff_preserves_commit_guards(harness, mo
     admission.recover_accepted.side_effect = recover
     await runner._advance(state)
     await runner._commit_positions((state,))
-    assert state.handoff is prepared
+    # Valid persistence frees the reservation independently of commit authority.
+    assert state.handoff is (prepared if failure == "evidence" else None)
     assert state.resolved_next_offset is None
     harness.client.commit.assert_not_awaited()
     admission.schedule.assert_not_awaited()
@@ -1926,7 +2076,7 @@ async def test_skip_checkpoint_rechecks_local_safety_after_waiting_for_revision_
 async def test_new_skip_during_commit_keeps_its_revision_fence(harness) -> None:
     runner = harness.runner
     state = runner._partitions[0]
-    harness.processing.process.side_effect = lambda snapshot, identity, _event: SkippedRecord(
+    harness.processing.process.side_effect = lambda snapshot, identity, _event, **_kwargs: SkippedRecord(
         identity=identity, configuration_revision=snapshot.configuration_revision, outcome="no_match"
     )
     await runner._enqueue({0: [event(harness, 5), event(harness, 6)]}, 7)
@@ -2074,7 +2224,9 @@ async def test_stop_retains_parked_handoff_across_revocation_until_execution_is_
     with pytest.raises(SubscriptionRuntimeError, match="stop_incomplete"):
         await runner.stop()
     assert 2 not in runner._partitions
-    assert runner._handoffs[prepared.identity.digest].workflow_arguments() == prepared.workflow_arguments()
+    assert runner._handoffs[prepared.identity.digest].prepared.workflow_arguments() == prepared.workflow_arguments()
+    assert runner.queued_records == 1
+    assert runner.queued_bytes == prepared.encoded_arguments_size()
     assert not runner._stopped
     admission.recover_accepted.return_value = terminal(prepared.identity)
     await runner.stop()
@@ -2082,6 +2234,77 @@ async def test_stop_retains_parked_handoff_across_revocation_until_execution_is_
     assert not runner._handoffs
     admission.schedule.assert_not_awaited()
     filtering.assert_not_called()
+
+
+@pytest.mark.parametrize("probe_fails", [False, True], ids=["resume-fetching", "retry-on-stop"])
+async def test_detached_handoff_releases_full_queue_for_a_healthy_partition(
+    harness, monkeypatch, *, probe_fails
+) -> None:
+    context, processing, admission, record, _logs = filtered_context(monkeypatch, {"expression": "true"})
+    runner = harness.runner
+    runner.snapshot, runner._processing = context.snapshot, processing
+    harness.settings.event_queue_max_records = 1
+    harness.settings.event_drain_timeout_seconds = 1
+    harness.client.assignment = frozenset({2, 3})
+    await runner.on_partitions_assigned(harness.client.assignment, 7)
+    for partition in (2, 3):
+        runner._partitions[partition].ready = runner._partitions[partition].eligible = True
+    admission.schedule.return_value = BlockedDelivery(error_code=SchedulingFailureCode.STORAGE_UNAVAILABLE)
+    await runner._enqueue({2: [record]}, 7)
+    await runner._advance(runner._partitions[2])
+    await runner.on_partitions_revoked(frozenset({2}), 7)
+    harness.client.assignment = frozenset({3})
+    assert runner.queued_records == 1
+
+    confirmed = terminal(context.identity)
+    if probe_fails:
+        admission.recover_accepted.side_effect = [RuntimeError("probe failed"), confirmed]
+    else:
+        admission.recover_accepted.return_value = confirmed
+    await runner._tick()
+    assert runner._detached_handoff_task is not None
+    await asyncio.wait_for(runner._detached_handoff_task, timeout=1)
+    if probe_fails:
+        assert runner.queued_records == 1
+        await runner.stop()
+        assert runner._stopped
+        assert runner.queued_records == 0
+        assert admission.recover_accepted.await_count == 2
+        admission.schedule.assert_awaited_once()
+        return
+    assert runner.queued_records == runner.queued_bytes == 0
+    await runner._tick()
+    assert harness.client.fetch.await_args.args[0] == [3]
+    admission.recover_accepted.assert_awaited_once_with(context.identity)
+    admission.schedule.assert_awaited_once()
+    harness.client.commit.assert_not_awaited()
+
+
+async def test_due_detached_handoff_does_not_starve_behind_a_failed_probe(harness, monkeypatch) -> None:
+    context, _processing, _admission, _record, _logs = filtered_context(monkeypatch, {"expression": "true"})
+    prepared = await context.prepare()
+    assert isinstance(prepared, PreparedExecution)
+    second_identity = prepared.identity.model_copy(
+        update={"record": prepared.identity.record.model_copy(update={"partition": 3})}
+    )
+    second = prepared.model_copy(update={"identity": second_identity})
+    runner = harness.runner
+    runner.snapshot = context.snapshot
+    harness.client.assignment = frozenset({2, 3})
+    await runner.on_partitions_assigned(harness.client.assignment, 7)
+    runner._partitions[2].handoff = prepared
+    runner._partitions[3].handoff = second
+    await runner.on_partitions_revoked(harness.client.assignment, 7)
+    harness.client.assignment = frozenset()
+    monkeypatch.setattr(EventSchedulingDefaults, "TRANSIENT_PROBE_SECONDS", 0)
+    harness.processing.process.side_effect = [HeldRecord(reason="storage_unavailable"), terminal(second_identity)]
+
+    for _ in range(2):
+        runner._poll_detached_handoffs()
+        assert runner._detached_handoff_task is not None
+        await runner._detached_handoff_task
+    assert [call.args[1] for call in harness.processing.process.await_args_list] == [prepared.identity, second_identity]
+    assert runner.queued_records == 1
 
 
 async def test_stop_retains_a_task_that_returns_a_handoff_after_drain_timeout(harness, monkeypatch) -> None:
@@ -2117,7 +2340,7 @@ async def test_stop_retains_a_task_that_returns_a_handoff_after_drain_timeout(ha
     finally:
         release.set()
         await state.task
-    assert runner._handoffs[prepared.identity.digest] == prepared
+    assert runner._handoffs[prepared.identity.digest].prepared == prepared
     with pytest.raises(SubscriptionRuntimeError, match="stop_incomplete"):
         await runner.stop()
     assert not runner._stopped

@@ -60,6 +60,7 @@ class Scenario:
         self.client.epoch = 7
         self.client.assignment = frozenset({0, 1})
         self.client._position_operations = set()
+        self.client.commits_interrupted = False
         self.client.position_operation.side_effect = lambda partition, *, expected_epoch: (
             KafkaPartitionConsumer.position_operation(self.client, partition, expected_epoch=expected_epoch)
         )

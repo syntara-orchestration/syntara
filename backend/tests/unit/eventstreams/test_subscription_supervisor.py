@@ -324,7 +324,7 @@ async def test_republish_waits_for_parked_execution_before_starting_a_false_filt
         assert status.state == RuntimeState.DRAINING
         assert status.reason == "stop_incomplete"
         factory.assert_awaited_once()
-        assert runners[0]._handoffs[prepared.identity.digest] == prepared
+        assert runners[0]._handoffs[prepared.identity.digest].prepared == prepared
 
         # Confirmation must precede replacement, even though the new filter
         # would skip this record without looking up the accepted run.

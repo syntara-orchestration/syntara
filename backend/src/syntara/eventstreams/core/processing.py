@@ -91,3 +91,4 @@ class HeldRecord(DeliveryValue):
     retry_at: datetime | None = None
     permanent_content_error: bool = False
     handoff: PreparedExecution | None = None
+    handoff_rejected: bool = False

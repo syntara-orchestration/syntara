@@ -30,10 +30,11 @@ class SchedulingFailureCode(StrEnum):
 class EventLaunchError(SyntaraError):
     """Safe adapter failure; only explicitly transient failures may be probed."""
 
-    def __init__(self, code: SchedulingFailureCode, *, transient: bool = True) -> None:
+    def __init__(self, code: SchedulingFailureCode, *, transient: bool = True, start_rejected: bool = False) -> None:
         """Retain only a bounded reason and its dependency retry classification."""
         self.code = code
         self.transient = transient
+        self.start_rejected = start_rejected
         super().__init__(code.value)
 
 
@@ -43,12 +44,14 @@ class RetryDelivery(DeliveryValue):
     error_code: SchedulingFailureCode
     next_attempt_at: datetime
     circuit_open: bool
+    start_rejected: bool = False
 
 
 class BlockedDelivery(DeliveryValue):
     """Unresolved work requiring correction or explicit evidence recovery."""
 
     error_code: SchedulingFailureCode
+    start_rejected: bool = False
 
 
 class ResolvedDelivery(DeliveryValue):
