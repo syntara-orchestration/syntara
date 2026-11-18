@@ -1529,7 +1529,7 @@ class EventStreamSettings(BaseSettings):
     event_queue_max_bytes: int = Field(
         default=EventRunnerDefaults.QUEUE_MAX_BYTES,
         gt=0,
-        description="Maximum raw bytes retained in application queues per subscription",
+        description="Maximum buffered raw bytes and encoded retained start arguments per subscription",
     )
     event_partition_max_records: int = Field(
         default=EventRunnerDefaults.PARTITION_MAX_RECORDS,

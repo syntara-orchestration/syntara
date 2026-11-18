@@ -64,6 +64,13 @@ class _ProcessingGuardArguments(TypedDict, total=False):
     admission_guard: Callable[[], bool]
 
 
+@dataclass(frozen=True)
+class _RetainedHandoff:
+    prepared: PreparedExecution
+    argument_bytes: int
+    probe_after: float = 0
+
+
 @dataclass
 class _Partition:
     partition: int
@@ -153,8 +160,10 @@ class KafkaRecordRunner:
         self._assignment_epoch: int | None = None
         self._commit_lock = asyncio.Lock()
         self._commit_task: asyncio.Task[None] | None = None
-        self._handoffs: dict[str, PreparedExecution] = {}
-        self._draining_tasks: set[asyncio.Task[None]] = set()
+        self._handoffs: dict[str, _RetainedHandoff] = {}
+        self._detached_handoff_task: asyncio.Task[None] | None = None
+        self._detached_handoff_partition: int | None = None
+        self._draining_tasks: dict[asyncio.Task[None], int] = {}
         self._fetch_lock = asyncio.Lock()
         self._stop_lock = asyncio.Lock()
         self._closing = False
@@ -172,13 +181,25 @@ class KafkaRecordRunner:
 
     @property
     def queued_records(self) -> int:
-        """Include in-flight heads in the subscription record bound."""
-        return sum(len(state.records) + int(state.pending_failure is not None) for state in self._partitions.values())
+        """Count queued records and detached handoffs, sharing a slot with a buffered head."""
+        count = len(self._handoffs)
+        for state in self._partitions.values():
+            count += len(state.records) + int(state.pending_failure is not None)
+            if (
+                state.records
+                and state.handoff is not None
+                and state.handoff.identity.digest in self._handoffs
+                and state.handoff.identity == self._identity(state.records[0])
+            ):
+                count -= 1
+        return count
 
     @property
     def queued_bytes(self) -> int:
-        """Include in-flight source bytes in the subscription byte bound."""
-        return sum(state.byte_count for state in self._partitions.values())
+        """Count buffered source bytes and the encoded size of retained start arguments."""
+        return sum(state.byte_count for state in self._partitions.values()) + sum(
+            item.argument_bytes for item in self._handoffs.values()
+        )
 
     @property
     def ready_partitions(self) -> frozenset[int]:
@@ -189,12 +210,7 @@ class KafkaRecordRunner:
         return self._gate is None or self._gate.resolution_open(self.snapshot) is True
 
     def _admission_open(self) -> bool:
-        return (
-            not self._closing
-            and not self._stopped
-            and self._placement_open()
-            and (self._gate is None or self._gate.admission_open(self.snapshot) is True)
-        )
+        return self._accepting_work() and (self._gate is None or self._gate.admission_open(self.snapshot) is True)
 
     def _transport_open(self) -> bool:
         return self._placement_open() and (self._gate is None or self._gate.transport_open(self.snapshot) is True)
@@ -235,9 +251,9 @@ class KafkaRecordRunner:
                 or state.resolved_next_offset <= state.handoff.identity.record.offset
             )
             and not any(
-                item.identity.record.partition == state.partition
+                item.prepared.identity.record.partition == state.partition
                 and state.resolved_next_offset is not None
-                and state.resolved_next_offset > item.identity.record.offset
+                and state.resolved_next_offset > item.prepared.identity.record.offset
                 for item in self._handoffs.values()
             )
             and (self._drain_deadline is None or asyncio.get_running_loop().time() < self._drain_deadline)
@@ -377,9 +393,7 @@ class KafkaRecordRunner:
                     partition=partition,
                     epoch=epoch,
                     closing=self._closing,
-                    handoff=next(
-                        (item for item in self._handoffs.values() if item.identity.record.partition == partition), None
-                    ),
+                    handoff=self._partition_handoff(partition),
                     held=HeldRecord(reason="content_inspection_required", permanent_content_error=True)
                     if partition in self._retained_content_partitions
                     else None,
@@ -437,10 +451,7 @@ class KafkaRecordRunner:
                 if not self._active(state):
                     return
                 if state.handoff is None:
-                    state.handoff = next(
-                        (item for item in self._handoffs.values() if item.identity.record.partition == state.partition),
-                        None,
-                    )
+                    state.handoff = self._partition_handoff(state.partition)
                 if state.handoff is not None and (not state.records or not state.ready or state.reload_required):
                     # Retry even on an idle partition, before initialization or
                     # pending-content handling can move its reading boundary.
@@ -526,10 +537,22 @@ class KafkaRecordRunner:
         return True
 
     def _active(self, state: _Partition) -> bool:
-        return self._owned(state) and state.fence is None and not state.closing and self._accepting_work()
+        return (
+            self._owned(state)
+            and state.fence is None
+            and not state.closing
+            and self._accepting_work()
+            and state.partition != self._detached_handoff_partition
+            and state.partition not in self._draining_tasks.values()
+        )
 
     def _accepting_work(self) -> bool:
-        return not self._closing and not self._stopped and self._placement_open()
+        return (
+            not self._closing
+            and not self._stopped
+            and self._client.commits_interrupted is not True
+            and self._placement_open()
+        )
 
     def _processing_guard(self, state: _Partition) -> _ProcessingGuardArguments:
         # Keep the guard scoped to this invocation, including injected/shared
@@ -552,7 +575,13 @@ class KafkaRecordRunner:
         if state.handoff is not None:
             result = await self._processing.process(self.snapshot, identity, event, handoff=state.handoff, **guard)
         else:
-            result = await self._processing.process(self.snapshot, identity, event, **guard)
+            result = await self._processing.process(
+                self.snapshot,
+                identity,
+                event,
+                reserve_handoff=lambda prepared: self._reserve_handoff(state, prepared),
+                **guard,
+            )
         self._apply_head_result(state, event, result, epoch=epoch)
 
     def _apply_head_result(
@@ -565,7 +594,11 @@ class KafkaRecordRunner:
     ) -> None:
         """Apply a processing result only after ownership and offset-safety checks."""
         identity = self._identity(event)
-        if isinstance(result, HeldRecord) and result.handoff is not None:
+        if (isinstance(result, ResolvedDelivery) and result.terminal.identity == identity) or (
+            isinstance(result, HeldRecord) and result.handoff_rejected
+        ):
+            self._release_handoff(identity, state)
+        elif isinstance(result, HeldRecord) and result.handoff is not None:
             state.handoff = result.handoff
             self._retain_handoff(state)
         if not self._owned(state) or state.epoch != epoch:
@@ -590,8 +623,6 @@ class KafkaRecordRunner:
         elif identity.record.offset == MAX_POSITION_OFFSET:
             state.held = HeldRecord(reason="offset_exhausted")
         else:
-            if isinstance(result, ResolvedDelivery):
-                self._handoffs.pop(identity.digest, None)
             if isinstance(result, SkippedRecord):
                 state.local_skip_next_offset = identity.record.offset + 1
             self._complete_head(state, event, identity.record.offset)
@@ -605,17 +636,18 @@ class KafkaRecordRunner:
         result = await self._processing.process(
             self.snapshot, prepared.identity, None, handoff=prepared, **self._processing_guard(state)
         )
+        confirmed = isinstance(result, ResolvedDelivery) and result.terminal.identity == prepared.identity
+        if confirmed:
+            self._release_handoff(prepared.identity, state)
         if not self._owned(state) or state.epoch != epoch:
             return
         if not self._resolution_open():
             state.held = self._retry("dependency_unavailable")
         elif isinstance(result, HeldRecord):
             state.held = result
-        elif not isinstance(result, ResolvedDelivery) or result.terminal.identity != prepared.identity:
+        elif not confirmed:
             state.held = self._retry("evidence_mismatch")
         else:
-            self._handoffs.pop(prepared.identity.digest, None)
-            state.handoff = None
             state.held = None
 
     def _complete_head(self, state: _Partition, event: RawEvent, offset: int) -> None:
@@ -699,6 +731,7 @@ class KafkaRecordRunner:
     async def _park(self, state: _Partition) -> None:
         """Release blocked queue memory only with a recoverable reading position."""
         offset = self._identity(state.records[0]).record.offset
+        self._remember_inspection(state, list(state.records))
         self._request_rewind(state, offset)
         await self._pause(state, paused=True)
         if state.partition not in self._fetching:
@@ -769,11 +802,14 @@ class KafkaRecordRunner:
                 state.task = asyncio.create_task(self._run_partition(state))
 
     async def _tick(self) -> None:
+        if self._client.commits_interrupted is True:
+            self._closing = True
         if not self._accepting_work():
             return
         if not self._transport_open():
             await self.close_admission()
             return
+        self._poll_detached_handoffs()
         self._start_due_tasks()
         await self._commit_positions(tuple(self._partitions.values()))
         candidates: list[int] = []
@@ -868,7 +904,9 @@ class KafkaRecordRunner:
                 if events:
                     self._request_rewind(state, self._identity(events[0]).record.offset)
                 continue
-            if state.held is not None or state.pending_failure is not None:
+            if state.rewind_offset is not None or state.held is not None or state.pending_failure is not None:
+                # Reservation can evict buffered records while this fetch is
+                # outstanding. Never append a suffix from the old cursor.
                 if events:
                     self._remember_inspection(state, events)
                     self._request_rewind(state, self._identity(events[0]).record.offset)
@@ -1142,7 +1180,7 @@ class KafkaRecordRunner:
         for state in states:
             await self._pause(state, paused=True)
         tasks = {
-            task
+            task: state.partition
             for state in states
             for task in ((state.task, state.control_task) if include_controls else (state.task,))
             if task is not None and not task.done() and task is not asyncio.current_task()
@@ -1152,8 +1190,10 @@ class KafkaRecordRunner:
         if tasks:
             _, pending = await asyncio.wait(tasks, timeout=remaining)
         for task in pending:
-            self._draining_tasks.add(task)
-            task.add_done_callback(self._draining_tasks.discard)
+            if task in self._draining_tasks:
+                continue
+            self._draining_tasks[task] = tasks[task]
+            task.add_done_callback(self._draining_tasks.pop)
             task.cancel()
             task.add_done_callback(self._settled)
         if pending:
@@ -1182,8 +1222,97 @@ class KafkaRecordRunner:
 
     def _retain_handoff(self, state: _Partition) -> None:
         """Retain attempted arguments independently of partition assignment."""
-        if state.handoff is not None:
-            self._handoffs[state.handoff.identity.digest] = state.handoff
+        prepared = state.handoff
+        if prepared is not None and prepared.identity.digest not in self._handoffs:
+            self._handoffs[prepared.identity.digest] = _RetainedHandoff(prepared, prepared.encoded_arguments_size())
+
+    def _partition_handoff(self, partition: int) -> PreparedExecution | None:
+        return next(
+            (item.prepared for item in self._handoffs.values() if item.prepared.identity.record.partition == partition),
+            None,
+        )
+
+    def _reserve_handoff(self, state: _Partition, prepared: PreparedExecution) -> bool:
+        """Budget detached arguments before any Temporal start can be submitted."""
+        if not self._active(state) or not state.records or self._identity(state.records[0]) != prepared.identity:
+            return False
+        size = prepared.encoded_arguments_size()
+        limit = self._settings.event_queue_max_bytes
+        if raw_event_size(state.records[0]) + size > limit:
+            return False
+        # The head already owns a record slot. Free replayable tails when
+        # their bytes would otherwise prevent that head from making progress.
+        used = self.queued_bytes
+        evicted_offsets: list[int] = []
+        while used + size > limit and len(state.records) > 1:
+            tail = state.records.pop()
+            evicted_offsets.append(self._identity(tail).record.offset)
+            tail_size = raw_event_size(tail)
+            state.byte_count -= tail_size
+            used -= tail_size
+        if evicted_offsets:
+            self._request_rewind(state, min(evicted_offsets))
+            self._remember_offsets(state, evicted_offsets)
+        if used + size > limit:
+            return False
+        state.handoff = prepared
+        self._handoffs[prepared.identity.digest] = _RetainedHandoff(prepared, size)
+        return True
+
+    def _release_handoff(self, identity: DeliveryIdentity, state: _Partition | None = None) -> None:
+        self._handoffs.pop(identity.digest, None)
+        for candidate in (state, self._partitions.get(identity.record.partition)):
+            if candidate is not None and candidate.handoff is not None and candidate.handoff.identity == identity:
+                candidate.handoff = None
+
+    def _poll_detached_handoffs(self) -> None:
+        """Recover a revoked partition's reservation while healthy partitions keep running."""
+        if self._detached_handoff_task is not None:
+            if not self._detached_handoff_task.done():
+                return
+            self._detached_handoff_task.result()
+            self._detached_handoff_task = None
+        now = asyncio.get_running_loop().time()
+        due: tuple[str, _RetainedHandoff] | None = None
+        for digest, retained in self._handoffs.items():
+            partition = retained.prepared.identity.record.partition
+            if (
+                partition in self._partitions
+                or partition in self._draining_tasks.values()
+                or now < retained.probe_after
+            ):
+                continue
+            if due is None or retained.probe_after < due[1].probe_after:
+                due = (digest, retained)
+        if due is None:
+            return
+        digest, retained = due
+        self._handoffs[digest] = replace(retained, probe_after=now + EventSchedulingDefaults.TRANSIENT_PROBE_SECONDS)
+        self._detached_handoff_partition = retained.prepared.identity.record.partition
+        self._detached_handoff_task = asyncio.create_task(self._recover_detached_handoff(retained.prepared))
+        self._detached_handoff_task.add_done_callback(self._settled)
+
+    async def _recover_detached_handoff(self, prepared: PreparedExecution) -> None:
+        try:
+            async with asyncio.timeout(self._settings.event_drain_timeout_seconds), self._work:
+                if not self._closing and prepared.identity.record.partition not in self._partitions:
+                    await self._confirm_handoff(prepared)
+        except TimeoutError:
+            logger.warning("event_record_handoff_probe_incomplete", source_id=str(self.snapshot.source_id))
+        finally:
+            self._detached_handoff_partition = None
+
+    async def _confirm_handoff(self, prepared: PreparedExecution) -> None:
+        """Repair accepted work without granting admission for another start."""
+        try:
+            result = await self._processing.process(
+                self.snapshot, prepared.identity, None, handoff=prepared, admission_guard=lambda: False
+            )
+        except Exception:  # noqa: BLE001 - retain the reservation and let the next probe retry
+            logger.warning("event_record_handoff_probe_failed", source_id=str(self.snapshot.source_id))
+            return
+        if isinstance(result, ResolvedDelivery) and result.terminal.identity == prepared.identity:
+            self._release_handoff(prepared.identity)
 
     async def _flush_handoffs(self, deadline: float) -> None:
         """Repair parked attempts without filtering again or permitting a new start."""
@@ -1191,16 +1320,11 @@ class KafkaRecordRunner:
             return  # A cancellation-resistant task may still return a handoff.
         try:
             async with asyncio.timeout_at(deadline):
-                for digest, prepared in tuple(self._handoffs.items()):
+                if self._detached_handoff_task is not None:
+                    await asyncio.shield(self._detached_handoff_task)
+                for retained in tuple(self._handoffs.values()):
                     async with self._work:
-                        result = await self._processing.process(
-                            self.snapshot, prepared.identity, None, handoff=prepared, admission_guard=lambda: False
-                        )
-                    if isinstance(result, ResolvedDelivery) and result.terminal.identity == prepared.identity:
-                        self._handoffs.pop(digest, None)
-                        for state in self._partitions.values():
-                            if state.handoff is not None and state.handoff.identity == prepared.identity:
-                                state.handoff = None
+                        await self._confirm_handoff(retained.prepared)
         except TimeoutError:
             logger.warning("event_record_handoff_drain_incomplete", source_id=str(self.snapshot.source_id))
 
@@ -1237,6 +1361,8 @@ class KafkaRecordRunner:
             if self._stopped:
                 return
             await self.drain()
+            if self._commit_task is not None and not self._commit_task.done():
+                self._client.interrupt_commits()
             if self._draining_tasks:
                 _, pending = await asyncio.wait(
                     self._draining_tasks, timeout=self._settings.event_drain_timeout_seconds
@@ -1264,7 +1390,8 @@ class KafkaRecordRunner:
     async def _finish_recovery_handoff(self, state: _Partition, boundary: int) -> bool:
         """Require confirmed persistence for a saved identity below the new checkpoint."""
         self._retain_handoff(state)
-        for prepared in tuple(self._handoffs.values()):
+        for retained in tuple(self._handoffs.values()):
+            prepared = retained.prepared
             if prepared.identity.record.partition != state.partition or boundary <= prepared.identity.record.offset:
                 continue
             state.handoff = prepared
@@ -1296,6 +1423,11 @@ class KafkaRecordRunner:
                 # its caller. Waiting for the parent control task here would
                 # make that operation wait on its own completion.
                 quiescent = await self._drain_states([state], deadline, commit=False, include_controls=False)
+                quiescent = (
+                    quiescent
+                    and state.partition != self._detached_handoff_partition
+                    and state.partition not in self._draining_tasks.values()
+                )
                 if quiescent:
                     self._remember_inspection(state, list(state.records))
                     if state.pending_failure is not None:

@@ -37,12 +37,19 @@ There is no delivery ledger, delivery capacity table, terminal proof cache,
 cleanup worker or independent handoff-recovery scanner. Interrupted handoffs
 remain uncommitted in Kafka. The runner retries saved handoffs even without new
 records; after a restart, repair waits until that same source is consumed again.
+The runner also probes handoffs from revoked partitions during normal operation.
+Confirmed persistence releases their queue reservation even without reassignment.
+Matching redeliveries denied new Execution capacity still check for accepted
+Temporal work and can persist it without starting another workflow.
 During graceful republish, the old runner retries parked handoffs without
-filtering again or starting another workflow. It retains their original
-arguments across partition revocation and cannot be replaced until Execution
-persistence is confirmed. Failed recovery keeps the subscription draining and
-retries on later reconciliation; this in-memory protection does not survive a
-process crash.
+filtering again or starting another workflow. It reserves their original
+arguments before sending the start and retains them across drain cancellation
+and partition revocation. The signed event worker client makes one RPC attempt
+per start so it can distinguish direct rejections from uncertain outcomes. A
+definite rejection releases the reservation and leaves the offset for replay.
+For accepted or uncertain attempts, failed
+recovery keeps the subscription draining and retries on later reconciliation.
+This in-memory protection does not survive a process crash.
 Duplicate protection lasts while the normal Execution or Temporal
 evidence remains available; deleting both can permit a new start on redelivery.
 
@@ -67,6 +74,12 @@ failure closes the consumer and requires broker-confirmed membership removal
 before releasing the lock. If Kafka is unavailable, publication remains blocked
 until that fence can be confirmed. Shutdown also retains the runner while such a
 commit or fence is outstanding.
+The SDK retry loop has its own five-second limit. On an uncertain broker reply,
+timeout or interruption, the adapter closes to new commits and position
+operations immediately. Shutdown
+confirms removal of any group member with a potentially outstanding commit.
+An ambiguous skip batch also holds its publication lock until that fence is
+confirmed.
 
 Placement loss closes fetching and starts a bounded drain. Already admitted
 handoffs may finish persisting accepted runs. Their resolved offsets may commit
@@ -75,8 +88,11 @@ deadline. Assignment loss always forbids that commit.
 
 ## Queues and content holds
 
-Queue count, byte, per-partition and processing bounds limit local work. Overflow
-rewinds the unqueued tail rather than skipping records. Numeric offset gaps are
+Queue count, byte, per-partition and processing bounds limit local work. The
+queue budget covers buffered source bytes and the encoded arguments of retained
+handoffs, including handoffs for revoked partitions. An already reserved handoff
+can retry at capacity. Overflow rewinds the unqueued tail and discards fetch
+results from the old cursor while the rewind is pending. Numeric offset gaps are
 valid; later received records cannot advance past an unresolved earlier head.
 If admission closes during a fetch, its unqueued records are also rewound.
 Each partition task drains queued heads in order, with one handoff at a time,

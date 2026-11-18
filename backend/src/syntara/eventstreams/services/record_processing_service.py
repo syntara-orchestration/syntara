@@ -18,7 +18,7 @@ from syntara.eventstreams.core.deduplication import DeliveryIdentity
 from syntara.eventstreams.core.envelope import RawEvent
 from syntara.eventstreams.core.filter_input import EventFilterInput, FilterPayload
 from syntara.eventstreams.core.handler import ResolvedDelivery, RetryDelivery, SchedulingFailureCode
-from syntara.eventstreams.core.preparation import PreparedExecution
+from syntara.eventstreams.core.preparation import ExecutionCapacityUnavailable, PreparedExecution
 from syntara.eventstreams.core.processing import HeldRecord, InspectedRecord, RecordProcessingGate, SkippedRecord
 from syntara.eventstreams.core.results import EventDecodeFailure
 from syntara.eventstreams.core.serialization import EventDecodeSuccess, JsonEventDecoder
@@ -31,6 +31,7 @@ from syntara.filtering.models.result import FilterOutcome, FilterResult
 from syntara.workflows.models.workflow import Workflow
 
 type RecordResult = ResolvedDelivery | HeldRecord | SkippedRecord
+type HandoffReservation = Callable[[PreparedExecution], bool]
 logger = structlog.stdlib.get_logger(__name__)
 
 
@@ -158,6 +159,7 @@ class EventRecordProcessingService:
         *,
         admission_guard: Callable[[], bool] | None = None,
         handoff: PreparedExecution | None = None,
+        reserve_handoff: HandoffReservation | None = None,
     ) -> RecordResult:
         """Complete local skips before I/O; look up Execution only for valid matches."""
         try:
@@ -168,7 +170,7 @@ class EventRecordProcessingService:
             if event is None:
                 accepted = await self._accepted(snapshot, identity, recover=True)
                 return accepted if accepted is not None else self._hold("admission_closed")
-            return await self._process_event(snapshot, identity, event, admission_guard)
+            return await self._process_event(snapshot, identity, event, admission_guard, reserve_handoff)
         except (SQLAlchemyError, OSError, TimeoutError, SyntaraError, ValueError) as exc:
             if isinstance(exc, (SQLAlchemyError, OSError, TimeoutError)):
                 self._dependency_failed(snapshot)
@@ -180,6 +182,7 @@ class EventRecordProcessingService:
         identity: DeliveryIdentity,
         event: RawEvent,
         guard: Callable[[], bool] | None,
+        reserve_handoff: HandoffReservation | None,
     ) -> RecordResult:
         """Validate trusted coordinates and complete local filter outcomes before I/O."""
         if not self._event_matches(snapshot, identity, event):
@@ -191,7 +194,7 @@ class EventRecordProcessingService:
             return decoded if self._admission_open(snapshot, guard) else self._hold("admission_closed")
         if isinstance(decoded, EventDecodeFailure):
             return await self.hold_content_failure(snapshot, identity, decoded, admission_guard=guard)
-        return await self._process_match(snapshot, identity, decoded, guard)
+        return await self._process_match(snapshot, identity, decoded, guard, reserve_handoff)
 
     async def _process_match(
         self,
@@ -199,6 +202,7 @@ class EventRecordProcessingService:
         identity: DeliveryIdentity,
         decoded: EventDecodeSuccess,
         guard: Callable[[], bool] | None,
+        reserve_handoff: HandoffReservation | None,
     ) -> RecordResult:
         """Reuse an existing Execution before checking admission for a direct start."""
         accepted = await self._accepted(snapshot, identity)
@@ -206,7 +210,7 @@ class EventRecordProcessingService:
             return accepted
         if not self._admission_open(snapshot, guard) or not await self.admission_eligible(snapshot):
             return self._hold("admission_closed")
-        return await self._prepare_and_schedule(snapshot, identity, decoded, guard)
+        return await self._prepare_and_schedule(snapshot, identity, decoded, guard, reserve_handoff)
 
     async def _resume_handoff(
         self, snapshot: SubscriptionSnapshot, prepared: PreparedExecution, guard: Callable[[], bool] | None
@@ -217,31 +221,47 @@ class EventRecordProcessingService:
             return accepted.model_copy(update={"handoff": prepared}) if isinstance(accepted, HeldRecord) else accepted
         if not self._admission_open(snapshot, guard) or not await self.admission_eligible(snapshot):
             return self._hold("admission_closed").model_copy(update={"handoff": prepared})
-        return await self._schedule(snapshot, prepared)
+        return await self._schedule(snapshot, prepared, already_retained=True)
 
-    async def _schedule(self, snapshot: SubscriptionSnapshot, prepared: PreparedExecution) -> RecordResult:
-        result = self._scheduled(snapshot, await self._admission.schedule(prepared))
-        return result.model_copy(update={"handoff": prepared}) if isinstance(result, HeldRecord) else result
+    async def _schedule(
+        self,
+        snapshot: SubscriptionSnapshot,
+        prepared: PreparedExecution,
+        *,
+        reserve_handoff: HandoffReservation | None = None,
+        already_retained: bool = False,
+    ) -> RecordResult:
+        if reserve_handoff is not None and not reserve_handoff(prepared):
+            return await self._accepted(snapshot, prepared.identity, recover=True) or self._hold("queue_capacity")
+        scheduled = await self._admission.schedule(prepared)
+        result = self._scheduled(snapshot, scheduled)
+        if isinstance(scheduled, ResolvedDelivery):
+            return scheduled
+        # A rejection of a retry cannot clear an earlier ambiguous submission.
+        if scheduled.start_rejected and not already_retained:
+            return result.model_copy(update={"handoff_rejected": True})
+        return result.model_copy(update={"handoff": prepared})
 
     async def _prepare_and_schedule(
         self,
         snapshot: SubscriptionSnapshot,
         identity: DeliveryIdentity,
-        decoded: EventDecodeSuccess | EventDecodeFailure,
+        decoded: EventDecodeSuccess,
         guard: Callable[[], bool] | None,
+        reserve_handoff: HandoffReservation | None,
     ) -> RecordResult:
-        if isinstance(decoded, EventDecodeFailure):
-            return await self.hold_content_failure(snapshot, identity, decoded, admission_guard=guard)
         if not self._admission_open(snapshot, guard):
             return self._hold("admission_closed")
         prepared = await self._preparation.prepare_delivery(snapshot, identity, decoded.envelope)
         if isinstance(prepared, EventDecodeFailure):
             return await self.hold_content_failure(snapshot, identity, prepared, admission_guard=guard)
+        if isinstance(prepared, ExecutionCapacityUnavailable):
+            return await self._accepted(snapshot, identity, recover=True) or self._hold(prepared.reason)
         if not isinstance(prepared, PreparedExecution):
             return self._hold(prepared.reason)
         if not self._admission_open(snapshot, guard):
             return self._hold("admission_closed")
-        return await self._schedule(snapshot, prepared)
+        return await self._schedule(snapshot, prepared, reserve_handoff=reserve_handoff)
 
     async def inspect_only(
         self,

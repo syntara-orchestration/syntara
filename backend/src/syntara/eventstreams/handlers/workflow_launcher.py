@@ -18,16 +18,18 @@ from syntara.workflows.workflow_engine.workflow_auth import HEADER_NAME, verify_
 _WORKFLOW_TYPE = "orchestrator_workflow"
 
 
-def _rpc_failure(exc: RPCError) -> EventLaunchError:
+def _rpc_failure(exc: RPCError, *, starting: bool = False) -> EventLaunchError:
     if exc.status == RPCStatusCode.NOT_FOUND:
-        return EventLaunchError(SchedulingFailureCode.TEMPORAL_NOT_FOUND)
+        return EventLaunchError(SchedulingFailureCode.TEMPORAL_NOT_FOUND, start_rejected=starting)
     transient = exc.status not in {
         RPCStatusCode.INVALID_ARGUMENT,
         RPCStatusCode.PERMISSION_DENIED,
         RPCStatusCode.UNAUTHENTICATED,
         RPCStatusCode.FAILED_PRECONDITION,
     }
-    return EventLaunchError(SchedulingFailureCode.TEMPORAL_UNAVAILABLE, transient=transient)
+    return EventLaunchError(
+        SchedulingFailureCode.TEMPORAL_UNAVAILABLE, transient=transient, start_rejected=starting and not transient
+    )
 
 
 class TemporalWorkflowLauncher:
@@ -63,7 +65,10 @@ class TemporalWorkflowLauncher:
     async def start(self, prepared: PreparedExecution) -> TemporalAcceptance:
         """Submit the identical frozen start; duplicate responses require verification."""
         # Validate references before submitting, even when an adapter is called directly.
-        self._acceptance(prepared, "validation")
+        try:
+            self._acceptance(prepared, "validation")
+        except EventLaunchError as exc:
+            raise EventLaunchError(exc.code, transient=False, start_rejected=True) from None
         try:
             async with asyncio.timeout(self._timeout.total_seconds()):
                 handle = await self._client.start_workflow(
@@ -81,7 +86,10 @@ class TemporalWorkflowLauncher:
                 raise EventLaunchError(SchedulingFailureCode.EVIDENCE_MISMATCH, transient=False) from None
             return await self._describe(prepared, exc.run_id)
         except RPCError as exc:
-            raise _rpc_failure(exc) from None
+            retry = self._client.service_client.config.retry_config
+            # A client injected with SDK retries can return only the final
+            # RPC's rejection even if an earlier start may have succeeded.
+            raise _rpc_failure(exc, starting=retry is not None and retry.max_retries == 1) from None
         except (TimeoutError, OSError):
             raise EventLaunchError(SchedulingFailureCode.TEMPORAL_UNAVAILABLE) from None
 

@@ -12,10 +12,11 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import re
+from contextvars import ContextVar
 from typing import TYPE_CHECKING, Any, Protocol, cast
 
 import structlog
-from aiokafka import AIOKafkaConsumer, TopicPartition
+from aiokafka import AIOKafkaConsumer, TopicPartition, errors
 from aiokafka.abc import ConsumerRebalanceListener
 from aiokafka.client import ConnectionGroup, CoordinationType
 from aiokafka.coordinator.assignors.roundrobin import RoundRobinPartitionAssignor
@@ -35,7 +36,7 @@ from aiokafka.protocol.group import LeaveGroupRequest
 from aiokafka.structs import OffsetAndMetadata
 
 from syntara.core.config.base import get_settings
-from syntara.core.constants import EventSchedulingDefaults
+from syntara.core.constants import EventSchedulingDefaults, EventStreamLimits
 from syntara.eventstreams.adapters.kafka_identity import SourceMetadataRequest, decode_source_identity
 from syntara.eventstreams.adapters.kafka_metadata import KafkaSourceMetadata, KafkaTimestampType
 from syntara.eventstreams.core.consumer import (
@@ -69,6 +70,23 @@ if TYPE_CHECKING:
     from syntara.eventstreams.core.source_metadata import EventSourceMetadata
 
 logger = structlog.stdlib.get_logger(__name__)
+_COMMIT_EPOCH: ContextVar[int | None] = ContextVar("event_kafka_commit_epoch", default=None)
+_SETTLED_OFFSET_COMMIT_CODES = frozenset(
+    {
+        0,
+        errors.GroupLoadInProgressError.errno,
+        errors.GroupCoordinatorNotAvailableError.errno,
+        errors.NotCoordinatorForGroupError.errno,
+        errors.GroupAuthorizationFailedError.errno,
+        errors.TopicAuthorizationFailedError.errno,
+        errors.OffsetMetadataTooLargeError.errno,
+        errors.InvalidCommitOffsetSizeError.errno,
+        errors.UnknownMemberIdError.errno,
+        errors.IllegalGenerationError.errno,
+        errors.RebalanceInProgressError.errno,
+        errors.UnknownTopicOrPartitionError.errno,
+    }
+)
 
 _CREDENTIAL_SCRUB = re.compile(
     r"(password|username|credential|secret|sasl)[=:\s]+\S+",
@@ -92,6 +110,12 @@ class _LeaveGroupResult(Protocol):
     """Typed view of the broker's generated LeaveGroup response."""
 
     error_code: int
+
+
+class _OffsetCommitResult(Protocol):
+    """Typed view of the partition outcomes in a generated response."""
+
+    topics: list[tuple[str, list[tuple[int, int]]]]
 
 
 class _ResetAwareKafkaClient(KafkaPolicyClient):
@@ -120,10 +144,15 @@ class _ResetAwareKafkaClient(KafkaPolicyClient):
         self._commit_uncertain = commit_uncertain
         self._commit_members: set[str] = set()
         self._commits_closed = False
+        self.commit_outcome_uncertain = False
 
     def confirm_commit(self) -> None:
         """Clear prior attempts after a successful full checkpoint."""
         self._commit_members.clear()
+
+    def seal_commits(self) -> None:
+        """Reject any SDK commit that has yet to reach the transport."""
+        self._commits_closed = True
 
     async def close(self) -> None:
         """Confirm membership removal before releasing an ambiguous commit fence.
@@ -132,7 +161,7 @@ class _ResetAwareKafkaClient(KafkaPolicyClient):
         client is still usable here, after coordination/heartbeats have stopped.
         Keep it and the caller's revision lock until Kafka acknowledges the leave.
         """
-        self._commits_closed = True
+        self.seal_commits()
         if self._commit_uncertain is not None and self._commit_uncertain():
             for member in tuple(self._commit_members):
                 await self._fence_member(member)
@@ -169,12 +198,7 @@ class _ResetAwareKafkaClient(KafkaPolicyClient):
     ) -> Response | None:
         """Preserve the response while reporting affected partitions to the adapter."""
         if request.API_KEY == OffsetCommitRequest.API_KEY:
-            commit = cast("_CommitMembership", cast("OffsetCommitRequest", request).build(OffsetCommitRequest_v2))
-            if self._commits_closed or commit.consumer_group_generation_id < 0 or not commit.consumer_id:
-                # An anonymous (-1 generation) commit cannot be fenced by
-                # removing a group member. This adapter always uses membership.
-                raise IllegalGenerationError
-            self._commit_members.add(commit.consumer_id)
+            return await self._send_offset_commit(node_id, cast("OffsetCommitRequest", request), group=group)
         epoch = self._assignment_epoch()
         response = await super().send(node_id, request, group=group)
         if response is not None and request.API_KEY == FetchRequest_v0.API_KEY:
@@ -193,6 +217,37 @@ class _ResetAwareKafkaClient(KafkaPolicyClient):
                     ):
                         self._on_topic_missing()
         return response
+
+    async def _send_offset_commit(
+        self, node_id: int | str, request: OffsetCommitRequest, *, group: ConnectionGroup
+    ) -> Response | None:
+        commit = cast("_CommitMembership", request.build(OffsetCommitRequest_v2))
+        epoch = _COMMIT_EPOCH.get()
+        if (
+            self._commits_closed
+            or (epoch is not None and epoch != self._assignment_epoch())
+            or commit.consumer_group_generation_id < 0
+            or not commit.consumer_id
+        ):
+            # SDK retries inherit the issuing epoch. Anonymous writes cannot
+            # be fenced by removing a group member and are also disallowed.
+            raise IllegalGenerationError
+        self._commit_members.add(commit.consumer_id)
+        settled = False
+        try:
+            response = await super().send(node_id, request, group=group)
+            settled = response is not None and all(
+                error in _SETTLED_OFFSET_COMMIT_CODES
+                for _, partitions in cast("_OffsetCommitResult", response).topics
+                for _, error in partitions
+            )
+            return response
+        finally:
+            if not settled:
+                # The broker may apply a write even after a transport error
+                # or a broker-side timeout. Stop retries before another write.
+                self.commit_outcome_uncertain = True
+                self.seal_commits()
 
 
 class _RebalanceListener(ConsumerRebalanceListener):
@@ -251,8 +306,10 @@ class KafkaPartitionConsumer:
         self._last_source_identity: SourceIdentityObservation | None = None
         self._topic_missing = False
         self._identity_lock = asyncio.Lock()
-        self._pending_commits = 0
+        self._pending_commits: set[asyncio.Task[None]] = set()
+        self._commits_interrupted = False
         self._failed_commit = False
+        self._require_commit_fence = False
         self._policy_client: _ResetAwareKafkaClient | None = None
 
     @property
@@ -264,6 +321,14 @@ class KafkaPartitionConsumer:
     def epoch(self) -> int:
         """Return the opaque epoch, advanced on assignment, revocation and stop."""
         return self._epoch
+
+    @property
+    def commits_interrupted(self) -> bool:
+        """Signal that this consumer must close before accepting new offset work."""
+        return self._commits_interrupted or self._wire_commit_uncertain()
+
+    def _wire_commit_uncertain(self) -> bool:
+        return self._policy_client is not None and self._policy_client.commit_outcome_uncertain is True
 
     @property
     def is_running(self) -> bool:
@@ -302,7 +367,7 @@ class KafkaPartitionConsumer:
         self._require_running()
         self._check_epoch(expected_epoch)
         self._check_ownership(partition)
-        if partition in self._position_operations:
+        if self.commits_interrupted or partition in self._position_operations:
             yield False
             return
         self._position_operations.add(partition)
@@ -318,6 +383,7 @@ class KafkaPartitionConsumer:
         if self._consumer is not None:
             msg = "Consumer shutdown is incomplete; retry stop before starting"
             raise KafkaTransportError(msg)
+        self._commits_interrupted = self._failed_commit = self._require_commit_fence = False
 
         settings = get_settings()
         connection_options: dict[str, Any] = {  # aiokafka's untyped constructor boundary
@@ -359,7 +425,7 @@ class KafkaPartitionConsumer:
             on_metadata_changed=self._metadata_changed,
             on_topic_missing=self._note_topic_missing,
             commit_group_id=self.group_id,
-            commit_uncertain=lambda: self._pending_commits > 0 or self._failed_commit,
+            commit_uncertain=lambda: self._require_commit_fence,
         )
         consumer._client = self._policy_client  # noqa: SLF001 - aiokafka has no client injection API
 
@@ -462,6 +528,8 @@ class KafkaPartitionConsumer:
         consumer = self._consumer
         if consumer is None:
             return
+        if self._pending_commits or self.commits_interrupted:
+            self.interrupt_commits()
         if self._stop_task is None:
             self._stop_task = asyncio.create_task(consumer.stop())
             self._stop_task.add_done_callback(self._stop_settled)
@@ -500,30 +568,70 @@ class KafkaPartitionConsumer:
 
         Does not substitute fetched positions or commit all returned records.
         """
-        consumer = self._require_running()
-        self._check_epoch(expected_epoch)
-        for partition in offsets:
-            self._check_ownership(partition)
-        self._check_offset_resets(offsets)
-        await self._verify_metadata_identity(expected_epoch)
-
-        offset_map = {self._tp(p): OffsetAndMetadata(o, "") for p, o in offsets.items()}
-        self._pending_commits += 1
+        self._require_running()
+        self._check_commits_open()
+        task = asyncio.create_task(self._sdk_commit(offsets, expected_epoch=expected_epoch))
+        self._pending_commits.add(task)
         completed = False
         try:
-            await consumer.commit(offset_map)
+            done, _ = await asyncio.wait({task}, timeout=EventStreamLimits.OFFSET_COMMIT_TIMEOUT_SECONDS)
+            if not done or task.cancelled():
+                self.interrupt_commits()
+                msg = "Offset commit timed out or was interrupted"
+                raise KafkaTransportError(msg)
+            task.result()
+            self._check_commits_open()
             completed = True
         except KafkaError as exc:
             raise KafkaTransportError(_sanitize(str(exc))) from exc
         finally:
-            self._pending_commits -= 1
+            if self.commits_interrupted and not self._commits_interrupted:
+                self.interrupt_commits()
+            if not task.done():
+                if not self._commits_interrupted:
+                    self.interrupt_commits()
+                task.add_done_callback(self._stop_settled)
+            self._pending_commits.discard(task)
             self._failed_commit |= not completed
-            if self._pending_commits == 0 and not self._failed_commit and self._policy_client is not None:
+            if not self._pending_commits and not self._failed_commit and self._policy_client is not None:
                 self._policy_client.confirm_commit()
+
+    async def _sdk_commit(self, offsets: dict[int, int], *, expected_epoch: int) -> None:
+        # The task may start after an assignment change. Validate inside it.
+        consumer = self._require_running()
+        self._check_commits_open()
+        self._check_epoch(expected_epoch)
+        await self._verify_metadata_identity(expected_epoch)
+        self._check_epoch(expected_epoch)
+        for partition in offsets:
+            self._check_ownership(partition)
+        self._check_offset_resets(offsets)
+        self._check_commits_open()
+        epoch = _COMMIT_EPOCH.set(expected_epoch)
+        try:
+            await consumer.commit({self._tp(p): OffsetAndMetadata(o, "") for p, o in offsets.items()})
+        finally:
+            _COMMIT_EPOCH.reset(epoch)
+
+    def _check_commits_open(self) -> None:
+        if self.commits_interrupted:
+            msg = "Offset commits are closed"
+            raise KafkaTransportError(msg)
+
+    def interrupt_commits(self) -> None:
+        """Stop SDK retries and fence any shielded wire request before reuse."""
+        if self._wire_commit_uncertain() or any(not task.done() or task.cancelled() for task in self._pending_commits):
+            self._require_commit_fence = True
+        self._commits_interrupted = True
+        if self._policy_client is not None:
+            self._policy_client.seal_commits()
+        for task in self._pending_commits:
+            task.cancel()
 
     async def fence_commits(self) -> None:
         """Stop this generation with broker acknowledgement after an ambiguous commit."""
-        self._failed_commit = True
+        self._require_commit_fence = True
+        self.interrupt_commits()
         await self.stop()
 
     async def committed(

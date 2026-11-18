@@ -11,6 +11,7 @@ from syntara.eventstreams.core.deduplication import TemporalAcceptance
 from syntara.eventstreams.core.envelope import RawEvent
 from syntara.eventstreams.core.handler import BlockedDelivery, EventLaunchError, ResolvedDelivery, SchedulingFailureCode
 from syntara.eventstreams.core.preparation import AcceptedWorkflow, PreparedExecution
+from syntara.eventstreams.core.processing import HeldRecord
 from syntara.eventstreams.models.subscription_snapshot import SubscriptionSnapshot
 from syntara.eventstreams.services import admission_service as module
 from syntara.eventstreams.services.admission_service import EventAdmissionService
@@ -77,6 +78,33 @@ async def test_failed_start_does_not_write_execution(scheduling) -> None:
     assert not isinstance(result, ResolvedDelivery)
     context.store.persist.assert_not_awaited()
     assert context.sessions == []
+
+
+@pytest.mark.parametrize("accepted", [False, True])
+async def test_capacity_denial_checks_for_an_accepted_run(scheduling, monkeypatch, *, accepted: bool) -> None:
+    context = scheduling
+    preparation = context.preparation
+    preparation.capacity.side_effect = None
+    preparation.capacity.return_value = 2
+    processing = EventRecordProcessingService(lambda: preparation.session, preparation.service, context.service)
+    monkeypatch.setattr(processing, "admission_eligible", AsyncMock(return_value=True))
+    if accepted:
+        context.launcher.lookup.side_effect = None
+        context.launcher.lookup.return_value = context.accepted
+    result = await processing.process(
+        preparation.snapshot,
+        context.prepared.identity,
+        RawEvent(value=b'{"count":2}', source_metadata=preparation.envelope.source_metadata),
+    )
+    if accepted:
+        assert isinstance(result, ResolvedDelivery)
+        context.store.persist.assert_awaited_once()
+    else:
+        assert isinstance(result, HeldRecord)
+        assert result.reason == "execution_capacity"
+        context.store.persist.assert_not_awaited()
+    context.launcher.lookup.assert_awaited_once_with(context.prepared.identity)
+    context.launcher.start.assert_not_awaited()
 
 
 async def test_lost_start_response_recovers_original_arguments(scheduling) -> None:

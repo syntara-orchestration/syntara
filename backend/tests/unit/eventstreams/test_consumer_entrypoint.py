@@ -196,7 +196,7 @@ async def test_disabled_process_opens_no_temporal_client(monkeypatch):
 async def test_shutdown_cancels_pending_shared_client_connection(monkeypatch):
     entered, cancelled = asyncio.Event(), asyncio.Event()
 
-    async def connect() -> None:
+    async def connect(**_kwargs: object) -> None:
         entered.set()
         try:
             await asyncio.Event().wait()
@@ -244,6 +244,7 @@ async def test_main_uses_existing_signed_tls_client_and_disposes_database_after_
     await entrypoint.main()
     connect.assert_awaited_once()
     assert connect.call_args.kwargs["tls"] is tls
+    assert connect.call_args.kwargs["retry_config"].max_retries == 1
     assert len(connect.call_args.kwargs["interceptors"]) == 1
     assert type(connect.call_args.kwargs["interceptors"][0]).__name__ == "WorkflowAuthClientInterceptor"
     assert trace == ["drained", "audit_closed", "database_closed"]
