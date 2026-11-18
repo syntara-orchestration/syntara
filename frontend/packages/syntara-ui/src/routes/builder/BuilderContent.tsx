@@ -55,6 +55,7 @@ import { usePublishWorkflow, useUnpublishWorkflow } from './hooks/usePublishWork
 import { useRunStepDialog } from './hooks/useRunStepDialog'
 import { useUndoRedoKeyboard } from './hooks/useUndoRedoKeyboard'
 import { useWorkflowMetadata } from './hooks/useWorkflowMetadata'
+import { KafkaGroupConflictDialog } from './KafkaGroupConflictDialog'
 import { NodeActionsContext } from './NodeActionsContext'
 import { SaveBeforeViewDialog } from './SaveBeforeViewDialog'
 import type { BuilderContentProps } from './types/builderContent'
@@ -278,7 +279,13 @@ function BuilderContentBody(props: BuilderContentProps) {
     dispatch,
   })
 
-  const { publish: onPublish, isPublishing } = usePublishWorkflow({
+  const {
+    publish: onPublish,
+    isPublishing,
+    groupConflicts,
+    confirmGroups,
+    cancelGroups,
+  } = usePublishWorkflow({
     workflowId,
     currentVersion,
     workflowName,
@@ -597,6 +604,12 @@ function BuilderContentBody(props: BuilderContentProps) {
           <SynPage>
             <SynReactFlowViewportGuard>
               <StackItem>
+                <KafkaGroupConflictDialog
+                  conflicts={groupConflicts}
+                  isPending={isPublishing}
+                  onConfirm={confirmGroups}
+                  onCancel={cancelGroups}
+                />
                 <BuilderWorkflowPageHeader
                   workflowName={workflowName}
                   workflowDescription={workflowDescription}
