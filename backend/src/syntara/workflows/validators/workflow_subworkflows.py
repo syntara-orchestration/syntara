@@ -133,18 +133,18 @@ def _required_trigger_input_names(trigger: Mapping[str, Any]) -> list[str]:
     return [name for name in required if isinstance(name, str)]
 
 
-def _referenced_child_step_ids(
+def _referenced_child_output_paths(
     workflow_definition: Mapping[str, Any],
     subworkflow_node_id: str | None,
-) -> set[str]:
-    """Find child step IDs referenced through a Sub-workflow output expression."""
+) -> set[tuple[str, ...]]:
+    """Find declared output paths referenced through a Sub-workflow expression."""
     if subworkflow_node_id is None:
         return set()
 
     triggers = workflow_definition.get("triggers")
     nodes = workflow_definition.get("nodes")
     elements = [*(triggers if isinstance(triggers, list) else []), *(nodes if isinstance(nodes, list) else [])]
-    referenced_ids: set[str] = set()
+    referenced_paths: set[tuple[str, ...]] = set()
     for element in elements:
         if not isinstance(element, dict):
             continue
@@ -155,13 +155,89 @@ def _referenced_child_step_ids(
             result_field, *path = path
             if result_field != "Result" or not path:
                 continue
-            outputs_field, *path = path
-            if outputs_field != "outputs" or not path:
+            outputs_field, *output_path = path
+            if outputs_field != "outputs" or not output_path:
                 continue
-            child_step_id, *_ = path
-            if child_step_id:
-                referenced_ids.add(child_step_id)
-    return referenced_ids
+            referenced_paths.add(tuple(output_path))
+    return referenced_paths
+
+
+def _allows_composed_schema_path(schema: Mapping[str, Any], path: tuple[str, ...]) -> bool | None:
+    """Check paths through JSON Schema composition keywords when present."""
+    for union_key in ("anyOf", "oneOf"):
+        branches = schema.get(union_key)
+        if isinstance(branches, list) and branches:
+            return any(isinstance(branch, Mapping) and _schema_allows_nested_path(branch, path) for branch in branches)
+    all_of = schema.get("allOf")
+    if isinstance(all_of, list) and all_of:
+        return all(isinstance(branch, Mapping) and _schema_allows_nested_path(branch, path) for branch in all_of)
+    return None
+
+
+def _allows_object_schema_path(schema: Mapping[str, Any], segment: str, remaining: tuple[str, ...]) -> bool:
+    """Check an object property or additional property against its schema."""
+    properties = schema.get("properties")
+    if isinstance(properties, Mapping) and segment in properties:
+        child_schema = properties[segment]
+        return not remaining or (
+            isinstance(child_schema, Mapping) and _schema_allows_nested_path(child_schema, remaining)
+        )
+
+    if schema.get("additionalProperties") is False:
+        return False
+    additional_schema = schema.get("additionalProperties")
+    return (
+        not remaining
+        or not isinstance(additional_schema, Mapping)
+        or _schema_allows_nested_path(additional_schema, remaining)
+    )
+
+
+def _allows_array_schema_path(schema: Mapping[str, Any], segment: str, remaining: tuple[str, ...]) -> bool:
+    """Check a numeric array index and its item schema."""
+    item_schema = schema.get("items")
+    return (
+        segment.isdecimal()
+        and isinstance(item_schema, Mapping)
+        and (not remaining or _schema_allows_nested_path(item_schema, remaining))
+    )
+
+
+def _schema_allows_nested_path(schema: Mapping[str, Any], path: tuple[str, ...]) -> bool:
+    """Check nested object/array path segments against a JSON Schema fragment."""
+    if not path or not schema:
+        return True
+
+    composed_result = _allows_composed_schema_path(schema, path)
+    if composed_result is not None:
+        return composed_result
+
+    schema_type = schema.get("type")
+    schema_types = schema_type if isinstance(schema_type, list) else [schema_type]
+    has_object_type = "object" in schema_types or schema_type is None
+    has_array_type = "array" in schema_types
+    if not has_object_type and not has_array_type:
+        return False
+
+    segment, *remaining = path
+    remaining_path = tuple(remaining)
+    if has_object_type:
+        return _allows_object_schema_path(schema, segment, remaining_path)
+    # Numeric path segments can address array items in a declared array output.
+    return _allows_array_schema_path(schema, segment, remaining_path)
+
+
+def _is_declared_output_path(output_schema: Mapping[str, Any] | None, path: tuple[str, ...]) -> bool:
+    """Check that the first path segment is public and nested segments fit its schema."""
+    if not path or not isinstance(output_schema, Mapping):
+        return False
+
+    properties = output_schema.get("properties")
+    if not isinstance(properties, Mapping) or path[0] not in properties:
+        return False
+
+    field_schema = properties[path[0]]
+    return len(path) == 1 or (isinstance(field_schema, Mapping) and _schema_allows_nested_path(field_schema, path[1:]))
 
 
 def _validate_target_workflow(
@@ -220,25 +296,23 @@ def _validate_target_workflow(
         if input_name not in input_mapping
     ]
 
-    published_nodes = published_definition.get("nodes") if isinstance(published_definition, Mapping) else None
-    published_step_ids: set[str] = set()
-    if isinstance(published_nodes, list):
-        for child_node in published_nodes:
-            if isinstance(child_node, Mapping):
-                child_step_id = child_node.get("id")
-                if isinstance(child_step_id, str):
-                    published_step_ids.add(child_step_id)
-    stale_step_ids = sorted(_referenced_child_step_ids(parent_workflow_definition, node_id) - published_step_ids)
+    trigger_parameters = selected_trigger.get("parameters")
+    output_schema = trigger_parameters.get("output_schema") if isinstance(trigger_parameters, Mapping) else None
+    referenced_paths = _referenced_child_output_paths(parent_workflow_definition, node_id)
+    stale_output_paths = sorted(path for path in referenced_paths if not _is_declared_output_path(output_schema, path))
     findings.extend(
         [
             ValidationFinding(
                 severity=ValidationSeverity.warning,
                 category=ValidationCategory.invalid_reference,
-                message=f"Parent references child step '{step_id}' which no longer exists",
+                message=(
+                    f"Parent references child output '{'.'.join(path)}' which is not declared "
+                    "by the selected Subworkflow Trigger"
+                ),
                 node_id=node_id,
-                field_path=f"Result.outputs.{step_id}",
+                field_path=f"Result.outputs.{'.'.join(path)}",
             )
-            for step_id in stale_step_ids
+            for path in stale_output_paths
         ]
     )
     return findings
@@ -249,11 +323,11 @@ async def validate_subworkflow_project_references(
     workflow_definition: dict[str, Any],
     project_id: UUID,
 ) -> list[ValidationFinding]:
-    """Validate child workflow targets, required inputs, and referenced child step IDs.
+    """Validate child workflow targets, required inputs, and referenced public outputs.
 
     Reuse the parameter model's UUID check because the service can receive raw
     workflow-definition dictionaries. Collect IDs first to batch the lookup. Findings for
-    missing child inputs, unpublished children, or stale child step IDs are warnings.
+    missing child inputs, unpublished children, or undeclared child outputs are warnings.
     """
     nodes = workflow_definition.get("nodes", [])
     if not isinstance(nodes, list):

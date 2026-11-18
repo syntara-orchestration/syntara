@@ -283,9 +283,9 @@ class TestSubWorkflowDynamicOutputs:
             "${child}",
             "${child.Result}",
             "${child.Result.outputs}",
-            "${child.Result.outputs.deploy.Result.artifact_url}",
-            "${child.Result.outputs.deploy.StatusCode}",
-            "${child.Result.outputs.deploy.deeply.nested.field}",
+            "${child.Result.outputs.release.artifact_url}",
+            "${child.Result.outputs.release.status_code}",
+            "${child.Result.outputs.labels.deeply.nested.field}",
         ],
     )
     def test_dynamic_output_paths_are_accepted(self, expression: str) -> None:

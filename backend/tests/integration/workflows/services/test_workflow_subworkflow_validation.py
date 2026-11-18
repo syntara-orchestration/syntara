@@ -90,8 +90,8 @@ async def _create_child_workflow(
     trigger_node_id: str = "child_entry",
     trigger_type: str = "subworkflow_trigger",
     input_schema: dict[str, Any] | None = None,
+    output_schema: dict[str, Any] | None = None,
     additional_triggers: list[dict[str, Any]] | None = None,
-    child_step_ids: list[str] | None = None,
 ) -> Workflow:
     child = Workflow(
         name=f"child-{uuid4().hex[:8]}",
@@ -104,7 +104,11 @@ async def _create_child_workflow(
     await session.flush()
 
     if published:
-        trigger_parameters = {"input_schema": input_schema} if input_schema is not None else {}
+        trigger_parameters = {}
+        if input_schema is not None:
+            trigger_parameters["input_schema"] = input_schema
+        if output_schema is not None:
+            trigger_parameters["output_schema"] = output_schema
         triggers = [{"id": trigger_node_id, "type": trigger_type, "parameters": trigger_parameters}]
         triggers.extend(additional_triggers or [])
         version = WorkflowVersion(
@@ -115,7 +119,7 @@ async def _create_child_workflow(
                 "schema_version": "2.0.0",
                 "name": child.name,
                 "triggers": triggers,
-                "nodes": [{"id": step_id, "type": "script"} for step_id in child_step_ids or []],
+                "nodes": [],
                 "edges": [],
             },
             created_by=user.id,
@@ -349,7 +353,7 @@ async def test_same_project_reference_can_be_saved_and_published(
 
 
 @pytest.mark.asyncio
-async def test_reference_to_existing_published_child_step_has_no_finding(
+async def test_reference_to_declared_child_output_has_no_finding(
     test_db_session: AsyncSession,
     test_user: User,
     test_project_id: UUID,
@@ -358,14 +362,23 @@ async def test_reference_to_existing_published_child_step_has_no_finding(
         test_db_session,
         test_user,
         test_project_id,
-        child_step_ids=["deploy"],
+        output_schema={
+            "type": "object",
+            "properties": {
+                "release": {
+                    "type": "object",
+                    "properties": {"artifact_url": {"type": "string"}},
+                    "additionalProperties": False,
+                }
+            },
+        },
     )
 
     findings = await validate_subworkflow_project_references(
         test_db_session,
         _definition_with_subworkflow_output_references(
             child.id,
-            ["call_child.Result.outputs.deploy.Result.artifact_url"],
+            ["call_child.Result.outputs.release.artifact_url"],
         ),
         test_project_id,
     )
@@ -374,7 +387,7 @@ async def test_reference_to_existing_published_child_step_has_no_finding(
 
 
 @pytest.mark.asyncio
-async def test_stale_child_step_references_each_produce_warnings(
+async def test_undeclared_child_output_references_each_produce_warnings(
     test_db_session: AsyncSession,
     test_user: User,
     test_project_id: UUID,
@@ -383,7 +396,16 @@ async def test_stale_child_step_references_each_produce_warnings(
         test_db_session,
         test_user,
         test_project_id,
-        child_step_ids=["still_present"],
+        output_schema={
+            "type": "object",
+            "properties": {
+                "still_present": {
+                    "type": "object",
+                    "properties": {"value": {"type": "string"}},
+                    "additionalProperties": False,
+                }
+            },
+        },
     )
 
     findings = await validate_subworkflow_project_references(
@@ -391,9 +413,9 @@ async def test_stale_child_step_references_each_produce_warnings(
         _definition_with_subworkflow_output_references(
             child.id,
             [
-                "call_child.Result.outputs.removed_a.Result.value",
-                "call_child.Result.outputs.still_present.Result.value",
-                "call_child.Result.outputs.removed_b.StatusCode",
+                "call_child.Result.outputs.removed_a.value",
+                "call_child.Result.outputs.still_present.value",
+                "call_child.Result.outputs.removed_b",
             ],
         ),
         test_project_id,
@@ -402,23 +424,28 @@ async def test_stale_child_step_references_each_produce_warnings(
     assert len(findings) == 2
     assert all(finding.severity == ValidationSeverity.warning for finding in findings)
     assert [finding.message for finding in findings] == [
-        "Parent references child step 'removed_a' which no longer exists",
-        "Parent references child step 'removed_b' which no longer exists",
+        "Parent references child output 'removed_a.value' which is not declared by the selected Subworkflow Trigger",
+        "Parent references child output 'removed_b' which is not declared by the selected Subworkflow Trigger",
     ]
     assert all(finding.node_id == "call_child" for finding in findings)
     assert [finding.field_path for finding in findings] == [
-        "Result.outputs.removed_a",
+        "Result.outputs.removed_a.value",
         "Result.outputs.removed_b",
     ]
 
 
 @pytest.mark.asyncio
-async def test_stale_child_step_warning_does_not_block_publish(
+async def test_undeclared_child_output_warning_does_not_block_publish(
     test_db_session: AsyncSession,
     test_user: User,
     test_project_id: UUID,
 ) -> None:
-    child = await _create_child_workflow(test_db_session, test_user, test_project_id)
+    child = await _create_child_workflow(
+        test_db_session,
+        test_user,
+        test_project_id,
+        output_schema={"type": "object", "properties": {}},
+    )
     service = WorkflowService(test_db_session, test_user)
 
     with (
@@ -440,7 +467,7 @@ async def test_stale_child_step_warning_does_not_block_publish(
             labels={},
             workflow_definition=_definition_with_subworkflow_output_references(
                 child.id,
-                ["call_child.Result.outputs.removed_step.Result.value"],
+                ["call_child.Result.outputs.removed_step.value"],
             ),
             project_id=test_project_id,
         )
@@ -448,7 +475,8 @@ async def test_stale_child_step_warning_does_not_block_publish(
         assert validation_result.error_count == 0
         assert validation_result.warning_count == 1
         assert validation_result.findings[0].message == (
-            "Parent references child step 'removed_step' which no longer exists"
+            "Parent references child output 'removed_step.value' which is not declared "
+            "by the selected Subworkflow Trigger"
         )
 
         published_workflow, published_version, warning = await service.publish_workflow_version(
@@ -457,7 +485,111 @@ async def test_stale_child_step_warning_does_not_block_publish(
         )
 
     assert published_workflow.published_version_id == published_version.id
-    assert "Parent references child step 'removed_step' which no longer exists" in warning
+    assert "Parent references child output 'removed_step.value' which is not declared" in warning
+
+
+@pytest.mark.asyncio
+async def test_nested_dynamic_child_output_paths_follow_declared_schema(
+    test_db_session: AsyncSession,
+    test_user: User,
+    test_project_id: UUID,
+) -> None:
+    child = await _create_child_workflow(
+        test_db_session,
+        test_user,
+        test_project_id,
+        output_schema={
+            "type": "object",
+            "properties": {
+                "labels": {
+                    "type": "object",
+                    "additionalProperties": {"type": "string"},
+                }
+            },
+        },
+    )
+
+    findings = await validate_subworkflow_project_references(
+        test_db_session,
+        _definition_with_subworkflow_output_references(
+            child.id,
+            [
+                "call_child.Result.outputs.labels.release",
+                "call_child.Result.outputs.labels.region",
+            ],
+        ),
+        test_project_id,
+    )
+
+    assert findings == []
+
+
+@pytest.mark.asyncio
+async def test_child_output_validation_uses_selected_trigger_schema(
+    test_db_session: AsyncSession,
+    test_user: User,
+    test_project_id: UUID,
+) -> None:
+    child = await _create_child_workflow(
+        test_db_session,
+        test_user,
+        test_project_id,
+        output_schema={"type": "object", "properties": {"selected": {"type": "string"}}},
+        additional_triggers=[
+            {
+                "id": "other_entry",
+                "type": "subworkflow_trigger",
+                "parameters": {"output_schema": {"type": "object", "properties": {"other": {"type": "string"}}}},
+            }
+        ],
+    )
+
+    findings = await validate_subworkflow_project_references(
+        test_db_session,
+        _definition_with_subworkflow_output_references(
+            child.id,
+            ["call_child.Result.outputs.selected", "call_child.Result.outputs.other"],
+        ),
+        test_project_id,
+    )
+
+    assert len(findings) == 1
+    assert findings[0].field_path == "Result.outputs.other"
+
+
+@pytest.mark.asyncio
+async def test_nested_child_output_path_rejects_missing_property_in_closed_object(
+    test_db_session: AsyncSession,
+    test_user: User,
+    test_project_id: UUID,
+) -> None:
+    child = await _create_child_workflow(
+        test_db_session,
+        test_user,
+        test_project_id,
+        output_schema={
+            "type": "object",
+            "properties": {
+                "release": {
+                    "type": "object",
+                    "properties": {"url": {"type": "string"}},
+                    "additionalProperties": False,
+                }
+            },
+        },
+    )
+
+    findings = await validate_subworkflow_project_references(
+        test_db_session,
+        _definition_with_subworkflow_output_references(
+            child.id,
+            ["call_child.Result.outputs.release.tag"],
+        ),
+        test_project_id,
+    )
+
+    assert len(findings) == 1
+    assert findings[0].field_path == "Result.outputs.release.tag"
 
 
 @pytest.mark.asyncio
