@@ -5,7 +5,7 @@ import type { ReactNode } from 'react'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { axe } from 'vitest-axe'
 
-import { AlertProvider } from '../../providers/alerts'
+import { AlertProvider } from '../../providers/alerts/AlertProvider'
 
 import { accessClient } from './accessClient'
 import { fetchAllPoliciesForSelect } from './fetchAllPoliciesForSelect'
@@ -33,8 +33,8 @@ vi.mock('./fetchAllPoliciesForSelect', () => ({
 
 const mockShowError = vi.fn()
 
-vi.mock('../../providers/alerts', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../providers/alerts')>()
+vi.mock('../../providers/alerts/AlertContext', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../providers/alerts/AlertContext')>()
   return {
     ...actual,
     useAlerts: () => ({

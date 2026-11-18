@@ -1,7 +1,7 @@
 import { ExecutorTypeEnum, TriggerTypeEnum, type TaskActivity } from '@syntara/contracts'
 import { describe, expect, it, vi } from 'vitest'
 
-import { RegistryStepId } from '../../../../constants'
+import { RegistryStepId } from '../../../../constants/registryStepIds'
 
 import { DetectedExecutorType } from './common/detectTaskExecutorType'
 import { getCanvasStepIconDescriptor, getTaskIconDescriptor } from './stepIconResolver'

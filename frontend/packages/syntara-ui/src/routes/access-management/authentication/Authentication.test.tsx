@@ -7,7 +7,7 @@ import { axe } from 'vitest-axe'
 
 import { adminClient, identityProvidersClient } from '../../../client'
 import { useCanI } from '../../../hooks/useCanI'
-import { AlertProvider } from '../../../providers/alerts'
+import { AlertProvider } from '../../../providers/alerts/AlertProvider'
 import type { DocKey } from '../../../utils/docs/types'
 
 import Authentication from './Authentication'

@@ -7,7 +7,7 @@ import {
 } from '@syntara/contracts'
 import { useMemo, type ReactNode } from 'react'
 
-import { useAlerts } from '../../../providers/alerts'
+import { useAlerts } from '../../../providers/alerts/AlertContext'
 import { useWorkflowStoreActions } from '../../../stores/useWorkflowStore'
 import type { Trigger } from '../../../stores/workflowStoreTypes'
 import { parseJsonSchema } from '../../../utils/jsonSafeParse'
