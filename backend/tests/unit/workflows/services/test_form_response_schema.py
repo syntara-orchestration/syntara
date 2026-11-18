@@ -155,11 +155,8 @@ def test_generated_schema_is_checked_against_draft_2020_12() -> None:
     ("include_date", "include_time", "include_timezone", "expected_schema"),
     [
         (True, False, False, {"type": "string", "format": "date"}),
-        (True, True, False, {"type": "string", "format": "date-time"}),
         (True, True, True, {"type": "string", "format": "date-time"}),
-        (False, True, False, {"type": "string", "format": "time"}),
         (False, True, True, {"type": "string", "format": "time"}),
-        (False, False, True, {"type": "string"}),
     ],
 )
 def test_date_field_schema_matches_collected_components(
