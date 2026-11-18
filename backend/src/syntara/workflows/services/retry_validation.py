@@ -577,14 +577,20 @@ def _retry_selection_reason(
     completed_outputs: dict[str, list[Any]],
     successors: dict[str, set[str]],
     overrides: dict[str, dict[str, Any]],
-) -> tuple[str | None, list[str], list[str], list[str]]:
-    """Apply selection guards and return the reported points and sanitized nodes."""
+) -> tuple[str | None, list[str], list[str], list[str], bool]:
+    """Apply selection guards and return the reported points and sanitized nodes.
+
+    The final bool is whether ``reported_selection`` is a graph-valid retry
+    set whose step counts are meaningful. That is true for an eligible retry
+    and for an override rejection of an otherwise valid selection. State,
+    selection, version, and converge rejections leave counts at zero.
+    """
     reason = _state_reason(source) or _selection_reason(normalized, failed_ids, replacement_ids)
     if reason is not None:
         # Do not report sanitized nodes for a request that cannot be retried
         # because of its state or selection. In particular, the version scan
         # below may otherwise populate unrelated replacement UI on a rejection.
-        return reason, normalized, [], []
+        return reason, normalized, [], [], False
 
     version_reason, sanitized, auto_included, final_selection = _version_reason(
         normalized,
@@ -616,9 +622,8 @@ def _retry_selection_reason(
             overrides,
             successors,
         )
-    else:
-        reported_selection = normalized
-    return reason, reported_selection, sanitized, auto_included
+        return reason, reported_selection, sanitized, auto_included, True
+    return reason, normalized, sanitized, auto_included, False
 
 
 def _retry_result_counts(
@@ -737,7 +742,7 @@ async def validate_retry_from_failure(
     )
     replacement_ids = {node_id for ids in replacements.values() for node_id in ids}
 
-    reason, reported_selection, sanitized, auto_included = _retry_selection_reason(
+    reason, reported_selection, sanitized, auto_included, counts_apply = _retry_selection_reason(
         source,
         normalized,
         is_default_selection=is_default_selection,
@@ -753,7 +758,7 @@ async def validate_retry_from_failure(
     step_counts: dict[str, int] = {}
     total_steps = 0
     retained_result_count = 0
-    if reason is None:
+    if counts_apply:
         step_counts, total_steps, retained_result_count = _retry_result_counts(
             snapshot, snapshot_def, reported_selection, completed, successors
         )

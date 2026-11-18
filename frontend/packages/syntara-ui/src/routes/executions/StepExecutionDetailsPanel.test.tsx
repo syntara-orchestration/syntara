@@ -75,7 +75,7 @@ describe('StepExecutionDetailsPanel', () => {
     expect(screen.getByText('Successful')).toBeInTheDocument()
   })
 
-  it('does not show retry markers beside the selected step status', () => {
+  it('does not show retry markers beside the selected step status without a retry baseline', () => {
     render(
       <StepExecutionDetailsPanel
         {...defaultProps}
@@ -87,6 +87,68 @@ describe('StepExecutionDetailsPanel', () => {
 
     expect(screen.getByText('Failed')).toBeInTheDocument()
     expect(screen.queryByText('Retained failure')).not.toBeInTheDocument()
+  })
+
+  it('shows retry markers in the selected step details header for a retry execution', () => {
+    render(
+      <StepExecutionDetailsPanel
+        {...defaultProps}
+        stepType="script"
+        replayBaselineAt="2024-01-01T12:00:00Z"
+        stepState={{
+          ...defaultProps.stepState,
+          startedAt: '2024-01-01T10:00:00Z',
+          completedAt: '2024-01-01T10:01:30Z',
+        }}
+      />,
+      { wrapper }
+    )
+
+    const header = screen.getByRole('group', { name: 'Step details header' })
+    expect(within(header).getByText('Successful')).toBeInTheDocument()
+    expect(within(header).getByText('Reused output')).toBeInTheDocument()
+  })
+
+  it('shows reused trigger input in the selected step details header', () => {
+    render(
+      <StepExecutionDetailsPanel
+        {...defaultProps}
+        stepType="manual_trigger"
+        replayBaselineAt="2024-01-01T12:00:00Z"
+        stepState={{
+          ...defaultProps.stepState,
+          startedAt: '2024-01-01T10:00:00Z',
+          completedAt: '2024-01-01T10:00:01Z',
+        }}
+      />,
+      { wrapper }
+    )
+
+    const header = screen.getByRole('group', { name: 'Step details header' })
+    expect(within(header).getByText('Reused trigger input')).toBeInTheDocument()
+    expect(within(header).queryByText('Reused output')).not.toBeInTheDocument()
+  })
+
+  it('shows a retained-failure marker in the selected step details header', () => {
+    render(
+      <StepExecutionDetailsPanel
+        {...defaultProps}
+        stepType="script"
+        replayBaselineAt="2024-01-01T12:00:00Z"
+        stepState={{
+          ...defaultProps.stepState,
+          status: 'failed',
+          startedAt: '2024-01-01T10:00:00Z',
+          completedAt: '2024-01-01T10:01:30Z',
+        }}
+      />,
+      { wrapper }
+    )
+
+    const header = screen.getByRole('group', { name: 'Step details header' })
+    expect(within(header).getByText('Failed')).toBeInTheDocument()
+    expect(within(header).getByText('Retained failure')).toBeInTheDocument()
+    expect(within(header).queryByText('Reused output')).not.toBeInTheDocument()
   })
 
   it('renders Input and Output panes side by side', () => {
@@ -383,7 +445,7 @@ describe('StepExecutionDetailsPanel', () => {
     expect(within(header).getByText('Successful')).toBeInTheDocument()
   })
 
-  it('does not show retry labels in the selected step details header', () => {
+  it('does not show retry labels in the selected step details header without a retry baseline', () => {
     render(<StepExecutionDetailsPanel {...defaultProps} stepType="script" />, { wrapper })
 
     const header = screen.getByRole('group', { name: 'Step details header' })

@@ -37,6 +37,7 @@ import { highlightTextLines } from '../../utils/highlightText'
 import { InputSchemaView } from '../builder/panels/views/InputSchemaView'
 import { InputTableView } from '../builder/panels/views/InputTableView'
 import { ViewToggle, type PanelView } from '../builder/panels/ViewToggle'
+import { getRetryActivityMarkers } from '../builder/utils/replayedNodes'
 import type { ActivityState } from '../workflows/execution/types'
 import { extractApprovalAudit, type ApprovalAudit } from '../workflows/execution/utils/activityState'
 
@@ -57,6 +58,8 @@ type StepExecutionDetailsPanelProps = {
   stepState?: ActivityState
   /** Step type from workflow definition (e.g. 'aap_job_template'). */
   stepType?: string
+  /** Timestamp replayed steps predate; set only for retry executions. */
+  replayBaselineAt?: string | null
   retryInputOverride?: Omit<RetryInputOverrideDetailsProps, 'resolvedInputs'>
 }
 
@@ -400,6 +403,7 @@ export function StepExecutionDetailsPanel({
   executionId,
   stepState,
   stepType,
+  replayBaselineAt,
   retryInputOverride,
 }: Readonly<StepExecutionDetailsPanelProps>) {
   const [activeTab, setActiveTab] = useState<'io' | 'agent-steps'>('io')
@@ -423,6 +427,7 @@ export function StepExecutionDetailsPanel({
       ? formatElapsedTime(Math.max(0, completedAtMs - startedAtMs))
       : null
   const stepIsFailed = stepState?.status === 'failed'
+  const retryMarkers = getRetryActivityMarkers(stepState, replayBaselineAt, stepType)
 
   return (
     <Stack className={styles.contentContainer}>
@@ -433,6 +438,9 @@ export function StepExecutionDetailsPanel({
         elapsedLabel={elapsedLabel}
         status={stepState?.status}
         nodeType={stepType}
+        replayed={retryMarkers.replayed}
+        retainedFailure={retryMarkers.retainedFailure}
+        triggerInputReused={retryMarkers.triggerInputReused}
       />
 
       {/* Approval audit strip (shown only for decided approval steps) */}
