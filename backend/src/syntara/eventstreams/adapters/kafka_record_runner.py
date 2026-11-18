@@ -152,6 +152,9 @@ class KafkaRecordRunner:
         self._partitions: dict[int, _Partition] = {}
         self._assignment_epoch: int | None = None
         self._commit_lock = asyncio.Lock()
+        self._commit_task: asyncio.Task[None] | None = None
+        self._handoffs: dict[str, PreparedExecution] = {}
+        self._draining_tasks: set[asyncio.Task[None]] = set()
         self._fetch_lock = asyncio.Lock()
         self._stop_lock = asyncio.Lock()
         self._closing = False
@@ -230,6 +233,12 @@ class KafkaRecordRunner:
                 state.handoff is None
                 or state.resolved_next_offset is None
                 or state.resolved_next_offset <= state.handoff.identity.record.offset
+            )
+            and not any(
+                item.identity.record.partition == state.partition
+                and state.resolved_next_offset is not None
+                and state.resolved_next_offset > item.identity.record.offset
+                for item in self._handoffs.values()
             )
             and (self._drain_deadline is None or asyncio.get_running_loop().time() < self._drain_deadline)
         )
@@ -368,6 +377,9 @@ class KafkaRecordRunner:
                     partition=partition,
                     epoch=epoch,
                     closing=self._closing,
+                    handoff=next(
+                        (item for item in self._handoffs.values() if item.identity.record.partition == partition), None
+                    ),
                     held=HeldRecord(reason="content_inspection_required", permanent_content_error=True)
                     if partition in self._retained_content_partitions
                     else None,
@@ -401,6 +413,7 @@ class KafkaRecordRunner:
         states = [state for p, state in self._partitions.items() if p in partitions and state.epoch == epoch]
         for state in states:
             state.closing = True
+            self._retain_handoff(state)
         deadline = self._drain_deadline or (
             asyncio.get_running_loop().time() + self._settings.event_drain_timeout_seconds
         )
@@ -423,6 +436,11 @@ class KafkaRecordRunner:
             async with self._work:
                 if not self._active(state):
                     return
+                if state.handoff is None:
+                    state.handoff = next(
+                        (item for item in self._handoffs.values() if item.identity.record.partition == state.partition),
+                        None,
+                    )
                 if state.handoff is not None and (not state.records or not state.ready or state.reload_required):
                     # Retry even on an idle partition, before initialization or
                     # pending-content handling can move its reading boundary.
@@ -549,6 +567,7 @@ class KafkaRecordRunner:
         identity = self._identity(event)
         if isinstance(result, HeldRecord) and result.handoff is not None:
             state.handoff = result.handoff
+            self._retain_handoff(state)
         if not self._owned(state) or state.epoch != epoch:
             return
         if not state.records or self._identity(state.records[0]) != identity:
@@ -571,6 +590,8 @@ class KafkaRecordRunner:
         elif identity.record.offset == MAX_POSITION_OFFSET:
             state.held = HeldRecord(reason="offset_exhausted")
         else:
+            if isinstance(result, ResolvedDelivery):
+                self._handoffs.pop(identity.digest, None)
             if isinstance(result, SkippedRecord):
                 state.local_skip_next_offset = identity.record.offset + 1
             self._complete_head(state, event, identity.record.offset)
@@ -593,6 +614,7 @@ class KafkaRecordRunner:
         elif not isinstance(result, ResolvedDelivery) or result.terminal.identity != prepared.identity:
             state.held = self._retry("evidence_mismatch")
         else:
+            self._handoffs.pop(prepared.identity.digest, None)
             state.handoff = None
             state.held = None
 
@@ -1029,6 +1051,22 @@ class KafkaRecordRunner:
         return events[0] if events else None
 
     async def _commit_positions(self, states: tuple[_Partition, ...]) -> None:
+        """Bound the observer, never cancel a commit that owns a revision lock."""
+        task = self._commit_task
+        if task is None or task.done():
+            if task is not None:
+                task.result()
+            if not any(self._commit_allowed(state) and state.resolved_next_offset is not None for state in states):
+                return
+            task = asyncio.create_task(self._commit_batch(states))
+            task.add_done_callback(self._settled)
+            self._commit_task = task
+        done, _ = await asyncio.wait({task}, timeout=EventStreamLimits.COMMITTED_POSITION_TIMEOUT_SECONDS)
+        if done:
+            task.result()
+
+    async def _commit_batch(self, states: tuple[_Partition, ...]) -> None:
+        """Own the lock until the broker operation settles or membership is fenced."""
         async with self._commit_lock:
             epoch = self._client.epoch
             offsets = {
@@ -1040,24 +1078,28 @@ class KafkaRecordRunner:
                 return
             skip_partitions = {state.partition for state in states if state.local_skip_next_offset is not None}
             try:
-                async with asyncio.timeout(EventStreamLimits.COMMITTED_POSITION_TIMEOUT_SECONDS):
-                    async with (
-                        self._processing.local_skip_commit_guard(self.snapshot)
-                        if skip_partitions.intersection(offsets)
-                        else nullcontext(enter_result=True)
-                    ) as current_revision:
-                        # Ownership, drain deadlines and recovery fences can
-                        # change while the authoritative revision lock waits.
-                        offsets = {
-                            state.partition: offsets[state.partition]
-                            for state in states
-                            if state.partition in offsets
-                            and self._commit_allowed(state)
-                            and (current_revision or state.partition not in skip_partitions)
-                        }
-                        if not offsets:
-                            return
+                async with (
+                    self._processing.local_skip_commit_guard(self.snapshot)
+                    if skip_partitions.intersection(offsets)
+                    else nullcontext(enter_result=True)
+                ) as current_revision:
+                    # Ownership, drain deadlines and recovery fences can
+                    # change while the authoritative revision lock waits.
+                    offsets = {
+                        state.partition: offsets[state.partition]
+                        for state in states
+                        if state.partition in offsets
+                        and self._commit_allowed(state)
+                        and (current_revision or state.partition not in skip_partitions)
+                    }
+                    if not offsets:
+                        return
+                    try:
                         await self._client.commit(offsets, expected_epoch=epoch)
+                    except (*_TRANSPORT_ERRORS, TimeoutError, OSError):
+                        if current_revision and skip_partitions.intersection(offsets):
+                            await self._fence_failed_commit()
+                        return
             except SQLAlchemyError:
                 self._invalidate_gate()
                 return
@@ -1077,6 +1119,17 @@ class KafkaRecordRunner:
                     and state.resolved_next_offset == offsets.get(state.partition)
                 ):
                     state.resolved_next_offset = None
+
+    async def _fence_failed_commit(self) -> None:
+        """Keep publication blocked until Kafka confirms this member cannot commit."""
+        self._closing = True
+        while True:
+            try:
+                await self._client.fence_commits()
+                return
+            except (*_TRANSPORT_ERRORS, OSError, TimeoutError):
+                logger.warning("event_record_commit_fence_incomplete", source_id=str(self.snapshot.source_id))
+                await asyncio.sleep(EventSchedulingDefaults.TRANSIENT_PROBE_SECONDS)
 
     @staticmethod
     def _settled(task: asyncio.Task[None]) -> None:
@@ -1099,6 +1152,8 @@ class KafkaRecordRunner:
         if tasks:
             _, pending = await asyncio.wait(tasks, timeout=remaining)
         for task in pending:
+            self._draining_tasks.add(task)
+            task.add_done_callback(self._draining_tasks.discard)
             task.cancel()
             task.add_done_callback(self._settled)
         if pending:
@@ -1118,10 +1173,36 @@ class KafkaRecordRunner:
         states = list(self._partitions.values())
         for state in states:
             state.closing = True
+            self._retain_handoff(state)
         if self._drain_deadline is None:
             self._drain_deadline = asyncio.get_running_loop().time() + self._settings.event_drain_timeout_seconds
         await self._drain_states(states, self._drain_deadline, commit=True)
         await self._flush_pending_content(states, self._drain_deadline)
+        await self._flush_handoffs(self._drain_deadline)
+
+    def _retain_handoff(self, state: _Partition) -> None:
+        """Retain attempted arguments independently of partition assignment."""
+        if state.handoff is not None:
+            self._handoffs[state.handoff.identity.digest] = state.handoff
+
+    async def _flush_handoffs(self, deadline: float) -> None:
+        """Repair parked attempts without filtering again or permitting a new start."""
+        if any(not task.done() for task in self._draining_tasks):
+            return  # A cancellation-resistant task may still return a handoff.
+        try:
+            async with asyncio.timeout_at(deadline):
+                for digest, prepared in tuple(self._handoffs.items()):
+                    async with self._work:
+                        result = await self._processing.process(
+                            self.snapshot, prepared.identity, None, handoff=prepared, admission_guard=lambda: False
+                        )
+                    if isinstance(result, ResolvedDelivery) and result.terminal.identity == prepared.identity:
+                        self._handoffs.pop(digest, None)
+                        for state in self._partitions.values():
+                            if state.handoff is not None and state.handoff.identity == prepared.identity:
+                                state.handoff = None
+        except TimeoutError:
+            logger.warning("event_record_handoff_drain_incomplete", source_id=str(self.snapshot.source_id))
 
     async def close_admission(self) -> None:
         """Begin full runner drain after placement loss; preserve accepted handoffs.
@@ -1155,22 +1236,43 @@ class KafkaRecordRunner:
         async with self._stop_lock:
             if self._stopped:
                 return
+            await self.drain()
+            if self._draining_tasks:
+                _, pending = await asyncio.wait(
+                    self._draining_tasks, timeout=self._settings.event_drain_timeout_seconds
+                )
+                if pending:
+                    raise SubscriptionRuntimeError(RuntimeFailureCode.STOP_INCOMPLETE)
+            if self._commit_task is not None:
+                done, _ = await asyncio.wait({self._commit_task}, timeout=self._settings.event_drain_timeout_seconds)
+                if not done:
+                    raise SubscriptionRuntimeError(RuntimeFailureCode.STOP_INCOMPLETE)
+                self._commit_task.result()
             try:
-                await self.drain()
-            finally:
                 async with asyncio.timeout(self._settings.event_drain_timeout_seconds):
                     await self._client.stop()
+            finally:
+                for state in self._partitions.values():
+                    self._retain_handoff(state)
+            await self._flush_handoffs(asyncio.get_running_loop().time() + self._settings.event_drain_timeout_seconds)
+            if self._handoffs:
+                raise SubscriptionRuntimeError(RuntimeFailureCode.STOP_INCOMPLETE)
             if not await self._positions.settle_operations(self._settings.event_drain_timeout_seconds):
                 raise SubscriptionRuntimeError(RuntimeFailureCode.STOP_INCOMPLETE)
             self._stopped = True
 
     async def _finish_recovery_handoff(self, state: _Partition, boundary: int) -> bool:
         """Require confirmed persistence for a saved identity below the new checkpoint."""
-        if state.handoff is None or boundary <= state.handoff.identity.record.offset:
-            return True
-        async with self._work:
-            await self._finish_handoff(state)
-        return state.handoff is None
+        self._retain_handoff(state)
+        for prepared in tuple(self._handoffs.values()):
+            if prepared.identity.record.partition != state.partition or boundary <= prepared.identity.record.offset:
+                continue
+            state.handoff = prepared
+            async with self._work:
+                await self._finish_handoff(state)
+            if state.handoff is not None:
+                return False
+        return True
 
     async def close_and_drain(self, request: PositionRequest, *, token: UUID, boundary: int) -> DrainEvidence:
         """Fence local tasks/commits for the upstream explicit gap-recovery service."""

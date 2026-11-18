@@ -3,6 +3,7 @@
 import asyncio
 import random
 from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, Mock
@@ -105,6 +106,12 @@ async def harness(monkeypatch: pytest.MonkeyPatch) -> AsyncIterator[SimpleNamesp
         positions=positions,
         settings=settings,
     )
+    if runner._handoffs or any(state.handoff is not None for state in runner._partitions.values()):
+        monkeypatch.setattr(
+            runner._processing,
+            "process",
+            AsyncMock(side_effect=lambda _snapshot, identity, _event, **_kwargs: terminal(identity)),
+        )
     await runner.stop()
 
 
@@ -1342,8 +1349,9 @@ async def test_reload_finishes_original_handoff_before_processing_a_different_re
     await runner.on_partitions_assigned(frozenset({2}), 7)
     state = runner._partitions[2]
     state.ready = state.eligible = True
-    earlier = record.model_copy(
-        update={"value": b'{"count":0}', "source_metadata": record.source_metadata.model_copy(update={"offset": "41"})}
+    earlier = record.model_copy(update={"source_metadata": record.source_metadata.model_copy(update={"offset": "41"})})
+    admission.lookup_execution.side_effect = (
+        lambda identity: terminal(identity) if identity.record.offset == 41 else None
     )
     attempted = record.model_copy(
         update={"source_metadata": record.source_metadata.model_copy(update={"offset": "44"})}
@@ -1383,14 +1391,20 @@ async def test_reload_finishes_original_handoff_before_processing_a_different_re
     assert state.handoff is None
     assert state.ready
     refetched = earlier.model_copy(
-        update={"source_metadata": earlier.source_metadata.model_copy(update={"offset": str(refetched_offset)})}
+        update={
+            "value": b'{"count":0}',
+            "source_metadata": earlier.source_metadata.model_copy(update={"offset": str(refetched_offset)}),
+        }
     )
     await runner._enqueue({2: [refetched]}, 7)
     await runner._advance(state)
     admission.schedule.assert_awaited_once()
     assert admission.schedule.await_args.args[0].workflow_arguments() == arguments
     assert [call.args[0] for call in admission.recover_accepted.await_args_list] == [attempted_identity] * 2
-    admission.lookup_execution.assert_awaited_once_with(attempted_identity)
+    assert [call.args[0] for call in admission.lookup_execution.await_args_list] == [
+        runner._identity(earlier),
+        attempted_identity,
+    ]
     harness.client.commit.side_effect = None
     await runner._commit_positions((state,))
     assert harness.client.commit.await_args.args == ({2: refetched_offset + 1},)
@@ -1835,7 +1849,7 @@ async def test_skip_batch_holds_publication_lock_until_broker_commit_finishes(ha
     admission.recover_accepted.assert_not_awaited()
 
 
-async def test_skip_fence_survives_failed_commit_and_later_execution_completion(harness, monkeypatch) -> None:
+async def test_failed_skip_commit_fences_runner_before_later_execution_completion(harness, monkeypatch) -> None:
     context, processing, admission, record, _logs = filtered_context(
         monkeypatch, {"expression": "input.payload.value.count == 2"}
     )
@@ -1853,15 +1867,20 @@ async def test_skip_fence_survives_failed_commit_and_later_execution_completion(
     harness.client.commit.side_effect = KafkaTransportError("Commit unavailable")
     await runner._commit_positions((state,))
     assert state.local_skip_next_offset == 6
+    assert runner._closing
+    harness.client.fence_commits.assert_awaited_once()
     await runner._advance(state)
-    assert state.resolved_next_offset == 7
+    assert state.resolved_next_offset == 6
+    assert list(state.records) == [matched]
     context.subscription.configuration_revision += 1
     harness.client.commit.reset_mock(side_effect=True)
     await runner._commit_positions((state,))
     harness.client.commit.assert_not_awaited()
 
 
-@pytest.mark.parametrize("checkpoint", ["normal", "recovery", "recovery_with_tail", "oversized", "idle"])
+@pytest.mark.parametrize(
+    "checkpoint", ["normal", "recovery", "recovery_with_tail", "reassigned_recovery", "oversized", "idle"]
+)
 async def test_unresolved_handoff_blocks_every_checkpoint_crossing_its_offset(harness, monkeypatch, checkpoint) -> None:
     context, processing, admission, record, _logs = filtered_context(
         monkeypatch, {"expression": "input.payload.value.count == 2"}
@@ -1885,7 +1904,13 @@ async def test_unresolved_handoff_blocks_every_checkpoint_crossing_its_offset(ha
     )
     if checkpoint == "normal":
         state.resolved_next_offset = 6
-    elif checkpoint in {"recovery", "recovery_with_tail"}:
+    elif checkpoint in {"recovery", "recovery_with_tail", "reassigned_recovery"}:
+        if checkpoint == "reassigned_recovery":
+            await runner.on_partitions_revoked(frozenset({2}), 7)
+            harness.client.epoch = 8
+            await runner.on_partitions_assigned(frozenset({2}), 8)
+            state = runner._partitions[2]
+            assert state.handoff == prepared
         if checkpoint == "recovery_with_tail":
             later = record.model_copy(
                 update={
@@ -2000,3 +2025,183 @@ async def test_new_skip_during_commit_keeps_its_revision_fence(harness) -> None:
     harness.client.commit.reset_mock(side_effect=True)
     await runner._commit_positions((state,))
     harness.client.commit.assert_not_awaited()
+
+
+@pytest.mark.parametrize("cancel_observer", [False, True])
+async def test_skip_commit_keeps_revision_lock_after_observer_timeout_or_cancel(  # noqa: PLR0915 - One commit/publication race.
+    harness, monkeypatch, *, cancel_observer: bool
+) -> None:
+    runner = harness.runner
+    state = runner._partitions[0]
+    state.resolved_next_offset = state.local_skip_next_offset = 6
+    monkeypatch.setattr(EventStreamLimits, "COMMITTED_POSITION_TIMEOUT_SECONDS", 0.01)
+    publication_lock = asyncio.Lock()
+    entered, release = asyncio.Event(), asyncio.Event()
+    published: list[int] = []
+
+    @asynccontextmanager
+    async def guard(_snapshot: SubscriptionSnapshot) -> AsyncIterator[bool]:
+        async with publication_lock:
+            yield True
+
+    monkeypatch.setattr(harness.processing, "local_skip_commit_guard", guard)
+
+    async def broker_commit() -> None:
+        await release.wait()
+        assert publication_lock.locked()
+        assert published == []
+
+    broker = asyncio.create_task(broker_commit())
+
+    async def commit(_offsets: dict[int, int], *, expected_epoch: int) -> None:
+        assert expected_epoch == 7
+        entered.set()
+        await asyncio.shield(broker)  # Reproduce aiokafka's independently shielded operation.
+
+    async def publish() -> None:
+        async with publication_lock:
+            published.append(2)
+
+    harness.client.commit.side_effect = commit
+    observer = asyncio.create_task(runner._commit_positions((state,)))
+    publication = None
+    try:
+        await asyncio.wait_for(entered.wait(), timeout=1)
+        if cancel_observer:
+            observer.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await observer
+        else:
+            await observer
+        assert publication_lock.locked()
+        assert runner._commit_task is not None
+        assert not runner._commit_task.done()
+        publication = asyncio.create_task(publish())
+        await runner._commit_positions((state,))
+        assert not publication.done()
+        harness.client.commit.assert_awaited_once()
+        with pytest.raises(SubscriptionRuntimeError, match="stop_incomplete"):
+            await runner.stop()
+        harness.client.stop.assert_not_awaited()
+    finally:
+        release.set()
+        await broker
+        await asyncio.gather(observer, return_exceptions=True)
+        if runner._commit_task is not None:
+            await runner._commit_task
+        if publication is not None:
+            await publication
+    assert published == [2]
+
+
+async def test_ambiguous_skip_commit_retains_revision_lock_until_group_fence(harness, monkeypatch) -> None:
+    runner = harness.runner
+    state = runner._partitions[0]
+    state.resolved_next_offset = state.local_skip_next_offset = 6
+    monkeypatch.setattr(EventStreamLimits, "COMMITTED_POSITION_TIMEOUT_SECONDS", 0.01)
+    lock = asyncio.Lock()
+    fencing, acknowledged = asyncio.Event(), asyncio.Event()
+
+    @asynccontextmanager
+    async def guard(_snapshot: SubscriptionSnapshot) -> AsyncIterator[bool]:
+        async with lock:
+            yield True
+
+    async def fence() -> None:
+        fencing.set()
+        await acknowledged.wait()
+        assert lock.locked()
+
+    monkeypatch.setattr(harness.processing, "local_skip_commit_guard", guard)
+    harness.client.commit.side_effect = KafkaTransportError("Ambiguous commit")
+    harness.client.fence_commits.side_effect = fence
+    try:
+        await runner._commit_positions((state,))
+        assert fencing.is_set()
+        assert lock.locked()
+        assert runner._closing
+    finally:
+        acknowledged.set()
+        if runner._commit_task is not None:
+            await runner._commit_task
+    assert not lock.locked()
+    assert state.local_skip_next_offset == 6
+
+
+async def test_stop_retains_parked_handoff_across_revocation_until_execution_is_confirmed(harness, monkeypatch) -> None:
+    context, processing, admission, _record, _logs = filtered_context(monkeypatch, {"expression": "true"})
+    prepared = await context.prepare()
+    assert isinstance(prepared, PreparedExecution)
+    runner = harness.runner
+    runner.snapshot, runner._processing = context.snapshot, processing
+    harness.client.assignment = frozenset({2})
+    await runner.on_partitions_assigned(frozenset({2}), 7)
+    state = runner._partitions[2]
+    state.ready = state.eligible = True
+    state.handoff = prepared
+    admission.recover_accepted.return_value = RetryDelivery(
+        error_code=SchedulingFailureCode.STORAGE_UNAVAILABLE, next_attempt_at=datetime.now(UTC), circuit_open=False
+    )
+    filtering = Mock(side_effect=AssertionError("A saved handoff must bypass filtering"))
+    monkeypatch.setattr(processing, "evaluate_filter", filtering)
+
+    async def revoke() -> None:
+        if harness.client.assignment:
+            await runner.on_partitions_revoked(frozenset({2}), 7)
+            harness.client.assignment = frozenset()
+            harness.client.epoch += 1
+
+    harness.client.stop.side_effect = revoke
+    with pytest.raises(SubscriptionRuntimeError, match="stop_incomplete"):
+        await runner.stop()
+    assert 2 not in runner._partitions
+    assert runner._handoffs[prepared.identity.digest].workflow_arguments() == prepared.workflow_arguments()
+    assert not runner._stopped
+    admission.recover_accepted.return_value = terminal(prepared.identity)
+    await runner.stop()
+    assert runner._stopped
+    assert not runner._handoffs
+    admission.schedule.assert_not_awaited()
+    filtering.assert_not_called()
+
+
+async def test_stop_retains_a_task_that_returns_a_handoff_after_drain_timeout(harness, monkeypatch) -> None:
+    context, _processing, _admission, record, _logs = filtered_context(monkeypatch, {"expression": "true"})
+    prepared = await context.prepare()
+    assert isinstance(prepared, PreparedExecution)
+    runner = harness.runner
+    runner.snapshot = context.snapshot
+    harness.client.assignment = frozenset({2})
+    await runner.on_partitions_assigned(frozenset({2}), 7)
+    state = runner._partitions[2]
+    state.ready = state.eligible = True
+    entered, cancelled, release = asyncio.Event(), asyncio.Event(), asyncio.Event()
+
+    async def process(_snapshot, _identity, _event, **_kwargs: object) -> HeldRecord:
+        entered.set()
+        try:
+            await release.wait()
+        except asyncio.CancelledError:
+            cancelled.set()
+            await release.wait()
+        return HeldRecord(reason="storage_unavailable", handoff=prepared)
+
+    harness.processing.process.side_effect = process
+    await runner._enqueue({2: [record]}, 7)
+    state.task = asyncio.create_task(runner._advance(state))
+    try:
+        await entered.wait()
+        with pytest.raises(SubscriptionRuntimeError, match="stop_incomplete"):
+            await runner.stop()
+        assert cancelled.is_set()
+        harness.client.stop.assert_not_awaited()
+    finally:
+        release.set()
+        await state.task
+    assert runner._handoffs[prepared.identity.digest] == prepared
+    with pytest.raises(SubscriptionRuntimeError, match="stop_incomplete"):
+        await runner.stop()
+    assert not runner._stopped
+    harness.processing.process.side_effect = lambda _snapshot, identity, _event, **_kwargs: terminal(identity)
+    await runner.stop()
+    assert runner._stopped
