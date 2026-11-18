@@ -155,11 +155,11 @@ JSON parsing precedes envelope attribute validation. Messages
 with multiple defects receive the first failure encountered, not a list.
 Failure results and model representations do not include event contents.
 
-The caller retains the raw record for correlation and durable failure recording.
-A decode failure is not durable delivery evidence and provides no permission to
-discard a record or advance an offset. The current processing service persists
-safe unresolved error evidence and holds permanent content failures with
-`activity_log_unavailable` until the author-accessible activity-recording path
-exists. This protects the affected partition, including after restart; adding
-structured decoding does not remove that hold. General filtering and durable
-activity recording remain separate integration dependencies.
+The caller uses the trusted record coordinates for correlation. A decode failure
+alone provides no permission to advance an offset. The processing layer emits a
+sanitized event through the platform OTEL audit pipeline and can classify known
+invalid content as a local skip. The runner separately checks lifecycle,
+dependencies, configuration revision, partition ownership, and completion of all
+earlier records before advancing. Audit delivery is best-effort and is never
+commit evidence. Unknown or uninspected content remains held. Author-visible
+activity logs are deferred and are not a consumption prerequisite.

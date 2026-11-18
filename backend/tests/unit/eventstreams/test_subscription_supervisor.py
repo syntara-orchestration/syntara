@@ -268,7 +268,7 @@ async def test_supervisor_resume_delegates_to_managed_runner_initialization(harn
         await supervisor.stop()
 
 
-@pytest.mark.parametrize(("reason", "permanent"), [("recovery_gap", False), ("activity_log_unavailable", True)])
+@pytest.mark.parametrize(("reason", "permanent"), [("recovery_gap", False), ("content_inspection_required", True)])
 async def test_runner_holds_remain_blocked_without_restart_or_implicit_recovery(harness, reason, permanent):
     await harness.supervisor.apply(harness.snapshot)
     runner = harness.runners[0]
@@ -431,7 +431,7 @@ async def test_connection_refresh_preserves_permanent_content_error(harness):
     harness.supervisor._connection_revision = reader
     await harness.supervisor.apply(harness.snapshot)
     harness.runners[0].observation = RunnerStatus(
-        state=RuntimeState.BLOCKED, reason="activity_log_unavailable", permanent_content_error=True
+        state=RuntimeState.BLOCKED, reason="content_inspection_required", permanent_content_error=True
     )
     reader.return_value = "connection-2"
     status = await harness.supervisor.apply(harness.snapshot)
@@ -1035,7 +1035,7 @@ async def test_revision_change_revalidates_uncommitted_content_with_a_new_runner
     await harness.supervisor.apply(harness.snapshot)
     runner = harness.runners[0]
     runner.observation = RunnerStatus(
-        state=RuntimeState.BLOCKED, reason="activity_log_unavailable", permanent_content_error=True
+        state=RuntimeState.BLOCKED, reason="content_inspection_required", permanent_content_error=True
     )
     changed = harness.snapshot.model_copy(
         update={"configuration_revision": harness.snapshot.configuration_revision + 1}

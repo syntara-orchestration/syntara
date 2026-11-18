@@ -243,7 +243,7 @@ class KafkaRecordRunner:
             return RunnerStatus(state=RuntimeState.DRAINING, permanent_content_error=self._retained_content_gate)
         if self._retained_content_gate:
             return RunnerStatus(
-                state=RuntimeState.BLOCKED, reason="activity_log_unavailable", permanent_content_error=True
+                state=RuntimeState.BLOCKED, reason="content_inspection_required", permanent_content_error=True
             )
         if not self._started or self._assignment_epoch != self._client.epoch:
             return RunnerStatus(state=RuntimeState.STARTING)
@@ -359,7 +359,7 @@ class KafkaRecordRunner:
                     partition=partition,
                     epoch=epoch,
                     closing=self._closing,
-                    held=HeldRecord(reason="activity_log_unavailable", permanent_content_error=True)
+                    held=HeldRecord(reason="content_inspection_required", permanent_content_error=True)
                     if partition in self._retained_content_partitions
                     else None,
                 )
@@ -560,7 +560,22 @@ class KafkaRecordRunner:
         if pending is None or not self._owned(state):
             return
         if isinstance(result, SkippedRecord):
-            state.held = self._retry("recovery_evidence_mismatch")
+            if (
+                result.identity != pending.identity
+                or result.configuration_revision != self.snapshot.configuration_revision
+                or state.records
+                or not self._active(state)
+                or not self._admission_open()
+                or not self._resolution_open()
+            ):
+                state.held = self._retry("admission_closed")
+            elif pending.identity.record.offset == MAX_POSITION_OFFSET:
+                state.held = HeldRecord(reason="offset_exhausted")
+            else:
+                state.pending_failure = None
+                state.held = None
+                state.resolved_next_offset = pending.identity.record.offset + 1
+                await self._resume_after_terminal(state, pending.identity.record.offset)
             return
         if isinstance(result, HeldRecord):
             state.held = self._retry("queue_capacity") if pending.validated else result
@@ -824,12 +839,13 @@ class KafkaRecordRunner:
 
     async def _stage_content_failure(self, state: _Partition, event: RawEvent) -> None:
         """Inspect before releasing unbufferable bytes; keep unresolved offsets uncommitted."""
-        result = await self._inspect_delivered(state, event, apply_filter=self.snapshot.filter is not None)
+        result = await self._inspect_delivered(state, event, apply_filter=True)
         if isinstance(result, SkippedRecord):
             identity = self._identity(event)
             if (
                 result.identity != identity
                 or result.configuration_revision != self.snapshot.configuration_revision
+                or state.records
                 or not self._active(state)
                 or not self._admission_open()
                 or not self._resolution_open()
@@ -842,7 +858,7 @@ class KafkaRecordRunner:
                 state.held = None
                 await self._resume_after_terminal(state, identity.record.offset)
             return
-        if self.snapshot.filter is not None and isinstance(result, HeldRecord) and not result.permanent_content_error:
+        if isinstance(result, HeldRecord) and not result.permanent_content_error:
             # Retry delivered bytes after admission reopens; an identity alone
             # cannot prove a local filter outcome.
             state.held = result
