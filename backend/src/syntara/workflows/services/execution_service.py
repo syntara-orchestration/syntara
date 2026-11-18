@@ -1251,7 +1251,8 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
 
         failed_types: set[str] = set()
         for activity in failed_activities:
-            failed_types.add(activity.node_type.value)
+            if activity.node_type is not None:
+                failed_types.add(activity.node_type.value)
 
         # Sort deterministically and bound to 50 entries
         return sorted(failed_types)[:50]

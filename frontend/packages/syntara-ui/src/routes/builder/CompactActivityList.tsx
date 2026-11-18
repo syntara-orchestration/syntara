@@ -9,7 +9,7 @@ import styles from './CompactActivityList.module.css'
 import type { ActivityOrderItem } from './ExecutionActivityTable'
 import { ActivityStatusLabel } from './ExecutionStatus'
 import { ACTIVITY_STATUS } from './utils/executionState/executionHelpers'
-import { isReplayedStep } from './utils/replayedNodes'
+import { getRetryActivityMarkers } from './utils/replayedNodes'
 
 export type CompactActivityListProps = {
   activityStates: Map<string, ActivityState>
@@ -32,6 +32,7 @@ export function CompactActivityList({
       <Tbody>
         {activityOrder.map(({ id, name, type }) => {
           const state = activityStates.get(id)
+          const retryMarkers = getRetryActivityMarkers(state, replayBaselineAt, type)
           const hasTimeRange = Boolean(state?.startedAt)
           const displayName = name ?? id
           const isSelected = id === selectedNodeId
@@ -59,7 +60,9 @@ export function CompactActivityList({
                 <ActivityStatusLabel
                   status={state?.status ?? ACTIVITY_STATUS.PENDING}
                   nodeType={type}
-                  replayed={isReplayedStep(state?.startedAt, replayBaselineAt, state?.status)}
+                  replayed={retryMarkers.replayed}
+                  retainedFailure={retryMarkers.retainedFailure}
+                  triggerInputReused={retryMarkers.triggerInputReused}
                 />
               </Td>
             </Tr>

@@ -1,4 +1,4 @@
-import { EdgeHandleEnum, type Activity } from '@syntara/contracts'
+import { EdgeHandleEnum, TriggerTypeEnum, type Activity } from '@syntara/contracts'
 import { describe, expect, it } from 'vitest'
 
 import type { ActivityState } from '../../../../workflows/execution/types'
@@ -101,6 +101,7 @@ describe('ExecutionStateEnricher', () => {
         completed_at: undefined,
         error_details: undefined,
         replayed: false,
+        retainedFailure: false,
       })
     })
 
@@ -1198,7 +1199,11 @@ describe('ExecutionStateEnricher', () => {
     })
 
     it('uses trigger status from activityStates when available', () => {
-      const triggerData = { name: 'Manual trigger', details: 'Manual', triggerType: 'manual' }
+      const triggerData = {
+        name: 'Manual trigger',
+        details: 'Manual',
+        triggerType: TriggerTypeEnum.MANUAL_TRIGGER,
+      }
       const activityStates = new Map<string, ActivityState>([
         [
           'trigger-real-id',
@@ -1216,10 +1221,13 @@ describe('ExecutionStateEnricher', () => {
         triggerData,
         executionStatus: 'running',
         activityStates,
+        replayBaselineAt: '2024-01-02T00:00:00Z',
       })
 
       expect(result.__executionState?.status).toBe('completed')
       expect(result.__executionState?.started_at).toBe('2024-01-01T00:00:00Z')
+      expect(result.__executionState?.triggerInputReused).toBe(true)
+      expect(result.__executionState?.replayed).toBe(false)
       expect(
         ((result as Record<string, unknown>).metadata as Record<string, unknown> | undefined)?.__showExecutionBadge
       ).toBe(true)

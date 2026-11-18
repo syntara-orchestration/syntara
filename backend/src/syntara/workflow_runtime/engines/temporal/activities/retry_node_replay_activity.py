@@ -29,16 +29,12 @@ with workflow.unsafe.imports_passed_through():
     from syntara.core.constants import JsonbLimits
     from syntara.core.database.session import get_db
     from syntara.core.exceptions import SafeValueError
-    from syntara.workflows.models.activity_execution import ActivityExecution, ActivityStatus
     from syntara.workflow_core.models import NodeType
-    from syntara.workflows.utils.loop_iteration_names import strip_iteration_suffix
     from syntara.workflow_runtime.engines.temporal.utils.loop_iteration_ids import (
         join_loop_iteration_id,
         strip_loop_iteration_suffixes,
     )
-        join_loop_iteration_id,
-        strip_loop_iteration_suffixes,
-    )
+    from syntara.workflows.models.activity_execution import ActivityExecution, ActivityStatus
 
 logger = structlog.stdlib.get_logger(__name__)
 
@@ -210,9 +206,10 @@ async def replay_retry_node_activity(
                 col(ActivityExecution.status).in_(RESTORABLE_SOURCE_STATUSES),
             )
         else:
-            query = query.where(ActivityExecution.activity_name == node_id).order_by(
-                col(ActivityExecution.iteration).desc(), col(ActivityExecution.created_at).desc()
-            )
+            query = query.where(
+                ActivityExecution.activity_name == node_id,
+                col(ActivityExecution.status).in_(RESTORABLE_SOURCE_STATUSES),
+            ).order_by(col(ActivityExecution.iteration).desc(), col(ActivityExecution.created_at).desc())
         activity_row = (await session.exec(query.limit(1))).first()
         if activity_row is not None:
             stored = {
@@ -400,9 +397,15 @@ async def probe_retry_loop_iteration(
             col(ActivityExecution.temporal_activity_id).startswith(prefix, autoescape=True)
             for prefix in child_loop_prefixes
         )
+        # This probe checks whether an iteration was reached, not whether its
+        # entry activity finished. In-flight and cancelled rows are evidence too;
+        # status filtering belongs to the separate state-restoration query.
         found = await session.exec(
             select(ActivityExecution.id)
-            .where(ActivityExecution.execution_id == source_execution_id, or_(*direct_conditions))
+            .where(
+                ActivityExecution.execution_id == source_execution_id,
+                or_(*direct_conditions),
+            )
             .limit(1)
         )
         return found.first() is not None

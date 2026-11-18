@@ -11,6 +11,7 @@ from syntara.audit.dispatcher import AuditEventDispatcher
 from syntara.audit.emitter import request_id_context_var
 from syntara.core.exceptions import SafeValueError
 from syntara.core.models import User
+from syntara.workflow_core.models import NodeType
 from syntara.workflow_runtime.engines.temporal.services.temporal_execution_service import TemporalExecutionService
 from syntara.workflows.exceptions import (
     ExecutionNotFoundError,
@@ -21,7 +22,6 @@ from syntara.workflows.models.execution import Execution, ExecutionMode, Executi
 from syntara.workflows.models.workflow import Workflow
 from syntara.workflows.models.workflow_version import WorkflowVersion
 from syntara.workflows.services.execution_service import ExecutionService
-from syntara.workflow_core.models import NodeType
 
 
 def _make_execution(
@@ -392,6 +392,25 @@ class TestRetryInfrastructureMetrics:
 
 class TestFailedStepTypes:
     """Test failed-step telemetry normalization."""
+
+    @pytest.mark.asyncio
+    async def test_skips_failed_activities_with_missing_node_type(self) -> None:
+        unknown_type = Mock(spec=ActivityExecution)
+        unknown_type.status = ActivityStatus.FAILED
+        unknown_type.node_type = None
+
+        failed_script = Mock(spec=ActivityExecution)
+        failed_script.status = ActivityStatus.FAILED
+        failed_script.node_type = NodeType.SCRIPT
+
+        result = Mock()
+        result.all.return_value = [unknown_type, failed_script]
+        session = Mock(spec=AsyncSession)
+        session.exec = AsyncMock(return_value=result)
+
+        step_types = await ExecutionService._get_failed_step_types(session, uuid4())
+
+        assert step_types == ["script"]
 
     @pytest.mark.asyncio
     async def test_uses_failed_activity_node_types(self) -> None:

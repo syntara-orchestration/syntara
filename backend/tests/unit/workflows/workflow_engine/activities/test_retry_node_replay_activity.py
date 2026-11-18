@@ -5,12 +5,15 @@ wrong one is a silently wrong result rather than a failure.
 """
 
 from datetime import UTC, datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from sqlalchemy.dialects import postgresql
 
-from syntara.workflows.models.activity_execution import ActivityStatus
+if TYPE_CHECKING:
+    from sqlalchemy.sql import Select
+
 from syntara.workflow_runtime.engines.temporal.activities.retry_node_replay_activity import (
     _result_digest,
     fetch_retry_converge_metadata_activity,
@@ -18,6 +21,7 @@ from syntara.workflow_runtime.engines.temporal.activities.retry_node_replay_acti
     retry_control_ports,
 )
 from syntara.workflow_runtime.engines.temporal.constants import RESTORABLE_SOURCE_STATUSES
+from syntara.workflows.models.activity_execution import ActivityStatus
 
 
 class _Row:
@@ -461,6 +465,32 @@ async def test_a_completed_node_in_a_cancelled_run_is_still_restorable() -> None
     assert result["status"] == "completed"
     assert result["output_data"] == {"result": "ok"}
     assert await _run([rows[1]], "interrupted") is None
+
+
+@pytest.mark.asyncio
+async def test_logical_loop_restore_query_excludes_non_restorable_rows() -> None:
+    session = AsyncMock()
+    result = MagicMock()
+    result.first.return_value = None
+    session.exec.return_value = result
+
+    async def mock_get_db():  # noqa: ANN202
+        yield session
+
+    with patch(
+        "syntara.workflow_runtime.engines.temporal.activities.retry_node_replay_activity.get_db",
+        mock_get_db,
+    ):
+        await replay_retry_node_activity("src-1", "loop_1")
+
+    query = cast("Select[Any]", session.exec.await_args.args[0])
+    compiled_query = query.compile(
+        dialect=postgresql.dialect(),  # type: ignore[no-untyped-call]
+        compile_kwargs={"literal_binds": True},
+    )
+    sql = str(compiled_query)
+    for status in RESTORABLE_SOURCE_STATUSES:
+        assert status.value in sql
 
 
 # --- persisted routing data reaches the caller -------------------------------

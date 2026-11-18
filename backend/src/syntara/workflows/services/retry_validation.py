@@ -79,6 +79,7 @@ from typing import TYPE_CHECKING, Any
 
 from sqlmodel import select
 
+from syntara.workflow_core.utils.credential_scrubber import REDACTED
 from syntara.workflows.exceptions import ExecutionNotFoundError
 from syntara.workflows.models.activity_execution import ActivityExecution, ActivityStatus
 from syntara.workflows.models.execution import Execution, ExecutionStatus
@@ -89,9 +90,9 @@ from syntara.workflows.utils.loop_iteration_names import (
     strip_iteration_suffix,
 )
 from syntara.workflows.utils.template_refs import FieldPath, find_template_refs, paths_overlap
-from syntara.workflow_core.utils.credential_scrubber import REDACTED
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
     from uuid import UUID
 
     from sqlmodel.ext.asyncio.session import AsyncSession
@@ -208,17 +209,17 @@ def _selection_reason(
     """Rejection reason for an empty or ineligible selection, else None.
 
     ``normalized`` has already been resolved to the default (all currently
-    failed nodes) if the caller's selection was empty, so an empty result
-    here only happens when there are no failed nodes at all to default to.
-    Sanitized replacements for failed nodes are also allowed: they replace
-    the failed node as the selectable start point.
+    failed nodes) if the caller's selection was empty, so an empty result here
+    only happens when there are no failed nodes at all to default to. Sanitized
+    replacements for failed nodes are also allowed: they replace the failed
+    node as the selectable start point.
     """
     if not normalized:
         return "no failed nodes in this execution to retry from"
     allowed = failed_ids | (replacement_ids or set())
     unknown = [point for point in normalized if point not in allowed]
     if unknown:
-        return f"not failed nodes in this execution: {', '.join(unknown)}"
+        return f"these node IDs are neither failed nor eligible replacements in this execution: {', '.join(unknown)}"
     return None
 
 
@@ -555,6 +556,111 @@ def _sanitized_replacements(
     return replacements
 
 
+def _completed_output_map(completed: Sequence[ActivityExecution]) -> dict[str, list[Any]]:
+    """Group completed activity outputs by base node ID."""
+    outputs: dict[str, list[Any]] = {}
+    for activity in completed:
+        outputs.setdefault(strip_iteration_suffix(activity.activity_name), []).append(activity.output_data)
+    return outputs
+
+
+def _retry_selection_reason(
+    source: Execution,
+    normalized: list[str],
+    *,
+    is_default_selection: bool,
+    snapshot: WorkflowVersion | None,
+    snapshot_def: dict[str, Any],
+    failed_ids: set[str],
+    completed_ids: set[str],
+    replacement_ids: set[str],
+    completed_outputs: dict[str, list[Any]],
+    successors: dict[str, set[str]],
+    overrides: dict[str, dict[str, Any]],
+) -> tuple[str | None, list[str], list[str], list[str], bool]:
+    """Apply selection guards and return the reported points and sanitized nodes.
+
+    The final bool is whether ``reported_selection`` is a graph-valid retry
+    set whose step counts are meaningful. That is true for an eligible retry
+    and for an override rejection of an otherwise valid selection. State,
+    selection, version, and converge rejections leave counts at zero.
+    """
+    reason = _state_reason(source) or _selection_reason(normalized, failed_ids, replacement_ids)
+    if reason is not None:
+        # Do not report sanitized nodes for a request that cannot be retried
+        # because of its state or selection. In particular, the version scan
+        # below may otherwise populate unrelated replacement UI on a rejection.
+        return reason, normalized, [], [], False
+
+    version_reason, sanitized, auto_included, final_selection = _version_reason(
+        normalized,
+        snapshot,
+        completed_outputs,
+        successors,
+        sanitized_expansion_seeds=(None if is_default_selection else set(normalized) & replacement_ids),
+    )
+    # Report a missing retained-version node before converge mootness: the version
+    # error explains why this retry cannot use its source graph at all.
+    reason = version_reason or _converge_reason(snapshot_def, normalized, completed_ids, successors)
+    if reason is None:
+        reported_selection = sorted(
+            _eligible_points(
+                snapshot_def,
+                set(final_selection),
+                set(auto_included),
+                successors,
+                failed_ids=failed_ids,
+            )
+        )
+        # Only meaningful once the earlier guards have passed: overrides target
+        # failed nodes that re-execute, not starting points.
+        reason = _override_reason(
+            snapshot.workflow_definition if snapshot is not None else None,
+            reported_selection,
+            failed_ids,
+            set(sanitized),
+            overrides,
+            successors,
+        )
+        return reason, reported_selection, sanitized, auto_included, True
+    return reason, normalized, sanitized, auto_included, False
+
+
+def _retry_result_counts(
+    snapshot: WorkflowVersion | None,
+    snapshot_def: dict[str, Any],
+    reported_selection: list[str],
+    completed: Sequence[ActivityExecution],
+    successors: dict[str, set[str]],
+) -> tuple[dict[str, int], int, int]:
+    """Return retry step counts and the number of retained completed results."""
+    if snapshot is None:
+        return {}, 0, 0
+
+    retry_path = collect_downstream_node_ids(snapshot_def, reported_selection, successors)
+    step_counts, total_steps = _step_counts(snapshot_def, reported_selection, successors)
+    retained_result_count = sum(
+        strip_all_iteration_suffixes(activity.activity_name) not in retry_path for activity in completed
+    )
+    return step_counts, total_steps, retained_result_count
+
+
+def _normalized_retry_points(retry_point_ids: list[str]) -> tuple[list[str], list[str]]:
+    """Return iteration-suffixed IDs and base IDs suitable for UI guidance."""
+    suffixed = sorted({point.strip() for point in retry_point_ids if point and LOOP_ITERATION_SEP in point.strip()})
+    normalized = {
+        point.strip()
+        for point in retry_point_ids
+        if point and point.strip() and LOOP_ITERATION_SEP not in point.strip()
+    }
+    normalized.update(
+        base_id
+        for point in suffixed
+        if (base_id := strip_all_iteration_suffixes(point)) and LOOP_ITERATION_SEP not in base_id
+    )
+    return suffixed, sorted(normalized)
+
+
 async def validate_retry_from_failure(
     session: AsyncSession,
     execution_id: UUID,
@@ -585,7 +691,7 @@ async def validate_retry_from_failure(
     if source is None:
         raise ExecutionNotFoundError(execution_id)
 
-    suffixed = sorted({point.strip() for point in retry_point_ids if point and LOOP_ITERATION_SEP in point.strip()})
+    suffixed, normalized_input = _normalized_retry_points(retry_point_ids)
     if suffixed:
         return RetryValidation(
             eligible=False,
@@ -593,9 +699,8 @@ async def validate_retry_from_failure(
                 "loop-iteration failure points are not selectable "
                 f"({', '.join(suffixed)}); select base node ids instead"
             ),
-            eligible_point_ids=sorted({point.strip() for point in retry_point_ids if point and point.strip()}),
+            eligible_point_ids=normalized_input,
         )
-    normalized_input = sorted({point.strip() for point in retry_point_ids if point and point.strip()})
     is_default_selection = not normalized_input
 
     activities = (
@@ -617,12 +722,9 @@ async def validate_retry_from_failure(
             )
         )
     ).all()
-    # Per-iteration outputs keyed by base node id: any tainted iteration taints
-    # the node (iteration-level classification is the engine's job; validation
-    # stays fail-closed at base-id granularity rather than last-write-wins).
-    completed_outputs: dict[str, list[Any]] = {}
-    for activity in completed:
-        completed_outputs.setdefault(strip_iteration_suffix(activity.activity_name), []).append(activity.output_data)
+    # Per-iteration outputs keyed by base node ID, so any tainted iteration
+    # taints the node instead of using last-write-wins behavior.
+    completed_outputs = _completed_output_map(completed)
     completed_ids = set(completed_outputs)
 
     snapshot_result = await session.exec(
@@ -640,51 +742,26 @@ async def validate_retry_from_failure(
     )
     replacement_ids = {node_id for ids in replacements.values() for node_id in ids}
 
-    version_reason, sanitized, auto_included, final_selection = _version_reason(
+    reason, reported_selection, sanitized, auto_included, counts_apply = _retry_selection_reason(
+        source,
         normalized,
-        snapshot,
-        completed_outputs,
-        successors,
-        sanitized_expansion_seeds=(None if is_default_selection else set(normalized) & replacement_ids),
+        is_default_selection=is_default_selection,
+        snapshot=snapshot,
+        snapshot_def=snapshot_def,
+        failed_ids=failed_ids,
+        completed_ids=completed_ids,
+        replacement_ids=replacement_ids,
+        completed_outputs=completed_outputs,
+        successors=successors,
+        overrides=overrides,
     )
-    reason = (
-        _state_reason(source)
-        or _selection_reason(normalized, failed_ids, replacement_ids)
-        or _converge_reason(snapshot_def, normalized, completed_ids, successors)
-        or version_reason
-    )
-
-    if reason is None:
-        reported_selection = sorted(
-            _eligible_points(
-                snapshot_def,
-                set(final_selection),
-                set(auto_included),
-                successors,
-                failed_ids=failed_ids,
-            )
+    step_counts: dict[str, int] = {}
+    total_steps = 0
+    retained_result_count = 0
+    if counts_apply:
+        step_counts, total_steps, retained_result_count = _retry_result_counts(
+            snapshot, snapshot_def, reported_selection, completed, successors
         )
-        # Only meaningful once the earlier guards have passed: overrides target
-        # failed nodes that re-execute, not starting points.
-        reason = _override_reason(
-            snapshot.workflow_definition if snapshot is not None else None,
-            reported_selection,
-            failed_ids,
-            set(sanitized),
-            overrides,
-            successors,
-        )
-    else:
-        reported_selection = normalized
-    if snapshot is not None:
-        retry_path = collect_downstream_node_ids(snapshot_def, reported_selection, successors)
-        step_counts, total_steps = _step_counts(snapshot_def, reported_selection, successors)
-        retained_result_count = sum(
-            strip_all_iteration_suffixes(activity.activity_name) not in retry_path for activity in completed
-        )
-    else:
-        step_counts, total_steps = {}, 0
-        retained_result_count = 0
 
     if reason is not None:
         return RetryValidation(

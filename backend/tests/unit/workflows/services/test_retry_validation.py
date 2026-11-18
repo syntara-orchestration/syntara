@@ -39,6 +39,20 @@ def _definition(
     }
 
 
+def _loop_definition() -> dict[str, Any]:
+    return {
+        "triggers": TRIGGERS,
+        "nodes": [
+            {"id": "loop_1", "type": "loop", "parameters": {}},
+            {"id": "body_step", "type": "script", "parameters": {"code": "exit 1"}},
+        ],
+        "edges": [
+            {"from": "trigger_1", "to": "loop_1"},
+            {"from": "loop_1", "to": "body_step"},
+        ],
+    }
+
+
 def test_strip_iteration_suffix() -> None:
     assert strip_iteration_suffix("step_2#iter-3") == "step_2"
     assert strip_iteration_suffix("step_2") == "step_2"
@@ -138,6 +152,24 @@ async def test_validate_retry_rejects_unknown_failure_point() -> None:
 
 
 @pytest.mark.asyncio
+async def test_validate_retry_rejection_does_not_report_result_counts() -> None:
+    execution = _make_execution(ExecutionStatus.FAILED)
+    session = _mock_session(
+        (execution, "one"),
+        ([_make_activity("step_2")], "all"),
+        ([_make_completed_activity("step_1")], "all"),
+        (_make_version(1), "one"),
+    )
+
+    verdict = await validate_retry_from_failure(session, execution.id, ["nope"])
+
+    assert verdict.eligible is False
+    assert verdict.step_count_by_eligible_point == {}
+    assert verdict.total_step_count == 0
+    assert verdict.retained_result_count == 0
+
+
+@pytest.mark.asyncio
 async def test_validate_retry_passes_clean_path() -> None:
     execution = _make_execution(ExecutionStatus.FAILED)
     session = _mock_session(
@@ -210,6 +242,42 @@ async def test_validate_retry_rejects_sanitized_upstream_output() -> None:
     assert clean.eligible is True
     assert clean.sanitized_node_ids == []
     assert clean.sanitized_replacements == {}
+
+
+@pytest.mark.asyncio
+async def test_invalid_execution_state_does_not_report_sanitized_retry_nodes() -> None:
+    execution = _make_execution(ExecutionStatus.RUNNING)
+    ref_nodes = [
+        dict(node, parameters={**node.get("parameters", {}), "input_ref": "${step_1.token}"})
+        if node["id"] == "step_2"
+        else node
+        for node in NODES
+    ]
+    session = _field_session(execution, ref_nodes, [_make_completed_activity("step_1", {"token": "[REDACTED]"})])
+
+    verdict = await validate_retry_from_failure(session, execution.id, ["step_2"])
+
+    assert verdict.eligible is False
+    assert "running" in (verdict.reason or "")
+    assert verdict.sanitized_node_ids == []
+
+
+@pytest.mark.asyncio
+async def test_invalid_selection_does_not_report_sanitized_retry_nodes() -> None:
+    execution = _make_execution(ExecutionStatus.FAILED)
+    ref_nodes = [
+        dict(node, parameters={**node.get("parameters", {}), "input_ref": "${step_1.token}"})
+        if node["id"] in {"step_2", "step_3"}
+        else node
+        for node in NODES
+    ]
+    session = _field_session(execution, ref_nodes, [_make_completed_activity("step_1", {"token": "[REDACTED]"})])
+
+    verdict = await validate_retry_from_failure(session, execution.id, ["step_3"])
+
+    assert verdict.eligible is False
+    assert "neither failed nor eligible replacements" in (verdict.reason or "")
+    assert verdict.sanitized_node_ids == []
 
 
 @pytest.mark.asyncio
@@ -795,6 +863,29 @@ async def test_validate_retry_rejects_failure_under_completed_converge() -> None
 
 
 @pytest.mark.asyncio
+async def test_missing_snapshot_node_reason_precedes_completed_converge_reason() -> None:
+    """A missing retained-version node should report the actionable version error."""
+    execution = _make_execution(ExecutionStatus.FAILED)
+    snapshot = _make_version(1)
+    snapshot.workflow_definition = {
+        "triggers": TRIGGERS,
+        "nodes": [{"id": "conv_1", "type": "converge", "parameters": {}}],
+        "edges": [{"from": "missing_step", "to": "conv_1"}],
+    }
+    session = _mock_session(
+        (execution, "one"),
+        ([_make_activity("missing_step")], "all"),
+        ([_make_completed_activity("conv_1")], "all"),
+        (snapshot, "one"),
+    )
+
+    verdict = await validate_retry_from_failure(session, execution.id, ["missing_step"])
+
+    assert verdict.eligible is False
+    assert "not nodes in the executed workflow version: missing_step" in (verdict.reason or "")
+
+
+@pytest.mark.asyncio
 async def test_validate_retry_allows_failure_under_failed_converge() -> None:
     execution = _make_execution(ExecutionStatus.FAILED)
     session = _converge_session(execution, "failed")
@@ -831,6 +922,19 @@ async def test_validate_retry_empty_selection_defaults_to_all_failed() -> None:
 
 
 @pytest.mark.asyncio
+async def test_validate_retry_keeps_loop_control_as_a_failed_start_point() -> None:
+    execution = _make_execution(ExecutionStatus.FAILED)
+    for selection in (["loop_1"], []):
+        verdict = await validate_retry_from_failure(
+            _run_session(execution, _loop_definition(), failed=[_make_activity("loop_1")]),
+            execution.id,
+            selection,
+        )
+        assert verdict.eligible is True
+        assert verdict.eligible_point_ids == ["loop_1"]
+
+
+@pytest.mark.asyncio
 async def test_validate_retry_rejects_empty_selection_with_no_failed_nodes() -> None:
     """Defaulting still rejects when there are no failed nodes at all to default to."""
     execution = _make_execution(ExecutionStatus.FAILED)
@@ -846,6 +950,19 @@ async def test_validate_retry_rejects_iteration_suffixed_selection() -> None:
     verdict = await validate_retry_from_failure(_run_session(execution, _definition()), execution.id, ["step_2#iter-1"])
     assert verdict.eligible is False
     assert "base node" in (verdict.reason or "")
+    assert verdict.eligible_point_ids == ["step_2"]
+
+
+@pytest.mark.asyncio
+async def test_validate_retry_suggests_base_id_for_nested_iteration_selection() -> None:
+    execution = _make_execution(ExecutionStatus.FAILED)
+
+    verdict = await validate_retry_from_failure(
+        _run_session(execution, _definition()), execution.id, ["step_2#iter-1#iter-2"]
+    )
+
+    assert verdict.eligible is False
+    assert verdict.eligible_point_ids == ["step_2"]
 
 
 @pytest.mark.asyncio
@@ -1086,6 +1203,9 @@ async def test_validate_retry_rejects_override_with_unknown_parameter_key() -> N
     assert verdict.eligible is False
     assert "not_a_param" in (verdict.reason or "")
     assert "code" in (verdict.reason or "")
+    assert verdict.eligible_point_ids == ["step_2"]
+    assert verdict.step_count_by_eligible_point == {"step_2": 2}
+    assert verdict.total_step_count == 2
 
 
 @pytest.mark.asyncio

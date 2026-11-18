@@ -1,3 +1,4 @@
+import { TriggerTypeEnum } from '@syntara/contracts'
 import { renderHook } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -86,6 +87,23 @@ describe('useActivityNameMap', () => {
     const { result } = renderHook(() => useActivityNameMap(null, activityStates))
 
     expect(result.current.typeMap.get('task-1')).toBe('script')
+  })
+
+  it('uses the workflow trigger type when store data omits that trigger', () => {
+    vi.mocked(useActivities).mockReturnValue([{ id: 'task-1', name: 'Store Task', type: 'script' }] as never)
+    vi.mocked(useTriggers).mockReturnValue([])
+
+    const wfDef: WorkflowDefShape = {
+      triggers: [{ id: 'trigger-manual', name: 'Manual Trigger', type: TriggerTypeEnum.MANUAL_TRIGGER }],
+    }
+    const states = new Map<string, ActivityState>([
+      ['trigger-manual', { activityId: 'trigger-manual', status: 'completed' }],
+    ])
+
+    const { result } = renderHook(() => useActivityNameMap(wfDef, states))
+
+    expect(result.current.typeMap.get('trigger-manual')).toBe(TriggerTypeEnum.MANUAL_TRIGGER)
+    expect(result.current.activityOrder[0]?.type).toBe(TriggerTypeEnum.MANUAL_TRIGGER)
   })
 
   it('includes triggers from store in name map', () => {

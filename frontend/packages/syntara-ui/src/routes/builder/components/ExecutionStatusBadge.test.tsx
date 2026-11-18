@@ -155,5 +155,21 @@ describe('ExecutionStatusBadge', () => {
       const results = await axe(container)
       expect(results).toHaveNoViolations()
     })
+
+    it('identifies a retained failure in the accessible name and metadata', () => {
+      render(<ExecutionStatusBadge status="failed" retainedFailure />)
+
+      const badge = screen.getByLabelText('Error — Retained failure')
+      expect(badge).toHaveAttribute('data-retained-failure')
+      expect(badge).not.toHaveAttribute('data-replayed')
+    })
+
+    it('identifies reused trigger input without claiming the output was reused', () => {
+      render(<ExecutionStatusBadge status="completed" triggerInputReused />)
+
+      expect(
+        screen.getByLabelText('Success — reused trigger input; output generated in this retry')
+      ).toBeInTheDocument()
+    })
   })
 })

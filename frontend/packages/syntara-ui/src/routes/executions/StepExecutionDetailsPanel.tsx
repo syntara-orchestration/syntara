@@ -1,7 +1,5 @@
 import {
   Button,
-  Content,
-  ContentVariants,
   EmptyState,
   EmptyStateBody,
   Flex,
@@ -14,8 +12,6 @@ import {
   Tab,
   Tabs,
   TabTitleText,
-  Title,
-  TitleSizes,
   Tooltip,
 } from '@patternfly/react-core'
 import {
@@ -35,12 +31,13 @@ import { SynErrorState } from '../../components/states/SynErrorState'
 import { ExecutionTimestamp } from '../../components/table/ExecutionTimestamp'
 import { extractAAPJobUrl, isAAPNodeType } from '../../utils/aapJobUrl'
 import { capitalize } from '../../utils/capitalize'
+import { formatElapsedTime } from '../../utils/dateUtils'
 import { detachPromise } from '../../utils/detachPromise'
 import { highlightTextLines } from '../../utils/highlightText'
-import { ActivityStatusLabel } from '../builder/ExecutionStatus'
 import { InputSchemaView } from '../builder/panels/views/InputSchemaView'
 import { InputTableView } from '../builder/panels/views/InputTableView'
 import { ViewToggle, type PanelView } from '../builder/panels/ViewToggle'
+import { getRetryActivityMarkers } from '../builder/utils/replayedNodes'
 import type { ActivityState } from '../workflows/execution/types'
 import { extractApprovalAudit, type ApprovalAudit } from '../workflows/execution/utils/activityState'
 
@@ -49,6 +46,7 @@ import { AgentTraceView } from './AgentTraceView'
 import { useStepExecutionDetails } from './hooks/useStepExecutionDetails'
 import { RetryInputOverrideDetails, type RetryInputOverrideDetailsProps } from './RetryInputOverrideDetails'
 import { getEffectiveRetryInputs, getRetryInputEditorValue } from './retryInputOverrides'
+import { StepDetailsHeader } from './StepDetailsHeader'
 import styles from './StepExecutionDetailsPanel.module.css'
 import { extractUsedTools, type UsedTool } from './utils/extractUsedTools'
 
@@ -60,6 +58,8 @@ type StepExecutionDetailsPanelProps = {
   stepState?: ActivityState
   /** Step type from workflow definition (e.g. 'aap_job_template'). */
   stepType?: string
+  /** Timestamp replayed steps predate; set only for retry executions. */
+  replayBaselineAt?: string | null
   retryInputOverride?: Omit<RetryInputOverrideDetailsProps, 'resolvedInputs'>
 }
 
@@ -274,45 +274,6 @@ function UsedToolsSection({ tools }: Readonly<{ tools: UsedTool[] }>) {
   )
 }
 
-function StepDetailsHeader({
-  stepName,
-  stepTimestamp,
-  status,
-}: Readonly<{
-  stepName: string
-  stepTimestamp: string | null
-  status?: ActivityState['status']
-}>) {
-  return (
-    <StackItem className={styles.headerRow}>
-      <Flex justifyContent={{ default: 'justifyContentSpaceBetween' }} alignItems={{ default: 'alignItemsCenter' }}>
-        <FlexItem>
-          <Title headingLevel="h2" size={TitleSizes.md} style={{ margin: 0 }}>
-            {stepName}
-          </Title>
-        </FlexItem>
-        <FlexItem>
-          <Flex gap={{ default: 'gapMd' }} alignItems={{ default: 'alignItemsCenter' }}>
-            {stepTimestamp && (
-              <Content
-                component={ContentVariants.small}
-                style={{ color: 'var(--pf-t--global--text--color--subtle)', margin: 0 }}
-              >
-                <ExecutionTimestamp dateString={stepTimestamp} />
-              </Content>
-            )}
-            {status && (
-              <FlexItem style={{ display: 'flex', alignItems: 'center' }}>
-                <ActivityStatusLabel status={status} />
-              </FlexItem>
-            )}
-          </Flex>
-        </FlexItem>
-      </Flex>
-    </StackItem>
-  )
-}
-
 type StepContentAreaProps = Readonly<{
   stepId: string
   inputData: Record<string, unknown> | null
@@ -442,6 +403,7 @@ export function StepExecutionDetailsPanel({
   executionId,
   stepState,
   stepType,
+  replayBaselineAt,
   retryInputOverride,
 }: Readonly<StepExecutionDetailsPanelProps>) {
   const [activeTab, setActiveTab] = useState<'io' | 'agent-steps'>('io')
@@ -456,12 +418,30 @@ export function StepExecutionDetailsPanel({
   const approvalAudit = useMemo(() => extractApprovalAudit(outputData), [outputData])
   const usedTools = useMemo(() => extractUsedTools(outputData), [outputData])
 
-  const stepTimestamp = stepState?.completedAt ?? stepState?.startedAt ?? null
+  const startedAt = stepState?.startedAt ?? null
+  const completedAt = stepState?.completedAt ?? null
+  const startedAtMs = startedAt ? Date.parse(startedAt) : Number.NaN
+  const completedAtMs = completedAt ? Date.parse(completedAt) : Number.NaN
+  const elapsedLabel =
+    Number.isFinite(startedAtMs) && Number.isFinite(completedAtMs)
+      ? formatElapsedTime(Math.max(0, completedAtMs - startedAtMs))
+      : null
   const stepIsFailed = stepState?.status === 'failed'
+  const retryMarkers = getRetryActivityMarkers(stepState, replayBaselineAt, stepType)
 
   return (
     <Stack className={styles.contentContainer}>
-      <StepDetailsHeader stepName={stepName} stepTimestamp={stepTimestamp} status={stepState?.status} />
+      <StepDetailsHeader
+        stepName={stepName}
+        startedAt={startedAt}
+        completedAt={completedAt}
+        elapsedLabel={elapsedLabel}
+        status={stepState?.status}
+        nodeType={stepType}
+        replayed={retryMarkers.replayed}
+        retainedFailure={retryMarkers.retainedFailure}
+        triggerInputReused={retryMarkers.triggerInputReused}
+      />
 
       {/* Approval audit strip (shown only for decided approval steps) */}
       {approvalAudit && (

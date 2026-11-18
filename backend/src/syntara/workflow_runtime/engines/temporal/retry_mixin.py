@@ -11,16 +11,14 @@ from temporalio import workflow
 from temporalio.exceptions import ApplicationError
 
 from syntara.core.exceptions import SafeValueError
-from syntara.workflows.models.activity_execution import ActivityStatus
-from syntara.workflows.utils.loop_body_nodes import collect_loop_bodies
-from syntara.workflows.utils.loop_iteration_names import strip_iteration_suffix
+from syntara.workflow_core.graph import ActivityNode, WorkflowGraph
+from syntara.workflow_core.models import ActivityName, ConvergeStrategy, LoopState, NodeType
 from syntara.workflow_core.utils.namespace_resolver import NamespaceResolver
 from syntara.workflow_runtime.engines.temporal.constants import (
     DEFAULT_ACTIVITY_TIMEOUT_SECONDS,
     RESTORABLE_SOURCE_STATUSES,
+    is_converge_timeout_reason,
 )
-from syntara.workflow_core.graph import ActivityNode, WorkflowGraph
-from syntara.workflow_core.models import ActivityName, ConvergeStrategy, LoopState, NodeType
 from syntara.workflow_runtime.engines.temporal.utils.loop_iteration_ids import (
     approval_temporal_activity_id,
     loop_body_temporal_activity_id,
@@ -30,6 +28,9 @@ from syntara.workflow_runtime.engines.temporal.utils.loop_iteration_ids import (
     retry_loop_record_activity_id,
     strip_loop_iteration_suffixes,
 )
+from syntara.workflows.models.activity_execution import ActivityStatus
+from syntara.workflows.utils.loop_body_nodes import collect_loop_bodies
+from syntara.workflows.utils.loop_iteration_names import strip_iteration_suffix
 
 #: Node types a retry executes rather than restores from the source run.
 #:
@@ -442,7 +443,11 @@ class WorkflowRetryMixin:
             return False
         if source_predecessor.get("status") not in _RESTORABLE_SOURCE_STATUS_VALUES:
             return False
-        if temporal_activity_id in self._restored_node_timestamps:
+        # Real restores publish a status with the source times. Trigger retry
+        # plants display-only timestamps here with no status, and that node
+        # still executes live — do not treat those entries as restored output.
+        restored = self._restored_node_timestamps.get(temporal_activity_id)
+        if restored is not None and restored.get("status") is not None:
             return True
         if node.type == NodeType.LOOP:
             return self._should_replay_loop(node.id)
@@ -461,7 +466,7 @@ class WorkflowRetryMixin:
             return None
 
         failure_reason = self._retry_converge_failure_reasons.get(node.id)
-        if failure_reason and " timed out after " in failure_reason:
+        if is_converge_timeout_reason(failure_reason, node.id):
             # A timeout means some gate state did not arrive. Planned source rows
             # are not enough to turn that into a successful replay.
             self._retry_replay_candidates.discard(node.id)
@@ -515,6 +520,8 @@ class WorkflowRetryMixin:
         source_converge = source_state.get("converge")
         if not isinstance(source_converge, dict):
             return False
+        # CANCELLED rows are interrupted work. Reject them before the strict
+        # require_record replay path so the converge can execute normally.
         if source_converge.get("status") not in {
             ActivityStatus.COMPLETED.value,
             ActivityStatus.FAILED.value,

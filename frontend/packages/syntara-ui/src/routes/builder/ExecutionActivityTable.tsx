@@ -12,7 +12,7 @@ import type { ActivityState } from '../workflows/execution/types'
 
 import { ActivityStatusLabel } from './ExecutionStatus'
 import { ACTIVITY_STATUS } from './utils/executionState/executionHelpers'
-import { isReplayedStep } from './utils/replayedNodes'
+import { getRetryActivityMarkers } from './utils/replayedNodes'
 
 function parseTimeMs(value: string | null | undefined): number | null {
   if (value == null) return null
@@ -130,7 +130,7 @@ function ActivityRow({
   const displayName = name ?? id
   const jobUrl = isAAPNodeType(type) ? extractAAPJobUrl(state?.outputData) : null
   const columnCount = hasAAPColumn ? 6 : 5
-  const replayed = isReplayedStep(state?.startedAt, replayBaselineAt, state?.status)
+  const { replayed, retainedFailure, triggerInputReused } = getRetryActivityMarkers(state, replayBaselineAt, type)
 
   return (
     <Fragment>
@@ -144,7 +144,13 @@ function ActivityRow({
         <Td dataLabel="Ended">{state?.completedAt ? <ExecutionTimestamp dateString={state.completedAt} /> : DASH}</Td>
         <Td dataLabel="Elapsed time">{elapsedMs === undefined ? DASH : formatElapsedTime(elapsedMs)}</Td>
         <Td dataLabel="Status" modifier="nowrap">
-          <ActivityStatusLabel status={state?.status ?? 'pending'} nodeType={type} replayed={replayed} />
+          <ActivityStatusLabel
+            status={state?.status ?? 'pending'}
+            nodeType={type}
+            replayed={replayed}
+            retainedFailure={retainedFailure}
+            triggerInputReused={triggerInputReused}
+          />
         </Td>
         {hasAAPColumn && <Td dataLabel="AAP Job">{jobUrl ? <AAPJobLink url={jobUrl} /> : null}</Td>}
       </Tr>

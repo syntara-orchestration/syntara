@@ -259,8 +259,8 @@ class TestPrepareApprovalArgs:
         assert args[11] == "approval_iter_0"
 
     @pytest.mark.asyncio
-    async def test_approval_args_always_include_loop_identity(self) -> None:
-        """The full iteration path is passed even when the prompt patch is absent."""
+    async def test_approval_args_keep_legacy_temporal_id_without_loop_patch(self) -> None:
+        """Loop path is preserved while pre-patch histories keep the canvas activity ID."""
         wf = _make_workflow()
         wf.loop_body_map["approval"] = "loop"
         wf.node_control_data["loop"] = {"current_index": 1, "next_port": "iterate"}
@@ -271,7 +271,7 @@ class TestPrepareApprovalArgs:
         with (
             patch("syntara.workflow_runtime.engines.temporal.approval_mixin.workflow.execute_activity", mock_execute),
             patch(
-                "syntara.workflow_runtime.engines.temporal.approval_mixin.use_unique_loop_iteration_ids",
+                "syntara.workflow_runtime.engines.temporal.utils.loop_iteration_ids.use_unique_loop_iteration_ids",
                 return_value=False,
             ),
             patch("syntara.workflow_runtime.engines.temporal.approval_mixin.workflow.patched", return_value=False),
@@ -281,7 +281,7 @@ class TestPrepareApprovalArgs:
         assert len(args) == 12
         assert args[1] == "approval"
         assert args[10] == [1]
-        assert args[11] == "approval_iter_1"
+        assert args[11] == "approval"
 
     @pytest.mark.asyncio
     async def test_approval_args_with_approver_config(self) -> None:
@@ -890,8 +890,8 @@ class TestDispatchApprovalNode:
         assert approval_call.kwargs["args"][11] == "approval_iter_2"
 
     @pytest.mark.asyncio
-    async def test_dispatch_always_uses_path_activity_id_and_loop_args(self) -> None:
-        """Approval dispatch always uses the canonical path ID and arguments."""
+    async def test_dispatch_keeps_legacy_activity_id_without_loop_patch(self) -> None:
+        """Pre-patch histories keep the canvas activity ID and still pass loop args."""
         wf = _make_workflow()
         wf.loop_body_map["approval"] = "loop"
         wf.node_control_data["loop"] = {"current_index": 2}
@@ -902,10 +902,6 @@ class TestDispatchApprovalNode:
         with (
             patch("syntara.workflow_runtime.engines.temporal.approval_mixin.workflow.execute_activity", mock_activity),
             patch(
-                "syntara.workflow_runtime.engines.temporal.approval_mixin.use_unique_loop_iteration_ids",
-                return_value=False,
-            ),
-            patch(
                 "syntara.workflow_runtime.engines.temporal.utils.loop_iteration_ids.use_unique_loop_iteration_ids",
                 return_value=False,
             ),
@@ -914,9 +910,11 @@ class TestDispatchApprovalNode:
             await wf._dispatch_node_to_executor(node, {}, graph, timeout_seconds=300)
 
         approval_call = mock_activity.call_args_list[0]
-        assert approval_call.kwargs["activity_id"] == "approval_iter_2"
+        assert approval_call.kwargs["activity_id"] == "approval"
         assert len(approval_call.kwargs["args"]) == 12
         assert approval_call.kwargs["args"][1] == "approval"
+        assert approval_call.kwargs["args"][10] == [2]
+        assert approval_call.kwargs["args"][11] == "approval"
 
     @pytest.mark.asyncio
     async def test_dispatch_sets_approved_port(self) -> None:

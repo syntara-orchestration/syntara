@@ -48,12 +48,14 @@ def _render(query: Select[Any]) -> str:
 
 
 @pytest.mark.asyncio
-async def test_exact_full_path_record_means_iteration_was_reached() -> None:
+async def test_exact_full_path_record_means_iteration_was_reached_regardless_of_status() -> None:
     answer, queries = await _run(["body_a"], [2, 3], found=[True])
 
     assert answer is True
-    assert "body_a_iter_2_iter_3" in _render(queries[0])
-    assert "src-1" in _render(queries[0])
+    sql = _render(queries[0])
+    assert "body_a_iter_2_iter_3" in sql
+    assert "src-1" in sql
+    assert "status" not in sql.lower()
 
 
 @pytest.mark.asyncio

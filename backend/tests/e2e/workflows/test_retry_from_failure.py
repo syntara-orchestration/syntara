@@ -489,7 +489,7 @@ def test_retry_replays_upstream_output_and_applies_override_for_retry_only(
     )
     assert _activity_input(retry_activity_executions["repair"]).get("environment") == {"MESSAGE": "retry-only"}
 
-    # Retry dispatches the trigger again but keeps its original display timestamps.
+    # Retry dispatches the trigger again but preserves its source timestamps for display.
     retry_trigger = retry_activity_executions["trigger"]
     assert retry_trigger.id != source_trigger.id
     assert retry_trigger.status == "completed"

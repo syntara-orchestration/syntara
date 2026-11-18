@@ -200,6 +200,7 @@ function ThreePanelLayout({
               executionId={executionId}
               stepState={selectedNodeState}
               stepType={selectedNodeType}
+              replayBaselineAt={replayBaselineAt}
               retryInputOverride={retryInputOverride}
             />
           ) : (

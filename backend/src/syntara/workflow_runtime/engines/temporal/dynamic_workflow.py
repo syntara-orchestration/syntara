@@ -29,9 +29,6 @@ with workflow.unsafe.imports_passed_through():
     from syntara.workflow_runtime.engines.temporal.activities.integration_resolution_activity import (
         resolve_workflow_integration,
     )
-    from syntara.workflows.models.activity_execution import ActivityStatus
-        resolve_workflow_integration,
-    )
     from syntara.workflow_runtime.engines.temporal.activities.integration_scope_activity import validate_node_references
     from syntara.workflow_runtime.engines.temporal.activities.wait_activity import complete_wait
     from syntara.workflow_runtime.engines.temporal.constants import (
@@ -39,6 +36,7 @@ with workflow.unsafe.imports_passed_through():
         ENGINE_MAX_OUTPUT_BYTES_KEY,
         ENGINE_TIMEOUT_SECONDS_KEY,
         INTERNAL_ACTIVITY_HEARTBEAT_TIMEOUT_SECONDS,
+        is_converge_timeout_reason,
     )
     from syntara.workflow_runtime.engines.temporal.node_settings_resolver import (
         resolve_continue_on_failure,
@@ -48,6 +46,7 @@ with workflow.unsafe.imports_passed_through():
         resolve_timeout,
     )
     from syntara.workflow_runtime.engines.utils.timeout_messages import build_timeout_error_message
+    from syntara.workflows.models.activity_execution import ActivityStatus
 from syntara.workflow_core.graph import ActivityNode, WorkflowGraph
 from syntara.workflow_core.models import (
     NODE_OUTPUT_MODELS,
@@ -1551,15 +1550,15 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
         if self.retry_context:
             node = graph.get_node(node_id)
             pending_failure = self._retry_converge_failure_reasons.get(node_id)
-            if pending_failure and " timed out after " not in pending_failure:
+            if pending_failure and not is_converge_timeout_reason(pending_failure, node_id):
                 await workflow.wait_condition(
                     lambda: (
                         self._retry_converge_gate_is_decided(node_id, resolved_parameters, graph)
-                        or " timed out after " in self._retry_converge_failure_reasons.get(node_id, "")
+                        or is_converge_timeout_reason(self._retry_converge_failure_reasons.get(node_id), node_id)
                     )
                 )
                 pending_failure = self._retry_converge_failure_reasons.get(node_id)
-                if pending_failure and " timed out after " not in pending_failure:
+                if pending_failure and not is_converge_timeout_reason(pending_failure, node_id):
                     timeout_task = self._timeout_tasks.pop(node_id, None)
                     if timeout_task is not None:
                         timeout_task.cancel()
@@ -1590,7 +1589,7 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
             await workflow.wait_condition(
                 lambda: (
                     self._retry_converge_gate_is_decided(node_id, resolved_parameters, graph)
-                    or " timed out after " in self._retry_converge_failure_reasons.get(node_id, "")
+                    or is_converge_timeout_reason(self._retry_converge_failure_reasons.get(node_id), node_id)
                 )
             )
             restored = await self._maybe_restore_retry_converge(node, resolved_parameters, graph)
@@ -1611,7 +1610,7 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
         failure_reason = self._retry_converge_failure_reasons.pop(node_id, None)
         upstream_failure_id = self._retry_converge_upstream_failures.pop(node_id, None)
         if failure_reason is not None:
-            if " timed out after " in failure_reason:
+            if is_converge_timeout_reason(failure_reason, node_id):
                 raise ApplicationError(failure_reason, type="RetryConvergeGateFailure", non_retryable=True)
             resolved_failure = self._retry_converge_gate_failure(
                 node_id,

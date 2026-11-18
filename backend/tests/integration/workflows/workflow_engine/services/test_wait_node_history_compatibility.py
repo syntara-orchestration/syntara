@@ -12,9 +12,9 @@ from temporalio import activity, workflow
 from temporalio.worker import Replayer, Worker
 
 with workflow.unsafe.imports_passed_through():
-    from syntara.workflows.workflow_engine.constants import DEFAULT_ACTIVITY_TIMEOUT_SECONDS
-    from syntara.workflows.workflow_engine.dynamic_workflow import OrchestratorWorkflow
-    from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName
+    from syntara.workflow_core.models import ActivityName
+    from syntara.workflow_runtime.engines.temporal.constants import DEFAULT_ACTIVITY_TIMEOUT_SECONDS
+    from syntara.workflow_runtime.engines.temporal.dynamic_workflow import OrchestratorWorkflow
 
 if TYPE_CHECKING:
     from temporalio.testing import WorkflowEnvironment
