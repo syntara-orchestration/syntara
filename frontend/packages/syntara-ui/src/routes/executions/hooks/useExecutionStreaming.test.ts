@@ -146,10 +146,10 @@ describe('useSyncActivityStore', () => {
     expect(mockSetActivityExecutions).toHaveBeenCalledWith(activities)
   })
 
-  it('clears activity executions when no activities and execution is completed', () => {
+  it('does not clear activity executions when no activities and execution is completed', () => {
     renderHook(() => useSyncActivityStore(baseExecution, []))
 
-    expect(mockSetActivityExecutions).toHaveBeenCalledWith([])
+    expect(mockSetActivityExecutions).not.toHaveBeenCalled()
   })
 
   it('creates pending activities from workflow definition when running with no activities', () => {
@@ -255,10 +255,10 @@ describe('useSyncActivityStore', () => {
     expect(mockInjectPendingStates).not.toHaveBeenCalled()
   })
 
-  it('clears activities when execution is undefined', () => {
+  it('does not clear activities when execution is undefined', () => {
     renderHook(() => useSyncActivityStore(undefined, []))
 
-    expect(mockSetActivityExecutions).toHaveBeenCalledWith([])
+    expect(mockSetActivityExecutions).not.toHaveBeenCalled()
   })
 
   it('uses node ID, not display name', () => {
