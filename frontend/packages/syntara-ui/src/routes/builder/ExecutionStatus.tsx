@@ -125,7 +125,7 @@ export function ActivityStatusLabel({
 }
 
 /** Renders retry markers as StackItems so callers can control their placement. */
-export function ActivityStatusRetryMarkers({
+function ActivityStatusRetryMarkers({
   replayed = false,
   retainedFailure = false,
   triggerInputReused = false,
