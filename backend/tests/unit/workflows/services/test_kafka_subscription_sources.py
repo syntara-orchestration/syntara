@@ -33,6 +33,7 @@ async def test_reads_effective_group_and_identity_without_payload_or_credentials
             "integration_id": str(integration_id),
             "topic": "orders",
             "group_id": "established-custom-group",
+            "group_id_is_generated": False,
         }
     ]
     statement = session.exec.call_args.args[0]
@@ -94,6 +95,7 @@ async def test_detail_response_exposes_effective_group_even_when_definition_omit
         integration_id=uuid4(),
         topic="orders",
         group_id="established-custom-group",
+        group_id_is_generated=False,
     )
     with patch("syntara.workflows.router.read_kafka_subscription_sources", AsyncMock(return_value=[source])) as read:
         response = await _build_workflow_with_version_response(workflow, version, service)
@@ -101,3 +103,27 @@ async def test_detail_response_exposes_effective_group_even_when_definition_omit
     read.assert_awaited_once_with(service.session, workflow_id)
     assert response.kafka_subscription_sources == [source]
     assert response.version.workflow_definition["triggers"][0]["parameters"]["group_id"] is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("is_generated", [True, False])
+async def test_reports_automatic_mode_by_exact_source_identity(*, is_generated: bool) -> None:
+    from syntara.eventstreams.adapters.source_projection import generated_kafka_group_id
+
+    deployment_id, subscription_id = uuid4(), uuid4()
+    automatic = generated_kafka_group_id(deployment_id, subscription_id, 2)
+    source = MagicMock(
+        id=uuid4(),
+        deployment_id=deployment_id,
+        subscription_id=subscription_id,
+        generation=2,
+        integration_identity=uuid4(),
+        configuration=KafkaSourceConfiguration(
+            topic="orders", group_id=automatic if is_generated else f"{automatic}.custom"
+        ),
+    )
+    session = AsyncMock()
+    session.exec.return_value = [(MagicMock(trigger_node_id="subscribe", configuration_revision=1), source)]
+    [result] = await read_kafka_subscription_sources(session, uuid4())
+    assert result.group_id_is_generated is is_generated
+    assert result.group_id == source.configuration.group_id

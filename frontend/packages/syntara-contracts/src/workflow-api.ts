@@ -507,6 +507,11 @@ export interface components {
       topic: string
       /** Group Id */
       group_id: string
+      /**
+       * Group Id Is Generated
+       * @description Whether the effective group is the automatic ID for this source identity.
+       */
+      group_id_is_generated: boolean
     }
     /**
      * WorkflowReadWithVersion

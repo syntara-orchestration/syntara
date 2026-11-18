@@ -270,6 +270,9 @@ class KafkaSubscriptionSourceRead(SQLModel):
     integration_id: UUID
     topic: str
     group_id: str
+    group_id_is_generated: bool = Field(
+        description="Whether the effective group is the automatic ID for this source identity."
+    )
 
 
 class WorkflowReadWithVersion(WorkflowRead):

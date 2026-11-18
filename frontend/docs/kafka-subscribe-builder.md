@@ -156,7 +156,10 @@ for the `start` and `group_id` parameters.
 
 Opening and saving an unchanged form does not insert default policies. Partial
 `start` objects survive unrelated edits. Unpublished drafts retain optional group
-omissions; same-source updates preserve the established group's explicit ID.
+omissions. Same-source updates preserve established custom IDs; automatic groups
+remain omitted or null in definitions and exports, while the locked field displays
+their effective runtime ID. Copying such an export creates an independent automatic
+group for the new workflow.
 Clearing the group on a new source sends null. Custom IDs accept 1–512 ASCII letters, numbers, dots,
 underscores, or hyphens; whitespace is rejected rather than silently trimmed.
 Groups must be exclusive to their Syntara source. Backend publication remains
@@ -169,7 +172,8 @@ controls activation: drafts do not affect consumption until publication.
 
 The group becomes fixed at the **first successful publication**, before worker
 activation. Workflow detail responses expose the current projected Kafka source,
-its generation and revision, and its effective group ID, including while unpublished.
+its generation and revision, its effective group ID, and whether that ID was
+automatically generated, including while unpublished.
 The UI reads this metadata directly without scanning version history, so large
 histories and definitions that omit the group do not hide the established ID.
 The group is disabled while this check loads or fails, with a retry on failure.
@@ -177,12 +181,14 @@ Background refreshes preserve the raw draft value; Update reconciles against a
 fresh projection. A changed Integration or topic permits a replacement group.
 Saved version views disable all consumption controls.
 
-Publication checks both saved definitions and unsaved changes against fresh source
-metadata. If a draft explicitly requests a different group for the same source,
+Publication from the main Publish action and Version History checks the selected
+saved definition or unsaved changes against fresh source metadata. If a draft explicitly requests a different group for the same source,
 the designer can cancel without changing the draft or confirm carrying forward
 the established group into a new saved definition. Confirmation rechecks source
 generation and revision. Backend publication remains authoritative if another
 publication races with the request. Existing saved versions are never rewritten.
+Dismissing either initial Publish dialog cancels pending preparation before a
+publish request is sent; completing a submission closes the dialog separately.
 
 Valid committed offsets and saved initialization/recovery decisions take precedence
 over policy changes. Start position is not a replay or manual-reset control.

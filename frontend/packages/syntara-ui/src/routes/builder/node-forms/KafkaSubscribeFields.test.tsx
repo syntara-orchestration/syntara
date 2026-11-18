@@ -167,6 +167,7 @@ describe('Kafka Subscribe form', () => {
         source_id: 'source-1',
         generation: 1,
         configuration_revision: 1,
+        group_id_is_generated: false,
         integration_id: integrationId,
         topic: initialData.topic,
         group_id: 'established-custom',
@@ -195,12 +196,47 @@ describe('Kafka Subscribe form', () => {
     }
   )
 
+  it('displays the effective automatic ID but keeps automatic mode on Update', async () => {
+    vi.mocked(workflowFetchClient.GET).mockResolvedValue({
+      data: {
+        kafka_subscription_sources: [
+          {
+            trigger_node_id: 'subscribe',
+            source_id: 'source-1',
+            generation: 1,
+            configuration_revision: 1,
+            integration_id: integrationId,
+            topic: initialData.topic,
+            group_id: 'syntara.runtime-id',
+            group_id_is_generated: true,
+          },
+        ],
+      },
+      response: new Response(),
+    })
+    const onSubmit = vi.fn()
+    renderWithHeader(
+      <TriggerNodeForm
+        initialData={initialData}
+        kafkaTriggerId="subscribe"
+        workflowId="workflow-1"
+        onSubmit={onSubmit}
+      />
+    )
+    const group = screen.getByRole('textbox', { name: 'Consumer group ID' })
+    await waitFor(() => expect(group).toHaveValue('syntara.runtime-id'))
+    expect(group).toBeDisabled()
+    await submitForm()
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ kafkaGroupId: undefined })))
+  })
+
   it('preserves the raw draft when the publication changes to a replacement before Update', async () => {
     const source = {
       trigger_node_id: 'subscribe',
       source_id: 'source-1',
       generation: 1,
       configuration_revision: 1,
+      group_id_is_generated: false,
       integration_id: integrationId,
       topic: initialData.topic,
       group_id: 'established-custom',
@@ -240,6 +276,7 @@ describe('Kafka Subscribe form', () => {
             source_id: 'source-1',
             generation: 1,
             configuration_revision: 1,
+            group_id_is_generated: false,
             integration_id: integrationId,
             topic: initialData.topic,
             group_id: 'established-custom',

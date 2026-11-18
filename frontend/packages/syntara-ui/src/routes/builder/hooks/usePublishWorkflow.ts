@@ -7,6 +7,7 @@ import { useAlerts } from '../../../providers/alerts'
 import { useWorkflowStore } from '../../../stores/useWorkflowStore'
 import { extractVersionConflictInfo, getErrorMessage, isWorkflowVersionConflictError } from '../../../utils/apiErrors'
 import { detachPromise } from '../../../utils/detachPromise'
+import { configuredKafkaGroup } from '../node-forms/kafkaPublishedGroups'
 import { buildWorkflowDefinition } from '../utils/workflowDefinitionBuilder'
 import type { ConflictInfo } from '../VersionConflictDialog'
 
@@ -91,7 +92,11 @@ export function usePublishWorkflow({
               showSuccess({ title: 'Workflow published' })
             }
             const state = useWorkflowStore.getState()
-            if (workflowDefinition && state.currentWorkflow === submittedWorkflow) {
+            if (
+              workflowDefinition &&
+              callOptions?.versionOverride === undefined &&
+              state.currentWorkflow === submittedWorkflow
+            ) {
               submittedWorkflow?.triggers?.forEach((trigger, index) => {
                 const source = data.kafka_subscription_sources?.find(
                   (item) =>
@@ -99,10 +104,10 @@ export function usePublishWorkflow({
                     item.integration_id === trigger.parameters?.integration_id &&
                     item.topic === trigger.parameters?.topic
                 )
-                if (source && trigger.parameters?.group_id !== source.group_id) {
+                if (source && trigger.parameters?.group_id !== configuredKafkaGroup(source)) {
                   state.updateTrigger(index, {
                     ...trigger,
-                    parameters: { ...trigger.parameters, group_id: source.group_id },
+                    parameters: { ...trigger.parameters, group_id: configuredKafkaGroup(source) },
                   })
                 }
               })

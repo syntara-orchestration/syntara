@@ -36316,6 +36316,10 @@ components:
         group_id:
           title: Group Id
           type: string
+        group_id_is_generated:
+          description: Whether the effective group is the automatic ID for this source identity.
+          title: Group Id Is Generated
+          type: boolean
       required:
         - trigger_node_id
         - source_id
@@ -36324,6 +36328,7 @@ components:
         - integration_id
         - topic
         - group_id
+        - group_id_is_generated
       title: KafkaSubscriptionSourceRead
       type: object
     WorkflowReadWithVersion:

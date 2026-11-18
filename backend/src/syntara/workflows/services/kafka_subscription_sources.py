@@ -5,6 +5,7 @@ from uuid import UUID
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from syntara.eventstreams.adapters.source_projection import generated_kafka_group_id
 from syntara.eventstreams.models.source import EventSubscriptionSource
 from syntara.eventstreams.models.subscription import EventSubscription
 from syntara.workflows.models.workflow import KafkaSubscriptionSourceRead
@@ -40,6 +41,8 @@ async def read_kafka_subscription_sources(
                 integration_id=source.integration_identity,
                 topic=configuration.topic,
                 group_id=configuration.group_id,
+                group_id_is_generated=configuration.group_id
+                == generated_kafka_group_id(source.deployment_id, source.subscription_id, source.generation),
             )
         )
     return sources
