@@ -94,10 +94,10 @@ Items enforced by ESLint at **error** level are omitted -- ESLint is the source 
 - `Page` imported directly from `@playwright/test` in E2E files → E2E `no-restricted-imports`
 - `waitForLoadState('networkidle')` in E2E tests → E2E `no-restricted-syntax`
 - Unnecessary `useEffect` patterns → `reactYouMightNotNeedAnEffect/*` (warn)
-- Raw `fetch()` / `XMLHttpRequest` → `syntara/no-raw-http-calls`
-- `useQueryState` with a plain string instead of `{ title, onRetry }` → `no-restricted-syntax`
-- Inline `Modal` confirmation boilerplate → `syntara/prefer-confirmation-dialog`
-- Missing `<title>` in route page components → `syntara/require-page-title` (use `toPageTitle` from `src/utils/toPageTitle.ts`)
+- Raw `fetch()` / `XMLHttpRequest` / axios → `syntara/no-raw-http-calls` (does not catch `window.fetch` or `globalThis.fetch`)
+- `useQueryState` with a string literal instead of `{ title, onRetry }` → `no-restricted-syntax`
+- Destructive raw `Modal` confirmations (static delete/remove/cancel-style title plus a danger button) → `syntara/prefer-confirmation-dialog`; other confirmations still need manual review (see item 6)
+- Missing page title in route page components → `syntara/require-page-title` (render `<SynPageTitle segments={[...]} />` as the first child of `<SynPage>`)
 - `fireEvent` in tests → `testing-library/prefer-user-event`
 - `container.querySelector` / DOM node access in tests → `testing-library/no-container`, `testing-library/no-node-access`
 
@@ -272,7 +272,7 @@ See: [`docs/data-flow.md`](docs/data-flow.md) — "Type-Safe API Clients"
 1. Add route constant to `packages/syntara-ui/src/app/AppRoute.tsx`
 2. Add navigation item to `packages/syntara-ui/src/app/navigationItems.tsx` with lazy-loaded component
 3. The router auto-discovers it from `navigationItems` — no manual route config needed. If the route owns URL search state, declare it with `validateSearch` and use TanStack Router APIs to read and update it.
-4. In the page component, render `<title>{toPageTitle(['Page Name'])}</title>` as the first child of `<SynPage>`; import `toPageTitle` from `src/utils/toPageTitle`
+4. In the page component, render `<SynPageTitle segments={['Page Name']} />` as the first child of `<SynPage>`; import `SynPageTitle` from `src/components/SynPageTitle`
 5. Run `npm run route-baseline:update` and commit the regenerated `manifest.gen.json`
 
 #### How do I add filters to a list page?

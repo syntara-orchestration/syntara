@@ -1862,27 +1862,28 @@ if (isNotFound) {
 
 Look at sibling pages in the same route directory. If `IdentityProviderDetail.tsx` uses `<SynEmptyState>` for its not-found state, the new `EditGroupMapping.tsx` in the same directory must match that pattern -- not introduce raw text.
 
-## 37. Browser Tab Titles -- `toPageTitle`
+## 37. Browser Tab Titles -- `SynPageTitle`
 
-Every top-level page component (default export with an `<SynPage>` render) must include `<title>` as the first child of `<SynPage>`. React 19 hoists it to `<head>` automatically — no third-party library needed.
+Every top-level page component (default export with an `<SynPage>` render) must render `<SynPageTitle>` as the first child of `<SynPage>`. It renders a `<title>` built with `toPageTitle`, and React 19 hoists it to `<head>` automatically. ESLint (`syntara/require-page-title`) fails route files that render no title; placement as the first child is a review check.
 
 ```tsx
-import { toPageTitle } from '../../utils/toPageTitle'
+import { SynPageTitle } from '../../components/SynPageTitle'
 
 export default function Workflows() {
   return (
     <SynPage>
-      <title>{toPageTitle(['Workflows'])}</title>
+      <SynPageTitle segments={['Workflows']} />
       <SynPageHeader title="Workflows" ... />
     </SynPage>
   )
 }
 ```
 
-- **Static pages**: pass a string literal — `toPageTitle(['Credentials'])`
-- **Dynamic pages**: pass the entity name — `toPageTitle([integration.name])` (falls back gracefully if undefined/null)
-- **Loading/error states**: use a static fallback — `toPageTitle(['Integration'])`
-- **Multi-segment pages**: `toPageTitle(['admin', 'Users'])` → `admin | Users | Syntara`
+- **Static pages**: pass a string literal — `segments={['Credentials']}`
+- **Dynamic pages**: pass the entity name — `segments={[integration.name]}` (null/undefined/blank segments are dropped)
+- **Loading/error states**: use a static fallback — `segments={['Integration']}`
+- **Multi-segment pages**: `segments={['admin', 'Users']}` → `admin | Users | Syntara`
+- Call `toPageTitle` directly only when you need the title string itself rather than a rendered `<title>`
 
 ## 38. React 19 Ref Patterns — No `forwardRef`; Prefer Ref Cleanup Functions
 

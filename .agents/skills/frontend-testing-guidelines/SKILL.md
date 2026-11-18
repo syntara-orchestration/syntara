@@ -184,7 +184,7 @@ Does the component use browser-specific APIs?
 
 ### E2E Test Tags (`@pr-check`, `@local-only`)
 
-Tagging rules for Playwright tests live in `.agents/skills/frontend-playwright-e2e/SKILL.md` → "Test Suite Tags". `@pr-check` marks a fast critical-path subset for quick local runs (`npm run e2e:pr-check` in `packages/syntara-ui`); no CI workflow filters on it yet.
+Tagging rules for Playwright tests live in `.agents/skills/frontend-playwright-e2e/SKILL.md` → "Test Suite Tags". `@pr-check` marks a fast critical-path subset for quick local runs (`npm run e2e:pr-check` in `packages/syntara-ui`); no workflow in this repo filters on it yet.
 
 ---
 
