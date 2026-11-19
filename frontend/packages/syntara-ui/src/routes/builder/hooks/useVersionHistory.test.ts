@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { renderHook, act } from '@testing-library/react'
+import { renderHook, act, waitFor } from '@testing-library/react'
 import { createElement } from 'react'
 import type { ReactNode } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -398,7 +398,7 @@ describe('useVersionHistory', () => {
   })
 
   describe('publishVersion', () => {
-    it('checks output contracts then publishes with the selected version definition', () => {
+    it('checks output contracts then publishes with the selected version definition', async () => {
       const { result } = renderHook(() => useVersionHistory({ workflowId: 'wf-1', isNew: false }), {
         wrapper: makeWrapper(queryClient),
       })
@@ -406,6 +406,8 @@ describe('useVersionHistory', () => {
       act(() => {
         result.current.publishVersion(2)
       })
+
+      await waitFor(() => expect(mockMutate).toHaveBeenCalled())
 
       expect(mockCheckBreakingChangesMutate).toHaveBeenCalledWith(
         {
@@ -426,7 +428,7 @@ describe('useVersionHistory', () => {
       )
     })
 
-    it('passes publishName and changeDescription when provided', () => {
+    it('passes publishName and changeDescription when provided', async () => {
       const { result } = renderHook(() => useVersionHistory({ workflowId: 'wf-1', isNew: false }), {
         wrapper: makeWrapper(queryClient),
       })
@@ -434,6 +436,8 @@ describe('useVersionHistory', () => {
       act(() => {
         result.current.publishVersion(2, 'Release 1.0', 'First public release')
       })
+
+      await waitFor(() => expect(mockMutate).toHaveBeenCalled())
 
       expect(mockMutate).toHaveBeenCalledWith(
         {
@@ -450,7 +454,7 @@ describe('useVersionHistory', () => {
       )
     })
 
-    it('waits for confirmation before publishing a breaking version', () => {
+    it('waits for confirmation before publishing a breaking version', async () => {
       mockCheckBreakingChangesMutate.mockImplementation(
         (
           _params: unknown,
@@ -473,6 +477,8 @@ describe('useVersionHistory', () => {
 
       act(() => result.current.publishVersion(2, 'Release'))
 
+      await waitFor(() => expect(result.current.breakingChanges).toHaveLength(1))
+
       expect(result.current.breakingChanges).toHaveLength(1)
       expect(mockMutate).not.toHaveBeenCalled()
 
@@ -481,7 +487,7 @@ describe('useVersionHistory', () => {
       expect(mockMutate).toHaveBeenCalledOnce()
     })
 
-    it('refetches versions and invalidates queries on publish success', () => {
+    it('refetches versions and invalidates queries on publish success', async () => {
       mockMutate.mockImplementation((_params: unknown, callbacks?: { onSuccess?: () => void }) => {
         callbacks?.onSuccess?.()
       })
@@ -494,11 +500,13 @@ describe('useVersionHistory', () => {
         result.current.publishVersion(2)
       })
 
+      await waitFor(() => expect(mockRefetch).toHaveBeenCalled())
+
       expect(mockRefetch).toHaveBeenCalled()
       expect(mockShowSuccess).toHaveBeenCalledWith({ title: 'Version published' })
     })
 
-    it('calls onVersionUpdated when publish response includes current_version', () => {
+    it('calls onVersionUpdated when publish response includes current_version', async () => {
       const onVersionUpdated = vi.fn()
       mockMutate.mockImplementation(
         (_params: unknown, callbacks?: { onSuccess?: (data: { current_version: number }) => void }) => {
@@ -514,10 +522,12 @@ describe('useVersionHistory', () => {
         result.current.publishVersion(2)
       })
 
+      await waitFor(() => expect(onVersionUpdated).toHaveBeenCalledWith(9))
+
       expect(onVersionUpdated).toHaveBeenCalledWith(9)
     })
 
-    it('does not call onVersionUpdated when publish response omits current_version', () => {
+    it('does not call onVersionUpdated when publish response omits current_version', async () => {
       const onVersionUpdated = vi.fn()
       mockMutate.mockImplementation((_params: unknown, callbacks?: { onSuccess?: (data: object) => void }) => {
         callbacks?.onSuccess?.({})
@@ -530,6 +540,8 @@ describe('useVersionHistory', () => {
       act(() => {
         result.current.publishVersion(2)
       })
+
+      await waitFor(() => expect(mockMutate).toHaveBeenCalled())
 
       expect(onVersionUpdated).not.toHaveBeenCalled()
     })
@@ -546,7 +558,7 @@ describe('useVersionHistory', () => {
       expect(mockMutate).not.toHaveBeenCalled()
     })
 
-    it('shows success alert on publish success', () => {
+    it('shows success alert on publish success', async () => {
       mockMutate.mockImplementation((_params: unknown, callbacks?: { onSuccess?: () => void }) => {
         callbacks?.onSuccess?.()
       })
@@ -559,10 +571,12 @@ describe('useVersionHistory', () => {
         result.current.publishVersion(2)
       })
 
+      await waitFor(() => expect(mockShowSuccess).toHaveBeenCalledWith({ title: 'Version published' }))
+
       expect(mockShowSuccess).toHaveBeenCalledWith({ title: 'Version published' })
     })
 
-    it('shows error alert on publish failure', () => {
+    it('shows error alert on publish failure', async () => {
       const mockError = new Error('Publish failed')
       mockMutate.mockImplementation((_params: unknown, callbacks?: { onError?: (error: unknown) => void }) => {
         callbacks?.onError?.(mockError)
@@ -575,6 +589,8 @@ describe('useVersionHistory', () => {
       act(() => {
         result.current.publishVersion(2)
       })
+
+      await waitFor(() => expect(mockShowError).toHaveBeenCalled())
 
       expect(mockShowError).toHaveBeenCalledWith({
         title: 'Failed to publish version',

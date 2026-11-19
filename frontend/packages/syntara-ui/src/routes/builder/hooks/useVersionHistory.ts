@@ -1,6 +1,6 @@
 import type { WorkflowAPI } from '@syntara/contracts'
 import { useQueryClient } from '@tanstack/react-query'
-import { useCallback, useMemo, useState, type Dispatch, type SetStateAction } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 
 import { workflowClient } from '../../../client'
 import type { PaginationFooterProps } from '../../../components/table/PaginationFooter'
@@ -11,6 +11,7 @@ import { detachPromise } from '../../../utils/detachPromise'
 import { downloadVersionExport } from '../../../utils/downloadWorkflowExport'
 
 import { buildWorkflowVersionsQuery } from './buildWorkflowVersionsQuery'
+import { useOutputContractReview } from './useOutputContractReview'
 import { resolvePublishedVersionName } from './versionHistoryHelpers'
 
 export type VersionStatus = 'draft' | 'published' | 'previously_published'
@@ -21,29 +22,6 @@ export function isVersionStatus(s: string): s is VersionStatus {
 }
 
 type WorkflowVersion = WorkflowAPI.components['schemas']['WorkflowVersionRead']
-type TriggerBreakingChanges = WorkflowAPI.components['schemas']['TriggerBreakingChanges']
-type ContractReference = WorkflowAPI.components['schemas']['WorkflowReferenceRead']
-
-function updateContractReviewState(
-  response: WorkflowAPI.components['schemas']['BreakingChangesResponse'],
-  setBreakingChanges: Dispatch<SetStateAction<TriggerBreakingChanges[]>>,
-  setContractChanges: Dispatch<SetStateAction<TriggerBreakingChanges[]>>,
-  setParentWorkflows: Dispatch<SetStateAction<ContractReference[]>>
-): void {
-  setBreakingChanges(response.triggers)
-  setContractChanges(response.contract_changes ?? [])
-  setParentWorkflows(response.parent_workflows ?? [])
-}
-
-function clearContractReviewState(
-  setBreakingChanges: Dispatch<SetStateAction<TriggerBreakingChanges[]>>,
-  setContractChanges: Dispatch<SetStateAction<TriggerBreakingChanges[]>>,
-  setParentWorkflows: Dispatch<SetStateAction<ContractReference[]>>
-): void {
-  setBreakingChanges([])
-  setContractChanges([])
-  setParentWorkflows([])
-}
 
 function openWorkflowVersion(workflowId: string | null, version: number): void {
   if (workflowId) window.open(`/workflow-builder/${workflowId}?version=${version}`, '_blank', 'noopener,noreferrer')
@@ -80,6 +58,14 @@ export function useVersionHistory({ workflowId, isNew, onVersionUpdated }: UseVe
   const [statusFilter, setStatusFilterState] = useState<VersionStatus[]>([])
   const queryClient = useQueryClient()
   const { showSuccess, showError } = useAlerts()
+  const {
+    breakingChanges,
+    contractChanges,
+    parentWorkflows,
+    isChecking: isCheckingOutputContract,
+    clearReview: clearOutputContractReview,
+    reviewOutputContract: runOutputContractReview,
+  } = useOutputContractReview(workflowId)
 
   const {
     cursor: versionsCursor,
@@ -120,14 +106,7 @@ export function useVersionHistory({ workflowId, isNew, onVersionUpdated }: UseVe
 
   const restoreMutation = workflowClient.useMutation('post', '/workflows/{workflow_id}/versions/{version}/restore')
   const publishMutation = workflowClient.useMutation('post', '/workflows/{workflow_id}/versions/{version}/publish')
-  const checkBreakingChangesMutation = workflowClient.useMutation(
-    'post',
-    '/workflows/{workflow_id}/check_subworkflow_output_contract_changes'
-  )
   const updateMetadataMutation = workflowClient.useMutation('patch', '/workflows/{workflow_id}/versions/{version}')
-  const [breakingChanges, setBreakingChanges] = useState<TriggerBreakingChanges[]>([])
-  const [contractChanges, setContractChanges] = useState<TriggerBreakingChanges[]>([])
-  const [parentWorkflows, setParentWorkflows] = useState<ContractReference[]>([])
   const [pendingPublish, setPendingPublish] = useState<PendingVersionPublish | null>(null)
 
   const allVersions = versionsQuery.data?.resources
@@ -202,44 +181,37 @@ export function useVersionHistory({ workflowId, isNew, onVersionUpdated }: UseVe
         workflowDefinition,
         onSettled,
       }
-      clearContractReviewState(setBreakingChanges, setContractChanges, setParentWorkflows)
+      clearOutputContractReview()
       setPendingPublish(pending)
-      checkBreakingChangesMutation.mutate(
-        {
-          params: { path: { workflow_id: workflowId } },
-          body: { workflow_definition: workflowDefinition },
-        },
-        {
-          onSuccess: (response) => {
-            updateContractReviewState(response, setBreakingChanges, setContractChanges, setParentWorkflows)
-            if (response.has_breaking_changes || (response.has_contract_changes && response.parent_workflows?.length)) {
-              return
-            }
-            setPendingPublish(null)
-            publishVersionNow(pending)
-          },
-          onError: (error: unknown) => {
-            setPendingPublish(null)
-            showError({ title: 'Failed to check output contract changes', description: getErrorMessage(error) })
-          },
-        }
+      detachPromise(
+        runOutputContractReview(workflowDefinition, (error) => {
+          setPendingPublish(null)
+          showError({ title: 'Failed to check output contract changes', description: getErrorMessage(error) })
+        }).then((response) => {
+          if (!response) return
+          if (response.has_breaking_changes || (response.has_contract_changes && response.parent_workflows?.length)) {
+            return
+          }
+          setPendingPublish(null)
+          publishVersionNow(pending)
+        })
       )
     },
-    [workflowId, allVersions, checkBreakingChangesMutation, publishVersionNow, showError]
+    [workflowId, allVersions, clearOutputContractReview, runOutputContractReview, publishVersionNow, showError]
   )
 
   const confirmPublishVersion = useCallback(() => {
     if (!pendingPublish) return
     const pending = pendingPublish
-    clearContractReviewState(setBreakingChanges, setContractChanges, setParentWorkflows)
+    clearOutputContractReview()
     setPendingPublish(null)
     publishVersionNow(pending)
-  }, [pendingPublish, publishVersionNow])
+  }, [pendingPublish, clearOutputContractReview, publishVersionNow])
 
   const cancelBreakingChangeWarning = useCallback(() => {
-    clearContractReviewState(setBreakingChanges, setContractChanges, setParentWorkflows)
+    clearOutputContractReview()
     setPendingPublish(null)
-  }, [])
+  }, [clearOutputContractReview])
 
   const openInNewWindow = useCallback((version: number) => openWorkflowVersion(workflowId, version), [workflowId])
 
@@ -275,7 +247,7 @@ export function useVersionHistory({ workflowId, isNew, onVersionUpdated }: UseVe
     exportVersion,
     openInNewWindow,
     publishVersion,
-    isPublishingVersion: publishMutation.isPending || checkBreakingChangesMutation.isPending,
+    isPublishingVersion: publishMutation.isPending || isCheckingOutputContract,
     breakingChanges,
     contractChanges,
     parentWorkflows,
