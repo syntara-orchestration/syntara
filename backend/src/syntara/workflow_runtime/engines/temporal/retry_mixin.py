@@ -957,12 +957,13 @@ class WorkflowRetryMixin:
     def _should_restore_node(self, node_id: str, graph: WorkflowGraph) -> bool:
         """Whether this node's stored output may be injected instead of running it.
 
-        Membership decides it, for every node type. A condition or switch in the
-        set is held to the extra test of whether its recorded branch is recoverable;
-        if it is not, it re-decides normally. A loop must reach its executor so
-        its per-iteration probe can route it; generic restoration would lose that
-        routing state. A converge is evaluated at its gate and restored only when
-        the source occurrence and every direct predecessor's stable state match.
+        Membership decides it, for every node type. A completed condition or
+        switch still needs a recoverable branch; if none is known it re-decides.
+        A failed or skipped one never took a port, so it is restored as that
+        terminal outcome instead of being evaluated again. A loop must reach its
+        executor so its per-iteration probe can route it. A converge is evaluated
+        at its gate and restored only when the source occurrence and every direct
+        predecessor's stable state match.
         """
         if not self.retry_context:
             return False
@@ -973,9 +974,42 @@ class WorkflowRetryMixin:
         node = graph.get_node(node_id)
         if node is not None and node.type == NodeType.LOOP:
             return False
-        if node is not None and node.type in _CONTROL_NODE_TYPES_FOR_RETRY:
-            return node.type in _INFERABLE_CONTROL_NODE_TYPES and bool(self._resolved_control_port(node, graph))
-        return self._source_status_for_node(node_id, graph) in _RESTORABLE_SOURCE_STATUS_VALUES
+        if node is None or node.type not in _CONTROL_NODE_TYPES_FOR_RETRY:
+            return self._source_status_for_node(node_id, graph) in _RESTORABLE_SOURCE_STATUS_VALUES
+        if node.type not in _INFERABLE_CONTROL_NODE_TYPES:
+            return False
+        source_status = self._source_status_for_node(node_id, graph)
+        return source_status in (ActivityStatus.FAILED.value, ActivityStatus.SKIPPED.value) or bool(
+            self._resolved_control_port(node, graph)
+        )
+
+    def _restore_inferable_control_result(
+        self,
+        node: ActivityNode,
+        record: dict[str, Any] | None,
+        output: dict[str, Any],
+        source_status: str,
+        error_details: str | None,
+        graph: WorkflowGraph,
+    ) -> dict[str, Any] | None:
+        """Restore a condition or switch: terminal if it failed, otherwise its port.
+
+        A failed or skipped control node never took a branch. Publishing that
+        terminal outcome keeps an unselected sibling from being evaluated again.
+        A completed node still needs the routing decision the source run recorded.
+        """
+        if source_status in (ActivityStatus.FAILED.value, ActivityStatus.SKIPPED.value):
+            if output:
+                self._restored_node_outputs[node.id] = output
+            return self._restored_terminal_result(node, source_status, output, error_details)
+
+        stored_control = (record or {}).get("control_data") or {}
+        recorded_port = stored_control.get("next_port") if isinstance(stored_control, dict) else None
+        port = str(recorded_port) if recorded_port else self._resolved_control_port(node, graph)
+        if port is None:
+            return None
+        workflow.logger.info("Restored control node branch from source run", extra={"node_id": node.id, "port": port})
+        return {"output": output, "control": {"next_port": port}}
 
     async def _restore_node_state(  # noqa: C901, PLR0911
         self,
@@ -1054,7 +1088,12 @@ class WorkflowRetryMixin:
             raise SafeValueError(msg)
 
         output = (record or {}).get("output_data") or {}
-        source_status = str((record or {}).get("status") or ActivityStatus.COMPLETED.value)
+        record_status = (record or {}).get("status")
+        source_status = (
+            str(record_status)
+            if record_status
+            else (self._source_status_for_node(node.id, graph) or ActivityStatus.COMPLETED.value)
+        )
         error_details = (record or {}).get("error_details")
         restored_input = (record or {}).get("input_data") or {}
         self.node_inputs[node.id] = restored_input
@@ -1082,22 +1121,10 @@ class WorkflowRetryMixin:
                     return self._restored_terminal_result(node, source_status, output, error_details)
                 return {"output": output, "control": None}
 
-            # A control node needs the routing decision, not a payload, and the
-            # source row already carries it. The persisted ``control_data`` wins,
-            # because the sync layer records the branch the run actually took;
-            # inference stays the fallback for runs predating that column and for
-            # control data with no ``next_port``. The output is the source run's own
-            # and must not be replaced — only the port travels as control data,
-            # which is what the scheduler reads to pick the edge.
-            stored_control = (record or {}).get("control_data") or {}
-            recorded_port = stored_control.get("next_port") if isinstance(stored_control, dict) else None
-            port = str(recorded_port) if recorded_port else self._resolved_control_port(node, graph)
-            if port is None:
-                return None
-            workflow.logger.info(
-                "Restored control node branch from source run", extra={"node_id": node.id, "port": port}
+            control_record = record if isinstance(record, dict) else None
+            return self._restore_inferable_control_result(
+                node, control_record, output, source_status, error_details, graph
             )
-            return {"output": output, "control": {"next_port": port}}
 
         # Only a node that did not succeed has output worth keeping: a restored
         # completion publishes its own output through the normal path.

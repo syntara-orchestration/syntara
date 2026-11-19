@@ -137,6 +137,17 @@ def _retry_inside_loop_graph() -> WorkflowGraph:
     return WorkflowGraph(backend)
 
 
+def _parallel_failed_conditions_graph() -> WorkflowGraph:
+    """Fan-out of two conditions with no downstream work — the QA two-failure fixture."""
+    backend = InMemoryGraphBackend()
+    backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
+    backend.add_node("first", {"id": "first", "type": "condition", "parameters": {}})
+    backend.add_node("second", {"id": "second", "type": "condition", "parameters": {}})
+    backend.add_edge("trigger", "first", None)
+    backend.add_edge("trigger", "second", None)
+    return WorkflowGraph(backend)
+
+
 def _node(graph: WorkflowGraph, node_id: str) -> ActivityNode:
     node = graph.get_node(node_id)
     assert node is not None, f"missing node {node_id}"
@@ -379,6 +390,48 @@ def test_condition_is_not_restorable_when_the_branch_is_unknown() -> None:
     # decision that refuses it, because no branch can be recovered for it.
     assert "cond_1" in wf._retry_restorable_nodes(graph)
     assert wf._should_restore_node("cond_1", graph) is False
+
+
+def test_unselected_failed_condition_is_restored_without_a_branch() -> None:
+    """A failed condition never took a port; an unselected sibling must stay failed."""
+    wf = _make_workflow({"retry_from_execution_id": "src-1", "eligible_point_ids": ["first"]})
+    graph = _parallel_failed_conditions_graph()
+    wf._retry_source_statuses = {
+        "first": ActivityStatus.FAILED.value,
+        "second": ActivityStatus.FAILED.value,
+    }
+
+    assert "second" in wf._retry_restorable_nodes(graph)
+    assert wf._should_restore_node("second", graph) is True
+    assert wf._should_restore_node("first", graph) is False
+
+
+@pytest.mark.asyncio
+async def test_unselected_failed_condition_replays_as_retained_failure(mock_wf: MagicMock) -> None:
+    """Replay publishes the source failure instead of evaluating the condition again."""
+    wf = _make_workflow({"retry_from_execution_id": "src-1", "eligible_point_ids": ["first"]})
+    graph = _parallel_failed_conditions_graph()
+    wf._retry_source_statuses = {
+        "first": ActivityStatus.FAILED.value,
+        "second": ActivityStatus.FAILED.value,
+    }
+    mock_wf.execute_activity.return_value = {
+        "output_data": {"error": "missing_scope_b"},
+        "status": ActivityStatus.FAILED.value,
+        "error_details": "Failed to evaluate condition",
+        "input_data": {"condition": "missing_scope_b == true"},
+        "started_at": "2026-11-19T16:34:44Z",
+        "completed_at": "2026-11-19T16:34:44Z",
+    }
+
+    result = await wf._restore_node_state(_node(graph, "second"), graph)
+
+    assert result is not None
+    assert result["control"] is None
+    assert result["output"]["status"] == "failed"
+    assert wf.failed_nodes["second"] == "Failed to evaluate condition"
+    assert wf._restored_node_statuses["second"] == ActivityStatus.FAILED.value
+    assert "second" not in wf.skipped_nodes
 
 
 def test_loop_body_statuses_do_not_imply_a_branch() -> None:
