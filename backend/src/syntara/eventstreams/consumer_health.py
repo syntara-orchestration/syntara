@@ -7,11 +7,15 @@ dependencies. A stalled or exited process cannot answer a liveness request.
 import argparse
 import asyncio
 import socket
+import sys
 from collections.abc import Callable
 from contextlib import suppress
+from typing import Final
 
-HEALTH_HOST = "127.0.0.1"
+HEALTH_HOST: Final = "127.0.0.1"
 HEALTH_PORT = 8768
+MIN_HEALTH_PORT = 1024
+MAX_HEALTH_PORT = 65535
 HEALTH_TIMEOUT_SECONDS = 2
 
 
@@ -52,7 +56,7 @@ class EventWorkerHealth:
                 healthy = mode == b"L" or (mode == b"R" and not self._closing and self._ready())
                 writer.write(b"1" if healthy else b"0")
                 await writer.drain()
-        except (OSError, TimeoutError, asyncio.IncompleteReadError):
+        except (OSError, asyncio.IncompleteReadError):
             pass
         finally:
             writer.close()
@@ -62,6 +66,9 @@ class EventWorkerHealth:
 
 def probe(mode: str, *, port: int = HEALTH_PORT) -> bool:
     """Require a fresh response from this process, bounded below the exec timeout."""
+    if not isinstance(port, int) or not MIN_HEALTH_PORT <= port <= MAX_HEALTH_PORT:
+        msg = f"Health probe port must be an integer between {MIN_HEALTH_PORT} and {MAX_HEALTH_PORT}"
+        raise ValueError(msg)
     try:
         with socket.create_connection((HEALTH_HOST, port), timeout=HEALTH_TIMEOUT_SECONDS) as connection:
             connection.sendall(b"L" if mode == "live" else b"R")
@@ -75,8 +82,14 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("mode", choices=("live", "ready"))
     parser.add_argument("--port", type=int, default=HEALTH_PORT)
-    args = parser.parse_args()
-    return 0 if probe(args.mode, port=args.port) else 1
+    try:
+        args = parser.parse_args()
+        return 0 if probe(args.mode, port=args.port) else 1
+    except ValueError as error:
+        sys.stderr.write(f"{parser.prog}: error: {error}\n")
+        return 1
+    except SystemExit as error:
+        return 0 if error.code == 0 else 1
 
 
 if __name__ == "__main__":
