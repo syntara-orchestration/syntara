@@ -317,6 +317,8 @@ describe('Executions Component', () => {
 
     expect(screen.getByText('Access denied')).toBeInTheDocument()
     expect(screen.getByText('You do not have permission to view workflow runs in this project.')).toBeInTheDocument()
+    expect(mockShowError).not.toHaveBeenCalled()
+    expect(mockShowWarning).not.toHaveBeenCalled()
   })
 
   it('shows a service unavailable message when the list API returns 503', () => {
@@ -325,7 +327,7 @@ describe('Executions Component', () => {
 
     render(<Executions />, { wrapper: TestWrapper })
 
-    expect(screen.getByText('Service Unavailable')).toBeInTheDocument()
+    expect(screen.getByText('Service unavailable')).toBeInTheDocument()
     expect(
       screen.getByText('The workflow service is temporarily unavailable. Try again in a few minutes.')
     ).toBeInTheDocument()
