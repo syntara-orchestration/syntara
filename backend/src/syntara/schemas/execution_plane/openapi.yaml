@@ -3,7 +3,7 @@ openapi: 3.1.0
 info:
   title: Execution Plane API
   description: Execution Plane operator endpoints — manage execution targets and observe work items.
-  version: 0.3.0
+  version: 0.3.1
 paths:
   /api/execution_plane/v1/execution_targets:
     post:
@@ -593,14 +593,17 @@ components:
           title: Name
         placement:
           $ref: '#/components/schemas/KubernetesTargetPlacement'
+          description: Namespace and pod scheduling rules for this target. Updates require namespace; omitted scheduling lists retain their stored values. The placement type cannot be changed.
         labels:
           additionalProperties:
             type: string
           type: object
           title: Labels
+          description: User labels matched by work.execute selectors when routing workloads. Updates replace user labels; {} clears them. EP retains its reserved identity labels.
         is_default:
           type: boolean
           title: Is Default
+          description: Promote this target to the cluster default, replacing the previous default. The target and cluster must be active and enabled. To demote a default, promote another target rather than setting this field to false.
           default: false
       additionalProperties: false
       type: object
@@ -619,6 +622,7 @@ components:
           type: boolean
           const: true
           title: Accepted
+          description: Confirms that EP accepted the deletion request, not that draining or physical removal has finished.
           default: true
       type: object
       required:
@@ -630,6 +634,7 @@ components:
         healthy:
           type: boolean
           title: Healthy
+          description: 'Whether the namespace probe succeeded. For Kubernetes this checks namespace readability, not workload execution. Check skipped first: a skipped probe also returns true.'
         message:
           anyOf:
             - type: string
@@ -638,6 +643,7 @@ components:
         skipped:
           type: boolean
           title: Skipped
+          description: True when no health check ran because the backend, endpoint, or cluster/target lifecycle is outside probe scope; healthy then does not establish readiness.
           default: false
       additionalProperties: false
       type: object
@@ -739,17 +745,21 @@ components:
         placement:
           $ref: '#/components/schemas/KubernetesTargetPlacement'
           title: Placement
+          description: Namespace and pod scheduling rules for this target. Updates require namespace; omitted scheduling lists retain their stored values. The placement type cannot be changed.
         labels:
           additionalProperties:
             type: string
           type: object
           title: Labels
+          description: User labels matched by work.execute selectors when routing workloads. Updates replace user labels; {} clears them. EP retains its reserved identity labels.
         is_default:
           type: boolean
           title: Is Default
+          description: Promote this target to the cluster default, replacing the previous default. The target and cluster must be active and enabled. To demote a default, promote another target rather than setting this field to false.
         enabled:
           type: boolean
           title: Enabled
+          description: Whether the scheduler may assign new workloads to this target; disabling it does not request cancellation of work already assigned.
       additionalProperties: false
       type: object
       minProperties: 1
@@ -765,6 +775,7 @@ components:
           type: integer
           minimum: 0.0
           title: Active Workload Count
+          description: Number of assigned work items in claimed, dispatched, running, or reconciliation_required state. These states block safe deletion; pending and terminal items are excluded.
       type: object
       required:
         - target_id
@@ -799,11 +810,13 @@ components:
             type: string
           type: array
           title: Node Selectors
+          description: Pod nodeSelector entries in key=value form. Nodes must match every entry; an empty list imposes no label restriction. On update, omission preserves the stored list and [] clears it.
         tolerations:
           items:
             type: string
           type: array
           title: Tolerations
+          description: Pod taints to tolerate, using key=value:effect (Equal) or key:effect (Exists). Effect may be NoSchedule, PreferNoSchedule, or NoExecute; omitting it matches all effects. An empty key with Exists matches all keys. On update, omission preserves the list and [] clears it.
       type: object
       required:
         - namespace
@@ -822,16 +835,19 @@ components:
           minLength: 1
           pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
           title: Namespace
+          description: Existing Kubernetes namespace in which EP creates workload pods and checks target health.
         node_selectors:
           items:
             type: string
           type: array
           title: Node Selectors
+          description: Pod nodeSelector entries in key=value form. Nodes must match every entry; an empty list imposes no label restriction. On update, omission preserves the stored list and [] clears it.
         tolerations:
           items:
             type: string
           type: array
           title: Tolerations
+          description: Pod taints to tolerate, using key=value:effect (Equal) or key:effect (Exists). Effect may be NoSchedule, PreferNoSchedule, or NoExecute; omitting it matches all effects. An empty key with Exists matches all keys. On update, omission preserves the list and [] clears it.
       additionalProperties: false
       type: object
       required:

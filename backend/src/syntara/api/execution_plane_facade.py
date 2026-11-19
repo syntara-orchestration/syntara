@@ -80,7 +80,14 @@ class ExecutionTargetUsageRead(BaseModel):
     """Current workloads that make an execution target unsafe to delete."""
 
     target_id: UUID
-    active_workload_count: int = Field(ge=0)
+    active_workload_count: int = Field(
+        ge=0,
+        description=(
+            "Number of assigned work items in claimed, dispatched, running, or "
+            "reconciliation_required state. These states block safe deletion; pending and terminal "
+            "items are excluded."
+        ),
+    )
 
 
 def _validate_query_params(
