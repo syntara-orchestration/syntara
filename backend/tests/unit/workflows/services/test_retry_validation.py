@@ -94,16 +94,26 @@ def _make_execution(status: ExecutionStatus) -> Mock:
     return execution
 
 
-def _make_activity(name: str) -> Mock:
+def _make_activity(name: str, *, temporal_activity_id: str | None = None, iteration: int | None = None) -> Mock:
     activity = Mock()
     activity.activity_name = name
+    activity.temporal_activity_id = temporal_activity_id or name
+    activity.iteration = iteration
     activity.status = ActivityStatus.FAILED
     return activity
 
 
-def _make_completed_activity(name: str, output: dict[str, Any] | None = None) -> Mock:
+def _make_completed_activity(
+    name: str,
+    output: dict[str, Any] | None = None,
+    *,
+    temporal_activity_id: str | None = None,
+    iteration: int | None = None,
+) -> Mock:
     activity = Mock()
     activity.activity_name = name
+    activity.temporal_activity_id = temporal_activity_id or name
+    activity.iteration = iteration
     activity.status = ActivityStatus.COMPLETED
     activity.output_data = output if output is not None else {"result": "ok"}
     return activity
@@ -836,6 +846,21 @@ def _converge_definition() -> dict[str, Any]:
     }
 
 
+def _loop_converge_definition() -> dict[str, Any]:
+    loop = {"id": "loop_1", "type": "loop", "parameters": {}}
+    body = {"id": "step_a", "type": "script", "parameters": {"code": "exit 1"}}
+    converge = {"id": "conv_1", "type": "converge", "parameters": {}}
+    return {
+        "triggers": TRIGGERS,
+        "nodes": [loop, body, converge],
+        "edges": [
+            {"from": "trigger_1", "to": "loop_1"},
+            {"from": "loop_1", "to": "step_a"},
+            {"from": "step_a", "to": "conv_1"},
+        ],
+    }
+
+
 def _converge_session(execution: Mock, converge_status: str) -> AsyncSession:
     snapshot = _make_version(1)
     snapshot.workflow_definition = _converge_definition()
@@ -860,6 +885,77 @@ async def test_validate_retry_rejects_failure_under_completed_converge() -> None
     verdict = await validate_retry_from_failure(session, execution.id, ["step_a"])
     assert verdict.eligible is False
     assert "conv_1" in (verdict.reason or "")
+
+
+@pytest.mark.asyncio
+async def test_validate_retry_allows_later_loop_failure_when_earlier_converge_completed() -> None:
+    """A completed converge from iteration 0 must not block a failure in iteration 1."""
+    execution = _make_execution(ExecutionStatus.FAILED)
+    session = _run_session(
+        execution,
+        _loop_converge_definition(),
+        failed=[_make_activity("step_a#iter-1", temporal_activity_id="step_a_iter_1", iteration=1)],
+        completed=[_make_completed_activity("conv_1", temporal_activity_id="conv_1_iter_0", iteration=0)],
+    )
+
+    verdict = await validate_retry_from_failure(session, execution.id, ["step_a"])
+
+    assert verdict.eligible is True
+    assert verdict.reason is None
+
+
+@pytest.mark.asyncio
+async def test_validate_retry_rejects_loop_failure_when_same_iteration_converge_completed() -> None:
+    """A converge completed in the failed occurrence's iteration still blocks retry."""
+    execution = _make_execution(ExecutionStatus.FAILED)
+    session = _run_session(
+        execution,
+        _loop_converge_definition(),
+        failed=[_make_activity("step_a#iter-1", temporal_activity_id="step_a_iter_1", iteration=1)],
+        completed=[_make_completed_activity("conv_1#iter-1", temporal_activity_id="conv_1_iter_1", iteration=1)],
+    )
+
+    verdict = await validate_retry_from_failure(session, execution.id, ["step_a"])
+
+    assert verdict.eligible is False
+    assert "conv_1" in (verdict.reason or "")
+
+
+@pytest.mark.asyncio
+async def test_validate_retry_rejects_loop_failure_when_outer_converge_completed() -> None:
+    """A converge outside the loop is shared by all iteration paths."""
+    execution = _make_execution(ExecutionStatus.FAILED)
+    session = _run_session(
+        execution,
+        _loop_converge_definition(),
+        failed=[_make_activity("step_a#iter-1", temporal_activity_id="step_a_iter_1", iteration=1)],
+        completed=[_make_completed_activity("conv_1", temporal_activity_id="conv_1", iteration=None)],
+    )
+
+    verdict = await validate_retry_from_failure(session, execution.id, ["step_a"])
+
+    assert verdict.eligible is False
+    assert "conv_1" in (verdict.reason or "")
+
+
+@pytest.mark.asyncio
+async def test_validate_retry_allows_base_selection_when_only_some_failed_iterations_reached_converge() -> None:
+    """Base-node selection remains useful if any failed occurrence still needs retry."""
+    execution = _make_execution(ExecutionStatus.FAILED)
+    session = _run_session(
+        execution,
+        _loop_converge_definition(),
+        failed=[
+            _make_activity("step_a", temporal_activity_id="step_a_iter_0", iteration=0),
+            _make_activity("step_a#iter-1", temporal_activity_id="step_a_iter_1", iteration=1),
+        ],
+        completed=[_make_completed_activity("conv_1", temporal_activity_id="conv_1_iter_0", iteration=0)],
+    )
+
+    verdict = await validate_retry_from_failure(session, execution.id, ["step_a"])
+
+    assert verdict.eligible is True
+    assert verdict.reason is None
 
 
 @pytest.mark.asyncio

@@ -74,6 +74,7 @@ Design decisions (aligned 2026-09-24):
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
@@ -271,17 +272,57 @@ def _nearest_downstream_converges(
     return []
 
 
+_TEMPORAL_ITERATION_CHAIN = re.compile(r"(?:_iter_\d+)+$")
+_TEMPORAL_ITERATION_INDEX = re.compile(r"_iter_(\d+)")
+
+
+def _activity_iteration_path(activity: ActivityExecution) -> tuple[int, ...]:
+    """Return the enclosing loop indices for one persisted activity occurrence."""
+    temporal_id = activity.temporal_activity_id
+    match = _TEMPORAL_ITERATION_CHAIN.search(temporal_id)
+    if match is not None:
+        return tuple(int(index) for index in _TEMPORAL_ITERATION_INDEX.findall(match.group()))
+
+    # Older Temporal histories may not carry iteration suffixes in their IDs;
+    # the sync layer still records the innermost index on the activity row.
+    if activity.iteration is not None:
+        return (activity.iteration,)
+    return ()
+
+
+def _converge_completed_for_path(
+    converge_id: str,
+    point_path: tuple[int, ...],
+    completed: Sequence[ActivityExecution],
+) -> bool:
+    """Whether this converge completed in the selected point's loop scope.
+
+    An enclosing converge has a prefix of the point's iteration path (or no
+    suffix outside loops). A converge from a sibling iteration does not match.
+    """
+    for activity in completed:
+        if strip_all_iteration_suffixes(activity.activity_name) != converge_id:
+            continue
+        converge_path = _activity_iteration_path(activity)
+        if point_path[: len(converge_path)] == converge_path:
+            return True
+    return False
+
+
 def _converge_reason(
     snapshot_def: dict[str, Any],
     normalized: list[str],
-    completed_ids: set[str],
+    failed_activities: Sequence[ActivityExecution],
+    completed: Sequence[ActivityExecution],
     successors: dict[str, set[str]] | None = None,
 ) -> str | None:
-    """Rejection reason when failure points feed an already-completed converge.
+    """Reject points whose matching loop occurrence already passed a converge.
 
-    A completed converge met its threshold without these branches, so the
-    workflow already moved past them — restarting them is moot. A FAILED
-    converge (threshold unmet) keeps its branch failures as valid candidates.
+    A completed converge met its threshold without the selected occurrence, so
+    restarting it is moot. Loop body occurrences are matched by their Temporal
+    iteration paths: a converge from an earlier sibling iteration does not make
+    a failure in a later iteration moot. A FAILED converge keeps its branch
+    failures as valid candidates.
     """
     nodes = definition_nodes(snapshot_def)
     by_id = {node["id"]: node for node in nodes if "id" in node}
@@ -290,7 +331,22 @@ def _converge_reason(
     mooted: list[str] = []
     for point in normalized:
         nearest = _nearest_downstream_converges(successors, by_id, point)
-        if nearest and all(converge in completed_ids for converge in nearest):
+        if not nearest:
+            continue
+
+        point_activities = [
+            activity for activity in failed_activities if strip_all_iteration_suffixes(activity.activity_name) == point
+        ]
+        if not point_activities:
+            # Sanitized replacement points are completed sources rather than
+            # failed rows; preserve the same occurrence-aware check for them.
+            point_activities = [
+                activity for activity in completed if strip_all_iteration_suffixes(activity.activity_name) == point
+            ]
+        point_paths = [_activity_iteration_path(activity) for activity in point_activities] or [()]
+        if all(
+            all(_converge_completed_for_path(converge, path, completed) for converge in nearest) for path in point_paths
+        ):
             mooted.extend(f"{point} (converge {converge} already completed)" for converge in nearest)
     if mooted:
         return (
@@ -572,7 +628,8 @@ def _retry_selection_reason(
     snapshot: WorkflowVersion | None,
     snapshot_def: dict[str, Any],
     failed_ids: set[str],
-    completed_ids: set[str],
+    failed_activities: Sequence[ActivityExecution],
+    completed: Sequence[ActivityExecution],
     replacement_ids: set[str],
     completed_outputs: dict[str, list[Any]],
     successors: dict[str, set[str]],
@@ -601,7 +658,7 @@ def _retry_selection_reason(
     )
     # Report a missing retained-version node before converge mootness: the version
     # error explains why this retry cannot use its source graph at all.
-    reason = version_reason or _converge_reason(snapshot_def, normalized, completed_ids, successors)
+    reason = version_reason or _converge_reason(snapshot_def, normalized, failed_activities, completed, successors)
     if reason is None:
         reported_selection = sorted(
             _eligible_points(
@@ -725,7 +782,6 @@ async def validate_retry_from_failure(
     # Per-iteration outputs keyed by base node ID, so any tainted iteration
     # taints the node instead of using last-write-wins behavior.
     completed_outputs = _completed_output_map(completed)
-    completed_ids = set(completed_outputs)
 
     snapshot_result = await session.exec(
         select(WorkflowVersion).where(WorkflowVersion.id == source.workflow_version_id)
@@ -749,7 +805,8 @@ async def validate_retry_from_failure(
         snapshot=snapshot,
         snapshot_def=snapshot_def,
         failed_ids=failed_ids,
-        completed_ids=completed_ids,
+        failed_activities=activities,
+        completed=completed,
         replacement_ids=replacement_ids,
         completed_outputs=completed_outputs,
         successors=successors,
