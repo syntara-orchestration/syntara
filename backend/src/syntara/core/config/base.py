@@ -1492,13 +1492,6 @@ class WorkflowEngineSettings(BaseSettings):
         ge=1024,
     )
 
-    # Script nodes execute arbitrary user-supplied code in an isolated
-    # Execution Plane container. The feature gate remains disabled by default.
-    script_nodes_enabled: bool = Field(
-        default=False,
-        description="Enable Python and Bash script node execution in workflows (Developer Preview)",
-    )
-
     agent_orchestrator_base_url: HttpUrl = Field(  # type: ignore[assignment]
         default="http://localhost:8000/api/v1",
         description="Base URL for Agent Orchestrator API",
