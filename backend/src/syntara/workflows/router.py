@@ -53,7 +53,10 @@ from syntara.workflows.models import (
 from syntara.workflows.models.execution import ExecutionRead, TestExecutionCreate
 from syntara.workflows.models.workflow_definition import WorkflowDefinition
 from syntara.workflows.services import ExecutionService, WorkflowService
-from syntara.workflows.utils.schema_diff import detect_workflow_breaking_changes, detect_workflow_contract_changes
+from syntara.workflows.utils.schema_diff import (
+    detect_workflow_contract_changes,
+    filter_breaking_workflow_contract_changes,
+)
 from syntara.workflows.validators import get_system_continue_on_failure, workflow_validator
 from syntara.workflows.workflow_engine.services.temporal_execution_service import TemporalExecutionService
 
@@ -564,7 +567,7 @@ async def check_subworkflow_output_contract_changes(
     # Detect breaking changes
     new_definition = request.workflow_definition
     contract_changes_by_trigger = detect_workflow_contract_changes(old_definition, new_definition)
-    changes_by_trigger = detect_workflow_breaking_changes(old_definition, new_definition)
+    changes_by_trigger = filter_breaking_workflow_contract_changes(contract_changes_by_trigger)
 
     def trigger_name_for(trigger_id: str) -> str | None:
         # Get trigger name from new definition

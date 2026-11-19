@@ -270,6 +270,13 @@ def detect_workflow_breaking_changes(
 ) -> dict[str, list[dict[str, Any]]]:
     """Detect breaking output contract changes in a workflow definition."""
     contract_changes = detect_workflow_contract_changes(old_definition, new_definition)
+    return filter_breaking_workflow_contract_changes(contract_changes)
+
+
+def filter_breaking_workflow_contract_changes(
+    contract_changes: dict[str, list[dict[str, Any]]],
+) -> dict[str, list[dict[str, Any]]]:
+    """Keep only breaking entries from a full workflow contract diff."""
     breaking_changes: dict[str, list[dict[str, Any]]] = {}
     for trigger_id, changes in contract_changes.items():
         breaking = [change for change in changes if change["is_breaking"]]
