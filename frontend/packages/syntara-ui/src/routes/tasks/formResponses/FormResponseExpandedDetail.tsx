@@ -10,6 +10,7 @@ import type { FormsAPI } from '@syntara/contracts'
 import { formsClient } from '../../../client'
 import { SynErrorState } from '../../../components/states/SynErrorState'
 import { DateCell } from '../../../components/table/DateCell'
+import { formFieldValueNames, orderValuesByFieldOrder } from '../../../forms'
 import { detachPromise } from '../../../utils/detachPromise'
 
 import styles from './FormResponseExpandedDetail.module.css'
@@ -17,11 +18,15 @@ import type { FormResponseListRow } from './useFormResponsesData'
 
 type FormPromptRead = FormsAPI.components['schemas']['FormPromptRead']
 
-function formatResponseData(data: FormPromptRead['response_data']): string {
+function formatResponseData(
+  data: FormPromptRead['response_data'],
+  definition: FormPromptRead['form_definition'] | undefined
+): string {
   if (!data || Object.keys(data).length === 0) {
     return '—'
   }
-  return JSON.stringify(data, null, 2)
+  const orderedData = definition ? orderValuesByFieldOrder(data, formFieldValueNames(definition)) : data
+  return JSON.stringify(orderedData, null, 2)
 }
 
 type FormResponseExpandedDetailProps = {
@@ -59,7 +64,7 @@ export function FormResponseExpandedDetail({ row, isExpanded }: Readonly<FormRes
 
   const detail = detailQuery.data
   const message = detail?.message?.trim() || '—'
-  const submittedData = formatResponseData(detail?.response_data)
+  const submittedData = formatResponseData(detail?.response_data, detail?.form_definition)
 
   return (
     <DescriptionList>

@@ -183,6 +183,34 @@ describe('FormPromptResponseContent', () => {
     expect(screen.queryByRole('button', { name: 'Send' })).not.toBeInTheDocument()
   })
 
+  it('renders submitted response fields in form definition order', () => {
+    mockFormsUseQuery.mockReturnValue({
+      data: {
+        ...submittedPrompt,
+        form_definition: {
+          fields: [
+            { type: 'text', value_name: 'deployment_name', label: 'Deployment' },
+            { type: 'text', value_name: 'environment', label: 'Environment' },
+            { type: 'text', value_name: 'id', label: 'ID' },
+          ],
+        },
+        response_data: { id: '42', environment: 'stage', deployment_name: 'blue' },
+      },
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    })
+
+    renderContent()
+
+    expect(screen.getAllByText(/^(deployment_name|environment|id)$/)).toEqual([
+      screen.getByText('deployment_name'),
+      screen.getByText('environment'),
+      screen.getByText('id'),
+    ])
+  })
+
   it('shows access denied when user lacks read permission', () => {
     mockFormsUseQuery.mockReturnValue({
       data: pendingPrompt,

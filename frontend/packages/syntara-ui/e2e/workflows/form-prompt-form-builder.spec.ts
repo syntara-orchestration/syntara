@@ -29,7 +29,9 @@ import {
   setFormFieldValueName,
   workflowIdFromUrl,
 } from '../helpers/formFieldBuilder'
+import { openExecutionFormPromptDeepLink, formPromptRespondPanelRegion } from '../helpers/formPromptPanel'
 import { buildUniqueName, deleteWorkflow } from '../helpers/workflows'
+import { isRealBackendE2e } from '../playwrightWebServerEnv'
 
 const FORM_PROMPT_NODE_NAME = 'Intake Form'
 
@@ -201,5 +203,25 @@ test.describe('Form prompt — form field builder', { tag: '@pr-check' }, () => 
     } finally {
       await deleteWorkflow(app, workflowName)
     }
+  })
+})
+
+test.describe('Submitted form response order', { tag: '@local-only' }, () => {
+  test('orders submitted fields in the run details and response panel', async ({ app }) => {
+    test.skip(isRealBackendE2e, 'The ordering execution is seeded by the mock API.')
+    await openExecutionFormPromptDeepLink(app, 'exec-form-prompt-order', 'fp-exec-form-prompt-order')
+
+    const responsePanel = formPromptRespondPanelRegion(app)
+    await expect(responsePanel.getByText('Submitted response')).toBeVisible()
+    const terms = await responsePanel.getByRole('term').allTextContents()
+    expect(terms.slice(-3)).toEqual(['deployment_name', 'environment', 'id'])
+
+    await app.getByRole('tab', { name: 'Details' }).click()
+    await expect(app.getByRole('tab', { name: 'Details', selected: true })).toBeVisible()
+    const activityList = app.getByRole('grid', { name: 'Activity list' })
+    await activityList.getByRole('row').filter({ hasText: 'Confirm deployment details' }).click()
+
+    const outputJson = app.getByRole('code').filter({ hasText: 'response_data' })
+    await expect(outputJson).toHaveText(/"deployment_name"[\s\S]*"environment"[\s\S]*"id"/)
   })
 })

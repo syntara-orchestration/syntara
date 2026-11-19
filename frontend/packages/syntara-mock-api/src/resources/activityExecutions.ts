@@ -362,6 +362,29 @@ export const activityExecutions: Record<string, ActivityExecutionMockSeed[]> = {
       iteration: null,
     },
   ],
+  'exec-form-prompt-order': [
+    {
+      id: 'act-fp-order',
+      created_at: mockDate.daysAgo2,
+      updated_at: mockDate.daysAgo1,
+      execution_id: 'exec-form-prompt-order',
+      activity_name: 'confirm_details',
+      node_type: 'form_prompt',
+      status: 'completed',
+      started_at: mockDate.daysAgo2,
+      completed_at: mockDate.daysAgo1,
+      input_data: { message: 'Review the submitted deployment details.' } as Record<string, unknown>,
+      output_data: {
+        status: 'submitted',
+        outcome: 'success',
+        response_data: { id: '42', environment: 'stage', deployment_name: 'blue' },
+        responded_by: 'Admin User',
+      } as Record<string, unknown>,
+      error_details: null,
+      retry_count: 0,
+      iteration: null,
+    },
+  ],
   'exec-form-prompt-timeout-fail': [
     {
       id: 'act-fp-timeout-fail',

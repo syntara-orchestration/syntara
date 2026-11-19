@@ -57,6 +57,7 @@ export function TriggerStepComponent(props: NodeProps<TriggerNode>) {
     borderTopLeftRadius: '45px',
     borderBottomLeftRadius: '45px',
     paddingLeft: 'var(--pf-t--global--spacer--lg)',
+    ...(isForm && { paddingBottom: 'var(--pf-t--global--spacer--sm)' }),
     '--pf-v6-c-panel--BorderRadius':
       '45px var(--pf-t--global--border--radius--medium) var(--pf-t--global--border--radius--medium) 45px',
   } as CSSProperties

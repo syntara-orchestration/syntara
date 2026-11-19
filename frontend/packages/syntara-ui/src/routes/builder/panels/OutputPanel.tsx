@@ -15,7 +15,9 @@ import { useMemo, useState } from 'react'
 import { SynPanel } from '../../../components/layout/SynPanel'
 import { useMockDataStore } from '../../../stores/useMockDataStore'
 import { useWorkflowStore } from '../../../stores/useWorkflowStore'
-import { selectActivities } from '../../../stores/workflowStoreSelectors'
+import { selectActivities, selectTriggers } from '../../../stores/workflowStoreSelectors'
+import { buildTriggerNodeId } from '../../../utils/triggerNodeIds'
+import { formFieldOrderFromParameters, orderFormActivityData } from '../utils/formFieldOrder'
 import { useIsVersionView } from '../VersionViewContext'
 
 import { InlineMockEditor } from './InlineMockEditor'
@@ -32,6 +34,22 @@ type OutputPanelProps = {
   nodeId: string
 }
 
+function findTriggerByNodeId<T extends { id: string }>(
+  triggers: readonly T[] | undefined,
+  nodeId: string
+): T | undefined {
+  return triggers?.find((candidate, index) => candidate.id === nodeId || buildTriggerNodeId(index) === nodeId)
+}
+
+function resolveOutputPanelData(
+  outputMock: Record<string, unknown> | null,
+  outputData: Record<string, unknown> | null | undefined,
+  nodeType: string | undefined,
+  fieldOrder: readonly string[] | undefined
+): Record<string, unknown> | null {
+  return outputMock ?? orderFormActivityData(outputData ?? null, nodeType, fieldOrder, 'output')
+}
+
 export function OutputPanel({ outputData, nodeId }: Readonly<OutputPanelProps>) {
   const isVersionView = useIsVersionView()
   const [activeView, setActiveView] = useState<PanelView>('json')
@@ -43,13 +61,24 @@ export function OutputPanel({ outputData, nodeId }: Readonly<OutputPanelProps>) 
   const unpinOutputMock = useMockDataStore((s) => s.unpinOutputMock)
   const outputMock = useMockDataStore((s) => s.getOutputMock(nodeId))
   const activities = useWorkflowStore(selectActivities)
+  const triggers = useWorkflowStore(selectTriggers)
 
   const activity = useMemo(() => activities?.find((a) => a.id === nodeId), [activities, nodeId])
+  const trigger = findTriggerByNodeId(triggers, nodeId)
   const nodeType = activity?.type ?? null
   const effectiveSchema = useMemo(() => (activity ? getEffectiveOutputSchema(activity) : null), [activity])
+  const orderingNode = activity ?? trigger
+  const formFieldOrder = useMemo(
+    () => formFieldOrderFromParameters(orderingNode?.parameters),
+    [orderingNode?.parameters]
+  )
+  const orderingNodeType = orderingNode?.type
 
   // Priority: mock data (pinned, authoritative) > real execution data > empty
-  const displayData = outputMock ?? outputData
+  const displayData = useMemo(
+    () => resolveOutputPanelData(outputMock, outputData, orderingNodeType, formFieldOrder),
+    [outputData, outputMock, orderingNodeType, formFieldOrder]
+  )
 
   function buildOutputSkeleton(): string {
     // Best case: use existing execution output as the template

@@ -1,5 +1,6 @@
+import { ActivityTypeEnum, TriggerTypeEnum } from '@syntara/contracts'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { act, render, screen } from '@testing-library/react'
+import { act, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ReactNode } from 'react'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
@@ -86,6 +87,112 @@ describe('StepExecutionDetailsPanel', () => {
 
     expect(screen.getByText(/"stdout"/)).toBeInTheDocument()
     expect(screen.getByText(/"VM provisioned successfully"/)).toBeInTheDocument()
+  })
+
+  it('orders form-trigger parameters and response fields in each data view', async () => {
+    const user = userEvent.setup()
+    const fieldOrder = ['deployment_name', 'environment', 'id']
+    mockUseQuery.mockReturnValue({
+      data: {
+        resources: [
+          {
+            activity_name: 'form-trigger-1',
+            input_data: { id: '42', environment: 'stage', deployment_name: 'blue' },
+            output_data: {
+              response_data: { id: '42', environment: 'stage', deployment_name: 'blue' },
+            },
+            status: 'completed',
+          },
+        ],
+      },
+      isLoading: false,
+      error: null,
+      refetch: vi.fn(),
+    })
+
+    render(
+      <StepExecutionDetailsPanel
+        {...defaultProps}
+        stepId="form-trigger-1"
+        stepName="Launch form"
+        stepType={TriggerTypeEnum.FORM_TRIGGER}
+        formFieldOrder={fieldOrder}
+      />,
+      { wrapper }
+    )
+
+    const [parametersJson, outputJson] = screen.getAllByRole('code')
+    const orderedFieldsPattern = /"deployment_name"[\s\S]*"environment"[\s\S]*"id"/
+    expect(parametersJson).toHaveTextContent(orderedFieldsPattern)
+    expect(outputJson).toHaveTextContent(orderedFieldsPattern)
+
+    const tableButtons = screen.getAllByRole('button', { name: 'Table' })
+    await user.click(tableButtons[0])
+    await user.click(tableButtons[1])
+    const grids = screen.getAllByRole('grid', { name: 'Input data' })
+    expect(
+      within(grids[0])
+        .getAllByRole('columnheader')
+        .map((header) => header.textContent)
+    ).toEqual(fieldOrder)
+    expect(
+      within(grids[1])
+        .getAllByRole('columnheader')
+        .map((header) => header.textContent)
+    ).toEqual(['response_data'])
+    expect(within(grids[1]).getByRole('row', { name: /"deployment_name"/ })).toHaveTextContent(orderedFieldsPattern)
+
+    const schemaButtons = screen.getAllByRole('button', { name: 'Schema' })
+    await user.click(schemaButtons[0])
+    await user.click(schemaButtons[1])
+    for (const tree of screen.getAllByRole('tree', { name: 'Input schema' })) {
+      const fieldNames = ['T deployment_name blue', 'T environment stage', 'T id 42']
+      const orderedFields = fieldNames.map((name) =>
+        within(tree).getByRole('treeitem', { name: new RegExp(`^${name}$`) })
+      )
+      expect(
+        within(tree).getAllByRole('treeitem', {
+          name: /^T (deployment_name blue|environment stage|id 42)$/,
+        })
+      ).toEqual(orderedFields)
+    }
+  })
+
+  it('leaves form-prompt parameters alone while ordering response_data', () => {
+    const fieldOrder = ['deployment_name', 'environment', 'id']
+    mockUseQuery.mockReturnValue({
+      data: {
+        resources: [
+          {
+            activity_name: 'form-prompt-1',
+            input_data: { id: 'prompt-1', form_definition: { fields: fieldOrder } },
+            output_data: {
+              status: 'submitted',
+              response_data: { id: '42', environment: 'stage', deployment_name: 'blue' },
+            },
+            status: 'completed',
+          },
+        ],
+      },
+      isLoading: false,
+      error: null,
+      refetch: vi.fn(),
+    })
+
+    render(
+      <StepExecutionDetailsPanel
+        {...defaultProps}
+        stepId="form-prompt-1"
+        stepName="Intake form"
+        stepType={ActivityTypeEnum.FORM_PROMPT}
+        formFieldOrder={fieldOrder}
+      />,
+      { wrapper }
+    )
+
+    const [parametersJson, outputJson] = screen.getAllByRole('code')
+    expect(parametersJson).toHaveTextContent(/"id"[\s\S]*"form_definition"/)
+    expect(outputJson).toHaveTextContent(/"deployment_name"[\s\S]*"environment"[\s\S]*"id"/)
   })
 
   it('renders schema view when switching to Schema', async () => {

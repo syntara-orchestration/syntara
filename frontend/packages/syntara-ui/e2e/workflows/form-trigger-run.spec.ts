@@ -24,6 +24,7 @@ import {
   unregisterStripFormDefinitionFromWorkflowApi,
 } from '../helpers/formTriggerRun'
 import { openRowKebab, pfWidget } from '../helpers/patternfly'
+import { isRealBackendE2e } from '../playwrightWebServerEnv'
 
 const CUSTOM_FORM_MESSAGE = 'Describe why you are starting this run.'
 const CUSTOM_SUBMIT_LABEL = 'Start workflow'
@@ -167,14 +168,27 @@ test.describe('Form trigger — run from workflows list', { tag: '@pr-check' }, 
     }
   })
 
-  test('AC-4 / UI-8: list run submits values and navigates to execution details', async ({ app }) => {
+  test('AC-4 / UI-8: list run preserves configured field order in execution details', async ({ app }) => {
     const created = await createPublishedFormTriggerWorkflow(app, {
       namePrefix: 'e2e-form-trigger-ui8',
-      parameters: { submit_label: CUSTOM_SUBMIT_LABEL },
+      parameters: {
+        submit_label: CUSTOM_SUBMIT_LABEL,
+        form_definition: {
+          fields: [
+            { value_name: 'deployment_name', type: 'text', label: 'Deployment name', required: true },
+            { value_name: 'environment', type: 'text', label: 'Environment', required: true },
+            { value_name: 'id', type: 'text', label: 'ID', required: true },
+          ],
+        },
+      },
     })
 
-    const summaryValue = 'E2E form trigger list run'
-    const scoreValue = '7'
+    const submittedValues = {
+      deployment_name: 'blue',
+      environment: 'stage',
+      id: '42',
+    }
+    let activityDetailsRoute: string | undefined
 
     try {
       await startRunPublishedFromWorkflowList(app, created.workflowName)
@@ -184,17 +198,58 @@ test.describe('Form trigger — run from workflows list', { tag: '@pr-check' }, 
         triggerName: created.triggerName,
       })
 
-      await app.getByRole('textbox', { name: 'Summary' }).fill(summaryValue)
-      await app.getByLabel('Score').fill(scoreValue)
+      await app.getByRole('textbox', { name: 'Deployment name' }).fill(submittedValues.deployment_name)
+      await app.getByRole('textbox', { name: 'Environment' }).fill(submittedValues.environment)
+      await app.getByRole('textbox', { name: 'ID' }).fill(submittedValues.id)
       await app.getByRole('button', { name: CUSTOM_SUBMIT_LABEL }).click()
 
       await expect(app).toHaveURL(/\/executions\//, { timeout: 30_000 })
       const executionId = executionIdFromPageUrl(app)
 
       const inputData = await readExecutionInputData(app, executionId)
-      expect(inputData['summary']).toBe(summaryValue)
-      expect(String(inputData['score'])).toBe(scoreValue)
+      expect(inputData).toMatchObject(submittedValues)
+
+      if (!isRealBackendE2e) {
+        activityDetailsRoute = `**/api/v1/executions/${executionId}/activities**`
+        await app.route(activityDetailsRoute, async (route) => {
+          if (route.request().method() !== 'GET') {
+            await route.continue()
+            return
+          }
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+              resources: [
+                {
+                  activity_name: created.triggerNodeId,
+                  input_data: submittedValues,
+                  output_data: { response_data: submittedValues },
+                  status: 'completed',
+                },
+              ],
+            }),
+          })
+        })
+      }
+
+      await app.getByRole('tab', { name: 'Details' }).click()
+      await expect(app.getByRole('tab', { name: 'Details', selected: true })).toBeVisible({ timeout: 15_000 })
+      const activityList = app.getByRole('grid', { name: 'Activity list' })
+      await activityList.getByRole('row').filter({ hasText: created.triggerName }).click()
+
+      const orderedFieldsPattern = /"deployment_name"[\s\S]*"environment"[\s\S]*"id"/
+      const parameterJson = app
+        .getByRole('code')
+        .filter({ hasText: 'deployment_name' })
+        .filter({ hasNotText: 'response_data' })
+      const outputJson = app.getByRole('code').filter({ hasText: 'response_data' })
+      await expect(parameterJson).toHaveText(orderedFieldsPattern)
+      await expect(outputJson).toHaveText(orderedFieldsPattern)
     } finally {
+      if (activityDetailsRoute) {
+        await app.unroute(activityDetailsRoute)
+      }
       await disposeFormTriggerWorkflow(app, created.workflowId)
     }
   })

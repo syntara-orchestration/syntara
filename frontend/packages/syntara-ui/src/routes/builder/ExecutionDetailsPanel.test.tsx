@@ -1,3 +1,4 @@
+import { ActivityTypeEnum } from '@syntara/contracts'
 import { act, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
@@ -6,6 +7,12 @@ import { axe } from 'vitest-axe'
 import { executionsClient } from '../../client'
 
 import { ExecutionDetailsPanel, type WorkflowDefShape } from './ExecutionDetailsPanel'
+
+vi.mock('../executions/StepExecutionDetailsPanel', () => ({
+  StepExecutionDetailsPanel: ({ formFieldOrder }: { formFieldOrder?: readonly string[] }) => (
+    <div data-testid="selected-form-field-order">{formFieldOrder?.join(',') ?? 'none'}</div>
+  ),
+}))
 
 /** v1 workflow definition: names live under workflow.activities */
 const WORKFLOW_DEF: WorkflowDefShape = {
@@ -158,6 +165,33 @@ describe('ExecutionDetailsPanel', () => {
       expect(labels[0]).toHaveTextContent('completed')
       expect(labels[1]).toHaveTextContent('running')
     })
+  })
+
+  it('passes the configured form field order for the selected execution activity', async () => {
+    const user = userEvent.setup()
+    const workflowDefinition: WorkflowDefShape = {
+      nodes: [
+        {
+          id: 'task-1',
+          name: 'Intake form',
+          type: ActivityTypeEnum.FORM_PROMPT,
+          parameters: {
+            form_definition: {
+              fields: [{ value_name: 'deployment_name' }, { value_name: 'environment' }, { value_name: 'id' }],
+            },
+          },
+        },
+        { id: 'task-2', name: 'Send notification', type: 'script' },
+      ],
+    }
+
+    renderPanel(workflowDefinition)
+
+    await user.click(screen.getByRole('tab', { name: 'Details' }))
+    const activityList = screen.getByRole('grid', { name: 'Activity list' })
+    await user.click(within(activityList).getByRole('row', { name: /Intake form/ }))
+
+    expect(screen.getByTestId('selected-form-field-order')).toHaveTextContent('deployment_name,environment,id')
   })
 
   describe('activity table columns', () => {

@@ -46,6 +46,17 @@ const layoutCheckFormParameters = {
   },
 } satisfies Extract<WorkflowNode, { type: 'form_prompt' }>['parameters']
 
+const orderedResponseFormParameters = {
+  message: 'Review the submitted deployment details.',
+  form_definition: {
+    fields: [
+      { value_name: 'deployment_name', type: 'text' as const, label: 'Deployment name' },
+      { value_name: 'environment', type: 'text' as const, label: 'Environment' },
+      { value_name: 'id', type: 'text' as const, label: 'ID' },
+    ],
+  },
+} satisfies Extract<WorkflowNode, { type: 'form_prompt' }>['parameters']
+
 const continueDefaultsScriptParameters = {
   language: 'python' as const,
   code: '# continue with defaults',
@@ -100,6 +111,22 @@ export function getExecutionDetail(executionId: string): ExecutionDetailResponse
     ...execution,
     activities: (activityExecutions[execution.id] ?? []).map(toActivityData),
     workflow_definition: workflow?.version?.workflow_definition as ExecutionDetailResponse['workflow_definition'],
+  }
+
+  if (execution.id === 'exec-form-prompt-order') {
+    return {
+      ...base,
+      workflow_definition: {
+        nodes: [
+          {
+            id: 'confirm_details',
+            type: 'form_prompt',
+            name: 'Confirm deployment details',
+            parameters: orderedResponseFormParameters,
+          },
+        ],
+      },
+    }
   }
 
   if (execution.id === 'exec-form-prompt') {

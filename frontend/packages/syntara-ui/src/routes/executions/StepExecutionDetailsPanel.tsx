@@ -38,6 +38,7 @@ import { ActivityStatusLabel } from '../builder/ExecutionStatus'
 import { InputSchemaView } from '../builder/panels/views/InputSchemaView'
 import { InputTableView } from '../builder/panels/views/InputTableView'
 import { ViewToggle, type PanelView } from '../builder/panels/ViewToggle'
+import { orderFormActivityData } from '../builder/utils/formFieldOrder'
 import type { ActivityState } from '../workflows/execution/types'
 import { extractApprovalAudit, type ApprovalAudit } from '../workflows/execution/utils/activityState'
 
@@ -55,6 +56,8 @@ type StepExecutionDetailsPanelProps = {
   stepState?: ActivityState
   /** Step type from workflow definition (e.g. 'aap_job_template'). */
   stepType?: string
+  /** Configured form field order for this activity or trigger. */
+  formFieldOrder?: readonly string[]
 }
 
 function NoDataState({ label }: Readonly<{ label: string }>) {
@@ -367,6 +370,7 @@ export function StepExecutionDetailsPanel({
   executionId,
   stepState,
   stepType,
+  formFieldOrder,
 }: Readonly<StepExecutionDetailsPanelProps>) {
   const [activeTab, setActiveTab] = useState<'io' | 'agent-steps'>('io')
   const isAgenticStep = stepType === ActivityTypeEnum.AGENTIC
@@ -375,6 +379,14 @@ export function StepExecutionDetailsPanel({
     executionId,
     stepState?.status,
     stepState?.iteration
+  )
+  const orderedInputData = useMemo(
+    () => orderFormActivityData(inputData, stepType, formFieldOrder, 'input'),
+    [inputData, stepType, formFieldOrder]
+  )
+  const orderedOutputData = useMemo(
+    () => orderFormActivityData(outputData, stepType, formFieldOrder, 'output'),
+    [outputData, stepType, formFieldOrder]
   )
 
   const approvalAudit = useMemo(() => extractApprovalAudit(outputData), [outputData])
@@ -425,8 +437,8 @@ export function StepExecutionDetailsPanel({
       <StackItem isFilled style={{ minHeight: 0, overflow: 'hidden' }}>
         <StepContentArea
           stepId={stepId}
-          inputData={inputData}
-          outputData={outputData}
+          inputData={orderedInputData}
+          outputData={orderedOutputData}
           isLoading={isLoading}
           error={error}
           refetch={refetch}
