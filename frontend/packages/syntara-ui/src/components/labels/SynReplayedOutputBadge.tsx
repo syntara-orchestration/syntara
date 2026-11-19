@@ -7,7 +7,7 @@ import { SynLabel } from './SynLabel'
  * run. Shown only on retried executions, where replayed steps carry the source
  * run's timestamps.
  */
-export function ReplayedOutputBadge() {
+export function SynReplayedOutputBadge() {
   return (
     <SynLabel variant="outline" icon={<RhUiHistoryIcon />} data-testid="replayed-output-badge">
       Reused output

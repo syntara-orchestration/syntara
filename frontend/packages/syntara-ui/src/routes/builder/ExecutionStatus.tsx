@@ -15,8 +15,8 @@ import {
 import { ActivityTypeEnum, type ExecutionsAPI } from '@syntara/contracts'
 import type React from 'react'
 
-import { ReplayedOutputBadge } from '../../components/labels/ReplayedOutputBadge'
 import { SynLabel } from '../../components/labels/SynLabel'
+import { SynReplayedOutputBadge } from '../../components/labels/SynReplayedOutputBadge'
 import { capitalize } from '../../utils/capitalize'
 
 import styles from './ExecutionStatus.module.css'
@@ -79,7 +79,7 @@ const activityStatusIcons: Record<ActivityStatus, React.ComponentType<{ classNam
 
 /**
  * @param replayed True when this activity reused a previous run's output
- * instead of executing in this retry. Appends `ReplayedOutputBadge` next to
+ * instead of executing in this retry. Appends `SynReplayedOutputBadge` next to
  * the status label, matching the canvas treatment in `ExecutionStatusBadge`.
  */
 export function ActivityStatusLabel({
@@ -145,7 +145,7 @@ function ActivityStatusRetryMarkers({
       )}
       {replayed && (
         <StackItem>
-          <ReplayedOutputBadge />
+          <SynReplayedOutputBadge />
         </StackItem>
       )}
       {triggerInputReused && (

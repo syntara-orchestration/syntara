@@ -10,8 +10,8 @@ import { SEMANTIC_ZOOM_TILE_HANDLE_TOP_PX } from '../../routes/workflows/canvas/
 import type { SemanticZoomBranchSource } from '../../routes/workflows/canvas/semanticZoomTypes'
 import { STEP_TYPE_COLORS } from '../../routes/workflows/canvas/stepTypeColors'
 import type { ActivityStatus } from '../../routes/workflows/execution/types'
-import { ReplayedOutputBadge } from '../labels/ReplayedOutputBadge'
 import { SynLabel } from '../labels/SynLabel'
+import { SynReplayedOutputBadge } from '../labels/SynReplayedOutputBadge'
 import { SynPanel } from '../layout/SynPanel'
 
 import stepStyles from './SynStep.module.css'
@@ -104,7 +104,7 @@ function StepBottomBadge({
       )}
       {showReplayedOutput && (
         <StackItem>
-          <ReplayedOutputBadge />
+          <SynReplayedOutputBadge />
         </StackItem>
       )}
       {showTriggerInput && (

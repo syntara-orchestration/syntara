@@ -1,9 +1,9 @@
 import type { Meta, StoryObj } from '@storybook/tanstack-react'
 
-import { ReplayedOutputBadge } from './ReplayedOutputBadge'
+import { SynReplayedOutputBadge } from './SynReplayedOutputBadge'
 
-const meta: Meta<typeof ReplayedOutputBadge> = {
-  component: ReplayedOutputBadge,
+const meta: Meta<typeof SynReplayedOutputBadge> = {
+  component: SynReplayedOutputBadge,
   tags: ['autodocs'],
   parameters: {
     docs: {
