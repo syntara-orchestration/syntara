@@ -2605,6 +2605,20 @@ class TestExtractFailedActivitiesFromEvent:
 
         assert result == {"rest-api": {"method": "GET", "credential_id": "[REDACTED]"}}
 
+    def test_extracts_failed_activity_occurrences(self) -> None:
+        event = self._make_completed_event(
+            {
+                "failed_activity_occurrences": {
+                    "rest-api": "rest-api_iter_1",
+                    "malformed": 1,
+                }
+            }
+        )
+
+        result = self.service._extract_failed_activity_occurrences_from_event(event)
+
+        assert result == {"rest-api": "rest-api_iter_1"}
+
     def test_returns_empty_for_non_completed_event(self) -> None:
         event = Mock()
         event.event_type = EventType.EVENT_TYPE_WORKFLOW_EXECUTION_FAILED
@@ -2832,6 +2846,40 @@ class TestSyncNodesToTerminalStatus:
         assert activity.input_data == fallback_inputs["rest-api"]
 
     @pytest.mark.asyncio
+    async def test_missing_failed_loop_occurrence_is_created_from_completion_fallback(self) -> None:
+        """Closed-workflow fallback preserves a later loop failure as a separate row."""
+        completed = self._create_mock_activity_execution("rest-api", status=ActivityStatus.COMPLETED)
+        completed.temporal_activity_id = "rest-api_iter_0"
+        completed.node_type = NodeType.HTTP_REQUEST
+        completed.iteration = 0
+        completed.input_data = {"method": "GET", "url": "https://example.com/item-0"}
+        session = self._session_with_result([completed])
+        session.add = Mock()
+        self.mock_session_factory.side_effect = [self._session_context(session)]
+        metadata = self._create_metadata(activity_index_map={"rest-api": 0})
+        handle = AsyncMock()
+        handle.query = AsyncMock(side_effect=RuntimeError("workflow is already closed"))
+        fallback_error = {"rest-api": "Key 'host' not found"}
+        fallback_inputs = {"rest-api": {"method": "GET", "url": "https://example.com/${loop.item.host}"}}
+
+        result = await self.service._sync_failed_nodes(
+            metadata,
+            handle,
+            fallback_failed_nodes=fallback_error,
+            fallback_input_data=fallback_inputs,
+            fallback_occurrence_ids={"rest-api": "rest-api_iter_1"},
+        )
+
+        new_activity = session.add.call_args.args[0]
+        assert result is None
+        assert completed.status == ActivityStatus.COMPLETED
+        assert new_activity.activity_name == "rest-api#iter-1"
+        assert new_activity.temporal_activity_id == "rest-api_iter_1"
+        assert new_activity.status == ActivityStatus.FAILED
+        assert new_activity.error_details == "Key 'host' not found"
+        assert new_activity.input_data == fallback_inputs["rest-api"]
+
+    @pytest.mark.asyncio
     async def test_already_failed_row_backfills_empty_inputs_without_changing_status(self) -> None:
         """A Temporal-failed row with empty inputs still receives the completion-payload fallback."""
         activity = self._create_mock_activity_execution("rest-api", status=ActivityStatus.FAILED)
@@ -2906,6 +2954,41 @@ class TestSyncNodesToTerminalStatus:
         assert failed.status == ActivityStatus.FAILED
         assert failed.error_details == "Key 'host' not found"
         assert failed.input_data == fallback_inputs["rest-api"]
+
+    @pytest.mark.asyncio
+    async def test_missing_failed_loop_occurrence_creates_row_and_preserves_completed_row(self) -> None:
+        """A pre-dispatch loop failure gets its own row without changing an earlier success."""
+        completed = self._create_mock_activity_execution("rest-api", status=ActivityStatus.COMPLETED)
+        completed.temporal_activity_id = "rest-api_iter_0"
+        completed.node_type = NodeType.HTTP_REQUEST
+        completed.iteration = 0
+        completed.input_data = {"method": "GET", "url": "https://example.com/item-0"}
+        session = self._session_with_result([completed])
+        session.add = Mock()
+        self.mock_session_factory.side_effect = [self._session_context(session)]
+        metadata = self._create_metadata(activity_index_map={"rest-api": 0})
+        fallback_inputs = {"rest-api": {"method": "GET", "url": "https://example.com/${loop.item.host}"}}
+
+        await self.service._sync_nodes_to_terminal_status(
+            metadata,
+            ["rest-api"],
+            ActivityStatus.FAILED,
+            error_map={"rest-api": "Key 'host' not found"},
+            input_data_map=fallback_inputs,
+            occurrence_id_map={"rest-api": "rest-api_iter_1"},
+        )
+
+        new_activity = session.add.call_args.args[0]
+        assert completed.status == ActivityStatus.COMPLETED
+        assert completed.input_data == {"method": "GET", "url": "https://example.com/item-0"}
+        assert new_activity.activity_name == "rest-api#iter-1"
+        assert new_activity.temporal_activity_id == "rest-api_iter_1"
+        assert new_activity.status == ActivityStatus.FAILED
+        assert new_activity.error_details == "Key 'host' not found"
+        assert new_activity.input_data == fallback_inputs["rest-api"]
+        assert new_activity.iteration == 1
+        session.commit.assert_awaited_once()
+        self.mock_activity_publisher.publish_activity_patch.assert_awaited_once()
 
     @pytest.mark.asyncio
     async def test_retry_converge_failure_uses_current_run_timestamp(self) -> None:
@@ -4040,10 +4123,11 @@ class TestProcessHistoryEvent:
 
     @pytest.mark.asyncio
     async def test_sync_failed_nodes_none_falls_back_to_event_extraction(self) -> None:
-        """When _sync_failed_nodes returns None, _extract_failed_activities_from_event is used."""
+        """Completion fallback forwards the failed node, inputs, and loop occurrence ID."""
         event = self._create_event(EventType.EVENT_TYPE_WORKFLOW_EXECUTION_COMPLETED, event_id=20)
         fallback_map = {"node-X": "expression error"}
         fallback_inputs = {"node-X": {"method": "GET"}}
+        fallback_occurrences = {"node-X": "node-X_iter_1"}
 
         with (
             patch.object(self.service, "_sync_failed_nodes", new_callable=AsyncMock, return_value=None) as mock_failed,
@@ -4053,6 +4137,11 @@ class TestProcessHistoryEvent:
             patch.object(
                 self.service, "_extract_failed_activity_inputs_from_event", return_value=fallback_inputs
             ) as mock_extract_inputs,
+            patch.object(
+                self.service,
+                "_extract_failed_activity_occurrences_from_event",
+                return_value=fallback_occurrences,
+            ) as mock_extract_occurrences,
             patch.object(self.service, "_sync_skipped_nodes", new_callable=AsyncMock),
             patch.object(self.service, "_sync_detached_nodes", new_callable=AsyncMock),
             patch.object(self.service, "_update_execution_status_from_event", new_callable=AsyncMock) as mock_update,
@@ -4068,11 +4157,13 @@ class TestProcessHistoryEvent:
         assert result is True
         mock_extract.assert_called_once_with(event)
         mock_extract_inputs.assert_called_once_with(event)
+        mock_extract_occurrences.assert_called_once_with(event)
         mock_failed.assert_awaited_once_with(
             self.metadata,
             self.mock_handle,
             fallback_failed_nodes=fallback_map,
             fallback_input_data=fallback_inputs,
+            fallback_occurrence_ids=fallback_occurrences,
         )
         mock_update.assert_called_once()
         passed_failed_map = mock_update.call_args[0][2]

@@ -219,6 +219,7 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
         self.node_control_data: dict[str, dict[str, Any]] = {}
         self.skipped_nodes: set[str] = set()
         self.failed_nodes: dict[str, str] = {}
+        self.failed_node_temporal_ids: dict[str, str] = {}
         self.loop_state: dict[str, LoopState] = {}
         self.loop_body_map: dict[str, str] = {}
         self.loop_iteration_results: dict[str, dict[str, list[Any]]] = {}
@@ -544,6 +545,9 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
         # same way credential/reference failures do after resolution. The canvas
         # ID can still hold a previous loop iteration, so check this occurrence.
         failed_node = graph.get_node(node_id)
+        failed_node_temporal_ids = getattr(self, "failed_node_temporal_ids", {})
+        failed_node_temporal_ids[node_id] = self._source_temporal_activity_id(failed_node)
+        self.failed_node_temporal_ids = failed_node_temporal_ids
         if not self._inputs_recorded_for_current_occurrence(failed_node):
             self._record_input_history(failed_node, failed_node.parameters)
 
@@ -894,6 +898,11 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
                 node_id: self._scrub_data(self.node_inputs[node_id])
                 for node_id in self.failed_nodes
                 if node_id in self.node_inputs
+            },
+            "failed_activity_occurrences": {
+                node_id: temporal_id
+                for node_id, temporal_id in getattr(self, "failed_node_temporal_ids", {}).items()
+                if node_id in self.failed_nodes and temporal_id != node_id
             },
             "completed_activities": list(node_outputs.keys()),
             "failed_activities": self.failed_nodes,

@@ -7,11 +7,16 @@ from uuid import UUID
 import structlog
 from sqlalchemy import or_
 from sqlmodel import select
+from sqlmodel.ext.asyncio.session import AsyncSession
 from temporalio.client import WorkflowHandle
 
 from syntara.core.constants import FieldLimits
 from syntara.workflow_core.models import NodeType
 from syntara.workflow_runtime.engines.temporal.services.activity_sync_types import ExecutionMonitorMetadata
+from syntara.workflow_runtime.engines.temporal.utils.loop_iteration_ids import (
+    loop_iteration_path,
+    strip_loop_iteration_suffixes,
+)
 from syntara.workflows.models.activity_execution import TERMINAL_ACTIVITY_STATUSES, ActivityExecution, ActivityStatus
 from syntara.workflows.models.workflow_version import WorkflowVersion
 
@@ -263,6 +268,7 @@ class ActivityNodeSyncMixin:
         *,
         fallback_failed_nodes: dict[str, str] | None = None,
         fallback_input_data: dict[str, dict[str, Any]] | None = None,
+        fallback_occurrence_ids: dict[str, str] | None = None,
     ) -> dict[str, str] | None:
         """Query workflow for failed nodes and update them in database.
 
@@ -294,6 +300,7 @@ class ActivityNodeSyncMixin:
                         target_status=ActivityStatus.FAILED,
                         error_map=fallback_failed_nodes,
                         input_data_map=fallback_input_data,
+                        occurrence_id_map=fallback_occurrence_ids,
                     )
                 except Exception:
                     logger.exception(
@@ -327,6 +334,7 @@ class ActivityNodeSyncMixin:
                 target_status=ActivityStatus.FAILED,
                 error_map=failed_node_map,
                 input_data_map=failed_node_inputs,
+                occurrence_id_map=fallback_occurrence_ids,
             )
         except Exception:
             logger.exception(
@@ -337,6 +345,88 @@ class ActivityNodeSyncMixin:
         else:
             return failed_node_map
 
+    def _create_missing_failed_loop_occurrences(
+        self,
+        session: AsyncSession,
+        metadata: ExecutionMonitorMetadata,
+        activities: list[ActivityExecution],
+        node_ids: list[str],
+        error_map: dict[str, str] | None,
+        input_data_map: dict[str, dict[str, Any]] | None,
+        occurrence_id_map: dict[str, str] | None,
+        now: datetime,
+    ) -> list[ActivityExecution]:
+        """Create failed records for loop occurrences with no scheduled activity event."""
+        created: list[ActivityExecution] = []
+        if not occurrence_id_map:
+            return created
+
+        for base_name, temporal_activity_id in occurrence_id_map.items():
+            if (
+                base_name not in node_ids
+                or strip_loop_iteration_suffixes(temporal_activity_id) != base_name
+                or not loop_iteration_path(temporal_activity_id)
+            ):
+                continue
+
+            base_activities = [
+                activity
+                for activity in activities
+                if activity.activity_name == base_name
+                or activity.activity_name.startswith(f"{base_name}{_COMPOSITE_ITER_SEP}")
+            ]
+            if any(activity.temporal_activity_id == temporal_activity_id for activity in base_activities):
+                continue
+            if not any(activity.status in TERMINAL_ACTIVITY_STATUSES for activity in base_activities):
+                continue
+
+            original = next(
+                (activity for activity in base_activities if activity.activity_name == base_name),
+                base_activities[0] if base_activities else None,
+            )
+            if original is None:
+                continue
+            latest_iteration = max(
+                (
+                    activity.iteration
+                    if activity.iteration is not None
+                    else int(activity.activity_name.rpartition(_COMPOSITE_ITER_SEP)[2])
+                    if _COMPOSITE_ITER_SEP in activity.activity_name
+                    else 0
+                    for activity in base_activities
+                ),
+                default=0,
+            )
+            iteration = max(latest_iteration, metadata.iteration_counters.get(base_name, 0)) + 1
+            composite_key = f"{base_name}{_COMPOSITE_ITER_SEP}{iteration}"
+            while any(activity.activity_name == composite_key for activity in base_activities):
+                iteration += 1
+                composite_key = f"{base_name}{_COMPOSITE_ITER_SEP}{iteration}"
+
+            if original.iteration is None:
+                original.iteration = 0
+            failed_activity = ActivityExecution(
+                execution_id=metadata.execution_id,
+                activity_name=composite_key,
+                node_type=original.node_type,
+                temporal_activity_id=temporal_activity_id,
+                status=ActivityStatus.FAILED,
+                started_at=None,
+                completed_at=now,
+                input_data=_input_data_for_activity(input_data_map, base_name) or {},
+                output_data=None,
+                error_details=(error_map or {}).get(base_name),
+                retry_count=0,
+                iteration=iteration,
+            )
+            session.add(failed_activity)
+            created.append(failed_activity)
+            metadata.iteration_counters[base_name] = iteration
+            metadata.activity_index_map[composite_key] = metadata.next_activity_index
+            metadata.next_activity_index += 1
+
+        return created
+
     async def _sync_nodes_to_terminal_status(
         self,
         metadata: ExecutionMonitorMetadata,
@@ -344,6 +434,7 @@ class ActivityNodeSyncMixin:
         target_status: ActivityStatus,
         error_map: dict[str, str] | None = None,
         input_data_map: dict[str, dict[str, Any]] | None = None,
+        occurrence_id_map: dict[str, str] | None = None,
     ) -> None:
         """Update ActivityExecution records to a terminal status and publish patches.
 
@@ -361,6 +452,9 @@ class ActivityNodeSyncMixin:
             error_map: Optional mapping of node ID to error message
             input_data_map: Optional mapping of failed node IDs to inputs that were
                 recorded without a Temporal activity event.
+            occurrence_id_map: Optional mapping of failed canvas node IDs to their
+                exact Temporal activity IDs, used to persist loop failures that
+                occurred before that iteration scheduled an activity.
 
         """
         if not node_ids:
@@ -387,12 +481,23 @@ class ActivityNodeSyncMixin:
                 )
             )
             activities = result.all()
-
-            if not activities:
-                return
-
             updated_activities: list[tuple[ActivityExecution, dict[str, Any]]] = []
             now = datetime.now(UTC)
+            new_iteration_activities = (
+                self._create_missing_failed_loop_occurrences(
+                    session,
+                    metadata,
+                    activities,
+                    node_ids,
+                    error_map,
+                    input_data_map,
+                    occurrence_id_map,
+                    now,
+                )
+                if target_status == ActivityStatus.FAILED
+                else []
+            )
+
             for activity in activities:
                 input_data = _input_data_for_activity(input_data_map, activity.activity_name)
                 if activity.status in TERMINAL_ACTIVITY_STATUSES:
@@ -428,7 +533,7 @@ class ActivityNodeSyncMixin:
                 activity.updated_at = now
                 updated_activities.append((activity, old_values))
 
-            if not updated_activities:
+            if not updated_activities and not new_iteration_activities:
                 return
 
             await session.commit()
@@ -440,4 +545,8 @@ class ActivityNodeSyncMixin:
                 count=len(updated_activities),
             )
 
-            await self._publish_activity_patches(metadata, updated_activities)
+            await self._publish_activity_patches(
+                metadata,
+                updated_activities,
+                new_iteration_activities=new_iteration_activities,
+            )

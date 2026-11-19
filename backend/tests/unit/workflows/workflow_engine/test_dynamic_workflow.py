@@ -828,6 +828,7 @@ class TestFanInConverge:
         assert wf.get_activity_input("rest-api_iter_1") == current_params
         result = wf._build_result("exec-1", include_node_results=False)
         assert result["failed_activity_inputs"]["rest-api"] == current_params
+        assert result["failed_activity_occurrences"] == {"rest-api": "rest-api_iter_1"}
 
     def test_current_loop_occurrence_keeps_already_recorded_inputs(self) -> None:
         """A failure after resolution must keep this occurrence's resolved inputs."""

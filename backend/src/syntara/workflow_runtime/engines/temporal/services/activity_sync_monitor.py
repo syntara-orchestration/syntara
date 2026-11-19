@@ -49,6 +49,7 @@ class ActivitySyncMonitorMixin:
     _TRIGGER_ACTIVITY_TYPES: Any
     _extract_failed_activities_from_event: Any
     _extract_failed_activity_inputs_from_event: Any
+    _extract_failed_activity_occurrences_from_event: Any
     temporal_client: Any
     _initialize_monitoring: Any
     _process_activity_scheduled: Any
@@ -197,11 +198,13 @@ class ActivitySyncMonitorMixin:
             # are already FAILED in the DB, so _finalize_non_terminal_activities skips them.
             event_failed_node_map = self._extract_failed_activities_from_event(event)
             event_failed_node_inputs = self._extract_failed_activity_inputs_from_event(event)
+            event_failed_node_occurrences = self._extract_failed_activity_occurrences_from_event(event)
             failed_node_map = await self._sync_failed_nodes(
                 metadata,
                 handle,
                 fallback_failed_nodes=event_failed_node_map,
                 fallback_input_data=event_failed_node_inputs,
+                fallback_occurrence_ids=event_failed_node_occurrences,
             )
             if failed_node_map is None:
                 failed_node_map = event_failed_node_map

@@ -187,6 +187,30 @@ class ActivityExecutionStateMixin:
             return {}
 
     @staticmethod
+    def _extract_failed_activity_occurrences_from_event(event: HistoryEvent) -> dict[str, str]:
+        """Extract per-loop Temporal IDs for failed nodes from the completion event."""
+        if event.event_type != EventType.EVENT_TYPE_WORKFLOW_EXECUTION_COMPLETED:
+            return {}
+        completed_attrs = getattr(event, "workflow_execution_completed_event_attributes", None)
+        if not completed_attrs or not completed_attrs.result or not completed_attrs.result.payloads:
+            return {}
+        try:
+            result_data = json.loads(completed_attrs.result.payloads[0].data)
+            if not isinstance(result_data, dict):
+                return {}
+            occurrences = result_data.get("failed_activity_occurrences", {})
+            if not isinstance(occurrences, dict):
+                return {}
+            return {
+                node_id: temporal_id
+                for node_id, temporal_id in occurrences.items()
+                if isinstance(node_id, str) and isinstance(temporal_id, str)
+            }
+        except (json.JSONDecodeError, TypeError, UnicodeDecodeError):
+            logger.debug("Could not parse failed_activity_occurrences from workflow result", exc_info=True)
+            return {}
+
+    @staticmethod
     def _finalize_non_terminal_activities(
         execution: Execution,
         execution_id: UUID,
