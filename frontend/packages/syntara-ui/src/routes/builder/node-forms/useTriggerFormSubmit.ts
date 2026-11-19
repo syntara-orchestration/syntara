@@ -54,7 +54,18 @@ export function useTriggerFormSubmit({ schema, workflowId, triggerId, onSubmit }
         data.integrationId,
         data.topic
       )
-      return { data: source ? { ...data, kafkaGroupId: configuredKafkaGroup(source) ?? undefined } : data, publication }
+      return {
+        data: source
+          ? {
+              ...data,
+              kafkaGroupId:
+                source.group_id_is_generated && data.kafkaGroupId == null
+                  ? data.kafkaGroupId
+                  : configuredKafkaGroup(source),
+            }
+          : data,
+        publication,
+      }
     },
   })
 

@@ -10,7 +10,11 @@ import { getErrorMessage } from '../../../utils/apiErrors'
 import { detachPromise } from '../../../utils/detachPromise'
 import { kafkaSourceRevision, readKafkaPublication, reconcileKafkaGroups } from '../node-forms/kafkaPublishedGroups'
 
-export type PublishCallOptions = { expectedVersionOverride?: number; versionOverride?: number }
+export type PublishCallOptions = {
+  expectedVersionOverride?: number
+  versionOverride?: number
+  workflowIdOverride?: string
+}
 export type PreparedPublishOptions = PublishCallOptions & { workflowDefinition?: Record<string, unknown> }
 type Request = {
   name?: string
@@ -58,10 +62,15 @@ export function useKafkaPublishGroups({ workflowId, currentVersion, getDefinitio
   const requestEpoch = useRef(0)
   const { showError } = useAlerts()
   const preparation = useMutation({
-    mutationFn: ({ version, request }: { version: number; request: Request }) => {
-      if (!workflowId) throw new Error('Workflow ID is required')
-      return prepareGroups(workflowId, version, request)
-    },
+    mutationFn: ({
+      targetWorkflowId,
+      version,
+      request,
+    }: {
+      targetWorkflowId: string
+      version: number
+      request: Request
+    }) => prepareGroups(targetWorkflowId, version, request),
   })
   const { mutateAsync, reset } = preparation
   const { open, close, item: data } = dialog
@@ -69,10 +78,11 @@ export function useKafkaPublishGroups({ workflowId, currentVersion, getDefinitio
   const checkAndPublish = useCallback(
     async (request: Request, acceptedRevision?: string) => {
       const version = request.options?.versionOverride ?? currentVersion
-      if (!workflowId || version == null) return
+      const targetWorkflowId = request.options?.workflowIdOverride ?? workflowId
+      if (!targetWorkflowId || version == null) return
       const epoch = ++requestEpoch.current
       try {
-        const plan = await mutateAsync({ version, request })
+        const plan = await mutateAsync({ targetWorkflowId, version, request })
         if (epoch !== requestEpoch.current) return
         if (plan.conflicts.length && plan.revision !== acceptedRevision) {
           request.onSettled?.()

@@ -189,6 +189,7 @@ export default function Workflows() {
     handleUnpublishWorkflow,
     isDeleting,
     isPublishing,
+    publication,
   } = useWorkflowActions({
     showSuccess,
     showError,
@@ -315,6 +316,7 @@ export default function Workflows() {
         runDialog={runDialog}
         deleteDialog={deleteDialog}
         publishDialog={publishDialog}
+        publication={publication}
         unpublishDialog={unpublishDialog}
         importDialogOpen={importDialogOpen}
         setImportDialogOpen={setImportDialogOpen}

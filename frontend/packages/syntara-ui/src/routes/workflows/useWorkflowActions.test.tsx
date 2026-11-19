@@ -8,7 +8,11 @@ import { executionsFetchClient, workflowFetchClient } from '../../client'
 
 import { useWorkflowActions } from './useWorkflowActions'
 
+const publishedRequests = vi.hoisted(() => vi.fn())
+
 type Workflow = WorkflowAPI.components['schemas']['WorkflowRead']
+
+vi.mock('../../providers/alerts', () => ({ useAlerts: () => ({ showError: vi.fn() }) }))
 
 // Helper to create mock workflow objects for testing
 function mockWorkflow(overrides: Partial<Workflow> = {}): Workflow {
@@ -69,6 +73,7 @@ vi.mock('../../client', () => ({
         // Publish mutation
         return {
           mutate: vi.fn((_params: unknown, callbacks?: MutationCallbacks) => {
+            publishedRequests(_params)
             // Simulate successful publish
             callbacks?.onSuccess?.()
             callbacks?.onSettled?.()
@@ -110,7 +115,79 @@ describe('useWorkflowActions', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.mocked(executionsFetchClient.POST).mockReset()
-    vi.mocked(workflowFetchClient.GET).mockReset()
+    vi.mocked(workflowFetchClient.GET)
+      .mockReset()
+      .mockResolvedValue({
+        data: { kafka_subscription_sources: [], version: { version: 1, workflow_definition: {} } },
+        response: new Response(),
+      })
+  })
+
+  it('requires carry-forward before publishing the selected list workflow and version', async () => {
+    const source = {
+      trigger_node_id: 'subscribe',
+      source_id: 'source-1',
+      generation: 1,
+      configuration_revision: 1,
+      integration_id: 'integration-1',
+      topic: 'orders',
+      group_id: 'established-A',
+      group_id_is_generated: false,
+    }
+    const definition = {
+      triggers: [
+        {
+          id: 'subscribe',
+          type: 'event_subscribe_trigger',
+          parameters: {
+            integration_id: 'integration-1',
+            topic: 'orders',
+            group_id: 'draft-B',
+          },
+        },
+      ],
+    }
+    vi.mocked(workflowFetchClient.GET).mockResolvedValue({
+      data: { kafka_subscription_sources: [source], version: { version: 3, workflow_definition: definition } },
+      response: new Response(),
+    })
+    const { result } = renderHook(
+      () =>
+        useWorkflowActions({
+          showSuccess: mockShowSuccess,
+          showError: mockShowError,
+          onNavigate: mockOnNavigate,
+          onRefetch: mockOnRefetch,
+        }),
+      { wrapper: createWrapper() }
+    )
+    result.current.handlePublishWorkflow(mockWorkflow({ id: 'selected-workflow', current_version: 3 }))
+    await waitFor(() => expect(result.current.publication.groupConflicts).toHaveLength(1))
+    expect(publishedRequests).not.toHaveBeenCalled()
+    expect(workflowFetchClient.GET).toHaveBeenCalledWith('/workflows/{workflow_id}', {
+      params: { path: { workflow_id: 'selected-workflow' } },
+    })
+    result.current.publication.confirmGroups()
+    await waitFor(() =>
+      expect(publishedRequests).toHaveBeenCalledWith(
+        expect.objectContaining({
+          params: { path: { workflow_id: 'selected-workflow', version: 3 } },
+          body: {
+            name: null,
+            change_description: null,
+            workflow_definition: {
+              triggers: [
+                {
+                  ...definition.triggers[0],
+                  parameters: { ...definition.triggers[0]?.parameters, group_id: 'established-A' },
+                },
+              ],
+            },
+          },
+        })
+      )
+    )
+    expect(definition.triggers[0]?.parameters.group_id).toBe('draft-B')
   })
 
   describe('onSettled callbacks', () => {
