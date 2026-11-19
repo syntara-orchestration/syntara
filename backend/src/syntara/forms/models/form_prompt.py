@@ -288,6 +288,10 @@ class FormPromptListRead(UserReferenceFieldsMixin, SQLModel):
     execution_id: UUID = Field(..., description="Parent workflow execution ID")
     project_id: UUID = Field(..., description="Project ID (denormalized from execution)")
     prompt_node_id: str = Field(..., description="Canvas node ID from the workflow definition")
+    loop_iteration_path: list[int] = Field(
+        default_factory=list,
+        description="Enclosing-loop indices, outermost first (empty when not inside a loop)",
+    )
     name: str = Field(..., description="Display name for the form prompt")
     status: FormPromptStatus = Field(..., description="Current prompt status")
     timeout_at: datetime | None = Field(
