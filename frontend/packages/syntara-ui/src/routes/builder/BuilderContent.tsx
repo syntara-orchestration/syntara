@@ -171,7 +171,7 @@ export function BuilderContent(props: BuilderContentProps) {
     mostRecentRunPanelOpen,
   })
 
-  useBuilderWorkflowLifecycle({
+  const { isWorkflowInitialized } = useBuilderWorkflowLifecycle({
     workflowId,
     isNew,
     workflow,
@@ -186,7 +186,13 @@ export function BuilderContent(props: BuilderContentProps) {
     setStoredEdges,
     loadWorkflowWithEdges,
   })
-  useExecutionCopyToEditor({ executionCopy, dispatch, markDirty, showSuccess })
+  useExecutionCopyToEditor({
+    executionCopy,
+    isWorkflowInitialized,
+    dispatch,
+    markDirty,
+    showSuccess,
+  })
 
   const initialViewVersionRef = useRef(initialViewVersion)
   useEffect(() => {

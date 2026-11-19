@@ -139,7 +139,7 @@ describe('useBuilderWorkflowLifecycle', () => {
     } as unknown as WorkflowWithVersion
     const loadWorkflowWithEdges = vi.fn()
     const dispatch = vi.fn()
-    renderHook(() =>
+    const { result } = renderHook(() =>
       useBuilderWorkflowLifecycle(
         createDeps({
           isNew: false,
@@ -158,7 +158,31 @@ describe('useBuilderWorkflowLifecycle', () => {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- vitest asymmetric matcher
         payload: expect.objectContaining({ name: 'processed' }),
       })
+      expect(result.current.isWorkflowInitialized).toBe(true)
     })
+  })
+
+  it('resets isWorkflowInitialized when workflowId changes', async () => {
+    const workflow = {
+      id: 'wf-1',
+      version: { workflow_definition: { nodes: [] } },
+    } as unknown as WorkflowWithVersion
+    const { result, rerender } = renderHook((p: ReturnType<typeof createDeps>) => useBuilderWorkflowLifecycle(p), {
+      initialProps: createDeps({
+        isNew: false,
+        workflowId: 'wf-1',
+        workflow,
+      }),
+    })
+    await waitFor(() => expect(result.current.isWorkflowInitialized).toBe(true))
+    rerender(
+      createDeps({
+        isNew: false,
+        workflowId: 'wf-2',
+        workflow: { ...workflow, id: 'wf-2' },
+      })
+    )
+    await waitFor(() => expect(result.current.isWorkflowInitialized).toBe(false))
   })
 
   it('syncs INIT_WORKFLOW from workflow metadata when editing', async () => {
