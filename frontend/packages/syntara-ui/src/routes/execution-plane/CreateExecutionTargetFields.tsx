@@ -56,11 +56,8 @@ export function CreateExecutionTargetFields({ clusterName, isClusterPending }: C
         />
       </FormSection>
 
-      <FormSection className={styles.formSection} title="Node selector and routing labels" titleElement="h2">
-        <Content className={styles.sectionDescription}>
-          Node selectors choose eligible OpenShift workers. Routing labels let workflow steps target this execution
-          target.
-        </Content>
+      <FormSection className={styles.formSection} title="Node selector" titleElement="h2">
+        <Content className={styles.sectionDescription}>Node selectors choose eligible OpenShift workers.</Content>
         <FormGroup
           label="OpenShift node selector"
           fieldId="openshift-node-selector"

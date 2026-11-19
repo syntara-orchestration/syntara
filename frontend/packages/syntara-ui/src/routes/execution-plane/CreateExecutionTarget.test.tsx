@@ -93,7 +93,7 @@ describe('CreateExecutionTarget', () => {
     expect(await screen.findByRole('heading', { level: 1, name: 'Configure execution target' })).toBeInTheDocument()
     expectPageTitle(['Configure execution target', 'Execution Plane'])
     expect(screen.getByRole('heading', { level: 2, name: 'General' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { level: 2, name: 'Node selector and routing labels' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 2, name: 'Node selector' })).toBeInTheDocument()
     expect(screen.getByText('prod-openshift-east')).toBeInTheDocument()
     expect(screen.getByRole('textbox', { name: 'Execution target name' })).toBeInTheDocument()
     expect(screen.getByRole('textbox', { name: 'Execution namespace' })).toBeInTheDocument()
