@@ -26,7 +26,7 @@ export interface paths {
     put?: never
     /**
      * Create form prompt
-     * @description Create a new form prompt. Internal service-to-service endpoint for workflow engine.
+     * @description Create a form prompt for the internal workflow service. A retry with the same execution, node, loop path, and Temporal activity ID returns the existing prompt with 201 Created while pending and before its deadline; replays intentionally use 201. A missing row, different activity ID, non-pending prompt, or elapsed deadline returns 409 Conflict.
      */
     post: operations['create_form_prompt']
     delete?: never
@@ -1251,7 +1251,7 @@ export interface operations {
       }
     }
     responses: {
-      /** @description Form prompt created */
+      /** @description Created prompt or existing pending prompt returned for a same-activity replay; both return 201. */
       201: {
         headers: {
           [name: string]: unknown
