@@ -537,7 +537,7 @@ describe('flat ESLint config rule inheritance', () => {
       true
     )
     expect(
-      barrelMessages.some((message) => message.ruleId === 'barrel-files/avoid-barrel-files' && message.severity === 2)
+      barrelMessages.some((message) => message.ruleId === '@ansible/no-barrel-files' && message.severity === 2)
     ).toBe(true)
   })
 
@@ -564,12 +564,16 @@ describe('flat ESLint config rule inheritance', () => {
     const config = await eslint.calculateConfigForFile('src/routes/access-management/AssignRoleModal.tsx')
     const ruleIds = [
       'syntara/no-locale-date-format',
+      'syntara/no-fetch-aliases',
       'syntara/prefer-confirmation-dialog',
       'syntara/prefer-syn-select',
       'syntara/prefer-pf-list-components',
       'syntara/prefer-pf-text-components',
       'syntara/require-page-title',
+      'syntara/require-http-client-disable-reason',
       'syntara/use-design-tokens-not-hardcoded',
+      '@ansible/no-barrel-files',
+      '@ansible/no-hardcoded-api-prefix',
       '@ansible/no-hardcoded-doc-urls',
       '@ansible/no-nested-component-definitions',
       '@ansible/no-unapproved-http-client',

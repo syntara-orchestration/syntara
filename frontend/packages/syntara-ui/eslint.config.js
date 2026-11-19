@@ -45,6 +45,11 @@ const ANSIBLE_TEST_FILES = [
   'src/**/tests/**',
   'src/**/test-utils/**',
 ]
+const HTTP_CLIENT_RULE_OPTIONS = {
+  clientModules: ['axios', 'cross-fetch', 'got', 'ky', 'node-fetch', 'ofetch', 'superagent', 'undici'],
+  disallowFetch: true,
+  disallowXMLHttpRequest: true,
+}
 /** Import restrictions shared by TypeScript source files. */
 const SHARED_RESTRICTED_IMPORT_PATTERNS = [
   {
@@ -128,18 +133,17 @@ export default tseslint.config(
     },
   },
   {
-    // Keep raw HTTP checks on TypeScript source while allowing documented exceptions.
+    // Keep HTTP-client checks on TypeScript source.
     files: ['**/*.{ts,tsx}'],
-    ignores: ['**/useFileUploadWithProgress.ts', '**/useFileStorageStatus.ts', '**/e2e/global-setup.ts'],
     rules: {
-      '@ansible/no-unapproved-http-client': [
-        'error',
-        {
-          clientModules: ['axios', 'cross-fetch', 'got', 'ky', 'node-fetch', 'ofetch', 'superagent', 'undici'],
-          disallowFetch: true,
-          disallowXMLHttpRequest: true,
-        },
-      ],
+      '@ansible/no-unapproved-http-client': ['error', HTTP_CLIENT_RULE_OPTIONS],
+    },
+  },
+  {
+    // This hook needs XHR upload progress; keep its fetch and client-import checks active.
+    files: ['src/hooks/useFileUploadWithProgress.ts'],
+    rules: {
+      '@ansible/no-unapproved-http-client': ['error', { ...HTTP_CLIENT_RULE_OPTIONS, disallowXMLHttpRequest: false }],
     },
   },
   {
@@ -402,6 +406,8 @@ export default tseslint.config(
       // -- Syntara-specific rules (PR checklist + UX design system enforcement) --
       // no-switch-is-reversed, require-alert-object-param, and require-query-state-object
       // are enforced via no-restricted-syntax AST selectors above (no custom plugin needed).
+      'syntara/no-fetch-aliases': 'error',
+      'syntara/require-http-client-disable-reason': 'error',
       'syntara/prefer-pf-list-components': 'error',
       'syntara/prefer-pf-text-components': 'error',
       'syntara/use-design-tokens-not-hardcoded': 'error',

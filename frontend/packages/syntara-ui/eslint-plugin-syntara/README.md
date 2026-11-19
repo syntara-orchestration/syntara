@@ -2,9 +2,17 @@
 
 Custom ESLint rules for Syntara UI patterns that are not covered by shared packages.
 
-Shared checks for documentation URLs, nested component definitions, and HTTP clients are configured from `@ansible/eslint-plugin` in `eslint.config.js`.
+Shared checks for API paths, documentation URLs, nested component definitions, HTTP clients, and barrel files are configured from `@ansible/eslint-plugin` in `eslint.config.js`.
 
 ## Rules
+
+### `no-fetch-aliases`
+
+Disallows storing or passing the global `fetch` function, which would bypass the shared HTTP-client check. Direct `fetch()` calls are reported by `@ansible/no-unapproved-http-client`.
+
+### `require-http-client-disable-reason`
+
+Requires an explanation after `--` when suppressing `@ansible/no-unapproved-http-client`.
 
 ### `prefer-confirmation-dialog`
 

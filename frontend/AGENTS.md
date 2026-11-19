@@ -84,7 +84,11 @@ Items enforced by ESLint at **error** level are omitted -- ESLint is the source 
 - `aria-label` on `<span>` → `no-restricted-syntax`
 - Nested React component definitions → `@ansible/no-nested-component-definitions` (for PatternFly `toggle` / similar props use a module-scoped child and pass data as props; see coding-standards §18)
 - Hardcoded documentation URLs → `@ansible/no-hardcoded-doc-urls`
+- Hardcoded API prefixes → `@ansible/no-hardcoded-api-prefix`
 - Unapproved HTTP clients and direct `fetch` / `XMLHttpRequest` usage → `@ansible/no-unapproved-http-client`
+- Aliasing or passing the global `fetch` function → `syntara/no-fetch-aliases`
+- HTTP-client rule suppressions without an explanation → `syntara/require-http-client-disable-reason`
+- Barrel files in `src/` → `@ansible/no-barrel-files`
 - `// TODO` / `// FIXME` comments → `no-warning-comments` (warn, not error -- surfaced as a lint warning, does not block CI)
 - Native `<select>` / `<FormSelect>` → `no-restricted-syntax`
 - Non-null assertions (`!`) on nullable types → `@typescript-eslint/no-non-null-assertion`
@@ -131,7 +135,7 @@ The items below cover patterns ESLint **cannot** catch:
 31. **Prefer ref callback cleanup functions** -- when attaching DOM listeners or observers, return a cleanup from the ref callback instead of pairing `useRef` + `useEffect` (see [`.agents/skills/frontend-coding-standards/SKILL.md`](../.agents/skills/frontend-coding-standards/SKILL.md) §38)
 32. **No new `useContext`** -- React 19 reads context with `use(Context)`; do not add `useContext` (see [`.agents/skills/frontend-coding-standards/SKILL.md`](../.agents/skills/frontend-coding-standards/SKILL.md) §39)
 33. **Prefer `useOptimistic` for clear toggle/counter mutations** -- update UI inside a `startTransition` Action with `mutateAsync`; do not hand-roll pending mirror state for simple before/after mutations (see [`.agents/skills/frontend-coding-standards/SKILL.md`](../.agents/skills/frontend-coding-standards/SKILL.md) §40)
-34. **No new barrel files in `src/`** -- do not create a file that only re-exports from other files. Import directly from the source file instead. ESLint enforces this at `error` (`barrel-files/avoid-barrel-files`), scoped to `src/**/*.{ts,tsx}`. Does not apply to `e2e/` or other non-production directories (see [`.agents/skills/frontend-coding-standards/SKILL.md`](../.agents/skills/frontend-coding-standards/SKILL.md) §43)
+34. **No new barrel files in `src/`** -- do not create a file that only re-exports from other files. Import directly from the source file instead. ESLint enforces this at `error` (`@ansible/no-barrel-files`), scoped to `src/**/*.{ts,tsx}`. Does not apply to `e2e/` or other non-production directories (see [`.agents/skills/frontend-coding-standards/SKILL.md`](../.agents/skills/frontend-coding-standards/SKILL.md) §43)
 35. **Use TanStack Router for URL search state** -- see [URL Search State](../.agents/skills/frontend-coding-standards/SKILL.md#url-search-state) for `validateSearch`, `useSearch`, `useNavigate`, and list-filter patterns
 
 ### Feature Preservation Rules
