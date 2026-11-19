@@ -50,7 +50,6 @@ type StepEditorLayoutProps = {
   workflowMetadata?: WorkflowMetadata
   tabBarAction?: ReactNode
   readOnly?: boolean
-  isViewingVersion?: boolean
   mode?: 'add' | 'edit'
 }
 
@@ -75,10 +74,9 @@ export function StepEditorLayout({
   workflowMetadata,
   tabBarAction,
   readOnly,
-  isViewingVersion = false,
   mode = 'edit',
 }: StepEditorLayoutProps) {
-  const readOnlyReason = useStepFormReadOnlyReason(isViewingVersion, readOnly)
+  const readOnlyReason = useStepFormReadOnlyReason(readOnly)
   const { inputData, outputData } = useStepExecutionData(nodeId ?? '', executionId, workflowId)
   let closeAriaLabel = 'Cancel without saving'
   if (readOnly) closeAriaLabel = 'Close step editor'

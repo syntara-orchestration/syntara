@@ -404,6 +404,7 @@ export function BuilderWorkflowPageHeader({
 }: BuilderWorkflowPageHeaderProps) {
   const builderDocLink = useDocLink('builder')
   const publishDialog = useDialogState<true>()
+  const retryStepTypePermissions = builderPermissions.retryStepTypePermissions
 
   const toolbar = (
     <BuilderToolbarContent
@@ -504,14 +505,7 @@ export function BuilderWorkflowPageHeader({
         permissionCheckError={builderPermissions.stepTypePermissionError}
         permissionCheckLoading={builderPermissions.stepTypePermissionLoading}
         blockedStepTypes={builderPermissions.blockedStepTypes}
-        onRetryPermissionCheck={
-          builderPermissions.retryStepTypePermissions
-            ? () => {
-                const retry = builderPermissions.retryStepTypePermissions
-                if (retry) detachPromise(retry())
-              }
-            : undefined
-        }
+        onRetryPermissionCheck={retryStepTypePermissions ? () => detachPromise(retryStepTypePermissions()) : undefined}
         onPublish={(publishName, description) => {
           onPublish(publishName, description, publishDialog.close)
         }}

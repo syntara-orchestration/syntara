@@ -88,7 +88,6 @@ export const StepEditorOverlay = memo(function StepEditorOverlay(props: StepEdit
           workflowMetadata={workflowMetadata}
           onRunStep={isReadOnly ? undefined : onRunStep}
           readOnly={isReadOnly}
-          isViewingVersion={isVersionView}
           onStepAdded={onStepAdded}
         />
       </FlexItem>

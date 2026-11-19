@@ -43,131 +43,15 @@ export type BuildWorkflowRowActionsParams = {
   stepTypePermissions?: StepTypePermissions
 }
 
-type WorkflowActionContext = BuildWorkflowRowActionsParams & {
-  canAuthor: boolean
-  noUpdate: ActionTooltip
-  noDuplicate: ActionTooltip
-  noRun: ActionTooltip
-  noPublish: ActionTooltip
-  noUnpublish: ActionTooltip
-  noDelete: ActionTooltip
-}
-
-function getActionTooltip(options: {
-  isBuiltinProject: boolean
-  action: string
-  permissionAllowed: boolean
-  permissionMessage: string
-  stepTypeTooltip?: ActionTooltip
-}): ActionTooltip {
-  if (options.isBuiltinProject) return { content: builtinProjectTooltip(options.action) }
-  if (!options.permissionAllowed) return { content: options.permissionMessage }
-  return options.stepTypeTooltip
-}
-
 function actionIfAllowed(isAllowed: boolean, action: () => void): (() => void) | undefined {
   return isAllowed ? action : undefined
 }
 
-function buildEditAction(context: WorkflowActionContext): RowAction {
-  const { callbacks, isBuiltinProject, permissions, workflow, canAuthor, noUpdate } = context
-  return {
-    key: 'edit',
-    title: <IconLabel icon={<RhUiEditFillIcon />}>Edit workflow</IconLabel>,
-    isAriaDisabled: isBuiltinProject || !permissions.canUpdate || !canAuthor,
-    tooltipProps: noUpdate,
-    onClick: actionIfAllowed(!isBuiltinProject && permissions.canUpdate && canAuthor, () => {
-      detachPromise(callbacks.navigate({ to: '/workflow-builder/$workflowId', params: { workflowId: workflow.id } }))
-    }),
+function runActionTooltip(hasPublishedVersion: boolean, canRun: boolean, runPermissionTooltip: string): ActionTooltip {
+  if (!hasPublishedVersion) {
+    return { content: 'No published version. Go to the workflow editor to run the current version.' }
   }
-}
-
-function buildRunAction(context: WorkflowActionContext): RowAction {
-  const { callbacks, permissions, workflow, noRun } = context
-  const hasPublishedVersion = workflow.published_version_id != null
-  return {
-    key: 'run',
-    title: <IconLabel icon={<RhUiPlayIcon />}>Run published version</IconLabel>,
-    isAriaDisabled: !permissions.canRun || !hasPublishedVersion,
-    tooltipProps: hasPublishedVersion
-      ? noRun
-      : { content: 'No published version. Go to the workflow editor to run the current version.' },
-    onClick: actionIfAllowed(permissions.canRun && hasPublishedVersion, () => callbacks.onRun(workflow)),
-  }
-}
-
-function buildHistoryAction(context: WorkflowActionContext): RowAction {
-  const { callbacks, workflow } = context
-  return {
-    key: 'history',
-    title: <IconLabel icon={<RhUiHistoryIcon />}>View run history</IconLabel>,
-    onClick: () => {
-      detachPromise(callbacks.navigate({ to: '/executions', search: { workflow_id: workflow.id } }))
-    },
-  }
-}
-
-function buildDuplicateAction(context: WorkflowActionContext): RowAction {
-  const { callbacks, isBuiltinProject, permissions, workflow, canAuthor, noDuplicate } = context
-  return {
-    key: 'duplicate',
-    title: <IconLabel icon={<RhUiDuplicateIcon />}>Duplicate workflow</IconLabel>,
-    isDisabled: callbacks.isDuplicating,
-    isAriaDisabled: isBuiltinProject || !permissions.canCreate || !canAuthor,
-    tooltipProps: noDuplicate,
-    onClick: actionIfAllowed(!isBuiltinProject && permissions.canCreate && canAuthor, () =>
-      callbacks.onDuplicate(workflow)
-    ),
-  }
-}
-
-function buildExportAction(context: WorkflowActionContext): RowAction {
-  const { callbacks, workflow } = context
-  return {
-    key: 'export',
-    title: <IconLabel icon={<RhUiExportIcon />}>Export workflow</IconLabel>,
-    onClick: () => callbacks.onExport(workflow),
-  }
-}
-
-function buildPublishAction(context: WorkflowActionContext): RowAction {
-  const { callbacks, isBuiltinProject, permissions, workflow, canAuthor, noPublish } = context
-  return {
-    key: 'publish',
-    title: <IconLabel icon={<RhUiCheckCircleIcon />}>Publish workflow</IconLabel>,
-    isAriaDisabled: isBuiltinProject || !permissions.canUpdate || !canAuthor,
-    tooltipProps: noPublish,
-    onClick: actionIfAllowed(!isBuiltinProject && permissions.canUpdate && canAuthor, () =>
-      callbacks.onPublish(workflow)
-    ),
-  }
-}
-
-function buildUnpublishAction(context: WorkflowActionContext): RowAction {
-  const { callbacks, isBuiltinProject, permissions, workflow, canAuthor, noUnpublish } = context
-  return {
-    key: 'unpublish',
-    title: <IconLabel icon={<RhUiMinusCircleFillIcon />}>Unpublish workflow</IconLabel>,
-    isAriaDisabled: isBuiltinProject || !permissions.canUpdate || !canAuthor,
-    tooltipProps: noUnpublish,
-    onClick: actionIfAllowed(!isBuiltinProject && permissions.canUpdate && canAuthor, () =>
-      callbacks.onUnpublish(workflow)
-    ),
-  }
-}
-
-function buildDeleteAction(context: WorkflowActionContext): RowAction {
-  const { callbacks, isBuiltinProject, permissions, workflow, canAuthor, noDelete } = context
-  return {
-    key: 'delete',
-    title: <IconLabel icon={<RhUiTrashIcon />}>Delete workflow</IconLabel>,
-    isAriaDisabled: isBuiltinProject || !permissions.canDelete || !canAuthor,
-    tooltipProps: noDelete,
-    isDanger: true,
-    onClick: actionIfAllowed(!isBuiltinProject && permissions.canDelete && canAuthor, () =>
-      callbacks.onDelete(workflow)
-    ),
-  }
+  return canRun ? undefined : { content: runPermissionTooltip }
 }
 
 export function buildWorkflowRowActions({
@@ -181,50 +65,20 @@ export function buildWorkflowRowActions({
   const canAuthor = stepTypePermissions?.canAuthor ?? true
   const stepTypeTooltip =
     stepTypePermissions && !canAuthor ? { content: getStepTypePermissionMessage(stepTypePermissions) } : undefined
-  const context: WorkflowActionContext = {
-    workflow,
-    permissions,
-    isBuiltinProject,
-    callbacks,
-    stepTypePermissions,
-    canAuthor,
-    noUpdate: getActionTooltip({
-      isBuiltinProject,
-      action: 'edit this workflow',
-      permissionAllowed: permissions.canUpdate,
-      permissionMessage: permissions.tooltips.update,
-      stepTypeTooltip,
-    }),
-    noDuplicate: getActionTooltip({
-      isBuiltinProject,
-      action: 'duplicate this workflow',
-      permissionAllowed: permissions.canCreate,
-      permissionMessage: permissions.tooltips.duplicate,
-      stepTypeTooltip,
-    }),
-    noRun: permissions.canRun ? undefined : { content: permissions.tooltips.run },
-    noPublish: getActionTooltip({
-      isBuiltinProject,
-      action: 'publish this workflow',
-      permissionAllowed: permissions.canUpdate,
-      permissionMessage: permissions.tooltips.update,
-      stepTypeTooltip,
-    }),
-    noUnpublish: getActionTooltip({
-      isBuiltinProject,
-      action: 'unpublish this workflow',
-      permissionAllowed: permissions.canUpdate,
-      permissionMessage: permissions.tooltips.update,
-      stepTypeTooltip,
-    }),
-    noDelete: getActionTooltip({
-      isBuiltinProject,
-      action: 'delete this workflow',
-      permissionAllowed: permissions.canDelete,
-      permissionMessage: permissions.tooltips.delete,
-      stepTypeTooltip,
-    }),
+  /** Builtin beats RBAC beats step-type denial, mirroring the disabled flags. */
+  const tooltip = (action: string, allowed: boolean, permissionMessage: string): ActionTooltip => {
+    if (isBuiltinProject) return { content: builtinProjectTooltip(action) }
+    if (!allowed) return { content: permissionMessage }
+    return stepTypeTooltip
   }
+
+  const gated = (rbacAllowed: boolean) => isBuiltinProject || !rbacAllowed || !canAuthor
+  const updateDisabled = gated(permissions.canUpdate)
+  const duplicateDisabled = gated(permissions.canCreate)
+  const deleteDisabled = gated(permissions.canDelete)
+  const hasPublishedVersion = workflow.published_version_id != null
+  const runDisabled = !permissions.canRun || !hasPublishedVersion
+
   const actions: RowAction[] = []
   if (stepTypePermissions?.isError) {
     actions.push({
@@ -234,14 +88,69 @@ export function buildWorkflowRowActions({
     })
   }
   actions.push(
-    buildEditAction(context),
-    buildRunAction(context),
-    buildHistoryAction(context),
-    buildDuplicateAction(context),
-    buildExportAction(context),
-    buildPublishAction(context)
+    {
+      key: 'edit',
+      title: <IconLabel icon={<RhUiEditFillIcon />}>Edit workflow</IconLabel>,
+      isAriaDisabled: updateDisabled,
+      tooltipProps: tooltip('edit this workflow', permissions.canUpdate, permissions.tooltips.update),
+      onClick: actionIfAllowed(!updateDisabled, () => {
+        detachPromise(callbacks.navigate({ to: '/workflow-builder/$workflowId', params: { workflowId: workflow.id } }))
+      }),
+    },
+    {
+      key: 'run',
+      title: <IconLabel icon={<RhUiPlayIcon />}>Run published version</IconLabel>,
+      isAriaDisabled: runDisabled,
+      tooltipProps: runActionTooltip(hasPublishedVersion, permissions.canRun, permissions.tooltips.run),
+      onClick: actionIfAllowed(!runDisabled, () => callbacks.onRun(workflow)),
+    },
+    {
+      key: 'history',
+      title: <IconLabel icon={<RhUiHistoryIcon />}>View run history</IconLabel>,
+      onClick: () => {
+        detachPromise(callbacks.navigate({ to: '/executions', search: { workflow_id: workflow.id } }))
+      },
+    },
+    {
+      key: 'duplicate',
+      title: <IconLabel icon={<RhUiDuplicateIcon />}>Duplicate workflow</IconLabel>,
+      isDisabled: callbacks.isDuplicating,
+      isAriaDisabled: duplicateDisabled,
+      tooltipProps: tooltip('duplicate this workflow', permissions.canCreate, permissions.tooltips.duplicate),
+      onClick: actionIfAllowed(!duplicateDisabled, () => callbacks.onDuplicate(workflow)),
+    },
+    {
+      key: 'export',
+      title: <IconLabel icon={<RhUiExportIcon />}>Export workflow</IconLabel>,
+      onClick: () => callbacks.onExport(workflow),
+    },
+    {
+      key: 'publish',
+      title: <IconLabel icon={<RhUiCheckCircleIcon />}>Publish workflow</IconLabel>,
+      isAriaDisabled: updateDisabled,
+      tooltipProps: tooltip('publish this workflow', permissions.canUpdate, permissions.tooltips.update),
+      onClick: actionIfAllowed(!updateDisabled, () => callbacks.onPublish(workflow)),
+    }
   )
-  if (workflow.published_version_id != null) actions.push(buildUnpublishAction(context))
-  actions.push({ key: 'sep-delete', isSeparator: true }, buildDeleteAction(context))
+  if (hasPublishedVersion) {
+    actions.push({
+      key: 'unpublish',
+      title: <IconLabel icon={<RhUiMinusCircleFillIcon />}>Unpublish workflow</IconLabel>,
+      isAriaDisabled: updateDisabled,
+      tooltipProps: tooltip('unpublish this workflow', permissions.canUpdate, permissions.tooltips.update),
+      onClick: actionIfAllowed(!updateDisabled, () => callbacks.onUnpublish(workflow)),
+    })
+  }
+  actions.push(
+    { key: 'sep-delete', isSeparator: true },
+    {
+      key: 'delete',
+      title: <IconLabel icon={<RhUiTrashIcon />}>Delete workflow</IconLabel>,
+      isAriaDisabled: deleteDisabled,
+      tooltipProps: tooltip('delete this workflow', permissions.canDelete, permissions.tooltips.delete),
+      isDanger: true,
+      onClick: actionIfAllowed(!deleteDisabled, () => callbacks.onDelete(workflow)),
+    }
+  )
   return actions
 }

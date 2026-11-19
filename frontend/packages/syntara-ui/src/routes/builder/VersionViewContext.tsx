@@ -11,9 +11,9 @@ export function useIsStepFormReadOnly(): boolean {
   return useIsVersionView() || Boolean(use(StepFormReadOnlyContext))
 }
 
-export function useStepFormReadOnlyReason(isViewingVersion: boolean, readOnly?: boolean): string | null {
+export function useStepFormReadOnlyReason(readOnly?: boolean): string | null {
   const reason = use(StepFormReadOnlyContext)
-  if (isViewingVersion) return 'You are viewing a previous version. Return to the editor to make changes.'
+  if (useIsVersionView()) return 'You are viewing a previous version. Return to the editor to make changes.'
   if (!readOnly) return null
   return typeof reason === 'string' ? reason : 'You do not have permission to edit this workflow.'
 }

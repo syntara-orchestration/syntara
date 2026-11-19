@@ -93,16 +93,6 @@ function actionIfAllowed(isAllowed: boolean, action: () => void): (() => void) |
   return isAllowed ? action : undefined
 }
 
-function getDisabledTooltip(isDisabled: boolean, content?: string) {
-  return isDisabled && content ? { content } : undefined
-}
-
-function getPublishTooltip(disabledTooltip: { content: string } | undefined, isAlreadyPublished: boolean) {
-  if (disabledTooltip) return disabledTooltip
-  if (isAlreadyPublished) return { content: 'This version is already published' }
-  return undefined
-}
-
 function VersionKebabMenu({
   version,
   isOpen,
@@ -124,10 +114,12 @@ function VersionKebabMenu({
   duplicateTooltip,
 }: VersionKebabMenuProps) {
   const ariaLabel = `Actions for version ${version.version}`
-  const disabledTooltip = getDisabledTooltip(!canEdit, editTooltip)
-  const duplicateDisabledTooltip = getDisabledTooltip(!canDuplicate, duplicateTooltip ?? editTooltip)
+  const disabledTooltip = !canEdit && editTooltip ? { content: editTooltip } : undefined
+  const duplicateReason = duplicateTooltip ?? editTooltip
+  const duplicateDisabledTooltip = !canDuplicate && duplicateReason ? { content: duplicateReason } : undefined
   const isAlreadyPublished = version.status === 'published'
-  const publishTooltip = getPublishTooltip(disabledTooltip, isAlreadyPublished)
+  const publishTooltip =
+    disabledTooltip ?? (isAlreadyPublished ? { content: 'This version is already published' } : undefined)
   const renderToggle = (toggleRef: Ref<MenuToggleElement>) => (
     <VersionKebabToggle toggleRef={toggleRef} isOpen={isOpen} onToggle={onToggle} ariaLabel={ariaLabel} />
   )

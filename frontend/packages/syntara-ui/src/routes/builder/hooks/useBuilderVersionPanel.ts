@@ -9,135 +9,100 @@ import type { BuilderAction } from '../builderReducer'
 
 import { useBuilderVersionHistory } from './useBuilderVersionHistory'
 import { useBuilderVersionPermissions } from './useBuilderVersionPermissions'
+import type { useVersionDefinitionPermissions } from './useVersionDefinitionPermissions'
 import { useVersionViewNavigation } from './useVersionViewNavigation'
 
 type WorkflowWithVersion = WorkflowAPI.components['schemas']['WorkflowReadWithVersion']
 type WorkflowVersion = WorkflowAPI.components['schemas']['WorkflowVersionRead']
-type VersionHistoryState = ReturnType<typeof useBuilderVersionHistory>
 type ResourceDialog<T> = { isOpen: boolean; item: T | null; open: (item: T) => void; close: () => void }
 type RestoreDialogItem = { version: number; dateTime: string }
+type VersionDefinitionPermissions = ReturnType<typeof useVersionDefinitionPermissions>
 
-type VersionSidePanelOptions = {
-  workflowId: string | null
-  isNew: boolean
-  versionHistoryOpen: boolean
-  dispatch: Dispatch<BuilderAction>
-  filteredVersions: VersionHistoryState['filteredVersions']
-  publishedVersionName: string | null
-  selectedVersion: number | null
-  statusFilter: VersionHistoryState['statusFilter']
-  setStatusFilter: VersionHistoryState['setStatusFilter']
-  paginationFooterProps: VersionHistoryState['paginationFooterProps']
-  onSelectVersion: (version: number) => void
-  onExportVersion: (version: number) => void
-  onOpenInNewWindow: (version: number) => void
-  onViewRunHistory: (versionNumber: number) => void
-  executedVersionNumbers: Map<number, string>
+function buildPublishDialogProps(options: {
+  canEdit: boolean
+  canPublish: boolean
+  publishPermissions: VersionDefinitionPermissions
+  versionPublishDialog: ResourceDialog<number>
+  publishVersion: (version: number, publishName?: string, description?: string) => void
+}) {
+  const { canEdit, canPublish, publishPermissions, versionPublishDialog, publishVersion } = options
+  return {
+    isOpen: versionPublishDialog.isOpen,
+    onClose: versionPublishDialog.close,
+    canPublish,
+    permissionCheckError: publishPermissions.isError,
+    permissionCheckLoading: publishPermissions.isChecking,
+    blockedStepTypes: publishPermissions.blockedStepTypes.map((type) => type.label),
+    editTooltip: canEdit
+      ? publishPermissions.permissionMessage
+      : 'You do not have permission to publish this workflow.',
+    onRetryPermissionCheck: publishPermissions.retry,
+    onPublish: (publishName?: string, description?: string) => {
+      if (canPublish && versionPublishDialog.item != null) {
+        publishVersion(versionPublishDialog.item, publishName, description)
+        versionPublishDialog.close()
+      }
+    },
+  }
+}
+
+function buildRestoreDialogProps(options: {
+  canConfirm: boolean
+  restorePermissions: VersionDefinitionPermissions
   restoreDialog: ResourceDialog<RestoreDialogItem>
   restoreDialogTitle: string
   restoreMutationIsPending: boolean
-  canConfirmRestore: boolean
-  restorePermissionCheckError: boolean
-  restorePermissionCheckLoading: boolean
-  restoreBlockedStepTypes: string[]
-  retryRestorePermissions: () => Promise<void>
   handleConfirmRestore: () => void
-  versionPublishDialog: ResourceDialog<number>
-  canPublishSelectedVersion: boolean
-  publishPermissionCheckError: boolean
-  publishPermissionCheckLoading: boolean
-  publishBlockedStepTypes: string[]
-  publishTargetTooltip: string
-  retryPublishPermissions: () => Promise<void>
-  publishVersion: (version: number, publishName?: string, description?: string) => void
-  saveBeforeViewDialog: {
-    isOpen: boolean
-    onSave: () => Promise<boolean>
-    onViewWithoutSaving: () => void
-    onCancel: () => void
+}) {
+  const {
+    canConfirm,
+    restorePermissions,
+    restoreDialog,
+    restoreDialogTitle,
+    restoreMutationIsPending,
+    handleConfirmRestore,
+  } = options
+  return {
+    isOpen: restoreDialog.isOpen,
+    title: restoreDialogTitle,
+    isLoading: restoreMutationIsPending,
+    canConfirm,
+    permissionCheckError: restorePermissions.isError,
+    permissionCheckLoading: restorePermissions.isChecking,
+    blockedStepTypes: restorePermissions.blockedStepTypes.map((type) => type.label),
+    onRetryPermissionCheck: restorePermissions.retry,
+    onClose: restoreDialog.close,
+    onConfirm: () => {
+      if (canConfirm) handleConfirmRestore()
+    },
   }
-  editVersionDialog: ResourceDialog<WorkflowVersion>
-  canEditSelectedVersion: boolean
-  editVersionTooltip: string
-  editPermissionCheckError: boolean
-  retryEditPermissions: () => Promise<void>
-  isSavingVersionMetadata: boolean
-  handleEditVersionSave: (name: string | null, description: string | null) => void
-  canCreate: boolean
-  canEdit: boolean
-  onDuplicateVersion: (version: WorkflowVersion) => void
 }
 
-function buildVersionSidePanel(options: VersionSidePanelOptions) {
+function editDialogTooltip(canEdit: boolean, canEditSelected: boolean, permissionMessage: string): string | undefined {
+  if (canEditSelected) return undefined
+  return canEdit ? permissionMessage : 'You do not have permission to edit this workflow.'
+}
+
+function buildEditDialogProps(options: {
+  canEdit: boolean
+  canEditSelected: boolean
+  editPermissions: VersionDefinitionPermissions
+  editVersionDialog: ResourceDialog<WorkflowVersion>
+  isSaving: boolean
+  onSave: (name: string | null, description: string | null) => void
+}) {
+  const { canEdit, canEditSelected, editPermissions, editVersionDialog, isSaving, onSave } = options
   return {
-    show: !options.isNew && !!options.workflowId && options.versionHistoryOpen,
-    filteredVersions: options.filteredVersions,
-    publishedVersionName: options.publishedVersionName,
-    selectedVersion: options.selectedVersion,
-    statusFilter: options.statusFilter,
-    onStatusFilterChange: options.setStatusFilter,
-    paginationFooterProps: options.paginationFooterProps,
-    onClose: () => options.dispatch({ type: 'SET_VERSION_HISTORY_OPEN', payload: false }),
-    onSelectVersion: options.onSelectVersion,
-    onRestoreVersion: (version: number, createdAt: string) => {
-      if (options.canEdit) options.restoreDialog.open({ version, dateTime: createdAt })
-    },
-    onExportVersion: options.onExportVersion,
-    onOpenInNewWindow: options.onOpenInNewWindow,
-    onPublishVersion: (version: number) => {
-      if (options.canEdit) options.versionPublishDialog.open(version)
-    },
-    onViewRunHistory: options.onViewRunHistory,
-    executedVersionNumbers: options.executedVersionNumbers,
-    onEditVersion: (version: WorkflowVersion) => {
-      if (options.canEdit) options.editVersionDialog.open(version)
-    },
-    onDuplicateVersion: (version: WorkflowVersion) => {
-      if (options.canCreate) options.onDuplicateVersion(version)
-    },
-    publishDialog: {
-      isOpen: options.versionPublishDialog.isOpen,
-      onClose: options.versionPublishDialog.close,
-      canPublish: options.canPublishSelectedVersion,
-      permissionCheckError: options.publishPermissionCheckError,
-      permissionCheckLoading: options.publishPermissionCheckLoading,
-      blockedStepTypes: options.publishBlockedStepTypes,
-      editTooltip: options.publishTargetTooltip,
-      onRetryPermissionCheck: options.retryPublishPermissions,
-      onPublish: (publishName?: string, description?: string) => {
-        if (options.canPublishSelectedVersion && options.versionPublishDialog.item != null) {
-          options.publishVersion(options.versionPublishDialog.item, publishName, description)
-          options.versionPublishDialog.close()
-        }
-      },
-    },
-    saveBeforeViewDialog: options.saveBeforeViewDialog,
-    restoreDialog: {
-      isOpen: options.restoreDialog.isOpen,
-      title: options.restoreDialogTitle,
-      isLoading: options.restoreMutationIsPending,
-      canConfirm: options.canConfirmRestore,
-      permissionCheckError: options.restorePermissionCheckError,
-      permissionCheckLoading: options.restorePermissionCheckLoading,
-      blockedStepTypes: options.restoreBlockedStepTypes,
-      onRetryPermissionCheck: options.retryRestorePermissions,
-      onClose: options.restoreDialog.close,
-      onConfirm: () => {
-        if (options.canConfirmRestore) options.handleConfirmRestore()
-      },
-    },
-    editDialog: {
-      isOpen: options.editVersionDialog.isOpen,
-      isSaving: options.isSavingVersionMetadata,
-      onClose: options.editVersionDialog.close,
-      onSave: options.handleEditVersionSave,
-      canEdit: options.canEditSelectedVersion,
-      editTooltip: options.canEditSelectedVersion ? undefined : options.editVersionTooltip,
-      permissionCheckError: options.editPermissionCheckError,
-      onRetryPermissionCheck: options.retryEditPermissions,
-      initialName: options.editVersionDialog.item?.name,
-      initialDescription: options.editVersionDialog.item?.change_description,
-    },
+    isOpen: editVersionDialog.isOpen,
+    isSaving,
+    onClose: editVersionDialog.close,
+    onSave,
+    canEdit: canEditSelected,
+    editTooltip: editDialogTooltip(canEdit, canEditSelected, editPermissions.permissionMessage),
+    permissionCheckError: editPermissions.isError,
+    onRetryPermissionCheck: editPermissions.retry,
+    initialName: editVersionDialog.item?.name,
+    initialDescription: editVersionDialog.item?.change_description,
   }
 }
 
@@ -149,7 +114,6 @@ type UseBuilderVersionPanelParams = {
   versionHistoryOpen: boolean
   dispatch: Dispatch<BuilderAction>
   handleSaveWorkflow: () => Promise<boolean>
-  workflowName: string
   expandAllEvent: EventTarget
   baseHandleToggleVersionHistory: () => void
   searchParams: URLSearchParams
@@ -242,12 +206,14 @@ export function useBuilderVersionPanel(params: UseBuilderVersionPanelParams) {
   const editVersionDialog = useDialogState<WorkflowVersion>()
   const restoreTargetVersion = filteredVersions.find((version) => version.version === restoreDialog.item?.version)
   const publishTargetVersion = filteredVersions.find((version) => version.version === versionPublishDialog.item)
-  const versionPermissions = useBuilderVersionPermissions({
-    canEdit,
+  const {
+    selected: selectedVersionPermissions,
+    edit: editPermissions,
+    restore: restorePermissions,
+    publish: publishPermissions,
+  } = useBuilderVersionPermissions({
     projectId: workflow?.project_id,
     isViewingVersion,
-    viewedVersion: viewingVersion,
-    viewedVersionDate,
     viewedVersionDefinition,
     viewedVersionIsLoading,
     retryViewedVersion: () => refetchViewedVersion(),
@@ -259,50 +225,97 @@ export function useBuilderVersionPanel(params: UseBuilderVersionPanelParams) {
     isPublishDialogOpen: versionPublishDialog.isOpen,
   })
 
-  const handleEditVersionSave = useCallback(
-    (publishName: string | null, changeDescription: string | null) => {
-      if (!versionPermissions.canEditSelectedVersion || !editVersionDialog.item) return
-      updateVersionMetadata(editVersionDialog.item.version, publishName, changeDescription)
-      editVersionDialog.close()
-    },
-    [versionPermissions.canEditSelectedVersion, editVersionDialog, updateVersionMetadata]
-  )
+  const canEditSelectedVersion = canEdit && editPermissions.canAuthor
+  const canConfirmRestore = canEdit && restorePermissions.canAuthor
+  const canPublishSelectedVersion = canEdit && publishPermissions.canAuthor
+  const canRestoreSelectedVersion =
+    canEdit &&
+    isViewingVersion &&
+    viewedVersionDate != null &&
+    viewingVersion !== null &&
+    selectedVersionPermissions.canAuthor
 
-  const handleViewRunHistory = useCallback(
-    (versionNumber: number) => {
-      if (isViewingVersion) {
-        handleExitVersionView()
-      } else {
-        dispatch({ type: 'SET_VERSION_HISTORY_OPEN', payload: false })
-      }
-      onOpenRunHistory(versionNumber)
-    },
-    [isViewingVersion, handleExitVersionView, dispatch, onOpenRunHistory]
-  )
+  const handleEditVersionSave = (publishName: string | null, changeDescription: string | null) => {
+    if (!canEditSelectedVersion || !editVersionDialog.item) return
+    updateVersionMetadata(editVersionDialog.item.version, publishName, changeDescription)
+    editVersionDialog.close()
+  }
 
-  const setVersionParam = useCallback(
-    (version: number) => {
-      const params = new URLSearchParams(searchParams)
-      params.set('version', String(version))
-      setSearchParams(params)
-    },
-    [searchParams, setSearchParams]
-  )
+  const handleViewRunHistory = (versionNumber: number) => {
+    if (isViewingVersion) {
+      handleExitVersionView()
+    } else {
+      dispatch({ type: 'SET_VERSION_HISTORY_OPEN', payload: false })
+    }
+    onOpenRunHistory(versionNumber)
+  }
+
   const versionNavigation = useVersionViewNavigation({
     isDirty,
     isViewingVersion,
     dispatch,
     handleSaveWorkflow,
-    setVersionParam,
+    searchParams,
+    setSearchParams,
   })
 
   const canRestoreCurrentVersion = isViewingVersion && viewedVersionDate != null && viewingVersion !== null
-  const openRestoreDialogForCurrentVersion = canRestoreCurrentVersion
-    ? () => {
-        if (versionPermissions.canRestoreSelectedVersion)
-          restoreDialog.open({ version: viewingVersion, dateTime: viewedVersionDate })
-      }
-    : undefined
+  const openRestoreDialogForCurrentVersion =
+    canRestoreCurrentVersion && canRestoreSelectedVersion
+      ? () => restoreDialog.open({ version: viewingVersion, dateTime: viewedVersionDate })
+      : undefined
+
+  const versionSidePanel = {
+    show: !isNew && !!workflowId && versionHistoryOpen,
+    filteredVersions,
+    publishedVersionName,
+    selectedVersion: viewingVersion,
+    statusFilter,
+    onStatusFilterChange: setStatusFilter,
+    paginationFooterProps,
+    onClose: () => dispatch({ type: 'SET_VERSION_HISTORY_OPEN', payload: false }),
+    onSelectVersion: versionNavigation.onSelectVersion,
+    onRestoreVersion: (version: number, createdAt: string) => {
+      if (canEdit) restoreDialog.open({ version, dateTime: createdAt })
+    },
+    onExportVersion: exportVersion,
+    onOpenInNewWindow: openInNewWindow,
+    onPublishVersion: (version: number) => {
+      if (canEdit) versionPublishDialog.open(version)
+    },
+    onViewRunHistory: handleViewRunHistory,
+    executedVersionNumbers,
+    onEditVersion: (version: WorkflowVersion) => {
+      if (canEdit) editVersionDialog.open(version)
+    },
+    onDuplicateVersion: (version: WorkflowVersion) => {
+      if (canCreate) onDuplicateVersion(version)
+    },
+    publishDialog: buildPublishDialogProps({
+      canEdit,
+      canPublish: canPublishSelectedVersion,
+      publishPermissions,
+      versionPublishDialog,
+      publishVersion,
+    }),
+    saveBeforeViewDialog: versionNavigation.saveBeforeViewDialog,
+    restoreDialog: buildRestoreDialogProps({
+      canConfirm: canConfirmRestore,
+      restorePermissions,
+      restoreDialog,
+      restoreDialogTitle,
+      restoreMutationIsPending: restoreMutation.isPending,
+      handleConfirmRestore,
+    }),
+    editDialog: buildEditDialogProps({
+      canEdit,
+      canEditSelected: canEditSelectedVersion,
+      editPermissions,
+      editVersionDialog,
+      isSaving: updateMetadataMutation.isPending,
+      onSave: handleEditVersionSave,
+    }),
+  }
 
   return {
     isViewingVersion,
@@ -315,57 +328,13 @@ export function useBuilderVersionPanel(params: UseBuilderVersionPanelParams) {
     handleExitVersionView,
     handleToggleVersionHistory,
     openRestoreDialogForCurrentVersion,
-    canRestoreSelectedVersion: versionPermissions.canRestoreSelectedVersion,
-    restoreTooltip: versionPermissions.restoreTooltip,
-    selectedVersionPermissionError: versionPermissions.selectedVersionPermissionError,
-    selectedVersionPermissionLoading: versionPermissions.selectedVersionPermissionLoading,
-    retrySelectedVersionPermissions: versionPermissions.retrySelectedVersionPermissions,
+    canRestoreSelectedVersion,
+    restoreTooltip: canEdit ? selectedVersionPermissions.permissionMessage : undefined,
+    selectedVersionPermissionError: selectedVersionPermissions.isError,
+    selectedVersionPermissionLoading: isViewingVersion && selectedVersionPermissions.isChecking,
+    retrySelectedVersionPermissions: selectedVersionPermissions.retry,
 
-    versionSidePanel: buildVersionSidePanel({
-      workflowId,
-      isNew,
-      versionHistoryOpen,
-      dispatch,
-      filteredVersions,
-      publishedVersionName,
-      selectedVersion: viewingVersion,
-      statusFilter,
-      setStatusFilter,
-      paginationFooterProps,
-      onSelectVersion: versionNavigation.onSelectVersion,
-      onExportVersion: exportVersion,
-      onOpenInNewWindow: openInNewWindow,
-      onViewRunHistory: handleViewRunHistory,
-      executedVersionNumbers,
-      restoreDialog,
-      restoreDialogTitle,
-      restoreMutationIsPending: restoreMutation.isPending,
-      canConfirmRestore: versionPermissions.canConfirmRestore,
-      restorePermissionCheckError: versionPermissions.restorePermissionCheckError,
-      restorePermissionCheckLoading: versionPermissions.restorePermissionCheckLoading,
-      restoreBlockedStepTypes: versionPermissions.restoreBlockedStepTypes,
-      retryRestorePermissions: versionPermissions.retryRestorePermissions,
-      handleConfirmRestore,
-      versionPublishDialog,
-      canPublishSelectedVersion: versionPermissions.canPublishSelectedVersion,
-      publishPermissionCheckError: versionPermissions.publishPermissionCheckError,
-      publishPermissionCheckLoading: versionPermissions.publishPermissionCheckLoading,
-      publishBlockedStepTypes: versionPermissions.publishBlockedStepTypes,
-      publishTargetTooltip: versionPermissions.publishTargetTooltip,
-      retryPublishPermissions: versionPermissions.retryPublishPermissions,
-      publishVersion,
-      saveBeforeViewDialog: versionNavigation.saveBeforeViewDialog,
-      editVersionDialog,
-      canEditSelectedVersion: versionPermissions.canEditSelectedVersion,
-      editVersionTooltip: versionPermissions.editVersionTooltip ?? '',
-      editPermissionCheckError: versionPermissions.editPermissionCheckError,
-      retryEditPermissions: versionPermissions.retryEditPermissions,
-      isSavingVersionMetadata: updateMetadataMutation.isPending,
-      handleEditVersionSave,
-      canCreate,
-      canEdit,
-      onDuplicateVersion,
-    }),
+    versionSidePanel,
   }
 }
 

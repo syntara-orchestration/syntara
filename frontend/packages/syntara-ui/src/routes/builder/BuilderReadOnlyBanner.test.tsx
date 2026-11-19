@@ -46,7 +46,10 @@ describe('BuilderReadOnlyBanner', () => {
         canEdit={false}
         isLoading={false}
         isBuiltin={false}
-        blockedStepTypes={['Script', 'REST API']}
+        blockedStepTypes={[
+          { kind: 'script', label: 'Script' },
+          { kind: 'http_request', label: 'REST API' },
+        ]}
       />
     )
 
@@ -88,10 +91,17 @@ describe('BuilderReadOnlyBanner', () => {
         canEdit={false}
         isLoading={false}
         isBuiltin={false}
-        blockedStepTypes={['Script', 'REST API']}
-        blockedStepTypeReasons={[
-          'Script (no-scripts, project payments).',
-          'No policy grants write permission for REST API in project payments.',
+        blockedStepTypes={[
+          {
+            kind: 'script',
+            label: 'Script',
+            description: 'Script (no-scripts, project payments).',
+          },
+          {
+            kind: 'http_request',
+            label: 'REST API',
+            description: 'No policy grants write permission for REST API in project payments.',
+          },
         ]}
       />
     )
