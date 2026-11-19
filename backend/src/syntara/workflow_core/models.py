@@ -322,7 +322,7 @@ class NodeSettingsCof(NodeSettingsBase):
 
 
 class NodeSettingsCofDisabled(NodeSettingsCof):
-    """Settings with disabled and continue_on_failure (wait)."""
+    """Settings with disabled and continue_on_failure (wait, form_prompt)."""
 
     disabled: bool | None = None
 

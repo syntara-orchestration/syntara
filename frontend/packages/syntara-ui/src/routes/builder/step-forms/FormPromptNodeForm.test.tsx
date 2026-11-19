@@ -112,12 +112,21 @@ describe('FormPromptNodeForm', () => {
       expect(screen.getByRole('heading', { name: 'Form fields' })).toBeInTheDocument()
     })
 
-    it('renders timeout section and fallback decision on Parameters', () => {
+    it('renders the response-window timeout and fallback decision on Parameters', () => {
       renderFormPrompt(<FormPromptNodeForm onSubmit={mockOnSubmit} />)
 
       expect(screen.getByRole('heading', { name: 'Timeout' })).toBeInTheDocument()
       expect(screen.getByText('Fallback decision')).toBeInTheDocument()
       expect(screen.getByText('Form submission window')).toBeInTheDocument()
+    })
+
+    it('does not render a node-level timeout field on Settings', async () => {
+      const user = userEvent.setup()
+      renderFormPrompt(<FormPromptNodeForm onSubmit={mockOnSubmit} />)
+
+      await user.click(screen.getByRole('tab', { name: 'Settings' }))
+
+      expect(screen.queryByLabelText('Timeout (seconds)')).not.toBeInTheDocument()
     })
 
     it('defaults fallback decision to fallback path when continue on failure is off', () => {

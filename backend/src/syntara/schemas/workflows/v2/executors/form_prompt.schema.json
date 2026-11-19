@@ -145,7 +145,7 @@
     }
   },
   "settingSchema": {
-    "$ref": "../common-definitions.schema.json#/$defs/nodeSettingsNoRetry"
+    "$ref": "../common-definitions.schema.json#/$defs/nodeSettingsCofDisabled"
   },
   "resultSchema": {
     "description": "Result structure available after form submission or timeout",

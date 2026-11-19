@@ -378,7 +378,6 @@ export async function createPendingFormStepWorkflow(
     parameters?: FormStepNodeParameters
     runAfterPublish?: boolean
     formPromptNodeId?: string
-    formPromptNodeSettings?: { timeout?: number }
     trailingNodes?: Array<{ id: string; type: string; name: string; parameters: Record<string, unknown> }>
     trailingEdges?: Array<{ from: string; to: string; from_port?: string }>
   }
@@ -426,7 +425,6 @@ export async function createPendingFormStepWorkflow(
         type: 'form_prompt',
         name: promptName,
         parameters: nodeParameters,
-        ...(options?.formPromptNodeSettings ? { settings: options.formPromptNodeSettings } : {}),
       },
       ...trailingNodes,
     ],

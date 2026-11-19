@@ -108,7 +108,7 @@ class FormPromptNode(WorkflowNodeBase):
 
     type: Literal["form_prompt"]
     parameters: FormPromptNodeParameters
-    settings: NodeSettingsNoRetry | None = None
+    settings: NodeSettingsCofDisabled | None = None
 
 
 class ConditionNode(WorkflowNodeBase):

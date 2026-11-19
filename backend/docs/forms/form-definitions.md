@@ -75,6 +75,78 @@ expressions inside `form_definition`. The workflow resolves dynamic options when
 prompt step. Form triggers are submitted before the workflow starts, so they have no upstream
 values to reference and reject template expressions throughout their parameters.
 
+## Generated Response Schema
+
+Valid form prompts and form triggers store a generated `response_schema` as
+[JSON Schema](https://json-schema.org) beside their `form_definition`. The schema describes
+the normalized `response_data` object produced by that form. Field `value_name` values become property
+names, and property types, constraints, and formats mirror the field configuration. This gives
+consumers (including the UI) a standards-based, machine-readable description of the form output based
+on its definition.
+
+For example, these persisted form parameters contain the authored form definition and its generated
+response schema:
+
+```json
+{
+  "parameters": {
+    "form_definition": {
+      "fields": [
+        {
+          "type": "text",
+          "value_name": "reason",
+          "label": "Reason",
+          "required": true
+        },
+        {
+          "type": "date",
+          "value_name": "due_date",
+          "label": "Due date",
+          "required": true,
+          "include_date": true
+        },
+        {
+          "type": "checkbox",
+          "value_name": "notify",
+          "label": "Notify me",
+          "required": false
+        }
+      ]
+    },
+    "response_schema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reason", "due_date", "notify"],
+      "properties": {
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        },
+        "due_date": {
+          "type": "string",
+          "format": "date"
+        },
+        "notify": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}
+```
+
+The top-level `required` array describes key presence, not whether the user must provide a value.
+Every field appears there because normalized `response_data` always contains each field's key.
+Field-level `required` is expressed by each property's constraints. In this example, the optional
+`notify` checkbox accepts either boolean value and normalizes to `false` when omitted; a required
+checkbox would instead use `"const": true`.
+
+`form_definition` remains the authoring source of truth. The server generates and owns
+`response_schema`. Changing the form definition regenerates the schema. Invalid form definitions
+may be saved as drafts with validation findings and do not receive a generated schema until
+their findings are corrected.
+
 ## Validation
 
 ### When Saving a Workflow

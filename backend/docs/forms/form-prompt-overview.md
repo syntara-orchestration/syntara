@@ -57,7 +57,8 @@ Form definitions list the fields a user will fill in. Authors choose each field'
 supported set and configure its label, required status, and other settings. Form parameters
 configure the form itself. Most field, option, and validation rules are
 shared by form prompts and form triggers. See [Form Definitions](form-definitions.md) for the
-full guide, including where the two differ.
+full guide, including where the two differ and how the server generates a schema for the prompt's
+normalized `response_data`.
 
 ## The Form Prompt Step
 
@@ -82,7 +83,7 @@ when the parameter is absent, sets how long a responder has. It becomes an absol
 mid-flight does not move a running prompt's deadline.
 
 Human-in-the-loop steps use dedicated parameters — `response_window` here and
-`decision_window` for approvals. `settings.timeout` does not set the form prompt deadline. See
+`decision_window` for approvals. See
 [Node Settings](../workflow-engine/node-settings.md) and [Runtime Settings](../runtime-settings.md).
 
 ## Creating the Prompt
@@ -290,10 +291,6 @@ For steps to add a field type or form parameter, see
 - **There is no prompt sweeper.** If a workflow ends outside the normal timeout or
   cancellation paths, its prompt row can remain `pending` indefinitely. Late submissions are
   still rejected. See [Cancellation and detachment](#cancellation-and-detachment).
-- **`settings.timeout` does not set the response deadline.** Form Prompt shares the
-  `NodeSettingsNoRetry` schema, so the field is accepted, but expiration uses
-  `parameters.response_window` or `workflow_engine.form_prompt_response_window_seconds`.
-
 ## Related Documentation
 
 - [Form Definitions](form-definitions.md) — field types and validation shared
