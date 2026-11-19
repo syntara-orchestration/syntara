@@ -99,6 +99,23 @@ describe('SynPageHeader', () => {
     expect(screen.queryByRole('link', { name: /View documentation/i })).not.toBeInTheDocument()
   })
 
+  it('renders titleAddons before the doc link', () => {
+    render(
+      <SynPageHeader
+        title="worker-east-01"
+        docLink="https://docs.example.com/execution-plane"
+        titleAddons={<span>Default</span>}
+      />
+    )
+
+    const title = screen.getByRole('heading', { level: 1, name: 'worker-east-01' })
+    const addon = screen.getByText('Default')
+    const docLink = screen.getByRole('link', { name: /View documentation/i })
+
+    expect(title.compareDocumentPosition(addon) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(addon.compareDocumentPosition(docLink) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
   it('keeps toolbar actions visible when the title is long', () => {
     const longTitle = 'Production MCP integration with an intentionally long name that should wrap in the header'
 
