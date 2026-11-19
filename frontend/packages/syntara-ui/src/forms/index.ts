@@ -17,8 +17,13 @@ export {
   uiKindForField,
   applyUiKind,
 } from './formFieldUiKind'
-export { DATE_FIELD_DATE_AND_TIMEZONE_REQUIRES_TIME_MESSAGE } from './dateFieldValidationMessages'
 export {
+  DATE_FIELD_RFC3339_COMBINATION_MESSAGE,
+  normalizeDateFieldCombinationMessage,
+} from './dateFieldValidationMessages'
+export {
+  formDefinitionInlineFieldMessage,
+  formFieldLabelFromDefinition,
   humanizeFormDefinitionIssueMessage,
   parseFormDefinitionErrorLocation,
   type FormDefinitionErrorLocation,
@@ -27,6 +32,7 @@ export {
 export {
   humanizeFormDefinitionValidationError,
   humanizeFormDefinitionValidationErrors,
+  type HumanizeFormDefinitionValidationErrorOptions,
 } from './humanizeFormDefinitionValidationError'
 export { FORM_PREVIEW_INCOMPLETE_TOOLTIP, isFormDefinitionReadyForPreview } from './isFormDefinitionReadyForPreview'
 export { prepareFormDefinitionForCommit, sanitizeDateFieldForApi } from './dateFieldUtils'

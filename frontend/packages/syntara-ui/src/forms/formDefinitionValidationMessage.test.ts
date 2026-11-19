@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
 
-import { humanizeFormDefinitionIssueMessage, parseFormDefinitionErrorLocation } from './formDefinitionValidationMessage'
+import { DATE_FIELD_RFC3339_COMBINATION_MESSAGE } from './dateFieldValidationMessages'
+import {
+  formDefinitionInlineFieldMessage,
+  formFieldLabelFromDefinition,
+  humanizeFormDefinitionIssueMessage,
+  parseFormDefinitionErrorLocation,
+} from './formDefinitionValidationMessage'
 
 describe('parseFormDefinitionErrorLocation', () => {
   it('parses backend dotted field paths', () => {
@@ -80,5 +86,42 @@ describe('humanizeFormDefinitionIssueMessage', () => {
         'parameters.form_definition.fields.6.label'
       )
     ).toBe('Field 7 — Field label is required')
+  })
+})
+
+describe('formDefinitionInlineFieldMessage', () => {
+  it('strips canvas banner prefixes for inline form builder copy', () => {
+    expect(
+      formDefinitionInlineFieldMessage(
+        `Form "Survey": Due — ${DATE_FIELD_RFC3339_COMBINATION_MESSAGE}`,
+        'parameters.form_definition.fields.0.include_date'
+      )
+    ).toBe(DATE_FIELD_RFC3339_COMBINATION_MESSAGE)
+  })
+})
+
+describe('date field combination copy', () => {
+  it('normalizes backend API wording to the standard message', () => {
+    expect(
+      humanizeFormDefinitionIssueMessage(
+        "Field 'due': unsupported combination of date components. Choose a date; a time with a timezone; or a date, time, and timezone.",
+        'parameters.form_definition.fields.0',
+        { includeFieldLocation: false }
+      )
+    ).toBe('Choose date only, time with timezone, or date and time with timezone.')
+  })
+})
+
+describe('formFieldLabelFromDefinition', () => {
+  const formDefinition = {
+    fields: [{ label: 'Due', value_name: 'due' }, { value_name: 'start' }],
+  }
+
+  it('returns authored label for zod-style paths', () => {
+    expect(formFieldLabelFromDefinition(formDefinition, 'fields[0].include_time')).toBe('Due')
+  })
+
+  it('falls back to value_name when label is empty', () => {
+    expect(formFieldLabelFromDefinition(formDefinition, 'fields[1].label')).toBe('start')
   })
 })

@@ -5,11 +5,7 @@ import { FormProvider, useForm } from 'react-hook-form'
 import { describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 
-import {
-  DATE_FIELD_DATE_AND_TIMEZONE_REQUIRES_TIME_MESSAGE,
-  FormFieldTypeEnum,
-  parseFormDefinition,
-} from '../../../forms'
+import { DATE_FIELD_RFC3339_COMBINATION_MESSAGE, FormFieldTypeEnum, parseFormDefinition } from '../../../forms'
 
 import { createDefaultField } from './createDefaultField'
 import type { FormDefinitionFieldServerError } from './formDefinitionFieldServerError'
@@ -23,12 +19,15 @@ type RenderSectionOptions = Readonly<{
   serverFieldErrors?: ReadonlyArray<FormDefinitionFieldServerError>
 }>
 
-function expectAccessibleCombinationError() {
+function expectAccessibleCombinationError(invalidCheckbox: 'Date' | 'Time' | 'Timezone' = 'Time') {
   const showInFormGroup = screen.getByRole('group', { name: 'Show in form' })
   expect(showInFormGroup).toHaveAttribute('aria-labelledby', 'field-0-show-in-form-label')
   expect(showInFormGroup).toHaveAttribute('aria-describedby', 'field-0-show-in-form-error')
-  expect(screen.getByText(DATE_FIELD_DATE_AND_TIMEZONE_REQUIRES_TIME_MESSAGE)).toBeVisible()
-  expect(within(showInFormGroup).getByRole('checkbox', { name: 'Time' })).toHaveAttribute('aria-invalid', 'true')
+  expect(screen.getByText(DATE_FIELD_RFC3339_COMBINATION_MESSAGE)).toBeVisible()
+  expect(within(showInFormGroup).getByRole('checkbox', { name: invalidCheckbox })).toHaveAttribute(
+    'aria-invalid',
+    'true'
+  )
 }
 
 function renderSection(definition: FormDefinition, options: RenderSectionOptions = {}, onCommit = vi.fn()) {
@@ -51,10 +50,10 @@ function renderSection(definition: FormDefinition, options: RenderSectionOptions
   return render(<Wrapper />)
 }
 
-const INCLUDE_TIME_SERVER_ERROR: FormDefinitionFieldServerError = {
+const INCLUDE_DATE_SERVER_ERROR: FormDefinitionFieldServerError = {
   fieldIndex: 0,
-  subPath: 'include_time',
-  message: DATE_FIELD_DATE_AND_TIMEZONE_REQUIRES_TIME_MESSAGE,
+  subPath: 'include_date',
+  message: DATE_FIELD_RFC3339_COMBINATION_MESSAGE,
 }
 
 /** Invalid date show-in-form combo (zod rejects this); used to assert server errors apply in draft. */
@@ -96,7 +95,55 @@ describe('FormFieldBuilderDateShowInFormSection', () => {
 
     await user.click(screen.getByRole('checkbox', { name: 'Timezone' }))
 
-    expect(screen.queryByText(DATE_FIELD_DATE_AND_TIMEZONE_REQUIRES_TIME_MESSAGE)).not.toBeInTheDocument()
+    expect(screen.queryByText(DATE_FIELD_RFC3339_COMBINATION_MESSAGE)).not.toBeInTheDocument()
+  })
+
+  it('marks timezone invalid for timezone-only combination in strict mode', () => {
+    const definition: FormDefinition = {
+      fields: [
+        {
+          type: FormFieldTypeEnum.DATE,
+          value_name: 'due',
+          label: 'Due',
+          include_date: false,
+          include_time: false,
+          include_timezone: true,
+        },
+      ],
+    }
+    renderSection(definition, { draftMode: false })
+
+    expect(screen.getByRole('checkbox', { name: 'Timezone' })).toHaveAttribute('aria-invalid', 'true')
+  })
+
+  it('marks time invalid for time-only combination in strict mode', () => {
+    const definition: FormDefinition = {
+      fields: [
+        {
+          type: FormFieldTypeEnum.DATE,
+          value_name: 'due',
+          label: 'Due',
+          include_date: false,
+          include_time: true,
+          include_timezone: false,
+        },
+      ],
+    }
+    renderSection(definition, { draftMode: false })
+
+    expect(screen.getByRole('checkbox', { name: 'Time' })).toHaveAttribute('aria-invalid', 'true')
+  })
+
+  it('shows an RFC 3339 combination error in strict mode for time without timezone', async () => {
+    const user = userEvent.setup()
+    const definition = parseFormDefinition({
+      fields: [{ type: FormFieldTypeEnum.DATE, value_name: 'due', label: 'Due' }],
+    })
+    renderSection(definition, { draftMode: false })
+
+    await user.click(screen.getByRole('checkbox', { name: 'Time' }))
+
+    expect(screen.getByText(DATE_FIELD_RFC3339_COMBINATION_MESSAGE)).toBeVisible()
   })
 
   it('shows an accessible checkbox-group error in strict mode when date and timezone are on without time', async () => {
@@ -111,29 +158,71 @@ describe('FormFieldBuilderDateShowInFormSection', () => {
     expectAccessibleCombinationError()
   })
 
-  it('shows verify findings on the field in draft mode when include_time has a server error', async () => {
+  it('shows only the standard RFC message when server copy includes canvas banner prefixes', async () => {
     renderSection(dateFieldWithDateAndTimezoneNoTime(), {
       draftMode: true,
-      serverFieldErrors: [INCLUDE_TIME_SERVER_ERROR],
+      serverFieldErrors: [
+        {
+          fieldIndex: 0,
+          subPath: 'include_date',
+          message: `Form "Survey": Due — ${DATE_FIELD_RFC3339_COMBINATION_MESSAGE}`,
+        },
+      ],
     })
 
     await waitFor(() => {
-      expectAccessibleCombinationError()
+      expect(screen.getByText(DATE_FIELD_RFC3339_COMBINATION_MESSAGE)).toBeVisible()
+      expect(screen.queryByText(/Form "Survey"/)).not.toBeInTheDocument()
+    })
+  })
+
+  it('highlights the same checkboxes for server combo errors as in strict mode', async () => {
+    renderSection(dateFieldWithDateAndTimezoneNoTime(), {
+      draftMode: true,
+      serverFieldErrors: [INCLUDE_DATE_SERVER_ERROR],
+    })
+
+    await waitFor(() => {
+      expectAccessibleCombinationError('Time')
+    })
+  })
+
+  it('marks time invalid when verify reports include_date for time-only combo', async () => {
+    const definition: FormDefinition = {
+      fields: [
+        {
+          type: FormFieldTypeEnum.DATE,
+          value_name: 'due',
+          label: 'Due',
+          include_date: false,
+          include_time: true,
+          include_timezone: false,
+        },
+      ],
+    }
+    renderSection(definition, {
+      draftMode: true,
+      serverFieldErrors: [INCLUDE_DATE_SERVER_ERROR],
+    })
+
+    await waitFor(() => {
+      expect(screen.getByRole('checkbox', { name: 'Time' })).toHaveAttribute('aria-invalid', 'true')
+      expect(screen.getByRole('checkbox', { name: 'Date' })).not.toHaveAttribute('aria-invalid', 'true')
     })
   })
 
   it('has no accessibility violations when the combination error is shown', async () => {
     const { container } = renderSection(dateFieldWithDateAndTimezoneNoTime(), {
-      serverFieldErrors: [INCLUDE_TIME_SERVER_ERROR],
+      serverFieldErrors: [INCLUDE_DATE_SERVER_ERROR],
     })
 
     await waitFor(() => {
-      expect(screen.getByText(DATE_FIELD_DATE_AND_TIMEZONE_REQUIRES_TIME_MESSAGE)).toBeVisible()
+      expect(screen.getByText(DATE_FIELD_RFC3339_COMBINATION_MESSAGE)).toBeVisible()
     })
     expect(await axe(container)).toHaveNoViolations()
   })
 
-  it('allows time without timezone after date is unchecked', async () => {
+  it('allows time with timezone after date is unchecked', async () => {
     const user = userEvent.setup()
     const definition = parseFormDefinition({
       fields: [{ type: FormFieldTypeEnum.DATE, value_name: 'due', label: 'Due' }],
@@ -141,11 +230,12 @@ describe('FormFieldBuilderDateShowInFormSection', () => {
     renderSection(definition)
 
     await user.click(screen.getByRole('checkbox', { name: 'Time' }))
+    await user.click(screen.getByRole('checkbox', { name: 'Timezone' }))
     await user.click(screen.getByRole('checkbox', { name: 'Date' }))
 
     expect(screen.getByRole('checkbox', { name: 'Date' })).not.toBeChecked()
     expect(screen.getByRole('checkbox', { name: 'Time' })).toBeChecked()
-    expect(screen.getByRole('checkbox', { name: 'Timezone' })).not.toBeChecked()
+    expect(screen.getByRole('checkbox', { name: 'Timezone' })).toBeChecked()
   })
 
   it('disables the only selected show-in-form checkbox', () => {
@@ -181,24 +271,15 @@ describe('FormFieldBuilderDateShowInFormSection', () => {
     expect(screen.getByRole('checkbox', { name: 'Timezone' })).not.toBeChecked()
   })
 
-  it('allows timezone only without time', async () => {
+  it('does not show inline validation in draft mode for unsupported RFC 3339 combinations', async () => {
     const user = userEvent.setup()
     const definition = parseFormDefinition({
-      fields: [
-        {
-          type: FormFieldTypeEnum.DATE,
-          value_name: 'due',
-          label: 'Due',
-          include_date: false,
-          include_timezone: true,
-        },
-      ],
+      fields: [{ type: FormFieldTypeEnum.DATE, value_name: 'due', label: 'Due' }],
     })
-    renderSection(definition)
+    renderSection(definition, { draftMode: true })
 
-    await user.click(screen.getByRole('checkbox', { name: 'Timezone' }))
+    await user.click(screen.getByRole('checkbox', { name: 'Time' }))
 
-    expect(screen.getByRole('checkbox', { name: 'Timezone' })).toBeChecked()
-    expect(screen.getByRole('checkbox', { name: 'Time' })).not.toBeChecked()
+    expect(screen.queryByText(DATE_FIELD_RFC3339_COMBINATION_MESSAGE)).not.toBeInTheDocument()
   })
 })

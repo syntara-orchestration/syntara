@@ -2,6 +2,7 @@ import { ActivityTypeEnum, EdgeHandleEnum, TriggerTypeEnum, type Activity } from
 import { describe, expect, it } from 'vitest'
 
 import { createEmptyFormDefinition } from '../../../components/forms/formFieldBuilder/createDefaultField'
+import { FormFieldTypeEnum } from '../../../forms'
 import type { EdgeConnection } from '../types/edge'
 
 import {
@@ -44,9 +45,30 @@ describe('formPromptSettingsNormalization', () => {
     expect(normalizeFormPromptActivityForDefinition(script)).toBe(script)
   })
 
-  it('returns form_prompt unchanged when fallback_behavior is absent', () => {
-    const activity = formActivity('form-1', { fallback_decision: 'submit' })
-    expect(normalizeFormPromptActivityForDefinition(activity)).toBe(activity)
+  it('prepares form_definition even when parameters are already allowlisted', () => {
+    const formDefinition = createEmptyFormDefinition()
+    const activity = formActivity('form-1', { fallback_decision: 'submit', form_definition: formDefinition })
+    const result = normalizeFormPromptActivityForDefinition(activity)
+    expect(result.parameters).toMatchObject({ fallback_decision: 'submit' })
+    expect(result.parameters?.form_definition).toEqual(formDefinition)
+  })
+
+  it('keeps unsupported date include combinations in the payload for workflow save validation', () => {
+    const formDefinition = {
+      fields: [
+        {
+          type: FormFieldTypeEnum.DATE,
+          value_name: 'due',
+          label: 'Due',
+          include_date: true,
+          include_time: true,
+          include_timezone: false,
+        },
+      ],
+    }
+    const result = normalizeFormPromptActivityForDefinition(formActivity('form-1', { form_definition: formDefinition }))
+    const savedField = (result.parameters?.form_definition as typeof formDefinition).fields[0]
+    expect(savedField).toMatchObject({ include_time: true, include_timezone: false })
   })
 
   it('does not change settings when stripping fallback_behavior', () => {

@@ -96,6 +96,7 @@ export function mapUtilsValidationErrorsToBanner(
     nodeName: lookupValidationNodeName(error.nodeId, options),
     severity: utilsSeverityToBannerSeverity(error.severity),
     rule: error.rule,
+    fieldPath: error.fieldPath ?? null,
   }))
 }
 
