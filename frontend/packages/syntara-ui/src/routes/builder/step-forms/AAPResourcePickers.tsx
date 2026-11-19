@@ -1,11 +1,13 @@
 import { Button, FormHelperText, HelperText, HelperTextItem, StackItem } from '@patternfly/react-core'
-import { useFormContext } from 'react-hook-form'
+import { useCallback, useEffect } from 'react'
+import { useFormContext, useWatch } from 'react-hook-form'
 
 import { SynFormField } from '../../../components/forms/SynFormField'
 import type { useAAPBrowser } from '../../../hooks/useAAPBrowser'
 import { isValidAAPTemplateURL } from '../../../utils/urlValidation'
 
 import type { AAPJobTemplateFormData } from './aapJobTemplateSchema'
+import { getAAPSelectionStaleness } from './aapSelectionStaleness'
 import { AAPTypeaheadSelect } from './AAPTypeaheadSelect'
 import { AAPErrorAlert } from './shared/AAPErrorAlert'
 import { stepHelp } from './shared/stepFieldHelp'
@@ -16,7 +18,7 @@ type AAPResourcePickersProps = {
 }
 
 export function AAPResourcePickers({ browser }: AAPResourcePickersProps) {
-  const { setValue, reset, getValues } = useFormContext<AAPJobTemplateFormData>()
+  const { setValue, reset, getValues, control } = useFormContext<AAPJobTemplateFormData>()
 
   const {
     organizations,
@@ -44,7 +46,7 @@ export function AAPResourcePickers({ browser }: AAPResourcePickersProps) {
    * Called when organization or template changes to reset user-provided values.
    * Uses reset() to batch updates and avoid unnecessary re-renders.
    */
-  const clearPromptOverrides = () => {
+  const clearPromptOverrides = useCallback(() => {
     const clearedOverrides = {
       inventory_name: '',
       inventory_id: undefined,
@@ -66,7 +68,30 @@ export function AAPResourcePickers({ browser }: AAPResourcePickersProps) {
       labels: [],
     }
     reset({ ...getValues(), ...clearedOverrides }, { keepDirty: false })
-  }
+  }, [reset, getValues])
+
+  const organizationName = useWatch({ control, name: 'organization_name' })
+  const templateName = useWatch({ control, name: 'job_template_name' })
+
+  // Drop selections the currently loaded lists no longer offer (for example
+  // after a credential switch); selections that remain visible are retained
+  const staleness = getAAPSelectionStaleness(browser, {
+    selectedOrganization: organizationName || undefined,
+    selectedTemplateName: templateName || undefined,
+  })
+
+  useEffect(() => {
+    if (staleness.organization) {
+      setValue('organization_name', '')
+      setValue('job_template_name', '')
+      setValue('job_template_id', undefined)
+      clearPromptOverrides()
+    } else if (staleness.template) {
+      setValue('job_template_name', '')
+      setValue('job_template_id', undefined)
+      clearPromptOverrides()
+    }
+  }, [staleness.organization, staleness.template, setValue, clearPromptOverrides])
 
   return (
     <>

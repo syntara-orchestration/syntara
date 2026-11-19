@@ -1,10 +1,12 @@
 import { Button, FormHelperText, HelperText, HelperTextItem, StackItem } from '@patternfly/react-core'
-import { useFormContext } from 'react-hook-form'
+import { useCallback, useEffect } from 'react'
+import { useFormContext, useWatch } from 'react-hook-form'
 
 import { SynFormField } from '../../../components/forms/SynFormField'
 import type { useAAPBrowser } from '../../../hooks/useAAPBrowser'
 import { isValidAAPTemplateURL } from '../../../utils/urlValidation'
 
+import { getAAPSelectionStaleness } from './aapSelectionStaleness'
 import { AAPTypeaheadSelect } from './AAPTypeaheadSelect'
 import type { AAPWorkflowTemplateFormData } from './aapWorkflowTemplateSchema'
 import { AAPErrorAlert } from './shared/AAPErrorAlert'
@@ -16,7 +18,7 @@ type AAPWorkflowTemplateResourcePickersProps = {
 }
 
 export function AAPWorkflowTemplateResourcePickers({ browser }: AAPWorkflowTemplateResourcePickersProps) {
-  const { setValue } = useFormContext<AAPWorkflowTemplateFormData>()
+  const { setValue, control } = useFormContext<AAPWorkflowTemplateFormData>()
 
   const {
     organizations,
@@ -43,7 +45,7 @@ export function AAPWorkflowTemplateResourcePickers({ browser }: AAPWorkflowTempl
         : undefined,
   }))
 
-  const clearPromptOverrides = () => {
+  const clearPromptOverrides = useCallback(() => {
     setValue('inventory_name', '')
     setValue('inventory_id', undefined)
     setValue('extra_vars', '')
@@ -52,7 +54,30 @@ export function AAPWorkflowTemplateResourcePickers({ browser }: AAPWorkflowTempl
     setValue('tags', '')
     setValue('skip_tags', '')
     setValue('labels', [])
-  }
+  }, [setValue])
+
+  const organizationName = useWatch({ control, name: 'organization_name' })
+  const templateName = useWatch({ control, name: 'workflow_job_template_name' })
+
+  // Drop selections the currently loaded lists no longer offer (for example
+  // after a credential switch); selections that remain visible are retained
+  const staleness = getAAPSelectionStaleness(browser, {
+    selectedOrganization: organizationName || undefined,
+    selectedTemplateName: templateName || undefined,
+  })
+
+  useEffect(() => {
+    if (staleness.organization) {
+      setValue('organization_name', '')
+      setValue('workflow_job_template_name', '')
+      setValue('workflow_job_template_id', undefined)
+      clearPromptOverrides()
+    } else if (staleness.template) {
+      setValue('workflow_job_template_name', '')
+      setValue('workflow_job_template_id', undefined)
+      clearPromptOverrides()
+    }
+  }, [staleness.organization, staleness.template, setValue, clearPromptOverrides])
 
   return (
     <>
