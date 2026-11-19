@@ -4,12 +4,16 @@ import { useVersionDefinitionPermissions } from './useVersionDefinitionPermissio
 
 type WorkflowVersion = WorkflowAPI.components['schemas']['WorkflowVersionRead']
 
+/**
+ * Step-type write permission checks for the four version surfaces that need
+ * them: the currently viewed version, and the open edit/restore/publish
+ * dialogs. Each result carries `canAuthor`, `isChecking`, `isError`,
+ * `blockedStepTypes`, `permissionMessage` and `retry`; combine with the
+ * builder's RBAC `canEdit` at the call site.
+ */
 export function useBuilderVersionPermissions(options: {
-  canEdit: boolean
   projectId?: string
   isViewingVersion: boolean
-  viewedVersion?: number | null
-  viewedVersionDate?: string | null
   viewedVersionDefinition?: Record<string, unknown>
   viewedVersionIsLoading: boolean
   retryViewedVersion: () => Promise<unknown>
@@ -38,33 +42,5 @@ export function useBuilderVersionPermissions(options: {
     isContextLoading: options.isPublishDialogOpen && !options.publishDefinition,
   })
 
-  return {
-    canRestoreSelectedVersion:
-      options.canEdit &&
-      options.isViewingVersion &&
-      options.viewedVersionDate != null &&
-      options.viewedVersion != null &&
-      selected.canAuthor,
-    restoreTooltip: options.canEdit ? selected.permissionMessage : undefined,
-    selectedVersionPermissionError: selected.isError,
-    selectedVersionPermissionLoading: options.isViewingVersion && selected.isChecking,
-    retrySelectedVersionPermissions: selected.retry,
-    canEditSelectedVersion: options.canEdit && edit.canAuthor,
-    editVersionTooltip: options.canEdit ? edit.permissionMessage : 'You do not have permission to edit this workflow.',
-    editPermissionCheckError: edit.isError,
-    retryEditPermissions: edit.retry,
-    canConfirmRestore: options.canEdit && restore.canAuthor,
-    restorePermissionCheckError: restore.isError,
-    restorePermissionCheckLoading: restore.isChecking,
-    restoreBlockedStepTypes: restore.blockedStepTypes.map((type) => type.label),
-    retryRestorePermissions: restore.retry,
-    canPublishSelectedVersion: options.canEdit && publish.canAuthor,
-    publishTargetTooltip: options.canEdit
-      ? publish.permissionMessage
-      : 'You do not have permission to publish this workflow.',
-    publishPermissionCheckError: publish.isError,
-    publishPermissionCheckLoading: publish.isChecking,
-    publishBlockedStepTypes: publish.blockedStepTypes.map((type) => type.label),
-    retryPublishPermissions: publish.retry,
-  }
+  return { selected, edit, restore, publish }
 }

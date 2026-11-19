@@ -299,7 +299,6 @@ type StepDetailsPanelProps = {
   workflowMetadata?: WorkflowMetadata
   onRunStep?: () => void
   readOnly?: boolean
-  isViewingVersion?: boolean
   onStepAdded?: () => void
 }
 
@@ -310,19 +309,6 @@ function createAddStepHandler(
 ): ((handle?: string) => void) | undefined {
   if (readOnly || !nodeId || !onAddStep) return undefined
   return (handle?: string) => onAddStep(nodeId, handle)
-}
-
-function renderPanelMenuActions(readOnly: boolean | undefined, actions: ReturnType<typeof buildPanelMenuActions>) {
-  return readOnly || actions.length === 0 ? null : <SynStepMenu menuActions={actions} />
-}
-
-function createStepIfWritable(
-  readOnly: boolean | undefined,
-  createStep: (data: Record<string, unknown>) => Promise<boolean>,
-  data: Record<string, unknown>
-): Promise<boolean> {
-  if (readOnly) return Promise.resolve(false)
-  return createStep(data)
 }
 
 export function StepDetailsPanel(props: StepDetailsPanelProps) {
@@ -342,7 +328,6 @@ export function StepDetailsPanel(props: StepDetailsPanelProps) {
     onAddStep,
     onRunStep,
     readOnly,
-    isViewingVersion,
     onStepAdded,
   } = props
   const { showError } = useAlerts()
@@ -363,7 +348,8 @@ export function StepDetailsPanel(props: StepDetailsPanelProps) {
     disabled: getNodeDisabledState(node),
   })
   const panelMenuActions = buildPanelMenuActions(mode, node, menuActions, onClose)
-  const headerActions = renderPanelMenuActions(readOnly, panelMenuActions)
+  const headerActions =
+    readOnly || panelMenuActions.length === 0 ? null : <SynStepMenu menuActions={panelMenuActions} />
 
   const iconDescriptor =
     mode === 'edit' && node
@@ -485,7 +471,7 @@ export function StepDetailsPanel(props: StepDetailsPanelProps) {
           initialData={initialData}
           submitButtonText={submitButtonText}
           onCancel={onClose}
-          onSubmit={(data) => createStepIfWritable(readOnly, handleCreate, data as Record<string, unknown>)}
+          onSubmit={(data) => handleCreate(data as Record<string, unknown>)}
           onHeaderContentChange={setHeaderContent}
           projectId={projectId}
         />
@@ -536,7 +522,6 @@ export function StepDetailsPanel(props: StepDetailsPanelProps) {
       workflowMetadata={props.workflowMetadata}
       tabBarAction={tabBarAction}
       readOnly={readOnly}
-      isViewingVersion={isViewingVersion}
       mode={mode}
     />
   )

@@ -1,11 +1,12 @@
 import { Alert, AlertActionLink, StackItem } from '@patternfly/react-core'
 
+import type { BlockedStepType } from '../workflows/useStepTypePermissions'
+
 type BuilderReadOnlyBannerProps = Readonly<{
   canEdit: boolean
   isLoading: boolean
   isBuiltin: boolean
-  blockedStepTypes?: string[]
-  blockedStepTypeReasons?: string[]
+  blockedStepTypes?: BlockedStepType[]
   permissionCheckError?: boolean
   onRetryPermissionCheck?: () => void
 }>
@@ -15,13 +16,11 @@ export function BuilderReadOnlyBanner({
   isLoading,
   isBuiltin,
   blockedStepTypes = [],
-  blockedStepTypeReasons = [],
   permissionCheckError = false,
   onRetryPermissionCheck,
 }: BuilderReadOnlyBannerProps) {
   if ((canEdit || isLoading) && !permissionCheckError) return null
 
-  const isStepTypeReadOnly = blockedStepTypes.length > 0
   let title = 'You are viewing this workflow in read-only mode.'
   let description = 'You do not have permission to edit this workflow. Contact your administrator to request access.'
   if (permissionCheckError) {
@@ -30,10 +29,11 @@ export function BuilderReadOnlyBanner({
   } else if (isBuiltin) {
     title = 'This is a built-in workflow.'
     description = 'Built-in workflows cannot be modified.'
-  } else if (isStepTypeReadOnly) {
-    description = blockedStepTypeReasons.length
-      ? blockedStepTypeReasons.join(' ')
-      : `Blocked step types: ${blockedStepTypes.join(', ')}.`
+  } else if (blockedStepTypes.length > 0) {
+    const reasons = blockedStepTypes.map((stepType) => stepType.description).filter(Boolean)
+    description = reasons.length
+      ? reasons.join(' ')
+      : `Blocked step types: ${blockedStepTypes.map((stepType) => stepType.label).join(', ')}.`
   }
 
   return (

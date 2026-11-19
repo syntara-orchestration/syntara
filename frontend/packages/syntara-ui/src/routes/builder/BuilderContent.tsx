@@ -12,6 +12,7 @@ import { SynPanel } from '../../components/layout/SynPanel'
 import { SynPanelStack, SynPanelStackItem } from '../../components/layout/SynPanelStack'
 import { SynReactFlowViewportGuard } from '../../components/layout/SynReactFlowViewportGuard'
 import { SynStepExpandedAllContext } from '../../components/steps/SynStepExpandedAllContext'
+import { invalidateWorkflowQueries } from '../../hooks/invalidateWorkflowQueries'
 import { useSearchParams } from '../../hooks/routing/useSearchParams'
 import { useCursorPagination } from '../../hooks/useCursorPagination'
 import { useProjectSelector } from '../../hooks/useProjectSelector'
@@ -228,16 +229,7 @@ export function BuilderContent(props: BuilderContentProps) {
   const currentVersion = workflow?.current_version ?? workflow?.version?.version
   const builderProjectId = workflow?.project_id ?? selectedProject?.id ?? stableProjectId
   const workflowPermissionChecks = useBuilderPermissions(isNew, currentWorkflow?.is_builtin === true, builderProjectId)
-  const retryWorkflowPermissionContext = useCallback(
-    async () =>
-      queryClient.invalidateQueries({
-        predicate: (query) =>
-          query.queryKey[0] === 'get' &&
-          typeof query.queryKey[1] === 'string' &&
-          query.queryKey[1].startsWith('/workflows'),
-      }),
-    [queryClient]
-  )
+  const retryWorkflowPermissionContext = useCallback(() => invalidateWorkflowQueries(queryClient), [queryClient])
   const stepTypePermissions = useStepTypePermissions(workflow?.step_types, builderProjectId, {
     enabled: !isNew && Boolean(workflowId) && currentWorkflow?.is_builtin !== true,
     retryContext: retryWorkflowPermissionContext,
@@ -500,14 +492,7 @@ export function BuilderContent(props: BuilderContentProps) {
                 </AlertActionLink>
               ) : undefined,
             })
-            detachPromise(
-              queryClient.invalidateQueries({
-                predicate: (q) =>
-                  q.queryKey[0] === 'get' &&
-                  typeof q.queryKey[1] === 'string' &&
-                  q.queryKey[1].startsWith('/workflows'),
-              })
-            )
+            detachPromise(invalidateWorkflowQueries(queryClient))
           },
           onError: (error: unknown) => {
             showError({ title: 'Failed to duplicate workflow', description: getErrorMessage(error) })
@@ -590,7 +575,6 @@ export function BuilderContent(props: BuilderContentProps) {
     versionHistoryOpen,
     dispatch,
     handleSaveWorkflow,
-    workflowName,
     expandAllEvent,
     baseHandleToggleVersionHistory,
     searchParams,
@@ -729,10 +713,7 @@ export function BuilderContent(props: BuilderContentProps) {
                   canEdit={builderPermissions.canEdit}
                   isLoading={builderPermissions.isLoading || versionPanel.selectedVersionPermissionLoading}
                   isBuiltin={currentWorkflow?.is_builtin === true}
-                  blockedStepTypes={stepTypePermissions.blockedStepTypes.map((stepType) => stepType.label)}
-                  blockedStepTypeReasons={stepTypePermissions.blockedStepTypes.map(
-                    (stepType) => stepType.description ?? stepType.label
-                  )}
+                  blockedStepTypes={stepTypePermissions.blockedStepTypes}
                   permissionCheckError={stepTypePermissions.isError || versionPanel.selectedVersionPermissionError}
                   onRetryPermissionCheck={() =>
                     detachPromise(

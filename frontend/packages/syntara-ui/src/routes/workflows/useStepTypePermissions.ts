@@ -62,7 +62,7 @@ export function getStepTypesFromDefinition(definition: Record<string, unknown> |
       if (typeof type === 'string') types.add(type)
     }
   }
-  return [...types].sort()
+  return [...types].sort((a, b) => a.localeCompare(b))
 }
 
 export function useStepTypePermissions(
@@ -72,7 +72,7 @@ export function useStepTypePermissions(
 ): StepTypePermissions {
   const enabled = options.enabled !== false
   const hasContext = stepTypes !== null && stepTypes !== undefined
-  const kinds = useMemo(() => [...new Set(stepTypes ?? [])].sort(), [stepTypes])
+  const kinds = useMemo(() => [...new Set(stepTypes ?? [])].sort((a, b) => a.localeCompare(b)), [stepTypes])
   const queries = useQueries({
     queries: kinds.map((kind) => {
       const body = {
@@ -93,22 +93,21 @@ export function useStepTypePermissions(
 
   const isChecking = enabled && queries.some((query) => query.isPending || query.isFetching)
   const isError = enabled && (!hasContext || !resourceProject || queries.some((query) => query.isError))
-  const blockedStepTypes = kinds
-    .filter((_, index) => queries[index]?.data?.data?.allowed !== true)
-    .map((kind) => {
-      const decision = queries[kinds.indexOf(kind)]?.data?.data
-      const label = getStepTypeDisplayName(kind)
-      const project = decision?.denied_project || resourceProject
-      let description = `${label} (write permission denied).`
-      if (decision?.denial_reason === 'no_matching_allow' || (decision && !decision.denied && !decision.denied_by)) {
-        description = `No policy grants write permission for ${label} in project ${project}.`
-      } else if (decision?.denied_by) {
-        const scope =
-          decision.denied_scope === 'any' ? 'all projects' : `${decision.denied_scope || 'project'} ${project}`
-        description = `${label} (${decision.denied_by}, ${scope}).`
-      }
-      return { kind, label, description }
-    })
+  const blockedStepTypes = kinds.flatMap((kind, index) => {
+    const decision = queries[index]?.data?.data
+    if (decision?.allowed === true) return []
+    const label = getStepTypeDisplayName(kind)
+    const project = decision?.denied_project || resourceProject
+    let description = `${label} (write permission denied).`
+    if (decision?.denial_reason === 'no_matching_allow' || (decision && !decision.denied && !decision.denied_by)) {
+      description = `No policy grants write permission for ${label} in project ${project}.`
+    } else if (decision?.denied_by) {
+      const scope =
+        decision.denied_scope === 'any' ? 'all projects' : `${decision.denied_scope || 'project'} ${project}`
+      description = `${label} (${decision.denied_by}, ${scope}).`
+    }
+    return [{ kind, label, description }]
+  })
   const retry = async () => {
     if (!hasContext || !resourceProject) {
       await options.retryContext?.()

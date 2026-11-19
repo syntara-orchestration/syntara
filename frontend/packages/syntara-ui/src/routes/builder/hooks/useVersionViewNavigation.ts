@@ -7,10 +7,20 @@ export function useVersionViewNavigation(options: {
   isViewingVersion: boolean
   dispatch: Dispatch<BuilderAction>
   handleSaveWorkflow: () => Promise<boolean>
-  setVersionParam: (version: number) => void
+  searchParams: URLSearchParams
+  setSearchParams: (params: URLSearchParams) => void
 }) {
-  const { isDirty, isViewingVersion, dispatch, handleSaveWorkflow, setVersionParam } = options
+  const { isDirty, isViewingVersion, dispatch, handleSaveWorkflow, searchParams, setSearchParams } = options
   const [pendingViewVersion, setPendingViewVersion] = useState<number | null>(null)
+
+  const setVersionParam = useCallback(
+    (version: number) => {
+      const params = new URLSearchParams(searchParams)
+      params.set('version', String(version))
+      setSearchParams(params)
+    },
+    [searchParams, setSearchParams]
+  )
 
   const onSelectVersion = useCallback(
     (version: number) => {

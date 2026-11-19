@@ -11,6 +11,7 @@ import { SynKebabMenu } from '../../components/SynKebabMenu'
 import { LinkCell } from '../../components/table/LinkCell'
 import { UserTimestamp } from '../../components/table/UserTimestamp'
 import { WorkflowPublishStatusBadge } from '../../components/WorkflowPublishStatusBadge'
+import { invalidateWorkflowQueries } from '../../hooks/invalidateWorkflowQueries'
 import type { ProjectRead } from '../access/types'
 import { useProjectPermissions } from '../access-management/useProjectPermissions'
 
@@ -38,16 +39,7 @@ function WorkflowRow({
 }: Readonly<WorkflowRowProps>) {
   const [rowChecksEnabled, setRowChecksEnabled] = useState(false)
   const queryClient = useQueryClient()
-  const retryWorkflowContext = useCallback(
-    () =>
-      queryClient.invalidateQueries({
-        predicate: (query) =>
-          query.queryKey[0] === 'get' &&
-          typeof query.queryKey[1] === 'string' &&
-          query.queryKey[1].includes('/workflows'),
-      }),
-    [queryClient]
-  )
+  const retryWorkflowContext = useCallback(() => invalidateWorkflowQueries(queryClient), [queryClient])
   const permissions = useWorkflowPermissions({
     resourceProject: workflow.project_id,
     enabled: showRowActions && rowChecksEnabled,
