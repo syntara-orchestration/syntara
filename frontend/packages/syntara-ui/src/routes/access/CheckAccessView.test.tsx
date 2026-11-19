@@ -326,6 +326,44 @@ describe('CheckAccessView', () => {
     })
   })
 
+  it('sends check_any_project when the project field is left as Any project', async () => {
+    const user = userEvent.setup()
+    render(<CheckAccessView {...sampleResourceActions} />, { wrapper })
+
+    await fillForm(user)
+    await user.click(screen.getByRole('button', { name: 'Check access' }))
+
+    await waitFor(() => {
+      expect(mockMutate).toHaveBeenCalledWith({
+        body: {
+          action: 'read',
+          resource_type: 'project',
+          check_any_project: true,
+        },
+      })
+    })
+  })
+
+  it('sends resource_project when a specific project is selected', async () => {
+    const user = userEvent.setup()
+    render(<CheckAccessView {...sampleResourceActions} />, { wrapper })
+
+    await fillForm(user)
+    await user.click(screen.getByRole('button', { name: 'Project' }))
+    await user.click(screen.getByRole('option', { name: 'default' }))
+    await user.click(screen.getByRole('button', { name: 'Check access' }))
+
+    await waitFor(() => {
+      expect(mockMutate).toHaveBeenCalledWith({
+        body: {
+          action: 'read',
+          resource_type: 'project',
+          resource_project: 'default',
+        },
+      })
+    })
+  })
+
   it('renders with empty resource actions', async () => {
     const user = userEvent.setup()
     render(<CheckAccessView resourceTypes={[]} actionsByResource={new Map()} />, { wrapper })
