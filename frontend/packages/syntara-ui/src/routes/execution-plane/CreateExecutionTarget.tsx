@@ -13,7 +13,7 @@ import { SynPageTitle } from '../../components/SynPageTitle'
 import { useDirtyFormGuard } from '../../hooks/useDirtyFormGuard'
 import { useFormMutationErrorHandler } from '../../hooks/useFormMutationErrorHandler'
 import { useSynForm } from '../../hooks/useSynForm'
-import { useAlerts } from '../../providers/alerts'
+import { useAlerts } from '../../providers/alerts/AlertContext'
 import { detachPromise } from '../../utils/detachPromise'
 import { useDocLink } from '../../utils/docs/useDocLink'
 

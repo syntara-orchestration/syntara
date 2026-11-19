@@ -1,7 +1,8 @@
 import { ExecutorTypeEnum } from '@syntara/contracts'
 import { describe, expect, it } from 'vitest'
 
-import { FlowNodeType, RegistryStepId } from '../../../constants'
+import { FlowNodeType } from '../../../constants/nodeTypes'
+import { RegistryStepId } from '../../../constants/registryStepIds'
 
 import { DetectedExecutorType } from './nodes/common/detectTaskExecutorType'
 import { getAddStepPanelColor, getStepTypeColor, STEP_TYPE_COLORS } from './stepTypeColors'

@@ -7,7 +7,7 @@ import { axe } from 'vitest-axe'
 
 import { AppRoute } from '../../app/AppRoute'
 import { executionPlaneClient, integrationsClient } from '../../client'
-import { AlertProvider } from '../../providers/alerts'
+import { AlertProvider } from '../../providers/alerts/AlertProvider'
 import { expectPageTitle } from '../../test/pageTitle'
 import { routerTestState } from '../../test/setup'
 

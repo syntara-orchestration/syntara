@@ -3,7 +3,7 @@ import { useCallback } from 'react'
 
 import { executionPlaneClient } from '../../client'
 import { useDialogState } from '../../hooks/useDialogState'
-import { useAlerts } from '../../providers/alerts'
+import { useAlerts } from '../../providers/alerts/AlertContext'
 import { getErrorMessage } from '../../utils/apiErrors'
 
 import { useOptimisticExecutionTargetEnabled } from './useOptimisticExecutionTargetEnabled'

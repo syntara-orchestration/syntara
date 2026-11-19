@@ -84,7 +84,7 @@ vi.mock('./useAutoApprovalDetection', () => ({
   useAutoApprovalDetection: vi.fn(),
 }))
 
-vi.mock('../../../providers/alerts', () => ({
+vi.mock('../../../providers/alerts/AlertContext', () => ({
   useAlerts: vi.fn(() => ({
     showError: vi.fn(),
     showSuccess: vi.fn(),
@@ -394,7 +394,7 @@ describe('useExecutionApprovalPanel', () => {
 
   it('shows error alert when URL approval fetch fails', async () => {
     const { useFetchApprovalForUrlParam } = await import('./useFetchApprovalForUrlParam')
-    const { useAlerts } = await import('../../../providers/alerts')
+    const { useAlerts } = await import('../../../providers/alerts/AlertContext')
     const showError = vi.fn()
     vi.mocked(useAlerts).mockReturnValueOnce({
       showError,
@@ -420,7 +420,7 @@ describe('useExecutionApprovalPanel', () => {
 
   it('shows permission message when URL approval fetch returns 403', async () => {
     const { useFetchApprovalForUrlParam } = await import('./useFetchApprovalForUrlParam')
-    const { useAlerts } = await import('../../../providers/alerts')
+    const { useAlerts } = await import('../../../providers/alerts/AlertContext')
     const showError = vi.fn()
     vi.mocked(useAlerts).mockReturnValueOnce({
       showError,
@@ -446,7 +446,7 @@ describe('useExecutionApprovalPanel', () => {
 
   it('shows not-found message when URL by-id fetch fails with APPROVAL_NOT_FOUND', async () => {
     const { useFetchApprovalForUrlParam } = await import('./useFetchApprovalForUrlParam')
-    const { useAlerts } = await import('../../../providers/alerts')
+    const { useAlerts } = await import('../../../providers/alerts/AlertContext')
     const showError = vi.fn()
     vi.mocked(useAlerts).mockReturnValueOnce({
       showError,
@@ -474,7 +474,7 @@ describe('useExecutionApprovalPanel', () => {
 
   it('auto-detection shows error when fetch fails', async () => {
     const { useAutoApprovalDetection } = await import('./useAutoApprovalDetection')
-    const { useAlerts } = await import('../../../providers/alerts')
+    const { useAlerts } = await import('../../../providers/alerts/AlertContext')
     const showError = vi.fn()
     vi.mocked(useAlerts).mockReturnValueOnce({
       showError,

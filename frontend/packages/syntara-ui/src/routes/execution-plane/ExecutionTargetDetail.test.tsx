@@ -8,7 +8,7 @@ import { axe } from 'vitest-axe'
 
 import { executionPlaneClient } from '../../client'
 import { useCanI } from '../../hooks/useCanI'
-import { AlertProvider } from '../../providers/alerts'
+import { AlertProvider } from '../../providers/alerts/AlertProvider'
 import { expectPageTitle } from '../../test/pageTitle'
 
 import ExecutionTargetDetail from './ExecutionTargetDetail'

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { RegistryStepId } from '../../../../constants'
+import { RegistryStepId } from '../../../../constants/registryStepIds'
 import { useWorkflowStore } from '../../../../stores/useWorkflowStore'
 import { StepRegistry } from '../StepRegistry'
 

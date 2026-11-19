@@ -2,7 +2,7 @@ import type { ExecutionPlaneAPI } from '@syntara/contracts'
 import { useCallback, useRef, useState } from 'react'
 
 import { executionPlaneClient } from '../../client'
-import { useAlerts } from '../../providers/alerts'
+import { useAlerts } from '../../providers/alerts/AlertContext'
 import { getErrorMessage } from '../../utils/apiErrors'
 
 type ExecutionTarget = ExecutionPlaneAPI.components['schemas']['ExecutionTargetRead']

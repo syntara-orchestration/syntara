@@ -8,7 +8,7 @@ import { axe } from 'vitest-axe'
 
 import { AppRoute } from '../../app/AppRoute'
 import { executionPlaneClient, integrationsClient } from '../../client'
-import { AlertProvider } from '../../providers/alerts'
+import { AlertProvider } from '../../providers/alerts/AlertProvider'
 import type { DirtyCheckOptions } from '../../providers/unsaved-changes/unsavedChangesContext'
 import { expectPageTitle } from '../../test/pageTitle'
 

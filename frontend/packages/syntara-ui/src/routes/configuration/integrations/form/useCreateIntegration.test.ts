@@ -15,7 +15,7 @@ vi.mock('../../../../app/tanstackRouter', () => ({
   tanstackRouter: { navigate: vi.fn().mockResolvedValue(undefined) },
 }))
 
-vi.mock('../../../../providers/alerts', () => ({
+vi.mock('../../../../providers/alerts/AlertContext', () => ({
   useAlerts: vi.fn(() => ({ showAlert: mockShowAlert })),
 }))
 
