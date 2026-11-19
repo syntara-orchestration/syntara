@@ -182,6 +182,21 @@ ignore = [
 "src/syntara/core/models/base/resource.py" = ["A005"]  # Allow module name shadowing stdlib
 "tools/**/*.py" = ["T201", "INP001", "PLC0415", "ARG001", "ANN401", "TRY003", "EM102"]  # CLI tools: print, deferred imports, unused args
 "scripts/**/*.py" = ["T201", "INP001", "D103"]  # Standalone scripts: print, no package, no docstrings
+"experiments/**/*.py" = [
+    "TRY003",  # POC exceptions use local messages
+    "EM101",
+    "EM102",
+    "INP001",
+]
+"experiments/**/tests/**/*.py" = [
+    "S101",
+    "ANN001",
+    "ANN201",
+    "D102",
+    "D103",
+    "PLR2004",
+    "INP001",
+]
 "tests/**/*.py" = [
     "S101",     # Allow assert statements in tests
     "ANN001",   # Don't require type annotations for test function arguments (fixtures)
