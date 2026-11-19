@@ -4,6 +4,7 @@ Tests verify that form_prompts are correctly created through the internal
 Forms API endpoint.
 """
 
+from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -12,10 +13,11 @@ from httpx import AsyncClient
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from syntara.core.models import User
+from syntara.core.models import Group, User
 from syntara.forms.models.api_models import FormPromptStatus
 from syntara.forms.models.form_fields import DropdownField, ResolvedOptions
 from syntara.forms.models.form_prompt import FormPrompt
+from syntara.forms.models.form_prompt_responders import FormPromptResponderGroup, FormPromptResponderUser
 from syntara.workflows.models import Workflow, WorkflowVersion
 from syntara.workflows.models.execution import Execution, ExecutionStatus
 
@@ -243,24 +245,78 @@ class TestFormPromptCreateAPI:
         jwt_client: AsyncClient,
         test_execution: Execution,
         test_db_session: AsyncSession,
+        test_user: User,
+        test_group: Group,
         loop_iteration_path: list[int],
     ) -> None:
-        """A retry after a lost response returns the original pending prompt instead of failing."""
+        """A retry with changed content and responders returns the original prompt unchanged."""
         execution_id = test_execution.id
+        original_deadline = datetime.now(UTC) + timedelta(hours=1)
+        original_form = {
+            "fields": [{"value_name": "original", "type": "text", "label": "Original label", "required": False}]
+        }
         payload = _form_prompt_payload(
             execution_id,
             test_execution.project_id,
             prompt_node_id="form1",
+            name="Original form",
+            form_definition=original_form,
             loop_iteration_path=loop_iteration_path,
+        )
+        payload.update(
+            {
+                "message": "Original guidance",
+                "timeout_at": original_deadline.isoformat(),
+                "submit_label": "Original submit",
+                "success_message": "Original success",
+            }
         )
 
         response1 = await jwt_client.post(FORM_PROMPTS_URL, json=payload)
         assert response1.status_code == 201
 
-        response2 = await jwt_client.post(FORM_PROMPTS_URL, json=payload)
+        retry_payload = {
+            **payload,
+            "name": "Changed form",
+            "message": "Changed guidance",
+            "timeout_at": (datetime.now(UTC) + timedelta(hours=2)).isoformat(),
+            "form_definition": {
+                "fields": [{"value_name": "changed", "type": "text", "label": "Changed label", "required": True}]
+            },
+            "submit_label": "Changed submit",
+            "success_message": "Changed success",
+            "responder_user_ids": [str(test_user.id)],
+            "responder_group_ids": [str(test_group.id)],
+        }
+        response2 = await jwt_client.post(FORM_PROMPTS_URL, json=retry_payload)
         assert response2.status_code == 201
-        assert response2.json()["id"] == response1.json()["id"]
+        assert response2.json() == response1.json()
+        assert response2.json()["name"] == "Original form"
         assert response2.json()["status"] == "pending"
+
+        prompt_id = UUID(response1.json()["id"])
+        prompt = await test_db_session.get(FormPrompt, prompt_id)
+        assert prompt is not None
+        assert prompt.name == "Original form"
+        assert prompt.message == "Original guidance"
+        assert prompt.timeout_at == original_deadline
+        assert prompt.form_definition.fields[0].value_name == "original"
+        assert prompt.form_definition.fields[0].label == "Original label"
+        assert prompt.submit_label == "Original submit"
+        assert prompt.success_message == "Original success"
+
+        user_responders = (
+            await test_db_session.exec(
+                select(FormPromptResponderUser).where(FormPromptResponderUser.form_prompt_id == prompt_id)
+            )
+        ).all()
+        group_responders = (
+            await test_db_session.exec(
+                select(FormPromptResponderGroup).where(FormPromptResponderGroup.form_prompt_id == prompt_id)
+            )
+        ).all()
+        assert user_responders == []
+        assert group_responders == []
 
         rows = (await test_db_session.exec(select(FormPrompt).where(FormPrompt.execution_id == execution_id))).all()
         assert len(rows) == 1
@@ -278,6 +334,28 @@ class TestFormPromptCreateAPI:
 
         assert response.status_code == 409
         assert response.json()["code"] == "FORM_ALREADY_REQUESTED"
+
+    async def test_create_duplicate_for_pending_prompt_past_deadline_returns_409_expired(
+        self,
+        jwt_client: AsyncClient,
+        test_execution: Execution,
+        test_db_session: AsyncSession,
+    ) -> None:
+        """A timed-out prompt still marked pending is no longer reusable."""
+        payload = _form_prompt_payload(test_execution.id, test_execution.project_id, prompt_node_id="form1")
+        response1 = await jwt_client.post(FORM_PROMPTS_URL, json=payload)
+        assert response1.status_code == 201
+
+        prompt = await test_db_session.get(FormPrompt, UUID(response1.json()["id"]))
+        assert prompt is not None
+        prompt.timeout_at = datetime.now(UTC) - timedelta(seconds=1)
+        test_db_session.add(prompt)
+        await test_db_session.commit()
+
+        response2 = await jwt_client.post(FORM_PROMPTS_URL, json=payload)
+
+        assert response2.status_code == 409
+        assert response2.json()["code"] == "FORM_EXPIRED"
 
     @pytest.mark.parametrize("terminal_status", ["submitted", "expired", "cancelled"])
     async def test_create_duplicate_for_non_pending_form_prompt_returns_409_not_pending(

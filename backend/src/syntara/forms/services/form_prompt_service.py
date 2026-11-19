@@ -244,6 +244,7 @@ class FormPromptService(UserReferenceResolverMixin, BaseService):
         Raises:
             FormPromptAlreadyRequestedError: If the prompt belongs to a different activity
             FormPromptNotPendingError: If the prompt was already submitted, expired or cancelled
+            FormPromptExpiredError: If the pending prompt's deadline has elapsed
 
         """
         result = await self.session.exec(
@@ -264,13 +265,17 @@ class FormPromptService(UserReferenceResolverMixin, BaseService):
 
         if existing.status != FormPromptStatus.PENDING:
             logger.error(
-                "Duplicate form prompt create for a prompt that is no longer pending",
+                "Duplicate form prompt create for a prompt that is not reusable",
                 prompt_id=existing.id,
                 status=existing.status,
                 execution_id=request.execution_id,
                 prompt_node_id=request.prompt_node_id,
             )
             raise FormPromptNotPendingError(existing.id, existing.status) from integrity_error
+
+        # Use the same status and deadline rule as response submission. A prompt can
+        # remain PENDING until the expiration activity runs after timeout_at.
+        validate_prompt_submission_state(existing)
 
         logger.info(
             "Duplicate form prompt create treated as idempotent replay",

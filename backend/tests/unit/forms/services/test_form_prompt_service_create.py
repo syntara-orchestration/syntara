@@ -4,6 +4,7 @@ Tests verify form prompt creation logic including validation,
 duplicate detection, and database operations.
 """
 
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock
 from uuid import UUID, uuid4
@@ -12,8 +13,13 @@ import pytest
 from sqlalchemy.exc import IntegrityError
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from syntara.forms.exceptions import FormPromptAlreadyRequestedError, FormPromptNotPendingError
-from syntara.forms.models.api_models import FormPromptCreateRequest, FormPromptStatus
+from syntara.forms.exceptions import (
+    FormPromptAlreadyRequestedError,
+    FormPromptExpiredError,
+    FormPromptNotPendingError,
+)
+from syntara.forms.models.api_models import FormPromptCreateRequest, FormPromptStatus, FormPromptSummary
+from syntara.forms.models.form_fields import FormDefinition
 from syntara.forms.models.form_prompt import FormPrompt
 from syntara.forms.services.form_prompt_service import FormPromptService
 
@@ -226,22 +232,70 @@ class TestFormPromptServiceCreate:
     async def test_duplicate_for_pending_prompt_of_same_activity_is_idempotent(
         self, mock_audit_dispatcher: Mock
     ) -> None:
-        """Retry after a lost response returns the original prompt without repeating side effects."""
+        """Retry returns original content and responders without repeating side effects."""
+        service, session = _make_service(raise_integrity_error=True)
+        original_request = _duplicate_request()
+        original_request.name = "Original form"
+        original_request.message = "Original guidance"
+        original_request.timeout_at = datetime.now(UTC) + timedelta(hours=1)
+        original_request.form_definition = FormDefinition.model_validate(
+            {"fields": [{"value_name": "original", "type": "text", "label": "Original label", "required": False}]}
+        )
+        original_request.submit_label = "Original submit"
+        original_request.success_message = "Original success"
+        retry_request = original_request.model_copy(
+            update={
+                "name": "Changed form",
+                "message": "Changed guidance",
+                "timeout_at": datetime.now(UTC) + timedelta(hours=2),
+                "form_definition": {
+                    "fields": [{"value_name": "changed", "type": "text", "label": "Changed label", "required": True}]
+                },
+                "submit_label": "Changed submit",
+                "success_message": "Changed success",
+                "responder_user_ids": [uuid4()],
+                "responder_group_ids": [uuid4()],
+            }
+        )
+        _mock_execution_project(session, retry_request.project_id)
+        existing = _existing_prompt(original_request)
+        existing.message = original_request.message
+        existing.timeout_at = original_request.timeout_at
+        existing.submit_label = original_request.submit_label
+        existing.success_message = original_request.success_message
+        _mock_existing_prompt(session, existing)
+        original_summary = FormPromptSummary.model_validate(existing)
+
+        result = await service.create(retry_request)
+
+        assert result == original_summary
+        assert result.name == "Original form"
+        assert result.status == FormPromptStatus.PENDING
+        assert result.temporal_activity_id == original_request.temporal_activity_id
+        session.rollback.assert_awaited_once()
+        session.commit.assert_not_awaited()
+        mock_audit_dispatcher.assert_not_called()
+        session.add.assert_called_once()
+        assert isinstance(session.add.call_args.args[0], FormPrompt)  # no responder rows staged on replay
+
+    @pytest.mark.asyncio
+    async def test_duplicate_for_pending_prompt_past_deadline_raises_expired(self, mock_audit_dispatcher: Mock) -> None:
+        """A pending row past its response deadline cannot be reused for a retry."""
         service, session = _make_service(raise_integrity_error=True)
         request = _duplicate_request()
         _mock_execution_project(session, request.project_id)
         existing = _existing_prompt(request)
+        existing.timeout_at = datetime.now(UTC) - timedelta(seconds=1)
         _mock_existing_prompt(session, existing)
 
-        result = await service.create(request)
+        with pytest.raises(FormPromptExpiredError) as exc_info:
+            await service.create(request)
 
-        assert result.id == existing.id
-        assert result.status == FormPromptStatus.PENDING
-        assert result.temporal_activity_id == request.temporal_activity_id
+        assert exc_info.value.form_prompt_id == existing.id
+        assert exc_info.value.timeout_at == existing.timeout_at
         session.rollback.assert_awaited_once()
         session.commit.assert_not_awaited()
         mock_audit_dispatcher.assert_not_called()
-        session.add.assert_called_once()  # only the failed first insert; nothing staged on replay
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize(

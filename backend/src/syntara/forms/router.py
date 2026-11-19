@@ -59,15 +59,16 @@ def get_form_prompt_service(
     description=(
         "Create a form prompt. Internal service-to-service endpoint for the workflow engine. "
         "If a prompt already exists for the same execution, node, and loop iteration, a retry "
-        "returns that prompt with 201 Created only when it is pending and belongs to the same "
-        "Temporal activity. This replay intentionally uses 201, the same status as first "
-        "creation. A duplicate with a different activity, a missing row after a uniqueness "
-        "conflict, or a non-pending prompt returns 409 Conflict."
+        "returns that prompt with 201 Created only when it is still pending, its response "
+        "deadline has not elapsed, and it belongs to the same Temporal activity. "
+        "This replay intentionally uses 201, the same status as first creation. "
+        "A duplicate with a different activity, a "
+        "missing row after a uniqueness conflict, a non-pending prompt, or a pending prompt "
+        "whose deadline has elapsed returns 409 Conflict."
     ),
     response_description=(
         "Created prompt or existing pending prompt returned for a same-activity replay; both return 201."
     ),
-    responses={status.HTTP_409_CONFLICT: {"description": "Conflict"}},
 )
 async def create_form_prompt(
     request: FormPromptCreateRequest,
