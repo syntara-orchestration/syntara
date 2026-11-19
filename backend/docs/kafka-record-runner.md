@@ -73,6 +73,9 @@ failure closes the consumer and requires broker-confirmed membership removal
 before releasing the lock. If Kafka is unavailable, publication remains blocked
 until that fence can be confirmed. Shutdown also retains the runner while such a
 commit or fence is outstanding.
+The publication lock follows the outstanding writes from its own batch. A
+definitive broker rejection settles that write and leaves its offsets uncommitted.
+A late definitive reply can settle the write while consumer shutdown continues.
 The SDK retry loop has its own five-second limit. On an uncertain broker reply,
 timeout or interruption, the adapter closes to new commits and position
 operations immediately. Shutdown
@@ -89,17 +92,43 @@ deadline. Assignment loss always forbids that commit.
 
 Queue count, byte, per-partition and processing bounds limit local work. The
 queue budget covers buffered source bytes and the encoded arguments of retained
-handoffs, including handoffs for revoked partitions. An already reserved handoff
-can retry at capacity. Overflow rewinds the unqueued tail and discards fetch
+handoffs, including handoffs for revoked partitions. Saving prepared arguments
+releases the raw queue entry and transfers its reservation to the handoff. A
+detached handoff still uses a record slot on its partition. A definitive rejection
+rewinds to the original offset. An already reserved handoff can retry at capacity.
+Queue overflow rewinds the unqueued tail and discards fetch
 results from the old cursor while the rewind is pending. Numeric offset gaps are
-valid; later received records cannot advance past an unresolved earlier head.
+valid for offsets the runner has never received. A checkpoint cannot cross a
+previously delivered offset that still requires inspection.
 If admission closes during a fetch, its unqueued records are also rewound.
 Each partition task drains queued heads in order, with one handoff at a time,
 releasing the shared processing slot between records.
 
 Invalid content stays uncommitted while the required author-visible activity
 logging is unavailable. Local holds do not create per-message database rows.
-A restart reads the uncommitted record again. Validation-only inspection during
+A restart reads the uncommitted record again. Reassignment and a local runner
+replacement on the same publication carry forward outstanding inspection and
+delivery evidence. The runner saves a match and its receipt time before checking
+execution storage or preparing a start. Replay on the same publication uses the
+saved match and receipt time. A definitively rejected start can be retried when
+the original Kafka payload is available. The runner checks for an existing
+Execution or an accepted Temporal run by record identity, even when the Kafka
+payload is unavailable. An oversized payload is classified during fetch. The
+partition task checks for terminal delivery under the normal recovery deadline.
+The runner tracks exact unresolved offsets and reserves room for another full
+fetch before admitting new records for a partition. When space runs low, normal
+intake pauses on that partition. The runner rotates single-record replay reads
+across paused partitions and reserves space for each result before fetching.
+An empty replay poll keeps its seek position and any late Kafka reply. If
+repeated verified rewinds fill the in-memory budget, the runner moves existing
+offsets to local temporary storage to make space for replay. Verification-only
+checks for unresolved offsets use a separate worker slot so ready records can keep processing.
+It can confirm a compacted record by its Execution identity and preserves
+verified read gaps across local reassignment. A delivered
+no-match can resolve locally. Position
+recovery checks evidence below the proposed next offset and leaves later
+evidence for replay. Resuming uses the verified Kafka cursor and discards
+rewind requests from the previous cursor. Validation-only inspection during
 position recovery never starts a workflow or creates a commit candidate.
 A new publication revalidates held content using its new schema. A hold retained
 after partition revocation does not block healthy sibling partitions.

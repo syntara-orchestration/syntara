@@ -23,6 +23,7 @@ from syntara.eventstreams.core.placement import PlacementAuthority
 from syntara.eventstreams.core.preparation import PreparedExecution
 from syntara.eventstreams.core.processing import SkippedRecord
 from syntara.eventstreams.core.runtime import (
+    PendingInspections,
     RunnerStatus,
     RuntimeFailureCode,
     RuntimeRevision,
@@ -163,10 +164,12 @@ async def test_revision_replacement_exposes_desire_while_old_runner_drains(harne
 
 async def test_publication_change_without_revision_increment_replaces_runner(harness):
     await harness.supervisor.apply(harness.snapshot)
+    harness.runners[0].inspections = {0: PendingInspections({5})}
     replacement = harness.snapshot.model_copy(update={"published_version_id": uuid4()})
     await harness.supervisor.apply(replacement)
     assert len(harness.runners) == 2
     assert harness.runners[0].stopped
+    assert not harness.runners[1].inspections
     assert harness.supervisor.status.applied_revision.published_version_id == replacement.published_version_id
     assert replacement.configuration_revision == harness.snapshot.configuration_revision
 
@@ -451,6 +454,8 @@ async def test_connection_change_replaces_consumer_without_changing_source(harne
     harness.supervisor._connection_revision = reader
     await harness.supervisor.apply(harness.snapshot)
     old = harness.runners[0]
+    saved = {0: PendingInspections({5}, matches={7: datetime.now(UTC)}), 1: PendingInspections({2, 3, 8})}
+    old.inspections = saved
     old.drain_release = asyncio.Event()
     reader.return_value = "connection-2"
     replacing = asyncio.create_task(harness.supervisor.apply(harness.snapshot))
@@ -462,6 +467,7 @@ async def test_connection_change_replaces_consumer_without_changing_source(harne
     assert result.state == RuntimeState.ACTIVE
     assert old.stopped
     assert len(harness.runners) == 2
+    assert harness.runners[1].inspections == saved
     assert all(runner.snapshot == harness.snapshot for runner in harness.runners)
     assert harness.runners[1].snapshot.configuration.group_id == old.snapshot.configuration.group_id
     assert harness.supervisor._runner_connection_revision == "connection-2"

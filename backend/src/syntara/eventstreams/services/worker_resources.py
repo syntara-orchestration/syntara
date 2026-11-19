@@ -15,6 +15,7 @@ class EventWorkerResources:
         self.preparation = asyncio.Semaphore(EventWorkerDefaults.PREPARATION_CONCURRENCY)
         self.finalization = asyncio.Semaphore(EventWorkerDefaults.FINALIZATION_CONCURRENCY)
         self.processing = asyncio.Semaphore(get_settings().event_processing_concurrency)
+        self.inspection = asyncio.Semaphore(1)
         self.placement = asyncio.Semaphore(EventWorkerDefaults.PLACEMENT_CONCURRENCY)
         self._gate = gate
         self._gate_failure_pending = False

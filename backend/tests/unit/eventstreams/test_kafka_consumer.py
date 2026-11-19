@@ -16,6 +16,7 @@ from aiokafka.client import AIOKafkaClient
 from aiokafka.consumer.group_coordinator import GroupCoordinator
 from aiokafka.coordinator.assignors.roundrobin import RoundRobinPartitionAssignor
 from aiokafka.errors import (
+    GroupAuthorizationFailedError,
     GroupLoadInProgressError,
     IllegalGenerationError,
     KafkaConnectionError,
@@ -35,6 +36,7 @@ from pydantic import SecretStr, ValidationError
 
 from syntara.core.constants import EventSchedulingDefaults, EventStreamLimits
 from syntara.eventstreams.adapters.kafka_consumer import (
+    KafkaCommitUncertainError,
     KafkaPartitionConsumer,
     _RebalanceListener,
     _ResetAwareKafkaClient,
@@ -98,6 +100,7 @@ def _mock_consumer() -> AsyncMock:
     consumer.pause = MagicMock()
     consumer.resume = MagicMock()
     consumer.getmany = AsyncMock(return_value={})
+    consumer._subscription = MagicMock()
     return consumer
 
 
@@ -154,12 +157,13 @@ async def test_fetch_checks_epoch_before_and_after_broker_wait(mock_aiokafka: Ma
     await adapter.stop()
 
 
-async def test_empty_paused_fetch_still_polls(mock_aiokafka: MagicMock) -> None:
+async def test_empty_paused_fetch_keeps_poll_alive_without_draining_prefetch(mock_aiokafka: MagicMock) -> None:
     adapter = KafkaPartitionConsumer(_connection(), _source_config())
     await _start_with_partitions(adapter, mock_aiokafka, {0})
     await adapter.pause([0], expected_epoch=adapter.epoch)
     assert await adapter.fetch([], _fetch_context(), expected_epoch=adapter.epoch, max_records=1, timeout_ms=1) == {}
-    mock_aiokafka.return_value.getmany.assert_awaited_once_with(timeout_ms=1, max_records=1)
+    mock_aiokafka.return_value.getmany.assert_not_awaited()
+    mock_aiokafka.return_value._subscription.fetch_context.assert_called_once_with()
     await adapter.stop()
 
 
@@ -265,7 +269,6 @@ async def test_ambiguous_commit_close_waits_for_broker_membership_fence(monkeypa
         on_reset=MagicMock(),
         bootstrap_servers=["broker:9092"],
         commit_group_id="shared-group",
-        commit_uncertain=lambda: True,
     )
     lookup = AsyncMock(return_value=1)
     monkeypatch.setattr(client, "coordinator_lookup", lookup)
@@ -326,34 +329,147 @@ async def test_unfenceable_commit_is_rejected_before_it_reaches_the_broker(gener
         await client.close()
 
 
-async def test_successful_concurrent_commit_does_not_clear_another_failed_attempt(mock_aiokafka: MagicMock) -> None:
+@pytest.mark.parametrize("concurrent", [False, True], ids=["only-rejection", "unrelated-commit"])
+async def test_group_authorization_rejection_does_not_require_membership_fencing(
+    mock_aiokafka, monkeypatch, *, concurrent: bool
+) -> None:
     adapter = KafkaPartitionConsumer(_connection(), _source_config())
     await _start_with_partitions(adapter, mock_aiokafka, {0, 1})
     consumer = mock_aiokafka.return_value
-    pending, release = asyncio.Event(), asyncio.Event()
+    client = _ResetAwareKafkaClient(
+        topic=adapter.topic,
+        assignment_epoch=lambda: adapter.epoch,
+        on_reset=MagicMock(),
+        bootstrap_servers=["broker:9092"],
+        commit_group_id=adapter.group_id,
+    )
+    monkeypatch.setattr(adapter, "_policy_client", client)
+    lookup = AsyncMock()
+    monkeypatch.setattr(client, "coordinator_lookup", lookup)
+
+    first = OffsetCommitRequest(adapter.group_id, 7, "member-a", -1, [(adapter.topic, [(0, 5, "")])])
+    second = OffsetCommitRequest(adapter.group_id, 7, "member-a", -1, [(adapter.topic, [(1, 10, "")])])
+    entered, release = asyncio.Event(), asyncio.Event()
 
     async def commit(offsets) -> None:
-        if TopicPartition(adapter.topic, 0) in offsets:
-            pending.set()
-            await release.wait()
-            raise KafkaTimeoutError
+        partition = next(iter(offsets)).partition
+        await client.send(1, first if partition == 0 else second)
+        if partition == 0:
+            raise GroupAuthorizationFailedError
 
     consumer.commit.side_effect = commit
-    first = asyncio.create_task(adapter.commit({0: 5}, expected_epoch=adapter.epoch))
+    consumer.stop.side_effect = client.close
+
+    async def send(_node, request, **_kwargs: object) -> OffsetCommitResponse_v0:
+        if request is first:
+            return OffsetCommitResponse_v0([(adapter.topic, [(0, GroupAuthorizationFailedError.errno)])])
+        assert request is second
+        entered.set()
+        await release.wait()
+        return OffsetCommitResponse_v0([(adapter.topic, [(1, 0)])])
+
     try:
-        await asyncio.wait_for(pending.wait(), timeout=1)
-        await adapter.commit({1: 10}, expected_epoch=adapter.epoch)
-        consumer._client.confirm_commit.assert_not_called()
-        release.set()
-        with pytest.raises(KafkaTransportError):
-            await first
-        await adapter.commit({1: 11}, expected_epoch=adapter.epoch)
-        consumer._client.confirm_commit.assert_not_called()
-        assert adapter._failed_commit
+        with patch.object(KafkaPolicyClient, "send", new_callable=AsyncMock, side_effect=send) as wire:
+            other = None
+            try:
+                if concurrent:
+                    other = asyncio.create_task(adapter.commit({1: 10}, expected_epoch=adapter.epoch))
+                    await asyncio.wait_for(entered.wait(), timeout=1)
+                with pytest.raises(KafkaTransportError) as failure:
+                    await adapter.commit({0: 5}, expected_epoch=adapter.epoch)
+                assert type(failure.value) is KafkaTransportError
+                assert isinstance(failure.value.__cause__, GroupAuthorizationFailedError)
+                assert client.has_unsettled_commits is concurrent
+            finally:
+                release.set()
+                if other is not None:
+                    await other
+            await asyncio.wait_for(adapter.stop(), timeout=1)
+            assert wire.await_count == 1 + concurrent
+            lookup.assert_not_awaited()
     finally:
-        release.set()
-        await asyncio.gather(first, return_exceptions=True)
-        await adapter.stop()
+        await KafkaPolicyClient.close(client)
+
+
+async def test_late_definitive_rejection_wakes_the_commit_fence(mock_aiokafka, monkeypatch) -> None:
+    adapter = KafkaPartitionConsumer(_connection(), _source_config())
+    await _start_with_partitions(adapter, mock_aiokafka, {0})
+    consumer = mock_aiokafka.return_value
+    client = _ResetAwareKafkaClient(
+        topic=adapter.topic,
+        assignment_epoch=lambda: adapter.epoch,
+        on_reset=MagicMock(),
+        bootstrap_servers=["broker:9092"],
+        commit_group_id=adapter.group_id,
+    )
+    monkeypatch.setattr(adapter, "_policy_client", client)
+    monkeypatch.setattr(client, "coordinator_lookup", AsyncMock(return_value=1))
+    monkeypatch.setattr(EventStreamLimits, "OFFSET_COMMIT_TIMEOUT_SECONDS", 0.05)
+    release, leave_attempted = asyncio.Event(), asyncio.Event()
+    request = OffsetCommitRequest(adapter.group_id, 7, "member-a", -1, [(adapter.topic, [(0, 5, "")])])
+
+    async def send(_node, operation, **_kwargs: object) -> OffsetCommitResponse_v0:
+        if operation is request:
+            await release.wait()
+            return OffsetCommitResponse_v0([(adapter.topic, [(0, GroupAuthorizationFailedError.errno)])])
+        assert operation.API_KEY == LeaveGroupRequest.API_KEY
+        leave_attempted.set()
+        raise GroupAuthorizationFailedError
+
+    async def commit(_offsets) -> None:
+        await asyncio.shield(client.send(1, request))
+
+    consumer.stop.side_effect = client.close
+    consumer.commit.side_effect = commit
+    with patch.object(KafkaPolicyClient, "send", new_callable=AsyncMock, side_effect=send):
+        fence = None
+        try:
+            with pytest.raises(KafkaCommitUncertainError) as failure:
+                await adapter.commit({0: 5}, expected_epoch=adapter.epoch)
+            fence = asyncio.create_task(adapter.fence_commits(failure.value))
+            await asyncio.wait_for(leave_attempted.wait(), timeout=1)
+            assert not fence.done()
+            release.set()
+            await asyncio.wait_for(fence, timeout=1)
+            await asyncio.wait_for(adapter.stop(), timeout=1)
+            assert failure.value.settled.is_set()
+            consumer.stop.assert_awaited_once()
+        finally:
+            release.set()
+            if fence is not None:
+                await asyncio.gather(fence, return_exceptions=True)
+            await KafkaPolicyClient.close(client)
+
+
+async def test_definitive_reply_does_not_clear_another_outstanding_write_for_the_same_member() -> None:
+    topic = "events.test"
+    client = _ResetAwareKafkaClient(
+        topic=topic, assignment_epoch=lambda: 7, on_reset=MagicMock(), bootstrap_servers=["broker:9092"]
+    )
+    first_entered, release_first = asyncio.Event(), asyncio.Event()
+    first = OffsetCommitRequest("shared-group", 7, "member-a", -1, [(topic, [(0, 5, "")])])
+    second = OffsetCommitRequest("shared-group", 7, "member-a", -1, [(topic, [(1, 10, "")])])
+
+    async def reply(_node, request, **_kwargs: object) -> OffsetCommitResponse_v0:
+        if request is first:
+            first_entered.set()
+            await release_first.wait()
+            return OffsetCommitResponse_v0([(topic, [(0, 0)])])
+        return OffsetCommitResponse_v0([(topic, [(1, GroupAuthorizationFailedError.errno)])])
+
+    try:
+        with patch.object(KafkaPolicyClient, "send", new_callable=AsyncMock, side_effect=reply):
+            pending = asyncio.create_task(client.send(1, first))
+            try:
+                await asyncio.wait_for(first_entered.wait(), timeout=1)
+                await client.send(1, second)
+                assert client.has_unsettled_commits
+            finally:
+                release_first.set()
+                await pending
+        assert not client.has_unsettled_commits
+    finally:
+        await client.close()
 
 
 @pytest.mark.parametrize("shutdown", [False, True], ids=["deadline", "shutdown"])
@@ -395,7 +511,6 @@ async def test_unbounded_sdk_commit_retries_end_at_deadline_or_shutdown(mock_aio
         await adapter.stop()
         await asyncio.gather(pending, return_exceptions=True)
     assert adapter.commits_interrupted
-    assert adapter._require_commit_fence
     consumer.stop.assert_awaited_once()
 
 
@@ -412,7 +527,6 @@ async def test_position_operation_stays_fenced_after_uncertain_commit(  # noqa: 
         on_reset=MagicMock(),
         bootstrap_servers=["broker:9092"],
         commit_group_id=adapter.group_id,
-        commit_uncertain=lambda: adapter._require_commit_fence,
     )
     monkeypatch.setattr(adapter, "_policy_client", client)
     monkeypatch.setattr(client, "coordinator_lookup", AsyncMock(return_value=1))
@@ -464,6 +578,7 @@ async def test_position_operation_stays_fenced_after_uncertain_commit(  # noqa: 
                     await adapter.commit({0: 50}, expected_epoch=epoch)
             assert submitted.is_set()
             assert not wire_done.is_set()
+            assert client.has_unsettled_commits
             with adapter.position_operation(0, expected_epoch=epoch) as acquired:
                 assert not acquired
             with pytest.raises(KafkaTransportError, match="Offset commits are closed"):
@@ -477,6 +592,7 @@ async def test_position_operation_stays_fenced_after_uncertain_commit(  # noqa: 
             acknowledged.set()
             await asyncio.wait_for(closing, timeout=1)
             await asyncio.wait_for(wire_done.wait(), timeout=1)
+            assert not client.has_unsettled_commits
     finally:
         acknowledged.set()
         if closing is not None:

@@ -6,7 +6,7 @@ from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 
 from syntara.eventstreams.core.placement import PlacementAuthority, SubscriptionPlacementLease, WorkerIdentity
-from syntara.eventstreams.core.runtime import RunnerStatus, RuntimeRevision, RuntimeState
+from syntara.eventstreams.core.runtime import PendingInspections, RunnerStatus, RuntimeRevision, RuntimeState
 from syntara.eventstreams.models.subscription_snapshot import SubscriptionSnapshot
 
 
@@ -52,6 +52,7 @@ class IsolatedSubscriptionRunner:
         self.start_calls = 0
         self.drain_calls = 0
         self.stop_calls = 0
+        self.inspections: dict[int, PendingInspections] = {}
 
     @property
     def status(self) -> RunnerStatus:
@@ -73,6 +74,14 @@ class IsolatedSubscriptionRunner:
         self.open_calls += 1
         self._accepting = not self.stopped and self._placement is not None and self._placement()
         return self._accepting
+
+    def pending_inspections(self) -> dict[int, PendingInspections]:
+        """Return unresolved delivered offsets when replacing this test runner."""
+        return self.inspections
+
+    def restore_inspections(self, inspections: dict[int, PendingInspections]) -> None:
+        """Capture replay evidence transferred by the supervisor."""
+        self.inspections = inspections
 
     async def start(self) -> None:
         """Permit a test to hold or fail startup without opening any connection."""
