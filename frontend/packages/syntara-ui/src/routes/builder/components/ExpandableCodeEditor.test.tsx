@@ -1,9 +1,14 @@
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { ExpandableCodeEditor } from './ExpandableCodeEditor'
+
+const { mockBeforeMountCallbacks, mockSetupMonacoShiki } = vi.hoisted(() => ({
+  mockBeforeMountCallbacks: [] as Array<(monaco: { editor: { setTheme: (theme: string) => void } }) => void>,
+  mockSetupMonacoShiki: vi.fn<(monaco: unknown, themeName: string) => Promise<void>>(),
+}))
 
 // Mock theme hook
 vi.mock('../../../providers/theme/useColorScheme', () => ({
@@ -13,29 +18,49 @@ vi.mock('../../../providers/theme/useColorScheme', () => ({
   })),
 }))
 
+vi.mock('../../../components/details/shiki-service-loader', () => ({
+  loadShikiService: () => Promise.resolve({ setupMonacoShiki: mockSetupMonacoShiki }),
+}))
+
 // Mock Monaco editor since it doesn't work well in test environment
 vi.mock('@patternfly/react-code-editor', () => ({
   CodeEditor: ({
     code,
     onCodeChange,
     customControls,
+    editorProps,
+    options,
     'aria-label': ariaLabel,
   }: {
     code: string
     onCodeChange: (code: string) => void
     customControls?: React.ReactNode
+    editorProps?: {
+      theme?: string
+      beforeMount?: (monaco: { editor: { setTheme: (theme: string) => void } }) => void
+    }
+    options?: { bracketPairColorization?: { enabled?: boolean } }
     'aria-label'?: string
-  }) => (
-    <div data-testid="code-editor" aria-label={ariaLabel}>
-      <textarea
-        data-testid="code-textarea"
-        value={code}
-        onChange={(e) => onCodeChange(e.target.value)}
+  }) => {
+    if (editorProps?.beforeMount) mockBeforeMountCallbacks.push(editorProps.beforeMount)
+
+    return (
+      <div
+        data-testid="code-editor"
         aria-label={ariaLabel}
-      />
-      {customControls}
-    </div>
-  ),
+        data-theme={editorProps?.theme}
+        data-bracket-pair-colorization={options?.bracketPairColorization?.enabled ? 'enabled' : 'disabled'}
+      >
+        <textarea
+          data-testid="code-textarea"
+          value={code}
+          onChange={(e) => onCodeChange(e.target.value)}
+          aria-label={ariaLabel}
+        />
+        {customControls}
+      </div>
+    )
+  },
   CodeEditorControl: ({
     icon,
     onClick,
@@ -64,11 +89,46 @@ describe('ExpandableCodeEditor', () => {
     onCodeChange: vi.fn(),
   }
 
+  beforeEach(() => {
+    mockBeforeMountCallbacks.length = 0
+    mockSetupMonacoShiki.mockReset().mockResolvedValue(undefined)
+  })
+
   it('renders the code editor with code', () => {
     render(<ExpandableCodeEditor {...defaultProps} />)
 
     expect(screen.getByTestId('code-editor')).toBeInTheDocument()
     expect(screen.getByTestId('code-textarea')).toHaveValue('console.log("hello")')
+  })
+
+  it('uses the matching Shiki theme and enables JSON bracket colorization in both editors', async () => {
+    const user = userEvent.setup()
+    render(<ExpandableCodeEditor {...defaultProps} language="json" />)
+
+    expect(screen.getByTestId('code-editor')).toHaveAttribute('data-theme', 'pf-v6-theme-dark')
+    const beforeMount = mockBeforeMountCallbacks[0]
+    expect(beforeMount).toBeDefined()
+
+    act(() => {
+      beforeMount?.({ editor: { setTheme: vi.fn() } })
+    })
+    await waitFor(() => {
+      expect(screen.getByTestId('code-editor')).toHaveAttribute('data-theme', 'github-dark-high-contrast')
+    })
+    expect(mockSetupMonacoShiki).toHaveBeenCalledWith(expect.anything(), 'github-dark-high-contrast')
+
+    const expectConfiguredEditors = () => {
+      for (const editor of screen.getAllByTestId('code-editor')) {
+        expect(editor).toHaveAttribute('data-theme', 'github-dark-high-contrast')
+        expect(editor).toHaveAttribute('data-bracket-pair-colorization', 'enabled')
+      }
+    }
+
+    expectConfiguredEditors()
+
+    await user.click(screen.getByTestId('expand-button'))
+
+    expectConfiguredEditors()
   })
 
   it('renders the expand button', () => {

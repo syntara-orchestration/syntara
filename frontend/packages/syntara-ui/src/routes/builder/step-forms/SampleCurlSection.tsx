@@ -31,7 +31,7 @@ export function SampleCurlSection({ url }: Readonly<SampleCurlSectionProps>) {
   return (
     <StackItem>
       <ExpandableSection toggleText="Sample request" isExpanded={expanded} onToggle={(_event, val) => setExpanded(val)}>
-        <SynCodeBlock enableCopy noMaxHeight>
+        <SynCodeBlock language="bash" enableCopy noMaxHeight>
           {curlCommand}
         </SynCodeBlock>
       </ExpandableSection>

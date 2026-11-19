@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ReactNode } from 'react'
 import { FormProvider, useForm } from 'react-hook-form'
@@ -43,8 +43,9 @@ describe('SampleCurlSection', () => {
 
     await user.click(screen.getByText('Sample request'))
 
-    expect(screen.getByText(/curl -X POST/)).toBeInTheDocument()
-    expect(screen.getByText(/example\.com\/webhooks\/test/)).toBeInTheDocument()
+    const code = screen.getByRole('code')
+    await waitFor(() => expect(code).toHaveTextContent(/curl -X POST/))
+    await waitFor(() => expect(code).toHaveTextContent(/example\.com\/webhooks\/test/))
   })
 
   it('includes Content-Type header in the command', async () => {
@@ -57,7 +58,7 @@ describe('SampleCurlSection', () => {
 
     await user.click(screen.getByText('Sample request'))
 
-    expect(screen.getByText(/Content-Type: application\/json/)).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByRole('code')).toHaveTextContent(/Content-Type: application\/json/))
   })
 
   it('generates sample body from schema fields', async () => {
@@ -75,7 +76,7 @@ describe('SampleCurlSection', () => {
 
     await user.click(screen.getByText('Sample request'))
 
-    expect(screen.getByText(/example/)).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByRole('code')).toHaveTextContent(/example/))
   })
 
   it('escapes single quotes in the URL', async () => {
@@ -88,7 +89,7 @@ describe('SampleCurlSection', () => {
 
     await user.click(screen.getByText('Sample request'))
 
-    expect(screen.getByText(/curl -X POST/)).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByRole('code')).toHaveTextContent(/curl -X POST/))
   })
 
   it('shows empty JSON body when no schema is defined', async () => {
@@ -101,7 +102,7 @@ describe('SampleCurlSection', () => {
 
     await user.click(screen.getByText('Sample request'))
 
-    expect(screen.getByText(/{}/)).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByRole('code')).toHaveTextContent(/\{\}/))
   })
 
   it('has no accessibility violations', async () => {
