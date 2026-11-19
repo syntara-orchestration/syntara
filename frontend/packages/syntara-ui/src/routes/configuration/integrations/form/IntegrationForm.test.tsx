@@ -6,7 +6,7 @@ import type { ReactNode } from 'react'
 import { type Mock, beforeEach, describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 
-import { tanstackRouter } from '../../../../app/tanstackRouter'
+import { AppRoute } from '../../../../app/AppRoute'
 import { integrationsClient } from '../../../../client'
 import { AlertProvider } from '../../../../providers/alerts/AlertProvider'
 import type { DocKey } from '../../../../utils/docs/types'
@@ -26,6 +26,8 @@ vi.mock('../useProjectAssignmentSync', () => ({
 }))
 
 vi.mock('../../../../client', () => ({
+  authMiddleware: { onRequest: vi.fn() },
+  interfaceTagMiddleware: { onRequest: vi.fn() },
   integrationsClient: {
     useMutation: vi.fn(() => ({
       mutate: vi.fn(),
@@ -39,8 +41,8 @@ vi.mock('../../../../client', () => ({
   },
 }))
 
-vi.mock('../../../../app/tanstackRouter', () => ({
-  tanstackRouter: { navigate: vi.fn().mockResolvedValue(undefined) },
+vi.mock('../../../../components/SynLink', () => ({
+  SynLink: ({ to, children }: { to: string; children: ReactNode }) => <a href={to}>{children}</a>,
 }))
 
 vi.mock('../../../access/useAllProjects', () => {
@@ -150,7 +152,7 @@ describe('IntegrationForm', () => {
     render(<IntegrationForm />, { wrapper })
 
     expect(screen.getByRole('button', { name: 'Next' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Cancel' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument()
   })
 
@@ -246,14 +248,12 @@ describe('IntegrationForm', () => {
     expect(screen.getByText(/credential is used to discover/i)).toBeInTheDocument()
   })
 
-  it('navigates to integrations list when Cancel is clicked', async () => {
-    const user = userEvent.setup()
+  it('links cancel to the integrations list', () => {
     render(<IntegrationForm />, { wrapper })
 
-    await user.click(screen.getByRole('button', { name: 'Cancel' }))
-
-    expect(vi.mocked(tanstackRouter.navigate)).toHaveBeenCalledWith(
-      expect.objectContaining({ to: '/configuration/integrations' })
+    expect(screen.getByRole('link', { name: 'Cancel' })).toHaveAttribute(
+      'href',
+      AppRoute.Configuration.Integrations.Root
     )
   })
 
