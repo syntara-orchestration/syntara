@@ -1,3 +1,4 @@
+import { ActivityTypeEnum, FormFieldTypeEnum, TriggerTypeEnum } from '@syntara/contracts'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -347,15 +348,20 @@ describe('InputStepContent', () => {
   it('orders an upstream form prompt response using its configured fields', () => {
     const form_definition = {
       fields: [
-        { type: 'text', value_name: 'deployment_name', label: 'Deployment' },
-        { type: 'text', value_name: 'environment', label: 'Environment' },
-        { type: 'text', value_name: 'id', label: 'ID' },
+        { type: FormFieldTypeEnum.TEXT, value_name: 'deployment_name', label: 'Deployment' },
+        { type: FormFieldTypeEnum.TEXT, value_name: 'environment', label: 'Environment' },
+        { type: FormFieldTypeEnum.TEXT, value_name: 'id', label: 'ID' },
       ],
     }
 
     render(
       <InputStepContent
-        upstreamNode={{ id: 'prompt-1', name: 'Ask', type: 'form_prompt', parameters: { form_definition } }}
+        upstreamNode={{
+          id: 'prompt-1',
+          name: 'Ask',
+          type: ActivityTypeEnum.FORM_PROMPT,
+          parameters: { form_definition },
+        }}
         hasData
         mergedExecutionData={{
           'prompt-1': {
@@ -377,15 +383,20 @@ describe('InputStepContent', () => {
   it('orders an upstream form trigger response_data', () => {
     const form_definition = {
       fields: [
-        { type: 'text', value_name: 'deployment_name', label: 'Deployment' },
-        { type: 'text', value_name: 'environment', label: 'Environment' },
-        { type: 'text', value_name: 'id', label: 'ID' },
+        { type: FormFieldTypeEnum.TEXT, value_name: 'deployment_name', label: 'Deployment' },
+        { type: FormFieldTypeEnum.TEXT, value_name: 'environment', label: 'Environment' },
+        { type: FormFieldTypeEnum.TEXT, value_name: 'id', label: 'ID' },
       ],
     }
 
     render(
       <InputStepContent
-        upstreamNode={{ id: 'form-trigger-id', name: 'Launch', type: 'form_trigger', parameters: { form_definition } }}
+        upstreamNode={{
+          id: 'form-trigger-id',
+          name: 'Launch',
+          type: TriggerTypeEnum.FORM_TRIGGER,
+          parameters: { form_definition },
+        }}
         hasData
         mergedExecutionData={{
           'form-trigger-id': {

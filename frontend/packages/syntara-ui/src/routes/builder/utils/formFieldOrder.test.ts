@@ -1,4 +1,4 @@
-import { ActivityTypeEnum, TriggerTypeEnum } from '@syntara/contracts'
+import { ActivityTypeEnum, FormFieldTypeEnum, TriggerTypeEnum } from '@syntara/contracts'
 import { describe, expect, it } from 'vitest'
 
 import { buildTriggerNodeId } from '../../../utils/triggerNodeIds'
@@ -12,9 +12,9 @@ describe('formFieldOrderFromParameters', () => {
     const parameters = {
       form_definition: {
         fields: [
-          { value_name: 'deployment_name', type: 'text' },
+          { value_name: 'deployment_name', type: FormFieldTypeEnum.TEXT },
           { value_name: 'environment', type: 'new_backend_field_type' },
-          { value_name: 'id', type: 'number' },
+          { value_name: 'id', type: FormFieldTypeEnum.NUMBER },
         ],
       },
     }
@@ -27,7 +27,7 @@ describe('formFieldOrderFromParameters', () => {
     ['missing form definition', {}],
     ['malformed form definition', { form_definition: { fields: 'invalid' } }],
     ['empty fields', { form_definition: { fields: [] } }],
-    ['fields without names', { form_definition: { fields: [{ type: 'text' }] } }],
+    ['fields without names', { form_definition: { fields: [{ type: FormFieldTypeEnum.TEXT }] } }],
     ['partly malformed fields', { form_definition: { fields: [{ value_name: 'known' }, null] } }],
   ])('returns undefined for %s', (_label, parameters) => {
     expect(formFieldOrderFromParameters(parameters)).toBeUndefined()
@@ -43,7 +43,7 @@ describe('buildFormFieldOrderMap', () => {
           type: ActivityTypeEnum.FORM_PROMPT,
           parameters: { form_definition: { fields: fieldOrder.map((value_name) => ({ value_name })) } },
         },
-        { id: 'script-1', type: 'script', parameters: {} },
+        { id: 'script-1', type: ActivityTypeEnum.SCRIPT, parameters: {} },
       ],
       triggers: [
         { id: 'manual-1', type: TriggerTypeEnum.MANUAL_TRIGGER, parameters: {} },
@@ -131,7 +131,7 @@ describe('orderFormActivityData', () => {
     const genericData = { id: '42', environment: 'stage' }
 
     expect(orderFormActivityData(parameters, ActivityTypeEnum.FORM_PROMPT, fieldOrder, 'input')).toBe(parameters)
-    expect(orderFormActivityData(genericData, 'script', fieldOrder, 'output')).toBe(genericData)
+    expect(orderFormActivityData(genericData, ActivityTypeEnum.SCRIPT, fieldOrder, 'output')).toBe(genericData)
   })
 
   it('passes malformed values and missing ordering through unchanged', () => {

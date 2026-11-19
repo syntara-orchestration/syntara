@@ -1,4 +1,10 @@
-import { FormFieldDisplayEnum, type Execution, type ExecutionsAPI } from '@syntara/contracts'
+import {
+  ActivityTypeEnum,
+  FormFieldDisplayEnum,
+  FormFieldTypeEnum,
+  type Execution,
+  type ExecutionsAPI,
+} from '@syntara/contracts'
 
 import { activityExecutions, type ActivityExecutionMockSeed } from './activityExecutions'
 import { executions } from './executions'
@@ -50,12 +56,12 @@ const orderedResponseFormParameters = {
   message: 'Review the submitted deployment details.',
   form_definition: {
     fields: [
-      { value_name: 'deployment_name', type: 'text' as const, label: 'Deployment name' },
-      { value_name: 'environment', type: 'text' as const, label: 'Environment' },
-      { value_name: 'id', type: 'text' as const, label: 'ID' },
+      { value_name: 'deployment_name', type: FormFieldTypeEnum.TEXT, label: 'Deployment name' },
+      { value_name: 'environment', type: FormFieldTypeEnum.TEXT, label: 'Environment' },
+      { value_name: 'id', type: FormFieldTypeEnum.TEXT, label: 'ID' },
     ],
   },
-} satisfies Extract<WorkflowNode, { type: 'form_prompt' }>['parameters']
+} satisfies Extract<WorkflowNode, { type: typeof ActivityTypeEnum.FORM_PROMPT }>['parameters']
 
 const continueDefaultsScriptParameters = {
   language: 'python' as const,
@@ -120,7 +126,7 @@ export function getExecutionDetail(executionId: string): ExecutionDetailResponse
         nodes: [
           {
             id: 'confirm_details',
-            type: 'form_prompt',
+            type: ActivityTypeEnum.FORM_PROMPT,
             name: 'Confirm deployment details',
             parameters: orderedResponseFormParameters,
           },

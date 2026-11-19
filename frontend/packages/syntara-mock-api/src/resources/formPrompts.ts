@@ -1,4 +1,4 @@
-import { FormFieldDisplayEnum, type FormsAPI } from '@syntara/contracts'
+import { FormFieldDisplayEnum, FormFieldTypeEnum, type FormsAPI } from '@syntara/contracts'
 
 import { executions } from './executions'
 import { mockDate } from './mockDates'
@@ -93,9 +93,9 @@ const dynamicResolvedFormDefinition: FormsAPI.components['schemas']['FormDefinit
 
 const orderedResponseFormDefinition: FormsAPI.components['schemas']['FormDefinition'] = {
   fields: [
-    { value_name: 'deployment_name', type: 'text', label: 'Deployment name' },
-    { value_name: 'environment', type: 'text', label: 'Environment' },
-    { value_name: 'id', type: 'text', label: 'ID' },
+    { value_name: 'deployment_name', type: FormFieldTypeEnum.TEXT, label: 'Deployment name' },
+    { value_name: 'environment', type: FormFieldTypeEnum.TEXT, label: 'Environment' },
+    { value_name: 'id', type: FormFieldTypeEnum.TEXT, label: 'ID' },
   ],
 }
 

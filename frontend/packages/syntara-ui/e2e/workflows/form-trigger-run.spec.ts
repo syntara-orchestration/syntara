@@ -12,6 +12,8 @@
  * | AC-5 | execution:run — Run published version disabled for viewer |
  * | AC-6 | UI-4 pre-run — invalid form definition; no form-trigger run modal, no execution |
  */
+import { FormFieldTypeEnum } from '@syntara/contracts'
+
 import { test, expect, toAppUrl } from '../fixtures'
 import { executionIdFromPageUrl } from '../helpers/formResponses'
 import {
@@ -175,9 +177,9 @@ test.describe('Form trigger — run from workflows list', { tag: '@pr-check' }, 
         submit_label: CUSTOM_SUBMIT_LABEL,
         form_definition: {
           fields: [
-            { value_name: 'deployment_name', type: 'text', label: 'Deployment name', required: true },
-            { value_name: 'environment', type: 'text', label: 'Environment', required: true },
-            { value_name: 'id', type: 'text', label: 'ID', required: true },
+            { value_name: 'deployment_name', type: FormFieldTypeEnum.TEXT, label: 'Deployment name', required: true },
+            { value_name: 'environment', type: FormFieldTypeEnum.TEXT, label: 'Environment', required: true },
+            { value_name: 'id', type: FormFieldTypeEnum.TEXT, label: 'ID', required: true },
           ],
         },
       },

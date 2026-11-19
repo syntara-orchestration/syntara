@@ -1,3 +1,4 @@
+import { ActivityTypeEnum, TriggerTypeEnum } from '@syntara/contracts'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ReactNode } from 'react'
@@ -134,7 +135,7 @@ describe('OutputPanel', () => {
     vi.mocked(useWorkflowStore).mockReturnValue([
       {
         id: nodeId,
-        type: 'form_prompt',
+        type: ActivityTypeEnum.FORM_PROMPT,
         parameters: {
           form_definition: {
             fields: [{ value_name: 'deployment_name' }, { value_name: 'environment' }, { value_name: 'id' }],
@@ -160,7 +161,7 @@ describe('OutputPanel', () => {
     vi.mocked(useWorkflowStore).mockReturnValue([
       {
         id: 'form-trigger-id',
-        type: 'form_trigger',
+        type: TriggerTypeEnum.FORM_TRIGGER,
         parameters: {
           form_definition: {
             fields: [{ value_name: 'deployment_name' }, { value_name: 'environment' }, { value_name: 'id' }],
@@ -184,7 +185,7 @@ describe('OutputPanel', () => {
     vi.mocked(useWorkflowStore).mockReturnValue([
       {
         id: nodeId,
-        type: 'form_prompt',
+        type: ActivityTypeEnum.FORM_PROMPT,
         parameters: {
           form_definition: {
             fields: [{ value_name: 'deployment_name' }, { value_name: 'environment' }, { value_name: 'id' }],

@@ -1,4 +1,4 @@
-import type { FormsAPI } from '@syntara/contracts'
+import { FormFieldTypeEnum, type FormsAPI } from '@syntara/contracts'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -189,9 +189,9 @@ describe('FormPromptResponseContent', () => {
         ...submittedPrompt,
         form_definition: {
           fields: [
-            { type: 'text', value_name: 'deployment_name', label: 'Deployment' },
-            { type: 'text', value_name: 'environment', label: 'Environment' },
-            { type: 'text', value_name: 'id', label: 'ID' },
+            { type: FormFieldTypeEnum.TEXT, value_name: 'deployment_name', label: 'Deployment' },
+            { type: FormFieldTypeEnum.TEXT, value_name: 'environment', label: 'Environment' },
+            { type: FormFieldTypeEnum.TEXT, value_name: 'id', label: 'ID' },
           ],
         },
         response_data: { id: '42', environment: 'stage', deployment_name: 'blue' },

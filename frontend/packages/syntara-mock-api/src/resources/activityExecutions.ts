@@ -1,4 +1,4 @@
-import type { ExecutionsAPI } from '@syntara/contracts'
+import { ActivityTypeEnum, type ExecutionsAPI } from '@syntara/contracts'
 
 import { mockDate } from './mockDates'
 
@@ -369,7 +369,7 @@ export const activityExecutions: Record<string, ActivityExecutionMockSeed[]> = {
       updated_at: mockDate.daysAgo1,
       execution_id: 'exec-form-prompt-order',
       activity_name: 'confirm_details',
-      node_type: 'form_prompt',
+      node_type: ActivityTypeEnum.FORM_PROMPT,
       status: 'completed',
       started_at: mockDate.daysAgo2,
       completed_at: mockDate.daysAgo1,
