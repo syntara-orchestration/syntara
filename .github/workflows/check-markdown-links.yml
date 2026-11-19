@@ -8,7 +8,7 @@ on:
       - '**/*.md'
       - '*.markdown'
       - '**/*.markdown'
-      - '.github/workflows/ci-markdown-links.yml'
+      - '.github/workflows/check-markdown-links.yml'
       - '.github/scripts/.nvmrc'
       - '.github/scripts/md-link-lint.config.json'
       - '.github/scripts/package.json'
