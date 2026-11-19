@@ -86,6 +86,10 @@ function createMockBrowser(overrides?: Partial<ReturnType<typeof useAAPBrowser>>
       { id: 1, name: 'Workflow Template 1', description: 'Workflow description 1' },
       { id: 2, name: 'Workflow Template 2', description: null },
     ],
+    templates: [
+      { id: 1, name: 'Workflow Template 1', description: 'Workflow description 1' },
+      { id: 2, name: 'Workflow Template 2', description: null },
+    ],
     selectOrganization: vi.fn(),
     selectTemplate: vi.fn(),
     searchOrganizations: vi.fn(),

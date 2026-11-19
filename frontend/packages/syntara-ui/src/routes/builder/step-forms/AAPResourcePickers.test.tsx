@@ -78,6 +78,10 @@ function createMockBrowser(overrides?: Partial<ReturnType<typeof useAAPBrowser>>
       { id: 1, name: 'Template 1', description: 'Desc 1' },
       { id: 2, name: 'Template 2', description: null },
     ],
+    templates: [
+      { id: 1, name: 'Template 1', description: 'Desc 1' },
+      { id: 2, name: 'Template 2', description: null },
+    ],
     selectOrganization: vi.fn(),
     selectJobTemplate: vi.fn(),
     searchOrganizations: vi.fn(),

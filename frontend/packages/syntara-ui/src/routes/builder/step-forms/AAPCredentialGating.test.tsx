@@ -47,16 +47,26 @@ vi.mock('../../../client', () => ({
 }))
 
 // CredentialSelector fetches its credential list via this hook — mocking it
-// keeps these tests synchronous.
+// keeps these tests synchronous. Two credentials let tests switch between
+// them to exercise the selection reconciliation.
 vi.mock('../components/useAllCredentials', () => ({
   useAllCredentials: vi.fn(() => ({
     credentials: [
       {
         id: 'cred-1',
-        name: 'Test AAP Credential',
+        name: 'Credential One',
         credential_type_id: 'type-aap',
-        description: 'Test credential for AAP',
+        description: 'First test credential for AAP',
         project_id: 'proj-1',
+        enabled: true,
+      },
+      {
+        id: 'cred-2',
+        name: 'Credential Two',
+        credential_type_id: 'type-aap',
+        description: 'Second test credential for AAP',
+        project_id: 'proj-1',
+        enabled: true,
       },
     ],
     isLoading: false,
@@ -133,6 +143,23 @@ const AAP_RESOURCES: Record<string, { results: Array<{ id: number; name: string;
   '/proxies/aap/labels': { results: [] },
 }
 
+/**
+ * Per-credential resource pages, keyed `${credential_id}:${path}`. Unset
+ * entries fall back to the shared pages above — what a credential with full
+ * access would see. Tests install pages to simulate a credential that lost
+ * access to specific resources.
+ */
+const credentialResources = new Map<string, { results: Array<{ id: number; name: string; description?: string }> }>()
+
+/** Serve a credential-specific resource page from the query stub. */
+function stubCredentialResource(
+  credentialId: string,
+  path: string,
+  page: { results: Array<{ id: number; name: string; description?: string }> }
+) {
+  credentialResources.set(`${credentialId}:${path}`, page)
+}
+
 /** Disabled queries must look idle with no data, exactly like a real one. */
 const idleQuery = {
   data: undefined,
@@ -144,12 +171,15 @@ const idleQuery = {
 
 function stubAapQuery() {
   mockAapUseQuery.mockImplementation(
-    (_method: unknown, path: unknown, _config: unknown, options?: { enabled?: boolean }) => {
+    (_method: unknown, path: unknown, config: unknown, options?: { enabled?: boolean }) => {
       if (options?.enabled === false) {
         return { ...idleQuery, refetch: vi.fn() }
       }
+      const credentialId = (config as { params?: { query?: { credential_id?: string } } } | undefined)?.params?.query
+        ?.credential_id
+      const page = credentialResources.get(`${credentialId ?? ''}:${path as string}`) ?? AAP_RESOURCES[path as string]
       return {
-        data: AAP_RESOURCES[path as string],
+        data: page,
         isPending: false,
         isError: false,
         error: null,
@@ -169,9 +199,21 @@ async function closeDropdown(user: ReturnType<typeof userEvent.setup>) {
   await user.keyboard('{Escape}')
 }
 
+/**
+ * Switch the node credential through the inline credential picker. The picker
+ * renders inline because the mocked credentials client cannot resolve the
+ * selected credential's name.
+ */
+async function switchCredential(user: ReturnType<typeof userEvent.setup>, credentialName: string) {
+  await user.click(screen.getByRole('button', { name: /Credential (One|Two)/ }))
+  // Regex match: the option's accessible name includes its description
+  await user.click(screen.getByRole('option', { name: new RegExp(credentialName) }))
+}
+
 describe('AAP credential gating', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    credentialResources.clear()
     stubAapQuery()
   })
 
@@ -218,11 +260,95 @@ describe('AAP credential gating', () => {
       await closeDropdown(user)
 
       // Clear the credential through the picker rendered by AAPCredentialStatus
-      await user.click(screen.getByRole('button', { name: /Test AAP Credential/ }))
+      await user.click(screen.getByRole('button', { name: /Credential One/ }))
       await user.click(screen.getByRole('option', { name: 'No credential' }))
 
       await openDropdown(user, 'Select an organization')
       expect(screen.queryByRole('option', { name: /Default/ })).not.toBeInTheDocument()
+    })
+
+    it('retains selections the new credential can still access', async () => {
+      const user = userEvent.setup()
+      renderWithHeader(
+        <AAPJobTemplateForm
+          onSubmit={vi.fn()}
+          initialData={{
+            integration_id: 'int-123',
+            credential_id: 'cred-1',
+            organization_name: 'Default',
+            job_template_name: 'Deploy App',
+            job_template_id: 10,
+          }}
+        />
+      )
+
+      const orgInput = screen.getByPlaceholderText('Select an organization')
+      const templateInput = screen.getByPlaceholderText('Select a job template')
+      expect(orgInput).toHaveValue('Default')
+      expect(templateInput).toHaveValue('Deploy App')
+
+      await switchCredential(user, 'Credential Two')
+
+      // Both resources remain visible under the new credential
+      expect(orgInput).toHaveValue('Default')
+      expect(templateInput).toHaveValue('Deploy App')
+    })
+
+    it('clears organization and template when the new credential loses the organization', async () => {
+      const user = userEvent.setup()
+      stubCredentialResource('cred-2', '/proxies/aap/organizations', {
+        results: [{ id: 3, name: 'Other Org' }],
+      })
+      renderWithHeader(
+        <AAPJobTemplateForm
+          onSubmit={vi.fn()}
+          initialData={{
+            integration_id: 'int-123',
+            credential_id: 'cred-1',
+            organization_name: 'Default',
+            job_template_name: 'Deploy App',
+            job_template_id: 10,
+          }}
+        />
+      )
+
+      const orgInput = screen.getByPlaceholderText('Select an organization')
+      const templateInput = screen.getByPlaceholderText('Select a job template')
+      expect(orgInput).toHaveValue('Default')
+
+      await switchCredential(user, 'Credential Two')
+
+      expect(orgInput).toHaveValue('')
+      expect(templateInput).toHaveValue('')
+    })
+
+    it('clears only the template when the new credential keeps the organization', async () => {
+      const user = userEvent.setup()
+      stubCredentialResource('cred-2', '/proxies/aap/job_templates', {
+        results: [{ id: 12, name: 'Other Template', description: 'A different template' }],
+      })
+      renderWithHeader(
+        <AAPJobTemplateForm
+          onSubmit={vi.fn()}
+          initialData={{
+            integration_id: 'int-123',
+            credential_id: 'cred-1',
+            organization_name: 'Default',
+            job_template_name: 'Deploy App',
+            job_template_id: 10,
+          }}
+        />
+      )
+
+      const orgInput = screen.getByPlaceholderText('Select an organization')
+      const templateInput = screen.getByPlaceholderText('Select a job template')
+      expect(orgInput).toHaveValue('Default')
+      expect(templateInput).toHaveValue('Deploy App')
+
+      await switchCredential(user, 'Credential Two')
+
+      expect(orgInput).toHaveValue('Default')
+      expect(templateInput).toHaveValue('')
     })
   })
 
@@ -259,6 +385,35 @@ describe('AAP credential gating', () => {
 
       await openDropdown(user, 'Select a workflow template')
       expect(await screen.findByRole('option', { name: /Deploy Workflow/ })).toBeInTheDocument()
+    })
+
+    it('clears organization and workflow template when the new credential loses the organization', async () => {
+      const user = userEvent.setup()
+      stubCredentialResource('cred-2', '/proxies/aap/organizations', {
+        results: [{ id: 3, name: 'Other Org' }],
+      })
+      renderWithHeader(
+        <AAPWorkflowTemplateForm
+          onSubmit={vi.fn()}
+          initialData={{
+            integration_id: 'int-123',
+            credential_id: 'cred-1',
+            organization_name: 'Default',
+            workflow_job_template_name: 'Deploy Workflow',
+            workflow_job_template_id: 20,
+          }}
+        />
+      )
+
+      const orgInput = screen.getByPlaceholderText('Select an organization')
+      const templateInput = screen.getByPlaceholderText('Select a workflow template')
+      expect(orgInput).toHaveValue('Default')
+      expect(templateInput).toHaveValue('Deploy Workflow')
+
+      await switchCredential(user, 'Credential Two')
+
+      expect(orgInput).toHaveValue('')
+      expect(templateInput).toHaveValue('')
     })
   })
 })

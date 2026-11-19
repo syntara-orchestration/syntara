@@ -142,15 +142,18 @@ const defaultTemplateDetail: AAPJobTemplateDetail = {
 }
 
 // Base mock data shared across all tests (static data that doesn't change)
+const baseMockJobTemplates = [
+  { id: 10, name: 'Deploy App', description: 'Deploy the application', organization_name: 'Default' },
+  { id: 11, name: 'Backup DB', description: 'Backup the database', organization_name: 'Default' },
+]
+
 const baseMockAAPBrowserData = {
   organizations: [
     { id: 1, name: 'Default' },
     { id: 2, name: 'Engineering' },
   ],
-  jobTemplates: [
-    { id: 10, name: 'Deploy App', description: 'Deploy the application', organization_name: 'Default' },
-    { id: 11, name: 'Backup DB', description: 'Backup the database', organization_name: 'Default' },
-  ],
+  jobTemplates: baseMockJobTemplates,
+  templates: baseMockJobTemplates,
   inventories: [{ id: 1, name: 'Demo Inventory', description: 'Demo hosts', organization_name: 'Default' }],
   executionEnvironments: [
     { id: 1, name: 'Default EE', description: 'Default execution environment' },
