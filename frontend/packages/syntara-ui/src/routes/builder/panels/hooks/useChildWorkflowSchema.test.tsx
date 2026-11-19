@@ -10,111 +10,49 @@ const mocks = vi.hoisted(() => ({ get: vi.fn() }))
 
 vi.mock('../../../../client', () => ({ workflowFetchClient: { GET: mocks.get } }))
 
-const childDefinition = {
-  schema_version: '2.0.0',
-  name: 'Child workflow',
-  triggers: [
-    { id: 'deploy', type: 'subworkflow_trigger', name: 'Deploy', parameters: {} },
-    { id: 'validate', type: 'subworkflow_trigger', name: 'Validate', parameters: {} },
-  ],
-  nodes: [
-    {
-      id: 'deploy-script',
-      name: 'Deploy application',
-      type: 'script',
-      parameters: { language: 'python', code: 'print("deployed")' },
+const deployTrigger: WorkflowAPI.components['schemas']['WorkflowInvocationTriggerSchema'] = {
+  trigger_node_id: 'deploy',
+  name: 'Deploy',
+  input_schema: {},
+  output_schema: {
+    type: 'object',
+    properties: {
+      status: { type: 'string', description: 'Deployment status' },
+      image_tag: { type: 'string', description: 'Published image tag' },
     },
-    {
-      id: 'shared-script',
-      name: 'Shared output',
-      type: 'script',
-      parameters: { language: 'python', code: 'print("shared")' },
-      outputs: { image_tag: '${result.stdout_json.tag}' },
-    },
-    {
-      id: 'validate-script',
-      name: 'Validate application',
-      type: 'script',
-      parameters: { language: 'python', code: 'print("validated")' },
-    },
-  ],
-  edges: [
-    { from: 'deploy', to: 'deploy-script' },
-    { from: 'deploy-script', to: 'shared-script' },
-    { from: 'validate', to: 'validate-script' },
-  ],
-} satisfies WorkflowAPI.components['schemas']['WorkflowDefinition']
+  },
+}
 
-const invocationSchema = {
+const validateTrigger: WorkflowAPI.components['schemas']['WorkflowInvocationTriggerSchema'] = {
+  trigger_node_id: 'validate',
+  name: 'Validate',
+  input_schema: {},
+  output_schema: { type: 'object', properties: { validation_status: { type: 'string' } } },
+}
+
+const invocationSchema: WorkflowAPI.components['schemas']['WorkflowInvocationSchemaRead'] = {
   workflow_id: 'child-workflow',
   published_version_id: 'published-v4',
   published_version: 4,
   is_eligible: true,
-  triggers: [
-    {
-      trigger_node_id: 'deploy',
-      name: 'Deploy',
-      input_schema: {},
-      output_schema: {
-        type: 'object',
-        properties: {
-          status: { type: 'string', description: 'Deployment status' },
-          image_tag: { type: 'string', description: 'Published image tag' },
-        },
-      },
-    },
-    {
-      trigger_node_id: 'validate',
-      name: 'Validate',
-      input_schema: {},
-      output_schema: { type: 'object', properties: { validation_status: { type: 'string' } } },
-    },
-  ],
-} satisfies WorkflowAPI.components['schemas']['WorkflowInvocationSchemaRead']
+  triggers: [deployTrigger, validateTrigger],
+}
 
-const publishedVersion = {
-  id: 'published-v4',
-  workflow_id: 'child-workflow',
-  version: 4,
-  schema_version: '2.0.0',
-  workflow_definition: childDefinition,
-  status: 'published',
-  created_at: '2026-01-01T00:00:00Z',
-  updated_at: '2026-01-01T00:00:00Z',
-} satisfies WorkflowAPI.components['schemas']['WorkflowVersionRead']
-
-const latestInvocationSchema = {
+const latestInvocationSchema: WorkflowAPI.components['schemas']['WorkflowInvocationSchemaRead'] = {
   ...invocationSchema,
   published_version_id: 'published-v5',
   published_version: 5,
-} satisfies WorkflowAPI.components['schemas']['WorkflowInvocationSchemaRead']
-
-const latestPublishedVersion = {
-  ...publishedVersion,
-  id: 'published-v5',
-  version: 5,
-} satisfies WorkflowAPI.components['schemas']['WorkflowVersionRead']
-
-const workflowDetail = {
-  id: 'child-workflow',
-  name: 'Child workflow',
-  current_version: 4,
-  is_enabled: true,
-  project_id: 'project-1',
-  created_at: '2026-01-01T00:00:00Z',
-  updated_at: '2026-01-01T00:00:00Z',
-  published_version_id: 'published-v4',
-  published_version_number: 4,
-  version: publishedVersion,
-} satisfies WorkflowAPI.components['schemas']['WorkflowReadWithVersion']
-
-const latestWorkflowDetail = {
-  ...workflowDetail,
-  current_version: 5,
-  published_version_id: 'published-v5',
-  published_version_number: 5,
-  version: latestPublishedVersion,
-} satisfies WorkflowAPI.components['schemas']['WorkflowReadWithVersion']
+  triggers: [
+    {
+      ...deployTrigger,
+      output_schema: {
+        type: 'object',
+        properties: { release_tag: { type: 'string', description: 'Published release tag' } },
+      },
+    },
+    validateTrigger,
+  ],
+}
 
 function createWrapper() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
@@ -126,18 +64,10 @@ function createWrapper() {
 describe('useChildWorkflowSchema', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mocks.get.mockImplementation((path: string) => {
-      if (path.includes('invocation_schema')) {
-        return Promise.resolve({ data: invocationSchema, response: new Response() })
-      }
-      if (path.includes('/versions/')) {
-        return Promise.resolve({ data: publishedVersion, response: new Response() })
-      }
-      return Promise.resolve({ data: workflowDetail, response: new Response() })
-    })
+    mocks.get.mockResolvedValue({ data: invocationSchema, response: new Response() })
   })
 
-  it('loads the published graph and exposes the selected trigger’s declared outputs', async () => {
+  it('uses the invocation schema to expose the selected trigger’s declared outputs', async () => {
     const { result } = renderHook(
       () => useChildWorkflowSchema({ workflowId: 'child-workflow', triggerNodeId: 'deploy' }),
       { wrapper: createWrapper() }
@@ -151,8 +81,9 @@ describe('useChildWorkflowSchema', () => {
     expect(result.current.childSteps[0]?.outputSchema).toMatchObject({ type: 'object' })
     expect(result.current.childSteps[0]?.outputFields?.map((field) => field.name)).toEqual(['status', 'image_tag'])
     expect(result.current.childSteps[0]?.outputFields?.find((field) => field.name === 'image_tag')?.type).toBe('string')
-    expect(mocks.get).toHaveBeenCalledWith('/workflows/{workflow_id}/versions/{version}', {
-      params: { path: { workflow_id: 'child-workflow', version: 4 } },
+    expect(mocks.get).toHaveBeenCalledTimes(1)
+    expect(mocks.get).toHaveBeenCalledWith('/workflows/{workflow_id}/invocation_schema', {
+      params: { path: { workflow_id: 'child-workflow' } },
     })
   })
 
@@ -167,23 +98,32 @@ describe('useChildWorkflowSchema', () => {
     expect(result.current.childSteps).toEqual([])
   })
 
-  it('refreshes the invocation schema and loads matching metadata after a republish race', async () => {
+  it('reports a requested trigger as unavailable when it is not in the invocation schema', async () => {
+    mocks.get.mockResolvedValue({
+      data: { ...invocationSchema, triggers: [validateTrigger] },
+      response: new Response(),
+    })
+
+    const { result } = renderHook(
+      () => useChildWorkflowSchema({ workflowId: 'child-workflow', triggerNodeId: 'removed-trigger' }),
+      { wrapper: createWrapper() }
+    )
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false))
+
+    expect(result.current.selectedTriggerNodeId).toBeNull()
+    expect(result.current.isTriggerUnavailable).toBe(true)
+    expect(result.current.childSteps).toEqual([])
+  })
+
+  it('refreshes the invocation schema and its output contract on retry', async () => {
     let invocationSchemaCalls = 0
-    mocks.get.mockImplementation((path: string, options?: { params?: { path?: { version?: number } } }) => {
-      if (path.includes('invocation_schema')) {
-        invocationSchemaCalls += 1
-        return Promise.resolve({
-          data: invocationSchemaCalls === 1 ? invocationSchema : latestInvocationSchema,
-          response: new Response(),
-        })
-      }
-      if (path.includes('/versions/')) {
-        return Promise.resolve({
-          data: options?.params?.path?.version === 5 ? latestPublishedVersion : publishedVersion,
-          response: new Response(),
-        })
-      }
-      return Promise.resolve({ data: latestWorkflowDetail, response: new Response() })
+    mocks.get.mockImplementation(() => {
+      invocationSchemaCalls += 1
+      return Promise.resolve({
+        data: invocationSchemaCalls === 1 ? invocationSchema : latestInvocationSchema,
+        response: new Response(),
+      })
     })
 
     const { result } = renderHook(
@@ -191,28 +131,24 @@ describe('useChildWorkflowSchema', () => {
       { wrapper: createWrapper() }
     )
 
-    // Wait for initial load - child steps come from invocation schema output_schema
-    await waitFor(() => expect(result.current.childSteps.length).toBeGreaterThan(0))
+    await waitFor(() =>
+      expect(result.current.childSteps[0]?.outputFields?.map((field) => field.name)).toEqual(['status', 'image_tag'])
+    )
 
     act(() => result.current.retry())
 
     await waitFor(() => {
       expect(result.current.publishedVersionId).toBe('published-v5')
+      expect(result.current.childSteps[0]?.outputFields?.map((field) => field.name)).toEqual(['release_tag'])
     })
     expect(invocationSchemaCalls).toBe(2)
-    expect(mocks.get).toHaveBeenCalledWith('/workflows/{workflow_id}/versions/{version}', {
-      params: { path: { workflow_id: 'child-workflow', version: 5 } },
-    })
   })
 
-  it('does not expose child details when invocation-schema access is denied', async () => {
-    mocks.get.mockImplementation((_path: string, options: { params: { path: { workflow_id: string } } }) =>
-      Promise.resolve({
-        error: { detail: 'Forbidden' },
-        response: new Response(null, { status: 403 }),
-        options,
-      })
-    )
+  it('does not expose child outputs when invocation-schema access is denied', async () => {
+    mocks.get.mockResolvedValue({
+      error: { detail: 'Forbidden' },
+      response: new Response(null, { status: 403 }),
+    })
 
     const { result } = renderHook(() => useChildWorkflowSchema({ workflowId: 'private-child', triggerNodeId: null }), {
       wrapper: createWrapper(),
@@ -226,12 +162,10 @@ describe('useChildWorkflowSchema', () => {
   })
 
   it('reports a missing published child schema as not found', async () => {
-    mocks.get.mockImplementation(() =>
-      Promise.resolve({
-        error: { detail: 'Not Found' },
-        response: new Response(null, { status: 404 }),
-      })
-    )
+    mocks.get.mockResolvedValue({
+      error: { detail: 'Not Found' },
+      response: new Response(null, { status: 404 }),
+    })
 
     const { result } = renderHook(
       () => useChildWorkflowSchema({ workflowId: 'unpublished-child', triggerNodeId: null }),
