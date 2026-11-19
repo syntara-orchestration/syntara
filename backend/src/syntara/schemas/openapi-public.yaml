@@ -9130,7 +9130,7 @@ paths:
         - bearerAuth: []
     post:
       summary: Create form prompt
-      description: Create a new form prompt. Internal service-to-service endpoint for workflow engine.
+      description: Create a form prompt. Internal service-to-service endpoint for the workflow engine. If a prompt already exists for the same execution, node, and loop iteration, a retry returns that prompt with 201 Created only when it is pending and belongs to the same Temporal activity. This replay intentionally uses 201, the same status as first creation. A duplicate with a different activity, a missing row after a uniqueness conflict, or a non-pending prompt returns 409 Conflict.
       operationId: create_form_prompt
       tags:
         - Form Prompts
@@ -9145,7 +9145,7 @@ paths:
               $ref: '#/components/schemas/FormPromptCreateRequest'
       responses:
         '201':
-          description: Form prompt created
+          description: Created prompt or existing pending prompt returned for a same-activity replay; both return 201.
           content:
             application/json:
               schema:

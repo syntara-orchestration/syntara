@@ -112,10 +112,13 @@ stateDiagram-v2
 Each workflow execution creates one prompt per step instance, with a separate prompt for
 each loop iteration. The Forms API's uniqueness constraint prevents a second row for the same
 execution, step, and iteration. If the Forms API saves a prompt but the worker times out
-before receiving the success response, an HTTP retry gets `409 Conflict` because the prompt
-already exists. The client treats that as an error rather than reusing the existing prompt.
-The form-prompt activity has no Temporal retries, so the constraint prevents duplicate rows
-but does not recover the failed request. See [Current Limitations](#current-limitations).
+before receiving the success response, a retry for the same Temporal activity returns the
+existing prompt when it is still pending. This replay intentionally returns `201 Created`,
+the same status as first creation. A duplicate with a different activity ID, a missing row
+after a uniqueness conflict, or a prompt that is no longer pending returns `409 Conflict`.
+The form-prompt activity has no Temporal retries, but the API can safely resolve a replay
+when the worker or HTTP layer retries the same activity request. See
+[Current Limitations](#current-limitations).
 
 ### The pause
 
@@ -280,10 +283,11 @@ For steps to add a field type or form parameter, see
 
 ## Current Limitations
 
-- **Ambiguous prompt creation has no recovery path.** If the API saves a prompt but the
-  worker times out before receiving the success response, the retry gets `409 Conflict` and
-  the activity fails rather than reusing the prompt. The row may remain pending even though
-  the workflow is no longer waiting for it. See
+- **Some duplicate creates cannot be replayed.** The API returns `409 Conflict` if a
+  uniqueness conflict has no corresponding row, belongs to a different Temporal activity,
+  or the existing prompt is no longer pending. Those conflicts fail the activity. A
+  same-activity retry reuses the existing prompt only while it is pending and returns
+  `201 Created`. See
   [One prompt per step, per loop iteration](#one-prompt-per-step-per-loop-iteration).
 - **Signal delivery has no durable recovery.** The response is saved before signaling the
   workflow. Transient failures are retried immediately; if delivery still fails, the response
