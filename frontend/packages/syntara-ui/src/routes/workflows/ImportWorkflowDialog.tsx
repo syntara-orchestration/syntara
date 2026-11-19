@@ -88,7 +88,19 @@ export function ImportWorkflowDialog({ isOpen, onClose, onSuccess }: ImportWorkf
       onClose()
     },
   })
-  const { handleSubmit, handleClose, setError } = form
+  const { getValues, handleSubmit, handleClose, setError, setValue } = form
+
+  const handleFileChange = (file: File | undefined) => {
+    if (!file) return
+
+    detachPromise(
+      file.text().then((content) => {
+        const parsed = parseWorkflowFile(content, file.name)
+        if (getValues('file') !== file || typeof parsed.name !== 'string' || parsed.name.length === 0) return
+        setValue('name', parsed.name, { shouldValidate: true })
+      })
+    )
+  }
 
   const onImportSuccess = (
     wfName: string,
@@ -176,6 +188,7 @@ export function ImportWorkflowDialog({ isOpen, onClose, onSuccess }: ImportWorkf
               fieldId="import-file"
               isRequired
               dropzoneProps={{ accept: { 'application/json': ['.json'] } }}
+              onFileChange={handleFileChange}
             />
             <SynTextField
               name="name"
