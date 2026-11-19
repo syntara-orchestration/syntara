@@ -121,7 +121,10 @@ python -m syntara.eventstreams.consumer_health ready
 ```
 
 The probe client accepts an optional `--port` argument; the default remains 8768.
-Tests use ephemeral listener ports to avoid competing with a natively running worker.
+Only integer ports from 1024 through 65535 are accepted, and the destination is
+fixed to `127.0.0.1`. Invalid arguments return exit code 1 without opening a
+connection. Tests use ephemeral listener ports to avoid competing with a natively
+running worker.
 
 Each returns zero on success and nonzero on failure, using a fresh response from
 the worker event loop at `127.0.0.1:8768`, separate from the local MCP service ports.
