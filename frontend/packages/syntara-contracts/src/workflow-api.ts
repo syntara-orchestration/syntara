@@ -1297,7 +1297,7 @@ export interface components {
        */
       type: 'form_prompt'
       parameters: components['schemas']['FormPromptNodeParameters']
-      settings?: components['schemas']['NodeSettingsNoRetry'] | null
+      settings?: components['schemas']['NodeSettingsCofDisabled'] | null
     } & {
       [key: string]: unknown
     }
@@ -2131,7 +2131,7 @@ export interface components {
     }
     /**
      * NodeSettingsCofDisabled
-     * @description Settings with disabled and continue_on_failure (wait).
+     * @description Settings with disabled and continue_on_failure (wait, form_prompt).
      */
     NodeSettingsCofDisabled: {
       /** Continue On Failure */

@@ -54532,7 +54532,7 @@
           "settings": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/NodeSettingsNoRetry"
+                "$ref": "#/components/schemas/NodeSettingsCofDisabled"
               },
               {
                 "type": "null"
@@ -56449,7 +56449,7 @@
         "additionalProperties": false,
         "type": "object",
         "title": "NodeSettingsCofDisabled",
-        "description": "Settings with disabled and continue_on_failure (wait)."
+        "description": "Settings with disabled and continue_on_failure (wait, form_prompt)."
       },
       "NodeSettingsNoRetry": {
         "properties": {

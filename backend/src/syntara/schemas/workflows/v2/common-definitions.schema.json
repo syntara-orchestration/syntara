@@ -47,6 +47,21 @@
       },
       "additionalProperties": false
     },
+    "nodeSettingsCofDisabled": {
+      "type": "object",
+      "description": "Settings with disabled and continue_on_failure (wait, form_prompt).",
+      "properties": {
+        "disabled": {
+          "type": "boolean",
+          "description": "When true, the node is skipped during execution. Downstream nodes still execute but receive no output from this node."
+        },
+        "continue_on_failure": {
+          "type": "boolean",
+          "description": "When true, downstream nodes continue executing even if this node fails. Inherits from global settings when absent."
+        }
+      },
+      "additionalProperties": false
+    },
     "nodeSettingsNoRetry": {
       "type": "object",
       "description": "Settings with disabled, continue_on_failure, and timeout (script, agentic, approval). No retry_policy — retry is either not applicable or handled internally by the node's client.",

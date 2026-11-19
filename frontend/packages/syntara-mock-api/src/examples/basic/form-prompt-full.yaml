@@ -47,7 +47,6 @@ nodes:
       submit_label: Deploy
       success_message: Deployment request submitted successfully
     settings:
-      timeout: 3700
       continue_on_failure: false
   - id: deploy
     type: script

@@ -500,9 +500,10 @@ class TestWorkflowResultResponse:
 class TestNodeSettingsValidation:
     """Validate that workflows with node-level settings validate correctly.
 
-    These tests ensure the schema properly validates all three tiers of node settings:
+    These tests ensure the schema properly validates each tier of node settings:
     - nodeSettingsFull: continue_on_failure + timeout + retry_policy
     - nodeSettingsNoRetry: continue_on_failure + timeout (no retry)
+    - nodeSettingsCofDisabled: disabled + continue_on_failure
     - nodeSettingsCof: continue_on_failure only
 
     Regression coverage for the missing nodeSettings $ref bug from PR #1301.
@@ -762,7 +763,7 @@ class TestNodeSettingsValidation:
                         "submit_label": "Submit",
                         "success_message": "Thanks!",
                     },
-                    "settings": {"continue_on_failure": True, "timeout": 7200},
+                    "settings": {"continue_on_failure": True, "disabled": False},
                 },
                 {"id": "s1", "type": "script", "parameters": {"language": "bash", "code": "echo ok"}},
                 {"id": "s2", "type": "script", "parameters": {"language": "bash", "code": "echo fallback"}},
@@ -796,4 +797,4 @@ class TestNodeSettingsValidation:
         # Verify settings tier
         settings = serialized["nodes"][0]["settings"]
         assert settings["continue_on_failure"] is True
-        assert settings["timeout"] == 7200
+        assert settings["disabled"] is False

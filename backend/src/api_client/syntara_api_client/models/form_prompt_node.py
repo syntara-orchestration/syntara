@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     from ..models.form_prompt_node_outputs_type_0 import FormPromptNodeOutputsType0
     from ..models.form_prompt_node_parameters import FormPromptNodeParameters
     from ..models.node_position import NodePosition
-    from ..models.node_settings_no_retry import NodeSettingsNoRetry
+    from ..models.node_settings_cof_disabled import NodeSettingsCofDisabled
 
 
 T = TypeVar("T", bound="FormPromptNode")
@@ -30,7 +30,7 @@ class FormPromptNode:
         description (None | str | Unset): Human-readable description of the node purpose
         outputs (FormPromptNodeOutputsType0 | None | Unset): Output extraction mapping
         position (NodePosition | None | Unset): Optional UI position hint
-        settings (NodeSettingsNoRetry | None | Unset):
+        settings (NodeSettingsCofDisabled | None | Unset):
     """
 
     id: str
@@ -40,13 +40,13 @@ class FormPromptNode:
     description: None | str | Unset = UNSET
     outputs: FormPromptNodeOutputsType0 | None | Unset = UNSET
     position: NodePosition | None | Unset = UNSET
-    settings: NodeSettingsNoRetry | None | Unset = UNSET
+    settings: NodeSettingsCofDisabled | None | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         from ..models.form_prompt_node_outputs_type_0 import FormPromptNodeOutputsType0
         from ..models.node_position import NodePosition
-        from ..models.node_settings_no_retry import NodeSettingsNoRetry
+        from ..models.node_settings_cof_disabled import NodeSettingsCofDisabled
 
         id = self.id
 
@@ -85,7 +85,7 @@ class FormPromptNode:
         settings: dict[str, Any] | None | Unset
         if isinstance(self.settings, Unset):
             settings = UNSET
-        elif isinstance(self.settings, NodeSettingsNoRetry):
+        elif isinstance(self.settings, NodeSettingsCofDisabled):
             settings = self.settings.to_dict()
         else:
             settings = self.settings
@@ -117,7 +117,7 @@ class FormPromptNode:
         from ..models.form_prompt_node_outputs_type_0 import FormPromptNodeOutputsType0
         from ..models.form_prompt_node_parameters import FormPromptNodeParameters
         from ..models.node_position import NodePosition
-        from ..models.node_settings_no_retry import NodeSettingsNoRetry
+        from ..models.node_settings_cof_disabled import NodeSettingsCofDisabled
 
         d = dict(src_dict)
         id = d.pop("id")
@@ -180,7 +180,7 @@ class FormPromptNode:
 
         position = _parse_position(d.pop("position", UNSET))
 
-        def _parse_settings(data: object) -> NodeSettingsNoRetry | None | Unset:
+        def _parse_settings(data: object) -> NodeSettingsCofDisabled | None | Unset:
             if data is None:
                 return data
             if isinstance(data, Unset):
@@ -188,12 +188,12 @@ class FormPromptNode:
             try:
                 if not isinstance(data, dict):
                     raise TypeError()
-                settings_type_0 = NodeSettingsNoRetry.from_dict(data)
+                settings_type_0 = NodeSettingsCofDisabled.from_dict(data)
 
                 return settings_type_0
             except (TypeError, ValueError, AttributeError, KeyError):
                 pass
-            return cast(NodeSettingsNoRetry | None | Unset, data)
+            return cast(NodeSettingsCofDisabled | None | Unset, data)
 
         settings = _parse_settings(d.pop("settings", UNSET))
 

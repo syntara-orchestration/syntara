@@ -93,8 +93,7 @@ System defaults by node type:
 
 Nodes not in this table (`converge`, `loop`, `wait`, `condition`, `switch`, `form_prompt`) use
 dedicated config fields for timing. A form prompt's deadline comes from `parameters.response_window`,
-falling back to `workflow_engine.form_prompt_response_window_seconds`; `settings.timeout` does not
-set that deadline. See
+falling back to `workflow_engine.form_prompt_response_window_seconds`. See
 [Form Prompt Current Limitations](../forms/form-prompt-overview.md#current-limitations).
 
 ```yaml
@@ -148,8 +147,8 @@ Settings validation happens at two layers:
 ```
 NodeSettingsBase
   → NodeSettingsCof (+continue_on_failure)        ← converge, loop
-    → NodeSettingsCofDisabled (+disabled)            ← wait
-      → NodeSettingsNoRetry (+timeout)             ← script, agentic, approval, form_prompt
+    → NodeSettingsCofDisabled (+disabled)            ← wait, form_prompt
+      → NodeSettingsNoRetry (+timeout)             ← script, agentic, approval
         → NodeSettingsFull (+retry_policy)          ← http_request, aap_*
 ```
 

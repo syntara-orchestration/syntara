@@ -365,7 +365,7 @@
                   "$ref": "executors/form_prompt.schema.json#/parameterSchema"
                 },
                 "settings": {
-                  "$ref": "common-definitions.schema.json#/$defs/nodeSettingsNoRetry"
+                  "$ref": "common-definitions.schema.json#/$defs/nodeSettingsCofDisabled"
                 }
               }
             }
