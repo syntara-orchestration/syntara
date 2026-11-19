@@ -21,6 +21,7 @@ import { breadcrumbsIntegrationEdit } from '../../../app/breadcrumbBuilders'
 import { integrationsClient } from '../../../client'
 import { SynDetail } from '../../../components/details/SynDetail'
 import { SynForm } from '../../../components/forms/SynForm'
+import { SynFormCancelButton } from '../../../components/forms/SynFormCancelButton'
 import { SynFormField } from '../../../components/forms/SynFormField'
 import { SynTextAreaField } from '../../../components/forms/SynTextAreaField'
 import { SynTextField } from '../../../components/forms/SynTextField'
@@ -195,7 +196,7 @@ function EditIntegrationFormFields({
   )
 }
 
-function EditFormFooter({ isSaving, onCancel }: Readonly<{ isSaving: boolean; onCancel: () => void }>) {
+function EditFormFooter({ isSaving, cancelTo }: Readonly<{ isSaving: boolean; cancelTo: string }>) {
   return (
     <ActionGroup>
       <Button
@@ -207,9 +208,7 @@ function EditFormFooter({ isSaving, onCancel }: Readonly<{ isSaving: boolean; on
       >
         Save integration
       </Button>
-      <Button variant="link" onClick={isSaving ? undefined : onCancel} isAriaDisabled={isSaving}>
-        Cancel
-      </Button>
+      <SynFormCancelButton to={cancelTo} isDisabled={isSaving} />
     </ActionGroup>
   )
 }
@@ -398,7 +397,7 @@ export function EditIntegrationForm() {
           isFullHeight
           isScrollable
           panelMainBodyProps={{ className: styles.panelBody }}
-          footer={<EditFormFooter isSaving={isSaving} onCancel={() => detachPromise(navigate({ to: detailPath }))} />}
+          footer={<EditFormFooter isSaving={isSaving} cancelTo={detailPath} />}
         >
           <Form
             id="edit-integration-form"

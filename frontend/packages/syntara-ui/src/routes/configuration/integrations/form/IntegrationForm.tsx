@@ -15,9 +15,9 @@ import { useWatch, type UseFormTrigger } from 'react-hook-form'
 
 import { AppRoute } from '../../../../app/AppRoute'
 import { breadcrumbsIntegrationConfigure } from '../../../../app/breadcrumbBuilders'
-import { tanstackRouter } from '../../../../app/tanstackRouter'
 import { integrationsClient } from '../../../../client'
 import { SynForm } from '../../../../components/forms/SynForm'
+import { SynFormCancelButton } from '../../../../components/forms/SynFormCancelButton'
 import { SynPage, SynPageBody } from '../../../../components/layout/SynPage'
 import { SynPageHeader } from '../../../../components/layout/SynPageHeader'
 import { SynPanel } from '../../../../components/layout/SynPanel'
@@ -126,14 +126,7 @@ function WizardNavFooter({
         </ActionListGroup>
         <ActionListGroup>
           <ActionListItem>
-            <Button
-              variant="link"
-              onClick={() => {
-                detachPromise(tanstackRouter.navigate({ to: AppRoute.Configuration.Integrations.Root }))
-              }}
-            >
-              Cancel
-            </Button>
+            <SynFormCancelButton to={AppRoute.Configuration.Integrations.Root} />
           </ActionListItem>
         </ActionListGroup>
       </ActionList>
