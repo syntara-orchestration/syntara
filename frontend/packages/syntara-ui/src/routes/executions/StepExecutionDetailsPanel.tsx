@@ -16,8 +16,10 @@ import {
   TabTitleText,
   Title,
   TitleSizes,
+  Tooltip,
 } from '@patternfly/react-core'
 import {
+  RhUiCompressArrowsIcon,
   RhUiDislikeFillIcon,
   RhUiExpandArrowsIcon,
   RhUiExternalLinkIcon,
@@ -70,6 +72,17 @@ function NoDataState({ label }: Readonly<{ label: string }>) {
 
 type IoPaneLayout = 'split' | 'parameters' | 'output'
 
+const PANE_LAYOUT_ACTION_LABELS = {
+  parameters: {
+    expand: 'Expand parameters panel',
+    restore: 'Restore parameters panel layout',
+  },
+  output: {
+    expand: 'Expand output panel',
+    restore: 'Restore output panel layout',
+  },
+} as const
+
 type DataPaneProps = {
   title: string
   stepId: string
@@ -94,6 +107,8 @@ function DataPane({
   onPaneLayoutChange,
 }: Readonly<DataPaneProps>) {
   const [searchTerm, setSearchTerm] = useState('')
+  const [layoutTooltipOpen, setLayoutTooltipOpen] = useState(false)
+  const [layoutTooltipContent, setLayoutTooltipContent] = useState('')
   const scrollContainerRef = useRef<HTMLDivElement>(null)
 
   const jsonText = useMemo(() => (data ? JSON.stringify(data, null, 2) : ''), [data])
@@ -135,6 +150,24 @@ function DataPane({
   }
 
   const isPaneExpanded = paneLayout === paneKey
+  const paneLayoutActionLabel = isPaneExpanded
+    ? PANE_LAYOUT_ACTION_LABELS[paneKey].restore
+    : PANE_LAYOUT_ACTION_LABELS[paneKey].expand
+  const PaneLayoutIcon = isPaneExpanded ? RhUiCompressArrowsIcon : RhUiExpandArrowsIcon
+
+  function openLayoutTooltip() {
+    setLayoutTooltipContent(paneLayoutActionLabel)
+    setLayoutTooltipOpen(true)
+  }
+
+  function closeLayoutTooltip() {
+    setLayoutTooltipOpen(false)
+  }
+
+  function handlePaneLayoutClick() {
+    closeLayoutTooltip()
+    onPaneLayoutChange(isPaneExpanded ? 'split' : paneKey)
+  }
 
   const searchAndViewControls = (
     <Flex
@@ -169,17 +202,24 @@ function DataPane({
           >
             <FlexItem className={styles.dataPaneTitle}>{title}</FlexItem>
             <FlexItem>
-              <Button
-                variant="plain"
-                aria-label={isPaneExpanded ? `Restore ${title} pane` : `Expand ${title} pane`}
-                aria-pressed={isPaneExpanded}
-                onClick={() => onPaneLayoutChange(isPaneExpanded ? 'split' : paneKey)}
-                icon={
-                  <Icon isInline>
-                    <RhUiExpandArrowsIcon />
-                  </Icon>
-                }
-              />
+              <Tooltip content={layoutTooltipContent} trigger="manual" isVisible={layoutTooltipOpen}>
+                <Button
+                  variant="plain"
+                  aria-label={paneLayoutActionLabel}
+                  aria-pressed={isPaneExpanded}
+                  onMouseEnter={openLayoutTooltip}
+                  onMouseLeave={closeLayoutTooltip}
+                  onFocus={openLayoutTooltip}
+                  onBlur={closeLayoutTooltip}
+                  onPointerDown={closeLayoutTooltip}
+                  onClick={handlePaneLayoutClick}
+                  icon={
+                    <Icon isInline>
+                      <PaneLayoutIcon />
+                    </Icon>
+                  }
+                />
+              </Tooltip>
             </FlexItem>
           </Flex>
           {searchAndViewControls}
