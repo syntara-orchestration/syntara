@@ -2,20 +2,9 @@ import type { OutputFieldDef } from '@syntara/contracts'
 
 import { parseTriggerIndex } from '../../../../utils/triggerNodeIds'
 
+import { mapJsonSchemaType } from './jsonSchemaPreviewUtils'
+
 type InputSchemaProperties = Record<string, { type?: string; description?: string }>
-
-const JSON_SCHEMA_TYPE_MAP: Record<string, OutputFieldDef['type']> = {
-  string: 'string',
-  number: 'number',
-  integer: 'number',
-  boolean: 'boolean',
-  object: 'object',
-  array: 'array',
-}
-
-function mapJsonSchemaType(type?: string): OutputFieldDef['type'] {
-  return type ? (JSON_SCHEMA_TYPE_MAP[type] ?? 'unknown') : 'unknown'
-}
 
 export function getTriggerInputSchemaFields(
   nodeId: string,
