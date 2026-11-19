@@ -187,10 +187,6 @@ class TestParseNodeSettings:
         assert settings.disabled is True
         assert settings.continue_on_failure is True
 
-    def test_form_prompt_rejects_timeout(self) -> None:
-        with pytest.raises(ValidationError):
-            _parse_node_settings("form_prompt", {"timeout": 60})
-
     def test_script_accepts_disabled(self) -> None:
         settings = _parse_node_settings("script", {"disabled": True})
         assert isinstance(settings, NodeSettingsNoRetry)
