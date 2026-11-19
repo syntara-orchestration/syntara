@@ -35,8 +35,8 @@ export type SynPageHeaderProps = Readonly<{
    * This is the opposite of modals and full-page forms, where the primary button is leftmost.
    *
    * @example
-   * // Correct: secondary left, primary rightmost
-   * toolbar={<><Button variant="primary">Save</Button><Button variant="link">Cancel</Button></>}
+   * // Correct: link cancel left, primary rightmost
+   * toolbar={<><Button variant="link">Cancel</Button><Button variant="primary">Save</Button></>}
    */
   toolbar?: ReactNode
   /** Optional content before the default title (e.g. provider icon). Ignored when `titleSlot` is set. */
