@@ -9,6 +9,7 @@ import { AAPTypeaheadSelect } from './AAPTypeaheadSelect'
 import type { AAPWorkflowTemplateFormData } from './aapWorkflowTemplateSchema'
 import { AAPErrorAlert } from './shared/AAPErrorAlert'
 import { stepHelp } from './shared/stepFieldHelp'
+import { AAP_CREDENTIAL_REQUIRED_HINT } from './shared/stepFieldHelpText'
 
 type AAPWorkflowTemplateResourcePickersProps = {
   readonly browser: ReturnType<typeof useAAPBrowser>
@@ -26,6 +27,7 @@ export function AAPWorkflowTemplateResourcePickers({ browser }: AAPWorkflowTempl
     searchTemplates,
     loadingOrgs,
     loadingTemplates,
+    isActive,
     workflowTemplateDetail,
     error: browserError,
     retryAll,
@@ -61,7 +63,7 @@ export function AAPWorkflowTemplateResourcePickers({ browser }: AAPWorkflowTempl
           labelHelp={stepHelp.aapOrganization}
           isRequired
           fieldId="aap-wf-organization"
-          hint="AAP organization to browse resources from"
+          hint={isActive ? 'AAP organization to browse resources from' : AAP_CREDENTIAL_REQUIRED_HINT}
         >
           {({ field, fieldState }) => (
             <AAPTypeaheadSelect
@@ -79,6 +81,7 @@ export function AAPWorkflowTemplateResourcePickers({ browser }: AAPWorkflowTempl
               onSearchChange={searchOrganizations}
               placeholder="Select an organization"
               isLoading={loadingOrgs}
+              isDisabled={!isActive}
               hasError={!!fieldState.error}
             />
           )}
@@ -110,6 +113,7 @@ export function AAPWorkflowTemplateResourcePickers({ browser }: AAPWorkflowTempl
               onSearchChange={searchTemplates}
               placeholder="Select a workflow template"
               isLoading={loadingTemplates}
+              isDisabled={!isActive}
               hasError={!!fieldState.error}
             />
           )}
