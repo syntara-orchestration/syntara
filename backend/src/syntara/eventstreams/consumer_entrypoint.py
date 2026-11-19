@@ -64,7 +64,7 @@ async def _run_connected(
     hints = SubscriptionHintListener(manager.request_reconcile, redis)
     health.set_readiness(lambda: manager.ready)
     try:
-        await run_event_worker(manager, resources, hints, shutdown_event=shutdown)
+        await run_event_worker(manager, resources, hints, shutdown_event=shutdown, on_shutdown=health.close_readiness)
     finally:
         health.close_readiness()
         try:

@@ -1,7 +1,8 @@
 """Process-local exec probes served by the worker's own event loop.
 
-The probe client imports only the standard library and never contacts worker
-dependencies. A stalled or exited process cannot answer a liveness request.
+This module imports only the standard library; invoking it also runs Syntara's
+package initialization. Probes never contact worker dependencies. A stalled or
+exited process cannot answer a liveness request.
 """
 
 import argparse

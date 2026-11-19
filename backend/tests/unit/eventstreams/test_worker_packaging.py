@@ -105,7 +105,7 @@ def test_environment_examples_omit_event_tuning_and_compose_uses_code_defaults()
     assert worker["healthcheck"]["test"] == ["CMD", "python", "-m", "syntara.eventstreams.consumer_health", "ready"]
 
 
-def test_backend_image_packages_executable_launcher_and_dependency_free_probes():
+def test_backend_image_packages_executable_launcher_and_health_module():
     scripts = ROOT / "backend/containers/syntara/scripts"
     launcher = scripts / "start-event-stream-worker"
     assert launcher.stat().st_mode & 0o111
@@ -117,7 +117,36 @@ def test_backend_image_packages_executable_launcher_and_dependency_free_probes()
     assert "COPY src/ ./src/" in containerfile
     assert "COPY --from=builder /opt/app-root/ /opt/app-root/" in containerfile
     probe_module = ROOT / "backend/src/syntara/eventstreams/consumer_health.py"
-    assert "from syntara." not in probe_module.read_text()
+    assert probe_module.is_file()
+
+
+async def test_probe_import_excludes_worker_settings_and_clients():
+    script = """
+import importlib
+import json
+import sys
+
+importlib.import_module("syntara.eventstreams.consumer_health")
+print(json.dumps(sorted(sys.modules)))
+"""
+    process = await asyncio.create_subprocess_exec(
+        sys.executable, "-c", script, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+    )
+    output, error = await asyncio.wait_for(process.communicate(), timeout=5)
+    assert process.returncode == 0, error.decode()
+    modules = json.loads(output)
+    excluded = (
+        "syntara.core.config",
+        "syntara.core.database",
+        "syntara.eventstreams.consumer_entrypoint",
+        "syntara.eventstreams.consumer_lifecycle",
+        "syntara.eventstreams.consumer_service",
+        "aiokafka",
+        "kafka",
+        "redis",
+        "temporalio",
+    )
+    assert not {name for name in modules if any(name == prefix or name.startswith(prefix + ".") for prefix in excluded)}
 
 
 async def test_packaged_launcher_exits_cleanly_when_feature_is_disabled():

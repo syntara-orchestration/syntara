@@ -153,6 +153,7 @@ async def test_composition_shares_one_client_factory_and_resource_limits(monkeyp
         captured.append(True)
         assert shared is resources
         assert kwargs["shutdown_event"] is shutdown
+        assert kwargs["on_shutdown"] == health.close_readiness
         assert manager._reader._session_factory is sessions
         assert manager._factory._session_factory is sessions
         assert manager._factory._resources is shared
@@ -368,44 +369,108 @@ async def test_membership_failure_is_monitored_and_closes_process_admission(mana
     hints.stop.assert_awaited_once()
 
 
-async def test_probes_follow_empty_authoritative_reconciliation_and_close_before_drain(manager_context, monkeypatch):
-    context = manager_context
-    entered, release = asyncio.Event(), asyncio.Event()
+@pytest.fixture
+async def entrypoint_context(monkeypatch):
     handlers = {}
-    monkeypatch.setattr(
-        asyncio.get_running_loop(), "add_signal_handler", lambda sig, callback: handlers.update({sig: callback})
+    registrations = []
+
+    def register(signal_number, callback) -> None:
+        registrations.append(signal_number)
+        handlers[signal_number] = callback
+
+    loop = asyncio.get_running_loop()
+    monkeypatch.setattr(loop, "add_signal_handler", register)
+    monkeypatch.setattr(loop, "remove_signal_handler", MagicMock())
+
+    reader = AsyncMock(spec=EventSubscriptionReader)
+    snapshot = connection_context().snapshot
+    placement = IsolatedPlacementService(IsolatedPlacementPool(snapshot.deployment_id))
+    resources = EventWorkerResources()
+    hints = SimpleNamespace(start=MagicMock(), stop=AsyncMock())
+    redis = SimpleNamespace(disconnect=AsyncMock())
+    health = EventWorkerHealth(port=0)
+    service = temporal_module.TemporalExecutionService(MagicMock(), "user", background_task_queue="builtin")
+    settings = get_settings().model_copy(update={"eventstream_enabled": True})
+    dispose = AsyncMock()
+    monkeypatch.setattr(entrypoint, "get_settings", lambda: settings)
+    monkeypatch.setattr(entrypoint, "validate_encryption_key_at_startup", MagicMock())
+    monkeypatch.setattr(entrypoint, "start_loggers", MagicMock())
+    monkeypatch.setattr(entrypoint, "stop_loggers", MagicMock())
+    monkeypatch.setattr(entrypoint, "EventWorkerHealth", lambda: health)
+    monkeypatch.setattr(entrypoint, "EventWorkerResources", lambda: resources)
+    monkeypatch.setattr(entrypoint, "create_temporal_execution_service", AsyncMock(return_value=service))
+    monkeypatch.setattr(entrypoint.SubscriptionPlacementService, "create", AsyncMock(return_value=placement))
+    monkeypatch.setattr(entrypoint, "EventSubscriptionReader", MagicMock(return_value=reader))
+    monkeypatch.setattr(entrypoint, "EventWorkerRedisClient", lambda: redis)
+    monkeypatch.setattr(entrypoint, "SubscriptionHintListener", MagicMock(return_value=hints))
+    monkeypatch.setattr(entrypoint, "engine", SimpleNamespace(dispose=dispose))
+    return SimpleNamespace(
+        health=health,
+        reader=reader,
+        resources=resources,
+        hints=hints,
+        redis=redis,
+        dispose=dispose,
+        handlers=handlers,
+        registrations=registrations,
     )
+
+
+@pytest.mark.parametrize("sig", [signal.SIGINT, signal.SIGTERM])
+async def test_entrypoint_closes_probe_readiness_before_signal_drain(entrypoint_context, monkeypatch, sig):
+    context = entrypoint_context
+    health = context.health
+    entered, release = asyncio.Event(), asyncio.Event()
+    draining, finish_drain = asyncio.Event(), asyncio.Event()
 
     async def read() -> list[SubscriptionSnapshot]:
         entered.set()
         await release.wait()
         return []
 
-    context.manager._reader.read.side_effect = read
-    hints = SimpleNamespace(start=MagicMock(), stop=AsyncMock())
-    shutdown = asyncio.Event()
-    health = EventWorkerHealth(port=0)
-    health.set_readiness(lambda: context.manager.ready)
-    await health.start()
-    task = asyncio.create_task(
-        lifecycle.run_event_worker(context.manager, context.resources, hints, shutdown_event=shutdown)
-    )
+    context.reader.read.side_effect = read
+    stop = EventWorkerManager.stop
+
+    async def stop_during_drain(manager, *, deadline=None) -> None:
+        draining.set()
+        try:
+            assert health._closing
+            assert not manager.ready
+            assert not context.resources.accepting
+            await finish_drain.wait()
+        finally:
+            await stop(manager, deadline=deadline)
+
+    monkeypatch.setattr(EventWorkerManager, "stop", stop_during_drain)
+    task = asyncio.create_task(entrypoint.main())
     try:
-        await entered.wait()
-        assert await asyncio.to_thread(probe, "live", port=health.port)
-        assert not await asyncio.to_thread(probe, "ready", port=health.port)
-        release.set()
-        await eventually(lambda: context.manager.ready)
-        assert not context.manager.subscription_ids
-        assert await asyncio.to_thread(probe, "ready", port=health.port)
-        handlers[signal.SIGTERM]()
-        assert not await asyncio.to_thread(probe, "ready", port=health.port)
-        assert await asyncio.to_thread(probe, "live", port=health.port)
+        async with asyncio.timeout(2):
+            await entered.wait()
+            assert context.registrations.count(sig) == 2
+            assert await asyncio.to_thread(probe, "live", port=health.port)
+            assert not await asyncio.to_thread(probe, "ready", port=health.port)
+            release.set()
+            await eventually(health._ready)
+            assert await asyncio.to_thread(probe, "ready", port=health.port)
+            context.handlers[sig]()
+            assert health._closing
+            await draining.wait()
+            assert not await asyncio.to_thread(probe, "ready", port=health.port)
+            assert await asyncio.to_thread(probe, "live", port=health.port)
+            health.set_readiness(lambda: True)
+            assert not await asyncio.to_thread(probe, "ready", port=health.port)
+            context.redis.disconnect.assert_not_awaited()
+            context.dispose.assert_not_awaited()
     finally:
         release.set()
-        shutdown.set()
-        await task
-        await health.stop()
+        finish_drain.set()
+        if not task.done() and sig in context.handlers:
+            context.handlers[sig]()
+        async with asyncio.timeout(2):
+            await task
+    context.hints.stop.assert_awaited_once()
+    context.redis.disconnect.assert_awaited_once()
+    context.dispose.assert_awaited_once()
 
 
 async def test_lifecycle_deadline_settles_drain_children_before_hints_close(manager_context, monkeypatch):

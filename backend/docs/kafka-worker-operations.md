@@ -129,11 +129,14 @@ running worker.
 Each returns zero on success and nonzero on failure, using a fresh response from
 the worker event loop at `127.0.0.1:8768`, separate from the local MCP service ports.
 The listener uses an internal protocol,
-without an HTTP endpoint, Kubernetes Service or published container port. Probe
-clients import only the Python standard library. Liveness does not query Kafka,
-Redis, message traffic or subscription lag. Readiness reads the manager's current
-state and closes before shutdown drain and shared-client cleanup. An exited or
-stalled process cannot pass liveness through a stale health marker.
+without an HTTP endpoint, Kubernetes Service or published container port. The
+probe module uses only standard-library imports, but `python -m` also runs
+Syntara's package initialization, including its guarded `regopy` preload. Probes
+do not load application settings or Kafka, Redis or Temporal clients. Liveness
+does not query Kafka, Redis, message traffic or subscription lag. Readiness reads
+the manager's current state and closes permanently before shutdown drain and
+shared-client cleanup. An exited or stalled process cannot pass liveness through
+a stale health marker.
 
 Kubernetes startup/liveness probes use `live`; readiness and the local compose
 health check use `ready`. Metrics and customer-facing health presentation remain
