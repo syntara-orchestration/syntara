@@ -56,14 +56,14 @@ export function useBuilderLiveRunPanel({
     prevExecutionIdRef.current = mostRecentExecutionId
   }, [mostRecentExecutionId])
 
-  const isActive = mostRecentRunPanelOpen && !!mostRecentExecutionId
   const isWorkflowBuilderQolEnabled = useFeatureFlag('workflow_builder_qol')
-  const { isPanelExpanded, panelExpandControl } = useRunDetailsPanelExpand(
+  const { isPanelExpanded, panelExpandControl, collapsePanel } = useRunDetailsPanelExpand(
     mostRecentPanelHeight,
     setMostRecentPanelHeight,
-    isWorkflowBuilderQolEnabled,
-    isActive
+    isWorkflowBuilderQolEnabled
   )
+
+  const isActive = mostRecentRunPanelOpen && !!mostRecentExecutionId
   const isTerminalStatus =
     executionStatus === ExecutionStatusEnum.COMPLETED ||
     executionStatus === ExecutionStatusEnum.FAILED ||
@@ -108,6 +108,11 @@ export function useBuilderLiveRunPanel({
     setMostRecentSelectedNodeName(null)
   }, [])
 
+  const handleCloseMostRecentRunPanel = useCallback(() => {
+    collapsePanel()
+    onClosePanel()
+  }, [collapsePanel, onClosePanel])
+
   return {
     showMostRecentRunPanelInEditor,
     isTerminalStatus,
@@ -119,7 +124,7 @@ export function useBuilderLiveRunPanel({
     handleMostRecentResize,
     handleMostRecentNodeSelect,
     handleMostRecentDeselectNode,
-    handleCloseMostRecentRunPanel: onClosePanel,
+    handleCloseMostRecentRunPanel,
     isPanelExpanded,
     panelExpandControl,
   }

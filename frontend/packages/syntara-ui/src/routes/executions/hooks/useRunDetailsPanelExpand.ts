@@ -3,8 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 export function useRunDetailsPanelExpand(
   panelHeight: number,
   setPanelHeight: (height: number) => void,
-  enabled: boolean,
-  panelActive = true
+  enabled: boolean
 ) {
   const [isExpanded, setIsExpanded] = useState(false)
   const savedHeightRef = useRef(panelHeight)
@@ -30,13 +29,7 @@ export function useRunDetailsPanelExpand(
   }, [collapse, isExpanded, panelHeight])
 
   useEffect(() => {
-    if (!panelActive && isExpanded) {
-      collapse()
-    }
-  }, [collapse, isExpanded, panelActive])
-
-  useEffect(() => {
-    if (!enabled || !isExpanded || !panelActive) {
+    if (!enabled || !isExpanded) {
       return
     }
     const onKeyDown = (event: KeyboardEvent) => {
@@ -46,7 +39,7 @@ export function useRunDetailsPanelExpand(
     }
     document.addEventListener('keydown', onKeyDown)
     return () => document.removeEventListener('keydown', onKeyDown)
-  }, [collapse, enabled, isExpanded, panelActive])
+  }, [collapse, enabled, isExpanded])
 
   const active = enabled && isExpanded
 
@@ -58,5 +51,6 @@ export function useRunDetailsPanelExpand(
           onToggle: toggle,
         }
       : undefined,
+    collapsePanel: collapse,
   }
 }
