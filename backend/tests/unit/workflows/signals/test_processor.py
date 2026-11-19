@@ -163,6 +163,7 @@ class TestWorkflowSignalProcessorProcessSignal:
             "TimeoutError": "timed out",
             "LLMConfigurationError": "AI model configuration",
             "NetworkError": "network error",
+            "StructuredOutputValidationError": "did not match the response schema",
         }
 
         for error_type, expected_fragment in known_types_and_expected.items():

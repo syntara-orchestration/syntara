@@ -91,7 +91,9 @@ When `response_schema` is set, the `GenericAgent` uses one of two strategies dep
 - **Without tools**: `llm.with_structured_output(response_schema, method="json_mode")` constrains the LLM to produce JSON matching the schema directly
 - **With tools**: The standard tool-call loop runs first, then a separate extraction LLM call reformats the result into the schema
 
-If structured output fails, execution falls back to standard (unstructured) output. The schema is wrapped in `OpaqueResponseSchema` (similar to `SecretStr`) to prevent it from appearing in logs.
+OpenAI-compatible gateways without native `json_schema` support sometimes return the structured result as a tool call instead of message content, leaving the parse empty. Both paths therefore resolve content from the first schema-valid candidate, in order: the sole tool-call arguments, the `json_mode` parse, then (tool path only) a JSON payload embedded in the answer text. The strategy that produced the content is recorded in `structured_output_metadata.fallback_strategy_used` (`tool_call_args`, `json_mode`, `text_parse`, or `none`).
+
+If no candidate satisfies the schema but a response was parsed, the invocation fails with `StructuredOutputValidationError` (retryable — the gateway quirk is intermittent) rather than completing with empty content. If structured output cannot be parsed at all, execution falls back to standard (unstructured) output. The schema is wrapped in `OpaqueResponseSchema` (similar to `SecretStr`) to prevent it from appearing in logs.
 
 ## MCP Tool Integration
 

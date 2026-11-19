@@ -7,6 +7,7 @@ import json as _json
 from typing import TYPE_CHECKING, Any, NamedTuple
 from uuid import UUID
 
+import jsonschema
 import structlog
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_core.tools import BaseTool
@@ -22,7 +23,7 @@ from syntara.agent_orchestrator.audit.llm_interaction import (
     LLMInteractionStatus,
     LLMInteractionType,
 )
-from syntara.agent_orchestrator.exceptions import EmptyLLMResponseError
+from syntara.agent_orchestrator.exceptions import EmptyLLMResponseError, StructuredOutputValidationError
 from syntara.agent_orchestrator.models import GenericAgentResponse
 from syntara.agent_orchestrator.models.agent_state import AgentState
 from syntara.agent_orchestrator.utils.keyword_association import annotate_tools_with_relevance
@@ -287,6 +288,7 @@ class GenericAgent(BaseAgent):
 
         """
         ctx = self._extract_context(state)
+        structured_output_invalid = False
 
         try:
             # include_raw=True so we can read provider usage from the AIMessage
@@ -313,6 +315,41 @@ class GenericAgent(BaseAgent):
                 model=getattr(self.llm, "model_name", None),
             )
             parsed_output, raw_message = self._unpack_structured_response(structured_response)
+
+            strategy = "json_mode"
+            if raw_message is not None and raw_message.tool_calls:
+                tool_call_output = self._tool_call_output_matching_schema(raw_message, response_schema)
+                if tool_call_output is not None:
+                    parsed_output = tool_call_output
+                    strategy = "tool_call_args"
+
+            # A parsed body that violates the schema (an empty object when the
+            # schema requires properties) must fail the step instead of silently
+            # completing it — with or without tool calls on the response. A
+            # forced structured-output tool call that could not be recovered is
+            # treated the same way when nothing was parsed at all.
+            forced_tool_call = raw_message is not None and bool(raw_message.tool_calls)
+            parsed_invalid = parsed_output is not None and not self._matches_response_schema(
+                parsed_output, response_schema
+            )
+            if parsed_invalid or (forced_tool_call and parsed_output is None):
+                AuditEventDispatcher.dispatch(
+                    LLMInteractionEvent(
+                        session_id=ctx.session_id,
+                        invocation_id=ctx.invocation_id,
+                        execution_id=ctx.execution_id,
+                        request_id=ctx.request_id,
+                        interaction_type=LLMInteractionType.STRUCTURED_OUTPUT,
+                        model_name=getattr(self.llm, "model_name", "unknown"),
+                        status=LLMInteractionStatus.ERROR,
+                        tools_available=0,
+                        response_schema_provided=True,
+                        error_type="StructuredOutputValidationError",
+                        activity_id=ctx.activity_id,
+                        activity_name=ctx.activity_name,
+                    )
+                )
+                structured_output_invalid = True
         except Exception as e:  # noqa: BLE001
             # Emit ERROR event before fallback
             AuditEventDispatcher.dispatch(
@@ -332,7 +369,12 @@ class GenericAgent(BaseAgent):
                 )
             )
             logger.warning("Structured output failed, falling back to standard execution", exc_info=True)
-            return await self._execute_standard(state)
+            state = await self._execute_standard(state)
+            self._mark_structured_fallback(state)
+            return state
+
+        if structured_output_invalid:
+            raise StructuredOutputValidationError(invocation_id=str(ctx.invocation_id))
 
         # include_raw=True returns parse failures as {parsed: None, raw: ...} instead of
         # raising — treat like the exception path: count billed tokens, then degrade to
@@ -361,6 +403,7 @@ class GenericAgent(BaseAgent):
             if structured_token_entry is not None:
                 fallback_log = list(state.get("llm_token_usage_log") or [])
                 state["llm_token_usage_log"] = [structured_token_entry, *fallback_log]
+            self._mark_structured_fallback(state)
             return state
 
         # Emit SUCCESS event after successful structured output
@@ -375,7 +418,7 @@ class GenericAgent(BaseAgent):
                 status=LLMInteractionStatus.SUCCESS,
                 tools_available=0,  # No tools in structured mode
                 response_schema_provided=True,
-                fallback_strategy_used="native",
+                fallback_strategy_used=strategy,
                 activity_id=ctx.activity_id,
                 activity_name=ctx.activity_name,
             )
@@ -392,7 +435,7 @@ class GenericAgent(BaseAgent):
                 usage_metadata=getattr(raw_message, "usage_metadata", None),
             ),
         ).model_dump(by_alias=True)
-        result_dict["structured_output_metadata"] = {"fallback_strategy_used": "native"}
+        result_dict["structured_output_metadata"] = {"fallback_strategy_used": strategy}
         state["result"] = result_dict
 
         return state
@@ -407,8 +450,13 @@ class GenericAgent(BaseAgent):
         Returns:
             Updated state with structured content
 
+        Raises:
+            StructuredOutputValidationError: If the extraction response is parsed
+                but violates the schema and no recovery path produces valid content.
+
         """
         ctx = self._extract_context(state)
+        structured_output_invalid = False
 
         try:
             result_dict = state.get("result")
@@ -447,30 +495,53 @@ class GenericAgent(BaseAgent):
                 existing_log.append(token_entry)
                 state["llm_token_usage_log"] = existing_log
 
-            if parsed_output is None:
+            candidate = self._resolve_extraction_candidate(parsed_output, raw_message, current_answer, response_schema)
+
+            if candidate is None and parsed_output is None:
                 result_dict["structured_output_metadata"] = {"fallback_strategy_used": "none"}
                 return state
 
-            # Emit SUCCESS only when extraction produced usable structured output
-            AuditEventDispatcher.dispatch(
-                LLMInteractionEvent(
-                    session_id=ctx.session_id,
-                    invocation_id=ctx.invocation_id,
-                    execution_id=ctx.execution_id,
-                    request_id=ctx.request_id,
-                    interaction_type=LLMInteractionType.EXTRACTION,
-                    model_name=getattr(self.llm, "model_name", "unknown"),
-                    status=LLMInteractionStatus.SUCCESS,
-                    response_schema_provided=True,
-                    fallback_strategy_used="native",
-                    activity_id=ctx.activity_id,
-                    activity_name=ctx.activity_name,
+            if candidate is None:
+                # Parsed but schema-violating with nothing to recover — the step
+                # must not complete with empty content. Raised outside the broad
+                # except below so it is not swallowed.
+                AuditEventDispatcher.dispatch(
+                    LLMInteractionEvent(
+                        session_id=ctx.session_id,
+                        invocation_id=ctx.invocation_id,
+                        execution_id=ctx.execution_id,
+                        request_id=ctx.request_id,
+                        interaction_type=LLMInteractionType.EXTRACTION,
+                        model_name=getattr(self.llm, "model_name", "unknown"),
+                        status=LLMInteractionStatus.ERROR,
+                        response_schema_provided=True,
+                        error_type="StructuredOutputValidationError",
+                        activity_id=ctx.activity_id,
+                        activity_name=ctx.activity_name,
+                    )
                 )
-            )
+                structured_output_invalid = True
+            else:
+                # Emit SUCCESS only when extraction produced usable structured output
+                resolved_output, strategy = candidate
+                AuditEventDispatcher.dispatch(
+                    LLMInteractionEvent(
+                        session_id=ctx.session_id,
+                        invocation_id=ctx.invocation_id,
+                        execution_id=ctx.execution_id,
+                        request_id=ctx.request_id,
+                        interaction_type=LLMInteractionType.EXTRACTION,
+                        model_name=getattr(self.llm, "model_name", "unknown"),
+                        status=LLMInteractionStatus.SUCCESS,
+                        response_schema_provided=True,
+                        fallback_strategy_used=strategy,
+                        activity_id=ctx.activity_id,
+                        activity_name=ctx.activity_name,
+                    )
+                )
 
-            result_dict["content"] = parsed_output
-            result_dict["structured_output_metadata"] = {"fallback_strategy_used": "native"}
-            return state
+                result_dict["content"] = resolved_output
+                result_dict["structured_output_metadata"] = {"fallback_strategy_used": strategy}
         except Exception as e:  # noqa: BLE001
             # Emit ERROR event before fallback
             AuditEventDispatcher.dispatch(
@@ -493,6 +564,10 @@ class GenericAgent(BaseAgent):
                 result_dict["structured_output_metadata"] = {"fallback_strategy_used": "none"}
             return state
 
+        if structured_output_invalid:
+            raise StructuredOutputValidationError(invocation_id=str(ctx.invocation_id))
+        return state
+
     @staticmethod
     def _unpack_structured_response(response: object) -> tuple[object, AIMessage | None]:
         """Unpack ``with_structured_output(..., include_raw=True)`` response.
@@ -505,6 +580,121 @@ class GenericAgent(BaseAgent):
             raw = response.get("raw")
             return response.get("parsed"), raw if isinstance(raw, AIMessage) else None
         return response, None
+
+    @staticmethod
+    def _matches_response_schema(output: object, response_schema: dict[str, Any]) -> bool:
+        """Check whether structured output satisfies the configured schema."""
+        validator = jsonschema.Draft7Validator(response_schema)
+        return not any(True for _ in validator.iter_errors(output))
+
+    @staticmethod
+    def _tool_call_output_matching_schema(raw_message: AIMessage, response_schema: dict[str, Any]) -> object | None:
+        """Return the sole tool-call arguments when they match the response schema."""
+        tool_calls = raw_message.tool_calls or []
+        if len(tool_calls) != 1:
+            return None
+
+        candidate = tool_calls[0].get("args")
+        if candidate is None:
+            return None
+
+        return candidate if GenericAgent._matches_response_schema(candidate, response_schema) else None
+
+    def _resolve_extraction_candidate(
+        self,
+        parsed_output: object,
+        raw_message: AIMessage | None,
+        current_answer: object,
+        response_schema: dict[str, Any],
+    ) -> tuple[object, str] | None:
+        """Return the first schema-valid extraction candidate and its strategy.
+
+        Candidate order: the sole tool-call arguments, the json_mode parse, then
+        a JSON payload embedded in the tool-loop answer text. Gateways that force
+        the structured result into a tool call can empty the message content, so
+        a later candidate often rescues an unusable earlier one.
+        """
+        if raw_message is not None and raw_message.tool_calls:
+            tool_call_output = self._tool_call_output_matching_schema(raw_message, response_schema)
+            if tool_call_output is not None:
+                return tool_call_output, "tool_call_args"
+
+        if parsed_output is not None and self._matches_response_schema(parsed_output, response_schema):
+            return parsed_output, "json_mode"
+
+        if isinstance(current_answer, str):
+            text_payload = self._json_payload_matching_schema(current_answer, response_schema)
+            if text_payload is not None:
+                return text_payload, "text_parse"
+
+        return None
+
+    @staticmethod
+    def _json_payload_matching_schema(text: str, response_schema: dict[str, Any]) -> object | None:
+        """Return the first JSON payload embedded in ``text`` that satisfies the schema.
+
+        When a gateway forces the structured result into a tool call, the model's
+        answer often remains in the message text — as bare JSON, wrapped in prose,
+        or trailed by stray characters. Scanning balanced object substrings lets
+        any of those shapes be recovered before the step is failed.
+        """
+        stripped = text.strip()
+        candidates: list[str] = [stripped] if stripped else []
+        candidates.extend(GenericAgent._json_object_substrings(text))
+        for candidate in candidates:
+            try:
+                payload: object = _json.loads(candidate)
+            except ValueError:
+                continue
+            if GenericAgent._matches_response_schema(payload, response_schema):
+                return payload
+        return None
+
+    @staticmethod
+    def _json_object_substrings(text: str) -> list[str]:
+        """Extract balanced top-level ``{...}`` substrings, respecting string literals."""
+        substrings: list[str] = []
+        depth = 0
+        start = -1
+        index = 0
+        length = len(text)
+        while index < length:
+            char = text[index]
+            if char == '"':
+                index = GenericAgent._skip_json_string(text, index)
+                continue
+            if char == "{":
+                if depth == 0:
+                    start = index
+                depth += 1
+            elif char == "}" and depth > 0:
+                depth -= 1
+                if depth == 0 and start >= 0:
+                    substrings.append(text[start : index + 1])
+            index += 1
+        return substrings
+
+    @staticmethod
+    def _skip_json_string(text: str, start: int) -> int:
+        """Return the index just past the string literal beginning at ``start``."""
+        index = start + 1
+        length = len(text)
+        while index < length:
+            char = text[index]
+            if char == "\\":
+                index += 2
+                continue
+            if char == '"':
+                return index + 1
+            index += 1
+        return length
+
+    @staticmethod
+    def _mark_structured_fallback(state: AgentState) -> None:
+        """Record that no structured-output strategy produced the result content."""
+        result_dict = state.get("result")
+        if isinstance(result_dict, dict):
+            result_dict["structured_output_metadata"] = {"fallback_strategy_used": "none"}
 
     @staticmethod
     def _build_token_usage_entry(result_message: AIMessage) -> dict[str, Any] | None:
