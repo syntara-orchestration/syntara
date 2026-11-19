@@ -1,6 +1,6 @@
 # Script step security review
 
-- **Review status:** Proposed for Product Security review; not approved.
+- **Review status:** Juan (@jperezdealgaba) commented on PR #1333; formal Product Security disposition is pending.
 - **Scope:** User-supplied Python and Bash executed as a Syntara workflow Script step through the Execution Plane (EP).
 - **Related design:** EP [architecture overview](https://github.com/syntara-orchestration/syntara-execution-plane/pull/169), AO integration AAP-98873, execution epic ANSTRAT-1803, SDK contracts ANSTRAT-2422.
 
@@ -188,9 +188,9 @@ Script output streams and operational logs are separate paths:
 
 | Field | Status |
 |---|---|
-| Product Security intake route/reviewer | Not yet identified |
-| Submission/disposition | Not submitted; no approval implied |
-| Required actions | Record after review with severity, owner, delivery impact, and release-blocking status |
+| Product Security intake route/reviewer | Juan (@jperezdealgaba) reviewed [PR #1333](https://github.com/syntara-orchestration/syntara/pull/1333) with seven questions. Confirm whether the PR review satisfies the applicable Product Security intake process. |
+| Submission/disposition | Review comments were submitted on 18 November 2026. All seven threads remain open; there is no approval or final security disposition. |
+| Required actions | Confirm Script result retention and access policy, raised in the [logging review thread](https://github.com/syntara-orchestration/syntara/pull/1333#discussion_r4616355179). Record its owner, severity, delivery impact, and release-blocking status with Product Security; track any further actions from the final review. |
 
 ## References
 
