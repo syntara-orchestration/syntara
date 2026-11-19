@@ -104,7 +104,10 @@ def sync_detailed(
 ) -> Response[ErrorData | FormPromptSummary]:
     """Create form prompt
 
-     Create a new form prompt. Internal service-to-service endpoint for workflow engine.
+     Create a form prompt for the internal workflow service. A retry with the same execution, node, loop
+    path, and Temporal activity ID returns the existing prompt with 201 Created while pending and before
+    its deadline; replays intentionally use 201. A missing row, different activity ID, non-pending
+    prompt, or elapsed deadline returns 409 Conflict.
 
     Args:
         body (FormPromptCreateRequest): Request payload for creating a form prompt.
@@ -137,7 +140,10 @@ def sync(
 ) -> ErrorData | FormPromptSummary | None:
     """Create form prompt
 
-     Create a new form prompt. Internal service-to-service endpoint for workflow engine.
+     Create a form prompt for the internal workflow service. A retry with the same execution, node, loop
+    path, and Temporal activity ID returns the existing prompt with 201 Created while pending and before
+    its deadline; replays intentionally use 201. A missing row, different activity ID, non-pending
+    prompt, or elapsed deadline returns 409 Conflict.
 
     Args:
         body (FormPromptCreateRequest): Request payload for creating a form prompt.
@@ -165,7 +171,10 @@ async def asyncio_detailed(
 ) -> Response[ErrorData | FormPromptSummary]:
     """Create form prompt
 
-     Create a new form prompt. Internal service-to-service endpoint for workflow engine.
+     Create a form prompt for the internal workflow service. A retry with the same execution, node, loop
+    path, and Temporal activity ID returns the existing prompt with 201 Created while pending and before
+    its deadline; replays intentionally use 201. A missing row, different activity ID, non-pending
+    prompt, or elapsed deadline returns 409 Conflict.
 
     Args:
         body (FormPromptCreateRequest): Request payload for creating a form prompt.
@@ -196,7 +205,10 @@ async def asyncio(
 ) -> ErrorData | FormPromptSummary | None:
     """Create form prompt
 
-     Create a new form prompt. Internal service-to-service endpoint for workflow engine.
+     Create a form prompt for the internal workflow service. A retry with the same execution, node, loop
+    path, and Temporal activity ID returns the existing prompt with 201 Created while pending and before
+    its deadline; replays intentionally use 201. A missing row, different activity ID, non-pending
+    prompt, or elapsed deadline returns 409 Conflict.
 
     Args:
         body (FormPromptCreateRequest): Request payload for creating a form prompt.

@@ -56,14 +56,22 @@ def get_form_prompt_service(
     dependencies=[Depends(PermissionChecker("form_prompt", "create"))],
     operation_id="create_form_prompt",
     summary="Create form prompt",
-    description="Create a new form prompt. Internal service-to-service endpoint for workflow engine.",
-    response_description="Form prompt created",
+    description=(
+        "Create a form prompt for the internal workflow service. A retry with the same "
+        "execution, node, loop path, and Temporal activity ID returns the existing prompt "
+        "with 201 Created while pending and before its deadline; replays intentionally use "
+        "201. A missing row, different activity ID, non-pending prompt, or elapsed deadline "
+        "returns 409 Conflict."
+    ),
+    response_description=(
+        "Created prompt or existing pending prompt returned for a same-activity replay; both return 201."
+    ),
 )
 async def create_form_prompt(
     request: FormPromptCreateRequest,
     service: Annotated[FormPromptService, Depends(get_form_prompt_service)],
 ) -> FormPromptSummary:
-    """Create a new form prompt."""
+    """Create a form prompt or return the existing pending prompt for a same-activity retry."""
     return await service.create(request)
 
 

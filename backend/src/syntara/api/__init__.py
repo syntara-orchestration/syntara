@@ -20,6 +20,7 @@ from syntara.forms.exceptions import (
     FormPromptCancelledError,
     FormPromptExpiredError,
     FormPromptNotFoundError,
+    FormPromptNotPendingError,
 )
 from syntara.tool_manager.exceptions import (
     ProviderNameConflictError,

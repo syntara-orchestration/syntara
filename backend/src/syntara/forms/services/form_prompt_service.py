@@ -38,6 +38,7 @@ from syntara.forms.exceptions import (
     FormPromptAlreadyRespondedError,
     FormPromptNotAuthorizedError,
     FormPromptNotFoundError,
+    FormPromptNotPendingError,
     InvalidResponderReferenceError,
 )
 from syntara.forms.models.api_models import (
@@ -225,6 +226,69 @@ class FormPromptService(UserReferenceResolverMixin, BaseService):
 
         return None
 
+    async def _resolve_duplicate_create(
+        self,
+        request: FormPromptCreateRequest,
+        integrity_error: IntegrityError,
+    ) -> FormPromptSummary:
+        """Resolve a unique-key collision on create, making retries of the same activity idempotent.
+
+        The worker can time out after the prompt commits but before it receives the
+        response, then retry. A duplicate is treated as a replay only when the existing
+        prompt is still pending, its deadline has not elapsed, and it belongs to the same
+        Temporal activity. The existing prompt's content and responders are not compared
+        or updated.
+
+        Must be called after the session has been rolled back. Nothing is staged on
+        this path, so the audit event from the original create is not repeated.
+
+        Raises:
+            FormPromptAlreadyRequestedError: If the prompt belongs to a different activity
+            FormPromptNotPendingError: If the prompt was already submitted, expired or cancelled
+            FormPromptExpiredError: If the pending prompt's deadline has elapsed
+
+        """
+        result = await self.session.exec(
+            select(FormPrompt).where(
+                FormPrompt.execution_id == request.execution_id,
+                FormPrompt.prompt_node_id == request.prompt_node_id,
+                FormPrompt.loop_iteration_path == request.loop_iteration_path,
+            )
+        )
+        existing = result.first()
+
+        if existing is None or existing.temporal_activity_id != request.temporal_activity_id:
+            raise FormPromptAlreadyRequestedError(
+                request.execution_id,
+                request.prompt_node_id,
+                request.loop_iteration_path,
+                existing_temporal_activity_id=existing.temporal_activity_id if existing is not None else None,
+                incoming_temporal_activity_id=request.temporal_activity_id,
+            ) from integrity_error
+
+        if existing.status != FormPromptStatus.PENDING:
+            raise FormPromptNotPendingError(
+                existing.id,
+                existing.status,
+                execution_id=request.execution_id,
+                prompt_node_id=request.prompt_node_id,
+                loop_iteration_path=request.loop_iteration_path,
+                existing_temporal_activity_id=existing.temporal_activity_id,
+                incoming_temporal_activity_id=request.temporal_activity_id,
+            ) from integrity_error
+
+        # Use the same status and deadline rule as response submission. A prompt can
+        # remain PENDING until the expiration activity runs after timeout_at.
+        validate_prompt_submission_state(existing)
+
+        logger.info(
+            "Duplicate form prompt create treated as idempotent replay",
+            prompt_id=existing.id,
+            execution_id=request.execution_id,
+            prompt_node_id=request.prompt_node_id,
+        )
+        return FormPromptSummary.model_validate(existing)
+
     async def _validate_execution_project(self, request: FormPromptCreateRequest) -> Execution:
         execution = await self.session.get(Execution, request.execution_id)
         if execution is None:
@@ -241,10 +305,13 @@ class FormPromptService(UserReferenceResolverMixin, BaseService):
             request: Form prompt creation request
 
         Returns:
-            Created form prompt summary
+            Created prompt summary, or the existing summary for a same-activity retry of
+            a matching pending prompt before its deadline.
 
         Raises:
-            FormPromptAlreadyRequestedError: If a prompt for this already exists
+            FormPromptAlreadyRequestedError: If the conflicting row is missing or belongs to a different activity
+            FormPromptNotPendingError: If a same-activity duplicate is already submitted, expired or cancelled
+            FormPromptExpiredError: If a same-activity pending duplicate is past its deadline
 
         """
         execution = await self._validate_execution_project(request)
@@ -319,11 +386,7 @@ class FormPromptService(UserReferenceResolverMixin, BaseService):
 
             # Map database constraint violations to domain errors
             if "uix_execution_prompt_node_path" in error_str:
-                raise FormPromptAlreadyRequestedError(
-                    request.execution_id,
-                    request.prompt_node_id,
-                    request.loop_iteration_path,
-                ) from e
+                return await self._resolve_duplicate_create(request, e)
 
             # Map FK violations to domain exceptions
             fk_error = self._map_fk_error_to_domain_exception(error_str, request)

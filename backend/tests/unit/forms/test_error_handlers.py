@@ -8,6 +8,7 @@ from datetime import UTC, datetime
 from unittest.mock import Mock
 from uuid import uuid4
 
+import pytest
 from fastapi import Request
 from fastapi.responses import JSONResponse
 
@@ -21,6 +22,7 @@ from syntara.forms.error_handlers import (
     form_prompt_cancelled_handler,
     form_prompt_expired_handler,
     form_prompt_not_found_handler,
+    form_prompt_not_pending_handler,
 )
 from syntara.forms.exceptions import (
     FormDataValidationError,
@@ -29,6 +31,7 @@ from syntara.forms.exceptions import (
     FormPromptCancelledError,
     FormPromptExpiredError,
     FormPromptNotFoundError,
+    FormPromptNotPendingError,
 )
 from syntara.forms.models.api_models import FormPromptStatus
 from syntara.forms.models.form_errors import FormFieldError
@@ -133,14 +136,23 @@ class TestFormPromptCancelledHandler:
 class TestFormPromptAlreadyRequestedHandler:
     """Test suite for form_prompt_already_requested_handler."""
 
-    def test_handles_form_prompt_already_requested_error(self) -> None:
+    def test_handles_form_prompt_already_requested_error(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Test handling of FormPromptAlreadyRequestedError."""
         request = Mock(spec=Request)
         request.url = "https://api.example.com/api/v1/forms"
 
         execution_id = uuid4()
         prompt_node_id = "form_task_1"
-        exc = FormPromptAlreadyRequestedError(execution_id, prompt_node_id)
+        loop_iteration_path = [1, 2]
+        error_log = Mock()
+        monkeypatch.setattr("syntara.forms.error_handlers.logger", Mock(error=error_log))
+        exc = FormPromptAlreadyRequestedError(
+            execution_id,
+            prompt_node_id,
+            loop_iteration_path,
+            existing_temporal_activity_id="existing_activity",
+            incoming_temporal_activity_id="incoming_activity",
+        )
         response = form_prompt_already_requested_handler(request, exc)
 
         assert isinstance(response, JSONResponse)
@@ -154,6 +166,63 @@ class TestFormPromptAlreadyRequestedHandler:
         assert prompt_node_id in data["detail"]
         assert data["code"] == "FORM_ALREADY_REQUESTED"
         assert data["retryable"] is False
+        error_log.assert_called_once_with(
+            "Form prompt already requested",
+            exc_info=exc,
+            execution_id=execution_id,
+            prompt_node_id=prompt_node_id,
+            loop_iteration_path=loop_iteration_path,
+            existing_temporal_activity_id="existing_activity",
+            incoming_temporal_activity_id="incoming_activity",
+        )
+
+
+class TestFormPromptNotPendingHandler:
+    """Test suite for form_prompt_not_pending_handler."""
+
+    def test_handles_form_prompt_not_pending_error(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """A duplicate create for a resolved prompt is a distinguishable 409."""
+        request = Mock(spec=Request)
+        request.url = "https://api.example.com/api/v1/form_prompts"
+
+        form_prompt_id = uuid4()
+        execution_id = uuid4()
+        prompt_node_id = "form_task_1"
+        loop_iteration_path = [2]
+        error_log = Mock()
+        monkeypatch.setattr("syntara.forms.error_handlers.logger", Mock(error=error_log))
+        exc = FormPromptNotPendingError(
+            form_prompt_id,
+            FormPromptStatus.SUBMITTED,
+            execution_id=execution_id,
+            prompt_node_id=prompt_node_id,
+            loop_iteration_path=loop_iteration_path,
+            existing_temporal_activity_id="form1_iter_2",
+            incoming_temporal_activity_id="form1_iter_2",
+        )
+        response = form_prompt_not_pending_handler(request, exc)
+
+        assert isinstance(response, JSONResponse)
+        assert response.status_code == 409
+        assert response.media_type == "application/problem+json"
+
+        data = json.loads(bytes(response.body).decode())
+        assert data["type"] == PROBLEM_TYPES["resource_conflict"]
+        assert data["title"] == "Form Prompt Not Pending"
+        assert "submitted" in data["detail"]
+        assert data["code"] == "FORM_PROMPT_NOT_PENDING"
+        assert data["retryable"] is False
+        error_log.assert_called_once_with(
+            "Duplicate form prompt create for a prompt that is not reusable",
+            exc_info=exc,
+            form_prompt_id=form_prompt_id,
+            status=FormPromptStatus.SUBMITTED,
+            execution_id=execution_id,
+            prompt_node_id=prompt_node_id,
+            loop_iteration_path=loop_iteration_path,
+            existing_temporal_activity_id="form1_iter_2",
+            incoming_temporal_activity_id="form1_iter_2",
+        )
 
 
 class TestFormDataValidationErrorHandler:
