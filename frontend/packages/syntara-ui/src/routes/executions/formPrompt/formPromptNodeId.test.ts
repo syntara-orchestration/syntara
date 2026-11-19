@@ -114,8 +114,8 @@ describe('formPromptIterationSortKey', () => {
     expect(formPromptIterationSortKey({ prompt_node_id: 'n', loop_iteration_path: [2, 0] })).toEqual([2, 0])
   })
 
-  it('parses iteration suffix from prompt_node_id', () => {
-    expect(formPromptIterationSortKey({ prompt_node_id: 'collect_input_iter_1_iter_0' })).toEqual([1, 0])
+  it('returns an empty key outside a loop', () => {
+    expect(formPromptIterationSortKey({ prompt_node_id: 'collect_input' })).toEqual([])
   })
 })
 
@@ -130,15 +130,29 @@ describe('compareFormPromptIterationKeys', () => {
 })
 
 describe('findFormPromptForCanvasNode loop selection', () => {
-  it('returns exact suffixed prompt_node_id match when canvas id differs', () => {
+  it('matches the iteration encoded in a Temporal activity ID by loop_iteration_path', () => {
     const loopPrompts = [
-      {
-        id: 'fp-suffixed',
-        prompt_node_id: 'collect_input_iter_2',
-        status: 'pending' as const,
-      },
+      { id: 'fp-0', prompt_node_id: 'collect_input', status: 'submitted' as const, loop_iteration_path: [0] },
+      { id: 'fp-2', prompt_node_id: 'collect_input', status: 'submitted' as const, loop_iteration_path: [2] },
+      { id: 'fp-3', prompt_node_id: 'collect_input', status: 'pending' as const, loop_iteration_path: [3] },
     ]
-    expect(findFormPromptForCanvasNode(loopPrompts, 'collect_input_iter_2')?.id).toBe('fp-suffixed')
+    expect(findFormPromptForCanvasNode(loopPrompts, 'collect_input_iter_2')?.id).toBe('fp-2')
+  })
+
+  it('matches nested loop paths exactly', () => {
+    const loopPrompts = [
+      { id: 'fp-1-0', prompt_node_id: 'collect_input', status: 'submitted' as const, loop_iteration_path: [1, 0] },
+      { id: 'fp-1-1', prompt_node_id: 'collect_input', status: 'pending' as const, loop_iteration_path: [1, 1] },
+    ]
+    expect(findFormPromptForCanvasNode(loopPrompts, 'collect_input_iter_1_iter_0')?.id).toBe('fp-1-0')
+  })
+
+  it('falls back to the latest iteration when no prompt has the activity loop path', () => {
+    const loopPrompts = [
+      { id: 'fp-0', prompt_node_id: 'collect_input', status: 'pending' as const, loop_iteration_path: [0] },
+      { id: 'fp-1', prompt_node_id: 'collect_input', status: 'pending' as const, loop_iteration_path: [1] },
+    ]
+    expect(findFormPromptForCanvasNode(loopPrompts, 'collect_input_iter_5')?.id).toBe('fp-1')
   })
 
   it('picks latest pending iteration among loop siblings', () => {
