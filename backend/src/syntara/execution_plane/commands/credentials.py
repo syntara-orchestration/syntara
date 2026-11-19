@@ -4,9 +4,9 @@ from typing import TYPE_CHECKING
 from uuid import UUID
 
 from execution_plane_client.commands.base import CommandPayload
-from execution_plane_client.commands.credentials import CredentialResolve, CredentialResolveWorkload
+from execution_plane_client.commands.credentials import CredentialResolveCluster, CredentialResolveWorkload
 from execution_plane_client.commands.results import (
-    CredentialResolveCommandResult,
+    CredentialResolveClusterCommandResult,
     CredentialResolveWorkloadCommandResult,
 )
 from execution_plane_client.errors import ProtocolConflict
@@ -33,35 +33,39 @@ if TYPE_CHECKING:
     from syntara.workflow_core.models import CredentialBinding
 
 
-class CredentialResolveCommandHandler:
-    """Resolve one opaque credential reference into its typed value."""
+class CredentialResolveClusterCommandHandler:
+    """Resolve one opaque cluster credential reference into its credential document."""
 
-    async def _resolve_credential(self, session: AsyncSession, credential_ref: UUID) -> str:
-        """Resolve an AO credential reference without logging or persisting its value."""
-        credential, credential_type = await fetch_credential_with_type(session, credential_ref)
+    async def _resolve_credential_document(self, session: AsyncSession, credential_ref: UUID) -> dict[str, str]:
+        """Resolve an AO credential reference without logging or persisting its values."""
+        try:
+            credential, credential_type = await fetch_credential_with_type(session, credential_ref)
+        except IntegrationCredentialNotFoundError as error:
+            raise CommandResourceStateError from error
         if not credential.enabled:
-            message = "Credential is disabled"
-            raise ValueError(message)
+            raise CommandResourceStateError
         secret_service = create_secret_service(session)
-        secret_data = await secret_service.retrieve_secret(credential.secret_id)  # type: ignore[arg-type]
+        try:
+            secret_data = await secret_service.retrieve_secret(credential.secret_id)  # type: ignore[arg-type]
+        except (EncryptionError, KeyError) as error:
+            raise CommandResourceStateError from error
         resolved = InjectorResolver.resolve(credential_type.injectors or {}, secret_data).extra_vars
-        secret = str(resolved.get("bearer_token") or resolved.get("token") or resolved.get("api_key") or "")
-        if not secret:
-            message = "Credential did not resolve to an API token"
-            raise ValueError(message)
-        return secret
+        document = {str(key): str(value) for key, value in resolved.items() if value is not None}
+        if not document:
+            raise CommandResourceStateError
+        return document
 
     async def handle(
         self, message: MessageEnvelope, payload: CommandPayload, context: AOCommandContext
     ) -> HandlingResult:
-        """Return a correlated credential value without exposing resolution details."""
+        """Return a correlated credential document without exposing resolution details."""
         del message
-        if not isinstance(payload, CredentialResolve):
+        if not isinstance(payload, CredentialResolveCluster):
             raise ProtocolConflict
-        credential = await self._resolve_credential(context.session, payload.credential_ref)
+        credential = await self._resolve_credential_document(context.session, payload.credential_ref)
         return HandlingResult(
             resource=None,
-            result=CredentialResolveCommandResult(credential=credential),
+            result=CredentialResolveClusterCommandResult(credential=credential),
         )
 
 

@@ -143,7 +143,7 @@ class TestRolePolicyMapping:  # noqa: D101
         names = builtin_role_policy_names("execution-plane-callback")
         assert names == [
             "execution-plane-callback:complete:any",
-            "execution-plane-callback:resolve-credential:any",
+            "execution-plane-callback:resolve-credential-cluster:any",
             "execution-plane-callback:resolve-credential-workload:any",
         ]
 
