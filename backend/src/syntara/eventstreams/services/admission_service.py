@@ -48,20 +48,31 @@ class EventAdmissionService:
     @staticmethod
     def _failure(failure: EventLaunchError) -> RetryDelivery | BlockedDelivery:
         if not failure.transient:
-            return BlockedDelivery(error_code=failure.code)
+            return BlockedDelivery(error_code=failure.code, start_rejected=failure.start_rejected)
         return RetryDelivery(
             error_code=failure.code,
             next_attempt_at=datetime.now(UTC) + timedelta(seconds=EventSchedulingDefaults.MAX_BACKOFF_SECONDS),
             circuit_open=False,
+            start_rejected=failure.start_rejected,
         )
 
-    async def recover_accepted(self, identity: DeliveryIdentity) -> SchedulingResult | None:
-        """Read Execution first, then recover original signed Temporal arguments."""
+    async def lookup_execution(self, identity: DeliveryIdentity) -> SchedulingResult | None:
+        """Reuse a retained Execution without making a preliminary Temporal call."""
         try:
             async with self._sessions() as session, session.begin():
                 terminal = await EventExecutionStore(session).lookup(identity)
-            if terminal is not None:
-                return ResolvedDelivery(terminal=terminal)
+            return ResolvedDelivery(terminal=terminal) if terminal is not None else None
+        except _STORAGE_ERRORS:
+            return self._storage_failed()
+        except (TypeError, ValueError):
+            return BlockedDelivery(error_code=SchedulingFailureCode.EVIDENCE_MISMATCH)
+
+    async def recover_accepted(self, identity: DeliveryIdentity) -> SchedulingResult | None:
+        """Recover an unfinished handoff using original signed Temporal arguments."""
+        existing = await self.lookup_execution(identity)
+        if existing is not None:
+            return existing
+        try:
             accepted = await self._launcher.lookup(identity)
             return await self._confirm(accepted.preparation(), accepted.acceptance)
         except EventLaunchError as exc:
@@ -75,7 +86,7 @@ class EventAdmissionService:
         """Start detached arguments without a pre-start Execution or delivery write."""
         prepared = prepared.model_copy(deep=True)
         if self._resources is not None and not self._resources.scheduling_open:
-            return BlockedDelivery(error_code=SchedulingFailureCode.STORAGE_UNAVAILABLE)
+            return BlockedDelivery(error_code=SchedulingFailureCode.STORAGE_UNAVAILABLE, start_rejected=True)
         try:
             acceptance = await self._launcher.start(prepared)
         except EventLaunchError as exc:
@@ -85,6 +96,8 @@ class EventAdmissionService:
         return await self._confirm(prepared, acceptance)
 
     async def _recover_failed_start(self, prepared: PreparedExecution, failure: EventLaunchError) -> SchedulingResult:
+        if failure.start_rejected:
+            return self._failure(failure)
         if failure.code not in {SchedulingFailureCode.TEMPORAL_UNAVAILABLE, SchedulingFailureCode.EVIDENCE_MISMATCH}:
             return self._failure(failure)
         try:

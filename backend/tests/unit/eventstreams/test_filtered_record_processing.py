@@ -1,4 +1,4 @@
-"""CEL skips preserve accepted runs and do not create execution or audit work."""
+"""CEL skips complete before execution reads, writes or Temporal work."""
 
 import json
 from unittest.mock import AsyncMock, MagicMock, Mock
@@ -56,8 +56,12 @@ async def test_local_outcomes_do_not_write_or_schedule(monkeypatch, expression, 
     assert result.outcome == outcome
     assert result.error_code == code
     assert context.events == []
-    admission.recover_accepted.assert_awaited_once_with(context.identity)
-    context.session.add.assert_not_called()
+    admission.lookup_execution.assert_not_awaited()
+    admission.recover_accepted.assert_not_awaited()
+    eligible = service.admission_eligible
+    assert isinstance(eligible, AsyncMock)
+    eligible.assert_not_awaited()
+    assert context.session.mock_calls == []
     admission.schedule.assert_not_awaited()
     (logs.error if code else logs.info).assert_called_once()
     assert "secret" not in str(logs.mock_calls)
@@ -76,7 +80,26 @@ async def test_preliminary_false_skips_invalid_payload_without_decoding(monkeypa
     assert isinstance(result, SkippedRecord)
     assert result.outcome == "no_match"
     decoder.decode.assert_not_called()
+    admission.lookup_execution.assert_not_awaited()
+    admission.recover_accepted.assert_not_awaited()
     admission.schedule.assert_not_awaited()
+
+
+@pytest.mark.parametrize("apply_filter", [False, True])
+@pytest.mark.parametrize("expression", ["false", "input.payload.value.count"])
+async def test_inspection_filter_outcomes_need_no_database_or_temporal(
+    monkeypatch, expression, *, apply_filter
+) -> None:
+    context, service, admission, event, _logs = filtered_context(monkeypatch, {"expression": expression})
+    result = await service.inspect_only(context.snapshot, context.identity, event, apply_filter=apply_filter)
+    assert not isinstance(result, HeldRecord)
+    admission.lookup_execution.assert_not_awaited()
+    admission.recover_accepted.assert_not_awaited()
+    admission.schedule.assert_not_awaited()
+    eligible = service.admission_eligible
+    assert isinstance(eligible, AsyncMock)
+    eligible.assert_not_awaited()
+    assert context.session.mock_calls == []
 
 
 async def test_log_failure_does_not_block_filter_skip(monkeypatch) -> None:
@@ -86,18 +109,20 @@ async def test_log_failure_does_not_block_filter_skip(monkeypatch) -> None:
     assert isinstance(result, SkippedRecord)
 
 
-async def test_accepted_execution_recovery_ignores_a_new_false_filter(monkeypatch) -> None:
+async def test_changed_false_filter_skips_previously_accepted_record_without_repair(monkeypatch) -> None:
     context, service, admission, event, logs = filtered_context(monkeypatch, {"expression": "false"})
     accepted = terminal(context.identity)
     admission.recover_accepted.return_value = accepted
+    admission.lookup_execution.return_value = accepted
     monkeypatch.setattr(
         service, "admission_eligible", AsyncMock(side_effect=AssertionError("Accepted work bypasses new admission"))
     )
     result = await service.process(context.snapshot, context.identity, event)
-    assert result == accepted
-    assert isinstance(result, ResolvedDelivery)
+    assert isinstance(result, SkippedRecord)
+    admission.lookup_execution.assert_not_awaited()
+    admission.recover_accepted.assert_not_awaited()
     admission.schedule.assert_not_awaited()
-    logs.info.assert_not_called()
+    logs.info.assert_called_once()
     logs.error.assert_not_called()
 
 
@@ -118,7 +143,8 @@ async def test_redelivery_can_match_a_new_filter_after_an_earlier_local_skip(mon
     result = await service.process(revised, context.identity, event)
     assert isinstance(result, ResolvedDelivery)
     prepare.assert_awaited_once()
-    assert admission.recover_accepted.await_count == 2
+    admission.lookup_execution.assert_awaited_once_with(context.identity)
+    admission.recover_accepted.assert_not_awaited()
 
 
 async def test_closed_admission_cannot_authorize_a_local_skip(monkeypatch) -> None:
@@ -165,8 +191,9 @@ async def test_runtime_filters_cloudevents_before_scheduling(monkeypatch, struct
     event = event.model_copy(update={"value": value, "key": b"order-123", "headers": tuple(headers)})
     before = event.model_copy(deep=True)
     result = await service.process(context.snapshot, context.identity, event)
-    admission.recover_accepted.assert_awaited_once_with(context.identity)
+    admission.recover_accepted.assert_not_awaited()
     if event_type == "order.created":
+        admission.lookup_execution.assert_awaited_once_with(context.identity)
         assert isinstance(result, ResolvedDelivery)
         prepared = admission.schedule.call_args.args[0]
         assert isinstance(prepared, PreparedExecution)
@@ -175,6 +202,7 @@ async def test_runtime_filters_cloudevents_before_scheduling(monkeypatch, struct
         assert prepared.input_data["cloudevents"]["extensions"] == {"priority": "3"}
         logs.info.assert_not_called()
     else:
+        admission.lookup_execution.assert_not_awaited()
         assert isinstance(result, SkippedRecord)
         assert result.outcome == "no_match"
         admission.schedule.assert_not_awaited()

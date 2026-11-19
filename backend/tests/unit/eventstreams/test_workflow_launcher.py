@@ -15,7 +15,7 @@ from temporalio.api.history.v1 import HistoryEvent, WorkflowExecutionStartedEven
 from temporalio.common import WorkflowIDConflictPolicy, WorkflowIDReusePolicy
 from temporalio.converter import DataConverter
 from temporalio.exceptions import WorkflowAlreadyStartedError
-from temporalio.service import RPCError, RPCStatusCode
+from temporalio.service import RetryConfig, RPCError, RPCStatusCode
 
 from syntara.eventstreams.core.handler import EventLaunchError, SchedulingFailureCode
 from syntara.eventstreams.core.preparation import PreparedExecution
@@ -108,6 +108,24 @@ async def test_already_started_verifies_pinned_signed_history(launcher_context) 
     assert context.handle.fetch_history_events.call_args.kwargs["page_size"] == 1
     assert context.handle.fetch_history_events.call_args.kwargs["skip_archival"] is True
     context.handle.cancel.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    ("status", "retry_config", "rejected"),
+    [
+        (RPCStatusCode.INVALID_ARGUMENT, RetryConfig(max_retries=1), True),
+        (RPCStatusCode.INVALID_ARGUMENT, None, False),
+        (RPCStatusCode.PERMISSION_DENIED, RetryConfig(max_retries=2), False),
+        (RPCStatusCode.DEADLINE_EXCEEDED, RetryConfig(max_retries=1), False),
+    ],
+)
+async def test_start_rejection_requires_a_single_rpc_attempt(launcher_context, status, retry_config, *, rejected):
+    context = launcher_context
+    context.client.service_client.config.retry_config = retry_config
+    context.client.start_workflow.side_effect = RPCError("start failed", status, b"")
+    with pytest.raises(EventLaunchError) as raised:
+        await context.launcher.start(context.prepared)
+    assert raised.value.start_rejected is rejected
 
 
 async def test_lookup_recovers_original_arguments_without_a_preparation(launcher_context) -> None:

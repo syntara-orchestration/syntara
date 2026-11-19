@@ -12,6 +12,7 @@ from syntara.core.constants import EventSchedulingDefaults
 from syntara.core.exceptions import SyntaraError
 from syntara.eventstreams.core.placement import PlacementAuthority
 from syntara.eventstreams.core.runtime import (
+    PendingInspections,
     RuntimeFailureCode,
     RuntimeRevision,
     RuntimeState,
@@ -80,6 +81,7 @@ class SubscriptionSupervisor:
         self._retry_at: datetime | None = None
         self._stop_retry_at: datetime | None = None
         self._retained_content_gate = False
+        self._retained_inspections: tuple[RuntimeRevision, dict[int, PendingInspections]] | None = None
 
     @staticmethod
     def _active(snapshot: SubscriptionSnapshot) -> bool:
@@ -343,6 +345,11 @@ class SubscriptionSupervisor:
             self._runner_connection_revision = connection_revision
             if runner.snapshot != snapshot:
                 raise SubscriptionRuntimeError(RuntimeFailureCode.RUNNER_FAILED)
+            if self._retained_inspections is not None:
+                previous_revision, inspections = self._retained_inspections
+                if previous_revision == revision:
+                    runner.restore_inspections(inspections)
+                self._retained_inspections = None
             runner.bind_placement(self._placement.is_current)
             if self._closed or self._desired != snapshot or not self._placement.is_current():
                 return
@@ -405,6 +412,9 @@ class SubscriptionSupervisor:
         except Exception:  # noqa: BLE001 - retain this runner until stop is verified
             self._cleanup_task = None  # Settled failure may be retried; pending cleanup is always retained.
             return self._stop_failed()
+        inspections = runner.pending_inspections()
+        if inspections and self._runner_revision is not None:
+            self._retained_inspections = (self._runner_revision, inspections)
         self._cleanup_task = None
         self._drain_task = None
         self._runner = None

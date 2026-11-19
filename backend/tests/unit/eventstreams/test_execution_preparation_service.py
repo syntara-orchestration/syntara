@@ -37,6 +37,7 @@ class PreparationContext:
 
     snapshot: SubscriptionSnapshot
     subscription: EventSubscription
+    source: EventSubscriptionSource
     identity: DeliveryIdentity
     envelope: WorkflowEventEnvelope
     workflow: Workflow
@@ -169,6 +170,7 @@ def preparation_context(monkeypatch: pytest.MonkeyPatch, value: bytes = b'{"coun
     return PreparationContext(
         snapshot,
         subscription,
+        source,
         identity,
         decoded.envelope,
         workflow,

@@ -18,14 +18,19 @@ from syntara.eventstreams.adapters.kafka_initial_position import PositionResult,
 from syntara.eventstreams.adapters.kafka_initial_position_service import KafkaInitialPositionService
 from syntara.eventstreams.adapters.kafka_record_runner import KafkaRecordRunner
 from syntara.eventstreams.core import runtime as runtime_module
+from syntara.eventstreams.core.handler import RetryDelivery, SchedulingFailureCode
 from syntara.eventstreams.core.placement import PlacementAuthority
+from syntara.eventstreams.core.preparation import PreparedExecution
+from syntara.eventstreams.core.processing import SkippedRecord
 from syntara.eventstreams.core.runtime import (
+    PendingInspections,
     RunnerStatus,
     RuntimeFailureCode,
     RuntimeRevision,
     RuntimeState,
     SubscriptionRuntimeError,
 )
+from syntara.eventstreams.models.subscription_snapshot import SubscriptionSnapshot
 from syntara.eventstreams.services import subscription_supervisor as module
 from syntara.eventstreams.services.admission_service import EventAdmissionService
 from syntara.eventstreams.services.execution_preparation_service import EventExecutionPreparationService
@@ -33,6 +38,8 @@ from syntara.eventstreams.services.record_processing_service import EventRecordP
 from syntara.eventstreams.services.subscription_supervisor import SubscriptionSupervisor
 from tests.helpers.eventstream_runtime import IsolatedSubscriptionRunner, confirmed_placement
 from tests.unit.eventstreams.test_connection_provider import connection_context
+from tests.unit.eventstreams.test_filtered_record_processing import filtered_context
+from tests.unit.eventstreams.test_record_processing_service import terminal
 
 
 @pytest_asyncio.fixture
@@ -157,10 +164,12 @@ async def test_revision_replacement_exposes_desire_while_old_runner_drains(harne
 
 async def test_publication_change_without_revision_increment_replaces_runner(harness):
     await harness.supervisor.apply(harness.snapshot)
+    harness.runners[0].inspections = {0: PendingInspections({5})}
     replacement = harness.snapshot.model_copy(update={"published_version_id": uuid4()})
     await harness.supervisor.apply(replacement)
     assert len(harness.runners) == 2
     assert harness.runners[0].stopped
+    assert not harness.runners[1].inspections
     assert harness.supervisor.status.applied_revision.published_version_id == replacement.published_version_id
     assert replacement.configuration_revision == harness.snapshot.configuration_revision
 
@@ -265,6 +274,76 @@ async def test_supervisor_resume_delegates_to_managed_runner_initialization(harn
         clients[1].commit.assert_not_awaited()
         processing.process.assert_not_awaited()
     finally:
+        await supervisor.stop()
+
+
+async def test_republish_waits_for_parked_execution_before_starting_a_false_filter(monkeypatch):
+    context, processing, admission, record, _logs = filtered_context(monkeypatch, {"expression": "true"})
+    prepared = await context.prepare()
+    assert isinstance(prepared, PreparedExecution)
+    settings = get_settings().model_copy(update={"event_drain_timeout_seconds": 0.05, "event_fetch_timeout_ms": 1})
+    monkeypatch.setattr(module, "get_settings", lambda: settings)
+    monkeypatch.setattr(runner_module, "get_settings", lambda: settings)
+    runners = []
+
+    async def spawn(binding) -> KafkaRecordRunner:
+        client = MagicMock(spec=KafkaPartitionConsumer)
+        client.topic, client.group_id = binding.configuration.topic, binding.configuration.group_id
+        client.epoch, client.assignment = 7, frozenset({2})
+        client.fetch.return_value = {}
+        positions = MagicMock(spec=KafkaInitialPositionService)
+        positions.initialize.side_effect = lambda request: PositionResult(
+            status=PositionStatus.READY, next_offset=0, assignment_epoch=request.assignment_epoch
+        )
+        runner = KafkaRecordRunner(
+            binding, client, MagicMock(), context.service, admission, processing=processing, positions=positions
+        )
+
+        async def start() -> None:
+            await runner.on_partitions_assigned(client.assignment, client.epoch)
+
+        client.start.side_effect = start
+        runners.append(runner)
+        return runner
+
+    factory = AsyncMock(side_effect=spawn)
+    supervisor = SubscriptionSupervisor(
+        context.snapshot.subscription_id, factory, placement=confirmed_placement(context.snapshot)
+    )
+    revised = SubscriptionSnapshot.model_validate(
+        {
+            **context.snapshot.model_dump(mode="json"),
+            "configuration_revision": context.snapshot.configuration_revision + 1,
+            "filter": {"expression": "false"},
+        }
+    )
+    admission.recover_accepted.return_value = RetryDelivery(
+        error_code=SchedulingFailureCode.STORAGE_UNAVAILABLE, next_attempt_at=datetime.now(UTC), circuit_open=False
+    )
+    try:
+        await supervisor.apply(context.snapshot)
+        runners[0]._partitions[2].handoff = prepared
+        status = await supervisor.apply(revised)
+        assert status.state == RuntimeState.DRAINING
+        assert status.reason == "stop_incomplete"
+        factory.assert_awaited_once()
+        assert runners[0]._handoffs[prepared.identity.digest].prepared == prepared
+
+        # Confirmation must precede replacement, even though the new filter
+        # would skip this record without looking up the accepted run.
+        admission.recover_accepted.return_value = terminal(prepared.identity)
+        status = await supervisor.retry()
+        assert status.applied_revision == RuntimeRevision.from_snapshot(revised)
+        assert factory.await_count == 2
+        assert runners[0]._stopped
+        assert not runners[0]._handoffs
+        recovered = admission.recover_accepted.await_count
+        result = await processing.process(revised, prepared.identity, record)
+        assert isinstance(result, SkippedRecord)
+        assert admission.recover_accepted.await_count == recovered
+        admission.schedule.assert_not_awaited()
+    finally:
+        admission.recover_accepted.return_value = terminal(prepared.identity)
         await supervisor.stop()
 
 
@@ -375,6 +454,8 @@ async def test_connection_change_replaces_consumer_without_changing_source(harne
     harness.supervisor._connection_revision = reader
     await harness.supervisor.apply(harness.snapshot)
     old = harness.runners[0]
+    saved = {0: PendingInspections({5}, matches={7: datetime.now(UTC)}), 1: PendingInspections({2, 3, 8})}
+    old.inspections = saved
     old.drain_release = asyncio.Event()
     reader.return_value = "connection-2"
     replacing = asyncio.create_task(harness.supervisor.apply(harness.snapshot))
@@ -386,6 +467,7 @@ async def test_connection_change_replaces_consumer_without_changing_source(harne
     assert result.state == RuntimeState.ACTIVE
     assert old.stopped
     assert len(harness.runners) == 2
+    assert harness.runners[1].inspections == saved
     assert all(runner.snapshot == harness.snapshot for runner in harness.runners)
     assert harness.runners[1].snapshot.configuration.group_id == old.snapshot.configuration.group_id
     assert harness.supervisor._runner_connection_revision == "connection-2"
