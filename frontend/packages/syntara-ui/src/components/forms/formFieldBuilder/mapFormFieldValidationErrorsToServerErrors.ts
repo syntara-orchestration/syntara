@@ -1,5 +1,5 @@
 import {
-  humanizeFormDefinitionIssueMessage,
+  formDefinitionInlineFieldMessage,
   parseFormDefinitionErrorLocation,
   type FormFieldValidationError,
 } from '../../../forms'
@@ -29,7 +29,7 @@ export function mapFormFieldValidationErrorsToServerErrors(
     result.push({
       fieldIndex: location.fieldIndex,
       subPath: subPathFromLocation(location),
-      message: humanizeFormDefinitionIssueMessage(error.message, error.field, { includeFieldLocation: false }),
+      message: formDefinitionInlineFieldMessage(error.message, error.field),
     })
   }
 

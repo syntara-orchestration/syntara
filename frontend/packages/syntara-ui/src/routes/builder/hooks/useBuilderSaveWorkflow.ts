@@ -8,9 +8,12 @@ import type { WorkflowDefinition } from '../../../stores/workflowStoreTypes'
 import { extractVersionConflictInfo, getErrorMessage, isWorkflowVersionConflictError } from '../../../utils/apiErrors'
 import type { ValidationError } from '../builderReducer'
 import { extractValidationErrors, extractValidationErrorsFromUnknown } from '../useWorkflowVerification'
+import { collectStoredWorkflowFormDefinitionCanvasFindings } from '../utils/validation/collectStoredWorkflowCanvasValidation'
 import { buildWorkflowDefinition } from '../utils/workflowDefinitionBuilder'
 import { DEFAULT_WORKFLOW_NAME, getNextDefaultWorkflowName } from '../utils/workflowNaming'
 import type { ConflictInfo } from '../VersionConflictDialog'
+
+import { useWorkflowEngineDefaults } from './useWorkflowEngineDefaults'
 
 type CleanedNode = { id: string; parameters?: Record<string, unknown> }
 
@@ -231,23 +234,74 @@ async function completeSave(
   }
 }
 
+type ProcessSaveResultContext = {
+  willPatchExisting: boolean
+  isNew: boolean
+  nameToSave: string
+  showError: (options: AlertMessage) => void
+  showSuccess: (options: AlertMessage) => void
+  showWarning: (options: AlertMessage) => void
+  markClean: () => void
+  queryClient: QueryClient
+  setLocation: (to: string) => void
+  onVersionUpdated?: (newVersion: number) => void
+  onSaveWithValidationIssues?: () => void
+  onValidationFindings?: (errors: ValidationError[]) => void
+  blockOnWarnings?: boolean
+  collectFrontendFindings?: () => ValidationError[]
+}
+
+function saveValidationIssueState(
+  data: SaveResponseData | undefined,
+  collectFrontendFindings?: () => ValidationError[]
+): { hasBackendIssues: boolean; frontendFindings: ValidationError[]; hasIssues: boolean } {
+  const hasBackendIssues = data?.has_validation_issues === true
+  const frontendFindings = hasBackendIssues ? [] : (collectFrontendFindings?.() ?? [])
+  return {
+    hasBackendIssues,
+    frontendFindings,
+    hasIssues: hasBackendIssues || frontendFindings.length > 0,
+  }
+}
+
+function reportSuccessfulSaveFindings(
+  data: SaveResponseData | undefined,
+  hasBackendIssues: boolean,
+  frontendFindings: ValidationError[],
+  ctx: Pick<ProcessSaveResultContext, 'onValidationFindings' | 'onSaveWithValidationIssues'>
+): void {
+  if (hasBackendIssues) {
+    reportSaveValidationIssues(data, ctx.onValidationFindings, ctx.onSaveWithValidationIssues)
+  } else {
+    ctx.onValidationFindings?.(frontendFindings)
+  }
+  syncToolSelectionsFromResponse(data)
+}
+
+function notifyWorkflowSaved(hasIssues: boolean, ctx: ProcessSaveResultContext, verb: 'created' | 'saved'): void {
+  if (hasIssues) {
+    ctx.showWarning({ title: `Workflow ${verb} with warnings`, description: `${ctx.nameToSave} has been saved.` })
+    return
+  }
+  ctx.showSuccess({ title: `Workflow ${verb}`, description: `${ctx.nameToSave} has been saved.` })
+}
+
+async function finalizeSuccessfulSave(
+  data: SaveResponseData | undefined,
+  hasIssues: boolean,
+  ctx: ProcessSaveResultContext
+): Promise<boolean> {
+  await completeSave(ctx.queryClient, ctx.markClean, ctx.isNew ? data?.id : undefined, ctx.setLocation)
+  const newVersion = data?.current_version
+  if (ctx.willPatchExisting && newVersion != null) ctx.onVersionUpdated?.(newVersion)
+  if (!hasIssues) ctx.onValidationFindings?.([])
+  if (hasIssues && ctx.blockOnWarnings) return false
+  return true
+}
+
 async function processSaveResult(
   saveResult: { data?: SaveResponseData; error?: unknown },
-  ctx: {
-    willPatchExisting: boolean
-    isNew: boolean
-    nameToSave: string
-    showError: (options: AlertMessage) => void
-    showSuccess: (options: AlertMessage) => void
-    showWarning: (options: AlertMessage) => void
-    markClean: () => void
-    queryClient: QueryClient
-    setLocation: (to: string) => void
-    onVersionUpdated?: (newVersion: number) => void
-    onSaveWithValidationIssues?: () => void
-    onValidationFindings?: (errors: ValidationError[]) => void
-    blockOnWarnings?: boolean
-  }
+  ctx: ProcessSaveResultContext
 ): Promise<boolean> {
   if (saveResult.error) {
     reportSaveError(
@@ -259,22 +313,17 @@ async function processSaveResult(
     return false
   }
 
-  const hasIssues = saveResult.data?.has_validation_issues === true
+  const { hasBackendIssues, frontendFindings, hasIssues } = saveValidationIssueState(
+    saveResult.data,
+    ctx.collectFrontendFindings
+  )
   const verb = ctx.isNew ? 'created' : 'saved'
+  notifyWorkflowSaved(hasIssues, ctx, verb)
   if (hasIssues) {
-    ctx.showWarning({ title: `Workflow ${verb} with warnings`, description: `${ctx.nameToSave} has been saved.` })
-    reportSaveValidationIssues(saveResult.data, ctx.onValidationFindings, ctx.onSaveWithValidationIssues)
-    syncToolSelectionsFromResponse(saveResult.data)
-  } else {
-    ctx.showSuccess({ title: `Workflow ${verb}`, description: `${ctx.nameToSave} has been saved.` })
+    reportSuccessfulSaveFindings(saveResult.data, hasBackendIssues, frontendFindings, ctx)
   }
 
-  await completeSave(ctx.queryClient, ctx.markClean, ctx.isNew ? saveResult.data?.id : undefined, ctx.setLocation)
-  const newVersion = saveResult.data?.current_version
-  if (ctx.willPatchExisting && newVersion != null) ctx.onVersionUpdated?.(newVersion)
-  if (!hasIssues) ctx.onValidationFindings?.([])
-  if (hasIssues && ctx.blockOnWarnings) return false
-  return true
+  return finalizeSuccessfulSave(saveResult.data, hasIssues, ctx)
 }
 
 export function useBuilderSaveWorkflow(
@@ -303,6 +352,16 @@ export function useBuilderSaveWorkflow(
     createWorkflow,
     updateWorkflow,
   } = params
+
+  const { defaults } = useWorkflowEngineDefaults()
+
+  const collectFrontendFindings = useCallback(
+    () =>
+      collectStoredWorkflowFormDefinitionCanvasFindings({
+        systemContinueOnFailure: defaults?.continueOnFailure ?? false,
+      }),
+    [defaults?.continueOnFailure]
+  )
 
   const getWorkflowDefinition = useCallback(() => {
     const { edges, nodePositions, currentWorkflow: freshWorkflow } = useWorkflowStore.getState()
@@ -373,6 +432,7 @@ export function useBuilderSaveWorkflow(
         onSaveWithValidationIssues,
         onValidationFindings,
         blockOnWarnings: options?.blockOnWarnings,
+        collectFrontendFindings,
       })
     },
     [
@@ -398,6 +458,7 @@ export function useBuilderSaveWorkflow(
       setLocation,
       queryClient,
       markClean,
+      collectFrontendFindings,
     ]
   )
 }

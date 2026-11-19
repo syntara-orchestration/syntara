@@ -25,6 +25,8 @@ export type ValidationError = {
   edgeId?: string
   /** Name of the validation rule that triggered this error */
   rule: string
+  /** Backend-style path for inline/banner field label lookup */
+  fieldPath?: string
   /** Optional suggestion for how to fix the issue */
   suggestion?: string
 }

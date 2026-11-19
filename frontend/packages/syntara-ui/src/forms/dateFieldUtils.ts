@@ -83,13 +83,31 @@ export function dateIncludesFromField(field: FormField): Record<DateComponentNam
   }
 }
 
-/** Date and timezone without time cannot be saved; used for show-in-form validation in the builder. */
+/** RFC 3339-supported include combinations for date fields (see form definition validation). */
+export function isSupportedRfc3339DateFieldCombination(includes: Record<DateComponentName, boolean>): boolean {
+  const { date, time, timezone } = includes
+  return (date && !time && !timezone) || (!date && time && timezone) || (date && time && timezone)
+}
+
+/** Date and timezone without time; used for show-in-form validation in the builder. */
 export function isDateFieldDateAndTimezoneWithoutTime(field: FormField): boolean {
   if (field.type !== FormFieldTypeEnum.DATE) {
     return false
   }
   const includes = dateIncludesFromField(field)
   return includes.date && includes.timezone && !includes.time
+}
+
+/** True when include flags are set but not an RFC 3339-supported combination. */
+export function isUnsupportedRfc3339DateFieldCombination(field: FormField): boolean {
+  if (field.type !== FormFieldTypeEnum.DATE) {
+    return false
+  }
+  const includes = dateIncludesFromField(field)
+  if (!includes.date && !includes.time && !includes.timezone) {
+    return false
+  }
+  return !isSupportedRfc3339DateFieldCombination(includes)
 }
 
 function countIncludedDateComponents(includes: Record<DateComponentName, boolean>): number {

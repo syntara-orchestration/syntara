@@ -351,24 +351,21 @@ describe('SynDynamicForm', () => {
       fields: [
         {
           type: FormFieldTypeEnum.DATE,
-          value_name: 'zone',
-          label: 'Zone',
-          include_date: false,
-          include_time: false,
-          include_timezone: true,
+          value_name: 'start',
+          label: 'Start',
         },
       ],
     })
 
     renderWithQueryClient(
-      <SynDynamicForm definition={definition} initialValues={{ zone: { timezone: 'UTC' } }} onSubmit={onSubmit} />
+      <SynDynamicForm definition={definition} initialValues={{ start: { date: '2026-06-15' } }} onSubmit={onSubmit} />
     )
 
-    await user.click(screen.getByRole('button', { name: 'Clear time zone' }))
+    await user.clear(screen.getByRole('textbox', { name: 'Start date' }))
     await user.click(screen.getByRole('button', { name: 'Submit' }))
 
     await waitFor(() => {
-      expect(onSubmit).toHaveBeenCalledWith({ zone: '' })
+      expect(onSubmit).toHaveBeenCalledWith({ start: '' })
     })
   })
 

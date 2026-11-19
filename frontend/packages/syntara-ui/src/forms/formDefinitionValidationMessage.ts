@@ -1,3 +1,5 @@
+import { normalizeDateFieldCombinationMessage } from './dateFieldValidationMessages'
+
 /** Parsed location for a form-definition validation issue (0-based indices). */
 export type FormDefinitionErrorLocation = Readonly<{
   fieldIndex: number
@@ -66,6 +68,27 @@ export function parseFormDefinitionErrorLocation(path: string | null | undefined
   return parseFieldsSegment(path)
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+/** Resolve the authored label for a form-definition validation path from stored parameters. */
+export function formFieldLabelFromDefinition(
+  formDefinition: unknown,
+  fieldPath: string | null | undefined
+): string | undefined {
+  const location = parseFormDefinitionErrorLocation(fieldPath)
+  if (!location) return undefined
+  if (!isRecord(formDefinition) || !Array.isArray(formDefinition.fields)) return undefined
+
+  const field: unknown = formDefinition.fields[location.fieldIndex]
+  if (!isRecord(field)) return undefined
+
+  if (typeof field.label === 'string' && field.label.trim()) return field.label.trim()
+  if (typeof field.value_name === 'string' && field.value_name.trim()) return field.value_name.trim()
+  return undefined
+}
+
 const VALUE_NAME_MESSAGE_PREFIX = 'String should match pattern'
 const FIELD_LABEL_EMPTY =
   /^String must contain at least 1 character\(s\)$|^String should have at least 1 character$|^Too small: expected string to have >=1 character/
@@ -89,6 +112,11 @@ function humanizeRequiredMessage(namedProperty: string | undefined): string {
 
 function humanizeCoreMessage(raw: string, propertyKey?: string): string {
   const namedProperty = propertyLabel(propertyKey)
+
+  const dateCombinationMessage = normalizeDateFieldCombinationMessage(raw)
+  if (dateCombinationMessage) {
+    return dateCombinationMessage
+  }
 
   if (raw.startsWith(VALUE_NAME_MESSAGE_PREFIX)) {
     return 'Value name must start with a letter or underscore, then use letters, numbers, or underscores only'
@@ -142,4 +170,18 @@ export function humanizeFormDefinitionIssueMessage(
   }
 
   return `${formatLocationPrefix(location, options?.fieldLabel)} — ${core}`
+}
+
+const BUILDER_FORM_STEP_VALIDATION_PREFIX = /^Form(?: trigger)? "[^"]+": (?:.+ — )?/
+
+/** Inline builder field copy: strip canvas banner prefixes and omit field-row context. */
+export function formDefinitionInlineFieldMessage(raw: string, fieldPath?: string | null): string {
+  const stripped = raw.replace(BUILDER_FORM_STEP_VALIDATION_PREFIX, '')
+
+  const normalized = normalizeDateFieldCombinationMessage(stripped) ?? normalizeDateFieldCombinationMessage(raw)
+  if (normalized) {
+    return normalized
+  }
+
+  return humanizeFormDefinitionIssueMessage(stripped, fieldPath, { includeFieldLocation: false })
 }

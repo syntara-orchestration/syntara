@@ -4,7 +4,7 @@ import type { ReactNode } from 'react'
 import { FormProvider, useController, useForm, useFormContext, useFormState } from 'react-hook-form'
 import { describe, expect, it } from 'vitest'
 
-import { DATE_FIELD_DATE_AND_TIMEZONE_REQUIRES_TIME_MESSAGE, FormFieldTypeEnum } from '../../../forms'
+import { DATE_FIELD_RFC3339_COMBINATION_MESSAGE, FormFieldTypeEnum } from '../../../forms'
 
 import { createDefaultField } from './createDefaultField'
 import type { FormDefinitionFieldServerError } from './formDefinitionFieldServerError'
@@ -16,9 +16,9 @@ function LabelErrorDisplay() {
   return <div data-testid="label-error">{typeof labelMessage === 'string' ? labelMessage : ''}</div>
 }
 
-function IncludeTimeErrorDisplay() {
+function IncludeDateErrorDisplay() {
   const { control } = useFormContext<FormDefinition>()
-  const { fieldState } = useController({ control, name: 'fields.0.include_time' })
+  const { fieldState } = useController({ control, name: 'fields.0.include_date' })
   const message = fieldState.error?.message
   if (typeof message !== 'string' || message.length === 0) {
     return null
@@ -50,23 +50,23 @@ describe('useApplyServerFormFieldErrors', () => {
     })
   })
 
-  it('maps include_time server errors onto form field paths', async () => {
+  it('maps include_date server errors onto form field paths', async () => {
     render(
       <TestHarness
         fieldType={FormFieldTypeEnum.DATE}
-        errorDisplay={<IncludeTimeErrorDisplay />}
+        errorDisplay={<IncludeDateErrorDisplay />}
         serverFieldErrors={[
           {
             fieldIndex: 0,
-            subPath: 'include_time',
-            message: DATE_FIELD_DATE_AND_TIMEZONE_REQUIRES_TIME_MESSAGE,
+            subPath: 'include_date',
+            message: DATE_FIELD_RFC3339_COMBINATION_MESSAGE,
           },
         ]}
       />
     )
 
     await waitFor(() => {
-      expect(screen.getByText(DATE_FIELD_DATE_AND_TIMEZONE_REQUIRES_TIME_MESSAGE)).toBeVisible()
+      expect(screen.getByText(DATE_FIELD_RFC3339_COMBINATION_MESSAGE)).toBeVisible()
     })
   })
 
