@@ -60,35 +60,9 @@
         { "type": "null" }
       ]
     },
-    "StandardOutputWrapper": {
+    "SubWorkflowOutput": {
       "type": "object",
-      "description": "Standard output envelope for Step SDK. All step outputs follow this structure.",
-      "properties": {
-        "Result": {
-          "description": "Primary task return payload (type varies by step)"
-        },
-        "StatusCode": {
-          "type": ["integer", "null"],
-          "minimum": 0,
-          "maximum": 255,
-          "description": "Execution status code (0=success, non-zero=failure per POSIX convention)"
-        },
-        "StatusMessage": {
-          "type": ["string", "null"],
-          "maxLength": 500,
-          "description": "Human-readable status summary (max 500 chars)"
-        },
-        "ErrorMessage": {
-          "type": ["string", "null"],
-          "maxLength": 10000,
-          "description": "Detailed error diagnostics (max 10k chars)"
-        }
-      },
-      "additionalProperties": false
-    },
-    "SubWorkflowOutputResult": {
-      "type": ["object", "null"],
-      "description": "Child execution metadata and the declared public output contract for Sub-workflow steps.",
+      "description": "Public Sub-workflow step result with child execution metadata and declared outputs, independent of the SDK/Execution Plane wrapper.",
       "properties": {
         "child_execution_id": {
           "type": ["string", "null"],
@@ -119,34 +93,6 @@
           "description": "Values mapped to the selected SubWorkflow Trigger's declared public output contract. Internal child step names are not exposed.",
           "maxProperties": 1000,
           "additionalProperties": { "$ref": "#/$defs/JSONValue" }
-        }
-      },
-      "additionalProperties": false
-    },
-    "SubWorkflowOutput": {
-      "allOf": [
-        {
-          "$ref": "#/$defs/StandardOutputWrapper"
-        }
-      ],
-      "type": "object",
-      "description": "Output model for Sub-workflow steps. Follows StandardOutputWrapper structure with Result containing child execution metadata.",
-      "properties": {
-        "Result": {
-          "$ref": "#/$defs/SubWorkflowOutputResult"
-        },
-        "StatusCode": {
-          "type": ["integer", "null"],
-          "minimum": 0,
-          "maximum": 255
-        },
-        "StatusMessage": {
-          "type": ["string", "null"],
-          "maxLength": 500
-        },
-        "ErrorMessage": {
-          "type": ["string", "null"],
-          "maxLength": 10000
         }
       },
       "additionalProperties": false

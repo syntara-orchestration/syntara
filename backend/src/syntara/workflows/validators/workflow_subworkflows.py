@@ -20,7 +20,7 @@ from syntara.workflows.workflow_engine.models.workflow_definition import NodeTyp
 
 NodeTarget = tuple[str | None, UUID, str, Mapping[str, Any]]
 TargetWorkflow = tuple[str | None, UUID, UUID | None, Mapping[str, Any] | None]
-_SUBWORKFLOW_OUTPUT_PATH_PREFIX = ("Result", "outputs")
+_SUBWORKFLOW_OUTPUT_PATH_PREFIX = ("outputs",)
 
 
 def _invalid_reference_finding(message: str, node_id: str | None, field_path: str) -> ValidationFinding:

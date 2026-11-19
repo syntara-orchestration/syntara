@@ -429,7 +429,7 @@ async def test_parent_subworkflow_input_rejects_incompatible_upstream_declared_o
                 "parameters": {
                     "workflow_id": str(consumer.id),
                     "trigger_node_id": "child_entry",
-                    "input_mapping": {"build_id": "${invoke_release.Result.outputs.release.id}"},
+                    "input_mapping": {"build_id": "${invoke_release.outputs.release.id}"},
                 },
             },
         ],

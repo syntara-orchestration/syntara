@@ -115,7 +115,7 @@ describe('InputNodeContent for Sub-workflow steps', () => {
         effectAllowed: '',
       },
     })
-    expect(dragCalls.find(([format]) => format === 'text/plain')?.[1]).toBe('${invoke_child.Result.outputs.status}')
+    expect(dragCalls.find(([format]) => format === 'text/plain')?.[1]).toBe('${invoke_child.outputs.status}')
     expect(await axe(container)).toHaveNoViolations()
   })
 

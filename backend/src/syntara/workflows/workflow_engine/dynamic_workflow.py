@@ -1853,7 +1853,6 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         except ChildWorkflowError as exc:
             err_status, reason = self._classify_child_workflow_failure(exc)
             output = self._build_sub_workflow_output(setup_result, err_status)
-            output["ErrorMessage"] = f"Sub-workflow {reason}"
             msg = f"Sub-workflow {reason}"
             # A cancelled child is a cancelled *step* (shown cancelled, not retried,
             # continue_on_failure still applies) that must not cancel the whole parent
@@ -1874,14 +1873,6 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         status_detail = child_status or "returned unexpected status"
         declared_outputs = child_result.get("declared_outputs") if isinstance(child_result, dict) else None
         output = self._build_sub_workflow_output(setup_result, child_status, declared_outputs)
-        if is_success:
-            output["StatusCode"] = 0
-            output["StatusMessage"] = (
-                "Sub-workflow completed with errors"
-                if child_status == "completed_with_errors"
-                else "Sub-workflow completed successfully"
-            )
-            output["ErrorMessage"] = None
 
         if not is_success:
             msg = f"Sub-workflow {status_detail}"
@@ -1893,7 +1884,6 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
                 if failed:
                     step_id = next(iter(failed))
                     detail = f"child step '{step_id}' failed: {failed[step_id]}"
-                    output["ErrorMessage"] = f"{output['ErrorMessage']} — {detail}"[:10000]
                     msg = f"{msg} — {detail}"
             # A child that returns status "cancelled" is a cancelled *step*, same as a
             # Temporal-cancelled child (see the ChildWorkflowError path); surface it as
@@ -1910,7 +1900,7 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         ``child_status`` stays within the published ``child_status`` enum
         (``completed``/``completed_with_errors``/``failed``/``cancelled``); a
         timeout or termination is a parent-step ``failed`` while ``reason``
-        preserves the specific Temporal cause for the ``ErrorMessage``.
+        preserves the specific Temporal cause in the parent step failure message.
         """
         cause = exc.cause
         if isinstance(cause, TemporalCancelledError):
@@ -1925,20 +1915,14 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
     def _build_sub_workflow_output(
         setup_result: dict[str, Any], child_status: str | None, outputs: dict[str, Any] | None = None
     ) -> dict[str, Any]:
-        """Build the M1 output dict from setup metadata and child status."""
-        status_detail = child_status or "returned unexpected status"
+        """Build the public Sub-workflow result from child metadata and outputs."""
         return {
-            "Result": {
-                "child_execution_id": setup_result["execution_id"],
-                "child_workflow_id": setup_result.get("child_workflow_id"),
-                "child_workflow_name": setup_result.get("child_workflow_name"),
-                "child_workflow_version": setup_result.get("child_workflow_version"),
-                "child_status": child_status,
-                "outputs": outputs,
-            },
-            "StatusCode": 1,
-            "StatusMessage": f"Sub-workflow {status_detail}",
-            "ErrorMessage": f"Sub-workflow {status_detail}",
+            "child_execution_id": setup_result["execution_id"],
+            "child_workflow_id": setup_result.get("child_workflow_id"),
+            "child_workflow_name": setup_result.get("child_workflow_name"),
+            "child_workflow_version": setup_result.get("child_workflow_version"),
+            "child_status": child_status,
+            "outputs": outputs,
         }
 
     def _process_node_result(self, node: ActivityNode, result: dict[str, Any]) -> dict[str, Any]:

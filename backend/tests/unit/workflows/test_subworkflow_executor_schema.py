@@ -139,8 +139,8 @@ def test_subworkflow_config_rejects_additional_properties(subworkflow_schema: di
         validate_parameter_schema(config, subworkflow_schema)
 
 
-def test_subworkflow_result_schema_has_standard_wrapper_fields(subworkflow_schema: dict[str, Any]) -> None:
-    """Result schema should follow StandardOutputWrapper pattern."""
+def test_subworkflow_result_schema_is_independent_of_standard_wrapper(subworkflow_schema: dict[str, Any]) -> None:
+    """Sub-workflow result schema exposes its step-specific fields directly."""
     # The $defs are at root level, not nested in resultSchema
     assert "$defs" in subworkflow_schema
     assert "SubWorkflowOutput" in subworkflow_schema["$defs"]
@@ -148,20 +148,19 @@ def test_subworkflow_result_schema_has_standard_wrapper_fields(subworkflow_schem
     output_schema = subworkflow_schema["$defs"]["SubWorkflowOutput"]
     properties = output_schema["properties"]
 
-    # StandardOutputWrapper fields
-    assert "Result" in properties
-    assert "StatusCode" in properties
-    assert "StatusMessage" in properties
-    assert "ErrorMessage" in properties
-    assert properties["StatusCode"]["minimum"] == 0
-    assert properties["StatusCode"]["maximum"] == 255
+    assert "outputs" in properties
+    assert "child_status" in properties
+    assert "Result" not in properties
+    assert "StatusCode" not in properties
+    assert "StatusMessage" not in properties
+    assert "ErrorMessage" not in properties
 
 
 def test_subworkflow_result_has_child_execution_metadata(subworkflow_schema: dict[str, Any]) -> None:
     """Result schema should include child execution metadata fields."""
     # The $defs are at root level
     assert "$defs" in subworkflow_schema
-    result_def = subworkflow_schema["$defs"]["SubWorkflowOutputResult"]
+    result_def = subworkflow_schema["$defs"]["SubWorkflowOutput"]
 
     properties = result_def["properties"]
     assert "child_execution_id" in properties

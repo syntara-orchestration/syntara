@@ -1107,38 +1107,16 @@ class WaitOutput(NodeOutput):
     """Output model for wait control nodes."""
 
 
-class StandardOutputWrapper(BaseModel):
-    """Standard output wrapper for Step SDK.
+class SubWorkflowOutput(NodeOutput):
+    """Public output model for Sub-workflow steps.
 
-    All steps in the Step SDK must return this envelope structure with:
-    - Result: Primary task return payload (type varies by step)
-    - StatusCode: Integer 0-255 (0=success, non-zero=failure per POSIX convention)
-    - StatusMessage: Human-readable summary (max 500 chars)
-    - ErrorMessage: Detailed error diagnostics (max 10k chars)
+    The step-specific result is independent of the SDK/Execution Plane output
+    wrapper. ``outputs`` contains only values declared by the selected
+    Subworkflow Trigger; internal child step names are never exposed.
 
-    This is a forward-compatible structure defined for sub-workflow outputs.
-    Existing NodeOutput models use flat structure but will eventually migrate
-    to this pattern when the Step SDK is fully implemented.
-    """
-
-    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
-
-    Result: Any = None  # Type varies by step - validated by step-specific models
-    StatusCode: int | None = Field(
-        default=None,
-        ge=0,
-        le=255,
-        description="Execution status code (0=success, non-zero=failure per POSIX convention).",
-    )
-    StatusMessage: str | None = Field(default=None, max_length=500)
-    ErrorMessage: str | None = Field(default=None, max_length=10000)
-
-
-class SubWorkflowOutputResult(BaseModel):
-    """Result payload for Sub-workflow steps containing child execution metadata.
-
-    This is the Result field of the StandardOutputWrapper structure. ``outputs``
-    contains only the selected SubWorkflow Trigger's declared public contract.
+    Parent expressions address the declared public outputs directly:
+    ${sub_workflow_step.outputs.artifact_url}
+    ${sub_workflow_step.outputs.release.url}
     """
 
     child_execution_id: str | None = None
@@ -1152,31 +1130,6 @@ class SubWorkflowOutputResult(BaseModel):
         strict=True,
         description="Values mapped to the child workflow's declared public output contract.",
     )
-
-
-class SubWorkflowOutput(StandardOutputWrapper, NodeOutput):
-    """Output model for Sub-workflow steps (reference mode).
-
-    Inherits from StandardOutputWrapper to ensure field consistency (StatusCode,
-    StatusMessage, ErrorMessage) and from NodeOutput to provide the dump() method
-    for output mapping.
-
-    This model adopts the StandardOutputWrapper pattern proactively, even though
-    existing NodeOutput models use flat structure, to align with the Step SDK
-    specification and avoid future breaking changes.
-
-    The outputs field (nested in Result) contains only fields declared by the
-    selected SubWorkflow Trigger. Internal child step names are never exposed.
-    The StandardOutputWrapper
-    envelope applies to the Sub-workflow step itself, while child outputs are
-    exposed directly for simplified access.
-
-    This allows template expressions that address declared public outputs:
-    ${sub_workflow_step.Result.outputs.artifact_url}
-    ${sub_workflow_step.Result.outputs.release.url}
-    """
-
-    Result: SubWorkflowOutputResult | None = None  # Override to specify concrete Result type
 
 
 NODE_OUTPUT_MODELS: dict[str, type[NodeOutput]] = {

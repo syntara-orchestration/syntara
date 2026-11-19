@@ -96,10 +96,10 @@ export function buildSubWorkflowOutputSchemaTree(childSteps: ChildWorkflowStepSc
   const buildField = (field: OutputFieldDef, parentPath: string[]): InputSchemaPreviewNode => {
     const fieldPath = [...parentPath, field.name]
 
-    // When we reach Result.outputs, populate it with the selected trigger's public fields.
-    if (fieldPath.length === 2 && fieldPath[0] === 'Result' && field.name === 'outputs') {
+    // Populate the top-level outputs field with the selected trigger's public fields.
+    if (parentPath.length === 0 && field.name === 'outputs') {
       if (declaredStep?.outputFields && declaredStep.outputFields.length > 0) {
-        // Declared output contract: flatten declared fields directly under Result.outputs
+        // Declared output contract: flatten declared fields directly under outputs.
         return {
           name: field.name,
           type: field.type,

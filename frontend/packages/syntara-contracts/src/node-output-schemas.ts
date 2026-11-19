@@ -111,40 +111,30 @@ export const NODE_OUTPUT_SCHEMAS: Record<string, OutputFieldDef[]> = {
   ],
   sub_workflow: [
     {
-      name: 'Result',
-      type: 'object',
-      description: 'Child execution metadata and the declared public output contract for Sub-workflow steps.',
-      children: [
-        {
-          name: 'child_execution_id',
-          type: 'string',
-          description: 'UUID of the child workflow execution instance (null if invocation failed)',
-        },
-        { name: 'child_workflow_id', type: 'string', description: 'UUID of the invoked child workflow definition' },
-        { name: 'child_workflow_name', type: 'string', description: 'Human-readable name of the child workflow' },
-        {
-          name: 'child_workflow_version',
-          type: 'number',
-          description: 'Version number of the child workflow that was invoked',
-        },
-        {
-          name: 'child_status',
-          type: 'string',
-          description:
-            'Terminal execution status of the child workflow (reference mode: parent blocks until child completes, so only terminal statuses are returned)',
-        },
-        {
-          name: 'outputs',
-          type: 'object',
-          description:
-            "Values mapped to the selected SubWorkflow Trigger's declared public output contract. Internal child step names are not exposed.",
-          additionalProperties: [],
-        },
-      ],
+      name: 'child_execution_id',
+      type: 'string',
+      description: 'UUID of the child workflow execution instance (null if invocation failed)',
     },
-    { name: 'StatusCode', type: 'number', description: '' },
-    { name: 'StatusMessage', type: 'string', description: '' },
-    { name: 'ErrorMessage', type: 'string', description: '' },
+    { name: 'child_workflow_id', type: 'string', description: 'UUID of the invoked child workflow definition' },
+    { name: 'child_workflow_name', type: 'string', description: 'Human-readable name of the child workflow' },
+    {
+      name: 'child_workflow_version',
+      type: 'number',
+      description: 'Version number of the child workflow that was invoked',
+    },
+    {
+      name: 'child_status',
+      type: 'string',
+      description:
+        'Terminal execution status of the child workflow (reference mode: parent blocks until child completes, so only terminal statuses are returned)',
+    },
+    {
+      name: 'outputs',
+      type: 'object',
+      description:
+        "Values mapped to the selected SubWorkflow Trigger's declared public output contract. Internal child step names are not exposed.",
+      additionalProperties: [],
+    },
   ],
   internal_activity: [{ name: 'status', type: 'string', description: 'Operation result status' }],
   condition: [

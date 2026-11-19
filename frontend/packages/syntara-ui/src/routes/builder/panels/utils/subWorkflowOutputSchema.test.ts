@@ -67,13 +67,12 @@ describe('buildSubWorkflowOutputSchemaTree', () => {
         outputFields: childOutputFields,
       },
     ])
-    const result = tree.find((field) => field.name === 'Result')
-    const outputs = result?.children?.find((field) => field.name === 'outputs')
+    const outputs = tree.find((field) => field.name === 'outputs')
     const artifactUrl = outputs?.children?.find((field) => field.name === 'artifact_url')
 
     expect(artifactUrl).toBeDefined()
     expect(buildExpression({ nodeId: 'invoke_child', fieldPath: artifactUrl?.fieldPath ?? [] })).toBe(
-      '${invoke_child.Result.outputs.artifact_url}'
+      '${invoke_child.outputs.artifact_url}'
     )
   })
 
@@ -97,13 +96,12 @@ describe('buildSubWorkflowOutputSchemaTree', () => {
         outputFields,
       },
     ])
-    const result = tree.find((field) => field.name === 'Result')
-    const outputs = result?.children?.find((field) => field.name === 'outputs')
+    const outputs = tree.find((field) => field.name === 'outputs')
     const imageTag = outputs?.children?.find((field) => field.name === 'image_tag')
 
     expect(imageTag).toBeDefined()
     expect(buildExpression({ nodeId: 'invoke_child', fieldPath: imageTag?.fieldPath ?? [] })).toBe(
-      '${invoke_child.Result.outputs.image_tag}'
+      '${invoke_child.outputs.image_tag}'
     )
     expect(outputs?.children?.some((field) => field.name === 'image_tag')).toBe(true)
   })
@@ -124,13 +122,12 @@ describe('buildSubWorkflowOutputSchemaTree', () => {
         outputFields,
       },
     ])
-    const result = tree.find((field) => field.name === 'Result')
-    const outputs = result?.children?.find((field) => field.name === 'outputs')
+    const outputs = tree.find((field) => field.name === 'outputs')
     const intake = outputs?.children?.find((field) => field.name === 'intake')
     const status = intake?.children?.find((field) => field.name === 'status')
 
     expect(buildExpression({ nodeId: 'invoke_child', fieldPath: status?.fieldPath ?? [] })).toBe(
-      '${invoke_child.Result.outputs.intake.status}'
+      '${invoke_child.outputs.intake.status}'
     )
   })
 
@@ -144,8 +141,7 @@ describe('buildSubWorkflowOutputSchemaTree', () => {
         outputFields: [{ name: 'stdout', type: 'string', description: 'Internal step output' }],
       },
     ])
-    const result = tree.find((field) => field.name === 'Result')
-    const outputs = result?.children?.find((field) => field.name === 'outputs')
+    const outputs = tree.find((field) => field.name === 'outputs')
     expect(outputs?.children).toBeUndefined()
   })
 })

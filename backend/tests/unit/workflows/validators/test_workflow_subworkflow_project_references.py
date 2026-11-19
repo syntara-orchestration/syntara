@@ -59,7 +59,7 @@ async def test_template_workflow_id_is_rejected_in_v1() -> None:
 def test_parent_child_input_mapping_rejects_known_incompatible_child_output_type() -> None:
     findings = _parent_input_type_findings(
         node_id="consume_release",
-        input_mapping={"build_id": "${invoke_release.Result.outputs.release.id}"},
+        input_mapping={"build_id": "${invoke_release.outputs.release.id}"},
         input_schema={"type": "object", "properties": {"build_id": {"type": "number"}}},
         nodes_by_id={"invoke_release": {"id": "invoke_release", "type": "sub_workflow"}},
         subworkflow_output_schemas={
@@ -84,8 +84,8 @@ def test_parent_child_input_mapping_accepts_compatible_types_and_skips_unknown_t
     findings = _parent_input_type_findings(
         node_id="consume_release",
         input_mapping={
-            "build_id": "${invoke_release.Result.outputs.release.id}",
-            "payload": "${invoke_release.Result.outputs.release.payload.id}",
+            "build_id": "${invoke_release.outputs.release.id}",
+            "payload": "${invoke_release.outputs.release.payload.id}",
         },
         input_schema={
             "type": "object",

@@ -347,10 +347,10 @@ def _parent_workflow_def_with_downstream(downstream_code: str | None = None) -> 
     if downstream_code is None:
         downstream_code = (
             "import json, sys\n"
-            'sys.stdout.write(json.dumps({"child_id": "${sub_wf_node.Result.child_execution_id}",'
-            ' "child_status": "${sub_wf_node.Result.child_status}",'
-            ' "child_wf_name": "${sub_wf_node.Result.child_workflow_name}",'
-            ' "status_code": "${sub_wf_node.StatusCode}"}))'
+            'sys.stdout.write(json.dumps({"child_id": "${sub_wf_node.child_execution_id}",'
+            ' "child_status": "${sub_wf_node.child_status}",'
+            ' "child_wf_name": "${sub_wf_node.child_workflow_name}",'
+            ' "child_workflow_version": "${sub_wf_node.child_workflow_version}"}))'
         )
     return {
         "schema_version": "2.0.0",
@@ -486,23 +486,23 @@ class TestSubWorkflowLifecycle:
 
         sub_wf_output = result["activity_outputs"]["sub_wf_node"]
         expected_child_id = str(uuid5(_SUB_WORKFLOW_NAMESPACE, f"{_PARENT_EXECUTION_ID}:sub_wf_node"))
-        assert sub_wf_output["Result"]["child_execution_id"] == expected_child_id
+        assert sub_wf_output["child_execution_id"] == expected_child_id
 
     async def test_child_status_is_completed(self, temporal_env: object) -> None:
         """Parent reports child_status as 'completed'."""
         result = await _run_parent_workflow(temporal_env)
 
         sub_wf_output = result["activity_outputs"]["sub_wf_node"]
-        assert sub_wf_output["Result"]["child_status"] == "completed"
+        assert sub_wf_output["child_status"] == "completed"
 
     async def test_child_workflow_metadata_in_output(self, temporal_env: object) -> None:
         """Parent output includes child workflow identity fields."""
         result = await _run_parent_workflow(temporal_env)
 
         sub_wf_output = result["activity_outputs"]["sub_wf_node"]
-        assert sub_wf_output["Result"]["child_workflow_id"] == str(_CHILD_WF_ID)
-        assert sub_wf_output["Result"]["child_workflow_name"] == "test-child-workflow"
-        assert sub_wf_output["Result"]["child_workflow_version"] == 1
+        assert sub_wf_output["child_workflow_id"] == str(_CHILD_WF_ID)
+        assert sub_wf_output["child_workflow_name"] == "test-child-workflow"
+        assert sub_wf_output["child_workflow_version"] == 1
 
     async def test_child_execution_persists_parent_identity(self, temporal_env: object) -> None:
         """Child Execution is owned by the top-level initiator, not the child's author.
@@ -547,7 +547,7 @@ class TestSubWorkflowLifecycle:
         assert result["failed_activities"] == {}
         assert result["cancelled_activities"] == {}
 
-    async def test_sub_workflow_output_validates_against_m1_model(self, temporal_env: object) -> None:
+    async def test_sub_workflow_output_validates_against_public_result_model(self, temporal_env: object) -> None:
         """Runtime output validates against the SubWorkflowOutput model."""
         result = await _run_parent_workflow(temporal_env)
 
@@ -555,16 +555,14 @@ class TestSubWorkflowLifecycle:
         validated = SubWorkflowOutput.model_validate(sub_wf_output)
 
         expected_child_id = str(uuid5(_SUB_WORKFLOW_NAMESPACE, f"{_PARENT_EXECUTION_ID}:sub_wf_node"))
-        assert validated.Result is not None
-        assert validated.Result.child_execution_id == expected_child_id
-        assert validated.Result.child_status == "completed"
-        assert validated.Result.child_workflow_id == str(_CHILD_WF_ID)
-        assert validated.Result.child_workflow_name == "test-child-workflow"
-        assert validated.Result.child_workflow_version == 1
-        assert validated.Result.outputs is None
-        assert validated.StatusCode == 0
-        assert validated.StatusMessage == "Sub-workflow completed successfully"
-        assert validated.ErrorMessage is None
+        assert validated.child_execution_id == expected_child_id
+        assert validated.child_status == "completed"
+        assert validated.child_workflow_id == str(_CHILD_WF_ID)
+        assert validated.child_workflow_name == "test-child-workflow"
+        assert validated.child_workflow_version == 1
+        assert validated.outputs is None
+        assert "Result" not in validated.model_dump()
+        assert "StatusCode" not in validated.model_dump()
 
 
 @pytest.mark.integration
@@ -576,8 +574,7 @@ class TestSubWorkflowDownstreamOutputConsumption:
         """Declared nested child values survive the Temporal boundary and resolve in the parent."""
         release_url = "https://example.test/release"
         downstream_code = (
-            "import json, sys\n"
-            'sys.stdout.write(json.dumps({"release_url": "${sub_wf_node.Result.outputs.release.url}"}))'
+            'import json, sys\nsys.stdout.write(json.dumps({"release_url": "${sub_wf_node.outputs.release.url}"}))'
         )
         result = await _run_parent_workflow(
             temporal_env,
@@ -588,14 +585,13 @@ class TestSubWorkflowDownstreamOutputConsumption:
 
         assert result["status"] == "completed"
         sub_workflow_output = SubWorkflowOutput.model_validate(result["activity_outputs"]["sub_wf_node"])
-        assert sub_workflow_output.Result is not None
-        assert sub_workflow_output.Result.outputs == {
+        assert sub_workflow_output.outputs == {
             "release": {"url": release_url, "labels": ["stable", "linux"]},
         }
-        assert "internal_token" not in str(sub_workflow_output.Result.outputs)
+        assert "internal_token" not in str(sub_workflow_output.outputs)
 
         downstream_input = result["activity_inputs"]["downstream_script"]["code"]
-        assert "${sub_wf_node.Result.outputs.release.url}" not in downstream_input
+        assert "${sub_wf_node.outputs.release.url}" not in downstream_input
         assert release_url in downstream_input
         assert result["activity_outputs"]["downstream_script"]["stdout_json"]["release_url"] == release_url
 
@@ -611,7 +607,7 @@ class TestSubWorkflowDownstreamOutputConsumption:
 
         downstream_input = result["activity_inputs"]["downstream_script"]
         expected_child_id = str(uuid5(_SUB_WORKFLOW_NAMESPACE, f"{_PARENT_EXECUTION_ID}:sub_wf_node"))
-        assert "${sub_wf_node.Result.child_execution_id}" not in downstream_input["code"]
+        assert "${sub_wf_node.child_execution_id}" not in downstream_input["code"]
         assert expected_child_id in downstream_input["code"]
 
     async def test_downstream_node_receives_resolved_child_status(self, temporal_env: object) -> None:
@@ -623,7 +619,7 @@ class TestSubWorkflowDownstreamOutputConsumption:
         )
 
         downstream_input = result["activity_inputs"]["downstream_script"]
-        assert "${sub_wf_node.Result.child_status}" not in downstream_input["code"]
+        assert "${sub_wf_node.child_status}" not in downstream_input["code"]
         assert "completed" in downstream_input["code"]
 
     async def test_downstream_script_produces_structured_output(self, temporal_env: object) -> None:
@@ -640,7 +636,7 @@ class TestSubWorkflowDownstreamOutputConsumption:
         assert downstream_output["stdout_json"]["child_id"] == expected_child_id
         assert downstream_output["stdout_json"]["child_status"] == "completed"
         assert downstream_output["stdout_json"]["child_wf_name"] == "test-child-workflow"
-        assert downstream_output["stdout_json"]["status_code"] == "0"
+        assert downstream_output["stdout_json"]["child_workflow_version"] == "1"
 
     async def test_both_sub_workflow_and_downstream_in_completed(self, temporal_env: object) -> None:
         """Both sub_wf_node and downstream_script appear in completed_activities."""
@@ -788,10 +784,10 @@ class TestSubWorkflowChildFailure:
         )
 
         sub_wf_output = result["activity_outputs"]["sub_wf_node"]
-        assert sub_wf_output["Result"]["child_status"] == "failed"
-        assert sub_wf_output["StatusCode"] == 1
+        assert sub_wf_output["child_status"] == "failed"
+        assert "StatusCode" not in sub_wf_output
         expected_child_id = str(uuid5(_SUB_WORKFLOW_NAMESPACE, f"{_PARENT_EXECUTION_ID}:sub_wf_node"))
-        assert sub_wf_output["Result"]["child_execution_id"] == expected_child_id
+        assert sub_wf_output["child_execution_id"] == expected_child_id
 
     async def test_child_failure_skips_downstream(self, temporal_env: object) -> None:
         """When child fails with continue_on_failure=false, downstream nodes do not execute."""

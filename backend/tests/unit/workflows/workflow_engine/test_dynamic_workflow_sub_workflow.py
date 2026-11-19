@@ -496,12 +496,11 @@ class TestSubWorkflowDispatch:
 
             result = await wf._execute_sub_workflow_node(node, node.parameters)
 
-        assert result["output"]["Result"]["child_execution_id"] == setup_result["execution_id"]
-        assert result["output"]["Result"]["child_status"] == "completed"
-        assert result["output"]["StatusCode"] == 0
-        assert result["output"]["StatusMessage"] == "Sub-workflow completed successfully"
-        assert result["output"]["ErrorMessage"] is None
-        assert result["output"]["Result"]["outputs"] is None
+        assert result["output"]["child_execution_id"] == setup_result["execution_id"]
+        assert result["output"]["child_status"] == "completed"
+        assert result["output"]["outputs"] is None
+        assert "Result" not in result["output"]
+        assert "StatusCode" not in result["output"]
 
     async def test_execute_activity_args(self) -> None:
         wf = _make_workflow_with_depth(2)
@@ -576,8 +575,8 @@ class TestSubWorkflowDispatch:
 
         assert exc_info.value.non_retryable
         output = exc_info.value.details[0]["output"]
-        assert output["Result"]["child_status"] is None
-        assert output["StatusCode"] == 1
+        assert output["child_status"] is None
+        assert "StatusCode" not in output
 
     async def test_child_failed_raises_application_error(self) -> None:
         """Child failure must propagate as ApplicationError so the engine records it as failed."""
@@ -600,13 +599,11 @@ class TestSubWorkflowDispatch:
         assert exc_info.value.non_retryable
         assert exc_info.value.type == "SubWorkflowFailedError"
         output = exc_info.value.details[0]["output"]
-        assert output["Result"]["child_execution_id"] == setup_result["execution_id"]
-        assert output["Result"]["child_status"] == "failed"
-        assert output["StatusCode"] == 1
-        assert output["ErrorMessage"] == "Sub-workflow failed"
+        assert output["child_execution_id"] == setup_result["execution_id"]
+        assert output["child_status"] == "failed"
 
     async def test_failed_child_error_message_includes_failing_step(self) -> None:
-        """A4: a failing child surfaces one failing step + message in ErrorMessage (string only)."""
+        """A failing child includes the failing step and message in the parent error."""
         wf = _make_workflow_with_depth(0)
         setup_result = _make_setup_result()
 
@@ -621,10 +618,8 @@ class TestSubWorkflowDispatch:
 
         assert exc_info.value.type == "SubWorkflowFailedError"
         assert exc_info.value.non_retryable
-        error_message = exc_info.value.details[0]["output"]["ErrorMessage"]
-        assert "step_a" in error_message
-        assert "boom" in error_message
-        assert len(error_message) <= 10000
+        assert "step_a" in str(exc_info.value)
+        assert "boom" in str(exc_info.value)
 
     def test_classifier_child_status_within_published_enum(self) -> None:
         """A2-P1: the classifier only yields child_status values the published schema allows."""
@@ -666,8 +661,8 @@ class TestSubWorkflowDispatch:
         assert exc_info.value.non_retryable
         assert exc_info.value.type == "SubWorkflowCancelledError"
         output = exc_info.value.details[0]["output"]
-        assert output["Result"]["child_status"] == "cancelled"
-        assert output["StatusCode"] == 1
+        assert output["child_status"] == "cancelled"
+        assert "StatusCode" not in output
 
     async def test_child_completed_with_errors_succeeds_when_patched(self) -> None:
         """A1: with the patch active, completed_with_errors is a successful parent step."""
@@ -683,10 +678,8 @@ class TestSubWorkflowDispatch:
             result = await wf._execute_sub_workflow_node(node, {})
 
         output = result["output"]
-        assert output["StatusCode"] == 0
-        assert output["Result"]["child_status"] == "completed_with_errors"
-        assert output["StatusMessage"] == "Sub-workflow completed with errors"
-        assert output["ErrorMessage"] is None
+        assert output["child_status"] == "completed_with_errors"
+        assert "StatusCode" not in output
 
     async def test_child_completed_with_errors_raises_when_unpatched(self) -> None:
         """A1: in-flight (pre-patch) executions keep the old raise on replay."""
@@ -725,9 +718,9 @@ def _make_child_workflow_error(cause: Exception) -> ChildWorkflowError:
 
 
 class TestChildWorkflowErrorHandling:
-    """Verify M1 output is preserved when execute_child_workflow raises ChildWorkflowError."""
+    """Verify the public Sub-workflow result is preserved on child workflow errors."""
 
-    async def test_terminated_child_preserves_m1_output(self) -> None:
+    async def test_terminated_child_preserves_output_metadata(self) -> None:
         """External termination preserves child_execution_id and metadata."""
         wf = _make_workflow_with_depth(0)
         setup_result = _make_setup_result()
@@ -750,18 +743,17 @@ class TestChildWorkflowErrorHandling:
         assert exc_info.value.non_retryable
         assert exc_info.value.type == "SubWorkflowFailedError"
         output = exc_info.value.details[0]["output"]
-        assert output["Result"]["child_execution_id"] == setup_result["execution_id"]
-        assert output["Result"]["child_workflow_id"] == setup_result["child_workflow_id"]
-        assert output["Result"]["child_workflow_name"] == setup_result["child_workflow_name"]
-        assert output["Result"]["child_workflow_version"] == setup_result["child_workflow_version"]
-        # A2-P1: child_status stays within the published enum; the "terminated"
-        # reason is preserved in ErrorMessage instead.
-        assert output["Result"]["child_status"] == "failed"
-        assert output["StatusCode"] == 1
-        assert output["ErrorMessage"] == "Sub-workflow terminated"
+        assert output["child_execution_id"] == setup_result["execution_id"]
+        assert output["child_workflow_id"] == setup_result["child_workflow_id"]
+        assert output["child_workflow_name"] == setup_result["child_workflow_name"]
+        assert output["child_workflow_version"] == setup_result["child_workflow_version"]
+        # Child status stays within the published enum; the specific reason is
+        # preserved by the parent step failure message.
+        assert output["child_status"] == "failed"
+        assert "terminated" in str(exc_info.value)
 
-    async def test_cancelled_child_preserves_m1_output(self) -> None:
-        """Temporal-level cancellation preserves M1 output and uses SubWorkflowCancelledError."""
+    async def test_cancelled_child_preserves_output_metadata(self) -> None:
+        """Temporal-level cancellation preserves output metadata and uses SubWorkflowCancelledError."""
         wf = _make_workflow_with_depth(0)
         setup_result = _make_setup_result()
 
@@ -781,12 +773,12 @@ class TestChildWorkflowErrorHandling:
         assert exc_info.value.non_retryable
         assert exc_info.value.type == "SubWorkflowCancelledError"
         output = exc_info.value.details[0]["output"]
-        assert output["Result"]["child_execution_id"] == setup_result["execution_id"]
-        assert output["Result"]["child_status"] == "cancelled"
-        assert output["StatusCode"] == 1
+        assert output["child_execution_id"] == setup_result["execution_id"]
+        assert output["child_status"] == "cancelled"
+        assert "StatusCode" not in output
 
-    async def test_timed_out_child_preserves_m1_output(self) -> None:
-        """Child timeout preserves M1 output."""
+    async def test_timed_out_child_preserves_output_metadata(self) -> None:
+        """Child timeout preserves output metadata."""
         from temporalio.exceptions import TimeoutType
 
         wf = _make_workflow_with_depth(0)
@@ -812,11 +804,10 @@ class TestChildWorkflowErrorHandling:
         assert exc_info.value.non_retryable
         assert exc_info.value.type == "SubWorkflowFailedError"
         output = exc_info.value.details[0]["output"]
-        assert output["Result"]["child_execution_id"] == setup_result["execution_id"]
-        # A2-P1: timeout maps to child_status "failed"; reason preserved in ErrorMessage.
-        assert output["Result"]["child_status"] == "failed"
-        assert output["StatusCode"] == 1
-        assert output["ErrorMessage"] == "Sub-workflow timed out"
+        assert output["child_execution_id"] == setup_result["execution_id"]
+        # A2-P1: timeout maps to child_status "failed"; the reason stays in the step error.
+        assert output["child_status"] == "failed"
+        assert "timed out" in str(exc_info.value)
 
     async def test_cancelled_child_does_not_cancel_parent(self) -> None:
         """Cancelled child uses SubWorkflowCancelledError, never InvocationCancelledError.
@@ -861,8 +852,8 @@ class TestChildWorkflowErrorHandling:
                 await wf._execute_sub_workflow_node(node, {})
 
         output = exc_info.value.details[0]["output"]
-        assert output["Result"]["child_execution_id"] == setup_result["execution_id"]
-        assert output["Result"]["child_status"] == "failed"
+        assert output["child_execution_id"] == setup_result["execution_id"]
+        assert output["child_status"] == "failed"
 
     async def test_normal_child_success_path_unchanged(self) -> None:
         """Normal child success still returns output without raising."""
@@ -882,20 +873,19 @@ class TestChildWorkflowErrorHandling:
             result = await wf._execute_sub_workflow_node(node, {})
 
         output = result["output"]
-        assert output["Result"]["child_execution_id"] == setup_result["execution_id"]
-        assert output["Result"]["child_status"] == "completed"
-        assert output["StatusCode"] == 0
-        assert output["ErrorMessage"] is None
+        assert output["child_execution_id"] == setup_result["execution_id"]
+        assert output["child_status"] == "completed"
+        assert "StatusCode" not in output
 
-    async def test_m1_output_propagated_through_handle_node_failure(self) -> None:
-        """Verify _handle_node_failure persists M1 output to the resolver namespace."""
+    async def test_subworkflow_output_propagated_through_handle_node_failure(self) -> None:
+        """Verify _handle_node_failure persists the direct result to the resolver namespace."""
         wf = _make_workflow_with_depth(0)
         setup_result = _make_setup_result()
 
-        m1_output = OrchestratorWorkflow._build_sub_workflow_output(setup_result, "terminated")
+        sub_workflow_output = OrchestratorWorkflow._build_sub_workflow_output(setup_result, "terminated")
         app_error = ApplicationError(
             "Sub-workflow terminated",
-            {"output": m1_output},
+            {"output": sub_workflow_output},
             type="SubWorkflowFailedError",
             non_retryable=True,
         )
@@ -907,9 +897,9 @@ class TestChildWorkflowErrorHandling:
         assert "sub_wf_1" in wf.failed_nodes
         set_call = wf.resolver.set_namespace.call_args  # type: ignore[attr-defined]
         persisted = set_call[0][1]
-        assert persisted["Result"]["child_execution_id"] == setup_result["execution_id"]
-        assert persisted["Result"]["child_status"] == "terminated"
-        assert persisted["StatusCode"] == 1
+        assert persisted["child_execution_id"] == setup_result["execution_id"]
+        assert persisted["child_status"] == "terminated"
+        assert "StatusCode" not in persisted
         assert persisted["status"] == "failed"
 
 
@@ -987,10 +977,8 @@ class TestSubWorkflowModels:
 
     def test_output_model_fields(self) -> None:
         output = SubWorkflowOutput()
-        assert output.Result is None
-        assert output.StatusCode is None
-        assert output.StatusMessage is None
-        assert output.ErrorMessage is None
+        assert output.child_execution_id is None
+        assert output.outputs is None
 
     def test_node_settings_class_registered(self) -> None:
         assert NodeType.SUB_WORKFLOW in _NODE_SETTINGS_CLASS
