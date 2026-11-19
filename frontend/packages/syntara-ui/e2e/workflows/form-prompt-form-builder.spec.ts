@@ -147,7 +147,8 @@ test.describe('Form prompt — form field builder', { tag: '@pr-check' }, () => 
       await setFormFieldLabel(app, 3, 'Gamma')
       await setFormFieldLabel(app, 4, 'Delta')
 
-      await reorderFormField(app, 4, 1, { assertFirstLabel: 'Delta' })
+      const expectedFieldOrder = ['Delta', 'Alpha', 'Beta', 'Gamma']
+      await reorderFormField(app, 4, 1, { assertLabelsInOrder: expectedFieldOrder })
 
       await selectFormFieldType(app, 4, FORM_FIELD_TYPE_MENU_LABELS.checkbox)
       await expect(formFieldBuilderCard(app, 4).getByRole('textbox', { name: 'Checkbox label' })).toBeVisible()
@@ -158,7 +159,7 @@ test.describe('Form prompt — form field builder', { tag: '@pr-check' }, () => 
       await saveFormPromptNodeAndWorkflow(app)
       const workflowId = workflowIdFromUrl(app)
       const stored = await readFormPromptDefinitionFromApi(app, workflowId)
-      expect(stored.fields.map((field) => field.label)).toEqual(['Delta', 'Alpha', 'Beta', 'Gamma'])
+      expect(stored.fields.map((field) => field.label)).toEqual(expectedFieldOrder)
       expect(stored.fields.map((field) => field.type)).toEqual(['text', 'number', 'text', 'dropdown'])
     } finally {
       await deleteWorkflow(app, workflowName)

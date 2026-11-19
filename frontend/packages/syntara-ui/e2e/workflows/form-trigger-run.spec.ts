@@ -26,7 +26,6 @@ import {
   unregisterStripFormDefinitionFromWorkflowApi,
 } from '../helpers/formTriggerRun'
 import { openRowKebab, pfWidget } from '../helpers/patternfly'
-import { isRealBackendE2e } from '../playwrightWebServerEnv'
 
 const CUSTOM_FORM_MESSAGE = 'Describe why you are starting this run.'
 const CUSTOM_SUBMIT_LABEL = 'Start workflow'
@@ -211,29 +210,27 @@ test.describe('Form trigger — run from workflows list', { tag: '@pr-check' }, 
       const inputData = await readExecutionInputData(app, executionId)
       expect(inputData).toMatchObject(submittedValues)
 
-      if (!isRealBackendE2e) {
-        activityDetailsRoute = `**/api/v1/executions/${executionId}/activities**`
-        await app.route(activityDetailsRoute, async (route) => {
-          if (route.request().method() !== 'GET') {
-            await route.continue()
-            return
-          }
-          await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({
-              resources: [
-                {
-                  activity_name: created.triggerNodeId,
-                  input_data: submittedValues,
-                  output_data: { response_data: submittedValues },
-                  status: 'completed',
-                },
-              ],
-            }),
-          })
+      activityDetailsRoute = `**/api/v1/executions/${executionId}/activities**`
+      await app.route(activityDetailsRoute, async (route) => {
+        if (route.request().method() !== 'GET') {
+          await route.continue()
+          return
+        }
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            resources: [
+              {
+                activity_name: created.triggerNodeId,
+                input_data: submittedValues,
+                output_data: { response_data: submittedValues },
+                status: 'completed',
+              },
+            ],
+          }),
         })
-      }
+      })
 
       await app.getByRole('tab', { name: 'Details' }).click()
       await expect(app.getByRole('tab', { name: 'Details', selected: true })).toBeVisible({ timeout: 15_000 })
