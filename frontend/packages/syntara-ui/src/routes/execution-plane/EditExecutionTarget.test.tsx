@@ -166,6 +166,7 @@ describe('EditExecutionTarget', () => {
     const checkbox = await screen.findByRole('checkbox', { name: 'Default execution target' })
     expect(checkbox).toBeChecked()
     expect(checkbox).toBeDisabled()
+    expect(screen.getByText(/This target is the current default and cannot be unmarked/)).toBeInTheDocument()
   })
 
   it('PATCHes is_default when promoting a non-default target', async () => {

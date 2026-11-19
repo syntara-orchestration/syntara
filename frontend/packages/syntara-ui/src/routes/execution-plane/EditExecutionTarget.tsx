@@ -22,6 +22,7 @@ import { detachPromise } from '../../utils/detachPromise'
 import { useDocLink } from '../../utils/docs/useDocLink'
 
 import { CreateExecutionTargetFields } from './CreateExecutionTargetFields'
+import { CURRENT_DEFAULT_EXECUTION_TARGET_HINT, DEFAULT_EXECUTION_TARGET_HINT } from './executionTargetFieldHelp'
 import styles from './ExecutionTargetForm.module.css'
 import {
   EXECUTION_TARGET_FORM_DEFAULT_VALUES,
@@ -212,6 +213,9 @@ export function EditExecutionTarget() {
                   clusterName={clusterName}
                   isClusterPending={isClusterPending}
                   isDefaultLocked={target.is_default}
+                  defaultCheckboxHint={
+                    target.is_default ? CURRENT_DEFAULT_EXECUTION_TARGET_HINT : DEFAULT_EXECUTION_TARGET_HINT
+                  }
                 />
               </SynForm>
             </Form>

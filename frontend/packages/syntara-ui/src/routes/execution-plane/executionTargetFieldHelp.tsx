@@ -16,6 +16,10 @@ export const DEFAULT_EXECUTION_TARGET_HINT =
 export const FIRST_DEFAULT_EXECUTION_TARGET_HINT =
   'Only one execution target can be default. Setting a default replaces the current default. The first target is automatically the default.'
 
+/** Helper text when editing the current default (checkbox locked checked). */
+export const CURRENT_DEFAULT_EXECUTION_TARGET_HINT =
+  'Only one execution target can be default. This target is the current default and cannot be unmarked. To change the default, edit another target and mark it as default.'
+
 /** Pre-built labelHelp elements for the configure execution target form. */
 export const executionTargetHelp = {
   nodeSelector: createFieldHelp('OpenShift node selector', OPENSHIFT_NODE_SELECTOR_TOOLTIP),
