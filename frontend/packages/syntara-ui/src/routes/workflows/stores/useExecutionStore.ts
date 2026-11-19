@@ -57,6 +57,15 @@ const STATUS_ORDER: Record<string, number> = {
 const ACTIVELY_IN_FLIGHT_ACTIVITY_STATUSES = new Set<ActivityStatus>(['running', 'retrying', 'waiting'])
 const TERMINAL_ACTIVITY_MERGE_STATUSES = new Set<ActivityStatus>(['completed', 'failed', 'cancelled', 'skipped'])
 
+type MergeActivityStatesOptions = {
+  /**
+   * When set, ignore stale terminal rows from REST over an in-flight local status
+   * (running/retrying/waiting). WebSocket snapshots (`setExecution`) omit this so
+   * `final_snapshot` can still advance badges when patches were missed.
+   */
+  rejectStaleTerminalOverInFlight?: boolean
+}
+
 /**
  * Merge incoming activity states with existing, preserving the most advanced
  * status per-activity. This prevents stale REST/snapshot data from regressing
@@ -67,7 +76,8 @@ const TERMINAL_ACTIVITY_MERGE_STATUSES = new Set<ActivityStatus>(['completed', '
  */
 function mergeActivityStates(
   existing: Map<string, ActivityState>,
-  incoming: Map<string, ActivityState>
+  incoming: Map<string, ActivityState>,
+  options?: MergeActivityStatesOptions
 ): Map<string, ActivityState> {
   if (existing.size === 0) return incoming
   if (incoming.size === 0) return existing
@@ -80,13 +90,12 @@ function mergeActivityStates(
     } else {
       const existingOrder = STATUS_ORDER[existingState.status] ?? 0
       const incomingOrder = STATUS_ORDER[incomingState.status] ?? 0
-      if (
-        incomingOrder > existingOrder &&
-        !(
-          ACTIVELY_IN_FLIGHT_ACTIVITY_STATUSES.has(existingState.status) &&
-          TERMINAL_ACTIVITY_MERGE_STATUSES.has(incomingState.status)
-        )
-      ) {
+      const rejectStaleTerminalOverInFlight = options?.rejectStaleTerminalOverInFlight === true
+      const staleTerminalOverInFlight =
+        rejectStaleTerminalOverInFlight &&
+        ACTIVELY_IN_FLIGHT_ACTIVITY_STATUSES.has(existingState.status) &&
+        TERMINAL_ACTIVITY_MERGE_STATUSES.has(incomingState.status)
+      if (incomingOrder > existingOrder && !staleTerminalOverInFlight) {
         merged.set(id, incomingState)
       } else if (incomingOrder === existingOrder) {
         // Preserve non-null timestamps/errors from either side so a same-rank
@@ -363,6 +372,8 @@ const initialState: ExecutionStoreState = {
  * **Note:** If both setExecution() and setActivityExecutions() are called,
  * activity states are merged via mergeActivityStates — the most advanced
  * status rank wins, and equal-rank merges preserve non-null timestamps/errors.
+ * Stale-terminal-over-in-flight rejection applies only to REST `setActivityExecutions`,
+ * not WebSocket snapshots via `setExecution`.
  */
 export const useExecutionStore = create<ExecutionStore>((set, get) => ({
   ...initialState,
@@ -497,7 +508,9 @@ export const useExecutionStore = create<ExecutionStore>((set, get) => ({
     // Convert ActivityData[] or ActivityExecution[] to activity state maps
     const [incoming] = buildActivityMapsFromInput(activities)
 
-    const activityStates = mergeActivityStates(get().activityStates, incoming)
+    const activityStates = mergeActivityStates(get().activityStates, incoming, {
+      rejectStaleTerminalOverInFlight: true,
+    })
     const [, activityErrors] = extractActivityMaps(activityStates)
 
     set({

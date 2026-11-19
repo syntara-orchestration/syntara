@@ -1036,6 +1036,30 @@ describe('useExecutionStore', () => {
       expect(useExecutionStore.getState().activityStates.get('wait_node')?.status).toBe('waiting')
     })
 
+    it('accepts terminal status from snapshot after patch left activity in-flight', () => {
+      useExecutionStore.getState().reset()
+
+      useExecutionStore.getState().applyPatch(
+        [{ op: 'replace', path: '/activities/script_step/status', value: 'running' }],
+        'patch-running'
+      )
+
+      const execution = createMockExecution({
+        activities: [
+          {
+            activity_id: 'script_step',
+            status: 'completed',
+            error_details: null,
+            started_at: '2025-12-10T15:00:05Z',
+            completed_at: '2025-12-10T15:00:10Z',
+          },
+        ],
+      })
+      useExecutionStore.getState().setExecution(execution)
+
+      expect(useExecutionStore.getState().activityStates.get('script_step')?.status).toBe('completed')
+    })
+
     it('rejects stale terminal status from REST while activity is in-flight locally', () => {
       useExecutionStore.getState().setActivityExecutions([
         {
