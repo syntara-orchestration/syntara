@@ -109,6 +109,7 @@ def _assert_lifecycle_audit_events(
 async def test_prompt_created_responded_and_expired_events_reach_outbox_export(
     mock_build_otel_log_record: MagicMock,
     jwt_client: AsyncClient,
+    internal_service_client: AsyncClient,
     test_execution: Execution,
     test_user: User,
     user_factory: Callable[..., Awaitable[User]],
@@ -119,11 +120,11 @@ async def test_prompt_created_responded_and_expired_events_reach_outbox_export(
     expired_node_id = f"expire-{uuid4().hex[:8]}"
     responder = await user_factory(username=f"form-responder-{uuid4().hex[:8]}")
 
-    created_response = await jwt_client.post(
+    created_response = await internal_service_client.post(
         FORM_PROMPTS_URL,
         json=_prompt_payload(test_execution, responded_node_id, responder_user_ids=[responder.id]),
     )
-    expired_create_response = await jwt_client.post(
+    expired_create_response = await internal_service_client.post(
         FORM_PROMPTS_URL,
         json=_prompt_payload(test_execution, expired_node_id),
     )
@@ -142,7 +143,7 @@ async def test_prompt_created_responded_and_expired_events_reach_outbox_export(
         )
     assert response.status_code == 200, response.text
 
-    expiry_response = await jwt_client.post(
+    expiry_response = await internal_service_client.post(
         f"{FORM_PROMPTS_URL}/batch",
         json={"updates": [{"prompt_id": expired_prompt_id, "status": "expired"}]},
     )

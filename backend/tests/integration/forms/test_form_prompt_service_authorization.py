@@ -305,45 +305,6 @@ class TestFormPromptServiceAuthorizationAPI:
         assert response.status_code == 403
         assert response.json()["code"] == "AUTHORIZATION_DENIED"
 
-    @pytest.mark.parametrize(
-        "role_name", ["admin", "auditor", "project-admin", "project-user", "project-auditor", "user"]
-    )
-    async def test_batch_update_permission_is_admin_only(self, role_name: str) -> None:
-        """The batch endpoint's form_prompt:create permission is currently admin-only."""
-        await self.setup.assign_role(role_name)
-        prompt = await self.setup.create_prompt()
-
-        response = await self.setup.client.post(
-            f"{FORM_PROMPTS_URL}/batch",
-            json={"updates": [{"prompt_id": str(prompt.id), "status": "expired"}]},
-        )
-
-        if role_name == "admin":
-            assert response.status_code == 200
-            assert response.json()["total_success"] == 1
-        else:
-            assert response.status_code == 403
-            assert response.json()["code"] == "AUTHORIZATION_DENIED"
-
-    async def test_create_permission_denied_for_user_role(self) -> None:
-        """The built-in user role cannot create form prompts."""
-        await self.setup.assign_role("user")
-
-        response = await self.setup.client.post(
-            FORM_PROMPTS_URL,
-            json={
-                "execution_id": str(uuid4()),
-                "project_id": str(self.setup.project_id),
-                "prompt_node_id": "form-prompt-authz-test",
-                "name": "Authorization test form",
-                "temporal_activity_id": "form-activity",
-                "form_definition": _FORM_DEFINITION,
-            },
-        )
-
-        assert response.status_code == 403
-        assert response.json()["code"] == "AUTHORIZATION_DENIED"
-
 
 @pytest.mark.integration
 @pytest.mark.asyncio

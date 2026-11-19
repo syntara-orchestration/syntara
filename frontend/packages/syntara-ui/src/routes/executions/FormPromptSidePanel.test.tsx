@@ -1,4 +1,3 @@
-import type { FormsAPI } from '@syntara/contracts'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
@@ -6,6 +5,7 @@ import { axe } from 'vitest-axe'
 
 import { FORM_PROMPT_RESPOND_PANEL_TITLE } from './formPrompt/formPromptRespondPanelConstants'
 import { FormPromptSidePanel } from './FormPromptSidePanel'
+import type { FormPromptSummary } from './formPromptTypes'
 
 const mockFormPromptResponseOptions = vi.hoisted(() => ({
   includeFooterSlot: false,
@@ -27,14 +27,13 @@ vi.mock('./FormPromptResponseContent', async () => {
   }
 })
 
-const mockFormPrompt: FormsAPI.components['schemas']['FormPromptSummary'] = {
+const mockFormPrompt: FormPromptSummary = {
   id: 'fp-1',
   execution_id: 'exec-1',
   project_id: 'proj-1',
   prompt_node_id: 'collect_input',
   name: 'Collect input',
   status: 'pending',
-  temporal_activity_id: 'act-1',
 }
 
 function queryPanelFooter(container: HTMLElement) {

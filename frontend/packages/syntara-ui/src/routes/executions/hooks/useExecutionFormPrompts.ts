@@ -1,4 +1,3 @@
-import type { FormsAPI } from '@syntara/contracts'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { FlowNodeType } from '../../../constants'
@@ -16,11 +15,10 @@ import {
   resolveFormPromptLookupKeys,
 } from '../formPrompt/formPromptNodeId'
 import { normalizeFormPromptNavigationList } from '../formPrompt/sortFormPromptsForNavigation'
+import type { FormPromptSummary } from '../formPromptTypes'
 
 import type { ExecutionNode } from './useExecutionApprovals'
 import { useFetchFormPromptsForExecution } from './useFetchFormPromptsForExecution'
-
-type FormPromptSummary = FormsAPI.components['schemas']['FormPromptSummary']
 
 const LIST_RETRY_DELAY_MS = 600
 const LIST_RETRY_ATTEMPTS = 4

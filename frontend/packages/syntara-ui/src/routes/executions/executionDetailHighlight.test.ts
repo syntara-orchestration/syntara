@@ -1,17 +1,17 @@
-import type { Approval, FormsAPI } from '@syntara/contracts'
+import type { Approval } from '@syntara/contracts'
 import { describe, expect, it } from 'vitest'
 
 import { resolveWaitingNodeHighlightId } from './executionDetailHighlight'
+import type { FormPromptSummary } from './formPromptTypes'
 
 describe('resolveWaitingNodeHighlightId', () => {
-  const formPrompt: FormsAPI.components['schemas']['FormPromptSummary'] = {
+  const formPrompt: FormPromptSummary = {
     id: 'fp-1',
     execution_id: 'exec-1',
     project_id: 'proj-1',
     prompt_node_id: 'collect_input_iter_1',
     name: 'Collect',
     status: 'pending',
-    temporal_activity_id: 'act-1',
   }
 
   const approval: Approval = {

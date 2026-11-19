@@ -20,7 +20,7 @@ from syntara.authz.engine import (
     resolve_visibility,
 )
 from syntara.authz.evaluator import AuthzEvaluator
-from syntara.authz.exceptions import AuthorizationDeniedError
+from syntara.authz.exceptions import AuthorizationDeniedError, InternalServiceRequiredError
 from syntara.authz.models.project import Project
 from syntara.core.database.session import get_db
 from syntara.core.models.base import NamedResource
@@ -47,6 +47,54 @@ def _record_authz_duration(start: float, resource_type: str, action: str) -> Non
         )
     except Exception:  # noqa: BLE001
         logger.debug("authz_metrics_recording_failed", exc_info=True)
+
+
+def _reject_internal_service_caller(request: Request, reason: str, msg: str) -> InternalServiceRequiredError:
+    """Audit and log a rejected internal-endpoint caller, returning the error to raise."""
+    from syntara.audit.dispatcher import AuditEventDispatcher  # noqa: PLC0415
+    from syntara.authz.audit.internal_service_denied import InternalServiceDeniedEvent  # noqa: PLC0415
+
+    path = request.url.path
+    cert_cn = getattr(request.state, "cert_cn", None)
+    AuditEventDispatcher.dispatch(
+        InternalServiceDeniedEvent(reason=reason, path=path, method=request.method, cert_cn=cert_cn)
+    )
+    logger.warning("internal_service_endpoint_rejected", reason=reason, path=path, cert_cn=cert_cn)
+    return InternalServiceRequiredError(msg, reason=reason)
+
+
+async def require_internal_service(request: Request) -> None:
+    """Allow only allowlisted internal services authenticated via mTLS.
+
+    Use on internal service-to-service endpoints in place of a
+    ``PermissionChecker``. Fails closed when S2S TLS is disabled, because
+    there is then no way to tell a service caller from a user.
+
+    ``ClientCertAuthMiddleware`` sets ``is_cert_authenticated`` only for
+    CA-verified client certificates whose CN is in the S2S allowlist.
+
+    Requests carrying an ``Authorization`` header are rejected even with a
+    valid service cert: ``get_current_user`` gives a bearer token precedence
+    over the cert, so the request would otherwise run as that user rather
+    than as the service.
+
+    Raises:
+        InternalServiceRequiredError: If the caller is not a trusted internal service.
+
+    """
+    from syntara.core.config.base import get_settings  # noqa: PLC0415
+
+    if not get_settings().s2s_tls_enabled:
+        msg = "This endpoint requires service-to-service TLS, which is disabled"
+        raise _reject_internal_service_caller(request, "s2s_tls_disabled", msg)
+
+    if not getattr(request.state, "is_cert_authenticated", False):
+        msg = "This endpoint is restricted to internal services"
+        raise _reject_internal_service_caller(request, "not_cert_authenticated", msg)
+
+    if "authorization" in request.headers:
+        msg = "Internal service endpoints do not accept an Authorization header"
+        raise _reject_internal_service_caller(request, "authorization_header_present", msg)
 
 
 def get_authz_evaluator(request: Request) -> AuthzEvaluator:
