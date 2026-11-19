@@ -29,12 +29,12 @@ export function GenericStepForm({ onSubmit, onCancel, submitButtonText }: BaseSt
       <StackItem>
         <Flex justifyContent={{ default: 'justifyContentFlexEnd' }} gap={{ default: 'gapSm' }}>
           <FlexItem>
+            <SynFormCancelButton onClick={onCancel} />
+          </FlexItem>
+          <FlexItem>
             <Button variant="primary" onClick={handleSubmit}>
               {submitButtonText ?? 'Add Generic Step'}
             </Button>
-          </FlexItem>
-          <FlexItem>
-            <SynFormCancelButton onClick={onCancel} />
           </FlexItem>
         </Flex>
       </StackItem>
