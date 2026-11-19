@@ -9,6 +9,7 @@ import type { AAPJobTemplateFormData } from './aapJobTemplateSchema'
 import { AAPTypeaheadSelect } from './AAPTypeaheadSelect'
 import { AAPErrorAlert } from './shared/AAPErrorAlert'
 import { stepHelp } from './shared/stepFieldHelp'
+import { AAP_CREDENTIAL_REQUIRED_HINT } from './shared/stepFieldHelpText'
 
 type AAPResourcePickersProps = {
   readonly browser: ReturnType<typeof useAAPBrowser>
@@ -26,6 +27,7 @@ export function AAPResourcePickers({ browser }: AAPResourcePickersProps) {
     searchJobTemplates,
     loadingOrgs,
     loadingTemplates,
+    isActive,
     error: browserError,
     retryAll,
   } = browser
@@ -75,7 +77,7 @@ export function AAPResourcePickers({ browser }: AAPResourcePickersProps) {
           labelHelp={stepHelp.aapOrganization}
           isRequired
           fieldId="aap-organization"
-          hint="AAP organization to browse resources from"
+          hint={isActive ? 'AAP organization to browse resources from' : AAP_CREDENTIAL_REQUIRED_HINT}
         >
           {({ field, fieldState }) => (
             <AAPTypeaheadSelect
@@ -93,6 +95,7 @@ export function AAPResourcePickers({ browser }: AAPResourcePickersProps) {
               onSearchChange={searchOrganizations}
               placeholder="Select an organization"
               isLoading={loadingOrgs}
+              isDisabled={!isActive}
               hasError={!!fieldState.error}
             />
           )}
@@ -124,6 +127,7 @@ export function AAPResourcePickers({ browser }: AAPResourcePickersProps) {
               onSearchChange={searchJobTemplates}
               placeholder="Select a job template"
               isLoading={loadingTemplates}
+              isDisabled={!isActive}
               hasError={!!fieldState.error}
             />
           )}

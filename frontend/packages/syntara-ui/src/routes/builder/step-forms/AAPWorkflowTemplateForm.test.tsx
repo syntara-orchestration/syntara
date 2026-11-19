@@ -108,6 +108,7 @@ import { submitForm } from '../../../test/submit-form'
 import { useAllCredentials } from '../components/useAllCredentials'
 
 import { AAPWorkflowTemplateForm } from './AAPWorkflowTemplateForm'
+import { AAP_CREDENTIAL_REQUIRED_HINT } from './shared/stepFieldHelpText'
 import { renderWithHeader } from './test-utils/renderWithHeader'
 
 // Mock useAAPBrowser hook to provide test data without real API calls
@@ -233,7 +234,7 @@ describe('AAPWorkflowTemplateForm', () => {
 
     expect(screen.getByPlaceholderText(/Select an organization/i)).toBeDisabled()
     expect(screen.getByPlaceholderText(/Select a workflow template/i)).toBeDisabled()
-    expect(screen.getByText('Select a credential to browse resources')).toBeInTheDocument()
+    expect(screen.getByText(AAP_CREDENTIAL_REQUIRED_HINT)).toBeInTheDocument()
   })
 
   it('submits form even without organization selected (permissive schema)', async () => {

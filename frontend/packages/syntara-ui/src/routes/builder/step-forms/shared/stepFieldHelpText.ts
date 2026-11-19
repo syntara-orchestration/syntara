@@ -129,6 +129,8 @@ export const MANUAL_INPUT_SCHEMA_HELP =
 export const AAP_ORGANIZATION_HELP =
   'Select the Ansible Automation Platform organization that contains the job template you want to launch.'
 
+export const AAP_CREDENTIAL_REQUIRED_HINT = 'Select a credential to browse resources'
+
 export const AAP_JOB_TEMPLATE_HELP =
   'Select the AAP job template to launch when this step executes. The template determines which playbook runs and its default configuration.'
 
