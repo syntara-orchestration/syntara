@@ -255,6 +255,17 @@ class TestFormPromptCreateAPI:
         original_form = {
             "fields": [{"value_name": "original", "type": "text", "label": "Original label", "required": False}]
         }
+        decoy_loop_iteration_path = [0] if not loop_iteration_path else []
+        decoy_payload = _form_prompt_payload(
+            execution_id,
+            test_execution.project_id,
+            prompt_node_id="form1",
+            name="Decoy form",
+            loop_iteration_path=decoy_loop_iteration_path,
+        )
+        decoy_response = await jwt_client.post(FORM_PROMPTS_URL, json=decoy_payload)
+        assert decoy_response.status_code == 201
+
         payload = _form_prompt_payload(
             execution_id,
             test_execution.project_id,
@@ -291,6 +302,8 @@ class TestFormPromptCreateAPI:
         response2 = await jwt_client.post(FORM_PROMPTS_URL, json=retry_payload)
         assert response2.status_code == 201
         assert response2.json() == response1.json()
+        assert response2.json()["id"] != decoy_response.json()["id"]
+        assert response2.json()["loop_iteration_path"] == loop_iteration_path
         assert response2.json()["name"] == "Original form"
         assert response2.json()["status"] == "pending"
 
@@ -319,7 +332,7 @@ class TestFormPromptCreateAPI:
         assert group_responders == []
 
         rows = (await test_db_session.exec(select(FormPrompt).where(FormPrompt.execution_id == execution_id))).all()
-        assert len(rows) == 1
+        assert len(rows) == 2
 
     async def test_create_duplicate_for_different_activity_returns_409(
         self,

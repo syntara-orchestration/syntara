@@ -99,7 +99,15 @@ def form_prompt_cancelled_handler(request: Request, exc: "FormPromptCancelledErr
 
 def form_prompt_already_requested_handler(request: Request, exc: "FormPromptAlreadyRequestedError") -> JSONResponse:
     """Handle FormPromptAlreadyRequestedError."""
-    logger.error("Form prompt already requested", exc_info=exc)
+    logger.error(
+        "Form prompt already requested",
+        exc_info=exc,
+        execution_id=exc.execution_id,
+        prompt_node_id=exc.prompt_node_id,
+        loop_iteration_path=exc.loop_iteration_path,
+        existing_temporal_activity_id=exc.existing_temporal_activity_id,
+        incoming_temporal_activity_id=exc.incoming_temporal_activity_id,
+    )
     return create_problem_details_response(
         status_code=status.HTTP_409_CONFLICT,
         problem_type=PROBLEM_TYPES["resource_conflict"],
@@ -116,7 +124,17 @@ def form_prompt_already_requested_handler(request: Request, exc: "FormPromptAlre
 
 def form_prompt_not_pending_handler(request: Request, exc: "FormPromptNotPendingError") -> JSONResponse:
     """Handle FormPromptNotPendingError."""
-    logger.error("Duplicate form prompt create for non-pending prompt", exc_info=exc)
+    logger.error(
+        "Duplicate form prompt create for a prompt that is not reusable",
+        exc_info=exc,
+        form_prompt_id=exc.form_prompt_id,
+        status=exc.current_status,
+        execution_id=exc.execution_id,
+        prompt_node_id=exc.prompt_node_id,
+        loop_iteration_path=exc.loop_iteration_path,
+        existing_temporal_activity_id=exc.existing_temporal_activity_id,
+        incoming_temporal_activity_id=exc.incoming_temporal_activity_id,
+    )
     return create_problem_details_response(
         status_code=status.HTTP_409_CONFLICT,
         problem_type=PROBLEM_TYPES["resource_conflict"],

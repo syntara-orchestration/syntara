@@ -209,9 +209,11 @@ class TestFormPromptServiceCreate:
         _mock_execution_project(session, request.project_id)
         _mock_existing_prompt(session, None)
 
-        with pytest.raises(FormPromptAlreadyRequestedError, match="already exists"):
+        with pytest.raises(FormPromptAlreadyRequestedError, match="already exists") as exc_info:
             await service.create(request)
 
+        assert exc_info.value.existing_temporal_activity_id is None
+        assert exc_info.value.incoming_temporal_activity_id == request.temporal_activity_id
         session.rollback.assert_awaited_once()
         mock_audit_dispatcher.assert_not_called()
 
@@ -221,11 +223,14 @@ class TestFormPromptServiceCreate:
         service, session = _make_service(raise_integrity_error=True)
         request = _duplicate_request()
         _mock_execution_project(session, request.project_id)
-        _mock_existing_prompt(session, _existing_prompt(request, temporal_activity_id="some_other_activity"))
+        existing_activity_id = "some_other_activity"
+        _mock_existing_prompt(session, _existing_prompt(request, temporal_activity_id=existing_activity_id))
 
-        with pytest.raises(FormPromptAlreadyRequestedError, match="already exists"):
+        with pytest.raises(FormPromptAlreadyRequestedError, match="already exists") as exc_info:
             await service.create(request)
 
+        assert exc_info.value.existing_temporal_activity_id == existing_activity_id
+        assert exc_info.value.incoming_temporal_activity_id == request.temporal_activity_id
         mock_audit_dispatcher.assert_not_called()
 
     @pytest.mark.asyncio
@@ -303,9 +308,14 @@ class TestFormPromptServiceCreate:
         [FormPromptStatus.SUBMITTED, FormPromptStatus.EXPIRED, FormPromptStatus.CANCELLED],
     )
     async def test_duplicate_for_non_pending_prompt_raises_not_pending(
-        self, terminal_status: FormPromptStatus, mock_audit_dispatcher: Mock
+        self,
+        terminal_status: FormPromptStatus,
+        mock_audit_dispatcher: Mock,
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """A retry cannot resume a prompt that was already submitted, expired or cancelled."""
+        service_logger = Mock()
+        monkeypatch.setattr("syntara.forms.services.form_prompt_service.logger", service_logger)
         service, session = _make_service(raise_integrity_error=True)
         request = _duplicate_request()
         _mock_execution_project(session, request.project_id)
@@ -317,6 +327,12 @@ class TestFormPromptServiceCreate:
 
         assert exc_info.value.form_prompt_id == existing.id
         assert exc_info.value.current_status == terminal_status
+        assert exc_info.value.execution_id == request.execution_id
+        assert exc_info.value.prompt_node_id == request.prompt_node_id
+        assert exc_info.value.loop_iteration_path == request.loop_iteration_path
+        assert exc_info.value.existing_temporal_activity_id == request.temporal_activity_id
+        assert exc_info.value.incoming_temporal_activity_id == request.temporal_activity_id
+        service_logger.error.assert_not_called()
         mock_audit_dispatcher.assert_not_called()
 
     @pytest.mark.asyncio

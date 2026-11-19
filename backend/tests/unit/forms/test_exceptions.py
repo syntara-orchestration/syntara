@@ -85,11 +85,26 @@ class TestFormExceptions:
     def test_form_prompt_not_pending_error(self) -> None:
         """Test FormPromptNotPendingError carries the prompt ID and status."""
         prompt_id = uuid4()
-        exc = FormPromptNotPendingError(prompt_id, FormPromptStatus.EXPIRED)
+        execution_id = uuid4()
+        loop_path = [2, 3]
+        exc = FormPromptNotPendingError(
+            prompt_id,
+            FormPromptStatus.EXPIRED,
+            execution_id=execution_id,
+            prompt_node_id="test_node",
+            loop_iteration_path=loop_path,
+            existing_temporal_activity_id="form1_iter_2",
+            incoming_temporal_activity_id="form1_iter_2",
+        )
 
         assert isinstance(exc, FormError)
         assert exc.form_prompt_id == prompt_id
         assert exc.current_status == FormPromptStatus.EXPIRED
+        assert exc.execution_id == execution_id
+        assert exc.prompt_node_id == "test_node"
+        assert exc.loop_iteration_path == loop_path
+        assert exc.existing_temporal_activity_id == "form1_iter_2"
+        assert exc.incoming_temporal_activity_id == "form1_iter_2"
         assert str(prompt_id) in exc.message
         assert "expired" in exc.message.lower()
 
@@ -98,12 +113,20 @@ class TestFormExceptions:
         execution_id = uuid4()
         prompt_node_id = "test_node"
         loop_path = [0, 1, 2]
-        exc = FormPromptAlreadyRequestedError(execution_id, prompt_node_id, loop_path)
+        exc = FormPromptAlreadyRequestedError(
+            execution_id,
+            prompt_node_id,
+            loop_path,
+            existing_temporal_activity_id="form1_iter_0",
+            incoming_temporal_activity_id="form1_iter_1",
+        )
 
         assert isinstance(exc, FormError)
         assert exc.execution_id == execution_id
         assert exc.prompt_node_id == prompt_node_id
         assert exc.loop_iteration_path == loop_path
+        assert exc.existing_temporal_activity_id == "form1_iter_0"
+        assert exc.incoming_temporal_activity_id == "form1_iter_1"
         assert str(execution_id) in exc.message
         assert prompt_node_id in exc.message
         assert str(loop_path) in exc.message
@@ -112,7 +135,12 @@ class TestFormExceptions:
         """Test FormPromptAlreadyRequestedError without loop_iteration_path."""
         execution_id = uuid4()
         prompt_node_id = "test_node"
-        exc = FormPromptAlreadyRequestedError(execution_id, prompt_node_id)
+        exc = FormPromptAlreadyRequestedError(
+            execution_id,
+            prompt_node_id,
+            existing_temporal_activity_id="existing_activity",
+            incoming_temporal_activity_id="incoming_activity",
+        )
 
         assert isinstance(exc, FormError)
         assert exc.execution_id == execution_id
@@ -123,7 +151,13 @@ class TestFormExceptions:
         """Test FormPromptAlreadyRequestedError with None loop_iteration_path."""
         execution_id = uuid4()
         prompt_node_id = "test_node"
-        exc = FormPromptAlreadyRequestedError(execution_id, prompt_node_id, None)
+        exc = FormPromptAlreadyRequestedError(
+            execution_id,
+            prompt_node_id,
+            None,
+            existing_temporal_activity_id=None,
+            incoming_temporal_activity_id="incoming_activity",
+        )
 
         assert isinstance(exc, FormError)
         assert exc.loop_iteration_path == []

@@ -75,18 +75,23 @@ class FormPromptCancelledError(FormError):
 
 @fastapi_exception(handler="syntara.forms.error_handlers.form_prompt_already_requested_handler")
 class FormPromptAlreadyRequestedError(FormError):
-    """Raised when attempting to create a form prompt that already exists for the execution and node."""
+    """Raised when a create conflict has no row or belongs to a different Temporal activity."""
 
     def __init__(
         self,
         execution_id: UUID,
         prompt_node_id: str,
         loop_iteration_path: list[int] | None = None,
+        *,
+        existing_temporal_activity_id: str | None,
+        incoming_temporal_activity_id: str,
     ) -> None:
-        """Initialize exception with execution ID, canvas node ID, and loop path."""
+        """Initialize exception with prompt identity and both activity IDs."""
         self.execution_id = execution_id
         self.prompt_node_id = prompt_node_id
         self.loop_iteration_path = [*loop_iteration_path] if loop_iteration_path is not None else []
+        self.existing_temporal_activity_id = existing_temporal_activity_id
+        self.incoming_temporal_activity_id = incoming_temporal_activity_id
         super().__init__(
             "Form prompt already exists for execution "
             f"{execution_id}, prompt node '{prompt_node_id}', "
@@ -98,14 +103,32 @@ class FormPromptAlreadyRequestedError(FormError):
 class FormPromptNotPendingError(FormError):
     """Raised when a duplicate create matches an existing prompt that is no longer pending.
 
-    A duplicate create for a still-pending prompt is an idempotent replay and succeeds.
-    Once the prompt has been submitted, expired or cancelled, the retry cannot resume it.
+    The exception also carries the execution, node, loop path, and both activity IDs so
+    the conflict log identifies the retry.
+
+    A duplicate create for a pending prompt before its deadline is an idempotent replay.
+    Once the prompt is submitted, expired or cancelled, the retry cannot resume it.
     """
 
-    def __init__(self, form_prompt_id: UUID, current_status: FormPromptStatus) -> None:
-        """Initialize exception with the existing prompt ID and its current status."""
+    def __init__(
+        self,
+        form_prompt_id: UUID,
+        current_status: FormPromptStatus,
+        *,
+        execution_id: UUID,
+        prompt_node_id: str,
+        loop_iteration_path: list[int],
+        existing_temporal_activity_id: str,
+        incoming_temporal_activity_id: str,
+    ) -> None:
+        """Initialize the conflict with the existing prompt and retry identity."""
         self.form_prompt_id = form_prompt_id
         self.current_status = current_status
+        self.execution_id = execution_id
+        self.prompt_node_id = prompt_node_id
+        self.loop_iteration_path = [*loop_iteration_path]
+        self.existing_temporal_activity_id = existing_temporal_activity_id
+        self.incoming_temporal_activity_id = incoming_temporal_activity_id
         super().__init__(
             f"Form prompt {form_prompt_id} already exists with status '{current_status.value}' "
             "and can no longer be reused"

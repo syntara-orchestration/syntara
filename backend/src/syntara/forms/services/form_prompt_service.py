@@ -235,8 +235,9 @@ class FormPromptService(UserReferenceResolverMixin, BaseService):
 
         The worker can time out after the prompt commits but before it receives the
         response, then retry. A duplicate is treated as a replay only when the existing
-        prompt is still pending and belongs to the same Temporal activity. The existing
-        prompt's content and responders are not compared or updated.
+        prompt is still pending, its deadline has not elapsed, and it belongs to the same
+        Temporal activity. The existing prompt's content and responders are not compared
+        or updated.
 
         Must be called after the session has been rolled back. Nothing is staged on
         this path, so the audit event from the original create is not repeated.
@@ -261,17 +262,20 @@ class FormPromptService(UserReferenceResolverMixin, BaseService):
                 request.execution_id,
                 request.prompt_node_id,
                 request.loop_iteration_path,
+                existing_temporal_activity_id=existing.temporal_activity_id if existing is not None else None,
+                incoming_temporal_activity_id=request.temporal_activity_id,
             ) from integrity_error
 
         if existing.status != FormPromptStatus.PENDING:
-            logger.error(
-                "Duplicate form prompt create for a prompt that is not reusable",
-                prompt_id=existing.id,
-                status=existing.status,
+            raise FormPromptNotPendingError(
+                existing.id,
+                existing.status,
                 execution_id=request.execution_id,
                 prompt_node_id=request.prompt_node_id,
-            )
-            raise FormPromptNotPendingError(existing.id, existing.status) from integrity_error
+                loop_iteration_path=request.loop_iteration_path,
+                existing_temporal_activity_id=existing.temporal_activity_id,
+                incoming_temporal_activity_id=request.temporal_activity_id,
+            ) from integrity_error
 
         # Use the same status and deadline rule as response submission. A prompt can
         # remain PENDING until the expiration activity runs after timeout_at.
@@ -304,7 +308,9 @@ class FormPromptService(UserReferenceResolverMixin, BaseService):
             Created form prompt summary
 
         Raises:
-            FormPromptAlreadyRequestedError: If a prompt for this already exists
+            FormPromptAlreadyRequestedError: If the conflicting row is missing or belongs to another activity
+            FormPromptNotPendingError: If the matching prompt is no longer pending
+            FormPromptExpiredError: If the matching pending prompt's deadline has elapsed
 
         """
         execution = await self._validate_execution_project(request)
