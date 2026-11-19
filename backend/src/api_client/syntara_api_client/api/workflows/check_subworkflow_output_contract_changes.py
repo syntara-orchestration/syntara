@@ -21,7 +21,7 @@ def _get_kwargs(
 
     _kwargs: dict[str, Any] = {
         "method": "post",
-        "url": f"/workflows/{workflow_id}/check_breaking_changes",
+        "url": f"/workflows/{workflow_id}/check_subworkflow_output_contract_changes",
     }
 
     _kwargs["json"] = body.to_dict()
@@ -105,9 +105,9 @@ def sync_detailed(
     client: AuthenticatedClient,
     body: WorkflowValidateRequest,
 ) -> Response[BreakingChangesResponse | ErrorData]:
-    """Check for breaking changes before publishing
+    """Check for Sub-workflow output contract changes before publishing
 
-     Check a candidate workflow definition for SubWorkflow output contract changes.
+     Check a candidate workflow definition for Sub-workflow output contract changes.
 
     Compares the submitted candidate definition against the currently published version
     to detect breaking changes such as:
@@ -152,9 +152,9 @@ def sync(
     client: AuthenticatedClient,
     body: WorkflowValidateRequest,
 ) -> BreakingChangesResponse | ErrorData | None:
-    """Check for breaking changes before publishing
+    """Check for Sub-workflow output contract changes before publishing
 
-     Check a candidate workflow definition for SubWorkflow output contract changes.
+     Check a candidate workflow definition for Sub-workflow output contract changes.
 
     Compares the submitted candidate definition against the currently published version
     to detect breaking changes such as:
@@ -194,9 +194,9 @@ async def asyncio_detailed(
     client: AuthenticatedClient,
     body: WorkflowValidateRequest,
 ) -> Response[BreakingChangesResponse | ErrorData]:
-    """Check for breaking changes before publishing
+    """Check for Sub-workflow output contract changes before publishing
 
-     Check a candidate workflow definition for SubWorkflow output contract changes.
+     Check a candidate workflow definition for Sub-workflow output contract changes.
 
     Compares the submitted candidate definition against the currently published version
     to detect breaking changes such as:
@@ -239,9 +239,9 @@ async def asyncio(
     client: AuthenticatedClient,
     body: WorkflowValidateRequest,
 ) -> BreakingChangesResponse | ErrorData | None:
-    """Check for breaking changes before publishing
+    """Check for Sub-workflow output contract changes before publishing
 
-     Check a candidate workflow definition for SubWorkflow output contract changes.
+     Check a candidate workflow definition for Sub-workflow output contract changes.
 
     Compares the submitted candidate definition against the currently published version
     to detect breaking changes such as:

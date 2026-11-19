@@ -106,7 +106,7 @@ const workflowDetail = {
   published_version_id: 'published-v4',
   published_version_number: 4,
   version: publishedVersion,
-} satisfies WorkflowAPI.components['schemas']['WorkflowDetailRead']
+} satisfies WorkflowAPI.components['schemas']['WorkflowReadWithVersion']
 
 const latestWorkflowDetail = {
   ...workflowDetail,
@@ -114,7 +114,7 @@ const latestWorkflowDetail = {
   published_version_id: 'published-v5',
   published_version_number: 5,
   version: latestPublishedVersion,
-} satisfies WorkflowAPI.components['schemas']['WorkflowDetailRead']
+} satisfies WorkflowAPI.components['schemas']['WorkflowReadWithVersion']
 
 function createWrapper() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })

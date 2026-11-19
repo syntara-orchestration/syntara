@@ -37,7 +37,6 @@ from syntara.workflows.models import (
     ValidationSeverity,
     Workflow,
     WorkflowCreate,
-    WorkflowDetailRead,
     WorkflowInvocationSchemaRead,
     WorkflowListParams,
     WorkflowListResponse,
@@ -341,16 +340,15 @@ async def list_workflows(
     dependencies=[Depends(_wf_perm_read)],
     operation_id="get_workflow",
     response_description="Workflow details",
-    response_model=WorkflowDetailRead,
+    response_model=WorkflowReadWithVersion,
 )
 async def get_workflow(
     workflow_id: UUID,
     service: Annotated[WorkflowService, Depends(get_workflow_service)],
-) -> WorkflowDetailRead:
+) -> WorkflowReadWithVersion:
     """Get a workflow by ID including its current active version."""
     workflow, current_version = await service.get_workflow_with_version(workflow_id)
-    response = await _build_workflow_with_version_response(workflow, current_version, service)
-    return WorkflowDetailRead.model_validate(response.model_dump())
+    return await _build_workflow_with_version_response(workflow, current_version, service)
 
 
 @router.get(
@@ -527,20 +525,20 @@ async def get_workflow_version(
 
 
 @router.post(
-    "/{workflow_id}/check_breaking_changes",
-    summary="Check for breaking changes before publishing",
+    "/{workflow_id}/check_subworkflow_output_contract_changes",
+    summary="Check for Sub-workflow output contract changes before publishing",
     response_model=BreakingChangesResponse,
     dependencies=[Depends(_wf_perm_read)],
-    operation_id="check_breaking_changes",
-    response_description="Breaking changes detection result",
+    operation_id="check_subworkflow_output_contract_changes",
+    response_description="Sub-workflow output contract changes detection result",
 )
-async def check_breaking_changes(
+async def check_subworkflow_output_contract_changes(
     workflow_id: UUID,
     request: WorkflowValidateRequest,
     service: Annotated[WorkflowService, Depends(get_workflow_service)],
     visibility: Annotated[VisibilityResult, Depends(VisibilityFilter("workflow", "read"))],
 ) -> BreakingChangesResponse:
-    """Check a candidate workflow definition for SubWorkflow output contract changes.
+    """Check a candidate workflow definition for Sub-workflow output contract changes.
 
     Compares the submitted candidate definition against the currently published version
     to detect breaking changes such as:

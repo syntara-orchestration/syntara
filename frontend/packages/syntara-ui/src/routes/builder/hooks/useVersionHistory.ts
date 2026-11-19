@@ -122,7 +122,7 @@ export function useVersionHistory({ workflowId, isNew, onVersionUpdated }: UseVe
   const publishMutation = workflowClient.useMutation('post', '/workflows/{workflow_id}/versions/{version}/publish')
   const checkBreakingChangesMutation = workflowClient.useMutation(
     'post',
-    '/workflows/{workflow_id}/check_breaking_changes'
+    '/workflows/{workflow_id}/check_subworkflow_output_contract_changes'
   )
   const updateMetadataMutation = workflowClient.useMutation('patch', '/workflows/{workflow_id}/versions/{version}')
   const [breakingChanges, setBreakingChanges] = useState<TriggerBreakingChanges[]>([])

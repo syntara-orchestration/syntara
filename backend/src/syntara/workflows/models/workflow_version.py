@@ -196,10 +196,8 @@ class PublishVersionRequest(SQLModel):
 # which is defined in this module, creating a circular dependency.
 from syntara.workflows.models.workflow import (  # noqa: E402
     PublishWorkflowVersionResponse,
-    WorkflowDetailRead,
     WorkflowReadWithVersion,
 )
 
 WorkflowReadWithVersion.model_rebuild()
-WorkflowDetailRead.model_rebuild()
 PublishWorkflowVersionResponse.model_rebuild()

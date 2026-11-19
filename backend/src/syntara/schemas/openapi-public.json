@@ -36572,7 +36572,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/WorkflowDetailRead"
+                  "$ref": "#/components/schemas/WorkflowReadWithVersion"
                 }
               }
             }
@@ -38258,11 +38258,11 @@
         }
       }
     },
-    "/workflows/{workflow_id}/check_breaking_changes": {
+    "/workflows/{workflow_id}/check_subworkflow_output_contract_changes": {
       "post": {
-        "summary": "Check for breaking changes before publishing",
-        "description": "Check a candidate workflow definition for SubWorkflow output contract changes.\n\nCompares the submitted candidate definition against the currently published version\nto detect breaking changes such as:\n- Removed outputs\n- Type changes\n- New required outputs\n\nThis endpoint does not publish the candidate definition. It should be called before\npublishing to warn users about breaking changes that may affect parent workflows.\n",
-        "operationId": "check_breaking_changes",
+        "summary": "Check for Sub-workflow output contract changes before publishing",
+        "description": "Check a candidate workflow definition for Sub-workflow output contract changes.\n\nCompares the submitted candidate definition against the currently published version\nto detect breaking changes such as:\n- Removed outputs\n- Type changes\n- New required outputs\n\nThis endpoint does not publish the candidate definition. It should be called before\npublishing to warn users about breaking changes that may affect parent workflows.\n",
+        "operationId": "check_subworkflow_output_contract_changes",
         "tags": [
           "Workflows"
         ],
@@ -38299,7 +38299,7 @@
         },
         "responses": {
           "200": {
-            "description": "Breaking changes detection result",
+            "description": "Sub-workflow output contract changes detection result",
             "content": {
               "application/json": {
                 "schema": {
@@ -51038,153 +51038,6 @@
         "type": "object",
         "title": "WorkflowReadWithVersion",
         "description": "Schema for workflow response with current version details.\n\nUsed when retrieving a single workflow to include the active workflow definition.",
-        "required": [
-          "name",
-          "id",
-          "current_version",
-          "is_enabled",
-          "project_id",
-          "created_at",
-          "updated_at",
-          "version"
-        ],
-        "properties": {
-          "name": {
-            "type": "string",
-            "maxLength": 255,
-            "minLength": 1,
-            "title": "Name",
-            "description": "Workflow name"
-          },
-          "description": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 2000
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Description",
-            "description": "Workflow description"
-          },
-          "labels": {
-            "additionalProperties": {
-              "type": "string"
-            },
-            "type": "object",
-            "title": "Labels",
-            "description": "Workflow labels"
-          },
-          "id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Id"
-          },
-          "current_version": {
-            "type": "integer",
-            "title": "Current Version"
-          },
-          "is_builtin": {
-            "type": "boolean",
-            "default": false,
-            "title": "Is Builtin"
-          },
-          "is_enabled": {
-            "type": "boolean",
-            "title": "Is Enabled"
-          },
-          "has_validation_issues": {
-            "type": "boolean",
-            "default": false,
-            "title": "Has Validation Issues"
-          },
-          "created_by": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/UserReference"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "User who created the workflow",
-            "readOnly": true,
-            "title": "Created By"
-          },
-          "updated_by": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/UserReference"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "User who last modified the workflow",
-            "readOnly": true,
-            "title": "Updated By"
-          },
-          "project_id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Project Id"
-          },
-          "published_version_id": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "uuid"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Published Version Id"
-          },
-          "published_version_number": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Published Version Number"
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Created At"
-          },
-          "updated_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Updated At"
-          },
-          "validation_result": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/ValidationResult"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "Validation findings from the last save operation. Only included in create/update responses; use has_validation_issues for the durable indicator."
-          },
-          "version": {
-            "$ref": "#/components/schemas/WorkflowVersionRead",
-            "description": "Current active version details"
-          }
-        }
-      },
-      "WorkflowDetailRead": {
-        "type": "object",
-        "title": "WorkflowDetailRead",
-        "description": "Workflow detail response.",
         "required": [
           "name",
           "id",

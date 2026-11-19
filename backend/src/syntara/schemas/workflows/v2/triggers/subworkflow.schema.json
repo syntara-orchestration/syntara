@@ -18,7 +18,12 @@
       },
       "output_mapping": {
         "type": "object",
-        "description": "Template expressions mapping internal step outputs to declared output fields. Keys are dotted paths from output_schema; values are template expressions (e.g., '${step.field}').",
+        "description": "Maps dotted paths declared in output_schema to template expressions that resolve to values from child steps.",
+        "examples": [
+          {
+            "release.url": "${publish.stdout_json.url}"
+          }
+        ],
         "additionalProperties": {
           "type": "string"
         }

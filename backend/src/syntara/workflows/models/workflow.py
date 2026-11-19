@@ -269,10 +269,6 @@ class WorkflowReadWithVersion(WorkflowRead):
     version: "WorkflowVersionRead" = Field(..., description="Current active version details")
 
 
-class WorkflowDetailRead(WorkflowReadWithVersion):
-    """Workflow detail response."""
-
-
 class PublishWorkflowVersionResponse(WorkflowReadWithVersion):
     """Publish endpoint response — extends WorkflowReadWithVersion with a warning field."""
 

@@ -117,7 +117,7 @@ class TestCheckBreakingChanges:
         # Check breaking changes
         workflow_id = await _create_unpublished_workflow(jwt_client, str(test_workflow.project_id))
         response = await jwt_client.post(
-            f"/api/v1/workflows/{workflow_id}/check_breaking_changes",
+            f"/api/v1/workflows/{workflow_id}/check_subworkflow_output_contract_changes",
             json={"workflow_definition": definition},
         )
 
@@ -171,7 +171,7 @@ class TestCheckBreakingChanges:
 
         # Check breaking changes
         response = await jwt_client.post(
-            f"/api/v1/workflows/{workflow_id}/check_breaking_changes",
+            f"/api/v1/workflows/{workflow_id}/check_subworkflow_output_contract_changes",
             json={"workflow_definition": definition},
         )
 
@@ -232,7 +232,7 @@ class TestCheckBreakingChanges:
 
         # Check breaking changes
         response = await jwt_client.post(
-            f"/api/v1/workflows/{workflow_id}/check_breaking_changes",
+            f"/api/v1/workflows/{workflow_id}/check_subworkflow_output_contract_changes",
             json={"workflow_definition": definition},
         )
 
@@ -291,7 +291,7 @@ class TestCheckBreakingChanges:
 
         # Check breaking changes
         response = await jwt_client.post(
-            f"/api/v1/workflows/{workflow_id}/check_breaking_changes",
+            f"/api/v1/workflows/{workflow_id}/check_subworkflow_output_contract_changes",
             json={"workflow_definition": definition},
         )
 
@@ -348,7 +348,7 @@ class TestCheckBreakingChanges:
 
         # Check breaking changes
         response = await jwt_client.post(
-            f"/api/v1/workflows/{workflow_id}/check_breaking_changes",
+            f"/api/v1/workflows/{workflow_id}/check_subworkflow_output_contract_changes",
             json={"workflow_definition": definition},
         )
 
@@ -361,7 +361,7 @@ class TestCheckBreakingChanges:
     async def test_404_when_workflow_not_found(self, jwt_client: AsyncClient) -> None:
         """Return 404 when workflow does not exist."""
         response = await jwt_client.post(
-            f"/api/v1/workflows/{uuid4()}/check_breaking_changes",
+            f"/api/v1/workflows/{uuid4()}/check_subworkflow_output_contract_changes",
             json={"workflow_definition": {"schema_version": "2.0.0", "triggers": [], "nodes": [], "edges": []}},
         )
         assert response.status_code == 404
@@ -426,7 +426,7 @@ class TestCheckBreakingChanges:
             "edges": [],
         }
         response = await jwt_client.post(
-            f"/api/v1/workflows/{workflow_id}/check_breaking_changes",
+            f"/api/v1/workflows/{workflow_id}/check_subworkflow_output_contract_changes",
             json={"workflow_definition": changed_definition},
         )
 

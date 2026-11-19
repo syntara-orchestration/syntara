@@ -105,7 +105,7 @@ class TestHelperFunctions:
         assert is_list_operation("what_can_i", properties)
 
         # Action responses can contain arrays without being collection endpoints.
-        assert not is_list_operation("check_breaking_changes", {"triggers": {"type": "array"}})
+        assert not is_list_operation("check_subworkflow_output_contract_changes", {"triggers": {"type": "array"}})
 
     def test_is_list_operation_rejects_single_resource(self) -> None:
         """Test that operations with id field but no array are NOT list endpoints."""

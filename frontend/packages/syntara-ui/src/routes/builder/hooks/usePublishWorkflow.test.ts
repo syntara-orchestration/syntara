@@ -41,7 +41,7 @@ vi.mock('../utils/workflowDefinitionBuilder', () => ({
 vi.mock('../../../client', () => ({
   workflowClient: {
     useMutation: vi.fn((_method: string, path: string) => {
-      if (path.includes('/check_breaking_changes')) {
+      if (path.includes('/check_subworkflow_output_contract_changes')) {
         return { mutate: mockCheckBreakingChangesMutate, isPending: false }
       }
       if (path.includes('/publish')) {

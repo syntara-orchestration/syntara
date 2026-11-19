@@ -213,7 +213,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/WorkflowDetailRead'
+                $ref: '#/components/schemas/WorkflowReadWithVersion'
         '400':
           $ref: '../../base/shared-resources.openapi.yaml#/components/responses/BadRequestError'
         '401':
@@ -641,11 +641,11 @@ paths:
           $ref: "../../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
         '500':
           $ref: '../../base/shared-resources.openapi.yaml#/components/responses/InternalServerError'
-  /workflows/{workflow_id}/check_breaking_changes:
+  /workflows/{workflow_id}/check_subworkflow_output_contract_changes:
     post:
-      summary: Check for breaking changes before publishing
+      summary: Check for Sub-workflow output contract changes before publishing
       description: |
-        Check a candidate workflow definition for SubWorkflow output contract changes.
+        Check a candidate workflow definition for Sub-workflow output contract changes.
 
         Compares the submitted candidate definition against the currently published version
         to detect breaking changes such as:
@@ -655,7 +655,7 @@ paths:
 
         This endpoint does not publish the candidate definition. It should be called before
         publishing to warn users about breaking changes that may affect parent workflows.
-      operationId: check_breaking_changes
+      operationId: check_subworkflow_output_contract_changes
       tags:
         - Workflows
       security:
@@ -679,7 +679,7 @@ paths:
               $ref: '#/components/schemas/WorkflowValidateRequest'
       responses:
         '200':
-          description: Breaking changes detection result
+          description: Sub-workflow output contract changes detection result
           content:
             application/json:
               schema:
@@ -978,8 +978,6 @@ components:
       $ref: ./shared-schemas.yaml#/components/schemas/WorkflowRead
     WorkflowReadWithVersion:
       $ref: ./shared-schemas.yaml#/components/schemas/WorkflowReadWithVersion
-    WorkflowDetailRead:
-      $ref: ./shared-schemas.yaml#/components/schemas/WorkflowDetailRead
     WorkflowInvocationTriggerSchema:
       $ref: ./shared-schemas.yaml#/components/schemas/WorkflowInvocationTriggerSchema
     WorkflowInvocationSchemaRead:

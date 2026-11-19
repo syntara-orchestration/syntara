@@ -374,8 +374,6 @@ __all__ = (
     "WorkflowDefinition",
     "WorkflowDefinitionEdgesItem",
     "WorkflowDefinitionTriggersItem",
-    "WorkflowDetailRead",
-    "WorkflowDetailReadLabels",
     "WorkflowInvocationSchemaRead",
     "WorkflowInvocationTriggerSchema",
     "WorkflowInvocationTriggerSchemaInputSchema",

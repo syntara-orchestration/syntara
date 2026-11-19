@@ -86,7 +86,7 @@ export function usePublishWorkflow({
 
   const { mutate: checkBreakingChangesMutation, isPending: isCheckingBreakingChanges } = workflowClient.useMutation(
     'post',
-    '/workflows/{workflow_id}/check_breaking_changes'
+    '/workflows/{workflow_id}/check_subworkflow_output_contract_changes'
   )
 
   const reviewOutputContract = useCallback(

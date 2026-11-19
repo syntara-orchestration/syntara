@@ -51,7 +51,7 @@ vi.mock('../../../client', () => ({
       refetch: mockRefetch,
     })),
     useMutation: vi.fn((_method: string, path: string) => ({
-      mutate: path.includes('/check_breaking_changes') ? mockCheckBreakingChangesMutate : mockMutate,
+      mutate: path.includes('/check_subworkflow_output_contract_changes') ? mockCheckBreakingChangesMutate : mockMutate,
       isPending: false,
     })),
   },
