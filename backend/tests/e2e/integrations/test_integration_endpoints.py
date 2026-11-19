@@ -35,6 +35,7 @@ from syntara_api_client.models.integration_update import IntegrationUpdate
 from syntara_api_client.models.llm_provider_configuration import LLMProviderConfiguration
 from syntara_api_client.models.llm_provider_hint import LLMProviderHint
 from syntara_api_client.models.mcp_server_configuration_input import MCPServerConfigurationInput
+from syntara_api_client.models.openshift_configuration import OpenShiftConfiguration
 
 pytestmark = [pytest.mark.e2e]
 
@@ -100,6 +101,22 @@ def e2e_aap_credential_id(syntara_api: SyntaraApiRegistry, first_project_id: UUI
         pass
 
 
+@pytest.fixture
+def e2e_openshift_credential_id(syntara_api: SyntaraApiRegistry, first_project_id: UUID) -> Generator[UUID, None, None]:
+    """Create an OpenShift credential for integration e2e tests."""
+    cred_id = _create_credential(
+        syntara_api,
+        "HTTP Bearer Token",
+        first_project_id,
+        {"token": "test-token"},
+    )
+    yield cred_id
+    try:
+        syntara_api.credentials.delete(credential_id=cred_id)
+    except Exception:
+        pass
+
+
 # ---------------------------------------------------------------------------
 # Integration create helpers
 # ---------------------------------------------------------------------------
@@ -137,6 +154,15 @@ def _aap_create(name: str | None = None, management_credential_id: UUID | None =
     )
 
 
+def _openshift_create(name: str | None = None, management_credential_id: UUID | None = None) -> IntegrationCreate:
+    return IntegrationCreate(
+        name=name or unique_name("e2e-openshift"),
+        integration_type=IntegrationType.OPENSHIFT,
+        configuration=OpenShiftConfiguration(base_url="https://93.184.216.34:6443"),
+        management_credential_id=management_credential_id,
+    )
+
+
 class TestCreateIntegration:
     """POST /api/v1/integrations."""
 
@@ -159,6 +185,23 @@ class TestCreateIntegration:
         result = integration_factory(_aap_create(management_credential_id=e2e_aap_credential_id))
         assert result["integration_type"] == "ansible_automation_platform"
         assert result["configuration"]["insecure_skip_tls_verify"] is False
+
+    def test_create_duplicate_openshift_returns_409(
+        self,
+        syntara_api: SyntaraApiRegistry,
+        integration_factory: Callable[..., dict[str, Any]],
+        e2e_openshift_credential_id: UUID,
+    ) -> None:
+        # Check if previous E2E tests created an OpenShift integration
+        existing = syntara_api.integrations.list(integration_type=IntegrationType.OPENSHIFT).assert_and_get().resources
+        if not existing:
+            integration_factory(_openshift_create(management_credential_id=e2e_openshift_credential_id))
+        resp = syntara_api.integrations.create(
+            body=_openshift_create(management_credential_id=e2e_openshift_credential_id)
+        )
+        assert resp.status_code == HTTPStatus.CONFLICT
+        assert resp.parsed is not None
+        assert resp.parsed.code == "INTEGRATION_TYPE_CONFLICT"
 
     def test_create_llm_without_credential_returns_422(self, syntara_api: SyntaraApiRegistry) -> None:
         resp = syntara_api.integrations.create(body=_llm_create())

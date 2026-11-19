@@ -22,6 +22,7 @@ def _make_minimal_workflow() -> OrchestratorWorkflow:
     """Create an OrchestratorWorkflow with only what the cancel path touches."""
     wf = OrchestratorWorkflow.__new__(OrchestratorWorkflow)
     wf.execution_id = "11111111-2222-3333-4444-555555555555"
+    wf._active_ep_nodes = set()
     return wf
 
 

@@ -71,7 +71,7 @@ def _minimal_workflow_definition() -> dict[str, Any]:
         "schema_version": "2.0.0",
         "name": "test",
         "triggers": [{"id": "t1", "type": "manual_trigger", "parameters": {}}],
-        "nodes": [{"id": "n1", "type": "script", "parameters": {"language": "python", "code": "pass"}}],
+        "nodes": [{"id": "n1", "type": "script_python", "parameters": {"code": "pass"}}],
         "edges": [{"from": "t1", "to": "n1"}],
     }
 
@@ -94,7 +94,8 @@ class TestValidateWorkflowDefinitionJson:
     def test_rejects_too_many_nodes(self) -> None:
         defn = _minimal_workflow_definition()
         defn["nodes"] = [
-            {"id": f"n{i}", "type": "script", "parameters": {}} for i in range(JsonbLimits.MAX_WORKFLOW_NODES + 1)
+            {"id": f"n{i}", "type": "script_python", "parameters": {}}
+            for i in range(JsonbLimits.MAX_WORKFLOW_NODES + 1)
         ]
         with pytest.raises(SafeValueError, match="too many nodes"):
             validate_workflow_definition_json(defn)
@@ -102,7 +103,7 @@ class TestValidateWorkflowDefinitionJson:
     def test_accepts_node_count_at_limit(self) -> None:
         defn = _minimal_workflow_definition()
         defn["nodes"] = [
-            {"id": f"n{i}", "type": "script", "parameters": {}} for i in range(JsonbLimits.MAX_WORKFLOW_NODES)
+            {"id": f"n{i}", "type": "script_python", "parameters": {}} for i in range(JsonbLimits.MAX_WORKFLOW_NODES)
         ]
         result = validate_workflow_definition_json(defn)
         assert result is defn

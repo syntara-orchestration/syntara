@@ -19,7 +19,6 @@ from __future__ import annotations
 import argparse
 import shutil
 import stat
-import sys
 from datetime import UTC, datetime, timedelta
 from ipaddress import IPv4Address
 from pathlib import Path
@@ -41,15 +40,17 @@ SERVICE_CERTS = [
     ("worker", "worker.ao.svc", ["temporal-worker"]),
     ("background-worker", "background-worker.ao.svc", ["temporal-background-worker"]),
     ("temporal", "temporal.ao.svc", ["temporal"]),
+    ("execution-plane", "execution-plane-callback.ao.svc", ["execution-plane-worker", "execution-plane-api"]),
 ]
 
-# Validate against the canonical list in principal.py
+# Validate against the canonical list in principal.py. The certificate set may
+# contain additional deployment-specific identities, such as the local EP CN.
 from syntara.core.models.principal import KNOWN_SERVICE_CNS  # noqa: E402
 
 _cert_cns = {cn for _, cn, _ in SERVICE_CERTS}
 _expected = set(KNOWN_SERVICE_CNS)
-if _cert_cns != _expected:
-    msg = f"SERVICE_CERTS CNs {_cert_cns} do not match KNOWN_SERVICE_CNS {_expected}"
+if not _expected.issubset(_cert_cns):
+    msg = f"SERVICE_CERTS CNs {_cert_cns} do not cover KNOWN_SERVICE_CNS {_expected}"
     raise RuntimeError(msg)
 
 
@@ -183,9 +184,36 @@ def _missing_service_certs() -> list[tuple[str, str, list[str]]]:
     for filename, cn, sans in SERVICE_CERTS:
         cert_path = CERTS_DIR / f"{filename}.crt"
         key_path = CERTS_DIR / f"{filename}.key"
-        if not cert_path.is_file() or not key_path.is_file():
+        if (
+            not cert_path.is_file()
+            or not key_path.is_file()
+            or not _has_expected_common_name(cert_path, cn)
+            or not _has_expected_dns_sans(cert_path, sans)
+        ):
             missing.append((filename, cn, sans))
     return missing
+
+
+def _has_expected_common_name(cert_path: Path, common_name: str) -> bool:
+    """Return whether an existing certificate retains its expected identity."""
+    try:
+        certificate = x509.load_pem_x509_certificate(cert_path.read_bytes())
+        existing = certificate.subject.get_attributes_for_oid(NameOID.COMMON_NAME)
+    except (OSError, ValueError):
+        return False
+    return bool(existing) and existing[0].value == common_name
+
+
+def _has_expected_dns_sans(cert_path: Path, dns_sans: list[str]) -> bool:
+    """Regenerate an existing certificate when a newly added service alias needs it."""
+    try:
+        cert = x509.load_pem_x509_certificate(cert_path.read_bytes())
+        existing = set(
+            cert.extensions.get_extension_for_class(x509.SubjectAlternativeName).value.get_values_for_type(x509.DNSName)
+        )
+    except (OSError, ValueError, x509.ExtensionNotFound):
+        return False
+    return set(dns_sans).issubset(existing)
 
 
 def _chmod_public_certs() -> None:
@@ -233,8 +261,8 @@ def main() -> None:
 
     print()
     print(f"[INFO] TLS certificates ready in {CERTS_DIR}")
-    print("[INFO] Services: backend, worker, background-worker, temporal")
+    print("[INFO] Services: backend, worker, background-worker, temporal, execution-plane")
 
 
 if __name__ == "__main__":
-    sys.exit(main() or 0)
+    main()

@@ -18,11 +18,6 @@ _settings = get_settings()
 AGENT_ORCHESTRATOR_BASE_URL = str(_settings.agent_orchestrator_base_url)
 APPROVALS_API_BASE_URL = str(_settings.approvals_api_base_url)
 
-# Script activity settings
-SCRIPT_CLEANUP_TERMINATE_TIMEOUT = _settings.script_cleanup_terminate_timeout
-SCRIPT_CLEANUP_KILL_TIMEOUT = _settings.script_cleanup_kill_timeout
-MAX_ENV_VAR_LENGTH = _settings.max_env_var_length
-
 # Temporal start-to-close safety ceiling used as a fallback until per-type
 # catalog lookup is wired in the engine. 30s is sufficient for condition and
 # switch nodes, which complete in milliseconds. Converge, loop, and all

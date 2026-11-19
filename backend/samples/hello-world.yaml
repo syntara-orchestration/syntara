@@ -8,10 +8,9 @@ triggers:
     parameters: {}
 nodes:
   - id: say_hello
-    type: script
+    type: script_bash
     name: Say Hello
     parameters:
-      language: bash
       environment:
         GREETING: Hello
         WORLD_NAME: World
@@ -20,10 +19,9 @@ nodes:
         echo "Current time: $(date)"
 
   - id: say_goodbye
-    type: script
+    type: script_bash
     name: Say Goodbye
     parameters:
-      language: bash
       environment:
         FAREWELL: Goodbye
       code: |

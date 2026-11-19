@@ -10,9 +10,8 @@ triggers:
 nodes:
   - id: task_with_both
     name: Task With Timeout and Retry
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       code: |
         echo "Executing task"
         sleep 1

@@ -55,8 +55,8 @@ class TestWorkflowDefinitionUpdates:
         new_node = {
             "id": "script_node_1",
             "name": "Test Script Node",
-            "type": "script",
-            "parameters": {"language": "bash", "code": "echo 'Hello'"},
+            "type": "script_bash",
+            "parameters": {"code": "echo 'Hello'"},
         }
         current_definition["nodes"].append(new_node)
 
@@ -199,20 +199,20 @@ class TestWorkflowDefinitionUpdates:
                         {
                             "id": "script_node_a",
                             "name": "Script Node A",
-                            "type": "script",
-                            "parameters": {"language": "bash", "code": "echo 'Node A'"},
+                            "type": "script_bash",
+                            "parameters": {"code": "echo 'Node A'"},
                         },
                         {
                             "id": "script_node_b",
                             "name": "Script Node B",
-                            "type": "script",
-                            "parameters": {"language": "bash", "code": "echo 'Node B'"},
+                            "type": "script_bash",
+                            "parameters": {"code": "echo 'Node B'"},
                         },
                         {
                             "id": "script_node_c",
                             "name": "Script Node C",
-                            "type": "script",
-                            "parameters": {"language": "bash", "code": "echo 'Node C'"},
+                            "type": "script_bash",
+                            "parameters": {"code": "echo 'Node C'"},
                         },
                     ],
                     "edges": [
@@ -318,14 +318,14 @@ class TestWorkflowDefinitionUpdates:
                         {
                             "id": "node_a",
                             "name": "Node A",
-                            "type": "script",
-                            "parameters": {"language": "bash", "code": "echo 'A'"},
+                            "type": "script_bash",
+                            "parameters": {"code": "echo 'A'"},
                         },
                         {
                             "id": "node_b",
                             "name": "Node B",
-                            "type": "script",
-                            "parameters": {"language": "bash", "code": "echo 'B'"},
+                            "type": "script_bash",
+                            "parameters": {"code": "echo 'B'"},
                         },
                     ],
                     "edges": [

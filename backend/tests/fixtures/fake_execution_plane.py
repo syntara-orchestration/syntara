@@ -1,0 +1,124 @@
+"""Small test double for the EP HTTP contract; never imported by application code."""
+
+from __future__ import annotations
+
+import asyncio
+import contextlib
+import json
+import os
+import sys
+from typing import TYPE_CHECKING, Any, Self
+
+from execution_plane_client.commands.results import TransportReceipt
+from execution_plane_client.commands.work import WorkExecute
+from execution_plane_client.protocol import MessageEnvelope, ResourceReference
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Coroutine
+    from uuid import UUID
+
+
+class FakeExecutionPlaneHttpClient:
+    """Return completed EP responses while running representative scripts in tests."""
+
+    def __init__(
+        self,
+        *,
+        timeout: float | None = None,
+        on_completion: Callable[[UUID, str, dict[str, Any]], Coroutine[Any, Any, None]] | None = None,
+    ) -> None:
+        """Accept the production client's request timeout configuration."""
+        self.timeout = timeout
+        self.on_completion = on_completion
+        self.work_items: dict[UUID, dict[str, Any]] = {}
+        self._completion_tasks: set[asyncio.Task[None]] = set()
+
+    async def __aenter__(self) -> Self:
+        """Mirror the production client's async context-manager contract."""
+        return self
+
+    async def __aexit__(self, *_: object) -> None:
+        """Close no resources because the test transport is in-process."""
+
+    async def submit_command(self, message: MessageEnvelope) -> TransportReceipt:
+        """Execute the shared work command and return its receipt."""
+        payload = WorkExecute.model_validate(message.command.payload)
+        result, status = await execute_fixture_script(payload.model_dump(mode="json"))
+        self.work_items[payload.work_item_id] = {"id": str(payload.work_item_id), "status": status, "result": result}
+        return TransportReceipt(
+            message_id=message.message_id,
+            resource=ResourceReference(kind="work_item", resource_id=payload.work_item_id),
+        )
+
+    async def get_work_item(self, *, work_item_id: UUID) -> dict[str, Any]:
+        """Read the separate resource state following a command receipt."""
+        response = self.work_items[work_item_id]
+        if self.on_completion is not None and response["status"] in {"completed", "failed", "cancelled"}:
+            task = asyncio.create_task(self.on_completion(work_item_id, str(response["status"]), response["result"]))
+            self._completion_tasks.add(task)
+            task.add_done_callback(self._completion_tasks.discard)
+            # Let the callback complete the Temporal activity instead of racing
+            # it with an immediate result that bypasses output validation.
+            return {"id": response["id"], "status": "running", "result": None}
+        return response
+
+
+async def execute_fixture_script(payload: dict[str, Any]) -> tuple[dict[str, Any], str]:
+    """Run a test script as a local stand-in for a separately deployed EP service."""
+    if "invocation" in payload:
+        invocation = payload["invocation"]
+        input_config = invocation["inputs"]
+        language = "bash" if invocation.get("step_revision_id", "").endswith(".script-bash") else "python"
+    else:
+        input_config = payload["input_config"]
+        language = input_config.get("language", "python")
+    code = input_config["code"]
+    command = ["bash", "-c", code] if language == "bash" else [sys.executable, "-c", code]
+    environment = {
+        key: value
+        for key, value in os.environ.items()
+        if key in {"HOME", "LANG", "LC_ALL", "LC_CTYPE", "PATH", "SHELL", "TEMP", "TERM", "TMPDIR", "TZ", "USER"}
+    }
+    environment.update({key: str(value) for key, value in (input_config.get("environment") or {}).items()})
+    process = await asyncio.create_subprocess_exec(
+        *command,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+        env=environment,
+    )
+    timeout = max(1, int(input_config.get("_engine_timeout_seconds", 300)))
+    try:
+        stdout_bytes, stderr_bytes = await asyncio.wait_for(process.communicate(), timeout=timeout)
+    except TimeoutError:
+        process.kill()
+        await process.wait()
+        return {"error": "Script execution timed out", "error_type": "TimeoutError"}, "failed"
+    stdout = stdout_bytes[: 1024 * 1024].decode("utf-8", errors="replace")
+    stderr = stderr_bytes[: 1024 * 1024].decode("utf-8", errors="replace")
+    if process.returncode:
+        return {
+            "error": f"Script failed with exit code {process.returncode}",
+            "error_type": "ScriptExecutionError",
+            "exit_code": process.returncode,
+            "stdout": stdout,
+            "stderr": stderr,
+        }, "failed"
+
+    stdout_json: Any = None
+    if language == "python" and stdout.strip():
+        try:
+            stdout_json = json.loads(stdout)
+        except json.JSONDecodeError:
+            with contextlib.suppress(json.JSONDecodeError):
+                stdout_json = json.loads([line for line in stdout.splitlines() if line.strip()][-1])
+    output: dict[str, Any] = {
+        "return_code": process.returncode,
+        "stdout": stdout,
+        "stderr": stderr,
+    }
+    if language == "python":
+        output["stdout_json"] = stdout_json
+    output_config = payload.get("output_config")
+    if output_config is not None:
+        output = {key: output[key] for key in output_config if key in output}
+    return {"output": output}, "completed"

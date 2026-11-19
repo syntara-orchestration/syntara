@@ -31,6 +31,13 @@ from syntara.workflow_runtime.engines.temporal.activities.credential_resolution_
     resolve_workflow_credentials,
 )
 from syntara.workflow_runtime.engines.temporal.activities.eda_trigger import eda_trigger
+from syntara.workflow_runtime.engines.temporal.activities.ep.ep_cancellation_activity import (
+    cancel_execution_plane_work_activity,
+)
+from syntara.workflow_runtime.engines.temporal.activities.ep.ep_dispatch_activity import (
+    execute_bash_script_activity,
+    execute_python_script_activity,
+)
 from syntara.workflow_runtime.engines.temporal.activities.http_request_activity import execute_http_request_activity
 from syntara.workflow_runtime.engines.temporal.activities.integration_resolution_activity import (
     resolve_workflow_integration,
@@ -52,7 +59,6 @@ from syntara.workflow_runtime.engines.temporal.activities.runtime_settings_activ
     fetch_workflow_runtime_settings,
 )
 from syntara.workflow_runtime.engines.temporal.activities.scheduled_trigger import scheduled_trigger
-from syntara.workflow_runtime.engines.temporal.activities.script_activity import execute_script_activity
 from syntara.workflow_runtime.engines.temporal.activities.switch import switch
 from syntara.workflow_runtime.engines.temporal.activities.wait_activity import complete_wait, wait
 from syntara.workflow_runtime.engines.temporal.activities.webhook_trigger import webhook_trigger
@@ -87,7 +93,9 @@ _TEMPORAL_ACTIVITIES: list[Callable[..., Any]] = [
     loop,
     manual_trigger,
     scheduled_trigger,
-    execute_script_activity,
+    execute_python_script_activity,
+    execute_bash_script_activity,
+    cancel_execution_plane_work_activity,
     wait,
     complete_wait,
     webhook_trigger,

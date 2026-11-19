@@ -20,6 +20,7 @@ from temporalio.client import Client, WorkflowHandle, WorkflowHistoryEventFilter
 from temporalio.exceptions import TemporalError
 
 from syntara.audit.dispatcher import AuditEventDispatcher
+from syntara.execution_plane.utils import execution_plane_work_item_id
 from syntara.workflow_core.models import NodeType
 from syntara.workflow_runtime.engines.temporal.services.activity_execution_state import ActivityExecutionStateMixin
 from syntara.workflow_runtime.engines.temporal.services.activity_execution_sync import ActivityExecutionSyncMixin
@@ -693,6 +694,7 @@ class ActivitySyncService(
 
                     # V2 workflows: Create records for all node types (triggers, control, executors)
                     new_activity = ActivityExecution(
+                        id=execution_plane_work_item_id(execution_id, activity_id),
                         execution_id=execution_id,
                         activity_name=activity_id,
                         node_type=node_type,

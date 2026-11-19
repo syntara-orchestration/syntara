@@ -16,12 +16,13 @@ from collections.abc import Callable
 from datetime import UTC, datetime
 from http import HTTPStatus
 from typing import Any
-from uuid import UUID
+from uuid import UUID, uuid5
 
 import pytest
 from orchestrator_test_sdk.e2e import unique_name
 from orchestrator_test_sdk.e2e.helpers import _retry_api_call, create_and_run_workflow, poll_for_pending_approval
 from syntara_api_client.api import SyntaraApiRegistry
+from syntara_api_client.client import AuthenticatedClient
 from syntara_api_client.models import (
     ExecutionCreate,
     WorkflowCreate,
@@ -53,6 +54,26 @@ def _workflow_definition_with_nodes(
             "edges": edges or [],
         }
     )
+
+
+def _list_work_items(
+    syntara_client: AuthenticatedClient,
+    syntara_base_url: str,
+    work_item_id: UUID,
+) -> list[dict[str, Any]]:
+    """List one work item through the AO Execution Plane facade."""
+    response = _retry_api_call(
+        lambda: syntara_client.get_httpx_client().get(
+            f"{syntara_base_url}/api/execution_plane/v1/work_items",
+            params={"id": str(work_item_id), "limit": 10, "include_total": "true"},
+        )
+    )
+    response.raise_for_status()
+    body = response.json()
+    resources = body.get("resources") if isinstance(body, dict) else None
+    if not isinstance(resources, list):
+        pytest.fail(f"Unexpected Execution Plane work-item payload: {body!r}")
+    return [resource for resource in resources if isinstance(resource, dict)]
 
 
 class TestWorkflowExecution:
@@ -89,8 +110,8 @@ class TestWorkflowExecution:
                 {
                     "id": "script_node",
                     "name": "Hello Script",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": "echo 'Hello from execution test'"},
+                    "type": "script_bash",
+                    "parameters": {"code": "echo 'Hello from execution test'"},
                 },
                 edges=[{"from": "trigger_manual", "to": "script_node"}],
             ),
@@ -118,7 +139,7 @@ class TestWorkflowExecution:
 
         # Step 3: Poll execution status and verify state transitions
         # Expected states: pending → running → completed
-        max_polls = 30  # Maximum number of status checks (30 * 2s = 60s timeout)
+        max_polls = 60  # Maximum number of status checks (60 * 2s = 120s timeout)
         poll_interval = 2  # seconds between polls
 
         states_observed = set()
@@ -195,20 +216,20 @@ class TestWorkflowExecution:
                 {
                     "id": "node_a",
                     "name": "First Script",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": "echo 'Output from node A'"},
+                    "type": "script_bash",
+                    "parameters": {"code": "echo 'Output from node A'"},
                 },
                 {
                     "id": "node_b",
                     "name": "Second Script",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": "echo 'Output from node B'"},
+                    "type": "script_bash",
+                    "parameters": {"code": "echo 'Output from node B'"},
                 },
                 {
                     "id": "node_c",
                     "name": "Third Script",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": "echo 'Output from node C'"},
+                    "type": "script_bash",
+                    "parameters": {"code": "echo 'Output from node C'"},
                 },
                 edges=[
                     {"from": "trigger_manual", "to": "node_a"},
@@ -227,7 +248,7 @@ class TestWorkflowExecution:
         execution_id = execution.id
 
         # Step 2: Poll until execution completes
-        max_polls = 30
+        max_polls = 60
         poll_interval = 2
         final_execution = None
 
@@ -332,8 +353,8 @@ class TestWorkflowExecution:
                 {
                     "id": "script_node",
                     "name": "Conditional Script",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": "echo 'Running script'; exit 0"},
+                    "type": "script_bash",
+                    "parameters": {"code": "echo 'Running script'; exit 0"},
                 },
                 edges=[{"from": "trigger_manual", "to": "script_node"}],
             ),
@@ -359,8 +380,8 @@ class TestWorkflowExecution:
             {
                 "id": "script_node",
                 "name": "Failing Script",
-                "type": "script",
-                "parameters": {"language": "bash", "code": "echo 'This will fail'; exit 1"},
+                "type": "script_bash",
+                "parameters": {"code": "echo 'This will fail'; exit 1"},
             },
             edges=[{"from": "trigger_manual", "to": "script_node"}],
         )
@@ -378,7 +399,7 @@ class TestWorkflowExecution:
             expected_failed += 1
 
         # Wait for all executions to reach a terminal state
-        max_polls = 30
+        max_polls = 60
         poll_interval = 2
         terminal_states = {"completed", "failed", "cancelled"}
 
@@ -503,8 +524,8 @@ class TestWorkflowExecution:
                 {
                     "id": "post_approval_script",
                     "name": "Post-Approval Step",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": "echo 'approved path executed'"},
+                    "type": "script_bash",
+                    "parameters": {"code": "echo 'approved path executed'"},
                 },
                 edges=[
                     {"from": "trigger_manual", "to": "approval_gate"},
@@ -570,12 +591,92 @@ class TestWorkflowExecution:
             "Completed time should be after created time"
         )
 
+    def test_cancel_execution_cancels_execution_plane_work(
+        self,
+        syntara_api: SyntaraApiRegistry,
+        syntara_client: AuthenticatedClient,
+        syntara_base_url: str,
+        workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
+        first_project_id: UUID,
+    ):
+        """Cancelling an execution cancels its in-flight Execution Plane work.
+
+        The script sleeps for five minutes, but the test waits only until EP
+        records the work item, cancels the execution, and polls for EP to mark
+        that work item cancelled.
+        """
+        workflow_name = unique_name("e2e-cancel-ep-work")
+
+        workflow_data = WorkflowCreate(
+            name=workflow_name,
+            description="Workflow for cancelling in-flight Execution Plane work",
+            project_id=first_project_id,
+            workflow_definition=_workflow_definition_with_nodes(
+                workflow_name,
+                {
+                    "id": "script_node",
+                    "name": "Long Script",
+                    "type": "script_bash",
+                    "parameters": {"code": "sleep 300"},
+                },
+                edges=[{"from": "trigger_manual", "to": "script_node"}],
+            ),
+        )
+        workflow = workflow_factory(workflow_data)
+        execution = syntara_api.executions.create(
+            body=ExecutionCreate(workflow_id=workflow.id, trigger_node_id="trigger_manual")
+        ).assert_and_get()
+        execution_id = UUID(str(execution.id))
+        work_item_id = uuid5(execution_id, "script_node")
+
+        work_items: list[dict[str, Any]] = []
+        for _ in range(30):
+            work_items = _list_work_items(syntara_client, syntara_base_url, work_item_id)
+            if work_items:
+                break
+            time.sleep(1)
+
+        assert work_items, f"Execution Plane work item {work_item_id} did not appear within 30s"
+
+        cancel_response = syntara_api.executions.cancel(execution_id=execution_id)
+        assert cancel_response.status_code == HTTPStatus.ACCEPTED, (
+            f"Expected 202 Accepted, got {cancel_response.status_code}: {cancel_response.content!r}"
+        )
+
+        cancelled_execution = None
+        cancelled_work_items: list[dict[str, Any]] = []
+        for _ in range(45):
+            current_execution = syntara_api.executions.get(
+                execution_id=execution_id, include="activities"
+            ).assert_and_get()
+            if str(current_execution.status) == "cancelled":
+                cancelled_execution = current_execution
+
+            cancelled_work_items = _list_work_items(syntara_client, syntara_base_url, work_item_id)
+            if (
+                cancelled_execution
+                and cancelled_work_items
+                and all(work_item.get("status") == "cancelled" for work_item in cancelled_work_items)
+            ):
+                break
+
+            time.sleep(1)
+
+        assert cancelled_execution is not None, (
+            f"Execution did not transition to cancelled within 45s. Last status: {current_execution.status!s}"
+        )
+        assert cancelled_work_items, f"Execution Plane work item {work_item_id} disappeared after cancellation"
+        work_item_statuses = {work_item.get("status") for work_item in cancelled_work_items}
+        assert work_item_statuses == {"cancelled"}, (
+            f"Execution Plane work item should be cancelled, got {work_item_statuses}"
+        )
+
 
 # ---------------------------------------------------------------------------
 # API-36: Parallel Branches
 # ---------------------------------------------------------------------------
 
-PARALLEL_POLL_TIMEOUT = 45  # seconds — parallel wait branches take ~5s wall-clock
+PARALLEL_POLL_TIMEOUT = 120  # seconds — CI load can delay parallel Execution Plane nodes
 
 
 class TestParallelBranches:
@@ -633,8 +734,8 @@ class TestParallelBranches:
                     {
                         "id": "final",
                         "name": "Final Step",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo 'both branches done'"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo 'both branches done'"},
                     },
                 ],
                 "edges": [
@@ -694,27 +795,27 @@ class TestParallelBranches:
                     {
                         "id": "branch_a",
                         "name": "Branch A",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo A"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo A"},
                     },
                     {
                         "id": "branch_b",
                         "name": "Branch B",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo B"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo B"},
                     },
                     {
                         "id": "branch_c",
                         "name": "Branch C",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo C"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo C"},
                     },
                     {"id": "join", "name": "Converge", "type": "converge", "parameters": {}},
                     {
                         "id": "final",
                         "name": "Final",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo done"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo done"},
                     },
                 ],
                 "edges": [
@@ -782,20 +883,20 @@ class TestNodeFailurePropagation:
                     {
                         "id": "node_a",
                         "name": "Node A — Succeeds",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo 'node A ok'"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo 'node A ok'"},
                     },
                     {
                         "id": "node_b",
                         "name": "Node B — Fails",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo 'node B failing'; exit 1"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo 'node B failing'; exit 1"},
                     },
                     {
                         "id": "node_c",
                         "name": "Node C — Should Not Run",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo 'node C ran (unexpected)'"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo 'node C ran (unexpected)'"},
                     },
                 ],
                 "edges": [
@@ -804,7 +905,7 @@ class TestNodeFailurePropagation:
                     {"from": "node_b", "to": "node_c"},
                 ],
             },
-            timeout=45,
+            timeout=120,
         )
 
         # Overall execution must fail.
@@ -843,20 +944,20 @@ class TestNodeFailurePropagation:
                     {
                         "id": "fail_first",
                         "name": "Fail First",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "exit 1"},
+                        "type": "script_bash",
+                        "parameters": {"code": "exit 1"},
                     },
                     {
                         "id": "node_b",
                         "name": "Node B",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo B"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo B"},
                     },
                     {
                         "id": "node_c",
                         "name": "Node C",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo C"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo C"},
                     },
                 ],
                 "edges": [
@@ -865,7 +966,7 @@ class TestNodeFailurePropagation:
                     {"from": "node_b", "to": "node_c"},
                 ],
             },
-            timeout=45,
+            timeout=120,
         )
 
         assert result.status == ExecutionStatus.FAILED, f"Expected 'failed', got '{result.status}'"
@@ -900,14 +1001,14 @@ class TestNodeFailurePropagation:
                     {
                         "id": "branch_ok",
                         "name": "Branch OK",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo 'ok branch'"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo 'ok branch'"},
                     },
                     {
                         "id": "branch_fail",
                         "name": "Branch Fail",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "exit 1"},
+                        "type": "script_bash",
+                        "parameters": {"code": "exit 1"},
                     },
                     {
                         "id": "join",
@@ -923,7 +1024,7 @@ class TestNodeFailurePropagation:
                     {"from": "branch_fail", "to": "join"},
                 ],
             },
-            timeout=45,
+            timeout=120,
         )
 
         # The workflow as a whole fails because one branch failed.

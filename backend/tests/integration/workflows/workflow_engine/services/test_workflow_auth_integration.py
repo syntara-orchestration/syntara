@@ -22,11 +22,14 @@ from temporalio.exceptions import ApplicationError
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
 
+from syntara.workflow_runtime.engines.temporal.activities.ep.ep_dispatch_activity import (
+    execute_bash_script_activity,
+    execute_python_script_activity,
+)
 from syntara.workflow_runtime.engines.temporal.activities.manual_trigger import manual_trigger
 from syntara.workflow_runtime.engines.temporal.activities.runtime_settings_activity import (
     fetch_workflow_runtime_settings,
 )
-from syntara.workflow_runtime.engines.temporal.activities.script_activity import execute_script_activity
 from syntara.workflow_runtime.engines.temporal.client_interceptor import WorkflowAuthClientInterceptor
 from syntara.workflow_runtime.engines.temporal.dynamic_workflow import OrchestratorWorkflow
 from syntara.workflow_runtime.engines.temporal.interceptors.auth_interceptor import WorkflowAuthInterceptor
@@ -34,6 +37,7 @@ from syntara.workflow_runtime.engines.temporal.schedule_parser import build_sche
 from syntara.workflow_runtime.engines.temporal.scheduled_launcher import ScheduledWorkflowLauncher
 from syntara.workflow_runtime.engines.temporal.services.temporal_execution_service import TemporalExecutionService
 from syntara.workflow_runtime.engines.temporal.workflow_auth import build_auth_header, init_signing_key
+from syntara.workflows.models.execution import Execution
 
 TASK_QUEUE = "test-auth-queue"
 
@@ -59,7 +63,8 @@ class _FixedHeaderInterceptor(Interceptor):
 
 _TEST_ACTIVITIES: list[Callable[..., object]] = [
     manual_trigger,
-    execute_script_activity,
+    execute_python_script_activity,
+    execute_bash_script_activity,
     fetch_workflow_runtime_settings,
 ]
 
@@ -89,8 +94,8 @@ SIMPLE_WORKFLOW = {
     "nodes": [
         {
             "id": "task1",
-            "type": "script",
-            "parameters": {"language": "bash", "code": "echo ok"},
+            "type": "script_bash",
+            "parameters": {"code": "echo ok"},
             "settings": {"timeout": 1},
         },
     ],
@@ -177,14 +182,16 @@ class TestWorkflowAuthIntegration:
             launcher_result = await asyncio.wait_for(handle.result(), timeout=60)
             assert "execution_id" in launcher_result
 
-    async def test_schedule_baked_auth_header_accepted(self, temporal_env: WorkflowEnvironment) -> None:
+    async def test_schedule_baked_auth_header_accepted(
+        self, temporal_env: WorkflowEnvironment, test_execution: Execution
+    ) -> None:
         """A workflow submitted with build_auth_header (schedule path) must execute."""
         init_signing_key()
 
         workflow_id = f"sched-auth-test-{uuid4()}"
         workflow_args: list[object] = [
             SIMPLE_WORKFLOW,
-            str(uuid4()),
+            str(test_execution.id),
             "trigger_manual",
             {},
             False,
@@ -216,9 +223,11 @@ class TestWorkflowAuthIntegration:
             )
 
             workflow_result = await asyncio.wait_for(handle.result(), timeout=30)
-            assert workflow_result["status"] == "completed"
+            assert workflow_result["status"] == "completed", f"Unexpected workflow result: {workflow_result!r}"
 
-    async def test_authorized_workflow_succeeds(self, temporal_env: WorkflowEnvironment) -> None:
+    async def test_authorized_workflow_succeeds(
+        self, temporal_env: WorkflowEnvironment, test_execution: Execution
+    ) -> None:
         """A workflow submitted with valid HMAC header must execute."""
         init_signing_key()
 
@@ -241,12 +250,20 @@ class TestWorkflowAuthIntegration:
             )
 
             result = await service.start_workflow(
+                execution_id=str(test_execution.id),
                 workflow_def=SIMPLE_WORKFLOW,
                 workflow_name="auth-test",
                 trigger_node_id="trigger_manual",
-                workflow_metadata=TEST_WORKFLOW_METADATA,
+                workflow_metadata={
+                    "workflow_context": {
+                        "workflow": {
+                            "project_id": str(test_execution.project_id),
+                            "id": str(test_execution.workflow_id),
+                        }
+                    }
+                },
             )
 
             handle = authed_client.get_workflow_handle(result.temporal_workflow_id, run_id=result.temporal_run_id)
             workflow_result = await asyncio.wait_for(handle.result(), timeout=30)
-            assert workflow_result["status"] == "completed"
+            assert workflow_result["status"] == "completed", f"Unexpected workflow result: {workflow_result!r}"

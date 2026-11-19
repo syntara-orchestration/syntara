@@ -176,6 +176,46 @@ class TestExtractCredentialIds:
         )
         assert WorkflowService._extract_credential_ids(wf) == {"direct-cred", "conn-cred"}
 
+    def test_script_credential_bindings(self) -> None:
+        wf = self._wf(
+            [
+                {
+                    "id": "n1",
+                    "parameters": {
+                        "credential_bindings": [
+                            {"credential_recipe_id": "acme.echo.api-token", "credential_ref": "bound-cred-1"},
+                            {"credential_recipe_id": "acme.echo.workspace-token", "credential_ref": "bound-cred-2"},
+                        ]
+                    },
+                }
+            ]
+        )
+        assert WorkflowService._extract_credential_ids(wf) == {"bound-cred-1", "bound-cred-2"}
+
+    def test_non_object_credential_bindings_ignored_and_logged(self, caplog: pytest.LogCaptureFixture) -> None:
+        wf = self._wf(
+            [
+                {
+                    "id": "n1",
+                    "parameters": {
+                        "credential_bindings": [
+                            None,
+                            {
+                                "credential_recipe_id": "acme.echo.api-token",
+                                "credential_ref": "bound-cred-1",
+                            },
+                        ]
+                    },
+                }
+            ]
+        )
+
+        with caplog.at_level("WARNING", logger="syntara.workflows.services.workflow_service"):
+            credential_ids = WorkflowService._extract_credential_ids(wf)
+
+        assert credential_ids == {"bound-cred-1"}
+        assert "Invalid credential binding shape" in caplog.text
+
     def test_node_without_parameters_skipped(self) -> None:
         wf = self._wf([{"id": "n1"}])
         assert WorkflowService._extract_credential_ids(wf) == set()

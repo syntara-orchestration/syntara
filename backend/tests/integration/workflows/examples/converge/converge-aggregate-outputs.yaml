@@ -10,21 +10,18 @@ nodes:
     type: fork
 
   - id: data_task1
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       code: "echo '{\"value\": 10}'"
 
   - id: data_task2
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       code: "echo '{\"value\": 20}'"
 
   - id: data_task3
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       code: "echo '{\"value\": 30}'"
 
   - id: parallel_aggregate_join

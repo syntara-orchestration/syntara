@@ -30,8 +30,8 @@ def valid_workflow_dict() -> dict[str, Any]:
         "nodes": [
             {
                 "id": "task1",
-                "type": "script",
-                "parameters": {"language": "bash", "code": "echo test"},
+                "type": "script_bash",
+                "parameters": {"code": "echo test"},
             }
         ],
         "edges": [{"from": "trigger_manual", "to": "task1"}],

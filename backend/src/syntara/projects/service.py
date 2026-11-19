@@ -14,6 +14,7 @@ from syntara.authz.models.assignments import RoleAssignment
 from syntara.authz.models.project import Project
 from syntara.core.models import User
 from syntara.core.services import BaseService
+from syntara.execution_plane.deletion import schedule_work_item_deletion
 from syntara.projects.schemas import ProjectListResponse
 
 logger = structlog.stdlib.get_logger(__name__)
@@ -220,6 +221,7 @@ class ProjectService(BaseService):
         await self._cascade_cleanup_project_resources(project_id)
         await self.session.delete(project)
         await self.session.commit()
+        schedule_work_item_deletion(owner_field="project_id", owner_id=project_id)
 
     async def _check_no_active_executions(self, project_id: UUID) -> None:
         """Raise 409 if the project has any non-terminal executions.

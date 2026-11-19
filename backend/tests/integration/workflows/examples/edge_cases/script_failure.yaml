@@ -10,9 +10,8 @@ triggers:
 nodes:
   - id: failing_script
     name: Script That Fails
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       code: |
         echo "This script will fail" >&2
         exit 1

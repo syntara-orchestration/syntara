@@ -160,6 +160,7 @@ export const IntegrationTypeEnum = {
   MCP_SERVER: 'mcp_server',
   LLM_PROVIDER: 'llm_provider',
   ANSIBLE_AUTOMATION_PLATFORM: 'ansible_automation_platform',
+  OPENSHIFT: 'openshift',
 } as const
 
 /**
@@ -184,6 +185,7 @@ export const IntegrationStatusEnum = {
   AVAILABLE: 'available',
   ERROR: 'error',
 } as const
+
 export type WorkflowsResponse =
   WorkflowAPI.paths['/workflows']['get']['responses']['200']['content']['application/json']
 export type WorkflowWithVersion = WorkflowAPI.components['schemas']['WorkflowReadWithVersion']
@@ -230,7 +232,11 @@ export interface NodeSettings {
 // Parameters Type Aliases (from Pydantic models via OpenAPI spec)
 // ============================================================================
 
-export type ScriptConfig = WorkflowAPI.components['schemas']['ScriptExecutorParameters']
+/** Internal builder representation; API workflow nodes use distinct Python and Bash types. */
+export type ScriptConfig = (
+  | WorkflowAPI.components['schemas']['PythonScriptExecutorParameters']
+  | WorkflowAPI.components['schemas']['BashScriptExecutorParameters']
+) & { language?: string }
 export type HttpRequestConfig = WorkflowAPI.components['schemas']['APIExecutorParameters']
 export type AgenticConfig = WorkflowAPI.components['schemas']['AgenticExecutorParameters']
 export type AAPJobTemplateConfig = WorkflowAPI.components['schemas']['AAPJobTemplateExecutorParameters']

@@ -27,7 +27,8 @@ from syntara.workflow_runtime.engines.temporal.constants import (
 # Approval and converge are excluded — they use dedicated parameters fields
 # (decision_window and wait_duration) resolved by their own functions below.
 _TIMEOUT_CATALOG_KEYS: dict[str, str] = {
-    NodeType.SCRIPT: "workflow_engine.script_timeout_seconds",
+    NodeType.SCRIPT_PYTHON: "workflow_engine.script_timeout_seconds",
+    NodeType.SCRIPT_BASH: "workflow_engine.script_timeout_seconds",
     NodeType.HTTP_REQUEST: "workflow_engine.http_request_timeout_seconds",
     NodeType.AAP_JOB_TEMPLATE: "workflow_engine.aap_timeout_seconds",
     NodeType.AAP_WORKFLOW_JOB_TEMPLATE: "workflow_engine.aap_timeout_seconds",
@@ -35,7 +36,8 @@ _TIMEOUT_CATALOG_KEYS: dict[str, str] = {
 }
 
 _MAX_OUTPUT_CATALOG_KEYS: dict[str, str] = {
-    NodeType.SCRIPT: "workflow_engine.script_max_output_kb",
+    NodeType.SCRIPT_PYTHON: "workflow_engine.script_max_output_kb",
+    NodeType.SCRIPT_BASH: "workflow_engine.script_max_output_kb",
 }
 
 _BYTES_PER_KB = 1024

@@ -11,9 +11,8 @@ nodes:
   # Node 1: Bash script that outputs a timeout value
   - id: generate_timeout
     name: Generate Timeout
-    type: script
+    type: script_bash
     config:
-      language: bash
       code: |
         echo '{"timeout_value": 120}'
     outputs:
@@ -22,9 +21,8 @@ nodes:
   # Node 2: Python script that uses the timeout from Node 1
   - id: use_timeout
     name: Use Timeout
-    type: script
+    type: script_python
     config:
-      language: python
       # Config resolution: Use timeout from previous node's output
       timeout: ${generate_timeout.output.config.timeout_value}
       code: |

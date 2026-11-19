@@ -91,7 +91,7 @@ class TestApprovalErrorScenarios:
             next_step_approved=ActivitySummary(
                 id="next_step",
                 name="Next Step",
-                type="script",
+                type="script_python",
             ),
             next_step_rejected=None,
             workflow_context=workflow_context,

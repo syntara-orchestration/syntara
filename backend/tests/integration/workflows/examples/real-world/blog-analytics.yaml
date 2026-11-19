@@ -61,9 +61,8 @@ nodes:
 
   - id: analyze_posts
     name: Analyze Post Content
-    type: script
+    type: script_python
     parameters:
-      language: python
       environment:
         INPUT_POSTS: ${fetch_posts.body}
       code: |
@@ -105,9 +104,8 @@ nodes:
 
   - id: analyze_todos
     name: Analyze Todo Completion
-    type: script
+    type: script_python
     parameters:
-      language: python
       environment:
         INPUT_TODOS: ${fetch_todos.body}
       code: |
@@ -134,9 +132,8 @@ nodes:
 
   - id: generate_report
     name: Generate User Activity Report
-    type: script
+    type: script_python
     parameters:
-      language: python
       environment:
         INPUT_NAME: ${fetch_user.body.name}
         INPUT_USERNAME: ${fetch_user.body.username}

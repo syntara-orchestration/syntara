@@ -373,6 +373,35 @@ SYSTEM_SCOPED_REPRESENTATIVE: list[PolicyTestCase] = [
 ]
 
 # ---------------------------------------------------------------------------
+# Execution-plane policy cases — system-wide permissions from
+# syntara.api.execution_plane_facade. These entries track policies only; HTTP
+# authorization tests are not yet wired to this list.
+# ---------------------------------------------------------------------------
+
+EXECUTION_PLANE_SCOPED_CASES: list[PolicyTestCase] = [
+    PolicyTestCase(
+        "execution_target:read:any",
+        description="GET /api/execution_plane/v1/execution_targets",
+    ),
+    PolicyTestCase(
+        "execution_target:create:any",
+        description="POST /api/execution_plane/v1/execution_targets",
+    ),
+    PolicyTestCase(
+        "execution_target:update:any",
+        description="PATCH /api/execution_plane/v1/execution_targets/{target_id}",
+    ),
+    PolicyTestCase(
+        "execution_target:delete:any",
+        description="DELETE /api/execution_plane/v1/execution_targets/{target_id}",
+    ),
+    PolicyTestCase(
+        "work_item:read:any",
+        description="GET /api/execution_plane/v1/work_items",
+    ),
+]
+
+# ---------------------------------------------------------------------------
 # Self-scoped policy test cases (5)
 # Tested via test_baseline.py; included here for completeness tracking.
 # ---------------------------------------------------------------------------
@@ -408,6 +437,10 @@ OWN_SCOPED_CASES: list[PolicyTestCase] = [
 # ---------------------------------------------------------------------------
 
 E2E_COVERAGE_EXEMPT: set[str] = {
+    # Execution Plane callback service policies — covered by callback bridge tests
+    "execution-plane-callback:complete:any",
+    "execution-plane-callback:resolve-credential-cluster:any",
+    "execution-plane-callback:resolve-credential-workload:any",
     # System-scoped CRUD policies that follow the same pattern as the
     # representative cases already tested e2e (create/read tested, so
     # update/delete for the same resource are unit-test-only).

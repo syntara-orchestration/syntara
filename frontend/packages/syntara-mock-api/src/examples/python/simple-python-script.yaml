@@ -9,9 +9,8 @@ triggers:
 
 nodes:
   - id: hello_python
-    type: script
+    type: script_python
     parameters:
-      language: python
       code: |
         import json
         print(json.dumps({"message": "Hello from Python!"}))

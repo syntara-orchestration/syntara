@@ -37,8 +37,8 @@ WORKFLOW_DEFINITION: dict[str, Any] = {
         {
             "id": "a1",
             "name": "a1",
-            "type": "script",
-            "parameters": {"language": "python", "code": "print('hi')"},
+            "type": "script_python",
+            "parameters": {"code": "print('hi')"},
         }
     ],
     "edges": [{"from": "trigger_manual", "to": "a1"}],

@@ -11,7 +11,7 @@ from syntara.workflows.audit.node_execution import NodeExecutedEvent
 from syntara.workflows.models.activity_execution import ActivityExecution, ActivityStatus
 
 EXECUTION_ID = uuid4()
-NODE_DEF: dict[str, object] = {"id": "script-1", "type": "script", "name": "Test Script"}
+NODE_DEF: dict[str, object] = {"id": "script-1", "type": "script_python", "name": "Test Script"}
 NODE_DEFINITIONS_MAP: dict[str, dict[str, object]] = {"script-1": NODE_DEF}
 
 
@@ -20,7 +20,7 @@ def _make_activity(
     status: ActivityStatus,
     started_at: datetime | None = None,
     completed_at: datetime | None = None,
-    node_type: str = "script",
+    node_type: str = "script_python",
 ) -> ActivityExecution:
     return ActivityExecution(
         execution_id=EXECUTION_ID,
@@ -58,7 +58,7 @@ class TestEmitActivityTelemetry:
         registry.send_event.assert_called_once()
         event = registry.send_event.call_args[0][0]
         assert event.workflow_execution_id == EXECUTION_ID
-        assert event.node_type == "script"
+        assert event.node_type == "script_python"
         assert event.status == "completed"
         assert event.duration_ms is None
         assert event.error_type is None

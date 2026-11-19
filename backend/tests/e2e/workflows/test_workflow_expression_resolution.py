@@ -101,18 +101,16 @@ class TestExpressionResolution:
                 {
                     "id": "node_a",
                     "name": "Producer Node",
-                    "type": "script",
+                    "type": "script_python",
                     "parameters": {
-                        "language": "python",
                         "code": 'print(\'{"message": "Hello from Node A", "status": "success", "count": 42}\')',
                     },
                 },
                 {
                     "id": "node_b",
                     "name": "Consumer Node",
-                    "type": "script",
+                    "type": "script_python",
                     "parameters": {
-                        "language": "python",
                         "code": "import os; msg = os.environ.get('MESSAGE', 'default'); print(f'Received: {msg}')",
                         "environment": {
                             "MESSAGE": "${node_a.stdout_json.message}",
@@ -137,7 +135,7 @@ class TestExpressionResolution:
 
         # Expected Result 1: Execution completes successfully
         assert final_execution.status == ExecutionStatus.COMPLETED, (
-            f"Execution should complete successfully, got: {final_execution.status}"
+            f"Execution should complete successfully, got: {final_execution.status}: {final_execution.error_details}"
         )
 
         # Expected Result 2: Both nodes executed successfully
@@ -221,18 +219,16 @@ class TestExpressionResolution:
                 {
                     "id": "node_a",
                     "name": "Data Producer",
-                    "type": "script",
+                    "type": "script_python",
                     "parameters": {
-                        "language": "python",
                         "code": ('print(\'{"name": "test-user", "team": "engineering", "role": "admin"}\')'),
                     },
                 },
                 {
                     "id": "node_b",
                     "name": "Data Consumer",
-                    "type": "script",
+                    "type": "script_python",
                     "parameters": {
-                        "language": "python",
                         "code": (
                             "import os; "
                             "name = os.environ.get('USER_NAME', 'unknown'); "
@@ -262,7 +258,7 @@ class TestExpressionResolution:
 
         # Verify execution completed
         assert final_execution.status == ExecutionStatus.COMPLETED, (
-            f"Execution should complete successfully, got: {final_execution.status}"
+            f"Execution should complete successfully, got: {final_execution.status}: {final_execution.error_details}"
         )
 
         # Verify both nodes completed
@@ -358,9 +354,8 @@ class TestExpressionResolution:
                 {
                     "id": "process_input",
                     "name": "Process Trigger Input",
-                    "type": "script",
+                    "type": "script_python",
                     "parameters": {
-                        "language": "python",
                         "code": (
                             "import os; "
                             "user = os.environ.get('USERNAME', 'unknown'); "
@@ -391,7 +386,7 @@ class TestExpressionResolution:
 
         # Verify execution completed
         assert final_execution.status == ExecutionStatus.COMPLETED, (
-            f"Execution should complete successfully, got: {final_execution.status}"
+            f"Execution should complete successfully, got: {final_execution.status}: {final_execution.error_details}"
         )
 
         # Verify node received resolved input values
@@ -460,9 +455,8 @@ class TestExpressionResolution:
                 {
                     "id": "print_exec_id",
                     "name": "Print Execution ID",
-                    "type": "script",
+                    "type": "script_bash",
                     "parameters": {
-                        "language": "bash",
                         "code": 'echo "exec_id=$EXEC_ID"',
                         "environment": {
                             "EXEC_ID": "${workflow_context.execution.id}",
@@ -549,18 +543,16 @@ class TestUnresolvableExpressionError:
                 {
                     "id": "node_a",
                     "name": "Producer",
-                    "type": "script",
+                    "type": "script_bash",
                     "parameters": {
-                        "language": "bash",
                         "code": 'echo "plain text — no structured output"',
                     },
                 },
                 {
                     "id": "node_b",
                     "name": "Consumer with bad ref",
-                    "type": "script",
+                    "type": "script_bash",
                     "parameters": {
-                        "language": "bash",
                         "code": 'echo "value=$VALUE"',
                         "environment": {
                             "VALUE": "${node_a.nonexistent_field}",
@@ -638,19 +630,17 @@ class TestUnresolvableExpressionError:
                 {
                     "id": "node_a",
                     "name": "Producer",
-                    "type": "script",
+                    "type": "script_bash",
                     "parameters": {
-                        "language": "bash",
                         "code": 'echo "plain text"',
                     },
                 },
                 {
                     "id": "node_bad",
                     "name": "Bad Expression",
-                    "type": "script",
+                    "type": "script_bash",
                     "settings": {"continue_on_failure": True},
                     "parameters": {
-                        "language": "bash",
                         "code": 'echo "value=$VALUE"',
                         "environment": {
                             "VALUE": "${node_a.nonexistent_field}",
@@ -660,9 +650,8 @@ class TestUnresolvableExpressionError:
                 {
                     "id": "node_ok",
                     "name": "Independent Node",
-                    "type": "script",
+                    "type": "script_bash",
                     "parameters": {
-                        "language": "bash",
                         "code": 'echo "independent step"',
                     },
                 },
@@ -742,18 +731,16 @@ class TestUnresolvableExpressionError:
             {
                 "id": "node_a",
                 "name": "Producer",
-                "type": "script",
+                "type": "script_bash",
                 "parameters": {
-                    "language": "bash",
                     "code": 'echo "hello"',
                 },
             },
             {
                 "id": "node_b",
                 "name": "Consumer with ghost namespace",
-                "type": "script",
+                "type": "script_bash",
                 "parameters": {
-                    "language": "bash",
                     "code": 'echo "value=$VALUE"',
                     "environment": {
                         "VALUE": "${ghost_node.output}",

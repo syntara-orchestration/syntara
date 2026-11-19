@@ -1,0 +1,114 @@
+"""Translate AO target CRUD into EP commands without storing target state in AO."""
+
+from uuid import UUID, uuid4
+
+from execution_plane_client.commands.base import CommandPayload
+from execution_plane_client.commands.results import TargetHealthCommandResult, TransportReceipt
+from execution_plane_client.commands.targets import TargetDelete, TargetHealth, TargetRegister, TargetUpdate
+from execution_plane_client.models.execution_target import (
+    ExecutionTargetCreate,
+    ExecutionTargetHealthResult,
+    ExecutionTargetUpdate,
+)
+from fastapi import HTTPException, status
+from sqlmodel import SQLModel
+
+from syntara.execution_plane.client import (
+    EP_AUDIENCE,
+    EP_CLIENT_ID,
+    ExecutionPlaneHttpClient,
+    ExecutionPlaneRejectedError,
+)
+
+
+class _InstalledCluster(SQLModel):
+    """Installed cluster fields used to create targets."""
+
+    id: UUID
+    endpoint: str
+
+
+async def _installed_cluster(client: ExecutionPlaneHttpClient) -> _InstalledCluster:
+    """Resolve the single installed cluster from EP inventory."""
+    page = await client.list_clusters(limit=2)
+    if len(page["resources"]) != 1 or page.get("next") or page.get("prev"):
+        raise HTTPException(status.HTTP_409_CONFLICT, "Expected exactly one installed Execution Plane cluster")
+    resource = page["resources"][0]
+    if resource.get("id") is None:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Installed Execution Plane cluster has no ID")
+    return _InstalledCluster.model_validate(resource)
+
+
+async def _submit_target_command(
+    client: ExecutionPlaneHttpClient, command: CommandPayload, target_id: UUID
+) -> TransportReceipt:
+    """Require EP to confirm that the command affected the intended target."""
+    receipt = await client.submit_command(
+        command.to_message(source_id=EP_CLIENT_ID, destination_id=EP_AUDIENCE, client_id=EP_CLIENT_ID)
+    )
+    if (
+        receipt.resource is None
+        or receipt.resource.kind != "execution_target"
+        or receipt.resource.resource_id != target_id
+    ):
+        message = "Execution Plane returned an invalid target receipt"
+        raise ExecutionPlaneRejectedError(message)
+    return receipt
+
+
+async def _read_target(client: ExecutionPlaneHttpClient, target_id: UUID) -> dict[str, object]:
+    """Read back the authoritative resource after a create or update command."""
+    resource = await client.get_execution_target(target_id=target_id)
+    if resource.get("id") != str(target_id):
+        message = "Execution Plane returned a different target"
+        raise ExecutionPlaneRejectedError(message)
+    return resource
+
+
+async def create_target(client: ExecutionPlaneHttpClient, data: ExecutionTargetCreate) -> dict[str, object]:
+    """Create on the installed physical cluster; authentication remains on it."""
+    cluster = await _installed_cluster(client)
+    target_id = uuid4()
+    command = TargetRegister(
+        resource_id=target_id,
+        cluster_id=cluster.id,
+        name=data.name,
+        backend_type="kubernetes",
+        endpoint=cluster.endpoint,
+        credential_ref=UUID(int=0),  # Kubernetes execution uses the cluster's credential reference.
+        placement=data.placement,
+        labels=data.labels,
+        is_default=data.is_default,
+    )
+    await _submit_target_command(client, command, target_id)
+    return await _read_target(client, target_id)
+
+
+async def update_target(
+    client: ExecutionPlaneHttpClient, target_id: UUID, data: ExecutionTargetUpdate
+) -> dict[str, object]:
+    """Keep omission distinct from clearing labels and scheduling lists."""
+    fields = data.model_dump(exclude_unset=True)
+    if data.placement is not None:
+        fields["placement"] = data.placement
+    command = TargetUpdate(resource_id=target_id, **fields)
+    await _submit_target_command(client, command, target_id)
+    return await _read_target(client, target_id)
+
+
+async def delete_target(client: ExecutionPlaneHttpClient, target_id: UUID) -> None:
+    """Request EP's drain lifecycle; deletion is not immediate."""
+    await _submit_target_command(client, TargetDelete(resource_id=target_id), target_id)
+
+
+async def get_target_health(client: ExecutionPlaneHttpClient, target_id: UUID) -> ExecutionTargetHealthResult:
+    """Run an on-demand health probe and return AO's shallow typed result."""
+    receipt = await _submit_target_command(client, TargetHealth(resource_id=target_id), target_id)
+    if not isinstance(receipt.result, TargetHealthCommandResult):
+        message = "Execution Plane returned an invalid target health result"
+        raise ExecutionPlaneRejectedError(message)
+    return ExecutionTargetHealthResult(
+        healthy=receipt.result.healthy,
+        message=receipt.result.message,
+        skipped=receipt.result.skipped,
+    )

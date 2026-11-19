@@ -34,30 +34,26 @@ nodes:
 
   - id: handle_approved
     name: Handle Approved
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       code: echo "Request approved"
 
   - id: handle_rejected
     name: Handle Rejected
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       code: echo "Request rejected"
 
   - id: handle_escalated
     name: Handle Escalated
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       code: echo "Request escalated"
 
   - id: handle_unknown
     name: Handle Unknown
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       code: echo "Unknown status"
 
 edges:

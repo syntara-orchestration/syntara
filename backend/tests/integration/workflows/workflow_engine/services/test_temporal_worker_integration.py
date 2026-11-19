@@ -11,22 +11,28 @@ import asyncio
 import os
 import signal
 from unittest.mock import patch
+from uuid import uuid4
 
 import pytest
 import yaml
 from orchestrator_test_sdk.e2e import async_poll_for
+from sqlmodel.ext.asyncio.session import AsyncSession
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
 
+from syntara.workflow_runtime.engines.temporal.activities.ep.ep_dispatch_activity import (
+    execute_bash_script_activity,
+    execute_python_script_activity,
+)
 from syntara.workflow_runtime.engines.temporal.activities.manual_trigger import manual_trigger
 from syntara.workflow_runtime.engines.temporal.activities.runtime_settings_activity import (
     fetch_workflow_runtime_settings,
 )
-from syntara.workflow_runtime.engines.temporal.activities.script_activity import execute_script_activity
 from syntara.workflow_runtime.engines.temporal.dynamic_workflow import OrchestratorWorkflow
 from syntara.workflow_runtime.engines.temporal.services.temporal_execution_service import TemporalExecutionService
 from syntara.workflow_runtime.engines.temporal.services.temporal_worker import TemporalWorkerService
 from syntara.workflow_runtime.workers.worker import main
+from syntara.workflows.models.execution import Execution
 
 
 class MockWorkerService(TemporalWorkerService):
@@ -63,7 +69,12 @@ class MockWorkerService(TemporalWorkerService):
             self.client,
             task_queue=self.task_queue,
             workflows=[OrchestratorWorkflow],
-            activities=[execute_script_activity, manual_trigger, fetch_workflow_runtime_settings],
+            activities=[
+                execute_python_script_activity,
+                execute_bash_script_activity,
+                manual_trigger,
+                fetch_workflow_runtime_settings,
+            ],
         )
 
         self._worker_task = asyncio.create_task(self.worker.run())
@@ -96,9 +107,8 @@ triggers:
   type: manual_trigger
 nodes:
 - id: {activity_id}
-  type: script
+  type: script_bash
   parameters:
-    language: bash
     code: {script}
   settings:
     timeout: 1
@@ -131,7 +141,7 @@ class TestTemporalWorkerServiceIntegration:
             temporal_env.client,
             task_queue="integration-test-queue",
             workflows=[OrchestratorWorkflow],
-            activities=[execute_script_activity, manual_trigger],
+            activities=[execute_python_script_activity, execute_bash_script_activity, manual_trigger],
         )
 
         # Start worker in background
@@ -171,7 +181,9 @@ class TestTemporalWorkerServiceIntegration:
         assert worker_service._worker_task is None
         assert worker_service.client is None
 
-    async def test_worker_processes_workflows(self, temporal_env: WorkflowEnvironment) -> None:
+    async def test_worker_processes_workflows(
+        self, temporal_env: WorkflowEnvironment, test_execution: Execution
+    ) -> None:
         """Test that worker actually processes workflow executions."""
         worker_service = MockWorkerService(
             temporal_env=temporal_env,
@@ -195,9 +207,18 @@ class TestTemporalWorkerServiceIntegration:
             workflow_def = yaml.safe_load(workflow_yaml)
 
             result = await execution_service.start_workflow(
+                execution_id=str(test_execution.id),
                 workflow_def=workflow_def,
                 workflow_name="worker-integration-test",
                 trigger_node_id="trigger_manual",
+                workflow_metadata={
+                    "workflow_context": {
+                        "workflow": {
+                            "project_id": str(test_execution.project_id),
+                            "id": str(test_execution.workflow_id),
+                        }
+                    }
+                },
             )
 
             # Wait for workflow to complete
@@ -207,9 +228,14 @@ class TestTemporalWorkerServiceIntegration:
             workflow_result = await asyncio.wait_for(handle.result(), timeout=30)
 
             # Verify workflow was processed successfully
-            assert workflow_result["status"] == "completed"
+            assert workflow_result["status"] == "completed", f"Unexpected workflow result: {workflow_result!r}"
 
-    async def test_multiple_workers_different_queues(self, temporal_env: WorkflowEnvironment) -> None:
+    async def test_multiple_workers_different_queues(
+        self,
+        temporal_env: WorkflowEnvironment,
+        test_execution: Execution,
+        test_db_session: AsyncSession,
+    ) -> None:
         """Test running multiple workers on different queues simultaneously."""
         # Create two workers on different queues
         worker1 = MockWorkerService(
@@ -242,15 +268,42 @@ class TestTemporalWorkerServiceIntegration:
             workflow_def = yaml.safe_load(workflow_yaml)
 
             result1 = await service1.start_workflow(
+                execution_id=str(test_execution.id),
                 workflow_def=workflow_def,
                 workflow_name="worker1-test",
                 trigger_node_id="trigger_manual",
+                workflow_metadata={
+                    "workflow_context": {
+                        "workflow": {
+                            "project_id": str(test_execution.project_id),
+                            "id": str(test_execution.workflow_id),
+                        }
+                    }
+                },
             )
 
+            second_execution = Execution(
+                workflow_id=test_execution.workflow_id,
+                workflow_version_id=test_execution.workflow_version_id,
+                project_id=test_execution.project_id,
+                created_by=test_execution.created_by,
+                temporal_workflow_id=f"exec-{uuid4()}",
+            )
+            test_db_session.add(second_execution)
+            await test_db_session.commit()
             result2 = await service2.start_workflow(
+                execution_id=str(second_execution.id),
                 workflow_def=workflow_def,
                 workflow_name="worker2-test",
                 trigger_node_id="trigger_manual",
+                workflow_metadata={
+                    "workflow_context": {
+                        "workflow": {
+                            "project_id": str(test_execution.project_id),
+                            "id": str(test_execution.workflow_id),
+                        }
+                    }
+                },
             )
 
             # Both workflows should complete
@@ -263,8 +316,8 @@ class TestTemporalWorkerServiceIntegration:
             )
             workflow_result2 = await asyncio.wait_for(handle2.result(), timeout=30)
 
-            assert workflow_result1["status"] == "completed"
-            assert workflow_result2["status"] == "completed"
+            assert workflow_result1["status"] == "completed", f"Unexpected workflow result: {workflow_result1!r}"
+            assert workflow_result2["status"] == "completed", f"Unexpected workflow result: {workflow_result2!r}"
 
         # Verify both workers stopped
         worker1_stopped = worker1._worker_task is None
@@ -272,7 +325,9 @@ class TestTemporalWorkerServiceIntegration:
         assert worker1_stopped
         assert worker2_stopped
 
-    async def test_worker_graceful_shutdown_with_running_workflow(self, temporal_env: WorkflowEnvironment) -> None:
+    async def test_worker_graceful_shutdown_with_running_workflow(
+        self, temporal_env: WorkflowEnvironment, test_execution: Execution
+    ) -> None:
         """Test worker graceful shutdown handles running workflows properly."""
         worker_service = MockWorkerService(
             temporal_env=temporal_env,
@@ -296,9 +351,18 @@ class TestTemporalWorkerServiceIntegration:
             workflow_def = yaml.safe_load(workflow_yaml)
 
             await execution_service.start_workflow(
+                execution_id=str(test_execution.id),
                 workflow_def=workflow_def,
                 workflow_name="long-running-test",
                 trigger_node_id="trigger_manual",
+                workflow_metadata={
+                    "workflow_context": {
+                        "workflow": {
+                            "project_id": str(test_execution.project_id),
+                            "id": str(test_execution.workflow_id),
+                        }
+                    }
+                },
             )
 
             # Yield control so the worker can pick up the workflow
@@ -319,7 +383,9 @@ class TestTemporalWorkerServiceIntegration:
 class TestWorkerServiceConfiguration:
     """Test worker service configuration and setup."""
 
-    async def test_worker_uses_correct_task_queue(self, temporal_env: WorkflowEnvironment) -> None:
+    async def test_worker_uses_correct_task_queue(
+        self, temporal_env: WorkflowEnvironment, test_execution: Execution
+    ) -> None:
         """Test that worker only processes tasks from its configured queue."""
         # Create worker on specific queue
         worker = MockWorkerService(
@@ -347,9 +413,18 @@ class TestWorkerServiceConfiguration:
             workflow_def = yaml.safe_load(workflow_yaml)
 
             result = await execution_service.start_workflow(
+                execution_id=str(test_execution.id),
                 workflow_def=workflow_def,
                 workflow_name="queue-test",
                 trigger_node_id="trigger_manual",
+                workflow_metadata={
+                    "workflow_context": {
+                        "workflow": {
+                            "project_id": str(test_execution.project_id),
+                            "id": str(test_execution.workflow_id),
+                        }
+                    }
+                },
             )
 
             # Should complete successfully
@@ -357,7 +432,7 @@ class TestWorkerServiceConfiguration:
                 result.temporal_workflow_id, run_id=result.temporal_run_id
             )
             workflow_result = await asyncio.wait_for(handle.result(), timeout=30)
-            assert workflow_result["status"] == "completed"
+            assert workflow_result["status"] == "completed", f"Unexpected workflow result: {workflow_result!r}"
 
 
 @pytest.mark.integration
@@ -395,7 +470,10 @@ class TestWorkerSignalHandling:
 
         with (
             patch("syntara.workflow_runtime.workers.worker.start_worker", side_effect=mock_start_worker),
-            patch("syntara.workflow_runtime.workers.worker_lifecycle.stop_worker", side_effect=mock_stop_worker),
+            patch(
+                "syntara.workflow_runtime.workers.worker_lifecycle.stop_worker",
+                side_effect=mock_stop_worker,
+            ),
         ):
             # Run main() in a background task
             main_task = asyncio.create_task(main())

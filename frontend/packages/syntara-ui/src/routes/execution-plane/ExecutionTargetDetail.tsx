@@ -1,0 +1,313 @@
+import {
+  Button,
+  EmptyState,
+  EmptyStateActions,
+  EmptyStateBody,
+  EmptyStateFooter,
+  Stack,
+  StackItem,
+  Switch,
+  Title,
+} from '@patternfly/react-core'
+import { RhUiArrowLeftIcon, RhUiEditIcon, RhUiSearchIcon, RhUiSyncIcon } from '@patternfly/react-icons'
+import type { ExecutionPlaneAPI } from '@syntara/contracts'
+import { useNavigate, useParams } from '@tanstack/react-router'
+import type { ReactNode } from 'react'
+
+import { AppRoute } from '../../app/AppRoute'
+import {
+  breadcrumbsExecutionTargetDetail,
+  breadcrumbsExecutionTargetDetailEarlyShell,
+} from '../../app/breadcrumbBuilders'
+import { executionPlaneClient } from '../../client'
+import { SynDetail } from '../../components/details/SynDetail'
+import { SynDetailList } from '../../components/details/SynDetailList'
+import { DisabledWithTooltip } from '../../components/DisabledWithTooltip'
+import { SynLabel } from '../../components/labels/SynLabel'
+import { SynPage, SynPageBody } from '../../components/layout/SynPage'
+import { SynPageHeader } from '../../components/layout/SynPageHeader'
+import { SynPanel } from '../../components/layout/SynPanel'
+import { SynPanelContentStack } from '../../components/layout/SynPanelContentStack'
+import { SynErrorState } from '../../components/states/SynErrorState'
+import { useQueryState } from '../../components/states/useQueryState'
+import { SynKebabMenu } from '../../components/SynKebabMenu'
+import { SynLink } from '../../components/SynLink'
+import { SynPageTitle } from '../../components/SynPageTitle'
+import { getErrorStatus } from '../../utils/apiErrors'
+import { detachPromise } from '../../utils/detachPromise'
+import { useDocLink } from '../../utils/docs/useDocLink'
+
+import { buildExecutionTargetDeleteAction } from './executionTargetDeleteAction'
+import { ExecutionTargetDialogs } from './ExecutionTargetDialogs'
+import { ExecutionTargetStatusLabel } from './ExecutionTargetStatusLabel'
+import { buildExecutionTargetTestConnectionAction } from './executionTargetTestConnectionAction'
+import { getNodeSelectors } from './getNodeSelectors'
+import { NodeSelectorsCell } from './NodeSelectorsCell'
+import { useExecutionTargetActions } from './useExecutionTargetActions'
+import { useExecutionTargetEnabledToggle } from './useExecutionTargetEnabledToggle'
+import { useExecutionTargetPermissions } from './useExecutionTargetPermissions'
+import { useExecutionTargetTestConnection } from './useExecutionTargetTestConnection'
+
+type ExecutionTarget = ExecutionPlaneAPI.components['schemas']['ExecutionTargetRead']
+
+function ExecutionTargetDetailEarlyShell({ children }: Readonly<{ children: ReactNode }>) {
+  return (
+    <SynPage>
+      <SynPageTitle segments={['Execution target', 'Execution Plane']} />
+      <SynPageHeader title="Execution target" breadcrumbs={breadcrumbsExecutionTargetDetailEarlyShell()} />
+      <SynPageBody>
+        <SynPanel isFullHeight>{children}</SynPanel>
+      </SynPageBody>
+    </SynPage>
+  )
+}
+
+function ClusterDetailValue({ target }: Readonly<{ target: ExecutionTarget }>) {
+  const integrationId = target.labels?.integration_id?.trim() || undefined
+  const displayId = target.cluster_id || '—'
+
+  if (!integrationId) {
+    return <>{displayId}</>
+  }
+
+  return (
+    <SynLink to={AppRoute.Configuration.Integrations.Detail.replace(':integrationId', integrationId)}>
+      {displayId}
+    </SynLink>
+  )
+}
+
+function ExecutionTargetDetailsBody({ target }: Readonly<{ target: ExecutionTarget }>) {
+  const placement = target.placement
+  const namespace = placement?.type === 'kubernetes' && placement.namespace ? placement.namespace : null
+  const nodeSelectors = getNodeSelectors(placement)
+
+  return (
+    <SynPanelContentStack hasGutter>
+      <StackItem>
+        <Stack hasGutter>
+          <StackItem>
+            <Title headingLevel="h2" size="lg">
+              General
+            </Title>
+          </StackItem>
+          <StackItem>
+            <SynDetailList isHorizontal>
+              <SynDetail label="Name">{target.name}</SynDetail>
+              <SynDetail label="OpenShift Cluster">
+                <ClusterDetailValue target={target} />
+              </SynDetail>
+              <SynDetail label="Execution namespace">{namespace ?? '—'}</SynDetail>
+              <SynDetail label="State">
+                <SynLabel status={target.enabled ? 'success' : 'custom'}>
+                  {target.enabled ? 'Enabled' : 'Disabled'}
+                </SynLabel>
+              </SynDetail>
+              <SynDetail label="Status">
+                <ExecutionTargetStatusLabel status={target.status} message={target.status_message} />
+              </SynDetail>
+            </SynDetailList>
+          </StackItem>
+        </Stack>
+      </StackItem>
+      <StackItem>
+        <Stack hasGutter>
+          <StackItem>
+            <Title headingLevel="h2" size="lg">
+              Routing
+            </Title>
+          </StackItem>
+          <StackItem>
+            <SynDetailList isHorizontal>
+              <SynDetail label="OpenShift node selector">
+                <NodeSelectorsCell selectors={nodeSelectors} />
+              </SynDetail>
+            </SynDetailList>
+          </StackItem>
+        </Stack>
+      </StackItem>
+    </SynPanelContentStack>
+  )
+}
+
+function ExecutionTargetNotFound({ onRetry, onBack }: Readonly<{ onRetry: () => void; onBack: () => void }>) {
+  return (
+    <EmptyState headingLevel="h2" titleText="Execution target not found" icon={RhUiSearchIcon} isFullHeight>
+      <EmptyStateBody>The execution target you are looking for does not exist or may have been deleted.</EmptyStateBody>
+      <EmptyStateFooter>
+        <EmptyStateActions>
+          <Button variant="primary" icon={<RhUiArrowLeftIcon />} onClick={onBack}>
+            Back to Execution Plane
+          </Button>
+          <Button variant="link" icon={<RhUiSyncIcon />} onClick={onRetry}>
+            Retry
+          </Button>
+        </EmptyStateActions>
+      </EmptyStateFooter>
+    </EmptyState>
+  )
+}
+
+function ExecutionTargetDetailToolbar({
+  target,
+  onEdit,
+  onToggleEnabled,
+  isPatchPending,
+  deleteDialog,
+  permissions,
+  onTestConnection,
+  isTestingConnection,
+}: Readonly<{
+  target: ExecutionTarget
+  onEdit: () => void
+  onToggleEnabled: () => void
+  isPatchPending: boolean
+  deleteDialog: { open: (item: ExecutionTarget) => void }
+  permissions: ReturnType<typeof useExecutionTargetPermissions>
+  onTestConnection: (target: ExecutionTarget) => void
+  isTestingConnection: boolean
+}>) {
+  const permissionBlocked = permissions.isLoading || !permissions.canUpdate
+  const toggleBlocked = permissionBlocked || isPatchPending
+
+  return (
+    <>
+      <DisabledWithTooltip isDisabled={permissionBlocked} content={permissions.tooltips.enable}>
+        <Switch
+          id="execution-target-enabled-toggle"
+          label={target.enabled ? 'Enabled' : 'Disabled'}
+          isChecked={target.enabled}
+          onChange={toggleBlocked ? () => undefined : onToggleEnabled}
+          aria-disabled={toggleBlocked || undefined}
+          aria-label={`Toggle ${target.name}`}
+        />
+      </DisabledWithTooltip>
+      <DisabledWithTooltip isDisabled={!permissions.canUpdate} content={permissions.tooltips.update}>
+        <Button
+          variant="primary"
+          icon={<RhUiEditIcon />}
+          isAriaDisabled={!permissions.canUpdate}
+          onClick={permissions.canUpdate ? onEdit : undefined}
+        >
+          Edit execution target
+        </Button>
+      </DisabledWithTooltip>
+      <SynKebabMenu
+        actions={[
+          buildExecutionTargetTestConnectionAction(target, onTestConnection, {
+            isDisabled: isTestingConnection,
+          }),
+          { key: 'sep-delete', isSeparator: true },
+          buildExecutionTargetDeleteAction(target, deleteDialog, permissions),
+        ]}
+        aria-label={`Actions for ${target.name}`}
+      />
+    </>
+  )
+}
+
+export default function ExecutionTargetDetail() {
+  const { executionTargetId }: { executionTargetId?: string } = useParams({ strict: false })
+  const navigate = useNavigate()
+  const docLink = useDocLink('executionPlane')
+  const permissions = useExecutionTargetPermissions()
+  const hasId = Boolean(executionTargetId?.length)
+
+  const query = executionPlaneClient.useQuery(
+    'get',
+    '/api/execution_plane/v1/execution_targets/{target_id}',
+    {
+      params: { path: { target_id: executionTargetId ?? '' } },
+    },
+    { enabled: hasId, refetchInterval: 30_000 }
+  )
+
+  const { deleteDialog, handleDelete } = useExecutionTargetActions({
+    onSuccess: () => detachPromise(navigate({ to: AppRoute.ExecutionPlane.Root })),
+  })
+
+  const { testConnection, isTestingTarget } = useExecutionTargetTestConnection()
+
+  const serverTarget = query.data
+  const {
+    targets: optimisticTargets,
+    disableDialog,
+    handleToggleEnabled,
+    handleDisable,
+    isPatchPending,
+  } = useExecutionTargetEnabledToggle({
+    targets: serverTarget ? [serverTarget] : [],
+    onSuccess: () => query.refetch(),
+  })
+
+  const target = optimisticTargets[0] ?? serverTarget
+  const queryState = useQueryState(query, {
+    title: 'Error loading execution target',
+    onRetry: () => detachPromise(query.refetch()),
+  })
+
+  const navigateBack = () => detachPromise(navigate({ to: AppRoute.ExecutionPlane.Root }))
+  const retry = () => detachPromise(query.refetch())
+
+  if (!hasId) {
+    return (
+      <ExecutionTargetDetailEarlyShell>
+        <SynErrorState title="Invalid execution target" message="No execution target ID provided" />
+      </ExecutionTargetDetailEarlyShell>
+    )
+  }
+
+  // Domain-specific empty state for missing targets; useQueryState handles other errors.
+  if (getErrorStatus(query.error) === 404) {
+    return (
+      <ExecutionTargetDetailEarlyShell>
+        <ExecutionTargetNotFound onRetry={retry} onBack={navigateBack} />
+      </ExecutionTargetDetailEarlyShell>
+    )
+  }
+
+  if (queryState) {
+    return <ExecutionTargetDetailEarlyShell>{queryState}</ExecutionTargetDetailEarlyShell>
+  }
+
+  if (!target) {
+    return null
+  }
+
+  const editPath = AppRoute.ExecutionPlane.Edit.replace(':executionTargetId', target.id)
+
+  return (
+    <SynPage>
+      <SynPageTitle segments={[target.name, 'Execution Plane']} />
+      <SynPageHeader
+        breadcrumbs={breadcrumbsExecutionTargetDetail(target.name)}
+        title={target.name}
+        docLink={docLink}
+        toolbar={
+          <ExecutionTargetDetailToolbar
+            target={target}
+            onEdit={() => detachPromise(navigate({ to: editPath }))}
+            onToggleEnabled={() => handleToggleEnabled(target)}
+            isPatchPending={isPatchPending}
+            deleteDialog={deleteDialog}
+            permissions={permissions}
+            onTestConnection={testConnection}
+            isTestingConnection={isTestingTarget(target.id)}
+          />
+        }
+      />
+      <SynPageBody>
+        <SynPanel isFullHeight isScrollable>
+          <ExecutionTargetDetailsBody target={target} />
+        </SynPanel>
+      </SynPageBody>
+
+      <ExecutionTargetDialogs
+        deleteDialog={deleteDialog}
+        onDelete={handleDelete}
+        disableDialog={disableDialog}
+        onDisable={handleDisable}
+      />
+    </SynPage>
+  )
+}

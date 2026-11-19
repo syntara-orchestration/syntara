@@ -86,6 +86,23 @@ const schemas = {}
 const realSchemasDir = realpathSync(schemasDir)
 const normalizedSchemasDir = realSchemasDir.endsWith('/') ? realSchemasDir : realSchemasDir + '/'
 
+function resolveLocalRef(ref, sourcePath) {
+  const [refPath, fragment] = ref.split('#', 2)
+  const targetPath = realpathSync(refPath ? resolve(dirname(sourcePath), refPath) : sourcePath)
+  if (!targetPath.startsWith(normalizedSchemasDir)) {
+    throw new Error(`Schema reference escapes schemas directory: ${ref}`)
+  }
+
+  let target = JSON.parse(readFileSync(targetPath, 'utf-8'))
+  if (!fragment) return target
+
+  for (const segment of fragment.replace(/^\//, '').split('/')) {
+    const key = segment.replace(/~1/g, '/').replace(/~0/g, '~')
+    target = target[key]
+  }
+  return target
+}
+
 for (const nodeType of catalog.node_types) {
   const schemaPath = realpathSync(resolve(catalogDir, nodeType.schema_ref))
   if (!schemaPath.startsWith(normalizedSchemasDir)) {
@@ -100,7 +117,9 @@ for (const nodeType of catalog.node_types) {
     continue
   }
 
-  const resultSchema = schema.resultSchema
+  const resultSchema = schema.resultSchema?.$ref
+    ? resolveLocalRef(schema.resultSchema.$ref, schemaPath)
+    : schema.resultSchema
   if (!resultSchema) {
     console.warn(`  WARN: No resultSchema in "${nodeType.type}", skipping.`)
     continue
