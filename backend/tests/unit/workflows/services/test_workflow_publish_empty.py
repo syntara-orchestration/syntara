@@ -241,6 +241,66 @@ class TestPublishEmptyWorkflow:
         assert published == new_version
         assert workflow.published_version_id == new_version.id
 
+    @pytest.mark.asyncio
+    async def test_publish_historical_correction_reuses_matching_current_definition(
+        self, mock_service: WorkflowService
+    ) -> None:
+        workflow_id = uuid4()
+        mock_workflow = MagicMock()
+        mock_workflow.id = workflow_id
+        mock_workflow.is_builtin = False
+        mock_workflow.published_version_id = None
+        mock_workflow.current_version = 2
+        mock_workflow.name = "test-wf"
+        mock_workflow.project_id = uuid4()
+
+        mock_version = MagicMock()
+        mock_version.id = uuid4()
+        mock_version.version = 1
+        mock_version.workflow_definition = {
+            "schema_version": "2.0.0",
+            "name": "old",
+            "triggers": [{"id": "t1", "type": "manual_trigger", "parameters": {}}],
+            "nodes": [{"id": "n1", "type": "script", "parameters": {"language": "python", "code": "pass"}}],
+            "edges": [{"from": "t1", "to": "n1"}],
+        }
+
+        new_definition = {
+            "schema_version": "2.0.0",
+            "name": "new",
+            "triggers": [{"id": "t1", "type": "manual_trigger", "parameters": {}}],
+            "nodes": [{"id": "n1", "type": "script", "parameters": {"language": "python", "code": "print(1)"}}],
+            "edges": [{"from": "t1", "to": "n1"}],
+        }
+
+        new_version = MagicMock()
+        new_version.id = uuid4()
+        new_version.version = 2
+        from syntara.workflows.models.workflow_definition import WorkflowDefinition
+
+        new_definition = WorkflowDefinition.model_validate(new_definition).model_dump(exclude_defaults=True)
+        new_version.workflow_definition = new_definition
+
+        with (
+            patch.object(mock_service, "_get_workflow_for_update", return_value=mock_workflow),
+            patch.object(mock_service, "_get_version_or_none", side_effect=[mock_version, new_version, new_version]),
+            patch.object(mock_service, "_flush_with_duplicate_check", new_callable=AsyncMock),
+            patch.object(mock_service, "_sync_all_trigger_types", new_callable=AsyncMock),
+            patch.object(mock_service, "_sync_scheduled_triggers", new_callable=AsyncMock),
+            patch.object(mock_service.session, "flush", new_callable=AsyncMock),
+            patch.object(mock_service.session, "commit", new_callable=AsyncMock),
+            patch("syntara.workflows.services.workflow_service.AuditEventDispatcher"),
+            patch("syntara.workflows.services.workflow_service.WebhookTriggerService"),
+        ):
+            workflow, published, _warning = await mock_service.publish_workflow_version(
+                workflow_id, version=1, workflow_definition=new_definition
+            )
+
+        assert published == new_version
+        assert published.workflow_definition == new_definition
+        assert mock_workflow.current_version == 2
+        assert workflow.published_version_id == new_version.id
+
 
 class TestUnpublishWorkflow:
     """Tests for unpublish_workflow missing version warning."""

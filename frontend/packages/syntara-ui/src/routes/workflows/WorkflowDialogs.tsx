@@ -9,6 +9,8 @@ import type { ProjectRead } from '../access/types'
 import { ProjectFormModal } from '../access-management/ProjectFormModal'
 import { ProjectDeleteDialog } from '../access-management/projects/ProjectDeleteDialog'
 import { RunWorkflowModal } from '../builder/components/RunWorkflowModal'
+import type { useKafkaPublishGroups } from '../builder/hooks/useKafkaPublishGroups'
+import { KafkaGroupConflictDialog } from '../builder/KafkaGroupConflictDialog'
 import { PublishWorkflowDialog } from '../builder/PublishWorkflowDialog'
 import { hasNonEmptyInputSchema } from '../builder/utils/triggerReferenceCheck'
 
@@ -33,6 +35,8 @@ type WorkflowDialogsProps = {
   deleteDialog: DialogState<Workflow>
   /** Dialog state for workflow publish modal */
   publishDialog: DialogState<Workflow>
+  /** Shared preparation and carry-forward confirmation for list publication. */
+  publication: ReturnType<typeof useKafkaPublishGroups>
   /** Dialog state for workflow unpublish confirmation */
   unpublishDialog: DialogState<Workflow>
   /** Controls visibility of the import workflow dialog */
@@ -69,6 +73,7 @@ export function WorkflowDialogs({
   runDialog,
   deleteDialog,
   publishDialog,
+  publication,
   unpublishDialog,
   importDialogOpen,
   setImportDialogOpen,
@@ -185,10 +190,19 @@ export function WorkflowDialogs({
         onSuccess={onRefetchWorkflows}
       />
 
+      <KafkaGroupConflictDialog
+        conflicts={publication.groupConflicts}
+        isPending={publication.isCheckingGroups}
+        onConfirm={publication.confirmGroups}
+        onCancel={publication.cancelGroups}
+      />
       <PublishWorkflowDialog
         isOpen={publishDialog.isOpen}
         isPublishing={isPublishing}
-        onClose={publishDialog.close}
+        onClose={() => {
+          publication.cancelGroups()
+          publishDialog.close()
+        }}
         onPublish={(publishName, description) => {
           if (publishDialog.item) {
             onPublishWorkflow(publishDialog.item, publishName, description)

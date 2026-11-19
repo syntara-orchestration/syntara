@@ -181,12 +181,15 @@ Background refreshes preserve the raw draft value; Update reconciles against a
 fresh projection. A changed Integration or topic permits a replacement group.
 Saved version views disable all consumption controls.
 
-Publication from the main Publish action and Version History checks the selected
+Publication from the main Publish action, Version History, and Workflows list checks the selected
 saved definition or unsaved changes against fresh source metadata. If a draft explicitly requests a different group for the same source,
 the designer can cancel without changing the draft or confirm carrying forward
 the established group into a new saved definition. Confirmation rechecks source
 generation and revision. Backend publication remains authoritative if another
 publication races with the request. Existing saved versions are never rewritten.
+A clean editor loads the corrected latest definition before advancing its version
+baseline. Pending local edits retain their original baseline and use the normal
+version-conflict flow when saved.
 Dismissing either initial Publish dialog cancels pending preparation before a
 publish request is sent; completing a submission closes the dialog separately.
 

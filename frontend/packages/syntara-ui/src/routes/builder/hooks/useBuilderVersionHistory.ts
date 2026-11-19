@@ -89,7 +89,19 @@ export function useBuilderVersionHistory({
     updateVersionMetadata,
     updateMetadataMutation,
     paginationFooterProps,
-  } = useVersionHistory({ workflowId, isNew, onVersionUpdated })
+  } = useVersionHistory({
+    workflowId,
+    isNew,
+    onVersionUpdated: (version) => {
+      if (viewingVersion !== null) {
+        dispatch({ type: 'EXIT_VERSION_VIEW' })
+        const params = new URLSearchParams(searchParams)
+        params.delete('version')
+        setSearchParams(params)
+      }
+      onVersionUpdated?.(version)
+    },
+  })
 
   const viewedVersionQuery = workflowClient.useQuery(
     'get',

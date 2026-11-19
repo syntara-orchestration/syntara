@@ -310,14 +310,15 @@ test.describe('Kafka consumer settings', () => {
     }
   })
 
-  for (const entry of ['toolbar', 'history']) {
+  for (const entry of ['toolbar', 'history', 'list']) {
     test(`offers carry-forward from ${entry} after an older version was published`, async ({ app }, testInfo) => {
       const connection = await createKafkaConnection(app)
       let workflowId: string | undefined
       try {
+        const workflowName = buildUniqueName('kafka-stale-group')
         const { id, versionNumber } = await createWorkflowViaApi({
           app,
-          name: buildUniqueName('kafka-stale-group'),
+          name: workflowName,
           nodes: [
             {
               id: 'process',
@@ -368,8 +369,16 @@ test.describe('Kafka consumer settings', () => {
         await publishWorkflowViaApi(app, id, versionNumber)
         await app.goto(toAppUrl(`/workflow-builder/${id}`))
         await expect(app.getByRole('button', { name: 'Publish workflow', exact: true })).toBeEnabled()
+        if (entry === 'list') {
+          await app.goto(toAppUrl('/workflows'))
+          await app.getByRole('textbox', { name: 'Name filter', exact: true }).fill(workflowName)
+          await app.getByRole('button', { name: 'Apply filter', exact: true }).click()
+        }
         const openPublish = async () => {
-          if (entry === 'history') {
+          if (entry === 'list') {
+            await app.getByRole('button', { name: `Actions for ${workflowName}`, exact: true }).click()
+            await app.getByRole('menuitem', { name: 'Publish workflow', exact: true }).click()
+          } else if (entry === 'history') {
             if (
               !(await app
                 .getByRole('button', { name: `Actions for version ${saved.current_version}`, exact: true })
@@ -438,7 +447,7 @@ test.describe('Kafka consumer settings', () => {
             exact: true,
           })
         ).toBeVisible()
-        if (entry === 'toolbar') {
+        if (entry !== 'list') {
           await app.getByRole('button', { name: 'Workflow actions', exact: true }).click()
           const downloadPromise = app.waitForEvent('download')
           await app.getByRole('menuitem', { name: 'Export workflow', exact: true }).click()
@@ -446,6 +455,19 @@ test.describe('Kafka consumer settings', () => {
             JSON.parse(await readFile(await (await downloadPromise).path(), 'utf8'))
           )
           expect(exported.triggers[0]?.parameters.group_id).toBe('established-A')
+          if (entry === 'history') {
+            await openNodeForEditing(app, 'Process order')
+            await app.getByRole('textbox', { name: 'Name', exact: true }).fill('Unrelated step edit')
+            await app.getByRole('button', { name: 'Update', exact: true }).click()
+            const savedAgain = app.waitForResponse(
+              (response) => response.request().method() === 'PATCH' && response.url().endsWith(`/workflows/${id}`)
+            )
+            await clickSaveAndWait(app)
+            expect((await savedAgain).ok()).toBe(true)
+            expect((await savedAgain).request().postDataJSON()).toMatchObject({
+              workflow_definition: { triggers: [{ parameters: { group_id: 'established-A' } }] },
+            })
+          }
         }
       } finally {
         if (workflowId) await deleteWorkflowViaApi(app, workflowId)

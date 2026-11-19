@@ -12,6 +12,7 @@ import { useAllCredentials } from '../components/useAllCredentials'
 import { useBuilderPermissions } from '../useBuilderPermissions'
 import { VersionViewContext } from '../VersionViewContext'
 
+import { buildKafkaSubscribeTrigger } from './kafkaSubscribeMapping'
 import { renderWithHeader } from './test-utils/renderWithHeader'
 import type { TriggerFormData } from './triggerFormSchema'
 import { TriggerNodeForm } from './TriggerNodeForm'
@@ -196,7 +197,7 @@ describe('Kafka Subscribe form', () => {
     }
   )
 
-  it('displays the effective automatic ID but keeps automatic mode on Update', async () => {
+  it.each([undefined, null, 'stale-custom'])('serializes automatic mode after Update from %s', async (kafkaGroupId) => {
     vi.mocked(workflowFetchClient.GET).mockResolvedValue({
       data: {
         kafka_subscription_sources: [
@@ -214,10 +215,10 @@ describe('Kafka Subscribe form', () => {
       },
       response: new Response(),
     })
-    const onSubmit = vi.fn()
+    const onSubmit = vi.fn<(data: TriggerFormData) => void>()
     renderWithHeader(
       <TriggerNodeForm
-        initialData={initialData}
+        initialData={{ ...initialData, kafkaGroupId }}
         kafkaTriggerId="subscribe"
         workflowId="workflow-1"
         onSubmit={onSubmit}
@@ -227,7 +228,14 @@ describe('Kafka Subscribe form', () => {
     await waitFor(() => expect(group).toHaveValue('syntara.runtime-id'))
     expect(group).toBeDisabled()
     await submitForm()
-    await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ kafkaGroupId: undefined })))
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled())
+    const previous = buildKafkaSubscribeTrigger('subscribe', 'Orders', { ...initialData, kafkaGroupId })
+    const submitted = onSubmit.mock.calls[0]?.[0]
+    expect(submitted).toBeDefined()
+    if (!submitted) throw new Error('Trigger was not submitted')
+    const serialized = buildKafkaSubscribeTrigger('subscribe', 'Orders', submitted, previous)
+    if (kafkaGroupId === undefined) expect(serialized.parameters).not.toHaveProperty('group_id')
+    else expect(serialized.parameters.group_id).toBeNull()
   })
 
   it('preserves the raw draft when the publication changes to a replacement before Update', async () => {

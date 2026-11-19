@@ -5,6 +5,7 @@ import type { ReactNode } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { workflowClient, workflowFetchClient } from '../../../client'
+import { useWorkflowStore } from '../../../stores/useWorkflowStore'
 
 import { isVersionStatus, useVersionHistory } from './useVersionHistory'
 
@@ -83,6 +84,7 @@ describe('useVersionHistory', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    useWorkflowStore.setState({ currentWorkflow: null, isDirty: false })
     vi.mocked(workflowFetchClient.GET)
       .mockReset()
       .mockResolvedValue({
@@ -457,13 +459,24 @@ describe('useVersionHistory', () => {
       await waitFor(() => expect(mockShowSuccess).toHaveBeenCalledWith({ title: 'Version published' }))
     })
 
-    it('calls onVersionUpdated when publish response includes current_version', async () => {
-      const onVersionUpdated = vi.fn()
-      mockMutate.mockImplementation(
-        (_params: unknown, callbacks?: { onSuccess?: (data: { current_version: number }) => void }) => {
-          callbacks?.onSuccess?.({ current_version: 9 })
-        }
-      )
+    it('loads the returned definition before advancing a clean editor baseline', async () => {
+      const onVersionUpdated = vi.fn(() => {
+        expect(useWorkflowStore.getState().currentWorkflow?.triggers?.[0]?.parameters?.group_id).toBe('established-A')
+        expect(useWorkflowStore.getState().isDirty).toBe(false)
+      })
+      mockMutate.mockImplementation((_params: unknown, callbacks?: { onSuccess?: (data: object) => void }) => {
+        callbacks?.onSuccess?.({
+          current_version: 9,
+          version: {
+            version: 9,
+            workflow_definition: {
+              triggers: [
+                { id: 'subscribe', type: 'event_subscribe_trigger', parameters: { group_id: 'established-A' } },
+              ],
+            },
+          },
+        })
+      })
 
       const { result } = renderHook(() => useVersionHistory({ workflowId: 'wf-1', isNew: false, onVersionUpdated }), {
         wrapper: makeWrapper(queryClient),
@@ -543,6 +556,31 @@ describe('useVersionHistory', () => {
         })
       )
     })
+  })
+
+  it.each(['before submission', 'in flight'])('keeps the original baseline and local edits made %s', async (when) => {
+    const onVersionUpdated = vi.fn()
+    let succeed: (() => void) | undefined
+    mockMutate.mockImplementation((_params: unknown, callbacks?: { onSuccess?: (data: object) => void }) => {
+      succeed = () =>
+        callbacks?.onSuccess?.({
+          current_version: 9,
+          version: { version: 9, workflow_definition: { name: 'corrected' } },
+        })
+    })
+    if (when === 'before submission') useWorkflowStore.setState({ isDirty: true })
+    const { result } = renderHook(() => useVersionHistory({ workflowId: 'wf-1', isNew: false, onVersionUpdated }), {
+      wrapper: makeWrapper(queryClient),
+    })
+    act(() => result.current.publishVersion(2))
+    await waitFor(() => expect(mockMutate).toHaveBeenCalled())
+    act(() => {
+      useWorkflowStore.setState({ isDirty: true })
+      succeed?.()
+    })
+    expect(onVersionUpdated).not.toHaveBeenCalled()
+    expect(useWorkflowStore.getState().isDirty).toBe(true)
+    expect(useWorkflowStore.getState().currentWorkflow).toBeNull()
   })
 
   it('reconciles the explicitly selected saved version before publishing from history', async () => {

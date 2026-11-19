@@ -6,9 +6,11 @@ import { workflowClient } from '../../../client'
 import type { PaginationFooterProps } from '../../../components/table/PaginationFooter'
 import { useCursorPagination } from '../../../hooks/useCursorPagination'
 import { useAlerts } from '../../../providers/alerts'
+import { useWorkflowStore } from '../../../stores/useWorkflowStore'
 import { getErrorMessage } from '../../../utils/apiErrors'
 import { detachPromise } from '../../../utils/detachPromise'
 import { downloadVersionExport } from '../../../utils/downloadWorkflowExport'
+import { processExistingWorkflow } from '../utils/processExistingWorkflow'
 
 import { buildWorkflowVersionsQuery } from './buildWorkflowVersionsQuery'
 import { useKafkaPublishGroups, type PreparedPublishOptions } from './useKafkaPublishGroups'
@@ -104,6 +106,9 @@ export function useVersionHistory({ workflowId, isNew, onVersionUpdated }: UseVe
     (publishName?: string, changeDescription?: string, onSettled?: () => void, options?: PreparedPublishOptions) => {
       const version = options?.versionOverride
       if (!workflowId || version == null) return
+      const submittedEditor = useWorkflowStore.getState()
+      const submittedWorkflow = submittedEditor.currentWorkflow
+      const wasDirty = submittedEditor.isDirty
       publishMutation.mutate(
         {
           params: { path: { workflow_id: workflowId, version } },
@@ -116,7 +121,23 @@ export function useVersionHistory({ workflowId, isNew, onVersionUpdated }: UseVe
         {
           onSuccess: (data) => {
             showSuccess({ title: 'Version published' })
-            if (data?.current_version != null) {
+            const editor = useWorkflowStore.getState()
+            if (
+              data?.current_version != null &&
+              data.version?.version === data.current_version &&
+              data.version.workflow_definition &&
+              !wasDirty &&
+              !editor.isDirty &&
+              editor.currentWorkflow === submittedWorkflow
+            ) {
+              const loaded = processExistingWorkflow(data)
+              editor.loadWorkflowWithEdges(
+                loaded.flattenedWorkflow,
+                loaded.generatedEdges,
+                loaded.nodePositions,
+                data.project_id
+              )
+              editor.markClean()
               onVersionUpdated?.(data.current_version)
             }
             detachPromise(versionsQuery.refetch())
