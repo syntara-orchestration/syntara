@@ -155,6 +155,7 @@ const baseMockAAPBrowserData = {
   workflowTemplateDetail: undefined,
   error: null,
   retryAll: mockRetryAll,
+  isActive: true,
   searchOrganizations: vi.fn(),
   searchTemplates: vi.fn(),
   searchInventories: vi.fn(),
@@ -221,6 +222,18 @@ describe('AAPWorkflowTemplateForm', () => {
 
     const templateInput = screen.getByPlaceholderText(/Select a workflow template/i)
     expect(templateInput).toBeInTheDocument()
+  })
+
+  it('disables resource pickers until a credential is selected', () => {
+    mockUseAAPBrowser.mockReturnValue({ ...createMockAAPBrowser(defaultWorkflowTemplateDetail), isActive: false })
+
+    renderWithHeader(
+      <AAPWorkflowTemplateForm onSubmit={mockOnSubmit} onCancel={vi.fn()} initialData={{ integration_id: 'int-123' }} />
+    )
+
+    expect(screen.getByPlaceholderText(/Select an organization/i)).toBeDisabled()
+    expect(screen.getByPlaceholderText(/Select a workflow template/i)).toBeDisabled()
+    expect(screen.getByText('Select a credential to browse resources')).toBeInTheDocument()
   })
 
   it('submits form even without organization selected (permissive schema)', async () => {

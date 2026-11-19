@@ -11,7 +11,16 @@ const defaultOptions = [
   { value: 'opt-3', label: 'Gamma' },
 ] as const
 
-function renderSelect(overrides: Partial<React.ComponentProps<typeof AAPTypeaheadSelect>> = {}) {
+/**
+ * Overrides accepted by renderSelect. `isDisabled` documents the planned
+ * disabled state; the component ignores it until the prop is implemented,
+ * which keeps the disabled-state assertions red.
+ */
+type RenderSelectOverrides = Partial<React.ComponentProps<typeof AAPTypeaheadSelect>> & {
+  isDisabled?: boolean
+}
+
+function renderSelect(overrides: RenderSelectOverrides = {}) {
   const onChange = vi.fn()
   const onSearchChange = vi.fn()
   const props = {
@@ -222,6 +231,43 @@ describe('AAPTypeaheadSelect', () => {
     it('renders without danger status when hasError is false', () => {
       renderSelect({ hasError: false })
       expect(getInput()).toBeInTheDocument()
+    })
+  })
+
+  describe('Disabled state', () => {
+    it('renders the filter input as disabled when isDisabled is true', () => {
+      renderSelect({ isDisabled: true })
+      expect(getInput()).toBeDisabled()
+    })
+
+    it('renders an enabled filter input when isDisabled is not set', () => {
+      renderSelect()
+      expect(getInput()).toBeEnabled()
+    })
+
+    it('does not open the dropdown when clicked while disabled', async () => {
+      const user = userEvent.setup()
+      renderSelect({ isDisabled: true })
+
+      await user.click(getInput())
+
+      expect(screen.queryByRole('listbox')).not.toBeInTheDocument()
+      expect(screen.queryByRole('option', { name: /Alpha/i })).not.toBeInTheDocument()
+    })
+
+    it('does not show the clear button while disabled', () => {
+      renderSelect({ selected: 'opt-1', isDisabled: true })
+      expect(screen.queryByRole('button', { name: 'Clear selection' })).not.toBeInTheDocument()
+    })
+
+    it('keeps the selected value visible while disabled', () => {
+      renderSelect({ selected: 'opt-1', isDisabled: true })
+      expect(getInput()).toHaveValue('Alpha')
+    })
+
+    it('has no accessibility violations while disabled', async () => {
+      const { container } = renderSelect({ selected: 'opt-1', isDisabled: true })
+      expect(await axe(container)).toHaveNoViolations()
     })
   })
 

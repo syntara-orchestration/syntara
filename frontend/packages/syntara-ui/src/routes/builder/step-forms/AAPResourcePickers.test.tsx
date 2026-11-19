@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { FormProvider, useForm } from 'react-hook-form'
 import { describe, expect, it, vi } from 'vitest'
+import { axe } from 'vitest-axe'
 
 import type { useAAPBrowser } from '../../../hooks/useAAPBrowser'
 
@@ -27,18 +28,21 @@ vi.mock('./AAPTypeaheadSelect', () => ({
     placeholder,
     selected,
     ariaLabel,
+    isDisabled,
   }: {
     options: Array<{ value: string; label: string }>
     onChange: (v: string) => void
     placeholder: string
     selected: string
     ariaLabel: string
+    isDisabled?: boolean
   }) => (
     <div data-testid={`typeahead-${ariaLabel.toLowerCase()}`}>
       <input
         aria-label={ariaLabel}
         value={selected}
         placeholder={placeholder}
+        disabled={isDisabled}
         onChange={(e) => onChange(e.target.value)}
       />
       {options.map((opt) => (
@@ -63,7 +67,16 @@ function TestWrapper({
   return <FormProvider {...methods}>{children}</FormProvider>
 }
 
-function createMockBrowser(overrides?: Partial<ReturnType<typeof useAAPBrowser>>): ReturnType<typeof useAAPBrowser> {
+const CREDENTIAL_REQUIRED_HINT = 'Select a credential to browse resources'
+
+/**
+ * Mock browser result. `isActive` becomes part of the hook's public return
+ * value once credential gating ships; the intersection keeps these tests
+ * compilable in the meantime.
+ */
+type MockBrowser = ReturnType<typeof useAAPBrowser> & { isActive: boolean }
+
+function createMockBrowser(overrides?: Partial<MockBrowser>): MockBrowser {
   return {
     organizations: [
       { id: 1, name: 'Org 1' },
@@ -82,8 +95,9 @@ function createMockBrowser(overrides?: Partial<ReturnType<typeof useAAPBrowser>>
     error: null,
     retryAll: vi.fn(),
     templateDetail: undefined,
+    isActive: true,
     ...overrides,
-  } as ReturnType<typeof useAAPBrowser>
+  } as unknown as MockBrowser
 }
 
 describe('AAPResourcePickers', () => {
@@ -351,5 +365,89 @@ describe('AAPResourcePickers', () => {
     )
 
     expect(screen.queryByRole('link', { name: /view job template in aap/i })).not.toBeInTheDocument()
+  })
+
+  describe('credential gating', () => {
+    it('disables organization and job template pickers until a credential is selected', () => {
+      const browser = createMockBrowser({ isActive: false })
+
+      render(
+        <TestWrapper>
+          <AAPResourcePickers browser={browser} />
+        </TestWrapper>
+      )
+
+      expect(screen.getByLabelText('Organization')).toBeDisabled()
+      expect(screen.getByLabelText('Job template')).toBeDisabled()
+    })
+
+    it('shows a credential hint while browsing is inactive', () => {
+      const browser = createMockBrowser({ isActive: false })
+
+      render(
+        <TestWrapper>
+          <AAPResourcePickers browser={browser} />
+        </TestWrapper>
+      )
+
+      expect(screen.getByText(CREDENTIAL_REQUIRED_HINT)).toBeInTheDocument()
+    })
+
+    it('does not show the credential hint once browsing is active', () => {
+      const browser = createMockBrowser({ isActive: true })
+
+      render(
+        <TestWrapper>
+          <AAPResourcePickers browser={browser} />
+        </TestWrapper>
+      )
+
+      expect(screen.queryByText(CREDENTIAL_REQUIRED_HINT)).not.toBeInTheDocument()
+    })
+
+    it('keeps saved selections visible while pickers are disabled', () => {
+      const browser = createMockBrowser({ isActive: false })
+
+      render(
+        <TestWrapper
+          defaultValues={{
+            organization_name: 'Org 1',
+            job_template_name: 'Template 1',
+            job_template_id: 1,
+          }}
+        >
+          <AAPResourcePickers browser={browser} />
+        </TestWrapper>
+      )
+
+      expect(screen.getByLabelText('Organization')).toHaveValue('Org 1')
+      expect(screen.getByLabelText('Job template')).toHaveValue('Template 1')
+      expect(screen.getByLabelText('Organization')).toBeDisabled()
+      expect(screen.getByLabelText('Job template')).toBeDisabled()
+    })
+
+    it('enables pickers once a credential is selected', () => {
+      const browser = createMockBrowser({ isActive: true })
+
+      render(
+        <TestWrapper>
+          <AAPResourcePickers browser={browser} />
+        </TestWrapper>
+      )
+
+      expect(screen.getByLabelText('Organization')).toBeEnabled()
+      expect(screen.getByLabelText('Job template')).toBeEnabled()
+    })
+
+    it('has no accessibility violations while pickers are disabled', async () => {
+      const browser = createMockBrowser({ isActive: false })
+      const { container } = render(
+        <TestWrapper>
+          <AAPResourcePickers browser={browser} />
+        </TestWrapper>
+      )
+
+      expect(await axe(container)).toHaveNoViolations()
+    })
   })
 })

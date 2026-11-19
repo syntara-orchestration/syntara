@@ -26,18 +26,21 @@ vi.mock('./AAPTypeaheadSelect', () => ({
     placeholder,
     selected,
     ariaLabel,
+    isDisabled,
   }: {
     options: Array<{ value: string; label: string }>
     onChange: (v: string) => void
     placeholder: string
     selected: string
     ariaLabel: string
+    isDisabled?: boolean
   }) => (
     <div data-testid={`typeahead-${ariaLabel.toLowerCase().replace(/\s+/g, '-')}`}>
       <input
         aria-label={ariaLabel}
         value={selected}
         placeholder={placeholder}
+        disabled={isDisabled}
         onChange={(e) => onChange(e.target.value)}
       />
       {options.map((opt) => (
@@ -72,7 +75,16 @@ function TestWrapper({
   return <FormProvider {...methods}>{children}</FormProvider>
 }
 
-function createMockBrowser(overrides?: Partial<ReturnType<typeof useAAPBrowser>>): ReturnType<typeof useAAPBrowser> {
+const CREDENTIAL_REQUIRED_HINT = 'Select a credential to browse resources'
+
+/**
+ * Mock browser result. `isActive` becomes part of the hook's public return
+ * value once credential gating ships; the intersection keeps these tests
+ * compilable in the meantime.
+ */
+type MockBrowser = ReturnType<typeof useAAPBrowser> & { isActive: boolean }
+
+function createMockBrowser(overrides?: Partial<MockBrowser>): MockBrowser {
   return {
     organizations: [
       { id: 1, name: 'Org 1' },
@@ -91,8 +103,9 @@ function createMockBrowser(overrides?: Partial<ReturnType<typeof useAAPBrowser>>
     error: null,
     retryAll: vi.fn(),
     workflowTemplateDetail: undefined,
+    isActive: true,
     ...overrides,
-  } as unknown as ReturnType<typeof useAAPBrowser>
+  } as unknown as MockBrowser
 }
 
 describe('AAPWorkflowTemplateResourcePickers', () => {
@@ -243,5 +256,89 @@ describe('AAPWorkflowTemplateResourcePickers', () => {
     )
 
     expect(await axe(container)).toHaveNoViolations()
+  })
+
+  describe('credential gating', () => {
+    it('disables organization and workflow template pickers until a credential is selected', () => {
+      const browser = createMockBrowser({ isActive: false })
+
+      render(
+        <TestWrapper>
+          <AAPWorkflowTemplateResourcePickers browser={browser} />
+        </TestWrapper>
+      )
+
+      expect(screen.getByLabelText('Organization')).toBeDisabled()
+      expect(screen.getByLabelText('Workflow template')).toBeDisabled()
+    })
+
+    it('shows a credential hint while browsing is inactive', () => {
+      const browser = createMockBrowser({ isActive: false })
+
+      render(
+        <TestWrapper>
+          <AAPWorkflowTemplateResourcePickers browser={browser} />
+        </TestWrapper>
+      )
+
+      expect(screen.getByText(CREDENTIAL_REQUIRED_HINT)).toBeInTheDocument()
+    })
+
+    it('does not show the credential hint once browsing is active', () => {
+      const browser = createMockBrowser({ isActive: true })
+
+      render(
+        <TestWrapper>
+          <AAPWorkflowTemplateResourcePickers browser={browser} />
+        </TestWrapper>
+      )
+
+      expect(screen.queryByText(CREDENTIAL_REQUIRED_HINT)).not.toBeInTheDocument()
+    })
+
+    it('keeps saved selections visible while pickers are disabled', () => {
+      const browser = createMockBrowser({ isActive: false })
+
+      render(
+        <TestWrapper
+          defaultValues={{
+            organization_name: 'Org 1',
+            workflow_job_template_name: 'Workflow Template 1',
+            workflow_job_template_id: 1,
+          }}
+        >
+          <AAPWorkflowTemplateResourcePickers browser={browser} />
+        </TestWrapper>
+      )
+
+      expect(screen.getByLabelText('Organization')).toHaveValue('Org 1')
+      expect(screen.getByLabelText('Workflow template')).toHaveValue('Workflow Template 1')
+      expect(screen.getByLabelText('Organization')).toBeDisabled()
+      expect(screen.getByLabelText('Workflow template')).toBeDisabled()
+    })
+
+    it('enables pickers once a credential is selected', () => {
+      const browser = createMockBrowser({ isActive: true })
+
+      render(
+        <TestWrapper>
+          <AAPWorkflowTemplateResourcePickers browser={browser} />
+        </TestWrapper>
+      )
+
+      expect(screen.getByLabelText('Organization')).toBeEnabled()
+      expect(screen.getByLabelText('Workflow template')).toBeEnabled()
+    })
+
+    it('has no accessibility violations while pickers are disabled', async () => {
+      const browser = createMockBrowser({ isActive: false })
+      const { container } = render(
+        <TestWrapper>
+          <AAPWorkflowTemplateResourcePickers browser={browser} />
+        </TestWrapper>
+      )
+
+      expect(await axe(container)).toHaveNoViolations()
+    })
   })
 })
