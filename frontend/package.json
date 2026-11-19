@@ -72,6 +72,7 @@
     "seroval": "^1.6.8"
   },
   "devDependencies": {
+    "@ansible/eslint-plugin": "^0.1.0",
     "@emnapi/core": "2.0.0-alpha.3",
     "@emnapi/runtime": "2.0.0-alpha.3",
     "@testing-library/dom": "^10.4.2",

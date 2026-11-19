@@ -1,3 +1,4 @@
+import ansiblePlugin from '@ansible/eslint-plugin'
 import storybook from 'eslint-plugin-storybook'
 import js from '@eslint/js'
 import { fixupPluginRules } from '@eslint/compat'
@@ -11,7 +12,6 @@ import noOnlyTests from 'eslint-plugin-no-only-tests'
 import testingLibrary from 'eslint-plugin-testing-library'
 import sonarjs from 'eslint-plugin-sonarjs'
 import unicorn from 'eslint-plugin-unicorn'
-import barrelFiles from 'eslint-plugin-barrel-files'
 import vitest from '@vitest/eslint-plugin'
 import pluginQuery from '@tanstack/eslint-plugin-query'
 import reactUseEffect from 'eslint-plugin-react-you-might-not-need-an-effect'
@@ -36,6 +36,15 @@ const importXResolver = importPlugin.createNodeResolver({
 const TEST_FILES = ['**/*.test.{ts,tsx}', '**/*.spec.{ts,tsx}']
 /** Glob pattern for end-to-end test files. */
 const E2E_FILES = ['e2e/**']
+/** Test-only source files excluded from application-level Ansible checks. */
+const ANSIBLE_TEST_FILES = [
+  '**/*.{test,spec}.{js,jsx,ts,tsx}',
+  'src/**/__tests__/**',
+  'src/**/__mocks__/**',
+  'src/**/test/**',
+  'src/**/tests/**',
+  'src/**/test-utils/**',
+]
 /** Import restrictions shared by TypeScript source files. */
 const SHARED_RESTRICTED_IMPORT_PATTERNS = [
   {
@@ -99,7 +108,49 @@ export default tseslint.config(
   },
   js.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked,
+  ...ansiblePlugin.configs.recommended,
   ...pluginQuery.configs['flat/recommended'],
+  {
+    files: ['src/**/*.{js,jsx,ts,tsx}'],
+    ignores: ANSIBLE_TEST_FILES,
+    rules: {
+      '@ansible/no-hardcoded-doc-urls': [
+        'error',
+        {
+          prefixes: [
+            'https://access.redhat.com/documentation/',
+            'https://docs.redhat.com/',
+            'https://docs.ansible.com/',
+            'https://ansible.readthedocs.io/',
+          ],
+        },
+      ],
+      // Syntara's raw HTTP rule covers axios, fetch, and XMLHttpRequest.
+      '@ansible/no-unapproved-http-client': [
+        'error',
+        {
+          clientModules: ['cross-fetch', 'got', 'ky', 'node-fetch', 'ofetch', 'superagent', 'undici'],
+        },
+      ],
+    },
+  },
+  {
+    // Keep API roots in shared clients and the few direct auth, upload, and webhook flows.
+    files: ['src/**/*.{js,jsx,ts,tsx}'],
+    ignores: [
+      ...ANSIBLE_TEST_FILES,
+      'src/app/useAuthProviders.ts',
+      'src/client.tsx',
+      'src/hooks/useFileUploadWithProgress.ts',
+      'src/routes/access/accessClient.ts',
+      'src/routes/builder/step-forms/shared/stepFieldHelpText.ts',
+      'src/stores/useAuthStore.ts',
+      'src/utils/backendUrl.ts',
+    ],
+    rules: {
+      '@ansible/no-hardcoded-api-prefix': ['error', { roots: { '/api/v1': 'typed API client' } }],
+    },
+  },
   // Align with Sonar typescript:S2245 / CWE-338: Math.random is not suitable for secrets, tokens, or crypto.
   // Reuse the selector in narrower E2E blocks below because flat config replaces array-valued rules.
   {
@@ -257,7 +308,6 @@ export default tseslint.config(
       'no-only-tests': noOnlyTests,
       sonarjs,
       unicorn,
-      'barrel-files': barrelFiles,
       syntara: syntaraPlugin,
       reactYouMightNotNeedAnEffect: reactUseEffect,
     },
@@ -373,8 +423,6 @@ export default tseslint.config(
           ],
         },
       ],
-      'syntara/no-nested-component-definitions': 'error',
-      'syntara/no-hardcoded-doc-urls': 'error',
       // Ban non-null assertions in project source; tests/e2e turn this off below.
       '@typescript-eslint/no-non-null-assertion': 'error',
       // Catch unnecessary useEffect patterns. Aligns with https://react.dev/learn/you-might-not-need-an-effect
@@ -428,26 +476,18 @@ export default tseslint.config(
     },
   },
   {
-    // Scoped to src/ production code only — this is where the TkDodo concerns (bundle size,
-    // tree-shaking, circular deps) actually apply. Test-only helper directories (e.g. e2e/) are
-    // out of scope, since code there never ships to users and grouped re-exports can be a
-    // reasonable convenience. See https://tkdodo.eu/blog/please-stop-using-barrel-files
-    // Barrel files in production code fail lint so new ones cannot be added.
     files: ['src/**/*.{ts,tsx}'],
+    // Keep established aliases for builder registration, grouped drag symbols, and compatibility tests.
+    ignores: [
+      'src/routes/builder/edges/LoopDoneEdge.tsx',
+      'src/routes/builder/edges/LoopOutgoingEdge.tsx',
+      'src/routes/builder/panels/utils/dragTypes.ts',
+      'src/routes/workflows/canvas/nodes/nodeIconResolver.ts',
+      'src/routes/workflows/canvas/nodes/nodeMetadata.ts',
+      'src/routes/workflows/canvas/nodes/renderNodeIcon.tsx',
+    ],
     rules: {
-      'barrel-files/avoid-barrel-files': 'error',
-    },
-  },
-  {
-    // `barrel-files/avoid-barrel-files` only counts a top-level declaration if it is NOT
-    // exported (e.g. `function foo() {}`, not `export function foo() {}`). These three files
-    // are substantial implementation files (a 1000+ line Zustand store, node-factory functions,
-    // expression defaults) that mostly use `export function`/`export const`, so the rule
-    // undercounts their real declarations and misreads a small re-export section as a barrel
-    // file. They are not barrel files.
-    files: ['src/stores/useWorkflowStore.ts', 'src/stores/workflowFactories.ts', 'src/utils/expressions/defaults.ts'],
-    rules: {
-      'barrel-files/avoid-barrel-files': 'off',
+      '@ansible/no-barrel-files': 'error',
     },
   },
   {
@@ -492,8 +532,6 @@ export default tseslint.config(
       'syntara/use-design-tokens-not-hardcoded': 'off',
       'syntara/prefer-confirmation-dialog': 'off',
       'syntara/no-locale-date-format': 'off',
-      'syntara/no-nested-component-definitions': 'off',
-      'syntara/no-hardcoded-doc-urls': 'off',
       'no-warning-comments': 'off',
       '@typescript-eslint/no-non-null-assertion': 'off',
       'reactYouMightNotNeedAnEffect/no-derived-state': 'off',
