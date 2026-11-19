@@ -8,6 +8,8 @@ on:
       - '**/*.md'
       - '*.markdown'
       - '**/*.markdown'
+      - 'docs/backend'
+      - 'docs/frontend'
       - '.github/workflows/check-markdown-links.yml'
       - '.github/scripts/.nvmrc'
       - '.github/scripts/md-link-lint.config.json'
