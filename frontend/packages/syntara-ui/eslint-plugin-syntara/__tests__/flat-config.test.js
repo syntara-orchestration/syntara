@@ -560,22 +560,22 @@ describe('flat ESLint config rule inheritance', () => {
     expect(config?.rules['import-x/extensions']?.[0]).toBe(2)
   })
 
-  it('loads every Syntara custom rule in the route source profile', async () => {
+  it('loads Syntara-specific and shared Ansible rules in the route source profile', async () => {
     const config = await eslint.calculateConfigForFile('src/routes/access-management/AssignRoleModal.tsx')
-    const customRuleIds = [
-      'syntara/no-hardcoded-doc-urls',
+    const ruleIds = [
       'syntara/no-locale-date-format',
-      'syntara/no-nested-component-definitions',
-      'syntara/no-raw-http-calls',
       'syntara/prefer-confirmation-dialog',
       'syntara/prefer-syn-select',
       'syntara/prefer-pf-list-components',
       'syntara/prefer-pf-text-components',
       'syntara/require-page-title',
       'syntara/use-design-tokens-not-hardcoded',
+      '@ansible/no-hardcoded-doc-urls',
+      '@ansible/no-nested-component-definitions',
+      '@ansible/no-unapproved-http-client',
     ]
 
-    expect(customRuleIds.every((ruleId) => config?.rules[ruleId]?.[0] === 2)).toBe(true)
+    expect(ruleIds.every((ruleId) => config?.rules[ruleId]?.[0] === 2)).toBe(true)
   })
 
   it('enforces the configured complexity and file-size thresholds', async () => {
@@ -669,8 +669,8 @@ describe('flat ESLint config rule inheritance', () => {
 
     expect(sourceConfig?.rules['vitest/expect-expect']?.[0] ?? 0).toBe(0)
     expect(testConfig?.rules['vitest/expect-expect']?.[0]).toBe(2)
-    expect(sourceConfig?.rules['syntara/no-hardcoded-doc-urls']?.[0]).toBe(2)
-    expect(testConfig?.rules['syntara/no-hardcoded-doc-urls']?.[0]).toBe(0)
+    expect(sourceConfig?.rules['@ansible/no-hardcoded-doc-urls']?.[0]).toBe(2)
+    expect(testConfig?.rules['@ansible/no-hardcoded-doc-urls']?.[0] ?? 0).toBe(0)
     expect(sourceConfig?.rules['@typescript-eslint/no-non-null-assertion']?.[0]).toBe(2)
     expect(testConfig?.rules['@typescript-eslint/no-non-null-assertion']?.[0]).toBe(0)
   })

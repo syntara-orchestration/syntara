@@ -125,11 +125,19 @@ export default tseslint.config(
           ],
         },
       ],
-      // Syntara's raw HTTP rule covers axios, fetch, and XMLHttpRequest.
+    },
+  },
+  {
+    // Keep raw HTTP checks on TypeScript source while allowing documented exceptions.
+    files: ['**/*.{ts,tsx}'],
+    ignores: ['**/useFileUploadWithProgress.ts', '**/useFileStorageStatus.ts', '**/e2e/global-setup.ts'],
+    rules: {
       '@ansible/no-unapproved-http-client': [
         'error',
         {
-          clientModules: ['cross-fetch', 'got', 'ky', 'node-fetch', 'ofetch', 'superagent', 'undici'],
+          clientModules: ['axios', 'cross-fetch', 'got', 'ky', 'node-fetch', 'ofetch', 'superagent', 'undici'],
+          disallowFetch: true,
+          disallowXMLHttpRequest: true,
         },
       ],
     },
@@ -218,9 +226,6 @@ export default tseslint.config(
           decoration: ['/', '*'],
         },
       ],
-      // axios restriction merged into the icon no-restricted-imports block below
-      // to avoid flat-config rule shadowing (the last matching block wins for a given rule).
-      // Raw HTTP calls are handled by syntara/no-raw-http-calls (fetch, XMLHttpRequest) below
       'no-restricted-properties': ['error', CRYPTO_RANDOM_UUID_RESTRICTION],
     },
   },
@@ -394,16 +399,9 @@ export default tseslint.config(
       // TypeScript resolves source extensions automatically; JSON imports need `.json`.
       'import-x/extensions': ['error', 'never', { json: 'always' }],
       '@typescript-eslint/consistent-type-definitions': ['error', 'type'],
-      // -- syntara custom rules (PR checklist + UX design system enforcement) --
+      // -- Syntara-specific rules (PR checklist + UX design system enforcement) --
       // no-switch-is-reversed, require-alert-object-param, and require-query-state-object
       // are enforced via no-restricted-syntax AST selectors above (no custom plugin needed).
-      'syntara/no-raw-http-calls': [
-        'error',
-        {
-          // XMLHttpRequest required for upload progress (fetch lacks upload progress events)
-          allowedFiles: ['**/useFileUploadWithProgress.ts', '**/useFileStorageStatus.ts', '**/e2e/global-setup.ts'],
-        },
-      ],
       'syntara/prefer-pf-list-components': 'error',
       'syntara/prefer-pf-text-components': 'error',
       'syntara/use-design-tokens-not-hardcoded': 'error',

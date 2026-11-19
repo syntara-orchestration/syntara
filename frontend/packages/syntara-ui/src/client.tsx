@@ -97,7 +97,7 @@ const authMiddleware: Middleware = {
     })
     retryRequest.headers.set('Authorization', `Bearer ${accessToken}`)
     retryRequest.headers.set('X-Auth-Retry', '1')
-    // eslint-disable-next-line syntara/no-raw-http-calls -- auth middleware retry with refreshed token after 401
+    // eslint-disable-next-line @ansible/no-unapproved-http-client -- auth middleware retry with refreshed token after 401
     return fetch(retryRequest)
   },
 }

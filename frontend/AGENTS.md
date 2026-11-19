@@ -82,8 +82,9 @@ Items enforced by ESLint at **error** level are omitted -- ESLint is the source 
 
 - `formState.isSubmitting` → use `isPending` (`no-restricted-syntax`)
 - `aria-label` on `<span>` → `no-restricted-syntax`
-- Nested React component definitions → `syntara/no-nested-component-definitions` (for PatternFly `toggle` / similar props use a module-scoped child and pass data as props; see coding-standards §18)
-- Hardcoded documentation URLs → `syntara/no-hardcoded-doc-urls`
+- Nested React component definitions → `@ansible/no-nested-component-definitions` (for PatternFly `toggle` / similar props use a module-scoped child and pass data as props; see coding-standards §18)
+- Hardcoded documentation URLs → `@ansible/no-hardcoded-doc-urls`
+- Unapproved HTTP clients and direct `fetch` / `XMLHttpRequest` usage → `@ansible/no-unapproved-http-client`
 - `// TODO` / `// FIXME` comments → `no-warning-comments` (warn, not error -- surfaced as a lint warning, does not block CI)
 - Native `<select>` / `<FormSelect>` → `no-restricted-syntax`
 - Non-null assertions (`!`) on nullable types → `@typescript-eslint/no-non-null-assertion`
@@ -123,7 +124,7 @@ The items below cover patterns ESLint **cannot** catch:
 24. **New routes must set `requiredPermissions` and/or `routePermission`** -- every route with access requirements needs permission fields in `navigationItems.tsx`; create/edit routes need a `routePermission` for `ProtectedRoute` guard (see [`docs/permissions-rbac.md`](docs/permissions-rbac.md))
 25. **New write actions must use `DisabledWithTooltip` + permission hook** -- never expose ungated create/edit/delete buttons; use a domain `use*Permissions` hook and `permissionTooltip()` for copy (see [`docs/permissions-rbac.md`](docs/permissions-rbac.md))
 26. **New permission-gated features need mock handlers** -- add role-aware responses in `packages/syntara-mock-api/src/handlers.ts` `can_i` block for all 4 roles (admin, viewer, auditor, user) and E2E tests in `permission-gating.spec.ts`
-27. **`SynPageHeader` must get `docLink={useDocLink('key')}`** -- hardcoded docs URLs are ESLint (`syntara/no-hardcoded-doc-urls`); still verify the header receives the hook result and new keys land in `docsUrls.json` (see [`.agents/skills/frontend-coding-standards/SKILL.md`](../.agents/skills/frontend-coding-standards/SKILL.md) section 33)
+27. **`SynPageHeader` must get `docLink={useDocLink('key')}`** -- hardcoded docs URLs are ESLint (`@ansible/no-hardcoded-doc-urls`); still verify the header receives the hook result and new keys land in `docsUrls.json` (see [`.agents/skills/frontend-coding-standards/SKILL.md`](../.agents/skills/frontend-coding-standards/SKILL.md) section 33)
 28. **No `new Date()` in mock API seed data** -- ESLint enforced in `syntara-mock-api`'s `eslint.config.js` for `src/resources/` and `src/utils/`; seed data must use deterministic timestamps from `mockDates.ts`, never `new Date()`. Dynamic timestamps cause visual regression baselines to go stale across CI runs because rendered dates change daily
 29. **New pages must render `<title>{toPageTitle(['...'])}</title>`** -- every top-level page component (default export with `<SynPage>`) must render a `<title>` as its first `<SynPage>` child. Use `toPageTitle` from `src/utils/toPageTitle.ts`
 30. **No new `forwardRef`** -- React 19 passes `ref` as a regular prop; accept `ref` on the props type instead of wrapping with `forwardRef` (see [`.agents/skills/frontend-coding-standards/SKILL.md`](../.agents/skills/frontend-coding-standards/SKILL.md) §38)

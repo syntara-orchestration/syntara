@@ -37,7 +37,7 @@ export function useAuthProviders(): UseAuthProvidersResult {
 
     const loadProviders = async () => {
       try {
-        // eslint-disable-next-line syntara/no-raw-http-calls -- pre-auth: fetching providers before token middleware is available
+        // eslint-disable-next-line @ansible/no-unapproved-http-client -- pre-auth: fetching providers before token middleware is available
         const response = await fetch('/api/v1/auth/providers', {
           headers: orchestratorUiClientHeaders(),
           signal: controller.signal,
