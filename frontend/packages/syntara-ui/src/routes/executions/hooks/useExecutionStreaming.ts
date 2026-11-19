@@ -58,8 +58,6 @@ export function useSyncActivityStore(
           injectPendingStates(nodeIds)
         }
       }
-    } else {
-      setActivityExecutions([])
     }
   }, [
     activities,

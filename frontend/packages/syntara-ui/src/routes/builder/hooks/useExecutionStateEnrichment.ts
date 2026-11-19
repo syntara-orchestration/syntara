@@ -42,6 +42,9 @@ function applyEnrichedData(
 ): NodeType {
   const currentState = (node.data as Record<string, unknown>).__executionState as ExecutionStateSnapshot | undefined
   const newState = enriched.__executionState as ExecutionStateSnapshot | undefined
+  if (newState === undefined && currentState !== undefined) {
+    return node
+  }
   if (hasExecutionStateChanged(currentState, newState)) {
     anyChangedRef.current = true
     return { ...node, data: enriched } as unknown as NodeType
