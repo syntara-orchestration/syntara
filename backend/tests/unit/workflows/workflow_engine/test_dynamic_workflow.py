@@ -882,6 +882,9 @@ class TestFanInConverge:
         assert wf.get_activity_input("converge_node") == converge_node.parameters
         assert wf.get_activity_input("converge_node_iter_0") == prior_inputs
         assert wf.get_activity_input("converge_node_iter_1") == converge_node.parameters
+        result = wf._build_result("exec-1", include_node_results=False)
+        assert result["failed_activity_inputs"]["converge_node"] == converge_node.parameters
+        assert result["failed_activity_occurrences"] == {"converge_node": "converge_node_iter_1"}
 
     def test_fail_converge_node_preserves_valid_output_mapping(self) -> None:
         """Converge failure fallback keeps mapped aliases for recovery steps."""

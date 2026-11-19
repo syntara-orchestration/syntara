@@ -44,6 +44,7 @@ class WorkflowConvergeMixin:
     skipped_nodes: set[str]
     resolver: NamespaceResolver
     node_inputs: dict[str, dict[str, Any]]
+    failed_node_temporal_ids: dict[str, str]
     node_control_data: dict[str, dict[str, Any]]
     _runtime_settings: dict[str, Any]
     _cof_failed_nodes: set[str]
@@ -59,6 +60,8 @@ class WorkflowConvergeMixin:
 
     # Methods provided by OrchestratorWorkflow (resolved via MRO)
     def _are_predecessors_complete(self, node_id: str, graph: WorkflowGraph) -> bool: ...  # type: ignore[empty-body]
+
+    def _source_temporal_activity_id(self, node: ActivityNode) -> str: ...  # type: ignore[empty-body]
 
     def _record_input_history(self, node: ActivityNode, resolved_parameters: dict[str, Any]) -> None: ...
 
@@ -443,6 +446,10 @@ class WorkflowConvergeMixin:
         skipped (via ``_timed_out_converge_nodes``).
         """
         node = graph.get_node(node_id)
+        failed_node_temporal_ids = getattr(self, "failed_node_temporal_ids", {})
+        failed_node_temporal_ids[node_id] = self._source_temporal_activity_id(node)
+        self.failed_node_temporal_ids = failed_node_temporal_ids
+
         # Gate/timeout can fail before `_execute_single_node` records inputs.
         # If this occurrence already published resolved parameters, keep those
         # instead of overwriting them with the unresolved definition. Canvas ID
