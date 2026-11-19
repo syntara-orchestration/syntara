@@ -37,7 +37,7 @@ vi.mock('../logoutWithAlert', () => ({
 
 const mockShowAlert = vi.fn()
 
-vi.mock('../../../providers/alerts', () => ({
+vi.mock('../../../providers/alerts/AlertContext', () => ({
   useAlerts: () => ({ showAlert: mockShowAlert }),
 }))
 

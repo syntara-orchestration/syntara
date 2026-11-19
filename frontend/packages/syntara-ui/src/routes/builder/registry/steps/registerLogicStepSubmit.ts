@@ -1,6 +1,6 @@
 import { ActivityTypeEnum, EdgeHandleEnum } from '@syntara/contracts'
 
-import { RegistryStepId } from '../../../../constants'
+import { RegistryStepId } from '../../../../constants/registryStepIds'
 import {
   createConditionActivity,
   createConvergeActivity,

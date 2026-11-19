@@ -9,7 +9,7 @@ import inspect
 
 import pytest
 
-from syntara.workflows.workflow_engine.dynamic_workflow import OrchestratorWorkflow
+from syntara.workflow_runtime.engines.temporal.dynamic_workflow import OrchestratorWorkflow
 
 
 class TestGetSkippedNodesUniqueness:

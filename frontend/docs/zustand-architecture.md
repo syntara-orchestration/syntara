@@ -782,7 +782,8 @@ packages/syntara-ui/src/lib/websocket/store.ts
 **Usage pattern:**
 
 ```tsx
-import { useWebSocket, WebSocketChannel } from '../../lib/websocket'
+import { useWebSocket } from '../../lib/websocket/hooks'
+import { WebSocketChannel } from '../../lib/websocket/channels'
 
 function ChatComponent() {
   const { connectionState, isConnected, sendRaw } = useWebSocket(WebSocketChannel.Chat, {

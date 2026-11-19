@@ -50,7 +50,7 @@ vi.mock('./useTestSignIn', () => ({
 
 const mockShowAlert = vi.fn()
 const mockShowSuccess = vi.fn()
-vi.mock('../../../../providers/alerts', () => ({
+vi.mock('../../../../providers/alerts/AlertContext', () => ({
   useAlerts: () => ({ showAlert: mockShowAlert, showSuccess: mockShowSuccess }),
 }))
 

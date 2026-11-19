@@ -44,7 +44,7 @@ vi.mock('../../stores/useWorkflowStore', async (importOriginal) => {
   }
 })
 
-vi.mock('../../providers/alerts', () => ({
+vi.mock('../../providers/alerts/AlertContext', () => ({
   useAlerts: vi.fn(() => ({
     showError: mockShowError,
   })),
@@ -63,18 +63,35 @@ vi.mock('./registry/StepRegistry', () => ({
   },
 }))
 
-vi.mock('./step-details', () => ({
+vi.mock('./step-details/TaskStepDetails', () => ({
   TaskStepDetails: ({ nodeId }: { nodeId: string }) => {
     useEffect(() => {
       taskDetailsMountCount.current += 1
     }, [])
     return <div data-testid="task-details">{nodeId}</div>
   },
+}))
+
+vi.mock('./step-details/ApprovalStepDetails', () => ({
   ApprovalStepDetails: () => <div data-testid="approval-details" />,
+}))
+vi.mock('./step-details/ConditionStepDetails', () => ({
   ConditionStepDetails: () => <div data-testid="condition-details" />,
+}))
+vi.mock('./step-details/LoopStepDetails', () => ({
   LoopStepDetails: () => <div data-testid="loop-details" />,
+}))
+vi.mock('./step-details/ConvergeStepDetails', () => ({
   ConvergeStepDetails: () => <div data-testid="converge-details" />,
+}))
+vi.mock('./step-details/SwitchStepDetails', () => ({
+  SwitchStepDetails: () => <div data-testid="switch-details" />,
+}))
+vi.mock('./step-details/TriggerStepDetails', () => ({
   TriggerStepDetails: () => <div data-testid="trigger-details" />,
+}))
+vi.mock('./step-details/WaitStepDetails', () => ({
+  WaitStepDetails: () => <div data-testid="wait-details" />,
 }))
 
 vi.mock('./StepRawDataView', () => ({
