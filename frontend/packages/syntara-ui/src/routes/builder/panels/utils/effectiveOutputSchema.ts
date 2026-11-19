@@ -10,6 +10,7 @@ import {
 import { safeParseFormDefinition } from '../../../../forms/formDefinitionSchema'
 import { formDefinitionToJsonSchema } from '../../../../forms/formDefinitionToJsonSchema'
 
+import { mapJsonSchemaPropertyType } from './jsonSchemaPreviewUtils'
 import { getTriggerInputSchemaFields } from './triggerSchemaUtils'
 
 /** Output fields used by the input preview, including configuration-derived children. */
@@ -124,14 +125,107 @@ function formResponseFields(formDefinition: unknown): PreviewFieldDef[] | null {
   }))
 }
 
+function previewFieldsFromJsonSchema(responseSchema: unknown): PreviewFieldDef[] | null {
+  if (!isRecord(responseSchema)) return null
+
+  const properties = responseSchema.properties
+  if (!isRecord(properties) || Object.keys(properties).length === 0) return null
+
+  return Object.entries(properties).map(([name, propertyValue]) => {
+    const property = isRecord(propertyValue) ? propertyValue : {}
+    const description = typeof property.description === 'string' ? property.description : ''
+
+    return {
+      name,
+      type: mapJsonSchemaPropertyType(property),
+      description,
+      displayName: name,
+    }
+  })
+}
+
+function sortedFieldNames(names: string[]): string {
+  return [...names].sort((left, right) => left.localeCompare(right)).join('\0')
+}
+
+function formDefinitionFieldNames(formDefinition: unknown): string[] | null {
+  const parsed = safeParseFormDefinition(tolerateUnfinishedDynamicOptions(formDefinition))
+  if (!parsed.success) return null
+  return parsed.data.fields.map((field) => field.value_name)
+}
+
+function previewTypesAlign(derived: PreviewFieldDef, persisted: PreviewFieldDef): boolean {
+  if (derived.type === 'unknown' || persisted.type === 'unknown') return true
+  return derived.type === persisted.type
+}
+
+function persistedResponseSchemaMatchesFormDefinition(
+  formDefinition: unknown,
+  derivedFields: PreviewFieldDef[] | null,
+  persistedFields: PreviewFieldDef[] | null
+): boolean {
+  const formFieldNames = formDefinitionFieldNames(formDefinition)
+  if (formFieldNames === null) return false
+
+  if (!persistedFields) return formFieldNames.length === 0
+
+  if (sortedFieldNames(formFieldNames) !== sortedFieldNames(persistedFields.map((field) => field.name))) {
+    return false
+  }
+
+  if (!derivedFields) return true
+
+  const persistedByName = new Map(persistedFields.map((field) => [field.name, field]))
+  return derivedFields.every((derived) => {
+    const persisted = persistedByName.get(derived.name)
+    return persisted !== undefined && previewTypesAlign(derived, persisted)
+  })
+}
+
+function enrichPersistedFieldsWithDerivedLabels(
+  persistedFields: PreviewFieldDef[],
+  derivedFields: PreviewFieldDef[]
+): PreviewFieldDef[] {
+  const derivedByName = new Map(derivedFields.map((field) => [field.name, field]))
+
+  return persistedFields.map((field) => {
+    const derived = derivedByName.get(field.name)
+    if (!derived) return field
+
+    return {
+      ...field,
+      displayName: derived.displayName,
+      description: derived.description || field.description,
+    }
+  })
+}
+
+function resolveFormResponseDataFields(parameters: Record<string, unknown> | undefined): PreviewFieldDef[] | null {
+  const derivedFields = formResponseFields(parameters?.form_definition)
+  const persistedFields = previewFieldsFromJsonSchema(parameters?.response_schema)
+
+  if (
+    derivedFields &&
+    persistedFields &&
+    persistedResponseSchemaMatchesFormDefinition(parameters?.form_definition, derivedFields, persistedFields)
+  ) {
+    return enrichPersistedFieldsWithDerivedLabels(persistedFields, derivedFields)
+  }
+
+  if (derivedFields) return derivedFields
+  return persistedFields
+}
+
 function cloneFields(fields: OutputFieldDef[] | null): PreviewFieldDef[] | null {
   return fields?.map((field) => ({ ...field })) ?? null
 }
 
 /**
  * Resolve the fields shown before execution. Form nodes enrich their static
- * output with fields from the current stored form definition; other nodes keep
- * their generated schema and manual triggers retain their input-schema fallback.
+ * output with `response_data` children from the persisted `response_schema` when
+ * it matches the current `form_definition` (names and preview types), otherwise
+ * from local derivation, with a legacy fallback to `response_schema` alone.
+ * Other nodes keep their generated schema; manual triggers retain their input-schema fallback.
  */
 export function getEffectiveOutputSchema(
   node: ConfiguredOutputNode,
@@ -141,7 +235,7 @@ export function getEffectiveOutputSchema(
   const isFormNode = node.type === ActivityTypeEnum.FORM_PROMPT || node.type === TriggerTypeEnum.FORM_TRIGGER
 
   if (isFormNode) {
-    const responseFields = formResponseFields(node.parameters?.form_definition)
+    const responseFields = resolveFormResponseDataFields(node.parameters)
     if (!responseFields || !staticFields) return staticFields
 
     return staticFields.map((field) =>
