@@ -347,7 +347,9 @@ class TestFormPromptCreateAPI:
         payload = _form_prompt_payload(test_execution.id, test_execution.project_id, prompt_node_id="form1")
         assert (await internal_service_client.post(FORM_PROMPTS_URL, json=payload)).status_code == 201
 
-        response = await internal_service_client.post(FORM_PROMPTS_URL, json={**payload, "temporal_activity_id": "other_activity"})
+        response = await internal_service_client.post(
+            FORM_PROMPTS_URL, json={**payload, "temporal_activity_id": "other_activity"}
+        )
 
         assert response.status_code == 409
         assert response.json()["code"] == "FORM_ALREADY_REQUESTED"
