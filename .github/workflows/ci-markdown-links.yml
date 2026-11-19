@@ -10,6 +10,7 @@ on:
       - '**/*.markdown'
       - '.github/workflows/ci-markdown-links.yml'
       - '.github/scripts/.nvmrc'
+      - '.github/scripts/md-link-lint.config.json'
       - '.github/scripts/package.json'
       - '.github/scripts/package-lock.json'
 
@@ -66,5 +67,6 @@ jobs:
         # Check paths as MkDocs sees them.
         run: >-
           .github/scripts/node_modules/.bin/md-link-lint
+          --config .github/scripts/md-link-lint.config.json
           --exclude 'backend/docs/**'
           --exclude 'frontend/docs/**'
