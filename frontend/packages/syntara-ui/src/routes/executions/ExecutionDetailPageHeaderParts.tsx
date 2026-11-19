@@ -85,8 +85,6 @@ export function ExecutionDetailHeaderToolbar({
   onRetryFromFailureClick,
   isRetryMode = false,
 }: ExecutionDetailHeaderToolbarProps) {
-  if (isRetryMode) return null
-
   const isRetryable = isExecutionRetryable(execution?.status, execution?.mode)
   const showRetryFromFailure = isRetryFromFailureEligible(execution?.status, execution?.mode)
   let retryAction: ReactNode = null
@@ -126,7 +124,7 @@ export function ExecutionDetailHeaderToolbar({
       {isCancellable && execution && (
         <CancelExecutionButton executionId={executionId} projectId={execution.project_id} />
       )}
-      {retryAction}
+      {!isRetryMode && retryAction}
       <Button variant="secondary" onClick={onCopyToEditor}>
         Copy to editor
       </Button>

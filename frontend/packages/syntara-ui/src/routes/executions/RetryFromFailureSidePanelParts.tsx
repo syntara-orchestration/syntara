@@ -59,6 +59,7 @@ type RetryPlanProps = Readonly<{
   notRetriedFailureCount: number
   scopeMode: RetryScopeMode
   scopeId: string
+  emptySelectionWarningId: string
   isRetryPending: boolean
   onSelectAll: () => void
   onChoosePoints: () => void
@@ -76,6 +77,7 @@ type RetryPlanContentProps = Readonly<{
   selectedPointCount: number
   affectedPointCount: number
   notRetriedFailureCount: number
+  emptySelectionWarningId: string
 }>
 
 /** Retry scope controls and the stateful retry plan view. */
@@ -95,6 +97,7 @@ export function RetryPlan({
   notRetriedFailureCount,
   scopeMode,
   scopeId,
+  emptySelectionWarningId,
   isRetryPending,
   onSelectAll,
   onChoosePoints,
@@ -161,6 +164,7 @@ export function RetryPlan({
           selectedPointCount={selectedPointCount}
           affectedPointCount={selectablePoints.length}
           notRetriedFailureCount={notRetriedFailureCount}
+          emptySelectionWarningId={emptySelectionWarningId}
         />
       </StackItem>
     </Stack>
@@ -277,10 +281,11 @@ function RetryPlanContent({
   selectedPointCount,
   affectedPointCount,
   notRetriedFailureCount,
+  emptySelectionWarningId,
 }: RetryPlanContentProps) {
   if (isEmptySelection) {
     return (
-      <Alert isInline variant="info" title="Choose at least one step">
+      <Alert id={emptySelectionWarningId} isInline variant="info" title="Choose at least one step">
         Select one or more steps to see the retry plan for that selection.
       </Alert>
     )
@@ -485,9 +490,11 @@ type RetryFooterProps = Readonly<{
   isRetryDisabled: boolean
   isRetryPending: boolean
   stepCount?: number
+  retryButtonDescribedBy?: string
 }>
 
-export function RetryFooter({ onRetry, onCancel, isRetryDisabled, isRetryPending, stepCount }: RetryFooterProps) {
+export function RetryFooter(props: RetryFooterProps) {
+  const { onRetry, onCancel, isRetryDisabled, isRetryPending, stepCount, retryButtonDescribedBy } = props
   return (
     <Flex justifyContent={{ default: 'justifyContentSpaceBetween' }} alignItems={{ default: 'alignItemsCenter' }}>
       <FlexItem>
@@ -496,6 +503,7 @@ export function RetryFooter({ onRetry, onCancel, isRetryDisabled, isRetryPending
           onClick={onRetry}
           isLoading={isRetryPending}
           isDisabled={isRetryDisabled}
+          aria-describedby={retryButtonDescribedBy}
           data-testid="retry-from-failure-confirm"
         >
           {getRetryButtonLabel(stepCount)}

@@ -138,8 +138,10 @@ describe('RetryFromFailureSidePanel', () => {
   it('requires input edits to be saved or cancelled before retrying', () => {
     renderPanel({ hasUnsavedInputOverrides: true })
 
-    expect(screen.getByText('Save or cancel input changes in Run details before retrying.')).toBeInTheDocument()
-    expect(screen.getByTestId('retry-from-failure-confirm')).toBeDisabled()
+    const retryButton = screen.getByTestId('retry-from-failure-confirm')
+
+    expect(retryButton).toBeDisabled()
+    expect(retryButton).toHaveAccessibleDescription(/^Save or cancel input changes in Run details before retrying\./)
   })
 
   it('previews an exact selected subset and retries only the checked steps', async () => {
@@ -211,8 +213,10 @@ describe('RetryFromFailureSidePanel', () => {
 
     await user.click(screen.getByRole('radio', { name: 'Choose steps' }))
 
-    expect(screen.getByRole('heading', { name: 'Info alert: Choose at least one step' })).toBeInTheDocument()
-    expect(screen.getByTestId('retry-from-failure-confirm')).toBeDisabled()
+    const retryButton = screen.getByTestId('retry-from-failure-confirm')
+
+    expect(retryButton).toBeDisabled()
+    expect(retryButton).toHaveAccessibleDescription(/Choose at least one step.*Select one or more steps/)
   })
 
   it('shows a loading state and disables retry while the plan loads', () => {

@@ -10,7 +10,7 @@ type UseRetryFromFailurePreviewParams = {
 /**
  * Read-only preview of a retry from failure.
  *
- * Fetches only while the dialog is open. Returns `200` with `eligible: false`
+ * Fetches only while the retry review panel is open. Returns `200` with `eligible: false`
  * and a `reason` when the backend refuses, so a rejection is data rather than
  * an error state — only transport failures surface as `isError`.
  */
