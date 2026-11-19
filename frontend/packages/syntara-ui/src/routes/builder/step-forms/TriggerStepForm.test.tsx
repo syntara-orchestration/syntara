@@ -434,6 +434,37 @@ describe('TriggerStepForm Component', () => {
       expect(screen.queryByTestId('schedule-builder-fields')).not.toBeInTheDocument()
     })
 
+    it('marks authorized service accounts as required', () => {
+      const { container } = renderWithHeader(
+        <TriggerStepForm onSubmit={mockOnSubmit} initialData={{ triggerType: TriggerTypeEnum.WEBHOOK_TRIGGER }} />
+      )
+
+      // PatternFly renders a required asterisk via this class on FormGroup; not reachable by accessible queries.
+      // eslint-disable-next-line testing-library/no-container, testing-library/no-node-access -- PatternFly required indicator is not accessible via accessible queries
+      const requiredIndicator = container.querySelector(
+        'label[for="webhook-authorized-service-accounts"] .pf-v6-c-form__label-required'
+      )
+      expect(requiredIndicator).toBeInTheDocument()
+    })
+
+    it('allows saving a draft trigger with no authorized service accounts selected', async () => {
+      renderWithHeader(
+        <TriggerStepForm
+          onSubmit={mockOnSubmit}
+          initialData={{ triggerType: TriggerTypeEnum.WEBHOOK_TRIGGER, authorizedServiceAccountIds: [] }}
+        />
+      )
+
+      await submitTriggerForm()
+
+      await waitFor(() => {
+        expect(mockOnSubmit).toHaveBeenCalledWith(
+          expect.objectContaining({ triggerType: TriggerTypeEnum.WEBHOOK_TRIGGER })
+        )
+      })
+      expect(screen.queryByText('At least one authorized service account is required')).not.toBeInTheDocument()
+    })
+
     it('renders with initial webhook trigger data', async () => {
       const user = userEvent.setup()
       renderWithHeader(
@@ -535,6 +566,35 @@ describe('TriggerStepForm Component', () => {
       await waitFor(() => {
         expect(mockOnSubmit).toHaveBeenCalled()
       })
+    })
+
+    it('marks authorized service accounts as required', () => {
+      const { container } = renderWithHeader(
+        <TriggerStepForm onSubmit={mockOnSubmit} initialData={{ triggerType: TriggerTypeEnum.EDA_TRIGGER }} />
+      )
+
+      // PatternFly renders a required asterisk via this class on FormGroup; not reachable by accessible queries.
+      // eslint-disable-next-line testing-library/no-container, testing-library/no-node-access -- PatternFly required indicator is not accessible via accessible queries
+      const requiredIndicator = container.querySelector(
+        'label[for="eda-authorized-service-accounts"] .pf-v6-c-form__label-required'
+      )
+      expect(requiredIndicator).toBeInTheDocument()
+    })
+
+    it('allows saving a draft trigger with no authorized service accounts selected', async () => {
+      renderWithHeader(
+        <TriggerStepForm
+          onSubmit={mockOnSubmit}
+          initialData={{ triggerType: TriggerTypeEnum.EDA_TRIGGER, authorizedServiceAccountIds: [] }}
+        />
+      )
+
+      await submitTriggerForm()
+
+      await waitFor(() => {
+        expect(mockOnSubmit).toHaveBeenCalledWith(expect.objectContaining({ triggerType: TriggerTypeEnum.EDA_TRIGGER }))
+      })
+      expect(screen.queryByText('At least one authorized service account is required')).not.toBeInTheDocument()
     })
 
     it('renders with initial EDA trigger data', async () => {
