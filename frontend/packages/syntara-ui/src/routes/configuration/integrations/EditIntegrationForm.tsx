@@ -7,9 +7,6 @@ import {
   Divider,
   Form,
   FormGroup,
-  FormHelperText,
-  HelperText,
-  HelperTextItem,
   Title,
 } from '@patternfly/react-core'
 import type { IntegrationsAPI } from '@syntara/contracts'
@@ -44,9 +41,9 @@ import styles from './EditIntegrationForm.module.css'
 import type { EditIntegrationFormValues, IntegrationRead } from './editIntegrationFormSchema'
 import { buildConfiguration, buildEditSchema, editIntegrationSchema } from './editIntegrationFormSchema'
 import { EditSecurityFields } from './EditSecurityFields'
+import { ExecutionPlaneScopeField } from './form/ExecutionPlaneScopeField'
 import { ScopeFields } from './form/ScopeFields'
 import { integrationHelp } from './integrationFieldHelp'
-import { EXECUTION_PLANE_SCOPE_HELP } from './integrationFieldHelpText'
 import {
   CREDENTIAL_REQUIRED_TYPES,
   CREDENTIAL_TYPES_BY_INTEGRATION,
@@ -140,14 +137,7 @@ function EditIntegrationFormFields({
       <EditSecurityFields />
 
       {isOpenShift ? (
-        <FormGroup label="Scope" fieldId="edit-integration-scope">
-          <Content id="edit-integration-scope">Global</Content>
-          <FormHelperText>
-            <HelperText>
-              <HelperTextItem>{EXECUTION_PLANE_SCOPE_HELP}</HelperTextItem>
-            </HelperText>
-          </FormHelperText>
-        </FormGroup>
+        <ExecutionPlaneScopeField fieldId="edit-integration-scope" />
       ) : (
         <ScopeFields<EditIntegrationFormValues>
           scope={scope}
@@ -241,12 +231,15 @@ export function EditIntegrationForm() {
     params: { path: { integration_id: integrationId ?? '' } },
   })
   const integration = query.data
+  const isOpenShiftIntegration = integration?.integration_type === IntegrationTypeEnum.OPENSHIFT
+  // OpenShift is always global in the UI/submit path, even if a bad record has scope: project.
+  const isProjectScoped = !isOpenShiftIntegration && integration?.scope === 'project'
 
   const assignmentsQuery = integrationsClient.useQuery(
     'get',
     '/integrations/{integration_id}/projects',
     { params: { path: { integration_id: integrationId ?? '' } } },
-    { enabled: integration?.scope === 'project' }
+    { enabled: isProjectScoped }
   )
   const initialProjectIds = useMemo(
     () => assignmentsQuery.data?.resources?.map((a) => a.project_id) ?? [],
@@ -268,14 +261,15 @@ export function EditIntegrationForm() {
   }, [integration])
 
   useEffect(() => {
-    const projectIds = integration?.scope === 'project' ? initialProjectIds : []
-    initialProjectIdsRef.current = projectIds
-  }, [integration, initialProjectIds])
+    initialProjectIdsRef.current = isProjectScoped ? initialProjectIds : []
+  }, [isProjectScoped, initialProjectIds])
 
   const formValues = useMemo<EditIntegrationFormValues | undefined>(() => {
     if (!integration) return undefined
     const config = integration.configuration
-    const projectIds = integration.scope === 'project' ? initialProjectIds : []
+    const coerceOpenShiftGlobal = integration.integration_type === IntegrationTypeEnum.OPENSHIFT
+    const scope = coerceOpenShiftGlobal ? 'global' : ((integration.scope as 'global' | 'project') ?? 'global')
+    const projectIds = isProjectScoped ? initialProjectIds : []
     return {
       name: integration.name ?? '',
       description: integration.description ?? '',
@@ -284,11 +278,11 @@ export function EditIntegrationForm() {
       allow_http: 'allow_http' in config ? Boolean(config.allow_http) : false,
       insecure_skip_tls_verify: 'insecure_skip_tls_verify' in config ? Boolean(config.insecure_skip_tls_verify) : false,
       ca_certificate: 'ca_certificate' in config ? (config.ca_certificate ?? null) : null,
-      scope: (integration.scope as 'global' | 'project') ?? 'global',
+      scope,
       project_ids: projectIds,
       management_credential_id: integration.management_credential_id ?? null,
     }
-  }, [integration, initialProjectIds])
+  }, [integration, isProjectScoped, initialProjectIds])
 
   const form = useSynForm({
     schema,
@@ -403,7 +397,7 @@ export function EditIntegrationForm() {
     )
   }
 
-  if (!integration || (integration.scope === 'project' && assignmentsQuery.isPending)) return null
+  if (!integration || (isProjectScoped && assignmentsQuery.isPending)) return null
 
   return (
     <SynPage>

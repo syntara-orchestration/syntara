@@ -5,7 +5,6 @@ import {
   ExpandableSection,
   Form,
   FormGroup,
-  FormHelperText,
   HelperText,
   HelperTextItem,
   MenuToggle,
@@ -23,9 +22,10 @@ import { SynFormField } from '../../../../components/forms/SynFormField'
 import { SynTextField } from '../../../../components/forms/SynTextField'
 import { SynSelect } from '../../../../components/SynSelect'
 import { integrationHelp } from '../integrationFieldHelp'
-import { EXECUTION_PLANE_SCOPE_HELP, EXECUTION_PLANE_SINGLETON_HELP } from '../integrationFieldHelpText'
+import { EXECUTION_PLANE_SINGLETON_HELP } from '../integrationFieldHelpText'
 import { PROVIDERS_HIDING_BASE_URL, PROVIDERS_REQUIRING_BASE_URL } from '../integrationFilters'
 
+import { ExecutionPlaneScopeField } from './ExecutionPlaneScopeField'
 import { INTEGRATION_TYPE_OPTIONS, PROVIDER_HINT_OPTIONS, type IntegrationFormData } from './integrationFormSchema'
 import { ScopeFields } from './ScopeFields'
 import { useOpenShiftIntegrationExists } from './useOpenShiftIntegrationExists'
@@ -444,14 +444,7 @@ export function IntegrationDetailsStep({ setValue, onTypeChange }: IntegrationDe
         <SecurityFields />
 
         {isOpenShift ? (
-          <FormGroup label="Scope" fieldId="integration-scope">
-            <Content id="integration-scope">Global</Content>
-            <FormHelperText>
-              <HelperText>
-                <HelperTextItem>{EXECUTION_PLANE_SCOPE_HELP}</HelperTextItem>
-              </HelperText>
-            </FormHelperText>
-          </FormGroup>
+          <ExecutionPlaneScopeField fieldId="integration-scope" />
         ) : (
           <ScopeFields<IntegrationFormData>
             scope={scope}

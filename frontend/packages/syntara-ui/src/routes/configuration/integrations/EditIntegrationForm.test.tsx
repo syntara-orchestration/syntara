@@ -815,6 +815,37 @@ describe('EditIntegrationForm', () => {
       expect(screen.getByText(EXECUTION_PLANE_SCOPE_HELP)).toBeInTheDocument()
     })
 
+    it('PATCHes scope global when the record incorrectly has scope project', async () => {
+      setupMocks({
+        integration: {
+          ...mockOpenShiftIntegration,
+          scope: 'project',
+        },
+        projectAssignments: {
+          resources: [{ project_id: 'p-001', project_name: 'default' }],
+        },
+      })
+      const { patchMutate } = setupMutationMocks()
+      const user = userEvent.setup()
+      render(<EditIntegrationForm />, { wrapper })
+
+      expect(screen.getByText('Global')).toBeInTheDocument()
+      expect(screen.queryByRole('switch', { name: /integration scope/i })).not.toBeInTheDocument()
+
+      await user.click(screen.getByRole('button', { name: 'Save integration' }))
+
+      await waitFor(() => {
+        expect(patchMutate).toHaveBeenCalledWith(
+          expect.objectContaining({
+            body: expect.objectContaining({
+              scope: 'global',
+            }) as Record<string, unknown>,
+          })
+        )
+      })
+      expect(mockSyncAssignments).not.toHaveBeenCalled()
+    })
+
     it('calls discover with matching openshift integration_type values on test connection', async () => {
       const { discoverMutate } = setupMutationMocks()
       const user = userEvent.setup()
@@ -838,6 +869,13 @@ describe('EditIntegrationForm', () => {
         }),
         expect.any(Object)
       )
+    })
+
+    it('has no accessibility violations', async () => {
+      const { container } = render(<EditIntegrationForm />, { wrapper })
+
+      expect(screen.getByText('Global')).toBeInTheDocument()
+      expect(await axe(container)).toHaveNoViolations()
     })
   })
 
