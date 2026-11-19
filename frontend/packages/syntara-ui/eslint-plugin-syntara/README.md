@@ -57,10 +57,10 @@ Run the test suite:
 npx vitest run packages/syntara-ui/eslint-plugin-syntara/__tests__/
 ```
 
-Run tests for a specific rule:
+Run a test for a Syntara-specific rule:
 
 ```bash
-npx vitest run eslint-plugin-syntara/__tests__/no-raw-http-calls.test.js
+npx vitest run eslint-plugin-syntara/__tests__/prefer-pf-text-components.test.js
 ```
 
 ### `require-page-title`

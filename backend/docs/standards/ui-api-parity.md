@@ -38,7 +38,7 @@ All clients apply `authMiddleware` from `client.tsx`, which handles token inject
 | ESLint config exclusions | ESLint config | Exempt specific files that need direct HTTP APIs (e.g., `useFileUploadWithProgress.ts` for upload progress via XMLHttpRequest) |
 | Inline `eslint-disable-next-line` | Per-call | Document why the direct call is needed after `--` (e.g., `-- pre-auth call before token middleware`) |
 
-**Rule source:** `frontend/packages/syntara-ui/eslint-plugin-syntara/rules/no-raw-http-calls.js`
+**Rule source:** `frontend/packages/syntara-ui/eslint.config.js` (`@ansible/no-unapproved-http-client`)
 
 ## Contract Generation
 
@@ -149,7 +149,7 @@ The scheduled workflow auto-closes drift issues when the drift is resolved.
 | What | Path |
 |------|------|
 | Typed API clients | `frontend/packages/syntara-ui/src/client.tsx`, `frontend/packages/syntara-ui/src/routes/access/accessClient.ts` |
-| ESLint rule (no raw HTTP) | `frontend/packages/syntara-ui/eslint-plugin-syntara/rules/no-raw-http-calls.js` |
+| ESLint rule (no raw HTTP) | `frontend/packages/syntara-ui/eslint.config.js` (`@ansible/no-unapproved-http-client`) |
 | Generated contracts | `frontend/packages/syntara-contracts/src/*.ts` |
 | Contract generation scripts | `frontend/packages/syntara-contracts/package.json` (`gen:local:*`) |
 | Backend domain sub-specs | `backend/src/syntara/schemas/` (see `gen:local:*` for paths) |
