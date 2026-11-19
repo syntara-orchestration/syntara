@@ -45,6 +45,45 @@ fi
 # Workload pods are deleted as soon as their Job completes, so dumping the
 # logs after the fact (in cleanup) would see nothing: the logs must be
 # captured live, pod by pod.
+# Build the AO step images from a syntara-step-types checkout and import
+# them into the kind cluster. Script-node dispatch resolves its workload
+# image from the ExecutionPlanePlugin registry (seeded with
+# quay.io/aap/ansible-automation-platform/ao-{python,bash}-rhel9:devel), and
+# nothing publishes those images yet — without this import every dispatched
+# node pod dies on ErrImagePull (401 from the registry).
+load_step_images() {
+    local step_types_repo="${STEP_TYPES_REPOSITORY:-../../syntara-step-types}"
+    local node="${EP_KIND_CLUSTER}-control-plane"
+    if ! podman container exists "${node}"; then
+        echo "⚠️  No ${node} container; skipping the step image import" >&2
+        return 0
+    fi
+    if [[ ! -f "${step_types_repo}/script-bash/Containerfile" ]]; then
+        echo "⚠️  No syntara-step-types checkout at ${step_types_repo}; script nodes will fail" \
+            "to pull quay.io/aap/.../ao-*-rhel9:devel unless the images are otherwise available" >&2
+        return 0
+    fi
+    local image plugin_dir
+    for image in ao-python-rhel9 ao-bash-rhel9; do
+        case "${image}" in
+            ao-python-rhel9) plugin_dir=script-python ;;
+            ao-bash-rhel9) plugin_dir=script-bash ;;
+        esac
+        local full="quay.io/aap/ansible-automation-platform/${image}:devel"
+        echo "📦 Building ${full} from ${step_types_repo}..."
+        if ! podman build -q -f "${step_types_repo}/${plugin_dir}/Containerfile" \
+            -t "${full}" "${step_types_repo}" > /dev/null; then
+            echo "⚠️  Failed to build ${full}; script nodes needing it will fail" >&2
+            continue
+        fi
+        # kind load is unreliable with the podman provider; import directly
+        # into the node's containerd image store instead.
+        if ! podman save "${full}" | podman exec -i "${node}" ctr --namespace=k8s.io images import - > /dev/null 2>&1; then
+            echo "⚠️  Failed to import ${full} into ${node}" >&2
+        fi
+    done
+}
+
 start_kind_log_collector() {
     if ! kubectl --context "kind-${EP_KIND_CLUSTER}" get ns >/dev/null 2>&1; then
         echo "⚠️  No 'kind-${EP_KIND_CLUSTER}' kubeconfig context; skipping kind log collection"
@@ -256,6 +295,8 @@ if [[ "${E2E_EP}" == "1" ]]; then
             --ao-insecure \
             --wait-for-api 60
     )
+
+    load_step_images
 
     start_kind_log_collector
 fi
