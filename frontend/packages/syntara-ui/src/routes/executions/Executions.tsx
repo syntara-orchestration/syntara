@@ -2,7 +2,7 @@ import { StackItem } from '@patternfly/react-core'
 import { Thead, Tr, Th } from '@patternfly/react-table'
 import type { Execution } from '@syntara/contracts'
 import { useSearch } from '@tanstack/react-router'
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 
 import { executionsClient } from '../../client'
 import { FilterBar } from '../../components/filters/FilterBar'
@@ -45,6 +45,39 @@ function buildFilterFieldDefinitions(executions: Execution[], projectId: string 
     getExecutionVersionFilterFromExecutions(executions),
     getExecutionCreatedAtFilterDefinition(),
   ].filter((def): def is FilterFieldDefinition => def !== null)
+}
+
+function renderExecutionsListQueryState(
+  listError: unknown,
+  listErrorMessage: string,
+  isPending: boolean,
+  onRetry: () => void
+): ReactNode {
+  if (listError) {
+    if (isServiceUnavailableError(listError)) {
+      return (
+        <SynEmptyStateServiceUnavailable title="Service unavailable" description={listErrorMessage} showAdminHint={false} />
+      )
+    }
+    if (isForbiddenError(listError)) {
+      return <SynEmptyStateAccessDenied description={listErrorMessage} />
+    }
+    return (
+      <SynErrorState
+        title="Unable to load workflow runs"
+        message={{
+          status: getErrorStatus(listError),
+          detail: listErrorMessage,
+          retryable: isRetryableError(listError),
+        }}
+        onRetry={onRetry}
+      />
+    )
+  }
+  if (isPending) {
+    return <SynLoadingState />
+  }
+  return null
 }
 
 export default function Executions() {
@@ -159,31 +192,12 @@ export default function Executions() {
     suppress503: true,
   })
 
-  const queryState = (() => {
-    if (listError) {
-      if (isServiceUnavailableError(listError)) {
-        return <SynEmptyStateServiceUnavailable description={listErrorMessage} showAdminHint={false} />
-      }
-      if (isForbiddenError(listError)) {
-        return <SynEmptyStateAccessDenied description={listErrorMessage} />
-      }
-      return (
-        <SynErrorState
-          title="Unable to load workflow runs"
-          message={{
-            status: getErrorStatus(listError),
-            detail: listErrorMessage,
-            retryable: isRetryableError(listError),
-          }}
-          onRetry={() => detachPromise(executionsQuery.refetch())}
-        />
-      )
-    }
-    if (executionsQuery.isPending) {
-      return <SynLoadingState />
-    }
-    return null
-  })()
+  const queryState = renderExecutionsListQueryState(
+    listError,
+    listErrorMessage,
+    executionsQuery.isPending,
+    () => detachPromise(executionsQuery.refetch())
+  )
 
   if (queryState) {
     return (
