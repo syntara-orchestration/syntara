@@ -57,7 +57,7 @@ export async function hasSingleOpenShiftIntegration(app: Page): Promise<boolean>
 /** Creates an execution target via the facade API. Caller must delete the returned id. */
 export async function createExecutionTargetViaApi(
   app: Page,
-  input: { name: string; namespace?: string }
+  input: { name: string; namespace?: string; isDefault?: boolean }
 ): Promise<{ id: string; name: string }> {
   const token = await getAuthToken(app)
   if (!token) {
@@ -74,6 +74,7 @@ export async function createExecutionTargetViaApi(
         namespace: input.namespace ?? 'aao-execution',
         node_selectors: [],
       },
+      ...(input.isDefault ? { is_default: true } : {}),
     },
   })
 

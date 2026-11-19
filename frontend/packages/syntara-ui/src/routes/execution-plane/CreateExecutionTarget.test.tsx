@@ -55,7 +55,10 @@ const OPENSHIFT_INTEGRATION = {
   integration_type: 'openshift',
 }
 
-function setupMocks(mutateOverrides?: Partial<{ mutate: ReturnType<typeof vi.fn>; isPending: boolean }>) {
+function setupMocks(
+  mutateOverrides?: Partial<{ mutate: ReturnType<typeof vi.fn>; isPending: boolean }>,
+  options?: { existingTargetCount?: number }
+) {
   vi.mocked(integrationsClient.useQuery).mockReturnValue({
     data: { resources: [OPENSHIFT_INTEGRATION], next: null, prev: null, total: 1 },
     isPending: false,
@@ -63,6 +66,22 @@ function setupMocks(mutateOverrides?: Partial<{ mutate: ReturnType<typeof vi.fn>
     error: null,
     refetch: vi.fn(),
   } as ReturnType<typeof integrationsClient.useQuery>)
+
+  const existingTargetCount = options?.existingTargetCount ?? 1
+  vi.mocked(executionPlaneClient.useQuery).mockReturnValue({
+    data: {
+      resources: existingTargetCount > 0 ? [{ id: 'et-existing', name: 'existing-target', is_default: true }] : [],
+      next: null,
+      prev: null,
+      total: existingTargetCount,
+    },
+    isPending: false,
+    isFetching: false,
+    isSuccess: true,
+    isError: false,
+    error: null,
+    refetch: vi.fn(),
+  } as ReturnType<typeof executionPlaneClient.useQuery>)
 
   const mockMutate = vi.fn()
   vi.mocked(executionPlaneClient.useMutation).mockReturnValue({
@@ -96,9 +115,43 @@ describe('CreateExecutionTarget', () => {
     expect(screen.getByRole('heading', { level: 2, name: 'Node selector' })).toBeInTheDocument()
     expect(screen.getByText('prod-openshift-east')).toBeInTheDocument()
     expect(screen.getByRole('textbox', { name: 'Execution target name' })).toBeInTheDocument()
+    expect(screen.getByRole('checkbox', { name: 'Default execution target' })).not.toBeChecked()
+    expect(screen.getByRole('checkbox', { name: 'Default execution target' })).toBeEnabled()
     expect(screen.getByRole('textbox', { name: 'Execution namespace' })).toBeInTheDocument()
     expect(screen.getByRole('textbox', { name: 'Node selector key 1' })).toBeInTheDocument()
     expect(screen.getByRole('textbox', { name: 'Node selector value 1' })).toBeInTheDocument()
+  })
+
+  it('locks the default checkbox when creating the first execution target', async () => {
+    setupMocks(undefined, { existingTargetCount: 0 })
+    render(<CreateExecutionTarget />, { wrapper })
+
+    const checkbox = await screen.findByRole('checkbox', { name: 'Default execution target' })
+    expect(checkbox).toBeChecked()
+    expect(checkbox).toBeDisabled()
+    expect(screen.getByText(/The first target is automatically the default/)).toBeInTheDocument()
+  })
+
+  it('shows an error state when the existing-targets query fails', async () => {
+    const refetch = vi.fn()
+    vi.mocked(executionPlaneClient.useQuery).mockReturnValue({
+      data: undefined,
+      isPending: false,
+      isFetching: false,
+      isSuccess: false,
+      isError: true,
+      error: { status: 500, detail: 'Upstream unavailable' },
+      refetch,
+    } as ReturnType<typeof executionPlaneClient.useQuery>)
+
+    render(<CreateExecutionTarget />, { wrapper })
+
+    expect(
+      await screen.findByRole('heading', { level: 2, name: 'Error loading execution targets' })
+    ).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument()
+    expect(screen.queryByRole('checkbox', { name: 'Default execution target' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Configure execution target' })).not.toBeInTheDocument()
   })
 
   it('queries OpenShift integrations for the readonly cluster field', () => {
@@ -162,6 +215,7 @@ describe('CreateExecutionTarget', () => {
     render(<CreateExecutionTarget />, { wrapper })
 
     await fillRequiredFields(user)
+    await user.click(screen.getByRole('checkbox', { name: 'Default execution target' }))
     await user.type(screen.getByRole('textbox', { name: 'Node selector key 1' }), 'region')
     await user.type(screen.getByRole('textbox', { name: 'Node selector value 1' }), 'us-east')
     await user.click(screen.getByRole('button', { name: 'Configure execution target' }))
@@ -178,6 +232,7 @@ describe('CreateExecutionTarget', () => {
           namespace: 'aao-execution',
           node_selectors: ['region=us-east'],
         },
+        is_default: true,
       },
     })
 

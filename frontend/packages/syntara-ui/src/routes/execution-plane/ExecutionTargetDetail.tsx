@@ -283,6 +283,7 @@ export default function ExecutionTargetDetail() {
         breadcrumbs={breadcrumbsExecutionTargetDetail(target.name)}
         title={target.name}
         docLink={docLink}
+        titleAddons={target.is_default ? <SynLabel color="blue">Default</SynLabel> : undefined}
         toolbar={
           <ExecutionTargetDetailToolbar
             target={target}

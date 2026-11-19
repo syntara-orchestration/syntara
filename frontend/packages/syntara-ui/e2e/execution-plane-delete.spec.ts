@@ -4,7 +4,7 @@
  * Covers:
  * - List kebab delete → 202 success toast (target may remain listed while draining)
  * - Detail kebab delete → navigate back to Execution Plane list
- * - Default-target conflict toast (intercepted 409; no mock seed dependency)
+ * - Default-target cannot-delete modal (target created with is_default)
  * - In-use conflict toast (intercepted 409; no mock seed dependency)
  *
  * Skipped when Execution Plane API is unreachable (compose CI does not start it).
@@ -117,30 +117,40 @@ test.describe('Execution Plane — delete execution target', { tag: '@pr-check' 
     }
   })
 
-  test('shows conflict when deleting the default target', async ({ app }) => {
+  test('shows cannot-delete modal when deleting the default target', async ({ app }) => {
     const name = buildUniqueName('e2e-et-del-default')
-    const created = await createExecutionTargetViaApi(app, { name })
+    const created = await createExecutionTargetViaApi(app, { name, isDefault: true })
     const targetId = created.id
-    const conflictDetail = 'Cannot delete the default execution target; promote another target first'
+    let replacementId: string | undefined
 
     try {
-      await withDeleteConflict(app, targetId, conflictDetail, async () => {
-        await app.goto(toAppUrl(LIST_URL))
-        await expect(app.getByRole('heading', { level: 1, name: 'Execution Plane' })).toBeVisible()
-        await filterTargetsByName(app, name)
+      await app.goto(toAppUrl(LIST_URL))
+      await expect(app.getByRole('heading', { level: 1, name: 'Execution Plane' })).toBeVisible()
+      await filterTargetsByName(app, name)
 
-        const row = app.getByRole('row', { name: new RegExp(name) })
-        await expect(row).toBeVisible({ timeout: 15_000 })
-        await openRowKebab(row, /Delete execution target/i)
-        await app.getByRole('menuitem', { name: /Delete execution target/i }).click()
-        await confirmDeleteDialog(app)
+      const row = app.getByRole('row', { name: new RegExp(name) })
+      await expect(row).toBeVisible({ timeout: 15_000 })
+      await expect(row.getByText('Default')).toBeVisible()
+      await openRowKebab(row, /Delete execution target/i)
+      await app.getByRole('menuitem', { name: /Delete execution target/i }).click()
 
-        await expect(app.getByText('Delete failed')).toBeVisible()
-        await expect(app.getByText(/promote another target first/i)).toBeVisible()
-        await expect(app.getByRole('row', { name: new RegExp(name) })).toBeVisible()
-      })
+      const dialog = app.getByRole('dialog')
+      await expect(dialog.getByText('Cannot delete default execution target')).toBeVisible()
+      await expect(dialog.getByText(new RegExp(`before deleting ${name}`))).toBeVisible()
+      // Modal X also has accessible name "Close"; scope to the footer primary action.
+      await dialog.locator('footer').getByRole('button', { name: 'Close' }).click()
+      await expect(dialog).not.toBeVisible()
+      await expect(app.getByRole('row', { name: new RegExp(name) })).toBeVisible()
     } finally {
+      // Promote another target so cleanup can delete the former default.
+      replacementId = (
+        await createExecutionTargetViaApi(app, {
+          name: buildUniqueName('e2e-et-del-default-other'),
+          isDefault: true,
+        })
+      ).id
       await deleteExecutionTargetViaApi(app, targetId)
+      await deleteExecutionTargetViaApi(app, replacementId)
     }
   })
 

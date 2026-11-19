@@ -94,6 +94,42 @@ describe('ExecutionTargetDialogs', () => {
     expect(within(dialog).getByRole('checkbox', { name: /permanently deleted/i })).toBeInTheDocument()
   })
 
+  it('shows the cannot-delete modal when the target is the default', async () => {
+    const user = userEvent.setup()
+    const close = vi.fn()
+    const onDelete = vi.fn()
+    renderDialogs({
+      deleteDialog: {
+        isOpen: true,
+        item: { ...target, is_default: true, name: 'worker-east-01' },
+        open: vi.fn(),
+        close,
+      },
+      onDelete,
+    })
+
+    expect(screen.getByText('Cannot delete default execution target')).toBeInTheDocument()
+    const dialog = screen.getByRole('dialog')
+    expect(within(dialog).getByText(/Set another execution target as default before deleting/)).toBeInTheDocument()
+    expect(within(dialog).getByText('worker-east-01')).toBeInTheDocument()
+    expect(screen.queryByRole('checkbox', { name: /permanently deleted/i })).not.toBeInTheDocument()
+    expect(useExecutionTargetUsage).toHaveBeenCalledWith(null)
+
+    // Modal X also has accessible name "Close"; scope to the footer primary action.
+    await user.click(within(within(dialog).getByRole('contentinfo')).getByRole('button', { name: 'Close' }))
+    expect(close).toHaveBeenCalled()
+    expect(onDelete).not.toHaveBeenCalled()
+  })
+
+  it('has no accessibility violations with the cannot-delete default modal open', async () => {
+    const { container } = renderDialogs({
+      deleteDialog: createDialog({ ...target, is_default: true, name: 'worker-east-01' }, true),
+    })
+
+    expect(await screen.findByText('Cannot delete default execution target')).toBeInTheDocument()
+    expect(await axe(container)).toHaveNoViolations()
+  })
+
   it('shows the active workload count in the delete confirmation', () => {
     mockUsage({ activeWorkloadCount: 7 })
     renderDialogs({ deleteDialog: createDialog(target, true) })
