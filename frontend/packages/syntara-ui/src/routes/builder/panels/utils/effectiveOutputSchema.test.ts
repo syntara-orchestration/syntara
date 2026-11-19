@@ -1,7 +1,10 @@
 import { ActivityTypeEnum, getNodeOutputSchema, TriggerTypeEnum } from '@syntara/contracts'
 import { describe, expect, it } from 'vitest'
 
+import { buildExpression } from '../../../../utils/expressions/templateBuilder'
+
 import { getEffectiveOutputSchema, type PreviewFieldDef } from './effectiveOutputSchema'
+import { buildMockJsonSkeleton } from './mockDataUtils'
 
 type FieldFixture = Record<string, unknown>
 
@@ -13,12 +16,12 @@ function textField(valueName: string, overrides: FieldFixture = {}): FieldFixtur
   return { type: 'text', value_name: valueName, label: `Label ${valueName}`, ...overrides }
 }
 
-function formPrompt(form_definition: unknown, id = 'prompt-1') {
-  return { id, type: ActivityTypeEnum.FORM_PROMPT, parameters: { form_definition } }
+function formPrompt(form_definition: unknown, id = 'prompt-1', extraParameters: Record<string, unknown> = {}) {
+  return { id, type: ActivityTypeEnum.FORM_PROMPT, parameters: { form_definition, ...extraParameters } }
 }
 
-function formTrigger(form_definition: unknown, id = 'form-trigger-1') {
-  return { id, type: TriggerTypeEnum.FORM_TRIGGER, parameters: { form_definition } }
+function formTrigger(form_definition: unknown, id = 'form-trigger-1', extraParameters: Record<string, unknown> = {}) {
+  return { id, type: TriggerTypeEnum.FORM_TRIGGER, parameters: { form_definition, ...extraParameters } }
 }
 
 function responseDataChildren(fields: PreviewFieldDef[] | null): PreviewFieldDef[] | undefined {
@@ -155,6 +158,212 @@ describe('getEffectiveOutputSchema', () => {
 
       expect(fields?.map((field) => field.name)).toContain('response_data')
       expect(responseDataChildren(fields)).toBeUndefined()
+    })
+  })
+
+  describe('persisted response_schema', () => {
+    const backendResponseSchema = {
+      type: 'object',
+      properties: {
+        full_name: { type: 'string', minLength: 1 },
+        accepted: { const: true },
+        count: { type: ['number', 'null'] },
+        tags: { type: 'array', items: { type: 'string', enum: ['one'] } },
+      },
+    }
+
+    it.each([
+      ['form prompt', formPrompt],
+      ['form trigger', formTrigger],
+    ])('uses persisted schema types when response_schema matches the current definition (%s)', (_label, buildNode) => {
+      const node = buildNode(
+        formDefinition(
+          textField('full_name'),
+          { type: 'checkbox', value_name: 'accepted', label: 'Accepted', required: true },
+          { type: 'number', value_name: 'count', label: 'Count' },
+          {
+            type: 'multi_select',
+            value_name: 'tags',
+            label: 'Tags',
+            options: { source: 'static', values: [{ display_label: 'One', value: 'one' }] },
+          }
+        ),
+        'form-1',
+        { response_schema: backendResponseSchema }
+      )
+
+      const children = responseDataChildren(getEffectiveOutputSchema(node))
+
+      expect(children).toStrictEqual([
+        {
+          name: 'full_name',
+          type: 'string',
+          description: '',
+          displayName: 'Label full_name',
+        },
+        { name: 'accepted', type: 'boolean', description: '', displayName: 'Accepted' },
+        { name: 'count', type: 'number', description: '', displayName: 'Count' },
+        { name: 'tags', type: 'array', description: '', displayName: 'Tags' },
+      ])
+    })
+
+    it.each([
+      ['form prompt', formPrompt],
+      ['form trigger', formTrigger],
+    ])('derives from form_definition when persisted response_schema is stale (%s)', (_label, buildNode) => {
+      const node = buildNode(formDefinition(textField('new_field'), textField('added_field')), 'form-1', {
+        response_schema: backendResponseSchema,
+      })
+
+      const children = responseDataChildren(getEffectiveOutputSchema(node))
+
+      expect(children?.map((field) => field.name)).toStrictEqual(['new_field', 'added_field'])
+    })
+
+    it.each([
+      ['form prompt', formPrompt],
+      ['form trigger', formTrigger],
+    ])(
+      'derives from form_definition when field names match but persisted types are stale (%s)',
+      (_label, buildNode) => {
+        const node = buildNode(formDefinition({ type: 'number', value_name: 'count', label: 'Count' }), 'form-1', {
+          response_schema: {
+            type: 'object',
+            properties: {
+              count: { type: 'string', minLength: 1 },
+            },
+          },
+        })
+
+        const children = responseDataChildren(getEffectiveOutputSchema(node))
+
+        expect(children).toStrictEqual([{ name: 'count', type: 'number', description: '', displayName: 'Count' }])
+      }
+    )
+
+    it.each([
+      ['form prompt', formPrompt],
+      ['form trigger', formTrigger],
+    ])('uses persisted schema for legacy nodes with an invalid form definition (%s)', (_label, buildNode) => {
+      const node = buildNode({ fields: [{ type: 'text', value_name: '1-bad', label: 'Bad' }] }, 'form-1', {
+        response_schema: {
+          type: 'object',
+          properties: {
+            legacy_field: { type: 'string', minLength: 1 },
+          },
+        },
+      })
+
+      const children = responseDataChildren(getEffectiveOutputSchema(node))
+
+      expect(children).toStrictEqual([
+        {
+          name: 'legacy_field',
+          type: 'string',
+          description: '',
+          displayName: 'legacy_field',
+        },
+      ])
+    })
+
+    it('ignores invalid persisted response_schema when the form definition is valid', () => {
+      const node = formPrompt(formDefinition(textField('live_field')), 'form-1', {
+        response_schema: { type: 'string' },
+      })
+
+      const children = responseDataChildren(getEffectiveOutputSchema(node))
+
+      expect(children).toStrictEqual([
+        { name: 'live_field', type: 'string', description: '', displayName: 'Label live_field' },
+      ])
+    })
+
+    it.each([
+      ['form prompt', formPrompt, ActivityTypeEnum.FORM_PROMPT],
+      ['form trigger', formTrigger, TriggerTypeEnum.FORM_TRIGGER],
+    ])(
+      'keeps the static outer envelope when response_schema supplies response_data children (%s)',
+      (_label, buildNode, nodeType) => {
+        const node = buildNode(formDefinition(textField('email_address')), 'form-1', {
+          response_schema: {
+            type: 'object',
+            properties: {
+              email_address: { type: 'string', minLength: 1 },
+            },
+          },
+        })
+
+        const fields = getEffectiveOutputSchema(node)
+        const staticNames = (getNodeOutputSchema(nodeType) ?? []).map((field) => field.name)
+
+        expect(fields?.map((field) => field.name)).toStrictEqual(staticNames)
+        expect(fields?.filter((field) => field.children).map((field) => field.name)).toStrictEqual(['response_data'])
+      }
+    )
+
+    it('builds response_data expression paths from persisted-schema fields', () => {
+      const node = formPrompt(formDefinition(textField('email_address')), 'prompt-1', {
+        response_schema: {
+          type: 'object',
+          properties: {
+            email_address: { type: 'string', minLength: 1 },
+          },
+        },
+      })
+
+      const children = responseDataChildren(getEffectiveOutputSchema(node))
+
+      expect(children?.map((field) => field.name)).toStrictEqual(['email_address'])
+      expect(buildExpression({ nodeId: 'prompt-1', fieldPath: ['response_data', 'email_address'] })).toBe(
+        '${prompt-1.response_data.email_address}'
+      )
+      expect(buildExpression({ nodeId: 'prompt-1', fieldPath: ['response_data'] })).toBe('${prompt-1.response_data}')
+    })
+
+    it('builds mock JSON skeleton including nested response_data from effective schema', () => {
+      const node = formPrompt(formDefinition(textField('email'), textField('nickname')), 'form-1', {
+        response_schema: {
+          type: 'object',
+          properties: {
+            email: { type: 'string', minLength: 1 },
+            nickname: { type: 'string' },
+          },
+        },
+      })
+
+      const schema = getEffectiveOutputSchema(node)
+      const parsed: unknown = JSON.parse(buildMockJsonSkeleton(ActivityTypeEnum.FORM_PROMPT, schema))
+
+      expect(parsed).toMatchObject({
+        status: '',
+        outcome: '',
+        response_data: {
+          email: '',
+          nickname: '',
+        },
+      })
+    })
+  })
+
+  describe('legacy without response_schema', () => {
+    it.each([
+      ['form prompt', formPrompt],
+      ['form trigger', formTrigger],
+    ])('derives response_data only from form_definition (%s)', (_label, buildNode) => {
+      const node = buildNode(formDefinition(textField('legacy_only')))
+
+      expect(node.parameters).not.toHaveProperty('response_schema')
+
+      const children = responseDataChildren(getEffectiveOutputSchema(node))
+
+      expect(children).toStrictEqual([
+        {
+          name: 'legacy_only',
+          type: 'string',
+          description: '',
+          displayName: 'Label legacy_only',
+        },
+      ])
     })
   })
 
