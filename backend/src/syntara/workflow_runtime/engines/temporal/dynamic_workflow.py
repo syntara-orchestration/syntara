@@ -58,7 +58,10 @@ from syntara.workflow_core.models import (
 from syntara.workflow_core.utils.namespace_resolver import NamespaceResolver
 from syntara.workflow_runtime.engines.temporal.approval_mixin import WorkflowApprovalMixin
 from syntara.workflow_runtime.engines.temporal.converge_mixin import WorkflowConvergeMixin
-from syntara.workflow_runtime.engines.temporal.utils.loop_iteration_ids import loop_control_activity_id
+from syntara.workflow_runtime.engines.temporal.utils.loop_iteration_ids import (
+    join_loop_iteration_id,
+    loop_control_activity_id,
+)
 from syntara.workflow_runtime.engines.unified_eval import safe_eval_with_namespace
 
 # Trigger types allowed for dynamic dispatch via Temporal activities.
@@ -193,6 +196,8 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         # belonging to the specific iteration it is persisting.
         self.activity_input_history: dict[str, list[dict[str, Any]]] = {}
         self.activity_output_history: dict[str, list[dict[str, Any]]] = {}
+        self._input_occurrence_ids: dict[str, str] = {}
+        self.failed_node_occurrence_ids: dict[str, str] = {}
         self.node_control_data: dict[str, dict[str, Any]] = {}
         self.skipped_nodes: set[str] = set()
         self.failed_nodes: dict[str, str] = {}
@@ -251,8 +256,7 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
 
         self._skip_unselected_triggers(trigger_node_id, graph)
 
-        self.node_inputs[trigger_node.id] = trigger_inputs
-        self.activity_input_history[trigger_node.id] = [copy.deepcopy(trigger_inputs)]
+        self._record_input_history(trigger_node, trigger_inputs)
 
         # Validate trigger type against allowlist to prevent arbitrary activity dispatch
         if trigger_node.type not in ALLOWED_TRIGGER_TYPES:
@@ -393,6 +397,17 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         app_error = self._extract_application_error(error)
         error_message = self._resolve_failure_message(node_id, error, app_error, graph)
         is_cancellation = app_error is not None and app_error.type == "InvocationCancelledError"
+
+        failed_node = graph.get_node(node_id)
+        inputs_recorded = self._inputs_recorded_for_current_occurrence(failed_node)
+        if not inputs_recorded:
+            # Resolution or setup can fail before the node's activity is scheduled.
+            # Keep its configured values so the failed activity remains inspectable.
+            self._record_input_history(failed_node, failed_node.parameters)
+        if not is_cancellation and not isinstance(error, ActivityError):
+            occurrence_id = self._input_occurrence_id(failed_node)
+            if occurrence_id != node_id:
+                self.failed_node_occurrence_ids[node_id] = occurrence_id
 
         namespace_entry = self._extract_failure_output(node_id, app_error, graph)
 
@@ -685,6 +700,16 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
             "activity_inputs": (
                 {k: self._scrub_data(v) for k, v in self.node_inputs.items()} if include_node_results else {}
             ),
+            "failed_activity_inputs": {
+                node_id: self._scrub_data(self.node_inputs[node_id])
+                for node_id in self.failed_nodes
+                if node_id in self.node_inputs
+            },
+            "failed_activity_occurrences": {
+                node_id: occurrence_id
+                for node_id, occurrence_id in self.failed_node_occurrence_ids.items()
+                if node_id in self.failed_nodes
+            },
             "completed_activities": list(node_outputs.keys()),
             "failed_activities": self.failed_nodes,
         }
@@ -1561,17 +1586,29 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
             resolved_parameters = self._resolve_node_parameters(node)
 
         timeout_seconds = resolve_timeout(node, self._runtime_settings)
-        self.node_inputs[node.id] = copy.deepcopy(resolved_parameters)
-        self.activity_input_history.setdefault(node.id, []).append(copy.deepcopy(resolved_parameters))
-        if node.type == NodeType.APPROVAL:
-            history_activity_id = self._approval_activity_id(node.id)
-            if history_activity_id != node.id:
-                self.activity_input_history.setdefault(history_activity_id, []).append(
-                    copy.deepcopy(resolved_parameters)
-                )
+        self._record_input_history(node, resolved_parameters)
 
         result = await self._dispatch_node(node, resolved_parameters, graph, timeout_seconds)
         return self._process_node_result(node, result)
+
+    def _input_occurrence_id(self, node: ActivityNode) -> str:
+        """Return a stable identity for this node's current loop occurrence."""
+        return join_loop_iteration_id(node.id, self._loop_iteration_path(node.id))
+
+    def _inputs_recorded_for_current_occurrence(self, node: ActivityNode) -> bool:
+        """Return whether this specific loop occurrence already has an input snapshot."""
+        return self._input_occurrence_ids.get(node.id) == self._input_occurrence_id(node)
+
+    def _record_input_history(self, node: ActivityNode, parameters: dict[str, Any]) -> None:
+        """Save input snapshots for activity sync and loop-specific queries."""
+        snapshot = copy.deepcopy(parameters)
+        self.node_inputs[node.id] = snapshot
+        self.activity_input_history.setdefault(node.id, []).append(copy.deepcopy(snapshot))
+        self._input_occurrence_ids[node.id] = self._input_occurrence_id(node)
+        if node.type == NodeType.APPROVAL:
+            history_activity_id = self._approval_activity_id(node.id)
+            if history_activity_id != node.id:
+                self.activity_input_history.setdefault(history_activity_id, []).append(copy.deepcopy(snapshot))
 
     def _resolve_node_parameters(self, node: ActivityNode) -> dict[str, Any]:
         """Resolve template expressions in a node's parameters.

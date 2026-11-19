@@ -2539,6 +2539,25 @@ class TestExtractFailedActivitiesFromEvent:
         result = self.service._extract_failed_activities_from_event(event)
         assert result == {"loop-1": "exceeded max_iterations", "loop-2": "exceeded max_iterations"}
 
+    def test_extracts_failed_activity_inputs(self) -> None:
+        event = self._make_completed_event(
+            {
+                "failed_activity_inputs": {
+                    "rest-api": {"method": "GET", "credential_id": "[REDACTED]"},
+                    "malformed": "not an object",
+                }
+            }
+        )
+
+        assert self.service._extract_failed_activity_inputs_from_event(event) == {
+            "rest-api": {"method": "GET", "credential_id": "[REDACTED]"}
+        }
+
+    def test_extracts_failed_loop_occurrence_ids(self) -> None:
+        event = self._make_completed_event({"failed_activity_occurrences": {"script": "script_iter_2", "invalid": 3}})
+
+        assert self.service._extract_failed_activity_occurrences_from_event(event) == {"script": "script_iter_2"}
+
     def test_returns_empty_for_non_completed_event(self) -> None:
         event = Mock()
         event.event_type = EventType.EVENT_TYPE_WORKFLOW_EXECUTION_FAILED
@@ -2584,10 +2603,12 @@ class TestSyncNodesToTerminalStatus:
     def _create_metadata(
         self,
         activity_index_map: dict[str, int] | None = None,
+        iteration_counters: dict[str, int] | None = None,
     ) -> ExecutionMonitorMetadata:
         return create_test_metadata(
             execution_id=self.execution_id,
             activity_index_map=activity_index_map or {},
+            iteration_counters=iteration_counters,
         )
 
     def _create_mock_activity_execution(
@@ -2603,6 +2624,10 @@ class TestSyncNodesToTerminalStatus:
         activity.completed_at = None
         activity.error_details = None
         activity.updated_at = None
+        activity.input_data = {}
+        activity.iteration = None
+        activity.node_type = NodeType.SCRIPT
+        activity.temporal_activity_id = activity_name
         return activity
 
     def _mock_session(
@@ -2639,14 +2664,17 @@ class TestSyncNodesToTerminalStatus:
         metadata = self._create_metadata(activity_index_map={"node-A": 0})
 
         handle = AsyncMock()
-        handle.query = AsyncMock(return_value={"node-A": "Key 'output' not found in namespace path"})
+        handle.query = AsyncMock(
+            side_effect=[{"node-A": "Key 'output' not found in namespace path"}, {"lang": "python"}]
+        )
 
         result = await self.service._sync_failed_nodes(metadata, handle)
 
-        handle.query.assert_awaited_once_with("get_failed_nodes")
+        handle.query.assert_has_awaits([call("get_failed_nodes"), call("get_activity_input", "node-A")])
         assert activity.status == ActivityStatus.FAILED
         assert activity.completed_at is not None
         assert activity.error_details == "Key 'output' not found in namespace path"
+        assert activity.input_data == {"lang": "python"}
         assert result == {"node-A": "Key 'output' not found in namespace path"}
 
     @pytest.mark.asyncio
@@ -2741,6 +2769,45 @@ class TestSyncNodesToTerminalStatus:
             assert len(updated) == 1
             assert updated[0][0] is activity
             assert updated[0][1]["status"] == ActivityStatus.PENDING
+
+    @pytest.mark.asyncio
+    async def test_completion_fallback_backfills_empty_failed_activity_inputs(self) -> None:
+        activity = self._create_mock_activity_execution("node-A", status=ActivityStatus.FAILED)
+        self._mock_session([activity])
+        metadata = self._create_metadata(activity_index_map={"node-A": 0})
+        handle = AsyncMock()
+        handle.query = AsyncMock(side_effect=RuntimeError("workflow is already closed"))
+
+        result = await self.service._sync_failed_nodes(
+            metadata,
+            handle,
+            fallback_failed_nodes={"node-A": "credential setup failed"},
+            fallback_input_data={"node-A": {"url": "https://example.com", "token": "[REDACTED]"}},
+        )
+
+        assert result is None
+        assert activity.input_data == {"url": "https://example.com", "token": "[REDACTED]"}
+
+    @pytest.mark.asyncio
+    async def test_unscheduled_loop_failure_creates_an_iteration_record(self) -> None:
+        activity = self._create_mock_activity_execution("node-A", status=ActivityStatus.COMPLETED)
+        self._mock_session([activity])
+        metadata = self._create_metadata(activity_index_map={"node-A": 0}, iteration_counters={"node-A": 1})
+        metadata.loop_body_activity_ids = {"node-A"}
+        handle = AsyncMock()
+        handle.query = AsyncMock(side_effect=[{"node-A": "input expression failed"}, {"value": "current"}])
+
+        await self.service._sync_failed_nodes(
+            metadata,
+            handle,
+            fallback_occurrence_ids={"node-A": "node-A_iter_2"},
+        )
+
+        added_activity = self.mock_session_factory.return_value.add.call_args.args[0]
+        assert added_activity.activity_name == "node-A#iter-2"
+        assert added_activity.temporal_activity_id == "node-A_iter_2"
+        assert added_activity.status == ActivityStatus.FAILED
+        assert added_activity.input_data == {"value": "current"}
 
     @pytest.mark.asyncio
     async def test_failed_sync_query_error_does_not_propagate(self) -> None:
@@ -3728,12 +3795,20 @@ class TestProcessHistoryEvent:
         """When _sync_failed_nodes returns None, _extract_failed_activities_from_event is used."""
         event = self._create_event(EventType.EVENT_TYPE_WORKFLOW_EXECUTION_COMPLETED, event_id=20)
         fallback_map = {"node-X": "expression error"}
+        fallback_inputs = {"node-X": {"script": "print('hello')"}}
+        fallback_occurrences = {"node-X": "node-X_iter_1"}
 
         with (
-            patch.object(self.service, "_sync_failed_nodes", new_callable=AsyncMock, return_value=None),
+            patch.object(self.service, "_sync_failed_nodes", new_callable=AsyncMock, return_value=None) as mock_failed,
             patch.object(
                 self.service, "_extract_failed_activities_from_event", return_value=fallback_map
             ) as mock_extract,
+            patch.object(
+                self.service, "_extract_failed_activity_inputs_from_event", return_value=fallback_inputs
+            ) as mock_inputs,
+            patch.object(
+                self.service, "_extract_failed_activity_occurrences_from_event", return_value=fallback_occurrences
+            ) as mock_occurrences,
             patch.object(self.service, "_sync_skipped_nodes", new_callable=AsyncMock),
             patch.object(self.service, "_sync_detached_nodes", new_callable=AsyncMock),
             patch.object(self.service, "_update_execution_status_from_event", new_callable=AsyncMock) as mock_update,
@@ -3748,6 +3823,15 @@ class TestProcessHistoryEvent:
 
         assert result is True
         mock_extract.assert_called_once_with(event)
+        mock_inputs.assert_called_once_with(event)
+        mock_occurrences.assert_called_once_with(event)
+        mock_failed.assert_awaited_once_with(
+            self.metadata,
+            self.mock_handle,
+            fallback_failed_nodes=fallback_map,
+            fallback_input_data=fallback_inputs,
+            fallback_occurrence_ids=fallback_occurrences,
+        )
         mock_update.assert_called_once()
         passed_failed_map = mock_update.call_args[0][2]
         assert passed_failed_map == fallback_map

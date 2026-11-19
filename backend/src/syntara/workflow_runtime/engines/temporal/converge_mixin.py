@@ -53,6 +53,23 @@ class WorkflowConvergeMixin:
     # Methods provided by OrchestratorWorkflow (resolved via MRO)
     def _are_predecessors_complete(self, node_id: str, graph: WorkflowGraph) -> bool: ...  # type: ignore[empty-body]
 
+    def _input_occurrence_id(self, node: ActivityNode) -> str: ...  # type: ignore[empty-body]
+
+    def _inputs_recorded_for_current_occurrence(self, node: ActivityNode) -> bool: ...  # type: ignore[empty-body]
+
+    def _record_input_history(self, node: ActivityNode, parameters: dict[str, Any]) -> None: ...
+
+    def _record_converge_failure_inputs(self, node: ActivityNode, parameters: dict[str, Any] | None) -> None:
+        """Preserve configured inputs when a converge fails before scheduling."""
+        if parameters is None or self._inputs_recorded_for_current_occurrence(node):
+            return
+        self._record_input_history(node, parameters)
+        occurrence_id = self._input_occurrence_id(node)
+        if occurrence_id != node.id:
+            failed_node_occurrence_ids = getattr(self, "failed_node_occurrence_ids", {})
+            failed_node_occurrence_ids[node.id] = occurrence_id
+            self.failed_node_occurrence_ids = failed_node_occurrence_ids
+
     @staticmethod
     def _build_failure_output(
         output_model_class: type[NodeOutput], output_config: dict[str, str] | None
@@ -202,7 +219,13 @@ class WorkflowConvergeMixin:
                     f"{', '.join(failed_preds)} failed, "
                     f"ALL strategy requires every branch to succeed"
                 )
-                self._fail_converge_node(converge_id, error_msg, graph, pending_tasks)
+                self._fail_converge_node(
+                    converge_id,
+                    error_msg,
+                    graph,
+                    pending_tasks,
+                    input_parameters=converge_node.parameters,
+                )
                 return
 
             if upstream_failure_id and upstream_failure_id not in self._cof_failed_nodes:
@@ -211,7 +234,13 @@ class WorkflowConvergeMixin:
                     f"{upstream_failure_id} failed, "
                     f"ALL strategy requires every branch to succeed"
                 )
-                self._fail_converge_node(converge_id, error_msg, graph, pending_tasks)
+                self._fail_converge_node(
+                    converge_id,
+                    error_msg,
+                    graph,
+                    pending_tasks,
+                    input_parameters=converge_node.parameters,
+                )
                 return
 
         if self._all_predecessors_terminal(predecessor_ids) and not self._are_predecessors_complete(converge_id, graph):
@@ -221,7 +250,13 @@ class WorkflowConvergeMixin:
                 f"Converge node {converge_id}: required {n_req} successful branches, "
                 f"got {successes} (failures excluded)"
             )
-            self._fail_converge_node(converge_id, error_msg, graph, pending_tasks)
+            self._fail_converge_node(
+                converge_id,
+                error_msg,
+                graph,
+                pending_tasks,
+                input_parameters=converge_node.parameters,
+            )
 
     def _is_loop_still_iterating(self, node_id: str) -> bool:
         """Return True if ``node_id`` is a loop whose last routing was ``iterate``."""
@@ -254,6 +289,8 @@ class WorkflowConvergeMixin:
         error_msg: str,
         graph: WorkflowGraph,
         pending_tasks: dict[str, asyncio.Task[Any]] | None = None,
+        *,
+        input_parameters: dict[str, Any] | None = None,
     ) -> None:
         """Mark a converge node as failed and clean up.
 
@@ -262,6 +299,9 @@ class WorkflowConvergeMixin:
         skipped (via ``_timed_out_converge_nodes``).
         """
         node = graph.get_node(node_id)
+        # Gate failures can happen before the converge activity is scheduled.
+        # Snapshot configured values without replacing resolved inputs.
+        self._record_converge_failure_inputs(node, input_parameters)
         cof = resolve_continue_on_failure(node, self._runtime_settings)
 
         self.failed_nodes[node_id] = error_msg
@@ -368,11 +408,23 @@ class WorkflowConvergeMixin:
             if timed_out:
                 error_msg = f"Converge node {node_id} timed out after {timeout_seconds}s waiting for predecessors"
                 workflow.logger.error(error_msg)
-                self._fail_converge_node(node_id, error_msg, graph, pending_tasks)
+                self._fail_converge_node(
+                    node_id,
+                    error_msg,
+                    graph,
+                    pending_tasks,
+                    input_parameters=graph.get_node(node_id).parameters,
+                )
         except Exception as exc:  # noqa: BLE001
             error_msg = f"Converge timeout handler error for {node_id}: {exc}"
             workflow.logger.error(error_msg)
-            self._fail_converge_node(node_id, error_msg, graph, pending_tasks)
+            self._fail_converge_node(
+                node_id,
+                error_msg,
+                graph,
+                pending_tasks,
+                input_parameters=graph.get_node(node_id).parameters,
+            )
 
     def _skip_incomplete_predecessors(
         self,

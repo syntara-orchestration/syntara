@@ -54,6 +54,8 @@ def _make_workflow(
     wf.failed_nodes = failed_nodes if failed_nodes is not None else {}
     wf.resolver = resolver if resolver is not None else NamespaceResolver()
     wf.node_inputs = {}
+    wf._input_occurrence_ids = {}
+    wf.failed_node_occurrence_ids = {}
     wf.node_control_data = {}
     wf.loop_state = {}
     wf.loop_body_map = {}
@@ -434,6 +436,7 @@ class TestFanInConverge:
         """Timeout marks the converge node as failed and skips downstream."""
         wf = _make_workflow()
         graph = _build_fanin_graph()
+        graph.get_node("converge_node").parameters = {"strategy": "all", "wait_duration": 30}
         wf.resolver.set_namespace("node_a", {"result": "a_done"})
 
         loop = asyncio.new_event_loop()
@@ -445,6 +448,7 @@ class TestFanInConverge:
             loop.close()
 
         assert "converge_node" in wf.failed_nodes
+        assert wf.get_activity_input("converge_node") == graph.get_node("converge_node").parameters
         assert "node_c" in wf.skipped_nodes
         assert "node_b" in wf.skipped_nodes
 
@@ -1506,6 +1510,74 @@ class TestBuildResultStatus:
         result = wf._build_result("exec-1", include_node_results=False)
         assert result["status"] == "completed_with_errors"
         assert result["failed_activities"] == {"node_b": "Script exited with code 1"}
+
+    def test_failed_inputs_are_scrubbed_and_included_without_full_node_results(self) -> None:
+        """The completion payload carries failed-node inputs even when normal inputs are omitted."""
+        from syntara.workflow_core.utils.credential_scrubber import REDACTED
+
+        wf = _make_workflow(failed_nodes={"node_a": "credential resolution failed"})
+        wf.node_inputs = {
+            "node_a": {"url": "https://example.com", "bearer_token": "secret-token"},
+            "node_b": {"value": "not included"},
+        }
+
+        result = wf._build_result("exec-1", include_node_results=False)
+
+        assert result["activity_inputs"] == {}
+        assert result["failed_activity_inputs"] == {"node_a": {"url": "https://example.com", "bearer_token": REDACTED}}
+
+
+class TestFailedInputPersistence:
+    """Inputs remain inspectable when setup fails before activity scheduling."""
+
+    def test_pre_activity_failure_records_configured_inputs(self) -> None:
+        wf = _make_workflow()
+        graph = _build_linear_graph()
+        configured = graph.get_node("node_a").parameters
+
+        wf._handle_node_failure("node_a", ValueError("parameter resolution failed"), graph)
+
+        assert wf.get_activity_input("node_a") == configured
+        result = wf._build_result("exec-1", include_node_results=False)
+        assert result["failed_activity_inputs"]["node_a"] == configured
+
+    def test_pre_activity_failure_in_later_loop_iteration_does_not_reuse_prior_inputs(self) -> None:
+        wf = _make_workflow()
+        backend = InMemoryGraphBackend()
+        backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
+        backend.add_node("loop", {"id": "loop", "type": "loop", "parameters": {"type": "for_each"}})
+        backend.add_node(
+            "node_a",
+            {"id": "node_a", "type": "script", "parameters": {"code": "print(${loop.item})"}},
+        )
+        backend.add_edge("trigger", "loop", None)
+        backend.add_edge("loop", "node_a", None)
+        graph = WorkflowGraph(backend)
+        node = graph.get_node("node_a")
+        previous_inputs = {"code": "print('first')"}
+
+        wf.loop_body_map = {"node_a": "loop"}
+        wf.node_control_data["loop"] = {"current_index": 0}
+        wf._record_input_history(node, previous_inputs)
+        wf.node_control_data["loop"] = {"current_index": 1}
+        wf._handle_node_failure("node_a", ValueError("loop item resolution failed"), graph)
+
+        assert wf.get_activity_input("node_a") == node.parameters
+        assert wf.get_activity_input("node_a", iteration=0) == previous_inputs
+        assert wf.get_activity_input("node_a", iteration=1) == node.parameters
+        result = wf._build_result("exec-1", include_node_results=False)
+        assert result["failed_activity_inputs"]["node_a"] == node.parameters
+        assert result["failed_activity_occurrences"]["node_a"] == "node_a_iter_1"
+
+    def test_failure_after_input_resolution_preserves_resolved_parameters(self) -> None:
+        wf = _make_workflow()
+        graph = _build_linear_graph()
+        resolved_inputs = {"lang": "python", "code": "print('resolved')"}
+        wf._record_input_history(graph.get_node("node_a"), resolved_inputs)
+
+        wf._handle_node_failure("node_a", ValueError("setup failed after resolution"), graph)
+
+        assert wf.get_activity_input("node_a") == resolved_inputs
 
     def test_completed_with_errors_when_last_node_fails_with_cof(self) -> None:
         """Last node fails with cof=True: still completed_with_errors (no successors to skip)."""
