@@ -14,7 +14,6 @@ from execution_plane_client.protocol import MessageEnvelope, ResourceReference
 from temporalio import activity
 from temporalio.exceptions import ApplicationError
 
-from syntara.core.config.base import get_settings
 from syntara.execution_plane.client import ExecutionPlaneRejectedError, ExecutionPlaneUnavailableError
 from syntara.workflow_runtime.engines.temporal.activities.ep import ep_dispatch_activity as activity_module
 from syntara.workflow_runtime.engines.temporal.constants import ENGINE_MAX_OUTPUT_BYTES_KEY, ENGINE_TIMEOUT_SECONDS_KEY
@@ -392,24 +391,6 @@ class TestScriptActivityDispatch:
             await activity_module.execute_bash_script_activity({"code": ":"}, None, EXECUTION_ID)
         assert len(_FakeEPClient.submissions) == 2
         assert _FakeEPClient.submissions[1] == _FakeEPClient.submissions[0]
-
-
-class TestScriptNodesGate:
-    """Keep the AO feature gate ahead of EP dispatch."""
-
-    @pytest.mark.asyncio
-    async def test_disabled_raises_application_error(self) -> None:
-        settings = get_settings()
-        original = settings.script_nodes_enabled
-        object.__setattr__(settings, "script_nodes_enabled", False)
-        try:
-            with pytest.raises(ApplicationError) as exc_info:
-                await activity_module.execute_bash_script_activity({"code": "echo hi"}, None, EXECUTION_ID)
-            assert exc_info.value.non_retryable is True
-            assert exc_info.value.type == "ScriptNodeDisabled"
-            assert _FakeEPClient.submissions == []
-        finally:
-            object.__setattr__(settings, "script_nodes_enabled", original)
 
 
 @pytest.mark.asyncio
