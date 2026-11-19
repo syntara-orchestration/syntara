@@ -9,7 +9,7 @@ from uuid import UUID, uuid4
 
 import httpx
 import pytest
-from execution_plane_client.commands.credentials import CredentialResolve, CredentialResolveWorkload
+from execution_plane_client.commands.credentials import CredentialResolveCluster, CredentialResolveWorkload
 from execution_plane_client.errors import ProtocolConflict
 from fastapi import FastAPI, Request, Response
 
@@ -483,7 +483,7 @@ async def test_workload_credential_command_handler_rejects_unexpected_payload(
 ) -> None:
     handler = command_credentials.CredentialResolveWorkloadCommandHandler()
     message, _payload = workload_command()
-    payload = CredentialResolve(credential_ref=uuid4())
+    payload = CredentialResolveCluster(credential_ref=uuid4())
 
     with pytest.raises(ProtocolConflict):
         await handler.handle(message, payload, command_context)

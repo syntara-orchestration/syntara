@@ -119,7 +119,7 @@ BUILTIN_POLICIES: list[PolicyInfo] = [
     PolicyInfo("execution", "run", roles=("admin",)),
     # internal service callbacks
     PolicyInfo("execution-plane-callback", "complete", roles=("execution-plane-callback",)),
-    PolicyInfo("execution-plane-callback", "resolve-credential", roles=("execution-plane-callback",)),
+    PolicyInfo("execution-plane-callback", "resolve-credential-cluster", roles=("execution-plane-callback",)),
     PolicyInfo("execution-plane-callback", "resolve-credential-workload", roles=("execution-plane-callback",)),
     # approvals
     PolicyInfo("approval", "read", roles=("admin", "auditor")),
