@@ -36,7 +36,7 @@ export type SynPageHeaderProps = Readonly<{
    *
    * @example
    * // Correct: secondary left, primary rightmost
-   * toolbar={<><Button variant="secondary">Cancel</Button><Button variant="primary">Save</Button></>}
+   * toolbar={<><Button variant="primary">Save</Button><Button variant="link">Cancel</Button></>}
    */
   toolbar?: ReactNode
   /** Optional content before the default title (e.g. provider icon). Ignored when `titleSlot` is set. */

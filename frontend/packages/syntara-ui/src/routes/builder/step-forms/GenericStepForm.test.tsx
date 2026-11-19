@@ -17,7 +17,8 @@ describe('GenericStepForm', () => {
     render(<GenericStepForm onSubmit={mockOnSubmit} onCancel={mockOnCancel} />)
 
     expect(screen.getByText(/generic placeholder step/i)).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /cancel/i })).toBeInTheDocument()
+    const cancel = screen.getByRole('button', { name: /cancel/i })
+    expect(cancel).toHaveClass('pf-m-link')
     expect(screen.getByRole('button', { name: /add generic step/i })).toBeInTheDocument()
   })
 

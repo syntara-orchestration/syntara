@@ -1,5 +1,6 @@
 import { Button, Content, ContentVariants, Flex, FlexItem, Stack, StackItem } from '@patternfly/react-core'
 
+import { SynFormCancelButton } from '../../../components/forms/SynFormCancelButton'
 import type { BaseStepFormProps } from '../registry/StepRegistry'
 
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
@@ -28,14 +29,12 @@ export function GenericStepForm({ onSubmit, onCancel, submitButtonText }: BaseSt
       <StackItem>
         <Flex justifyContent={{ default: 'justifyContentFlexEnd' }} gap={{ default: 'gapSm' }}>
           <FlexItem>
-            <Button variant="secondary" onClick={onCancel}>
-              Cancel
-            </Button>
-          </FlexItem>
-          <FlexItem>
             <Button variant="primary" onClick={handleSubmit}>
               {submitButtonText ?? 'Add Generic Step'}
             </Button>
+          </FlexItem>
+          <FlexItem>
+            <SynFormCancelButton onClick={onCancel} />
           </FlexItem>
         </Flex>
       </StackItem>
