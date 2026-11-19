@@ -160,6 +160,8 @@ class EventRecordProcessingService:
         admission_guard: Callable[[], bool] | None = None,
         handoff: PreparedExecution | None = None,
         reserve_handoff: HandoffReservation | None = None,
+        matched_at: datetime | None = None,
+        remember_match: Callable[[datetime], None] | None = None,
     ) -> RecordResult:
         """Complete local skips before I/O; look up Execution only for valid matches."""
         try:
@@ -170,31 +172,58 @@ class EventRecordProcessingService:
             if event is None:
                 accepted = await self._accepted(snapshot, identity, recover=True)
                 return accepted if accepted is not None else self._hold("admission_closed")
-            return await self._process_event(snapshot, identity, event, admission_guard, reserve_handoff)
+            decoded = self._decode_event(snapshot, identity, event, admission_guard, matched_at)
+            # The queue owns the raw bytes until preparation converts its reservation.
+            del event
+            if isinstance(decoded, (SkippedRecord, HeldRecord)):
+                return decoded
+            result: RecordResult
+            if isinstance(decoded, EventDecodeFailure):
+                result = await self.hold_content_failure(snapshot, identity, decoded, admission_guard=admission_guard)
+            else:
+                if remember_match is not None:
+                    remember_match(decoded.envelope.source_metadata.received_at)
+                result = await self._process_match(
+                    snapshot, identity, decoded, admission_guard, reserve_handoff, recover=matched_at is not None
+                )
+            return result
         except (SQLAlchemyError, OSError, TimeoutError, SyntaraError, ValueError) as exc:
             if isinstance(exc, (SQLAlchemyError, OSError, TimeoutError)):
                 self._dependency_failed(snapshot)
             return self._hold("dependency_unavailable").model_copy(update={"handoff": handoff})
 
-    async def _process_event(
+    def _decode_event(
         self,
         snapshot: SubscriptionSnapshot,
         identity: DeliveryIdentity,
         event: RawEvent,
         guard: Callable[[], bool] | None,
-        reserve_handoff: HandoffReservation | None,
-    ) -> RecordResult:
+        matched_at: datetime | None = None,
+    ) -> EventDecodeSuccess | EventDecodeFailure | SkippedRecord | HeldRecord:
         """Validate trusted coordinates and complete local filter outcomes before I/O."""
         if not self._event_matches(snapshot, identity, event):
             return self._hold("delivery_evidence_mismatch")
         if not self._admission_open(snapshot, guard):
             return self._hold("admission_closed")
+        if matched_at is not None:
+            metadata = event.source_metadata.model_copy(update={"received_at": matched_at})
+            return self._decode_payload(snapshot, event.model_copy(update={"source_metadata": metadata}))
         decoded = self.evaluate_filter(snapshot, identity, event)
-        if isinstance(decoded, SkippedRecord):
-            return decoded if self._admission_open(snapshot, guard) else self._hold("admission_closed")
-        if isinstance(decoded, EventDecodeFailure):
-            return await self.hold_content_failure(snapshot, identity, decoded, admission_guard=guard)
-        return await self._process_match(snapshot, identity, decoded, guard, reserve_handoff)
+        if isinstance(decoded, SkippedRecord) and not self._admission_open(snapshot, guard):
+            return self._hold("admission_closed")
+        return decoded
+
+    def inspect_unbuffered(
+        self,
+        snapshot: SubscriptionSnapshot,
+        identity: DeliveryIdentity,
+        event: RawEvent,
+        *,
+        admission_guard: Callable[[], bool] | None = None,
+    ) -> InspectedRecord | EventDecodeFailure | SkippedRecord | HeldRecord:
+        """Classify the payload while its bytes are available, without downstream I/O."""
+        decoded = self._decode_event(snapshot, identity, event, admission_guard)
+        return InspectedRecord(identity=identity) if isinstance(decoded, EventDecodeSuccess) else decoded
 
     async def _process_match(
         self,
@@ -203,9 +232,11 @@ class EventRecordProcessingService:
         decoded: EventDecodeSuccess,
         guard: Callable[[], bool] | None,
         reserve_handoff: HandoffReservation | None,
+        *,
+        recover: bool = False,
     ) -> RecordResult:
         """Reuse an existing Execution before checking admission for a direct start."""
-        accepted = await self._accepted(snapshot, identity)
+        accepted = await self._accepted(snapshot, identity, recover=recover)
         if accepted is not None:
             return accepted
         if not self._admission_open(snapshot, guard) or not await self.admission_eligible(snapshot):
@@ -382,7 +413,7 @@ class EventRecordProcessingService:
             result = prepared.precheck(view)
             if result.outcome != FilterOutcome.MATCH:
                 return self._skip_filter(snapshot, identity, result)
-        decoded = self._decoder.decode(event, schema=snapshot.model_dump(mode="json")["input_schema"])
+        decoded = self._decode_payload(snapshot, event)
         if isinstance(decoded, EventDecodeSuccess) and prepared is not None and view is not None:
             view.payload = FilterPayload(state="decoded", value=decoded.envelope.payload)
             view.cloudevents = decoded.envelope.cloudevents
@@ -390,6 +421,11 @@ class EventRecordProcessingService:
             if result.outcome != FilterOutcome.MATCH:
                 return self._skip_filter(snapshot, identity, result)
         return decoded
+
+    def _decode_payload(
+        self, snapshot: SubscriptionSnapshot, event: RawEvent
+    ) -> EventDecodeSuccess | EventDecodeFailure:
+        return self._decoder.decode(event, schema=snapshot.model_dump(mode="json")["input_schema"])
 
     @staticmethod
     def _skip_filter(snapshot: SubscriptionSnapshot, identity: DeliveryIdentity, result: FilterResult) -> SkippedRecord:
