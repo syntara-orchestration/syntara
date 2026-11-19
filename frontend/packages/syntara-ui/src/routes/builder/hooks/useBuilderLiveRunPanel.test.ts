@@ -25,7 +25,7 @@ vi.mock('../../workflows/stores/useExecutionStore', () => ({
 }))
 
 const mockInvalidateQueries = vi.fn()
-const mockUseFeatureFlag = vi.fn(() => false)
+const mockUseFeatureFlag = vi.fn<(_flag: string) => boolean>(() => false)
 vi.mock('../../../providers/use-feature-flag', () => ({
   useFeatureFlag: (flag: string) => mockUseFeatureFlag(flag),
 }))
@@ -368,32 +368,32 @@ describe('useBuilderLiveRunPanel', () => {
   describe('run details panel expand', () => {
     it('collapses when the live run panel closes while expanded', () => {
       mockUseFeatureFlag.mockReturnValue(true)
+      const onClosePanel = vi.fn()
 
-      const { result, rerender } = renderHook(({ params }: { params: HookParams }) => useBuilderLiveRunPanel(params), {
-        initialProps: {
-          params: defaultParams({
-            mostRecentRunPanelOpen: true,
-            mostRecentExecutionId: 'exec-1',
-            isViewingExecution: false,
-          }),
-        },
-        wrapper: makeWrapper(queryClient),
-      })
+      const { result } = renderHook(
+        () =>
+          useBuilderLiveRunPanel(
+            defaultParams({
+              mostRecentRunPanelOpen: true,
+              mostRecentExecutionId: 'exec-1',
+              isViewingExecution: false,
+              onClosePanel,
+            })
+          ),
+        { wrapper: makeWrapper(queryClient) }
+      )
 
       act(() => {
         result.current.panelExpandControl?.onToggle()
       })
       expect(result.current.isPanelExpanded).toBe(true)
 
-      rerender({
-        params: defaultParams({
-          mostRecentRunPanelOpen: false,
-          mostRecentExecutionId: 'exec-1',
-          isViewingExecution: false,
-        }),
+      act(() => {
+        result.current.handleCloseMostRecentRunPanel()
       })
 
       expect(result.current.isPanelExpanded).toBe(false)
+      expect(onClosePanel).toHaveBeenCalledTimes(1)
     })
   })
 

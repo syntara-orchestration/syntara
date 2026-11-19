@@ -40,24 +40,6 @@ describe('useRunDetailsPanelExpand', () => {
     expect(setPanelHeight).toHaveBeenCalledWith(300)
   })
 
-  it('collapses when the panel becomes inactive', () => {
-    const setPanelHeight = vi.fn()
-    const { result, rerender } = renderHook(
-      ({ active }: { active: boolean }) => useRunDetailsPanelExpand(320, setPanelHeight, true, active),
-      { initialProps: { active: true } }
-    )
-
-    act(() => {
-      result.current.panelExpandControl?.onToggle()
-    })
-    expect(result.current.isPanelExpanded).toBe(true)
-
-    rerender({ active: false })
-
-    expect(result.current.isPanelExpanded).toBe(false)
-    expect(setPanelHeight).toHaveBeenCalledWith(320)
-  })
-
   it('does not collapse on Escape when the event was already handled', () => {
     const setPanelHeight = vi.fn()
     const { result } = renderHook(() => useRunDetailsPanelExpand(400, setPanelHeight, true))
