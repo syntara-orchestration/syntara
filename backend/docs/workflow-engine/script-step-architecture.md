@@ -130,7 +130,7 @@ flowchart LR
     EPSecrets -. service-only .-> Worker
 ```
 
-The SDK has an invocation-scoped credential callback, but the current EP evidence does not establish bound workload-credential delivery for Script. Do not pass workload secrets in `environment` or ordinary workflow inputs.
+The first Script iteration has no Syntara-managed workload credential binding. EP's OpenShift credential is used only to manage the Job and Pod; it is not sent to the Script process. Script code and `environment` are ordinary inputs: the platform does not detect or block secret material in them, and arbitrary code can transmit any values it receives over permitted egress. This is a residual risk, not a security control.
 
 ## Security boundary
 
@@ -143,8 +143,8 @@ The child process shares the Pod's container identity, filesystem, and network n
 | Area | Current EP design evidence |
 |---|---|
 | Workload lifecycle | One Job completion and one parallel Pod per attempt; `backoffLimit: 0`; deterministic attempt identity; bounded active deadline; one-hour Job TTL as cleanup backstop. |
-| Pod privileges | Non-root execution, RuntimeDefault seccomp, no service-account token, no privilege escalation, all Linux capabilities dropped, read-only root filesystem. |
-| Compute and temporary storage | CPU request 100m and limit 1 CPU; memory request 128 MiB and limit 512 MiB; memory-backed `/tmp` capped at 64 MiB. |
+| Pod privileges | `runAsNonRoot: true`, RuntimeDefault seccomp, no service-account token, `allowPrivilegeEscalation: false`, all Linux capabilities dropped, and a read-only root filesystem. `allowPrivilegeEscalation: false` prevents a process from gaining additional privileges through mechanisms such as setuid binaries or file capabilities; it does not remove permissions the process already has or make the Pod a general-purpose sandbox. |
+| Compute and temporary storage | CPU request 100m and limit 1 CPU; memory request 128 MiB and limit 512 MiB; memory-backed `/tmp` capped at 64 MiB. These values are fixed in the current EP-generated Pod spec, not Script settings. Customer cluster policy may constrain or reject the workload. |
 | Network | Per-attempt NetworkPolicy denies ingress and allows DNS plus configured egress ranges, excluding forbidden ranges. Customer CNI enforcement must be validated. |
 | Workload transport | EP uses the Kubernetes API port-forward to the owned Pod. The SDK gRPC channel must authenticate peers and protect confidentiality; production mTLS wiring must be verified for the target deployment. |
 | Image provenance | EP accepts the caller-supplied image reference and does not independently enforce registry policy or digest pinning. |
@@ -156,18 +156,29 @@ These are controls in EP's implementation/design evidence, not a claim that ever
 
 | Data | Handling and boundary |
 |---|---|
-| Script code and `environment` | Ordinary, untrusted workflow input sent to the SDK Execute request and then to the child process. Environment values are not a secret-delivery mechanism. Avoid putting secrets here. |
-| OpenShift Cluster credential | AO resolves an opaque reference for EP. EP uses the short-lived value to access the customer Kubernetes API. It must not enter the WorkItem payload, workload Pod spec/environment, script process, result, or logs. |
-| Workload credential | Separate from the Cluster credential. The SDK supports invocation-scoped credential callbacks, but current EP evidence says bound workload credentials are unavailable. Script manifests do not currently declare credential recipes. Do not claim Script credential delivery is available. |
+| Script code and `environment` | Ordinary, untrusted workflow input sent to the SDK Execute request and then to the child process. The platform does not detect or block secret material supplied here; arbitrary code may expose any values it receives. |
+| OpenShift Cluster credential | AO resolves an opaque reference for EP. EP uses the short-lived value to access the customer Kubernetes API. The raw credential value must not enter the WorkItem payload, workload Pod spec or environment, Script process, result, or logs. |
+| Workload credential | Separate from the OpenShift Cluster credential. Although the SDK defines credential callback support, the current Script path does not bind credentials to user code; the first iteration has no Syntara-managed workload credential binding. |
 | AO/EP control-plane secrets | Service JWTs, callback mTLS material, database credentials/encryption keys, and EP TLS material stay in AO/EP service secret stores. They are never workload inputs. |
-| Script output | `return_code`, `stdout`, `stderr`, and Python `stdout_json` may contain arbitrary or sensitive data. Treat as untrusted; enforce limits and access controls; do not log full output. EP stores the result and AO maps it to workflow output. |
+| Script output | On success, the plugin returns `return_code`, captured `stdout` and `stderr`, and (for Python) `stdout_json` when stdout parses as JSON. These fields may contain sensitive data. A nonzero exit, timeout, or cancellation produces a failure result; the current Script wrapper does not include partial stdout/stderr in that failure result. |
+
+### Logs and result persistence
+
+Script output streams and operational logs are separate paths:
+
+| Data path | Current behavior |
+|---|---|
+| Script `stdout` and `stderr` | Captured from the subprocess and returned as result data on successful execution. They are not sent through the SDK logging callback. The current Script wrapper does not expose a logging callback to user-authored Python or Bash. |
+| SDK structured log events | The SDK provides an invocation-scoped `ExecutionContext.toolbox.log(...)` API for plugin implementations and batches events over the workload protocol. EP's current adaptor ignores `ContainerLogBatch`; forwarding these events to a configured OTEL collector is in progress and is not live in the current path. |
+| EP service logs | EP can export its own service logs to OTLP when configured. This is separate from SDK log events and Script output streams. |
+| Result storage | EP persists the terminal result in the WorkItem before cleanup, and AO returns it as workflow activity output. AO stores activity `output_data` in its `ActivityExecution` record. The result's retention and access policy are not specified here and require confirmation. Treat persisted output as potentially sensitive. |
 
 ## Script-specific limits and failure behavior
 
 | Concern | Current step/runtime contract | Security requirement for review |
 |---|---|---|
-| Output | Default capture is 276,480 bytes (270 KiB) per stream; configurable up to 1 MiB per stream. Combined serialized SDK result is capped at 1 MiB. Excess stream data is drained and truncated; a result that still exceeds the SDK limit fails. | Confirm truncation/failure semantics and ensure AO, EP, and Temporal payload limits are compatible. |
-| Memory and CPU | Pod limit is 512 MiB and 1 CPU. The script launcher attempts an address-space cap derived from the cgroup. | Confirm these defaults and identify any additional CPU-time, process-count, ephemeral-storage, or file-size controls required. |
+| Output | Successful results include the declared output fields; per-stream capture defaults to 276,480 bytes (270 KiB) and can be configured up to 1 MiB. Excess stream data is drained and truncated. The combined serialized SDK result is capped at 1 MiB. A nonzero exit, timeout, or cancellation returns failure metadata without partial stdout/stderr in the result. | Confirm AO, EP, and Temporal payload limits are compatible and document the output fields exposed for each outcome. |
+| Memory and CPU | Pod limit is 512 MiB and 1 CPU; the Script launcher attempts an address-space cap derived from the cgroup. Resource values are fixed by EP in the current implementation; the Script node has no customer override. | Assess whether CPU-time, process-count, ephemeral-storage, or file-size controls are also needed. |
 | Timeout | Invocation timeout is sent to the SDK; Pod active deadline covers startup, execution, and termination grace. Cleanup has its own bounded period. | Confirm maximum duration and that AO activity deadlines include EP startup, callback, and cleanup slack. |
 | Cancellation | EP sends SDK Cancel, waits a bounded grace period, then deletes the owned Job. Script cleanup sends TERM then KILL to the child process group. | Test ignored cancellation and descendants; distinguish cancellation before Execute from cancellation after it may have started. |
 | Retry | EP submits Execute once per attempt. Before submission, confirmed infrastructure failures may be retried. After possible submission, a missing result is uncertain and must not cause automatic replay. | Arbitrary scripts can have external side effects; confirm AO does not silently retry uncertain or non-idempotent executions. |
@@ -186,6 +197,9 @@ These are controls in EP's implementation/design evidence, not a claim that ever
 - [EP architecture overview and security control inventory (PR #169)](https://github.com/syntara-orchestration/syntara-execution-plane/pull/169)
 - [EP cold-start Job lifecycle](https://github.com/syntara-orchestration/syntara-execution-plane/blob/7c50410ac8a61478fe54ba6bfb245cb9018f1474/docs/kubernetes-jobs-followup.md)
 - [EP SDK workload protocol](https://github.com/syntara-orchestration/syntara-execution-plane/blob/7c50410ac8a61478fe54ba6bfb245cb9018f1474/docs/workload-protocol.md)
+- [Script Python input and output schema](https://github.com/syntara-orchestration/syntara-step-types/blob/982175a44ddd415f44dc2ab6e851bd3406fcb1dc/script-python/manifest.yaml)
+- [EP-generated workload Pod security and resource settings](https://github.com/syntara-orchestration/syntara-execution-plane/blob/7c50410ac8a61478fe54ba6bfb245cb9018f1474/src/execution_plane/worker_manager/vanilla_k8s/transport.py)
+- [EP SDK workload adaptor](https://github.com/syntara-orchestration/syntara-execution-plane/blob/7c50410ac8a61478fe54ba6bfb245cb9018f1474/src/execution_plane/worker_manager/vanilla_k8s/sdk_adaptor.py)
 - [SDK credential callback ADR 0011](https://github.com/syntara-orchestration/syntara-plugin-sdk/blob/448de6d8f7ad6cba2d5250c31cd82a1dd57f9812/.sdlc/adrs/0011-credential-callback.md)
 - [AAP-98873 AO/EP integration design](https://redhat.atlassian.net/browse/AAP-98873)
 - [AAP-95467 SDK architecture](https://redhat.atlassian.net/browse/AAP-95467)
