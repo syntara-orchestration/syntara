@@ -21,6 +21,7 @@ if TYPE_CHECKING:
     from .identity_providers import IdentityProvidersApi
     from .integrations import IntegrationsApi
     from .internal_metrics import InternalMetricsApi
+    from .node_kinds import NodeKindsApi
     from .policies import PoliciesApi
     from .projects import ProjectsApi
     from .role_assignments import RoleAssignmentsApi
@@ -178,6 +179,12 @@ class SyntaraApiRegistry:
         from .executions import ExecutionsApi
 
         return ExecutionsApi(client=self._client)
+
+    @cached_property
+    def node_kinds(self) -> NodeKindsApi:
+        from .node_kinds import NodeKindsApi
+
+        return NodeKindsApi(client=self._client)
 
     @cached_property
     def workflows(self) -> WorkflowsApi:

@@ -43,10 +43,23 @@ vi.mock('../../client', () => ({
   interfaceTagMiddleware: { onRequest: vi.fn() },
 }))
 
+// The add-step panel reads step-type verdicts; gating itself is covered by
+// AddStepPanel.stepTypeGating.test.tsx.
+vi.mock('../../hooks/useNodeKindsQuery', () => ({
+  useNodeKindsQuery: () => ({
+    query: { isPending: false },
+    nodeKinds: [],
+    nodeKindByKind: new Map(),
+    isLoading: false,
+    isUnavailable: false,
+  }),
+}))
+
 // Mock useProjectSelector to avoid accessClient dependency
 vi.mock('../../hooks/useProjectSelector', () => ({
   useProjectSelector: () => ({
     selectedProject: { id: 'project-1', name: 'Test Project' },
+    selectedProjectName: 'Test Project',
     stableProjectId: 'project-1',
     isAllProjects: false,
     projects: [{ id: 'project-1', name: 'Test Project' }],
@@ -66,6 +79,7 @@ vi.mock('../../app/useUnsavedChanges', () => ({
 vi.mock('../../hooks/useProjectSelector', () => ({
   useProjectSelector: () => ({
     selectedProject: { id: 'project-1', name: 'Test Project' },
+    selectedProjectName: 'Test Project',
     stableProjectId: 'project-1',
     isAllProjects: false,
     projects: [{ id: 'project-1', name: 'Test Project' }],
@@ -396,6 +410,11 @@ describe('BuilderContent', () => {
       expect(runButton).toHaveAttribute('aria-disabled', 'true')
     })
 
+    it('shows the project chosen before the builder opened as text, not a selector (R18)', async () => {
+      await renderBuilder({ workflow: undefined, isNew: true, workflowId: null, initialProjectId: 'project-1' })
+      expect(screen.getByText('Project: Test Project')).toBeInTheDocument()
+    })
+
     it('does not show Run history in kebab for new workflows', async () => {
       const user = userEvent.setup()
       await renderBuilder({ workflow: undefined, isNew: true, workflowId: null })
@@ -407,6 +426,11 @@ describe('BuilderContent', () => {
   })
 
   describe('Existing Workflow', () => {
+    it("shows the workflow's project as text, since it cannot change", async () => {
+      await renderBuilder({ workflow: mockWorkflow, isNew: false, workflowId: 'workflow-1' })
+      expect(screen.getByText('Project: Test Project')).toBeInTheDocument()
+    })
+
     it('renders existing workflow name in input', async () => {
       await renderBuilder({ workflow: mockWorkflow, isNew: false, workflowId: 'workflow-1' })
       await waitFor(() => {

@@ -10,14 +10,14 @@
  * - Schema persists after save and reopen
  * - Empty schema is valid (optional field)
  */
-import { test, expect, toAppUrl } from './fixtures'
+import { test, expect } from './fixtures'
 import { type SeededLlmIntegration, deleteLlmIntegration, createLlmIntegration } from './helpers/llm-helpers'
 import { addManualTrigger, ensureLlmCredential, selectLlmCredential } from './helpers/v2-steps'
-import { addStepPanel, buildUniqueName, fillCodeEditor } from './helpers/workflows'
+import { addStepPanel, buildUniqueName, fillCodeEditor, openNewWorkflowBuilder } from './helpers/workflows'
 
 test.describe('Task Agent Structured Output', () => {
   test('schema editor renders on Task Agent step', async ({ app }) => {
-    await app.goto(toAppUrl('/workflow-builder/new'))
+    await openNewWorkflowBuilder(app)
     await addManualTrigger(app)
 
     // Open Task Agent form via "Add connected step"
@@ -48,7 +48,7 @@ test.describe('Task Agent Structured Output', () => {
     let integration: SeededLlmIntegration | undefined
     try {
       integration = await createLlmIntegration(app, integrationName)
-      await app.goto(toAppUrl('/workflow-builder/new'))
+      await openNewWorkflowBuilder(app)
       await addManualTrigger(app)
 
       // Ensure LLM credential exists (required for AI Agent form submission)
@@ -102,7 +102,7 @@ test.describe('Task Agent Structured Output', () => {
     let integration: SeededLlmIntegration | undefined
     try {
       integration = await createLlmIntegration(app, integrationName)
-      await app.goto(toAppUrl('/workflow-builder/new'))
+      await openNewWorkflowBuilder(app)
       await addManualTrigger(app)
 
       // Ensure LLM credential exists (required for AI Agent form submission)

@@ -191,6 +191,34 @@ async def authorize(
     if groups is None:
         groups = await resolve_user_groups(db, request.user_id)
 
+    return await authorize_resolved(evaluator, request, effective_policies=effective, groups=groups)
+
+
+async def authorize_resolved(
+    evaluator: AuthzEvaluator,
+    request: AuthzRequest,
+    *,
+    effective_policies: list[dict[str, Any]],
+    groups: list[dict[str, Any]] | None,
+) -> AuthzResult:
+    """Evaluate a request against already-resolved policies and group memberships.
+
+    Callers that evaluate several requests for one principal and action (for
+    example every step type for ``step_type:write``) resolve the effective
+    policies and groups once and reuse them here, instead of paying the
+    database resolution on every call.
+
+    Args:
+        evaluator: Authorization evaluator for policy evaluation.
+        request: The authorization request.
+        effective_policies: Effective policies resolved for ``user_id`` and the
+            request's ``resource_type:action``.
+        groups: Group memberships resolved for ``user_id``.
+
+    Returns:
+        Authorization result with allow/deny decision.
+
+    """
     authz_input: dict[str, Any] = {
         "user": {
             "id": str(request.user_id),
@@ -207,7 +235,7 @@ async def authorize(
             "labels": request.resource_labels,
         },
         "groups": groups,
-        "effective_policies": effective,
+        "effective_policies": effective_policies,
     }
 
     opa_result = await _evaluate_authz_policy(
@@ -220,7 +248,7 @@ async def authorize(
         matched_policy=opa_result.get("matched_policy", ""),
         denial_reason=opa_result.get("denial_reason", ""),
         denied_by=opa_result.get("denied_by", ""),
-        effective_policies=effective,
+        effective_policies=effective_policies,
     )
 
     logger.debug(

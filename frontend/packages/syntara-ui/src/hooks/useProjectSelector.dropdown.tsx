@@ -178,6 +178,12 @@ export type ProjectSelectorDropdownProps = {
   loadMore: () => void
   projectsQueryRefetch: () => Promise<unknown>
   setSelectedProjectId: (id: string | null, name?: string | null) => void
+  /** Called after the user creates a project from the dropdown, which also selects it. */
+  onProjectSelect?: (project: ProjectRead | null) => void
+  /** When false, hides the "Project:" prefix inside the toggle (e.g. when a form label already names the field). */
+  showTogglePrefix: boolean
+  /** When true, renders the menu inside the selector instead of on `document.body` (needed inside a modal). */
+  isMenuInline: boolean
 }
 
 export function ProjectSelectorDropdown(props: Readonly<ProjectSelectorDropdownProps>): ReactNode {
@@ -210,6 +216,9 @@ export function ProjectSelectorDropdown(props: Readonly<ProjectSelectorDropdownP
     loadMore,
     projectsQueryRefetch,
     setSelectedProjectId,
+    onProjectSelect,
+    showTogglePrefix,
+    isMenuInline,
   } = props
 
   /**
@@ -232,7 +241,12 @@ export function ProjectSelectorDropdown(props: Readonly<ProjectSelectorDropdownP
           setIsOpen(open)
           if (!open) clearTypeaheadOnly()
         }}
-        popperProps={{ minWidth: PROJECT_SELECTOR_WIDTH, maxWidth: PROJECT_SELECTOR_WIDTH }}
+        popperProps={{
+          minWidth: PROJECT_SELECTOR_WIDTH,
+          maxWidth: PROJECT_SELECTOR_WIDTH,
+          // A modal hides everything outside it from assistive technology, including a body-attached menu.
+          ...(isMenuInline ? { appendTo: 'inline' as const } : {}),
+        }}
         onSelect={handleSelect}
         onActionClick={handleFavoriteAction}
         selected={selectedProjectId ?? (requireProject ? undefined : ALL_PROJECTS_VALUE)}
@@ -255,14 +269,16 @@ export function ProjectSelectorDropdown(props: Readonly<ProjectSelectorDropdownP
               onMouseLeave={() => setIsToggleHovered(false)}
             >
               <TextInputGroup isPlain isDisabled={isDisabled}>
-                <InputGroupItem isPlain isBox={false}>
-                  <Content
-                    className={PROJECT_TOGGLE_PREFIX_TEXT_CLASS}
-                    style={getProjectTogglePrefixLabelStyle(isDisabled)}
-                  >
-                    {projectSelectorUx.togglePrefixLabel}
-                  </Content>
-                </InputGroupItem>
+                {showTogglePrefix && (
+                  <InputGroupItem isPlain isBox={false}>
+                    <Content
+                      className={PROJECT_TOGGLE_PREFIX_TEXT_CLASS}
+                      style={getProjectTogglePrefixLabelStyle(isDisabled)}
+                    >
+                      {projectSelectorUx.togglePrefixLabel}
+                    </Content>
+                  </InputGroupItem>
+                )}
                 <TextInputGroupMain
                   value={isOpen ? filterValue : toggleLabel}
                   aria-label="Project"
@@ -335,6 +351,7 @@ export function ProjectSelectorDropdown(props: Readonly<ProjectSelectorDropdownP
         onCreated={(created) => {
           setCreateDialogOpen(false)
           const newId = created.id ?? null
+          onProjectSelect?.(created)
           detachPromise(
             projectsQueryRefetch().finally(() => {
               setSelectedProjectId(newId)

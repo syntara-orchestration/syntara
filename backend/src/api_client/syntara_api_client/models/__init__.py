@@ -304,6 +304,8 @@ __all__ = (
     "SettingUpdate",
     "SettingValueType",
     "SignalResponse",
+    "StepTypeBlockedBy",
+    "StepTypePermissionRead",
     "SubResourceRoleAssignmentCreate",
     "SwitchCase",
     "SwitchNode",
