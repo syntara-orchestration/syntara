@@ -305,12 +305,13 @@ class FormPromptService(UserReferenceResolverMixin, BaseService):
             request: Form prompt creation request
 
         Returns:
-            Created form prompt summary
+            Created prompt summary, or the existing summary for a same-activity retry of
+            a matching pending prompt before its deadline.
 
         Raises:
-            FormPromptAlreadyRequestedError: If the conflicting row is missing or belongs to another activity
-            FormPromptNotPendingError: If the matching prompt is no longer pending
-            FormPromptExpiredError: If the matching pending prompt's deadline has elapsed
+            FormPromptAlreadyRequestedError: If the conflicting row is missing or belongs to a different activity
+            FormPromptNotPendingError: If a same-activity duplicate is already submitted, expired or cancelled
+            FormPromptExpiredError: If a same-activity pending duplicate is past its deadline
 
         """
         execution = await self._validate_execution_project(request)
