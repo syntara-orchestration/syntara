@@ -106,9 +106,8 @@ vi.mock('../components/ExpandableCodeEditor', () => ({
 
 import { AAPJobTemplateForm } from './AAPJobTemplateForm'
 import { AAPWorkflowTemplateForm } from './AAPWorkflowTemplateForm'
+import { AAP_CREDENTIAL_REQUIRED_HINT } from './shared/stepFieldHelpText'
 import { renderWithHeader } from './test-utils/renderWithHeader'
-
-const CREDENTIAL_REQUIRED_HINT = 'Select a credential to browse resources'
 
 /**
  * Resource pages the stub returns for each AAP proxy list endpoint. Only
@@ -190,7 +189,7 @@ describe('AAP credential gating', () => {
       expect(screen.queryByRole('option', { name: /Deploy App/ })).not.toBeInTheDocument()
       await closeDropdown(user)
 
-      expect(screen.getByText(CREDENTIAL_REQUIRED_HINT)).toBeInTheDocument()
+      expect(screen.getByText(AAP_CREDENTIAL_REQUIRED_HINT)).toBeInTheDocument()
     })
 
     it('offers organizations and job templates after a credential is selected', async () => {
@@ -241,7 +240,7 @@ describe('AAP credential gating', () => {
       expect(screen.queryByRole('option', { name: /Deploy Workflow/ })).not.toBeInTheDocument()
       await closeDropdown(user)
 
-      expect(screen.getByText(CREDENTIAL_REQUIRED_HINT)).toBeInTheDocument()
+      expect(screen.getByText(AAP_CREDENTIAL_REQUIRED_HINT)).toBeInTheDocument()
     })
 
     it('offers organizations and workflow templates after a credential is selected', async () => {

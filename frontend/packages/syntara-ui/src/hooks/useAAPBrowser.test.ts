@@ -342,15 +342,13 @@ describe('useAAPBrowser', () => {
     it('exposes isActive false on the result when only integrationId is provided', () => {
       const { result } = renderHook(() => useAAPBrowser(undefined, undefined, 'job', 'int-123'))
 
-      // toMatchObject: the property is absent today, so this fails until the
-      // hook exposes isActive as part of its public result
-      expect(result.current).toMatchObject({ isActive: false })
+      expect(result.current.isActive).toBe(false)
     })
 
     it('exposes isActive true on the result when credentialId is provided', () => {
       const { result } = renderHook(() => useAAPBrowser('cred-1', undefined, 'job', 'int-123'))
 
-      expect(result.current).toMatchObject({ isActive: true })
+      expect(result.current.isActive).toBe(true)
     })
 
     it('disables every resource query when only integrationId is provided', () => {

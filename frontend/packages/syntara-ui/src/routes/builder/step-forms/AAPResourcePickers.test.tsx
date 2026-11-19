@@ -8,6 +8,7 @@ import type { useAAPBrowser } from '../../../hooks/useAAPBrowser'
 
 import type { AAPJobTemplateFormData } from './aapJobTemplateSchema'
 import { AAPResourcePickers } from './AAPResourcePickers'
+import { AAP_CREDENTIAL_REQUIRED_HINT } from './shared/stepFieldHelpText'
 
 // Mock dependencies
 // CredentialSelector moved to AAPStepForm — no longer rendered in AAPResourcePickers
@@ -67,16 +68,7 @@ function TestWrapper({
   return <FormProvider {...methods}>{children}</FormProvider>
 }
 
-const CREDENTIAL_REQUIRED_HINT = 'Select a credential to browse resources'
-
-/**
- * Mock browser result. `isActive` becomes part of the hook's public return
- * value once credential gating ships; the intersection keeps these tests
- * compilable in the meantime.
- */
-type MockBrowser = ReturnType<typeof useAAPBrowser> & { isActive: boolean }
-
-function createMockBrowser(overrides?: Partial<MockBrowser>): MockBrowser {
+function createMockBrowser(overrides?: Partial<ReturnType<typeof useAAPBrowser>>): ReturnType<typeof useAAPBrowser> {
   return {
     organizations: [
       { id: 1, name: 'Org 1' },
@@ -97,7 +89,7 @@ function createMockBrowser(overrides?: Partial<MockBrowser>): MockBrowser {
     templateDetail: undefined,
     isActive: true,
     ...overrides,
-  } as unknown as MockBrowser
+  } as ReturnType<typeof useAAPBrowser>
 }
 
 describe('AAPResourcePickers', () => {
@@ -390,7 +382,7 @@ describe('AAPResourcePickers', () => {
         </TestWrapper>
       )
 
-      expect(screen.getByText(CREDENTIAL_REQUIRED_HINT)).toBeInTheDocument()
+      expect(screen.getByText(AAP_CREDENTIAL_REQUIRED_HINT)).toBeInTheDocument()
     })
 
     it('does not show the credential hint once browsing is active', () => {
@@ -402,7 +394,7 @@ describe('AAPResourcePickers', () => {
         </TestWrapper>
       )
 
-      expect(screen.queryByText(CREDENTIAL_REQUIRED_HINT)).not.toBeInTheDocument()
+      expect(screen.queryByText(AAP_CREDENTIAL_REQUIRED_HINT)).not.toBeInTheDocument()
     })
 
     it('keeps saved selections visible while pickers are disabled', () => {

@@ -11,16 +11,7 @@ const defaultOptions = [
   { value: 'opt-3', label: 'Gamma' },
 ] as const
 
-/**
- * Overrides accepted by renderSelect. `isDisabled` documents the planned
- * disabled state; the component ignores it until the prop is implemented,
- * which keeps the disabled-state assertions red.
- */
-type RenderSelectOverrides = Partial<React.ComponentProps<typeof AAPTypeaheadSelect>> & {
-  isDisabled?: boolean
-}
-
-function renderSelect(overrides: RenderSelectOverrides = {}) {
+function renderSelect(overrides: Partial<React.ComponentProps<typeof AAPTypeaheadSelect>> = {}) {
   const onChange = vi.fn()
   const onSearchChange = vi.fn()
   const props = {
