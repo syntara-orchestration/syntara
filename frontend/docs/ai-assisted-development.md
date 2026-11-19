@@ -230,7 +230,7 @@ Use the frontend-review-pr skill to review my current branch.
 Or with focus areas:
 
 ```text
-Use the frontend-pr-review skill.
+Use the frontend-review-pr skill.
 Review branch [branch-name]. This PR [what it does].
 Focus areas:
 - [Specific concern]
@@ -355,7 +355,7 @@ Skills are detailed reference guides the agent consults while working. You can a
 | ------------------------------- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Coding Standards**            | `frontend-coding-standards/SKILL.md`   | Patterns with code examples: typed API clients, `useQueryState`, Zod forms, error handling, design tokens, accessibility                                            | Every implementation task. The agent reads this automatically, but you can say "check against the coding standards skill" to force a review. |
 | **Testing Guidelines**          | `frontend-testing-guidelines/SKILL.md` | Coverage requirements, query priority (`getByRole` > `getByLabelText` > `getByText`), `userEvent` over `fireEvent`, `vitest-axe` accessibility tests, mock patterns | Writing or reviewing tests. Say "use the frontend-testing-guidelines skill" to verify test quality.                                          |
-| **PR Review**                   | `frontend-pr-review/SKILL.md`          | Structured review process: identify scope, read every changed file, categorize issues as Blocking/Suggestion/Nitpick, generate PR description                       | Before opening a PR. Invoke the `frontend-review-pr` skill to run the full checklist.                                                        |
+| **PR Review**                   | `frontend-review-pr/SKILL.md`          | Structured review process: identify scope, read every changed file, categorize issues as Blocking/Suggestion/Nitpick, self-review gates before reporting done       | Before opening a PR, or as a self-review before reporting a task done.                                                                       |
 | **Playwright E2E**              | `frontend-playwright-e2e/SKILL.md`     | E2E test writing: fixtures, selectors, mock API setup, waiting strategies, debugging, CI integration                                                                | Writing browser-level tests for user flows. Say "use the frontend-playwright-e2e skill" to write E2E tests.                                  |
 | **PatternFly UX Design System** | `frontend-patternfly-ux/SKILL.md`      | PF6 component selection rules, table variants, form thresholds, modal sizes, alert casing, spacing tokens, color tokens                                             | Verifying that your UI matches the design system. Paste a screenshot and say "use the frontend-patternfly-ux skill to check this."           |
 | **Frontend Specialist**         | `frontend-specialist/SKILL.md`         | React 19, TypeScript, PatternFly 6, and Vitest implementation standards, pre-submission checklist, quality gates, and implementation workflow                       | Any implementation, review, or refactoring task. Triggered automatically via AGENTS.md.                                                      |
@@ -491,7 +491,7 @@ The skill lives at [`.agents/skills/frontend-build-ui-feature/SKILL.md`](https:/
 | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Coding standards            | [`.agents/skills/frontend-coding-standards/SKILL.md`](https://github.com/syntara-orchestration/syntara/blob/devel/.agents/skills/frontend-coding-standards/SKILL.md)     |
 | Testing standards           | [`.agents/skills/frontend-testing-guidelines/SKILL.md`](https://github.com/syntara-orchestration/syntara/blob/devel/.agents/skills/frontend-testing-guidelines/SKILL.md) |
-| PR review process           | [`.agents/skills/frontend-pr-review/SKILL.md`](https://github.com/syntara-orchestration/syntara/blob/devel/.agents/skills/frontend-pr-review/SKILL.md)                   |
+| PR review process           | [`.agents/skills/frontend-review-pr/SKILL.md`](https://github.com/syntara-orchestration/syntara/blob/devel/.agents/skills/frontend-review-pr/SKILL.md)                   |
 | Playwright E2E              | [`.agents/skills/frontend-playwright-e2e/SKILL.md`](https://github.com/syntara-orchestration/syntara/blob/devel/.agents/skills/frontend-playwright-e2e/SKILL.md)         |
 | PatternFly UX design system | [`.agents/skills/frontend-patternfly-ux/SKILL.md`](https://github.com/syntara-orchestration/syntara/blob/devel/.agents/skills/frontend-patternfly-ux/SKILL.md)           |
 | Frontend specialist         | [`.agents/skills/frontend-specialist/SKILL.md`](https://github.com/syntara-orchestration/syntara/blob/devel/.agents/skills/frontend-specialist/SKILL.md)                 |

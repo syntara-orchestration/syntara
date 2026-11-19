@@ -122,7 +122,7 @@ files below.
 | `frontend-testing-guidelines` | Vitest / accessibility |
 | `frontend-playwright-e2e` | How to **write** E2E tests |
 | `frontend-run-e2e` | How to **run** E2E tests, including never printing secrets |
-| `frontend-pr-review` / `frontend-review-pr` | Review checklist |
+| `frontend-review-pr` | Review checklist and self-review |
 | `frontend-build-ui-feature` | Feature wizard (tracker-neutral) |
 | `frontend-library-references` | Public `llms.txt` URLs |
 | `frontend-a11y-audit` | Registry axe sweep plus manual WCAG audits beyond axe-core (keyboard, media matrix, semantics, bug drafting) |

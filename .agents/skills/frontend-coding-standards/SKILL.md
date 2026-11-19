@@ -214,14 +214,18 @@ const isCancellable = isExecutionCancellable(status)
 
 ```tsx
 // ❌ BAD: Repeated JSX pattern
-<div className="glass rounded-lg p-4">
-  <h3 className="text-lg font-bold">{title1}</h3>
-  <p className="text-white/60">{description1}</p>
-</div>
-<div className="glass rounded-lg p-4">
-  <h3 className="text-lg font-bold">{title2}</h3>
-  <p className="text-white/60">{description2}</p>
-</div>
+<Card>
+  <CardTitle>{title1}</CardTitle>
+  <CardBody>
+    <Content component={ContentVariants.p}>{description1}</Content>
+  </CardBody>
+</Card>
+<Card>
+  <CardTitle>{title2}</CardTitle>
+  <CardBody>
+    <Content component={ContentVariants.p}>{description2}</Content>
+  </CardBody>
+</Card>
 
 // ✅ GOOD: Extract to component
 <InfoCard title={title1} description={description1} />
@@ -1211,6 +1215,77 @@ useEffect(() => { setIsChecked(checked) }, [checked])
 
 ---
 
+## 24. Documentation Links -- `useDocLink` Hook
+
+**Never hardcode documentation URLs.** Use the `useDocLink` hook to resolve documentation links. Community builds open the shared repo README for every key; extended builds resolve per-key product URLs when configured.
+
+### Architecture
+
+The doc link system has five parts:
+
+1. **`frontend/packages/syntara-ui/src/utils/docs/docsUrls.json`** -- flat map of logical doc keys to **path fragments** (one string per key). Adding a new page means adding a new entry here.
+2. **`frontend/packages/syntara-ui/src/utils/docs/docsConfig.json`** -- community homepage URL + docs `version` used when substituting `{version}` in product bases.
+3. **`frontend/packages/syntara-ui/src/utils/docs/loadDocsConfig.ts`** -- build-time merge via `import.meta.glob` of optional `docsConfig.overlay.json` / `docsUrls.overlay.json` (gitignored; injected only on extended builds).
+4. **`frontend/packages/syntara-ui/src/utils/docs/types.ts`** -- `DocKey` type is derived from `keyof typeof docsUrls`, so TypeScript rejects any key not in the JSON at compile time.
+5. **`frontend/packages/syntara-ui/src/utils/docs/DocLinkProvider.tsx` + `useDocLink.ts`** -- React context (wired in `App.tsx`) reads `VITE_EXTENDED` for community vs extended mode, then `resolveDocUrl` builds the final URL.
+
+### Usage
+
+```typescript
+import { useDocLink } from '../../utils/docs/useDocLink'
+
+function WorkflowsPage() {
+  const docLink = useDocLink('workflows')  // type-safe DocKey
+  return <SynPageHeader title="Workflows" docLink={docLink} />
+}
+```
+
+`SynPageHeader` renders the `docLink` as an external link icon next to the page title.
+
+For the workflow builder's step editor panel, pass `docLink` as a prop to `StepEditorLayout`, which enables its "Documentation" button (previously disabled with "Coming soon").
+
+The sidebar help icon (`AppDockedNav`) uses the `home` key. In community mode that is the same README URL as every other key; in extended mode it resolves to the configured product landing page.
+
+### Adding a New Doc Link
+
+1. Add a flat path entry to `frontend/packages/syntara-ui/src/utils/docs/docsUrls.json`:
+
+```json
+{
+  "myNewPage": "__PLACEHOLDER__/my-new-page"
+}
+```
+
+2. Use it in your component -- the `DocKey` type updates automatically from the JSON:
+
+```typescript
+const docLink = useDocLink('myNewPage')
+```
+
+3. Pass it to `SynPageHeader`:
+
+```typescript
+<SynPageHeader title="My New Page" docLink={docLink} />
+```
+
+### Community vs extended
+
+Controlled by **`VITE_EXTENDED`** (`true` / `1` = extended; unset = community). Do not use `VITE_DOC_MODE` or `VITE_APP_MODE` — they are ignored.
+
+| Build | Help link |
+|-------|-----------|
+| Community | Always community README for every key |
+| Extended | Per-key product URL when configured, otherwise community README |
+
+### Rules
+
+1. **Never hardcode doc URLs** -- always use `useDocLink(key)` so links follow community vs extended resolution
+2. **Every page with `SynPageHeader` should have a `docLink`** -- pass the hook result to the `docLink` prop
+3. **`DocKey` is enforced by TypeScript** -- passing a string not in `docsUrls.json` is a compile error
+4. **Keep paths as obvious placeholders until real URLs exist** -- use `__PLACEHOLDER__/...` (not subtle strings that could look real)
+
+---
+
 ## 25. Prefer CSS Modules Over Inline Style Objects
 
 Inline style objects (`style={{ margin: 0, color: '...' }}`) create a new object reference on every render and cannot be cached by the browser. Use CSS module classes instead.
@@ -1641,77 +1716,6 @@ export type SwitchConfig = { cases: Array<{ label: string }> }
 
 ---
 
-## 33. Documentation Links -- `useDocLink` Hook
-
-**Never hardcode documentation URLs.** Use the `useDocLink` hook to resolve documentation links. Community builds open the shared repo README for every key; extended builds resolve per-key product URLs when configured.
-
-### Architecture
-
-The doc link system has five parts:
-
-1. **`frontend/packages/syntara-ui/src/utils/docs/docsUrls.json`** -- flat map of logical doc keys to **path fragments** (one string per key). Adding a new page means adding a new entry here.
-2. **`frontend/packages/syntara-ui/src/utils/docs/docsConfig.json`** -- community homepage URL + docs `version` used when substituting `{version}` in product bases.
-3. **`frontend/packages/syntara-ui/src/utils/docs/loadDocsConfig.ts`** -- build-time merge via `import.meta.glob` of optional `docsConfig.overlay.json` / `docsUrls.overlay.json` (gitignored; injected only on extended builds).
-4. **`frontend/packages/syntara-ui/src/utils/docs/types.ts`** -- `DocKey` type is derived from `keyof typeof docsUrls`, so TypeScript rejects any key not in the JSON at compile time.
-5. **`frontend/packages/syntara-ui/src/utils/docs/DocLinkProvider.tsx` + `useDocLink.ts`** -- React context (wired in `App.tsx`) reads `VITE_EXTENDED` for community vs extended mode, then `resolveDocUrl` builds the final URL.
-
-### Usage
-
-```typescript
-import { useDocLink } from '../../utils/docs/useDocLink'
-
-function WorkflowsPage() {
-  const docLink = useDocLink('workflows')  // type-safe DocKey
-  return <SynPageHeader title="Workflows" docLink={docLink} />
-}
-```
-
-`SynPageHeader` renders the `docLink` as an external link icon next to the page title.
-
-For the workflow builder's step editor panel, pass `docLink` as a prop to `StepEditorLayout`, which enables its "Documentation" button (previously disabled with "Coming soon").
-
-The sidebar help icon (`AppDockedNav`) uses the `home` key. In community mode that is the same README URL as every other key; in extended mode it resolves to the configured product landing page.
-
-### Adding a New Doc Link
-
-1. Add a flat path entry to `frontend/packages/syntara-ui/src/utils/docs/docsUrls.json`:
-
-```json
-{
-  "myNewPage": "__PLACEHOLDER__/my-new-page"
-}
-```
-
-2. Use it in your component -- the `DocKey` type updates automatically from the JSON:
-
-```typescript
-const docLink = useDocLink('myNewPage')
-```
-
-3. Pass it to `SynPageHeader`:
-
-```typescript
-<SynPageHeader title="My New Page" docLink={docLink} />
-```
-
-### Community vs extended
-
-Controlled by **`VITE_EXTENDED`** (`true` / `1` = extended; unset = community). Do not use `VITE_DOC_MODE` or `VITE_APP_MODE` — they are ignored.
-
-| Build | Help link |
-|-------|-----------|
-| Community | Always community README for every key |
-| Extended | Per-key product URL when configured, otherwise community README |
-
-### Rules
-
-1. **Never hardcode doc URLs** -- always use `useDocLink(key)` so links follow community vs extended resolution
-2. **Every page with `SynPageHeader` should have a `docLink`** -- pass the hook result to the `docLink` prop
-3. **`DocKey` is enforced by TypeScript** -- passing a string not in `docsUrls.json` is a compile error
-4. **Keep paths as obvious placeholders until real URLs exist** -- use `__PLACEHOLDER__/...` (not subtle strings that could look real)
-
----
-
 ## 34. Use `<Link>` for Navigation, `<Button>` for Actions
 
 **For in-app route changes, always use `<Link>` from the router.** Never use `<Button onClick={() => navigate(...)}>` or `<a href="...">`. A raw `<a>` with `href` bypasses the router and causes a full page reload.
@@ -1858,27 +1862,28 @@ if (isNotFound) {
 
 Look at sibling pages in the same route directory. If `IdentityProviderDetail.tsx` uses `<SynEmptyState>` for its not-found state, the new `EditGroupMapping.tsx` in the same directory must match that pattern -- not introduce raw text.
 
-## 37. Browser Tab Titles -- `toPageTitle`
+## 37. Browser Tab Titles -- `SynPageTitle`
 
-Every top-level page component (default export with an `<SynPage>` render) must include `<title>` as the first child of `<SynPage>`. React 19 hoists it to `<head>` automatically — no third-party library needed.
+Every top-level page component (default export with an `<SynPage>` render) must render `<SynPageTitle>` as the first child of `<SynPage>`. It renders a `<title>` built with `toPageTitle`, and React 19 hoists it to `<head>` automatically. ESLint (`syntara/require-page-title`) fails route files that render no title; placement as the first child is a review check.
 
 ```tsx
-import { toPageTitle } from '../../utils/toPageTitle'
+import { SynPageTitle } from '../../components/SynPageTitle'
 
 export default function Workflows() {
   return (
     <SynPage>
-      <title>{toPageTitle(['Workflows'])}</title>
+      <SynPageTitle segments={['Workflows']} />
       <SynPageHeader title="Workflows" ... />
     </SynPage>
   )
 }
 ```
 
-- **Static pages**: pass a string literal — `toPageTitle(['Credentials'])`
-- **Dynamic pages**: pass the entity name — `toPageTitle([integration.name])` (falls back gracefully if undefined/null)
-- **Loading/error states**: use a static fallback — `toPageTitle(['Integration'])`
-- **Multi-segment pages**: `toPageTitle(['admin', 'Users'])` → `admin | Users | Syntara`
+- **Static pages**: pass a string literal — `segments={['Credentials']}`
+- **Dynamic pages**: pass the entity name — `segments={[integration.name]}` (null/undefined/blank segments are dropped)
+- **Loading/error states**: use a static fallback — `segments={['Integration']}`
+- **Multi-segment pages**: `segments={['admin', 'Users']}` → `admin | Users | Syntara`
+- Call `toPageTitle` directly only when you need the title string itself rather than a rendered `<title>`
 
 ## 38. React 19 Ref Patterns — No `forwardRef`; Prefer Ref Cleanup Functions
 
