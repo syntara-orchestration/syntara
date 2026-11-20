@@ -53,6 +53,30 @@ _PLUGIN_NAME = "agent-runtime"
 _STEP_IDENTITY = "syntara.agent-runtime.agent-runtime"
 _MAX_MODEL_CALLS = 8
 
+
+def _work_item_error(status: str, result: object) -> ApplicationError | None:
+    """Translate terminal EP outcomes into non-retryable workflow failures."""
+    if status not in {
+        WorkItemStatus.FAILED.value,
+        WorkItemStatus.CANCELLED.value,
+        WorkItemStatus.RECONCILIATION_REQUIRED.value,
+    }:
+        return None
+
+    value = result if isinstance(result, dict) else {}
+    error_message = str(value.get("error", "Agent Runtime workload failed"))
+    if status == WorkItemStatus.RECONCILIATION_REQUIRED.value:
+        return ApplicationError(
+            error_message,
+            value,
+            type="AgentRuntimeOutcomeUnknown",
+            non_retryable=True,
+        )
+
+    error_type = str(value.get("error_type", "AgentRuntimeWorkFailed"))
+    return ApplicationError(error_message, value, type=error_type, non_retryable=True)
+
+
 if TYPE_CHECKING:
     from uuid import UUID
 
@@ -301,7 +325,7 @@ async def _submit_and_wait(  # noqa: C901, PLR0915 -- keeps submit, recovery, po
     runtime_context = await _runtime_context(execution_id, invocation.id)
     if "host_operations" not in WorkloadInvocation.model_fields:
         raise ApplicationError(
-            "Agent Runtime requires an execution-plane-client release with host operations",
+            "Agent Runtime requires an execution-plane-client build with host operations",
             type="AgentRuntimeConfigError",
             non_retryable=True,
         )
@@ -343,11 +367,9 @@ async def _submit_and_wait(  # noqa: C901, PLR0915 -- keeps submit, recovery, po
                 if status == WorkItemStatus.COMPLETED.value:
                     value = work.get("result")
                     return value if isinstance(value, dict) else {}
-                if status in {WorkItemStatus.FAILED.value, WorkItemStatus.CANCELLED.value}:
-                    value = work.get("result") or {}
-                    error_message = str(value.get("error", "Agent Runtime workload failed"))
-                    error_type = str(value.get("error_type", "AgentRuntimeWorkFailed"))
-                    raise ApplicationError(error_message, value, type=error_type, non_retryable=True)
+                error = _work_item_error(status, work.get("result"))
+                if error is not None:
+                    raise error
                 activity.heartbeat({"agent_runtime_work_item_id": str(work_item_id), "status": status})
                 await asyncio.sleep(min(1.0, max(0.0, deadline - asyncio.get_running_loop().time())))
             with suppress(Exception):

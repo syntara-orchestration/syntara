@@ -12,8 +12,10 @@ from execution_plane_client.errors import ProtocolConflict
 from execution_plane_client.handlers import HandlingResult
 from execution_plane_client.protocol import MessageEnvelope, ResourceReference
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
+from langgraph.runtime import Runtime
 from pydantic import ValidationError
 
+from syntara.agent_orchestrator.agents.generic_agent import GenericAgent
 from syntara.agent_orchestrator.audit.llm_interaction import (
     LLMInteractionEvent,
     LLMInteractionStatus,
@@ -331,7 +333,7 @@ class AgentOperationCommandHandler:
         content = str(getattr(raw_result, "text", "") or "")
         assistant_message = {"role": "assistant", "content": content, "tool_calls": tool_calls}
         token_entry = (
-            InvocationExecutor._build_token_usage_entry(raw_result)  # noqa: SLF001 -- use AO's canonical token normalization.
+            GenericAgent._build_token_usage_entry(raw_result)  # noqa: SLF001 -- reuse AO's token usage normalization.
             if isinstance(raw_result, AIMessage)
             else None
         )
@@ -425,7 +427,8 @@ class AgentOperationCommandHandler:
                         tool_calls=[{"name": tool.name, "args": arguments, "id": call_id, "type": "tool_call"}],
                     )
                 ]
-            }
+            },
+            runtime=Runtime(),
         )
         result_messages = result.get("messages") if isinstance(result, dict) else None
         if (
