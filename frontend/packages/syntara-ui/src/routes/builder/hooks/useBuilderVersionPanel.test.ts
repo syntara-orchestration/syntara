@@ -75,11 +75,12 @@ vi.mock('./useBuilderVersionHistory', () => ({
   }),
 }))
 
+let mockBlockedStepTypes: { kind: string; label: string }[] = []
 vi.mock('../../workflows/useStepTypePermissions', () => ({
   getStepTypesFromDefinition: () => [],
   useStepTypePermissions: () => ({
-    canAuthor: true,
-    blockedStepTypes: [],
+    canAuthor: mockBlockedStepTypes.length === 0,
+    blockedStepTypes: mockBlockedStepTypes,
     isChecking: false,
     isError: false,
     retry: vi.fn().mockResolvedValue(undefined),
@@ -112,6 +113,7 @@ function createParams(overrides: Record<string, unknown> = {}) {
 
 describe('useBuilderVersionPanel', () => {
   beforeEach(() => {
+    mockBlockedStepTypes = []
     vi.clearAllMocks()
     mockIsDirty = false
     mockIsViewingVersion = false
@@ -578,6 +580,18 @@ describe('useBuilderVersionPanel', () => {
 
     expect(result.current.openRestoreDialogForCurrentVersion).toBeDefined()
     expect(typeof result.current.openRestoreDialogForCurrentVersion).toBe('function')
+  })
+
+  it('explains the historical denial and guards opening the restore dialog', () => {
+    mockIsViewingVersion = true
+    mockViewedVersionDate = '2026-05-19T14:30:00.000Z'
+    mockBlockedStepTypes = [{ kind: 'wait', label: 'Wait' }]
+    const { result } = renderHook(() => useBuilderVersionPanel(createParams({ viewingVersion: 2 })))
+
+    expect(result.current.canRestoreSelectedVersion).toBe(false)
+    expect(result.current.restoreTooltip).toContain('permission to edit Wait steps')
+    act(() => result.current.openRestoreDialogForCurrentVersion?.())
+    expect(mockRestoreDialogOpen).not.toHaveBeenCalled()
   })
 
   it('openRestoreDialogForCurrentVersion calls restoreDialog.open', () => {

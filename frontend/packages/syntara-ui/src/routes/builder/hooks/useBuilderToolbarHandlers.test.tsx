@@ -5,6 +5,7 @@ import { describe, expect, it, vi, beforeEach, type MockedFunction } from 'vites
 import { useWorkflowStore } from '../../../stores/useWorkflowStore'
 import type { WorkflowDefinition } from '../../../stores/workflowStoreTypes'
 import { expectStringContaining } from '../../../test/test-helpers'
+import { parseImportedDefinition } from '../utils/parseImportedDefinition'
 
 import type { UseBuilderToolbarHandlersOptions } from './useBuilderToolbarHandlers'
 import { useBuilderToolbarHandlers } from './useBuilderToolbarHandlers'
@@ -346,20 +347,28 @@ describe('useBuilderToolbarHandlers', () => {
     expect(executeWorkflow).toHaveBeenCalledTimes(1)
   })
 
-  it('runs the saved definition without saving local edits in read-only mode', async () => {
+  it.each(['current', 'newer', 'unsaved trigger'] as const)('handles the %s saved run case', async (scenario) => {
     const handleSaveWorkflow = vi.fn().mockResolvedValue(true)
     const executeWorkflow = vi.fn()
-    const savedWorkflowDefinition = {
+    const refreshSavedWorkflow = vi.fn().mockResolvedValue(undefined)
+    const showError = vi.fn()
+    const savedRunState = parseImportedDefinition({
       triggers: [{ id: 'trigger-1', type: 'manual', parameters: {} }],
       nodes: [{ id: 'task-1', type: 'action', name: 'Saved task', parameters: {} }],
       edges: [{ from: 'trigger-1', to: 'task-1' }],
-    }
+    })
+    mockWorkflowFetchClientGET.mockResolvedValueOnce({
+      data: { current_version: scenario === 'newer' ? 2 : 1 },
+    })
 
     const { result } = renderHook(() =>
       useBuilderToolbarHandlers(
         buildOptions({
           isReadOnly: true,
-          savedWorkflowDefinition,
+          savedRunState,
+          savedVersion: 1,
+          refreshSavedWorkflow,
+          showError,
           handleSaveWorkflow,
           executeWorkflow,
           currentWorkflow: null,
@@ -367,10 +376,25 @@ describe('useBuilderToolbarHandlers', () => {
       )
     )
 
-    await result.current.handleRunWorkflow()
+    const triggerId = scenario === 'unsaved trigger' ? 'local-only' : 'trigger-1'
+    await result.current.handleRunWorkflow({ saved: true }, triggerId)
 
     expect(handleSaveWorkflow).not.toHaveBeenCalled()
-    expect(executeWorkflow).toHaveBeenCalledOnce()
+    if (scenario === 'current') {
+      expect(executeWorkflow).toHaveBeenCalledWith(
+        { body: { workflow_id: 'wf-1', trigger_node_id: 'trigger-1', input_data: { saved: true } } },
+        expect.anything()
+      )
+      expect(refreshSavedWorkflow).not.toHaveBeenCalled()
+    } else {
+      expect(executeWorkflow).not.toHaveBeenCalled()
+      expect(showError).toHaveBeenCalledWith(
+        expect.objectContaining({
+          description: expectStringContaining(scenario === 'newer' ? 'saved workflow changed' : 'Select a trigger'),
+        })
+      )
+      expect(refreshSavedWorkflow).toHaveBeenCalledTimes(scenario === 'newer' ? 1 : 0)
+    }
   })
 
   it('handleDeleteWorkflow does not call deleteWorkflow when workflow is missing', () => {

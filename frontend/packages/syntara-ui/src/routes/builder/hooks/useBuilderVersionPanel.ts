@@ -5,6 +5,7 @@ import { useDialogState } from '../../../hooks/useDialogState'
 import { useAlerts } from '../../../providers/alerts/AlertContext'
 import { useWorkflowStore } from '../../../stores/useWorkflowStore'
 import { detachPromise } from '../../../utils/detachPromise'
+import { formatStepTypeLabels } from '../../../utils/nodeKindDenials'
 import type { BuilderAction } from '../builderReducer'
 
 import { useBuilderVersionHistory } from './useBuilderVersionHistory'
@@ -17,6 +18,14 @@ type WorkflowVersion = WorkflowAPI.components['schemas']['WorkflowVersionRead']
 type ResourceDialog<T> = { isOpen: boolean; item: T | null; open: (item: T) => void; close: () => void }
 type RestoreDialogItem = { version: number; dateTime: string }
 type VersionDefinitionPermissions = ReturnType<typeof useVersionDefinitionPermissions>
+
+function getRestoreTooltip(permissions: VersionDefinitionPermissions) {
+  if (permissions.isChecking || permissions.isError || !permissions.blockedStepTypes.length) {
+    return permissions.permissionMessage || undefined
+  }
+  const stepTypes = formatStepTypeLabels(permissions.blockedStepTypes)
+  return `You can’t restore this version because you don’t have permission to edit ${stepTypes} steps.`
+}
 
 function buildPublishDialogProps(options: {
   canEdit: boolean
@@ -259,11 +268,13 @@ export function useBuilderVersionPanel(params: UseBuilderVersionPanelParams) {
     setSearchParams,
   })
 
-  const canRestoreCurrentVersion = isViewingVersion && viewedVersionDate != null && viewingVersion !== null
-  const openRestoreDialogForCurrentVersion =
-    canRestoreCurrentVersion && canRestoreSelectedVersion
-      ? () => restoreDialog.open({ version: viewingVersion, dateTime: viewedVersionDate })
-      : undefined
+  const openRestoreDialogForCurrentVersion = isViewingVersion
+    ? () => {
+        if (canRestoreSelectedVersion && viewingVersion !== null && viewedVersionDate != null) {
+          restoreDialog.open({ version: viewingVersion, dateTime: viewedVersionDate })
+        }
+      }
+    : undefined
 
   const versionSidePanel = {
     show: !isNew && !!workflowId && versionHistoryOpen,
@@ -329,7 +340,7 @@ export function useBuilderVersionPanel(params: UseBuilderVersionPanelParams) {
     handleToggleVersionHistory,
     openRestoreDialogForCurrentVersion,
     canRestoreSelectedVersion,
-    restoreTooltip: canEdit ? selectedVersionPermissions.permissionMessage : undefined,
+    restoreTooltip: getRestoreTooltip(selectedVersionPermissions),
     selectedVersionPermissionError: selectedVersionPermissions.isError,
     selectedVersionPermissionLoading: isViewingVersion && selectedVersionPermissions.isChecking,
     retrySelectedVersionPermissions: selectedVersionPermissions.retry,

@@ -43,12 +43,17 @@ test.describe('Step-type read-only workflow actions', { tag: '@pr-check' }, () =
       workflowId = workflow.id
       await publishWorkflowViaApi(app, workflow.id, workflow.versionNumber)
 
+      let permissionCheckUnavailable = true
       await app.route('**/api/v1/authz/can_i', async (route) => {
         const body = route.request().postDataJSON() as {
           resource_type?: string
           resource_labels?: { kind?: string }
         }
         if (body.resource_type === 'step_type' && body.resource_labels?.kind === 'wait') {
+          if (permissionCheckUnavailable) {
+            await route.fulfill({ status: 503, json: { detail: 'Temporarily unavailable' } })
+            return
+          }
           await route.fulfill({
             status: 200,
             contentType: 'application/json',
@@ -68,6 +73,14 @@ test.describe('Step-type read-only workflow actions', { tag: '@pr-check' }, () =
 
       await openWorkflowInBuilder(app, workflowName, workflow.id)
 
+      const checkError = 'Unable to check step-type permissions.'
+      await expect(app.getByRole('status').filter({ hasText: checkError })).toHaveText(checkError)
+      await expect(app.getByText('Danger alert:')).toHaveCount(1)
+      permissionCheckUnavailable = false
+      await app.getByRole('button', { name: 'Retry permission check' }).click()
+      await expect(app.getByRole('status').filter({ hasText: 'Editing is unavailable.' })).toHaveText(
+        'Editing is unavailable. This workflow is read-only.'
+      )
       await expect(app.getByText('You are viewing this workflow in read-only mode.')).toBeVisible()
       await expect(
         app.getByText("This workflow includes Wait steps, but your assigned policies don't allow you to write them.")
@@ -77,6 +90,29 @@ test.describe('Step-type read-only workflow actions', { tag: '@pr-check' }, () =
       await expect(app.getByRole('button', { name: 'Save workflow' })).toHaveAttribute('aria-disabled', 'true')
       await expect(app.getByRole('button', { name: 'Publish workflow' })).toHaveAttribute('aria-disabled', 'true')
       await expect(app.getByRole('button', { name: 'Run', exact: true })).toBeEnabled()
+
+      await app.getByRole('button', { name: 'Workflow actions' }).click()
+      await app.getByRole('menuitem', { name: 'Version history' }).click()
+      await app
+        .getByRole('listitem')
+        .filter({
+          has: app.getByRole('button', { name: `Actions for version ${workflow.versionNumber}`, exact: true }),
+        })
+        .click()
+      const restore = app.getByRole('button', { name: 'Restore version' })
+      const back = app.getByRole('button', { name: 'Back to editor' })
+      const reason = 'You can’t restore this version because you don’t have permission to edit Wait steps.'
+      await expect(restore).toBeVisible()
+      await expect(restore).toHaveAttribute('aria-disabled', 'true')
+      await back.focus()
+      await app.keyboard.press('Shift+Tab')
+      await expect(restore).toBeFocused()
+      await expect(app.getByRole('tooltip')).toHaveText(reason)
+      await app.keyboard.press('Enter')
+      await expect(app.getByRole('dialog', { name: /restore/i })).toHaveCount(0)
+      await back.focus()
+      await restore.hover()
+      await expect(app.getByRole('tooltip')).toHaveText(reason)
     } finally {
       if (workflowId) await deleteWorkflowViaApi(app, workflowId)
     }

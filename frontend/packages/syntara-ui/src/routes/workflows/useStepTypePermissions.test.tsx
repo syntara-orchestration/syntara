@@ -85,6 +85,23 @@ describe('useStepTypePermissions', () => {
     expect(accessFetchClient.POST).toHaveBeenCalledTimes(2)
   })
   it.each([
+    ['HTTP 503', { error: { detail: 'Unavailable' }, response: new Response(null, { status: 503 }) }],
+    ['missing decision', { response: new Response(null, { status: 204 }) }],
+  ])('keeps authoring blocked after %s and retries the check', async (_name, response) => {
+    vi.mocked(accessFetchClient.POST)
+      .mockResolvedValueOnce(response)
+      .mockResolvedValueOnce({ data: { allowed: true } })
+    const { result } = renderHook(() => useStepTypePermissions(['script'], 'project-1'), { wrapper: createWrapper() })
+
+    await waitFor(() => expect(result.current.isError).toBe(true))
+    expect(result.current.canAuthor).toBe(false)
+    expect(result.current.blockedStepTypes).toEqual([])
+    await act(async () => result.current.retry())
+
+    await waitFor(() => expect(result.current.canAuthor).toBe(true))
+  })
+
+  it.each([
     {
       denial_reason: 'policy_deny',
       denied: true,

@@ -6,14 +6,47 @@ import { axe } from 'vitest-axe'
 import { BuilderReadOnlyBanner } from './BuilderReadOnlyBanner'
 
 describe('BuilderReadOnlyBanner', () => {
-  it('renders nothing when canEdit is true', () => {
-    const { container } = render(<BuilderReadOnlyBanner canEdit={true} isLoading={false} isBuiltin={false} />)
-    expect(container).toBeEmptyDOMElement()
+  it('keeps an empty status region mounted when editing is available', () => {
+    render(<BuilderReadOnlyBanner canEdit={true} isLoading={false} isBuiltin={false} />)
+    expect(screen.getByRole('status')).toBeEmptyDOMElement()
   })
 
-  it('renders nothing when isLoading is true', () => {
-    const { container } = render(<BuilderReadOnlyBanner canEdit={false} isLoading={true} isBuiltin={false} />)
-    expect(container).toBeEmptyDOMElement()
+  it('keeps the status region quiet while the permission check is pending', () => {
+    render(<BuilderReadOnlyBanner canEdit={false} isLoading={true} isBuiltin={false} />)
+    expect(screen.getByRole('status')).toBeEmptyDOMElement()
+  })
+
+  it('announces denial, check failure, and recovery through the same region without changing focus', async () => {
+    const user = userEvent.setup()
+    function content(canEdit: boolean, isLoading: boolean, permissionCheckError = false) {
+      return (
+        <>
+          <button type="button">Inspect workflow</button>
+          <BuilderReadOnlyBanner
+            canEdit={canEdit}
+            isLoading={isLoading}
+            isBuiltin={false}
+            permissionCheckError={permissionCheckError}
+          />
+        </>
+      )
+    }
+    const { rerender } = render(content(true, false))
+    const status = screen.getByRole('status')
+    await user.tab()
+
+    rerender(content(false, true))
+    expect(status).toBeEmptyDOMElement()
+    rerender(content(false, false))
+    expect(status).toHaveTextContent('Editing is unavailable.')
+    rerender(content(false, false, true))
+    expect(status).toHaveTextContent('Unable to check step-type permissions.')
+    rerender(content(false, true))
+    expect(status).toBeEmptyDOMElement()
+    rerender(content(true, false))
+    expect(status).toHaveTextContent('Editing access restored.')
+    expect(screen.getByRole('status')).toBe(status)
+    expect(screen.getByRole('button', { name: 'Inspect workflow' })).toHaveFocus()
   })
 
   it('renders builtin title when isBuiltin is true', () => {

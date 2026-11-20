@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 
+import { formatStepTypeLabels } from '../../../utils/nodeKindDenials'
 import { getStepTypesFromDefinition, useStepTypePermissions } from '../../workflows/useStepTypePermissions'
 
 export function useVersionDefinitionPermissions(
@@ -20,7 +21,7 @@ export function useVersionDefinitionPermissions(
   if (isError) permissionMessage = 'Unable to check the selected version step types. Retry the permission check.'
   else if (isChecking) permissionMessage = 'Checking the selected version step types.'
   else if (permissions.blockedStepTypes.length > 0) {
-    permissionMessage = `Blocked step types: ${permissions.blockedStepTypes.map((type) => type.label).join(', ')}.`
+    permissionMessage = `Blocked step types: ${formatStepTypeLabels(permissions.blockedStepTypes)}.`
   }
 
   return {
