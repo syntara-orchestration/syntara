@@ -1,0 +1,6 @@
+{
+  "defaultProfile": "github",
+  "targetProfiles": {
+    "docs/**": "python-markdown"
+  }
+}
