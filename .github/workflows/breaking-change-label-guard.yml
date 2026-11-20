@@ -1,4 +1,7 @@
 ---
+# TODO: Remove this file once PR #1331 (approval-label-authorization caller) merges.
+# That PR replaces this custom guard with the shared ansible/actions workflow.
+#
 # Restrict who may apply the privileged `breaking-change-approved` label.
 #
 # GitHub has no native per-label permission, so this guard enforces it: when the
