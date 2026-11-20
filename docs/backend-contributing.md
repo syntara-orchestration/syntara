@@ -192,9 +192,9 @@ This is the handbook for the AO REST API Versioning and Deprecation Policy as en
 3. **CVE / critical security escape hatch.** An in-place breaking change is allowed only when all of the following are true:
    - there is no non-breaking remediation
    - engineering and BU leadership (Senior Director or above) have approved
-   - a member of `syntara-leads` applies the `breaking-change-approved` label
+   - a member of `ansible/ansible-staff-eng-leads` applies the `breaking-change-approved` label
    - `info.version` is incremented by a **minor** version (never major — a new major version is a new spec at a new path)
-4. **Label restriction.** GitHub has no native per-label permission. The Breaking Change Label Guard workflow (`.github/workflows/breaking-change-label-guard.yml`) verifies the actor who added the label is in `syntara-leads`. If not, it fails the check, removes the label, and comments on the PR. Provision `SYNTARA_LEADS_READ_TOKEN` (org Members: read); without it the guard fails closed.
+4. **Label restriction.** GitHub has no native per-label permission. The `.github/workflows/approval-label-authorization.yml` caller invokes the shared authorization workflow, which verifies that the actor is an active member of `ansible/ansible-staff-eng-leads`. Authorized additions receive a verification comment; unauthorized changes are reverted when possible, and the check reports the outcome. The caller requires the `ANSIBLE_ORG_MEMBERS_READ_ONLY_APP_CLIENT_ID` Actions variable and `ANSIBLE_ORG_MEMBERS_READ_ONLY_APP_PRIVATE_KEY` Actions secret. Ask an organization administrator to confirm that the repository can access both before relying on the workflow.
 
 ### Submitting a Pull Request
 
