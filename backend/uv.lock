@@ -975,14 +975,14 @@ wheels = [
 
 [[package]]
 name = "execution-plane-client"
-version = "0.1.24"
+version = "0.1.25"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "pydantic" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/4f/85/1b440ad1b002d22afd2456e47d8f0ed37e90c9cf48f520f499d80bb5fe9e/execution_plane_client-0.1.24.tar.gz", hash = "sha256:25cf6dfed9cb2cd52eb2a12aa4da81c2a154fc030485a80da897aee060378180", size = 21600, upload-time = "2026-11-20T15:29:33.989Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/2b/20/13e34948b10b119549b524469c3ed4dd43fb5350ede715baedcab7a9252e/execution_plane_client-0.1.25.tar.gz", hash = "sha256:e19fa7f8db987d90f73072526c0e05374a335d506c9c446f8fe43ce2513d4da6", size = 21600, upload-time = "2026-11-20T19:24:20.811Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/1b/ba/7b3446b9146dc40e10ebd22944664f9c5448a4005acb76e9e694cff8ada6/execution_plane_client-0.1.24-py3-none-any.whl", hash = "sha256:56b1684fd356397a30bba4d6a35318e024ec4ee04cc803c4dbd8f210ed30db2a", size = 34132, upload-time = "2026-11-20T15:29:33.079Z" },
+    { url = "https://files.pythonhosted.org/packages/06/1b/a69bc11f799436f12c7e5abcb23eaea439d44dee9bcfd09303708a8a613c/execution_plane_client-0.1.25-py3-none-any.whl", hash = "sha256:0a4e6e9f6dce46949c9ded19d7ad6d595cb065f7d9aedb528288d4e7d6faaeec", size = 34131, upload-time = "2026-11-20T19:24:19.544Z" },
 ]
 
 [[package]]
@@ -4455,7 +4455,7 @@ requires-dist = [
     { name = "boto3-stubs", extras = ["s3"], marker = "extra == 'dev'", specifier = ">=1.35.0" },
     { name = "cachetools", specifier = ">=5.0" },
     { name = "cryptography", specifier = ">=48.0.1" },
-    { name = "execution-plane-client", specifier = ">=0.1.24,<0.2.0" },
+    { name = "execution-plane-client", specifier = ">=0.1.25,<0.2.0" },
     { name = "fastapi", specifier = ">=0.135.0" },
     { name = "fastmcp", marker = "extra == 'dev'", specifier = ">=3.2.0,<4.0.0" },
     { name = "filelock", specifier = ">=4.2.1" },
