@@ -213,16 +213,17 @@ class WorkflowFormPromptMixin:
 
         name = node.name or f"Form prompt for {node.id}"
 
-        # Snapshot authored intent before validating or resolving the names.
-        authored_responder_users = resolved_parameters.get("responder_users")
-        authored_responder_groups = resolved_parameters.get("responder_groups")
+        # Snapshot authored intent from the node before template substitution can
+        # turn a configured responder list into an empty resolved list.
+        authored_responder_users = node.parameters.get("responder_users")
+        authored_responder_groups = node.parameters.get("responder_groups")
         responders_configured = bool(authored_responder_users or authored_responder_groups)
         responder_users = _validate_responder_names(
-            authored_responder_users,
+            resolved_parameters.get("responder_users"),
             field_name="responder_users",
         )
         responder_groups = _validate_responder_names(
-            authored_responder_groups,
+            resolved_parameters.get("responder_groups"),
             field_name="responder_groups",
         )
 
