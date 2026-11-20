@@ -210,6 +210,30 @@ describe('getEffectiveOutputSchema', () => {
     it.each([
       ['form prompt', formPrompt],
       ['form trigger', formTrigger],
+    ])('keeps configured order when persisted schema properties are reordered (%s)', (_label, buildNode) => {
+      const node = buildNode(
+        formDefinition(textField('deployment_name'), textField('environment'), textField('id')),
+        'form-1',
+        {
+          response_schema: {
+            type: 'object',
+            properties: {
+              id: { type: 'string' },
+              environment: { type: 'string' },
+              deployment_name: { type: 'string' },
+            },
+          },
+        }
+      )
+
+      const children = responseDataChildren(getEffectiveOutputSchema(node))
+
+      expect(children?.map((field) => field.name)).toStrictEqual(['deployment_name', 'environment', 'id'])
+    })
+
+    it.each([
+      ['form prompt', formPrompt],
+      ['form trigger', formTrigger],
     ])('derives from form_definition when persisted response_schema is stale (%s)', (_label, buildNode) => {
       const node = buildNode(formDefinition(textField('new_field'), textField('added_field')), 'form-1', {
         response_schema: backendResponseSchema,

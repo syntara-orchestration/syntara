@@ -186,17 +186,19 @@ function enrichPersistedFieldsWithDerivedLabels(
   persistedFields: PreviewFieldDef[],
   derivedFields: PreviewFieldDef[]
 ): PreviewFieldDef[] {
-  const derivedByName = new Map(derivedFields.map((field) => [field.name, field]))
+  const persistedByName = new Map(persistedFields.map((field) => [field.name, field]))
 
-  return persistedFields.map((field) => {
-    const derived = derivedByName.get(field.name)
-    if (!derived) return field
+  return derivedFields.flatMap((derived) => {
+    const field = persistedByName.get(derived.name)
+    if (!field) return []
 
-    return {
-      ...field,
-      displayName: derived.displayName,
-      description: derived.description || field.description,
-    }
+    return [
+      {
+        ...field,
+        displayName: derived.displayName,
+        description: derived.description || field.description,
+      },
+    ]
   })
 }
 
