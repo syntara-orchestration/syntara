@@ -167,6 +167,7 @@ class TestConvergeCRUD:
         assert len(converge_nodes) == 1
         assert converge_nodes[0]["parameters"] == updated_config
 
+    @pytest.mark.usefixtures("ep_deletion_acknowledged")
     async def test_delete_workflow_with_converge_node(self, jwt_client: AsyncClient, test_project_id: UUID) -> None:
         """Delete workflow containing converge node."""
         payload = _converge_workflow_payload(
