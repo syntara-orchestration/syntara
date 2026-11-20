@@ -11,7 +11,6 @@ import { stepSettingsSchema } from './shared/stepSettingsSchema'
  * Uses discriminatedUnion on executor: script requires code, api requires url.
  */
 const httpMethodSchema = z.enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE'])
-const scriptAffinitySchema = z.enum([ScriptAffinityEnum.NONE, ScriptAffinityEnum.REQUIRED_TARGET])
 
 const optionalJsonObjectSchema = z
   .string()
@@ -30,40 +29,29 @@ const keyValueEntrySchema = z.object({
   value: z.string(),
 })
 
-const scriptActionSchema = z
-  .object({
-    executor: z.literal(ExecutorTypeEnum.SCRIPT),
-    name: z.string(),
-    code: z.string().optional(),
-    language: z.string().optional(),
-    method: httpMethodSchema.optional(),
-    url: z.string().optional(),
-    headers: z.array(keyValueEntrySchema).optional(),
-    body: z.string().optional(),
-    parameters: optionalJsonObjectSchema,
-    credential_id: z.string().optional(),
-    affinity: scriptAffinitySchema.default(ScriptAffinityEnum.NONE),
-    execution_target_id: z.uuid({ error: 'Select a valid execution target' }).optional(),
-    settings: stepSettingsSchema.optional(),
-  })
-  .superRefine((data, ctx) => {
-    if (data.affinity !== ScriptAffinityEnum.REQUIRED_TARGET) {
-      return
-    }
-    if (!data.execution_target_id) {
-      ctx.addIssue({
-        code: 'custom',
-        message: 'Execution target is required',
-        path: ['execution_target_id'],
-      })
-    }
-  })
+const scriptFormFields = {
+  name: z.string(),
+  code: z.string().min(1, 'Script code is required'),
+  parameters: optionalJsonObjectSchema,
+  affinity: z.enum([ScriptAffinityEnum.NONE, ScriptAffinityEnum.REQUIRED_TARGET]).default(ScriptAffinityEnum.NONE),
+  execution_target_id: z.uuid('Select a valid execution target').optional(),
+  settings: stepSettingsSchema.optional(),
+}
+
+const pythonScriptActionSchema = z.object({
+  executor: z.literal(ExecutorTypeEnum.SCRIPT_PYTHON),
+  ...scriptFormFields,
+})
+
+const bashScriptActionSchema = z.object({
+  executor: z.literal(ExecutorTypeEnum.SCRIPT_BASH),
+  ...scriptFormFields,
+})
 
 const apiActionSchema = z.object({
   executor: z.literal(ExecutorTypeEnum.HTTP_REQUEST),
   name: z.string(),
   code: z.string().optional(),
-  language: z.string().optional(),
   method: httpMethodSchema.optional(),
   url: z.string().optional(),
   headers: z.array(keyValueEntrySchema).optional(),
@@ -73,7 +61,21 @@ const apiActionSchema = z.object({
   settings: stepSettingsSchema.optional(),
 })
 
-export const actionFormSchema = z.discriminatedUnion('executor', [scriptActionSchema, apiActionSchema])
+export const actionFormSchema = z
+  .discriminatedUnion('executor', [pythonScriptActionSchema, bashScriptActionSchema, apiActionSchema])
+  .superRefine((data, context) => {
+    if (
+      (data.executor === ExecutorTypeEnum.SCRIPT_PYTHON || data.executor === ExecutorTypeEnum.SCRIPT_BASH) &&
+      data.affinity === ScriptAffinityEnum.REQUIRED_TARGET &&
+      !data.execution_target_id?.trim()
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['execution_target_id'],
+        message: 'Execution target is required',
+      })
+    }
+  })
 
 /** Validated form output (discriminated union). */
 export type ActionFormData = z.infer<typeof actionFormSchema>

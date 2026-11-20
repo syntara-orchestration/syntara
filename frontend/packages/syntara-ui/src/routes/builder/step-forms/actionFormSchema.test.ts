@@ -6,9 +6,8 @@ import { ScriptAffinityEnum } from '../utils/scriptExecutionProfile'
 import { actionFormSchema } from './actionFormSchema'
 
 const validScriptBase = {
-  executor: ExecutorTypeEnum.SCRIPT,
+  executor: ExecutorTypeEnum.SCRIPT_PYTHON,
   name: 'My Script',
-  language: 'python',
   code: 'print("hi")',
 }
 
@@ -65,6 +64,17 @@ describe('actionFormSchema', () => {
       const result = actionFormSchema.safeParse({
         ...validScriptBase,
         affinity: ScriptAffinityEnum.NONE,
+      })
+
+      expect(result.success).toBe(true)
+    })
+
+    it('validates execution target fields for Bash scripts too', () => {
+      const result = actionFormSchema.safeParse({
+        ...validScriptBase,
+        executor: ExecutorTypeEnum.SCRIPT_BASH,
+        affinity: ScriptAffinityEnum.REQUIRED_TARGET,
+        execution_target_id: '550e8400-e29b-41d4-a716-446655440000',
       })
 
       expect(result.success).toBe(true)

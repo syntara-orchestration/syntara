@@ -161,7 +161,7 @@ test.describe('Schedule Trigger — UI-19', () => {
         // Add a connected action so the workflow can be saved
         const panel = await clickAddConnectedStep(app)
         await panel.getByRole('button', { name: 'Action', exact: true }).click()
-        await panel.getByRole('button', { name: 'Script', exact: true }).click()
+        await panel.getByRole('button', { name: 'Python Script', exact: true }).click()
         await app.getByRole('textbox', { name: 'Name', exact: true }).fill('Scheduled action')
         await fillCodeEditor(app, { value: 'print("running")' })
         await app.getByRole('button', { name: 'Create', exact: true }).click()
@@ -193,7 +193,7 @@ test.describe('Schedule Trigger — UI-19', () => {
 
         const panel = await clickAddConnectedStep(app)
         await panel.getByRole('button', { name: 'Action', exact: true }).click()
-        await panel.getByRole('button', { name: 'Script', exact: true }).click()
+        await panel.getByRole('button', { name: 'Python Script', exact: true }).click()
         await app.getByRole('textbox', { name: 'Name', exact: true }).fill('Report action')
         await fillCodeEditor(app, { value: 'print("report")' })
         await app.getByRole('button', { name: 'Create', exact: true }).click()
@@ -221,7 +221,7 @@ test.describe('Schedule Trigger — UI-19', () => {
 
         const panel = await clickAddConnectedStep(app)
         await panel.getByRole('button', { name: 'Action', exact: true }).click()
-        await panel.getByRole('button', { name: 'Script', exact: true }).click()
+        await panel.getByRole('button', { name: 'Python Script', exact: true }).click()
         await app.getByRole('textbox', { name: 'Name', exact: true }).fill('Continuous action')
         await fillCodeEditor(app, { value: 'print("running")' })
         await app.getByRole('button', { name: 'Create', exact: true }).click()
@@ -258,7 +258,7 @@ test.describe('Schedule Trigger — UI-19', () => {
 
         const panel = await clickAddConnectedStep(app)
         await panel.getByRole('button', { name: 'Action', exact: true }).click()
-        await panel.getByRole('button', { name: 'Script', exact: true }).click()
+        await panel.getByRole('button', { name: 'Python Script', exact: true }).click()
         await app.getByRole('textbox', { name: 'Name', exact: true }).fill('Action')
         await fillCodeEditor(app, { value: 'print("ok")' })
         await app.getByRole('button', { name: 'Create', exact: true }).click()
@@ -299,7 +299,7 @@ test.describe('Schedule Trigger — UI-19', () => {
 
         const panel = await clickAddConnectedStep(app)
         await panel.getByRole('button', { name: 'Action', exact: true }).click()
-        await panel.getByRole('button', { name: 'Script', exact: true }).click()
+        await panel.getByRole('button', { name: 'Python Script', exact: true }).click()
         await app.getByRole('textbox', { name: 'Name', exact: true }).fill('Action')
         await fillCodeEditor(app, { value: 'print("ok")' })
         await app.getByRole('button', { name: 'Create', exact: true }).click()

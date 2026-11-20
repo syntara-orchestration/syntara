@@ -33,7 +33,7 @@ describe('useUpstreamSteps', () => {
   })
 
   it('returns empty array when no edges target the given nodeId', () => {
-    const activity = makeActivity('node-1', 'script', 'My Script')
+    const activity = makeActivity('node-1', 'script_python', 'My Script')
     useWorkflowStore.setState({
       currentWorkflow: makeWorkflow([activity]),
       edges: [],
@@ -45,7 +45,7 @@ describe('useUpstreamSteps', () => {
   })
 
   it('returns the correct upstream Activity when an edge targets the nodeId', () => {
-    const upstream = makeActivity('node-a', 'script', 'Upstream Script')
+    const upstream = makeActivity('node-a', 'script_python', 'Upstream Script')
     const target = makeActivity('node-b', 'condition', 'My Condition')
     const edge: EdgeConnection = {
       id: 'e1',
@@ -60,12 +60,12 @@ describe('useUpstreamSteps', () => {
 
     const { result } = renderHook(() => useUpstreamSteps('node-b'))
 
-    expect(result.current).toEqual([{ id: 'node-a', name: 'Upstream Script', type: 'script' }])
+    expect(result.current).toEqual([{ id: 'node-a', name: 'Upstream Script', type: 'script_python' }])
   })
 
   it('returns upstream Trigger when a trigger is the source', () => {
     const trigger = makeActivity('trigger-real-id', 'manual_trigger', 'Manual Trigger')
-    const target = makeActivity('node-1', 'script', 'My Script')
+    const target = makeActivity('node-1', 'script_python', 'My Script')
     const edge: EdgeConnection = {
       id: 'e1',
       source: 'trigger-real-id',
@@ -94,7 +94,7 @@ describe('useUpstreamSteps', () => {
   })
 
   it('returns multiple upstream nodes for fan-in', () => {
-    const activityA = makeActivity('node-a', 'script', 'Script A')
+    const activityA = makeActivity('node-a', 'script_python', 'Script A')
     const activityB = makeActivity('node-b', 'http_request', 'HTTP B')
     const converge = makeActivity('node-c', 'converge', 'Converge')
     const edges: EdgeConnection[] = [
@@ -110,16 +110,16 @@ describe('useUpstreamSteps', () => {
     const { result } = renderHook(() => useUpstreamSteps('node-c'))
 
     expect(result.current).toEqual([
-      { id: 'node-a', name: 'Script A', type: 'script' },
+      { id: 'node-a', name: 'Script A', type: 'script_python' },
       { id: 'node-b', name: 'HTTP B', type: 'http_request' },
     ])
   })
 
   it('returns all transitive ancestors in a chain, not just direct predecessors', () => {
     const trigger = makeActivity('trigger-1', 'manual_trigger', 'Trigger')
-    const gather = makeActivity('gather', 'script', 'Gather Info')
-    const process = makeActivity('process', 'script', 'Process Data')
-    const alert = makeActivity('alert', 'script', 'Send Alert')
+    const gather = makeActivity('gather', 'script_python', 'Gather Info')
+    const process = makeActivity('process', 'script_python', 'Process Data')
+    const alert = makeActivity('alert', 'script_python', 'Send Alert')
     const edges: EdgeConnection[] = [
       { id: 'e1', source: 'trigger-1', target: 'gather' },
       { id: 'e2', source: 'gather', target: 'process' },
@@ -143,11 +143,11 @@ describe('useUpstreamSteps', () => {
   describe('chain deletion and reconnection', () => {
     // Build a 6-node chain: trigger → A → B → C → D → E
     const trigger = makeActivity('trigger-1', 'manual_trigger', 'Trigger')
-    const nodeA = makeActivity('node-a', 'script', 'Step A')
-    const nodeB = makeActivity('node-b', 'script', 'Step B')
-    const nodeC = makeActivity('node-c', 'script', 'Step C')
-    const nodeD = makeActivity('node-d', 'script', 'Step D')
-    const nodeE = makeActivity('node-e', 'script', 'Step E')
+    const nodeA = makeActivity('node-a', 'script_python', 'Step A')
+    const nodeB = makeActivity('node-b', 'script_python', 'Step B')
+    const nodeC = makeActivity('node-c', 'script_python', 'Step C')
+    const nodeD = makeActivity('node-d', 'script_python', 'Step D')
+    const nodeE = makeActivity('node-e', 'script_python', 'Step E')
     const fullChainEdges: EdgeConnection[] = [
       { id: 'e1', source: 'trigger-1', target: 'node-a' },
       { id: 'e2', source: 'node-a', target: 'node-b' },
@@ -216,7 +216,7 @@ describe('useUpstreamSteps', () => {
 
   it('resolves trigger via display ID (trigger-0) in edges', () => {
     const trigger = makeActivity('real-trigger-id', 'manual_trigger', 'Manual Trigger')
-    const target = makeActivity('node-1', 'script', 'My Script')
+    const target = makeActivity('node-1', 'script_python', 'My Script')
     const edge: EdgeConnection = {
       id: 'e1',
       source: 'trigger-0',
@@ -235,8 +235,8 @@ describe('useUpstreamSteps', () => {
   })
 
   it('does not return the node itself', () => {
-    const activity = makeActivity('node-a', 'script', 'Self Loop')
-    const otherActivity = makeActivity('node-b', 'script', 'Other')
+    const activity = makeActivity('node-a', 'script_python', 'Self Loop')
+    const otherActivity = makeActivity('node-b', 'script_python', 'Other')
     const edges: EdgeConnection[] = [
       { id: 'e1', source: 'node-a', target: 'node-a' },
       { id: 'e2', source: 'node-b', target: 'node-a' },
@@ -249,6 +249,6 @@ describe('useUpstreamSteps', () => {
 
     const { result } = renderHook(() => useUpstreamSteps('node-a'))
 
-    expect(result.current).toEqual([{ id: 'node-b', name: 'Other', type: 'script' }])
+    expect(result.current).toEqual([{ id: 'node-b', name: 'Other', type: 'script_python' }])
   })
 })

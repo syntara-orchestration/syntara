@@ -26,11 +26,10 @@ vi.mock('@xyflow/react', () => ({
 
 describe('GenericStepComponent', () => {
   const baseGenericNode = {
-    type: 'script',
+    type: 'script_python',
     id: 'generic-1',
     name: 'Placeholder',
     parameters: {
-      language: 'python',
       code: '',
     },
   } as TaskActivity

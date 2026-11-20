@@ -30,11 +30,10 @@ vi.mock('@xyflow/react', () => ({
 
 describe('TaskReversedStepComponent', () => {
   const baseTaskNode = {
-    type: 'script',
+    type: 'script_python',
     id: 'task-reversed-1',
     name: 'Loop Back Task',
     parameters: {
-      language: 'python',
       code: 'print("hello")',
     },
   } as TaskActivity
@@ -65,8 +64,7 @@ describe('TaskReversedStepComponent', () => {
     it('renders executor type label', () => {
       render(<TaskReversedStepComponent {...createNodeProps(baseTaskNode)} />)
 
-      // Script executor label
-      expect(screen.getByText('Script')).toBeInTheDocument()
+      expect(screen.getByText('Python Script')).toBeInTheDocument()
     })
   })
 

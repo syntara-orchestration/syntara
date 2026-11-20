@@ -10,21 +10,18 @@ nodes:
     type: parallel
 
   - id: task1
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       code: echo "Task 1 complete"
 
   - id: task2
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       code: echo "Task 2 complete"
 
   - id: task3
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       code: echo "Task 3 complete"
 
   - id: join_all

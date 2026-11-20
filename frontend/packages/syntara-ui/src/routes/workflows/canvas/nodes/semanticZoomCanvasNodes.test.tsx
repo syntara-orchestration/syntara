@@ -122,9 +122,9 @@ describe('canvas nodes at semantic zoom', () => {
   it('renders script task node with semantic zoom tooltip labels', () => {
     const data = {
       id: 'task-1',
-      type: ExecutorTypeEnum.SCRIPT,
+      type: ExecutorTypeEnum.SCRIPT_PYTHON,
       name: 'Run backup',
-      parameters: { language: 'python', code: 'print(1)' },
+      parameters: { code: 'print(1)' },
     } as TaskActivity
 
     render(
@@ -134,15 +134,15 @@ describe('canvas nodes at semantic zoom', () => {
     )
 
     expect(screen.queryByText('Run backup')).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Run backup, Script' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Run backup, Python Script' })).toBeInTheDocument()
   })
 
   it('renders generic placeholder node at semantic zoom', () => {
     const data = {
-      type: 'script',
+      type: 'script_python',
       id: 'generic-1',
       name: 'Placeholder',
-      parameters: { language: 'python', code: '' },
+      parameters: { code: '' },
     } as TaskActivity
 
     render(
@@ -249,9 +249,9 @@ describe('canvas nodes at semantic zoom', () => {
   it('renders reversed task node at semantic zoom', () => {
     const data = {
       id: 'task-rev-1',
-      type: ExecutorTypeEnum.SCRIPT,
+      type: ExecutorTypeEnum.SCRIPT_PYTHON,
       name: 'Loop body',
-      parameters: { language: 'python', code: 'x' },
+      parameters: { code: 'x' },
     } as TaskActivity
 
     render(
@@ -262,7 +262,7 @@ describe('canvas nodes at semantic zoom', () => {
       </ReactFlowProvider>
     )
 
-    expect(screen.getByRole('button', { name: 'Loop body, Script' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Loop body, Python Script' })).toBeInTheDocument()
   })
 
   it('renders converge node at semantic zoom', () => {

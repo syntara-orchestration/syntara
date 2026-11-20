@@ -10,7 +10,8 @@ describe('getActivityTypeLabel', () => {
   })
 
   it('returns executor labels from executorMetadata', () => {
-    expect(getActivityTypeLabel('script')).toBe('Script')
+    expect(getActivityTypeLabel('script_python')).toBe('Python Script')
+    expect(getActivityTypeLabel('script_bash')).toBe('Bash Script')
     expect(getActivityTypeLabel('http_request')).toBe('REST API')
     expect(getActivityTypeLabel('agentic')).toBe('Task Agent')
   })
@@ -31,12 +32,12 @@ describe('getActivityTypeLabel', () => {
 
 describe('getUpstreamStepDisplayName', () => {
   it('uses trimmed custom name when present', () => {
-    expect(getUpstreamStepDisplayName({ id: 'a', name: '  My Step  ', type: 'script' })).toBe('My Step')
+    expect(getUpstreamStepDisplayName({ id: 'a', name: '  My Step  ', type: 'script_python' })).toBe('My Step')
   })
 
   it('falls back to type label when name is empty', () => {
     expect(getUpstreamStepDisplayName({ id: 'a', name: '', type: 'converge' })).toBe('Converge')
-    expect(getUpstreamStepDisplayName({ id: 'a', name: '', type: 'script' })).toBe('Script')
+    expect(getUpstreamStepDisplayName({ id: 'a', name: '', type: 'script_python' })).toBe('Python Script')
   })
 
   it('falls back to type label when name is whitespace or missing', () => {

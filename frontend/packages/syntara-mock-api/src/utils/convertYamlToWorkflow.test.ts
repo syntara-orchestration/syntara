@@ -15,10 +15,9 @@ triggers:
 nodes:
   - id: noop
     name: Noop
-    type: script
+    type: script_bash
     parameters:
-      language: bash
-      script: "true"
+      code: "true"
 edges: []
 `
 
@@ -71,8 +70,8 @@ describe('convertYamlToWorkflow audit fields', () => {
         {
           id: 'noop',
           name: 'Noop',
-          type: 'script',
-          parameters: { language: 'bash', script: 'true' },
+          type: 'script_bash',
+          parameters: { code: 'true' },
         },
       ],
       edges: [{ from: 'trigger_manual', to: 'noop' }],

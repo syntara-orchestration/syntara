@@ -24,7 +24,7 @@ function makeTaskNode(
     id,
     type,
     position: { x: 0, y: 0 },
-    data: { type: ActivityTypeEnum.SCRIPT, id, name: id, parameters: {} },
+    data: { type: ActivityTypeEnum.SCRIPT_PYTHON, id, name: id, parameters: {} },
   } as unknown as NodeType
 }
 
@@ -37,7 +37,7 @@ function makeGenericNode(id: string, reverseHandles = false): NodeType {
     id,
     type: FlowNodeType.GENERIC,
     position: { x: 0, y: 0 },
-    data: { type: ActivityTypeEnum.SCRIPT, id, name: id, parameters: {}, metadata },
+    data: { type: ActivityTypeEnum.SCRIPT_PYTHON, id, name: id, parameters: {}, metadata },
   } as unknown as NodeType
 }
 

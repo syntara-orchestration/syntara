@@ -36,7 +36,7 @@ vi.mock('./stepMetadata', () => ({
     wait: { icon: () => null },
   },
   executorMetadata: {
-    [ExecutorTypeEnum.SCRIPT]: { icon: () => null },
+    [ExecutorTypeEnum.SCRIPT_PYTHON]: { icon: () => null },
     [ExecutorTypeEnum.HTTP_REQUEST]: { icon: () => null },
     [ExecutorTypeEnum.AGENTIC]: { icon: () => null },
     [ExecutorTypeEnum.AAP_JOB_TEMPLATE]: { icon: () => null },
@@ -47,8 +47,12 @@ vi.mock('./stepMetadata', () => ({
 describe('stepIconResolver', () => {
   describe('getTaskIconDescriptor', () => {
     it('returns script icon by default', () => {
-      const result = getTaskIconDescriptor({ type: ExecutorTypeEnum.SCRIPT, id: 't1', name: 'Script' } as TaskActivity)
-      expect(result.id).toBe(RegistryStepId.ACTION_SCRIPT)
+      const result = getTaskIconDescriptor({
+        type: ExecutorTypeEnum.SCRIPT_PYTHON,
+        id: 't1',
+        name: 'Script',
+      } as TaskActivity)
+      expect(result.id).toBe(RegistryStepId.ACTION_SCRIPT_PYTHON)
     })
 
     it('returns API icon for http_request', () => {
@@ -192,11 +196,11 @@ describe('stepIconResolver', () => {
         {
           id: 'task-1',
           type: 'task',
-          data: { type: ExecutorTypeEnum.SCRIPT, id: 'task-1', name: 'Script' },
+          data: { type: ExecutorTypeEnum.SCRIPT_PYTHON, id: 'task-1', name: 'Script' },
         },
         null
       )
-      expect(result.id).toBe(RegistryStepId.ACTION_SCRIPT)
+      expect(result.id).toBe(RegistryStepId.ACTION_SCRIPT_PYTHON)
     })
   })
 })

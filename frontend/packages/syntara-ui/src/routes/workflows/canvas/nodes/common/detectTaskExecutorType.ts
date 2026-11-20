@@ -97,7 +97,7 @@ function detectAAPConnectorFromPrompt(data: TaskActivity): string | undefined {
 
 /**
  * Detects the effective executor type for a task Activity.
- * In v2, `activity.type` is the executor directly (e.g. 'script', 'http_request', 'agentic', 'aap_job_template').
+ * In v2, `activity.type` is the executor directly (e.g. 'script_python', 'script_bash', 'http_request').
  * No more `task.executor` wrapper — the type IS the executor name.
  *
  * For agentic tasks, checks `config.prompt` for a connector payload. If the prompt

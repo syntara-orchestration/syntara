@@ -469,7 +469,7 @@ describe('StepExecutionDetailsPanel', () => {
     })
 
     it('does not show AAP link for non-AAP step types', () => {
-      render(<StepExecutionDetailsPanel {...defaultProps} stepType="script" />, { wrapper })
+      render(<StepExecutionDetailsPanel {...defaultProps} stepType="script_python" />, { wrapper })
 
       expect(screen.queryByRole('link', { name: /View job in AAP/i })).not.toBeInTheDocument()
     })
@@ -578,7 +578,7 @@ describe('StepExecutionDetailsPanel', () => {
         refetch: vi.fn(),
       })
 
-      render(<StepExecutionDetailsPanel {...defaultProps} stepType="script" />, { wrapper })
+      render(<StepExecutionDetailsPanel {...defaultProps} stepType="script_python" />, { wrapper })
 
       expect(screen.queryByRole('tab')).not.toBeInTheDocument()
     })

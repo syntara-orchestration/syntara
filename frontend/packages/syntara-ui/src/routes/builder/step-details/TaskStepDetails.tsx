@@ -369,8 +369,12 @@ export function TaskStepDetails({
     )
   }
 
-  // Handle standard executors (script, http_request)
-  if (executor !== ExecutorTypeEnum.SCRIPT && executor !== ExecutorTypeEnum.HTTP_REQUEST) {
+  // Handle standard executors (Python, Bash, http_request)
+  if (
+    executor !== ExecutorTypeEnum.SCRIPT_PYTHON &&
+    executor !== ExecutorTypeEnum.SCRIPT_BASH &&
+    executor !== ExecutorTypeEnum.HTTP_REQUEST
+  ) {
     return null
   }
 

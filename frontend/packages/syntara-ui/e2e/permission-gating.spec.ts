@@ -140,9 +140,9 @@ async function createPublishedWorkflowForProjectAdmin(
           nodes: [
             {
               id: 'node_1',
-              type: 'script',
+              type: 'script_python',
               name: 'E2E admin step',
-              parameters: { language: 'python', code: 'print("e2e")' },
+              parameters: { code: 'print("e2e")' },
             },
           ],
           edges: [{ from: 'trigger_1', to: 'node_1' }],

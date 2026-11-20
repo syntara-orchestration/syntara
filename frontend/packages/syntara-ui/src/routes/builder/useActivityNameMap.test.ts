@@ -65,7 +65,7 @@ describe('useActivityNameMap', () => {
   })
 
   it('prefers store activities over workflow definition', () => {
-    vi.mocked(useActivities).mockReturnValue([{ id: 'task-1', name: 'Store Name', type: 'script' }] as never)
+    vi.mocked(useActivities).mockReturnValue([{ id: 'task-1', name: 'Store Name', type: 'script_python' }] as never)
     vi.mocked(useTriggers).mockReturnValue([])
 
     const wfDef: WorkflowDefShape = {
@@ -163,7 +163,7 @@ describe('useActivityNameMap', () => {
       vi.mocked(useTriggers).mockReturnValue(undefined)
 
       const wfDef: WorkflowDefShape = {
-        workflow: { activities: [{ id: 'script-1', name: 'Script', type: 'script' }] },
+        workflow: { activities: [{ id: 'script-1', name: 'Script', type: 'script_python' }] },
       }
       const states = new Map<string, ActivityState>([
         ['script-1', { activityId: 'script-1', status: 'completed', iteration: 0 }],

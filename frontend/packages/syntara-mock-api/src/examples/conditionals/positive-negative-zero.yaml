@@ -14,9 +14,8 @@ triggers:
 nodes:
   - id: check_value
     name: Check Value
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       environment:
         INPUT_VALUE: ${trigger.number}
       code: |
@@ -25,28 +24,25 @@ nodes:
 
   - id: positive_branch
     name: Positive Branch
-    type: script
+    type: script_bash
     condition: ${trigger.number} > 0
     parameters:
-      language: bash
       code: |
         echo "Value is positive"
 
   - id: negative_branch
     name: Negative Branch
-    type: script
+    type: script_bash
     condition: ${trigger.number} < 0
     parameters:
-      language: bash
       code: |
         echo "Value is negative"
 
   - id: zero_branch
     name: Zero Branch
-    type: script
+    type: script_bash
     condition: ${trigger.number} == 0
     parameters:
-      language: bash
       code: |
         echo "Value is zero"
 edges:

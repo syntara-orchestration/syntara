@@ -263,9 +263,10 @@ interface WorkflowStore {
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                         workflowFactories.ts                                 │
 ├─────────────────────────────────────────────────────────────────────────────┤
-│   createManualTrigger()        createScriptActivity()                        │
-│   createScheduledTrigger()     createApiActivity()                           │
-│   createEventTrigger()         createAgenticActivity()                       │
+│   createManualTrigger()        createPythonScriptActivity()                  │
+│   createScheduledTrigger()     createBashScriptActivity()                    │
+│   createEventTrigger()         createApiActivity()                           │
+│                                createAgenticActivity()                       │
 │                                createConditionActivity()                     │
 │                                createLoopActivity()                          │
 │                                createConvergeActivity()                      │
@@ -374,10 +375,15 @@ const unsubscribe = useWorkflowStore.subscribe((state) => {
 ### 5. Creating Entities → Factory Functions
 
 ```typescript
-import { createScriptActivity, createManualTrigger } from '../../stores/workflowFactories'
+import {
+  createBashScriptActivity,
+  createManualTrigger,
+  createPythonScriptActivity,
+} from '../../stores/workflowFactories'
 
 // Clean, type-safe entity creation
-const task = createScriptActivity('task-1', 'Run Script', 'python', 'print("hello")')
+const pythonTask = createPythonScriptActivity({ id: 'task-1', name: 'Run Python', code: 'print("hello")' })
+const bashTask = createBashScriptActivity({ id: 'task-2', name: 'Run Bash', code: 'echo hello' })
 const trigger = createManualTrigger(true) // requiresApproval = true
 ```
 
@@ -680,18 +686,19 @@ const { updateActivity } = useWorkflowStoreActions()
 
 ## Quick Reference
 
-| I want to...               | Import                    | Use                                                             |
-| -------------------------- | ------------------------- | --------------------------------------------------------------- |
-| Read activities            | `useActivities`           | `const activities = useActivities()`                            |
-| Read edges                 | `useEdges`                | `const edges = useEdges()`                                      |
-| Check for unsaved changes  | `useIsDirty`              | `const isDirty = useIsDirty()`                                  |
-| Check if workflow loaded   | `useHasWorkflow`          | `const loaded = useHasWorkflow()`                               |
-| Load workflow atomically   | `useWorkflowStoreActions` | `const { loadWorkflowWithEdges } = useWorkflowStoreActions()`   |
-| Update a step (activity)   | `useWorkflowStoreActions` | `const { updateActivity } = useWorkflowStoreActions()`          |
-| Delete steps atomically    | `useWorkflowStoreActions` | `batchRemoveNodesAndEdges({ nodeIds, edges })` (React Flow IDs) |
-| Mark workflow as saved     | `useWorkflowStoreActions` | `const { markClean } = useWorkflowStoreActions()`               |
-| Create a new task          | `createScriptActivity`    | `createScriptActivity(id, name, lang, code)`                    |
-| Access state outside React | `useWorkflowStore`        | `useWorkflowStore.getState().currentWorkflow`                   |
+| I want to...               | Import                       | Use                                                             |
+| -------------------------- | ---------------------------- | --------------------------------------------------------------- |
+| Read activities            | `useActivities`              | `const activities = useActivities()`                            |
+| Read edges                 | `useEdges`                   | `const edges = useEdges()`                                      |
+| Check for unsaved changes  | `useIsDirty`                 | `const isDirty = useIsDirty()`                                  |
+| Check if workflow loaded   | `useHasWorkflow`             | `const loaded = useHasWorkflow()`                               |
+| Load workflow atomically   | `useWorkflowStoreActions`    | `const { loadWorkflowWithEdges } = useWorkflowStoreActions()`   |
+| Update a step (activity)   | `useWorkflowStoreActions`    | `const { updateActivity } = useWorkflowStoreActions()`          |
+| Delete steps atomically    | `useWorkflowStoreActions`    | `batchRemoveNodesAndEdges({ nodeIds, edges })` (React Flow IDs) |
+| Mark workflow as saved     | `useWorkflowStoreActions`    | `const { markClean } = useWorkflowStoreActions()`               |
+| Create a Python script     | `createPythonScriptActivity` | `createPythonScriptActivity({ id, name, code })`                |
+| Create a Bash script       | `createBashScriptActivity`   | `createBashScriptActivity({ id, name, code })`                  |
+| Access state outside React | `useWorkflowStore`           | `useWorkflowStore.getState().currentWorkflow`                   |
 
 ---
 

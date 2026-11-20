@@ -8,7 +8,8 @@ import { ActivityTypeEnum } from '@syntara/contracts'
  * arbitrary nodes to render with AAP styling via metadata.__executorType injection.
  */
 export const API_EXECUTOR_TYPES = new Set([
-  ActivityTypeEnum.SCRIPT,
+  ActivityTypeEnum.SCRIPT_PYTHON,
+  ActivityTypeEnum.SCRIPT_BASH,
   ActivityTypeEnum.HTTP_REQUEST,
   ActivityTypeEnum.AGENTIC,
   ActivityTypeEnum.AAP_JOB_TEMPLATE,
@@ -20,4 +21,10 @@ export const API_EXECUTOR_TYPES = new Set([
  * TypeScript type for API executor types (from contracts).
  */
 export type ApiExecutorType =
-  'script' | 'http_request' | 'agentic' | 'aap_job_template' | 'approval' | 'internal_activity'
+  | typeof ActivityTypeEnum.SCRIPT_PYTHON
+  | typeof ActivityTypeEnum.SCRIPT_BASH
+  | typeof ActivityTypeEnum.HTTP_REQUEST
+  | typeof ActivityTypeEnum.AGENTIC
+  | typeof ActivityTypeEnum.AAP_JOB_TEMPLATE
+  | typeof ActivityTypeEnum.APPROVAL
+  | typeof ActivityTypeEnum.INTERNAL_ACTIVITY

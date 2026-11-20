@@ -19,7 +19,7 @@
  */
 
 import { test, expect, toAppUrl } from '../fixtures'
-import { addManualTrigger, addScriptStep } from '../helpers/v2-steps'
+import { addManualTrigger, addPythonScriptStep } from '../helpers/v2-steps'
 import { buildUniqueName, deleteWorkflow, selectProjectIfRequired } from '../helpers/workflows'
 import { ensureProject } from '../utils/api'
 
@@ -32,7 +32,7 @@ test.describe('Manual Trigger', () => {
 
     try {
       await addManualTrigger(app, 'Start workflow')
-      await addScriptStep(app, 'Process data', 'print("processing")')
+      await addPythonScriptStep(app, 'Process data', 'print("processing")')
 
       await selectProjectIfRequired(app)
       await app.getByPlaceholder('Workflow name').fill(workflowName)

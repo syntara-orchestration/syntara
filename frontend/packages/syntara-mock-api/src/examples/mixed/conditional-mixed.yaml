@@ -13,17 +13,15 @@ triggers:
           default: true
 nodes:
   - id: check_condition
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       code: |
         echo '{"condition_checked": true}'
 
   - id: python_branch
-    type: script
+    type: script_python
     condition: ${trigger.use_python} == true
     parameters:
-      language: python
       code: |
         print("Python branch executed")
 

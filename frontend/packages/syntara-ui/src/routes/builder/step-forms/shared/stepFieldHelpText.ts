@@ -19,9 +19,6 @@ export const SETTINGS_MAX_INTERVAL_HELP = 'The maximum delay, in seconds, betwee
 export const SETTINGS_BACKOFF_HELP =
   'The multiplier applied to the retry interval after each attempt. Use 1.0 for a fixed interval, or greater than 1.0 for exponential backoff.'
 
-export const SCRIPT_LANGUAGE_HELP =
-  'Select the scripting language for this step. Python and Bash are supported. The script runs in a sandboxed environment with access to workflow context variables.'
-
 export const SCRIPT_CODE_HELP =
   'Enter the script code to execute. Access input data through the context object. The script must return a value that downstream steps can reference.'
 

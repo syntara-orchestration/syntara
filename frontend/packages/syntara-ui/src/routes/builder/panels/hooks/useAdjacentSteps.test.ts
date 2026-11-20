@@ -37,7 +37,7 @@ describe('useAdjacentSteps', () => {
         id: 'check-value',
         type: 'task',
         position: { x: 0, y: 0 },
-        data: { name: 'Check Value', type: 'script' },
+        data: { name: 'Check Value', type: 'script_python' },
       },
     ]
     flowGraph.edges = [{ id: 'e1', source: 'trigger-0', target: 'check-value', type: 'default' }]
@@ -45,7 +45,7 @@ describe('useAdjacentSteps', () => {
     const { result } = renderHook(() => useAdjacentSteps('trigger-0'))
 
     expect(result.current.downstream).toMatchObject([
-      { id: 'check-value', name: 'Check Value', type: 'script', iconId: 'action-script' },
+      { id: 'check-value', name: 'Check Value', type: 'script_python', iconId: 'action-script-python' },
     ])
   })
 

@@ -185,7 +185,7 @@ export async function addChildScriptToLoopStep(page: Page, scriptName: string, c
   await page.getByRole('button', { name: 'Add step…' }).click()
   await page.getByRole('menuitem', { name: 'In loop' }).click()
   await expect(addStepPanel(page)).toHaveCount(1)
-  await selectCategoryAndStepType(page, 'Action', 'Script')
+  await selectCategoryAndStepType(page, 'Action', 'Python Script')
 
   const nameInput = page.getByRole('textbox', { name: 'Name', exact: true })
   await expect(nameInput).toBeVisible({ timeout: 10_000 })

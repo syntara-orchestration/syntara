@@ -60,13 +60,13 @@ describe('V2 Workflow Definition Round-Trip', () => {
       const activities = [
         makeActivity({
           id: 'script_1',
-          type: ActivityTypeEnum.SCRIPT,
-          parameters: { language: 'python', code: 'print("hello")' },
+          type: ActivityTypeEnum.SCRIPT_PYTHON,
+          parameters: { code: 'print("hello")' },
         }),
         makeActivity({
           id: 'script_2',
-          type: ActivityTypeEnum.SCRIPT,
-          parameters: { language: 'bash', code: 'echo done' },
+          type: ActivityTypeEnum.SCRIPT_BASH,
+          parameters: { code: 'echo done' },
         }),
       ]
       const edges = [makeEdge('trigger-0', 'script_1'), makeEdge('script_1', 'script_2')]
@@ -75,6 +75,9 @@ describe('V2 Workflow Definition Round-Trip', () => {
 
       expect(rebuilt.schema_version).toBe('2.0.0')
       expect(rebuilt.nodes).toHaveLength(original.nodes.length)
+      expect(rebuilt.nodes.map((node) => node.type)).toEqual(['script_python', 'script_bash'])
+      expect(rebuilt.nodes.map((node) => node.parameters)).toEqual([{ code: 'print("hello")' }, { code: 'echo done' }])
+      expect(JSON.stringify(rebuilt)).not.toContain('language')
       expect(rebuilt.edges).toHaveLength(original.edges.length)
       expect(rebuilt.triggers).toHaveLength(original.triggers.length)
     })
@@ -82,7 +85,7 @@ describe('V2 Workflow Definition Round-Trip', () => {
     it('preserves node count and types across round-trip', () => {
       const triggers = [makeActivity({ id: 'trigger_manual', type: 'manual_trigger' })]
       const activities = [
-        makeActivity({ id: 'script_node', type: ActivityTypeEnum.SCRIPT }),
+        makeActivity({ id: 'script_node', type: ActivityTypeEnum.SCRIPT_PYTHON }),
         makeActivity({ id: 'http_node', type: ActivityTypeEnum.HTTP_REQUEST }),
         makeActivity({ id: 'condition_node', type: ActivityTypeEnum.CONDITION }),
       ]
@@ -105,8 +108,8 @@ describe('V2 Workflow Definition Round-Trip', () => {
       const triggers = [makeActivity({ id: 'trigger_manual', type: 'manual_trigger' })]
       const activities = [
         makeActivity({ id: 'cond', type: ActivityTypeEnum.CONDITION, parameters: { condition: 'true' } }),
-        makeActivity({ id: 'true_branch', type: ActivityTypeEnum.SCRIPT }),
-        makeActivity({ id: 'false_branch', type: ActivityTypeEnum.SCRIPT }),
+        makeActivity({ id: 'true_branch', type: ActivityTypeEnum.SCRIPT_PYTHON }),
+        makeActivity({ id: 'false_branch', type: ActivityTypeEnum.SCRIPT_PYTHON }),
       ]
       const edges = [
         makeEdge('trigger-0', 'cond'),
@@ -137,8 +140,8 @@ describe('V2 Workflow Definition Round-Trip', () => {
           type: ActivityTypeEnum.LOOP,
           parameters: { loop_type: 'for_each', items: '${trigger.items}' },
         }),
-        makeActivity({ id: 'loop_body', type: ActivityTypeEnum.SCRIPT }),
-        makeActivity({ id: 'after_loop', type: ActivityTypeEnum.SCRIPT }),
+        makeActivity({ id: 'loop_body', type: ActivityTypeEnum.SCRIPT_PYTHON }),
+        makeActivity({ id: 'after_loop', type: ActivityTypeEnum.SCRIPT_PYTHON }),
       ]
       const edges = [
         makeEdge('trigger-0', 'loop_node'),
@@ -163,8 +166,8 @@ describe('V2 Workflow Definition Round-Trip', () => {
       const triggers = [makeActivity({ id: 'trigger_manual', type: 'manual_trigger' })]
       const activities = [
         makeActivity({ id: 'approval_node', type: ActivityTypeEnum.APPROVAL }),
-        makeActivity({ id: 'approved_action', type: ActivityTypeEnum.SCRIPT }),
-        makeActivity({ id: 'rejected_action', type: ActivityTypeEnum.SCRIPT }),
+        makeActivity({ id: 'approved_action', type: ActivityTypeEnum.SCRIPT_PYTHON }),
+        makeActivity({ id: 'rejected_action', type: ActivityTypeEnum.SCRIPT_PYTHON }),
       ]
       const edges = [
         makeEdge('trigger-0', 'approval_node'),
@@ -194,9 +197,9 @@ describe('V2 Workflow Definition Round-Trip', () => {
             ],
           },
         }),
-        makeActivity({ id: 'case_a_action', type: ActivityTypeEnum.SCRIPT }),
-        makeActivity({ id: 'case_b_action', type: ActivityTypeEnum.SCRIPT }),
-        makeActivity({ id: 'default_action', type: ActivityTypeEnum.SCRIPT }),
+        makeActivity({ id: 'case_a_action', type: ActivityTypeEnum.SCRIPT_PYTHON }),
+        makeActivity({ id: 'case_b_action', type: ActivityTypeEnum.SCRIPT_PYTHON }),
+        makeActivity({ id: 'default_action', type: ActivityTypeEnum.SCRIPT_PYTHON }),
       ]
       const edges = [
         makeEdge('trigger-0', 'switch_node'),
@@ -218,7 +221,7 @@ describe('V2 Workflow Definition Round-Trip', () => {
   describe('trigger IDs preserved through round-trip', () => {
     it('preserves manual trigger ID', () => {
       const triggers = [makeActivity({ id: 'trigger_manual', type: 'manual_trigger' })]
-      const activities = [makeActivity({ id: 'script_1', type: ActivityTypeEnum.SCRIPT })]
+      const activities = [makeActivity({ id: 'script_1', type: ActivityTypeEnum.SCRIPT_PYTHON })]
       const edges = [makeEdge('trigger-0', 'script_1')]
 
       const { original, rebuilt } = roundTrip({ activities, triggers, edges })
@@ -232,7 +235,7 @@ describe('V2 Workflow Definition Round-Trip', () => {
         makeActivity({ id: 'trigger_manual', type: 'manual_trigger' }),
         makeActivity({ id: 'trigger_webhook', type: 'webhook_trigger', parameters: { path: '/test' } }),
       ]
-      const activities = [makeActivity({ id: 'script_1', type: ActivityTypeEnum.SCRIPT })]
+      const activities = [makeActivity({ id: 'script_1', type: ActivityTypeEnum.SCRIPT_PYTHON })]
       const edges = [makeEdge('trigger-0', 'script_1'), makeEdge('trigger-1', 'script_1')]
 
       const { original, rebuilt } = roundTrip({ activities, triggers, edges })
@@ -251,8 +254,8 @@ describe('V2 Workflow Definition Round-Trip', () => {
       const activities = [
         makeActivity({
           id: 'script_1',
-          type: ActivityTypeEnum.SCRIPT,
-          parameters: { language: 'python', code: 'import json\nprint(json.dumps({"result": 42}))' },
+          type: ActivityTypeEnum.SCRIPT_PYTHON,
+          parameters: { code: 'import json\nprint(json.dumps({"result": 42}))' },
         }),
       ]
       const edges = [makeEdge('trigger-0', 'script_1')]
@@ -289,8 +292,8 @@ describe('V2 Workflow Definition Round-Trip', () => {
       const activities = [
         makeActivity({
           id: 'script_1',
-          type: ActivityTypeEnum.SCRIPT,
-          parameters: { language: 'python', code: 'print("hello")' },
+          type: ActivityTypeEnum.SCRIPT_PYTHON,
+          parameters: { code: 'print("hello")' },
           outputs: { result: '$.stdout' },
         }),
       ]
@@ -330,7 +333,7 @@ describe('V2 Workflow Definition Round-Trip', () => {
           parameters: { path: '/my-webhook', secret: 'test-secret' },
         }),
       ]
-      const activities = [makeActivity({ id: 'script_1', type: ActivityTypeEnum.SCRIPT })]
+      const activities = [makeActivity({ id: 'script_1', type: ActivityTypeEnum.SCRIPT_PYTHON })]
       const edges = [makeEdge('trigger-0', 'script_1')]
 
       const { original, rebuilt } = roundTrip({ activities, triggers, edges })
@@ -341,8 +344,8 @@ describe('V2 Workflow Definition Round-Trip', () => {
     it('preserves converge node parameters', () => {
       const triggers = [makeActivity({ id: 'trigger_manual', type: 'manual_trigger' })]
       const activities = [
-        makeActivity({ id: 'branch_a', type: ActivityTypeEnum.SCRIPT }),
-        makeActivity({ id: 'branch_b', type: ActivityTypeEnum.SCRIPT }),
+        makeActivity({ id: 'branch_a', type: ActivityTypeEnum.SCRIPT_PYTHON }),
+        makeActivity({ id: 'branch_b', type: ActivityTypeEnum.SCRIPT_PYTHON }),
         makeActivity({
           id: 'converge_node',
           type: ActivityTypeEnum.CONVERGE,

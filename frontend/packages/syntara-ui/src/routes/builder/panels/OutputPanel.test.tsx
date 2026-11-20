@@ -321,7 +321,7 @@ describe('OutputPanel', () => {
       vi.mocked(useWorkflowStore).mockReturnValue([
         {
           id: nodeId,
-          type: 'script',
+          type: 'script_python',
           name: 'Test Script',
           config: {},
         },
