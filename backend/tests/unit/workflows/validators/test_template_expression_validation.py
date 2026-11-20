@@ -275,17 +275,21 @@ class TestAllValidExpressions:
 
 
 class TestSubWorkflowDynamicOutputs:
-    """Sub-workflow outputs allow dynamic paths only below Result.outputs."""
+    """Sub-workflow outputs allow dynamic paths only below outputs."""
 
     @pytest.mark.parametrize(
         "expression",
         [
             "${child}",
-            "${child.Result}",
-            "${child.Result.outputs}",
-            "${child.Result.outputs.release.artifact_url}",
-            "${child.Result.outputs.release.status_code}",
-            "${child.Result.outputs.labels.deeply.nested.field}",
+            "${child.outputs}",
+            "${child.outputs.release.artifact_url}",
+            "${child.outputs.release.status_code}",
+            "${child.outputs.labels.deeply.nested.field}",
+            "${child.child_execution_id}",
+            "${child.child_workflow_id}",
+            "${child.child_workflow_name}",
+            "${child.child_workflow_version}",
+            "${child.child_status}",
         ],
     )
     def test_dynamic_output_paths_are_accepted(self, expression: str) -> None:
@@ -302,10 +306,11 @@ class TestSubWorkflowDynamicOutputs:
         "expression",
         [
             "${child.invalid_field}",
-            "${child.Result.invalid_field}",
-            "${child.Result.outputs_typo.deploy.value}",
+            "${child.Result}",
+            "${child.Result.outputs.release.url}",
+            "${child.outputs_typo.deploy.value}",
             "${child.StatusCode.nested}",
-            "${child.Result.child_status.nested}",
+            "${child.child_status.nested}",
         ],
     )
     def test_invalid_static_output_paths_are_rejected(self, expression: str) -> None:

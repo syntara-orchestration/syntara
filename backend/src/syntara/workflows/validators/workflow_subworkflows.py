@@ -152,9 +152,6 @@ def _referenced_child_output_paths(
             scope, *path = expression.split(".")
             if scope != subworkflow_node_id or not path:
                 continue
-            result_field, *path = path
-            if result_field != "Result" or not path:
-                continue
             outputs_field, *output_path = path
             if outputs_field != "outputs" or not output_path:
                 continue
@@ -310,7 +307,7 @@ def _validate_target_workflow(
                     "by the selected Subworkflow Trigger"
                 ),
                 node_id=node_id,
-                field_path=f"Result.outputs.{'.'.join(path)}",
+                field_path=f"outputs.{'.'.join(path)}",
             )
             for path in stale_output_paths
         ]

@@ -378,7 +378,7 @@ async def test_reference_to_declared_child_output_has_no_finding(
         test_db_session,
         _definition_with_subworkflow_output_references(
             child.id,
-            ["call_child.Result.outputs.release.artifact_url"],
+            ["call_child.outputs.release.artifact_url"],
         ),
         test_project_id,
     )
@@ -413,9 +413,9 @@ async def test_undeclared_child_output_references_each_produce_warnings(
         _definition_with_subworkflow_output_references(
             child.id,
             [
-                "call_child.Result.outputs.removed_a.value",
-                "call_child.Result.outputs.still_present.value",
-                "call_child.Result.outputs.removed_b",
+                "call_child.outputs.removed_a.value",
+                "call_child.outputs.still_present.value",
+                "call_child.outputs.removed_b",
             ],
         ),
         test_project_id,
@@ -429,8 +429,8 @@ async def test_undeclared_child_output_references_each_produce_warnings(
     ]
     assert all(finding.node_id == "call_child" for finding in findings)
     assert [finding.field_path for finding in findings] == [
-        "Result.outputs.removed_a.value",
-        "Result.outputs.removed_b",
+        "outputs.removed_a.value",
+        "outputs.removed_b",
     ]
 
 
@@ -467,7 +467,7 @@ async def test_undeclared_child_output_warning_does_not_block_publish(
             labels={},
             workflow_definition=_definition_with_subworkflow_output_references(
                 child.id,
-                ["call_child.Result.outputs.removed_step.value"],
+                ["call_child.outputs.removed_step.value"],
             ),
             project_id=test_project_id,
         )
@@ -514,8 +514,8 @@ async def test_nested_dynamic_child_output_paths_follow_declared_schema(
         _definition_with_subworkflow_output_references(
             child.id,
             [
-                "call_child.Result.outputs.labels.release",
-                "call_child.Result.outputs.labels.region",
+                "call_child.outputs.labels.release",
+                "call_child.outputs.labels.region",
             ],
         ),
         test_project_id,
@@ -548,13 +548,13 @@ async def test_child_output_validation_uses_selected_trigger_schema(
         test_db_session,
         _definition_with_subworkflow_output_references(
             child.id,
-            ["call_child.Result.outputs.selected", "call_child.Result.outputs.other"],
+            ["call_child.outputs.selected", "call_child.outputs.other"],
         ),
         test_project_id,
     )
 
     assert len(findings) == 1
-    assert findings[0].field_path == "Result.outputs.other"
+    assert findings[0].field_path == "outputs.other"
 
 
 @pytest.mark.asyncio
@@ -583,13 +583,13 @@ async def test_nested_child_output_path_rejects_missing_property_in_closed_objec
         test_db_session,
         _definition_with_subworkflow_output_references(
             child.id,
-            ["call_child.Result.outputs.release.tag"],
+            ["call_child.outputs.release.tag"],
         ),
         test_project_id,
     )
 
     assert len(findings) == 1
-    assert findings[0].field_path == "Result.outputs.release.tag"
+    assert findings[0].field_path == "outputs.release.tag"
 
 
 @pytest.mark.asyncio

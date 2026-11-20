@@ -2,8 +2,8 @@
 
 Validates that ``${...}`` expressions in node parameters reference valid
 scopes and existing activity/trigger IDs. Sub-workflow output fields are
-checked against their model except for dynamic child entries under
-``Result.outputs``.
+checked against their public fields except for dynamic child entries under
+``outputs``.
 """
 
 import re
@@ -11,10 +11,6 @@ from collections import deque
 from typing import Any
 
 from syntara.workflows.models.validation_finding import ValidationCategory, ValidationFinding, ValidationSeverity
-from syntara.workflows.workflow_engine.models.workflow_definition import (
-    SubWorkflowOutput,
-    SubWorkflowOutputResult,
-)
 
 TEMPLATE_PATTERN = re.compile(r"\$\{([^}]+)\}")
 
@@ -31,8 +27,17 @@ _SKIP_FIELDS_BY_NODE_TYPE: dict[str, frozenset[str]] = {
     "script": frozenset({"code"}),
 }
 
-_SUBWORKFLOW_OUTPUT_FIELDS = frozenset(SubWorkflowOutput.model_fields)
-_SUBWORKFLOW_RESULT_FIELDS = frozenset(SubWorkflowOutputResult.model_fields)
+# Public fields from SubWorkflowOutput; only ``outputs`` allows dynamic nesting.
+_SUBWORKFLOW_OUTPUT_FIELDS = frozenset(
+    {
+        "child_execution_id",
+        "child_workflow_id",
+        "child_workflow_name",
+        "child_workflow_version",
+        "child_status",
+        "outputs",
+    }
+)
 
 
 def _validate_subworkflow_output_path(
@@ -40,26 +45,18 @@ def _validate_subworkflow_output_path(
     node_id: str | None,
     field_path: str,
 ) -> ValidationFinding | None:
-    """Validate static Sub-workflow output fields, leaving ``Result.outputs`` dynamic."""
+    """Validate static Sub-workflow output fields, leaving ``outputs`` dynamic."""
     _, *path = expr_body.split(".")
     if not path:
         return None
 
-    output_field, *path = path
+    output_field, *nested_path = path
     if output_field not in _SUBWORKFLOW_OUTPUT_FIELDS:
         message = f"Expression '${{{expr_body}}}' references unknown Sub-workflow output field '{output_field}'"
-    elif output_field != "Result" and path:
+    elif output_field == "outputs":
+        return None
+    elif nested_path:
         message = f"Expression '${{{expr_body}}}' cannot access a nested field through '{output_field}'"
-    elif output_field == "Result" and path:
-        result_field, *path = path
-        if result_field not in _SUBWORKFLOW_RESULT_FIELDS:
-            message = f"Expression '${{{expr_body}}}' references unknown Sub-workflow Result field '{result_field}'"
-        elif result_field == "outputs":
-            return None
-        elif path:
-            message = f"Expression '${{{expr_body}}}' cannot access a nested field through 'Result.{result_field}'"
-        else:
-            return None
     else:
         return None
 
