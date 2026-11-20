@@ -1,6 +1,7 @@
 import { useQueries } from '@tanstack/react-query'
 import { useMemo } from 'react'
 
+import { formatStepTypeWriteDenial } from '../../utils/nodeKindDenials'
 import { accessFetchClient } from '../access/accessClient'
 
 const STEP_TYPE_LABELS: Record<string, string> = {
@@ -21,7 +22,7 @@ const STEP_TYPE_LABELS: Record<string, string> = {
   script: 'Script',
 }
 
-export type BlockedStepType = { kind: string; label: string; description?: string }
+export type BlockedStepType = { kind: string; label: string }
 
 export type StepTypePermissions = {
   canAuthor: boolean
@@ -36,10 +37,9 @@ export function getStepTypePermissionMessage(
 ): string {
   if (permissions.isError) return 'Unable to check step-type permissions. Retry the check.'
   if (permissions.isChecking) return 'Checking step-type permissions.'
-  const reasons = permissions.blockedStepTypes.map(
-    (stepType) => stepType.description ?? `${stepType.label} (write denied).`
-  )
-  return reasons.length ? reasons.join(' ') : 'Step-type permission is required.'
+  return permissions.blockedStepTypes.length
+    ? formatStepTypeWriteDenial(permissions.blockedStepTypes)
+    : 'Step-type permission is required.'
 }
 
 export function getStepTypeDisplayName(kind: string): string {
@@ -96,17 +96,7 @@ export function useStepTypePermissions(
   const blockedStepTypes = kinds.flatMap((kind, index) => {
     const decision = queries[index]?.data?.data
     if (decision?.allowed === true) return []
-    const label = getStepTypeDisplayName(kind)
-    const project = decision?.denied_project || resourceProject
-    let description = `${label} (write permission denied).`
-    if (decision?.denial_reason === 'no_matching_allow' || (decision && !decision.denied && !decision.denied_by)) {
-      description = `No policy grants write permission for ${label} in project ${project}.`
-    } else if (decision?.denied_by) {
-      const scope =
-        decision.denied_scope === 'any' ? 'all projects' : `${decision.denied_scope || 'project'} ${project}`
-      description = `${label} (${decision.denied_by}, ${scope}).`
-    }
-    return [{ kind, label, description }]
+    return [{ kind, label: getStepTypeDisplayName(kind) }]
   })
   const retry = async () => {
     if (!hasContext || !resourceProject) {

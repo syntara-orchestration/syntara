@@ -1,5 +1,6 @@
 import { Alert, AlertActionLink, StackItem } from '@patternfly/react-core'
 
+import { formatStepTypeWriteDenial } from '../../utils/nodeKindDenials'
 import type { BlockedStepType } from '../workflows/useStepTypePermissions'
 
 type BuilderReadOnlyBannerProps = Readonly<{
@@ -30,10 +31,7 @@ export function BuilderReadOnlyBanner({
     title = 'This is a built-in workflow.'
     description = 'Built-in workflows cannot be modified.'
   } else if (blockedStepTypes.length > 0) {
-    const reasons = blockedStepTypes.map((stepType) => stepType.description).filter(Boolean)
-    description = reasons.length
-      ? reasons.join(' ')
-      : `Blocked step types: ${blockedStepTypes.map((stepType) => stepType.label).join(', ')}.`
+    description = formatStepTypeWriteDenial(blockedStepTypes)
   }
 
   return (

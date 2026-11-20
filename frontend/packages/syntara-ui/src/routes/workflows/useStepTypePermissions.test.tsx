@@ -7,7 +7,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { invalidateAuthzCaches } from '../../hooks/invalidateAuthzCaches'
 import { accessFetchClient } from '../access/accessClient'
 
-import { useStepTypePermissions } from './useStepTypePermissions'
+import { getStepTypePermissionMessage, useStepTypePermissions } from './useStepTypePermissions'
 
 vi.mock('../access/accessClient', () => ({
   accessFetchClient: { POST: vi.fn() },
@@ -85,20 +85,25 @@ describe('useStepTypePermissions', () => {
     expect(accessFetchClient.POST).toHaveBeenCalledTimes(2)
   })
   it.each([
-    [
-      { denied: true, denied_by: 'no-scripts', denied_scope: 'project', denied_project: 'payments' },
-      'Script (no-scripts, project payments).',
-    ],
-    [{ denied: true, denied_by: 'no-scripts', denied_scope: 'any' }, 'Script (no-scripts, all projects).'],
-    [
-      { denied: false, denied_by: '', denial_reason: 'no_matching_allow', denied_project: 'payments' },
-      'No policy grants write permission for Script in project payments.',
-    ],
-  ])('explains a blocked decision with its provenance: %j', async (decision, description) => {
-    vi.mocked(accessFetchClient.POST).mockResolvedValue({ data: { allowed: false, ...decision } })
+    {
+      denial_reason: 'policy_deny',
+      denied: true,
+      denied_by: 'no-scripts',
+      denied_scope: 'project',
+      denied_project: 'payments',
+    },
+    { denial_reason: 'policy_deny', denied: true, denied_by: 'no-scripts', denied_scope: 'any' },
+    { denied: false, denied_by: '', denial_reason: 'no_matching_allow', denied_project: 'payments' },
+  ])('explains a blocked decision without policy details: %j', async (decision) => {
+    const denialReason =
+      "This workflow includes Script steps, but your assigned policies don't allow you to write them."
+    vi.mocked(accessFetchClient.POST).mockResolvedValue({
+      data: { allowed: false, ...decision },
+    })
     const { result } = renderHook(() => useStepTypePermissions(['script'], 'project-1'), { wrapper: createWrapper() })
     await waitFor(() => expect(result.current.isChecking).toBe(false))
-    expect(result.current.blockedStepTypes[0]?.description).toBe(description)
+    expect(result.current.blockedStepTypes).toEqual([{ kind: 'script', label: 'Script' }])
+    expect(getStepTypePermissionMessage(result.current)).toBe(denialReason)
   })
 
   it('updates both ways after policy or assignment cache invalidation', async () => {
@@ -116,5 +121,32 @@ describe('useStepTypePermissions', () => {
     allowed = false
     act(() => invalidateAuthzCaches(queryClient))
     await waitFor(() => expect(result.current.canAuthor).toBe(false))
+  })
+})
+
+describe('getStepTypePermissionMessage', () => {
+  it.each([
+    {
+      blockedStepTypes: [{ kind: 'wait', label: 'Wait' }],
+      message: "This workflow includes Wait steps, but your assigned policies don't allow you to write them.",
+    },
+    {
+      blockedStepTypes: [
+        { kind: 'http_request', label: 'REST API' },
+        { kind: 'script', label: 'Script' },
+      ],
+      message:
+        "This workflow includes REST API, Script steps, but your assigned policies don't allow you to write them.",
+    },
+  ])('formats blocked display labels: $message', ({ blockedStepTypes, message }) => {
+    expect(getStepTypePermissionMessage({ blockedStepTypes, isChecking: false, isError: false })).toBe(message)
+  })
+
+  it.each([
+    [{ isChecking: false, isError: true }, 'Unable to check step-type permissions. Retry the check.'],
+    [{ isChecking: true, isError: false }, 'Checking step-type permissions.'],
+    [{ isChecking: false, isError: false }, 'Step-type permission is required.'],
+  ])('preserves the permission-check message: %j', (status, message) => {
+    expect(getStepTypePermissionMessage({ blockedStepTypes: [], ...status })).toBe(message)
   })
 })

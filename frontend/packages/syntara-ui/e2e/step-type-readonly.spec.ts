@@ -56,6 +56,7 @@ test.describe('Step-type read-only workflow actions', { tag: '@pr-check' }, () =
               allowed: false,
               denied: true,
               denied_by: 'no-waits',
+              denial_reason: 'policy_deny',
               denied_scope: 'project',
               denied_project: 'payments',
             }),
@@ -68,7 +69,9 @@ test.describe('Step-type read-only workflow actions', { tag: '@pr-check' }, () =
       await openWorkflowInBuilder(app, workflowName, workflow.id)
 
       await expect(app.getByText('You are viewing this workflow in read-only mode.')).toBeVisible()
-      await expect(app.getByText('Wait (no-waits, project payments).')).toBeVisible()
+      await expect(
+        app.getByText("This workflow includes Wait steps, but your assigned policies don't allow you to write them.")
+      ).toBeVisible()
       await expect(app.getByRole('textbox', { name: 'Workflow name' })).toBeDisabled()
       await expect(app.getByRole('button', { name: 'Add step' })).toHaveAttribute('aria-disabled', 'true')
       await expect(app.getByRole('button', { name: 'Save workflow' })).toHaveAttribute('aria-disabled', 'true')
@@ -117,6 +120,7 @@ test.describe('Step-type read-only workflow actions', { tag: '@pr-check' }, () =
               allowed: false,
               denied: true,
               denied_by: 'no-waits',
+              denial_reason: 'policy_deny',
               denied_scope: 'project',
               denied_project: 'payments',
             }),

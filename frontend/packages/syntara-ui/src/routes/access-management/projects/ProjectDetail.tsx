@@ -27,12 +27,13 @@ import { useQueryState } from '../../../components/states/useQueryState'
 import { SynKebabMenu } from '../../../components/SynKebabMenu'
 import { SynPageTitle } from '../../../components/SynPageTitle'
 import { DateCell } from '../../../components/table/DateCell'
-import { useDeleteAction } from '../../../hooks/useDeleteAction'
 import { useDialogState } from '../../../hooks/useDialogState'
+import { useAlerts } from '../../../providers/alerts/AlertContext'
 import { detachPromise } from '../../../utils/detachPromise'
 import { useDocLink } from '../../../utils/docs/useDocLink'
 import { accessClient } from '../../access/accessClient'
 import type { ProjectRead } from '../../access/types'
+import { useProjectActions } from '../../workflows/useProjectActions'
 import { DetailPageShell } from '../DetailPageShell'
 import { ProjectFormModal } from '../ProjectFormModal'
 import { useProjectPermissions } from '../useProjectPermissions'
@@ -188,6 +189,7 @@ function ProjectDetailsTab({ project }: Readonly<{ project: ProjectRead }>) {
 
 export function ProjectDetail() {
   const navigate = useNavigate()
+  const { showSuccess, showError } = useAlerts()
   const projectsDocLink = useDocLink('projects')
   const { projectId }: { projectId: string } = useParams({ strict: false })
   const basePath = AppRoute.AccessManagement.ProjectDetail.replace(':projectId', projectId ?? '')
@@ -207,8 +209,6 @@ export function ProjectDetail() {
     canReadAssignments,
     isLoading: permissionsLoading,
   } = useProjectDetailPermissions(projectId ?? '')
-  const { mutate: deleteProject } = accessClient.useMutation('delete', '/projects/{project_id}')
-
   const { visibleTabs, urlValidTabs } = useMemo(
     () => computeProjectTabState(canReadWorkflows, canReadAssignments, permissionsLoading, activeTab),
     [canReadWorkflows, canReadAssignments, permissionsLoading, activeTab]
@@ -223,13 +223,11 @@ export function ProjectDetail() {
 
   const navigateBack = () => detachPromise(navigate({ to: AppRoute.AccessManagement.Projects }))
 
-  const handleDelete = useDeleteAction({
-    deleteFn: deleteProject,
-    buildParams: (project: ProjectRead) => ({ params: { path: { project_id: project.id ?? '' } } }),
-    entityLabel: 'project',
-    getItemName: (project: ProjectRead) => project.name,
-    onSuccess: navigateBack,
-    onSettled: deleteDialog.close,
+  const { handleDeleteProject } = useProjectActions({
+    showSuccess,
+    showError,
+    onRefetch: navigateBack,
+    onDeleteSettled: deleteDialog.close,
   })
 
   const projectData = projectQuery.data
@@ -326,7 +324,7 @@ export function ProjectDetail() {
         projectName={deleteDialog.item?.name}
         isOpen={deleteDialog.isOpen}
         onClose={deleteDialog.close}
-        onConfirm={() => handleDelete(deleteDialog.item)}
+        onConfirm={() => handleDeleteProject(deleteDialog.item)}
       />
     </SynPage>
   )

@@ -408,6 +408,7 @@ describe('useBuilderVersionHistory', () => {
         callbacks?.onError?.({
           cause: {
             code: 'NODE_KIND_WRITE_DENIED',
+            detail: "You can't restore workflow version: Script (write denied).",
             blocked_step_types: [{ kind: 'script', label: 'Script', reason: 'explicit_deny' }],
           },
         })
@@ -422,7 +423,7 @@ describe('useBuilderVersionHistory', () => {
 
       expect(params.showError).toHaveBeenCalledWith({
         title: 'Failed to restore version',
-        description: 'Step types not allowed: Script (write denied).',
+        description: "This workflow includes Script steps, but your assigned policies don't allow you to write them.",
       })
       expect(result.current.restoreDialog.isOpen).toBe(true)
       expect(params.showSuccess).not.toHaveBeenCalled()

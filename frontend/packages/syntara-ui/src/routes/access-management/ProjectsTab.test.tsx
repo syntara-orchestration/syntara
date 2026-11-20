@@ -416,7 +416,26 @@ describe('ProjectsTab', () => {
       })
     })
 
-    it('shows error alert on delete failure', async () => {
+    it.each([
+      {
+        error: new Error('Permission denied'),
+        title: 'Delete failed',
+        message: 'Failed to delete project "Alpha": Permission denied',
+      },
+      {
+        error: {
+          cause: {
+            code: 'NODE_KIND_WRITE_DENIED',
+            title: 'Step types not allowed',
+            detail: "You can't delete project: Script (write denied).",
+            blocked_step_types: [{ kind: 'script', label: 'Script', reason: 'explicit_deny' }],
+          },
+        },
+        title: 'Cannot delete project "Alpha"',
+        message:
+          "This project includes workflows with Script steps, but your assigned policies don't allow you to write them.",
+      },
+    ])('shows the error alert on delete failure: $title', async ({ error, title, message }) => {
       const user = userEvent.setup()
       const mockDeleteMutate = vi.fn()
 
@@ -437,17 +456,19 @@ describe('ProjectsTab', () => {
       await user.click(deleteButton)
 
       const callbacks = mockDeleteMutate.mock.calls[0][1] as {
-        onError: (err: Error) => void
+        onError: (err: unknown) => void
         onSettled: () => void
       }
       act(() => {
-        callbacks.onError(new Error('Permission denied'))
+        callbacks.onError(error)
         callbacks.onSettled()
       })
 
       await waitFor(() => {
         expect(screen.queryByText('Delete project?')).not.toBeInTheDocument()
       })
+      expect(screen.getByText(title)).toBeInTheDocument()
+      expect(screen.getByText(message)).toBeInTheDocument()
     })
 
     it('closes delete dialog when Cancel button is clicked', async () => {

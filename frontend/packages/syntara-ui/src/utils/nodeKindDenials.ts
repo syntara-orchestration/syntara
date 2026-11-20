@@ -28,20 +28,22 @@ export function extractNodeKindDenials(error: unknown): NodeKindDenial[] {
       typeof item === 'object' &&
       'kind' in item &&
       typeof item.kind === 'string' &&
+      item.kind.trim().length > 0 &&
       'label' in item &&
       typeof item.label === 'string' &&
+      item.label.trim().length > 0 &&
       'reason' in item &&
       (item.reason === 'explicit_deny' || item.reason === 'no_matching_allow')
   )
 }
 
-export function getNodeKindWriteDeniedMessage(error: unknown): string | undefined {
-  const body = denialBody(error)
-  if (!body) return undefined
-  if (typeof body.detail === 'string' && body.detail) return body.detail
+export function formatStepTypeWriteDenial(blockedStepTypes: readonly { label: string }[], project = false): string {
+  const labels = blockedStepTypes.map(({ label }) => label).join(', ')
+  const subject = project ? 'This project includes workflows with' : 'This workflow includes'
+  return `${subject} ${labels} steps, but your assigned policies don't allow you to write them.`
+}
+
+export function getNodeKindWriteDeniedMessage(error: unknown, project = false): string | undefined {
   const blocked = extractNodeKindDenials(error)
-  const names = blocked.map(
-    ({ label, reason }) => `${label} (${reason === 'no_matching_allow' ? 'no matching write grant' : 'write denied'})`
-  )
-  return names.length ? `Step types not allowed: ${names.join('; ')}.` : 'Step types not allowed.'
+  return blocked.length ? formatStepTypeWriteDenial(blocked, project) : undefined
 }
