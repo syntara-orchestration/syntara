@@ -807,6 +807,32 @@ describe('EditIntegrationForm', () => {
       setupMocks({ integration: mockOpenShiftIntegration })
     })
 
+    it('uses execution plane field labels and help for OpenShift fields', () => {
+      render(<EditIntegrationForm />, { wrapper })
+
+      expect(screen.getByRole('textbox', { name: /connection name/i })).toBeInTheDocument()
+      expect(screen.getByRole('textbox', { name: /api endpoint/i })).toBeInTheDocument()
+      expect(screen.queryByRole('textbox', { name: /^api url$/i })).not.toBeInTheDocument()
+      expect(screen.queryByRole('textbox', { name: /server name/i })).not.toBeInTheDocument()
+      expect(screen.getByText('OpenShift')).toBeInTheDocument()
+    })
+
+    it('hides Description field for OpenShift', () => {
+      render(<EditIntegrationForm />, { wrapper })
+
+      expect(screen.queryByRole('textbox', { name: /^description$/i })).not.toBeInTheDocument()
+    })
+
+    it('shows Authentication section with service account token credential', () => {
+      render(<EditIntegrationForm />, { wrapper })
+
+      expect(screen.getByText('Authentication')).toBeInTheDocument()
+      expect(screen.getByText(/service account token to authenticate/i)).toBeInTheDocument()
+      expect(screen.getByRole('textbox', { name: /service account token/i })).toBeInTheDocument()
+      expect(screen.queryByText('Connection credential')).not.toBeInTheDocument()
+      expect(screen.queryByRole('textbox', { name: /health check credential/i })).not.toBeInTheDocument()
+    })
+
     it('shows locked Global scope text with execution-plane helper text', () => {
       render(<EditIntegrationForm />, { wrapper })
 

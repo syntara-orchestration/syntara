@@ -13,7 +13,7 @@ import type { IntegrationsAPI } from '@syntara/contracts'
 import { IntegrationTypeEnum } from '@syntara/contracts'
 import { useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useParams } from '@tanstack/react-router'
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, type ReactElement } from 'react'
 import { useWatch, type UseFormSetValue } from 'react-hook-form'
 
 import { AppRoute } from '../../../app/AppRoute'
@@ -63,6 +63,72 @@ const CREDENTIAL_DESCRIPTION: Record<string, string> = {
     'This credential is used to verify the connection to this integration and perform periodic health checks. Workflow credentials are configured separately in the workflow builder.',
   [IntegrationTypeEnum.ANSIBLE_AUTOMATION_PLATFORM]:
     'This credential is used to verify the connection to the Ansible Automation Platform. Workflow credentials are configured separately in the workflow builder.',
+  [IntegrationTypeEnum.OPENSHIFT]:
+    'Use a service account token to authenticate to the cluster API. Credentials are stored encrypted in the platform credential store.',
+}
+
+type CredentialSectionCopy = {
+  title: string
+  description: string
+  fieldLabel: string
+  labelHelp: ReactElement
+}
+
+function getCredentialSectionCopy(integrationType: string): CredentialSectionCopy {
+  if (integrationType === IntegrationTypeEnum.OPENSHIFT) {
+    return {
+      title: 'Authentication',
+      description: CREDENTIAL_DESCRIPTION[IntegrationTypeEnum.OPENSHIFT],
+      fieldLabel: 'Service account token',
+      labelHelp: integrationHelp.serviceAccountToken,
+    }
+  }
+  return {
+    title: 'Connection credential',
+    description: CREDENTIAL_DESCRIPTION[integrationType] ?? CREDENTIAL_DESCRIPTION[IntegrationTypeEnum.MCP_SERVER],
+    fieldLabel: 'Health check credential',
+    labelHelp: integrationHelp.healthCheckCredential,
+  }
+}
+
+type EditDetailsFieldCopy = {
+  nameLabel: string
+  nameLabelHelp: ReactElement
+  baseUrlLabel: string
+  baseUrlLabelHelp: ReactElement
+}
+
+function getEditDetailsFieldCopy(integrationType: string, isLLM: boolean): EditDetailsFieldCopy {
+  if (integrationType === IntegrationTypeEnum.OPENSHIFT) {
+    return {
+      nameLabel: 'Connection name',
+      nameLabelHelp: integrationHelp.executionPlaneConnectionName,
+      baseUrlLabel: 'API endpoint',
+      baseUrlLabelHelp: integrationHelp.executionPlaneApiEndpoint,
+    }
+  }
+  if (isLLM) {
+    return {
+      nameLabel: 'Name',
+      nameLabelHelp: integrationHelp.name,
+      baseUrlLabel: 'API URL',
+      baseUrlLabelHelp: integrationHelp.apiUrl,
+    }
+  }
+  if (integrationType === IntegrationTypeEnum.ANSIBLE_AUTOMATION_PLATFORM) {
+    return {
+      nameLabel: 'Server name / ID',
+      nameLabelHelp: integrationHelp.serverName,
+      baseUrlLabel: 'API URL',
+      baseUrlLabelHelp: integrationHelp.aapUrl,
+    }
+  }
+  return {
+    nameLabel: 'Server name / ID',
+    nameLabelHelp: integrationHelp.serverName,
+    baseUrlLabel: 'API URL',
+    baseUrlLabelHelp: integrationHelp.apiUrl,
+  }
 }
 
 type FormFieldsProps = Readonly<{
@@ -82,15 +148,14 @@ function EditIntegrationFormFields({
   setValue,
   onTestConnection,
 }: FormFieldsProps) {
-  const isCredentialRequired = CREDENTIAL_REQUIRED_TYPES.has(integration.integration_type ?? '')
+  const integrationType = integration.integration_type ?? IntegrationTypeEnum.MCP_SERVER
+  const isCredentialRequired = CREDENTIAL_REQUIRED_TYPES.has(integrationType)
   const isTestDisabled = (isCredentialRequired && !credentialId) || isTesting
-  const isAnsibleAutomationPlatform = integration.integration_type === IntegrationTypeEnum.ANSIBLE_AUTOMATION_PLATFORM
-  const isOpenShift = integration.integration_type === IntegrationTypeEnum.OPENSHIFT
+  const isOpenShift = integrationType === IntegrationTypeEnum.OPENSHIFT
   const isLLM = isLLMProvider(integration)
   const hideBaseUrl = isLLM && PROVIDERS_HIDING_BASE_URL.has(getProviderHint(integration))
-
-  const credentialDescription =
-    CREDENTIAL_DESCRIPTION[integration.integration_type ?? ''] ?? CREDENTIAL_DESCRIPTION[IntegrationTypeEnum.MCP_SERVER]
+  const credentialCopy = getCredentialSectionCopy(integrationType)
+  const { nameLabel, nameLabelHelp, baseUrlLabel, baseUrlLabelHelp } = getEditDetailsFieldCopy(integrationType, isLLM)
 
   return (
     <>
@@ -99,9 +164,8 @@ function EditIntegrationFormFields({
       </Title>
 
       <DescriptionList isCompact isHorizontal>
-        <SynDetail label="Integration type">
-          {INTEGRATION_TYPE_LABELS[integration.integration_type ?? ''] ?? integration.integration_type ?? ''}
-        </SynDetail>
+        <SynDetail label="Integration type">{INTEGRATION_TYPE_LABELS[integrationType] ?? integrationType}</SynDetail>
+        {isOpenShift && <SynDetail label="Infrastructure type">OpenShift</SynDetail>}
         {isLLM && (
           <SynDetail label="Provider type">
             {PROVIDER_HINT_LABELS[getProviderHint(integration)] ?? getProviderHint(integration)}
@@ -111,26 +175,28 @@ function EditIntegrationFormFields({
 
       <SynTextField<EditIntegrationFormValues, 'name'>
         name="name"
-        label={isLLM ? 'Name' : 'Server name / ID'}
+        label={nameLabel}
         fieldId="edit-name"
         isRequired
-        labelHelp={isLLM ? integrationHelp.name : integrationHelp.serverName}
+        labelHelp={nameLabelHelp}
       />
 
-      <SynTextAreaField<EditIntegrationFormValues, 'description'>
-        name="description"
-        label="Description"
-        fieldId="edit-description"
-        resizeOrientation="vertical"
-      />
+      {!isOpenShift && (
+        <SynTextAreaField<EditIntegrationFormValues, 'description'>
+          name="description"
+          label="Description"
+          fieldId="edit-description"
+          resizeOrientation="vertical"
+        />
+      )}
 
       {!hideBaseUrl && (
         <SynTextField<EditIntegrationFormValues, 'base_url'>
           name="base_url"
-          label="API URL"
+          label={baseUrlLabel}
           fieldId="edit-base-url"
           isRequired={!isLLM}
-          labelHelp={isAnsibleAutomationPlatform ? integrationHelp.aapUrl : integrationHelp.apiUrl}
+          labelHelp={baseUrlLabelHelp}
         />
       )}
 
@@ -154,19 +220,19 @@ function EditIntegrationFormFields({
 
       <div>
         <Title headingLevel="h2" size="lg" className={styles.credentialHeading}>
-          Connection credential
+          {credentialCopy.title}
         </Title>
         <Content component={ContentVariants.p} className={styles.credentialDescription}>
-          {credentialDescription}
+          {credentialCopy.description}
         </Content>
       </div>
 
       <SynFormField<EditIntegrationFormValues, 'management_credential_id'>
         name="management_credential_id"
-        label="Health check credential"
+        label={credentialCopy.fieldLabel}
         fieldId="edit-credential-select"
         isRequired={isCredentialRequired}
-        labelHelp={integrationHelp.healthCheckCredential}
+        labelHelp={credentialCopy.labelHelp}
         hideFormGroupLabel
         hideFooter
       >
@@ -174,15 +240,13 @@ function EditIntegrationFormFields({
           <CredentialSelector
             value={field.value ?? undefined}
             onChange={(id) => setValue('management_credential_id', id ?? null)}
-            compatibleTypeNames={
-              CREDENTIAL_TYPES_BY_INTEGRATION[integration.integration_type ?? IntegrationTypeEnum.MCP_SERVER]
-            }
-            label="Health check credential"
+            compatibleTypeNames={CREDENTIAL_TYPES_BY_INTEGRATION[integrationType]}
+            label={credentialCopy.fieldLabel}
             fieldId="edit-credential-select"
             isRequired={isCredentialRequired}
             allowCreate
-            placeholder="Select a credential"
-            labelHelp={integrationHelp.healthCheckCredential}
+            placeholder={isOpenShift ? 'Select or create a credential' : 'Select a credential'}
+            labelHelp={credentialCopy.labelHelp}
           />
         )}
       </SynFormField>

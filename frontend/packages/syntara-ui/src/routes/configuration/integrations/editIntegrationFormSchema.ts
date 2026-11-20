@@ -65,6 +65,14 @@ export function buildEditSchema(requiresBaseUrl: boolean) {
         })
         if (err) ctx.addIssue({ code: z.ZodIssueCode.custom, message: err, path: ['base_url'] })
       }
+      if (data.integration_type === IntegrationTypeEnum.OPENSHIFT) {
+        const err = validateUrl(data.base_url, {
+          required: true,
+          allowHttp: data.allow_http,
+          fieldLabel: 'API endpoint',
+        })
+        if (err) ctx.addIssue({ code: z.ZodIssueCode.custom, message: err, path: ['base_url'] })
+      }
       if (data.integration_type === IntegrationTypeEnum.LLM_PROVIDER) {
         const err = validateUrl(data.base_url, {
           required: requiresBaseUrl,
