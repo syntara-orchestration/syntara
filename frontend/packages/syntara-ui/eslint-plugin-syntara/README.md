@@ -1,97 +1,18 @@
 # ESLint Plugin Syntara
 
-Custom ESLint rules for the Syntara UI project to enforce project-specific patterns and best practices.
+Custom ESLint rules for Syntara UI patterns that are not covered by shared packages.
+
+Shared checks for API paths, documentation URLs, nested component definitions, HTTP clients, and barrel files are configured from `@ansible/eslint-plugin` in `eslint.config.js`.
 
 ## Rules
 
-### `no-raw-http-calls`
+### `no-fetch-aliases`
 
-Disallows raw HTTP usage in UI source code: references to the global `fetch` and `XMLHttpRequest` instantiation. All API communication must go through typed API clients to maintain UI-API parity.
+Disallows storing or passing the global `fetch` function, which would bypass the shared HTTP-client check. Direct `fetch()` calls are reported by `@ansible/no-unapproved-http-client`.
 
-`axios` is blocked at the import boundary via `no-restricted-imports` (error level) in `eslint.config.js`.
+### `require-http-client-disable-reason`
 
-Non-`RhUi` icon imports from `@patternfly/react-icons` are rejected by `no-restricted-imports` at error level in production TypeScript files.
-
-For `fetch`, the rule flags any reference to the global identifier (direct calls, aliasing, passing as a callback). Property access such as `window.fetch` is allowed.
-
-#### Rationale
-
-The UI codebase uses typed `openapi-fetch` clients that are automatically generated from OpenAPI specifications. These clients provide:
-
-- Full TypeScript type safety for requests and responses
-- Automatic validation of request/response shapes
-- Guarantee that UI code only calls documented API endpoints
-- UI-API parity enforcement by design
-
-Raw HTTP calls bypass all these guarantees and can:
-
-- Hit undocumented or internal endpoints
-- Break the UI-API parity contract
-- Introduce type safety violations
-- Make API changes harder to track
-
-Aliasing patterns such as `const f = fetch; f(url)` are flagged so they cannot bypass a call-site-only check.
-
-#### Usage
-
-**Invalid:**
-
-```typescript
-// Raw fetch call
-const response = await fetch('/api/workflows')
-
-// Aliasing fetch
-const f = fetch
-await f('/api/workflows')
-
-// axios import (blocked by no-restricted-imports)
-import axios from 'axios'
-
-// Raw XMLHttpRequest
-const xhr = new XMLHttpRequest()
-xhr.open('GET', '/api/data')
-```
-
-**Valid:**
-
-```typescript
-// Use typed API clients
-import { workflowClient, credentialsClient } from '../client'
-
-const { data } = workflowClient.useQuery('get', '/workflows')
-const creds = await credentialsClient.GET('/credentials/{id}', { params: { path: { id } } })
-
-// Named import from a package (not the global fetch)
-import { fetch as customFetch } from 'cross-fetch'
-
-// Property access to fetch (e.g. mocks, polyfills)
-const fn = window.fetch
-```
-
-#### Exceptions
-
-**Config-level allowlist** — preferred for standing legitimate exceptions (coding standards §28):
-
-```javascript
-// eslint.config.js
-'syntara/no-raw-http-calls': [
-  'error',
-  {
-    allowedFiles: ['**/useFileUploadWithProgress.ts'],
-  },
-],
-```
-
-Used for `useFileUploadWithProgress.ts`, where `XMLHttpRequest` is required for upload progress events (the fetch API does not support upload progress).
-
-**Inline disable with justification** — for one-off pre-auth calls and similar cases:
-
-```typescript
-// eslint-disable-next-line syntara/no-raw-http-calls -- pre-auth: fetching providers before token middleware is available
-const response = await fetch('/api/auth/providers')
-```
-
-Disables without a `-- reason` suffix fail lint.
+Requires an explanation after `--` when suppressing `@ansible/no-unapproved-http-client`.
 
 ### `prefer-confirmation-dialog`
 
@@ -136,18 +57,6 @@ Use `DateCell` (table cells / detail fields), `UserTimestamp` (username + date),
 ],
 ```
 
-### `no-nested-component-definitions`
-
-Disallows React component definitions inside other functions or components (Sonar S6478). Nested components are re-created on every render, causing React to unmount and remount the entire subtree. Move the component to module scope and pass data as props.
-
-Test files and test utility directories are exempt — wrapper components defined in tests are idiomatic.
-
-### `no-hardcoded-doc-urls`
-
-Disallows hardcoded documentation URLs in project code. Use `useDocLink('key')` from `src/utils/docs/useDocLink.ts` and add new keys to `docsUrls.json` when needed.
-
-Exempt: `docsUrls.json`, `useDocLink.ts`, and `*.test.*` / `*.spec.*` files.
-
 ## Testing
 
 Run the test suite:
@@ -156,10 +65,10 @@ Run the test suite:
 npx vitest run packages/syntara-ui/eslint-plugin-syntara/__tests__/
 ```
 
-Run tests for a specific rule:
+Run a test for a Syntara-specific rule:
 
 ```bash
-npx vitest run eslint-plugin-syntara/__tests__/no-raw-http-calls.test.js
+npx vitest run eslint-plugin-syntara/__tests__/prefer-pf-text-components.test.js
 ```
 
 ### `require-page-title`
