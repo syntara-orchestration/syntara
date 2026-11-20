@@ -186,9 +186,9 @@ describe('Kafka Subscribe form', () => {
           onSubmit={onSubmit}
         />
       )
-      const group = screen.getByRole('textbox', { name: 'Consumer group ID' })
-      await waitFor(() => expect(group).toHaveValue('established-custom'))
-      expect(group).toBeDisabled()
+      const group = await screen.findByRole('group', { name: 'Consumer group ID' })
+      expect(group).toHaveTextContent('established-custom')
+      expect(screen.queryByRole('textbox', { name: 'Consumer group ID' })).not.toBeInTheDocument()
       await submitForm()
       await waitFor(() =>
         expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ kafkaGroupId: 'established-custom' }))
@@ -224,9 +224,8 @@ describe('Kafka Subscribe form', () => {
         onSubmit={onSubmit}
       />
     )
-    const group = screen.getByRole('textbox', { name: 'Consumer group ID' })
-    await waitFor(() => expect(group).toHaveValue('syntara.runtime-id'))
-    expect(group).toBeDisabled()
+    const group = await screen.findByRole('group', { name: 'Consumer group ID' })
+    expect(group).toHaveTextContent('syntara.runtime-id')
     await submitForm()
     await waitFor(() => expect(onSubmit).toHaveBeenCalled())
     const previous = buildKafkaSubscribeTrigger('subscribe', 'Orders', { ...initialData, kafkaGroupId })
@@ -266,9 +265,7 @@ describe('Kafka Subscribe form', () => {
         onSubmit={onSubmit}
       />
     )
-    await waitFor(() =>
-      expect(screen.getByRole('textbox', { name: 'Consumer group ID' })).toHaveValue('established-custom')
-    )
+    expect(await screen.findByRole('group', { name: 'Consumer group ID' })).toHaveTextContent('established-custom')
     await submitForm()
     await waitFor(() =>
       expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ kafkaGroupId: 'replacement-group' }))
@@ -303,9 +300,7 @@ describe('Kafka Subscribe form', () => {
         onSubmit={onSubmit}
       />
     )
-    await waitFor(() =>
-      expect(screen.getByRole('textbox', { name: 'Consumer group ID' })).toHaveValue('established-custom')
-    )
+    expect(await screen.findByRole('group', { name: 'Consumer group ID' })).toHaveTextContent('established-custom')
     let finish: (() => void) | undefined
     vi.mocked(workflowFetchClient.GET).mockImplementationOnce(
       () =>
