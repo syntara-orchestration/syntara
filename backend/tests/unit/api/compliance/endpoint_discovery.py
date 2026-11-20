@@ -18,6 +18,7 @@ if TYPE_CHECKING:
 from syntara.core.router.loader import load_openapi_schema
 
 _ACTION_OPERATION_PREFIXES = (
+    "check_",
     "disable_",
     "enable_",
     "publish_",
@@ -198,6 +199,11 @@ def is_list_operation(operation_id: str, properties: dict[str, Any]) -> bool:
         True if this is a list operation
 
     """
+    # List-like action responses can contain arrays (for example, a contract
+    # diff contains trigger changes) without being collection endpoints.
+    if operation_id.startswith(_ACTION_OPERATION_PREFIXES):
+        return False
+
     # Fast path: follows naming convention
     if operation_id.startswith("list_"):
         return True

@@ -13,6 +13,8 @@ from typing import Any
 import jsonschema
 import pytest
 
+from syntara.workflows.workflow_engine.models.workflow_definition import SubWorkflowOutput
+
 SCHEMA_DIR = Path(__file__).resolve().parents[3] / "src" / "syntara" / "schemas" / "workflows" / "v2"
 VALID_UUID = "550e8400-e29b-41d4-a716-446655440000"
 
@@ -137,8 +139,8 @@ def test_subworkflow_config_rejects_additional_properties(subworkflow_schema: di
         validate_parameter_schema(config, subworkflow_schema)
 
 
-def test_subworkflow_result_schema_has_standard_wrapper_fields(subworkflow_schema: dict[str, Any]) -> None:
-    """Result schema should follow StandardOutputWrapper pattern."""
+def test_subworkflow_result_schema_is_independent_of_standard_wrapper(subworkflow_schema: dict[str, Any]) -> None:
+    """Sub-workflow result schema exposes its step-specific fields directly."""
     # The $defs are at root level, not nested in resultSchema
     assert "$defs" in subworkflow_schema
     assert "SubWorkflowOutput" in subworkflow_schema["$defs"]
@@ -146,18 +148,19 @@ def test_subworkflow_result_schema_has_standard_wrapper_fields(subworkflow_schem
     output_schema = subworkflow_schema["$defs"]["SubWorkflowOutput"]
     properties = output_schema["properties"]
 
-    # StandardOutputWrapper fields
-    assert "Result" in properties
-    assert "StatusCode" in properties
-    assert "StatusMessage" in properties
-    assert "ErrorMessage" in properties
+    assert "outputs" in properties
+    assert "child_status" in properties
+    assert "Result" not in properties
+    assert "StatusCode" not in properties
+    assert "StatusMessage" not in properties
+    assert "ErrorMessage" not in properties
 
 
 def test_subworkflow_result_has_child_execution_metadata(subworkflow_schema: dict[str, Any]) -> None:
     """Result schema should include child execution metadata fields."""
     # The $defs are at root level
     assert "$defs" in subworkflow_schema
-    result_def = subworkflow_schema["$defs"]["SubWorkflowOutputResult"]
+    result_def = subworkflow_schema["$defs"]["SubWorkflowOutput"]
 
     properties = result_def["properties"]
     assert "child_execution_id" in properties
@@ -166,6 +169,34 @@ def test_subworkflow_result_has_child_execution_metadata(subworkflow_schema: dic
     assert "child_workflow_version" in properties
     assert "child_status" in properties
     assert "outputs" in properties
+    assert properties["outputs"]["additionalProperties"] == {"$ref": "#/$defs/JSONValue"}
+
+
+def test_subworkflow_outputs_allow_recursive_json_values(subworkflow_schema: dict[str, Any]) -> None:
+    """Declared outputs support JSON scalars, arrays, and recursively nested objects."""
+    definitions = subworkflow_schema["$defs"]
+    value_schema = definitions["JSONValue"]
+    variants = value_schema["anyOf"]
+
+    model_definitions = SubWorkflowOutput.model_json_schema()["$defs"]
+    assert model_definitions["JSONValue"] == value_schema
+    assert model_definitions["JSONFloat"] == definitions["JSONFloat"]
+    assert model_definitions["JSONList"] == definitions["JSONList"]
+    assert model_definitions["JSONObject"] == definitions["JSONObject"]
+    assert {variant["$ref"] for variant in variants if "$ref" in variant} == {
+        "#/$defs/JSONFloat",
+        "#/$defs/JSONList",
+        "#/$defs/JSONObject",
+    }
+    assert {variant.get("type") for variant in variants if "type" in variant} == {
+        "boolean",
+        "integer",
+        "string",
+        "null",
+    }
+    assert definitions["JSONFloat"]["type"] == "number"
+    assert definitions["JSONList"]["items"] == {"$ref": "#/$defs/JSONValue"}
+    assert definitions["JSONObject"]["additionalProperties"] == {"$ref": "#/$defs/JSONValue"}
 
 
 def test_subworkflow_executor_in_node_type_catalog() -> None:

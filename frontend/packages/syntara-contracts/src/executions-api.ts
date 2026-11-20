@@ -1539,8 +1539,9 @@ export interface components {
      * @description Parameters for Sub-workflow executor.
      *
      *     Defines the design-time configuration for invoking a child workflow from
-     *     a parent workflow. The Sub-workflow step always invokes the latest published
-     *     version of the selected target workflow in the same Project (V1).
+     *     a parent workflow. Each new invocation resolves the latest published child
+     *     version. The child execution record pins that version for the run so retries
+     *     keep using the same workflow definition.
      *
      *     When a workflow has multiple Subworkflow Triggers, the calling step must
      *     select a specific trigger to invoke via the trigger_node_id field.
@@ -1556,7 +1557,7 @@ export interface components {
       /**
        * Workflow Id
        * Format: uuid
-       * @description UUID of the selected child workflow in the same Project (latest published version).
+       * @description UUID of the selected child workflow in the same Project (latest published version per run).
        */
       workflow_id: string
       /**

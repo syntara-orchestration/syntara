@@ -11,7 +11,7 @@ lives in the DB-backed integration suite.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Self
 from unittest.mock import MagicMock
 from uuid import UUID, uuid4
@@ -125,9 +125,27 @@ async def test_invalid_parent_id_rejected_before_db_lookup() -> None:
 
 @dataclass
 class _FakeWorkflow:
+    id: UUID
     project_id: UUID
+    published_version_id: UUID
+    created_by: UUID = field(default_factory=uuid4)
     is_enabled: bool = True
     name: str = "child-wf"
+
+
+@dataclass
+class _FakeWorkflowVersion:
+    id: UUID
+    workflow_id: UUID
+    version: int = 1
+    workflow_definition: dict[str, Any] = field(
+        default_factory=lambda: {
+            "schema_version": "2.0.0",
+            "triggers": [{"id": "child_trigger", "type": "subworkflow_trigger", "parameters": {}}],
+            "nodes": [{"id": "child_script", "type": "script", "parameters": {}}],
+            "edges": [{"from": "child_trigger", "to": "child_script"}],
+        }
+    )
 
 
 @dataclass
@@ -182,9 +200,12 @@ class _WiringSession:
                 return self.existing
             return _FakeParent(project_id=self.parent_project)  # parent lookup in the gate
         if name == "WorkflowVersion":
-            return self.pinned_version
+            for version in (self.child_version, self.pinned_version):
+                if getattr(version, "id", None) == pk:
+                    return version
+            return None
         if name == "Workflow":
-            return self.child_workflow
+            return self.child_workflow if pk == self.child_workflow.id else None
         return None
 
     async def exec(self, _statement: object) -> _Result:
@@ -216,13 +237,19 @@ async def test_new_invocation_cross_project_rejects_before_insert() -> None:
     """New-invocation path: cross-project is rejected and no child Execution is added."""
     child_execution_id = uuid4()
     child_workflow_id = uuid4()
+    child_version_id = uuid4()
+    child_version = _FakeWorkflowVersion(id=child_version_id, workflow_id=child_workflow_id)
     session: Any = _WiringSession(
         child_execution_id=child_execution_id,
         parent_project=uuid4(),  # parent project
         existing=None,  # -> new-invocation path
-        child_workflow=_FakeWorkflow(project_id=uuid4()),  # different project
-        child_version=object(),
-        pinned_version=object(),
+        child_workflow=_FakeWorkflow(
+            id=child_workflow_id,
+            project_id=uuid4(),  # different project
+            published_version_id=child_version_id,
+        ),
+        child_version=child_version,
+        pinned_version=child_version,
     )
     activity = SubWorkflowSetupActivity(session_factory=lambda: session, task_queue="unit-tq")
 
@@ -239,13 +266,19 @@ async def test_resume_path_cross_project_cannot_bypass() -> None:
     """Idempotent resume path: an existing child is still project-validated, not bypassed."""
     child_execution_id = uuid4()
     child_workflow_id = uuid4()
+    child_version_id = uuid4()
+    child_version = _FakeWorkflowVersion(id=child_version_id, workflow_id=child_workflow_id)
     session: Any = _WiringSession(
         child_execution_id=child_execution_id,
         parent_project=uuid4(),
-        existing=_FakeExisting(workflow_id=child_workflow_id, workflow_version_id=uuid4()),
-        child_workflow=_FakeWorkflow(project_id=uuid4()),  # different project from parent
-        child_version=object(),
-        pinned_version=object(),  # pinned version exists
+        existing=_FakeExisting(workflow_id=child_workflow_id, workflow_version_id=child_version_id),
+        child_workflow=_FakeWorkflow(
+            id=child_workflow_id,
+            project_id=uuid4(),  # different project from parent
+            published_version_id=child_version_id,
+        ),
+        child_version=child_version,
+        pinned_version=child_version,
     )
     activity = SubWorkflowSetupActivity(session_factory=lambda: session, task_queue="unit-tq")
 

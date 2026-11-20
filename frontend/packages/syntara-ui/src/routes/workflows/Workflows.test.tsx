@@ -111,6 +111,21 @@ function mockWorkflowQuery(returnValue: ReturnType<typeof workflowClient.useQuer
   vi.mocked(accessClient.useQuery).mockReturnValue(returnValue)
 }
 
+function mockWorkflowQueryForPublish(returnValue: ReturnType<typeof workflowClient.useQuery>) {
+  mockWorkflowQuery(returnValue)
+  const workflowDetail = {
+    version: {
+      workflow_definition: { schema_version: '2.0.0', triggers: [], nodes: [], edges: [] },
+    },
+  }
+  vi.mocked(workflowClient.useQuery).mockImplementation((_method: string, path: string) => {
+    if (path === '/workflows/{workflow_id}') {
+      return { data: workflowDetail, refetch: vi.fn() } as never
+    }
+    return returnValue as never
+  })
+}
+
 // Create a QueryClient instance
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -2198,6 +2213,32 @@ describe('Workflows Component', () => {
       ...mockWorkflows[0],
       current_version: 5,
     }
+    const noContractChanges = {
+      has_breaking_changes: false,
+      triggers: [],
+      has_contract_changes: false,
+      contract_changes: [],
+      parent_workflows: [],
+    }
+
+    function mockPublishMutations(
+      defaultMutationReturn: Record<string, unknown>,
+      publishMutate: ReturnType<typeof vi.fn>
+    ) {
+      vi.mocked(workflowClient.useMutation).mockImplementation((_method: string, path: string) => {
+        if (path.includes('/check_subworkflow_output_contract_changes')) {
+          return {
+            ...defaultMutationReturn,
+            mutate: (_params: unknown, callbacks?: { onSuccess?: (response: typeof noContractChanges) => void }) =>
+              callbacks?.onSuccess?.(noContractChanges),
+          } as never
+        }
+        if (path.includes('/publish')) {
+          return { ...defaultMutationReturn, mutate: publishMutate } as never
+        }
+        return { ...defaultMutationReturn, mutate: vi.fn() } as never
+      })
+    }
 
     const openPublishDialogForFirstRow = async (user: ReturnType<typeof userEvent.setup>) => {
       await waitFor(() => {
@@ -2236,7 +2277,7 @@ describe('Workflows Component', () => {
         }
       )
 
-      mockWorkflowQuery({
+      mockWorkflowQueryForPublish({
         data: {
           resources: [workflowWithVersion],
           next: null,
@@ -2266,12 +2307,7 @@ describe('Workflows Component', () => {
         submittedAt: 0,
       }
 
-      vi.mocked(workflowClient.useMutation).mockImplementation((_method: string, path: string) => {
-        if (path.includes('/publish')) {
-          return { ...defaultMutationReturn, mutate: mockPublishMutate } as never
-        }
-        return { ...defaultMutationReturn, mutate: vi.fn() } as never
-      })
+      mockPublishMutations(defaultMutationReturn, mockPublishMutate)
 
       const user = userEvent.setup()
       render(<Workflows />, { wrapper })
@@ -2305,7 +2341,7 @@ describe('Workflows Component', () => {
         }
       )
 
-      mockWorkflowQuery({
+      mockWorkflowQueryForPublish({
         data: {
           resources: [workflowWithVersion],
           next: null,
@@ -2335,12 +2371,7 @@ describe('Workflows Component', () => {
         submittedAt: 0,
       }
 
-      vi.mocked(workflowClient.useMutation).mockImplementation((_method: string, path: string) => {
-        if (path.includes('/publish')) {
-          return { ...defaultMutationReturn, mutate: mockPublishMutate } as never
-        }
-        return { ...defaultMutationReturn, mutate: vi.fn() } as never
-      })
+      mockPublishMutations(defaultMutationReturn, mockPublishMutate)
 
       const user = userEvent.setup()
       render(<Workflows />, { wrapper })
@@ -2368,7 +2399,7 @@ describe('Workflows Component', () => {
         }
       )
 
-      mockWorkflowQuery({
+      mockWorkflowQueryForPublish({
         data: {
           resources: [workflowWithVersion],
           next: null,
@@ -2398,12 +2429,7 @@ describe('Workflows Component', () => {
         submittedAt: 0,
       }
 
-      vi.mocked(workflowClient.useMutation).mockImplementation((_method: string, path: string) => {
-        if (path.includes('/publish')) {
-          return { ...defaultMutationReturn, mutate: mockPublishMutate } as never
-        }
-        return { ...defaultMutationReturn, mutate: vi.fn() } as never
-      })
+      mockPublishMutations(defaultMutationReturn, mockPublishMutate)
 
       const user = userEvent.setup()
       render(<Workflows />, { wrapper })

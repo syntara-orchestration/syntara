@@ -1517,6 +1517,113 @@ class TestBuildResultStatus:
         assert "node_b" not in result["failed_activities"]
 
 
+class TestBuildDeclaredSubWorkflowOutputs:
+    """A child result exposes mapped public fields, never its internal namespaces."""
+
+    def test_builds_declared_output_payload(self) -> None:
+        wf = _make_workflow()
+        wf._workflow_definition = {
+            "triggers": [
+                {
+                    "id": "child_trigger",
+                    "type": "subworkflow_trigger",
+                    "parameters": {
+                        "output_schema": {
+                            "type": "object",
+                            "properties": {
+                                "release": {
+                                    "type": "object",
+                                    "properties": {"url": {"type": "string"}},
+                                    "required": ["url"],
+                                }
+                            },
+                            "required": ["release"],
+                        },
+                        "output_mapping": {"release.url": "${deploy.url}"},
+                    },
+                }
+            ]
+        }
+        wf._trigger_node_id = "child_trigger"
+        wf.resolver.set_namespace("deploy", {"url": "https://example.test/app", "internal_token": "secret"})
+
+        result = wf._build_declared_outputs()
+
+        assert result == {"release": {"url": "https://example.test/app"}}
+        assert "internal_token" not in str(result)
+
+    @pytest.mark.parametrize(
+        ("output_schema", "output_mapping", "nodes", "namespaces"),
+        [
+            pytest.param(
+                {
+                    "type": "object",
+                    "properties": {"release_tag": {"type": "string"}},
+                    "required": ["release_tag"],
+                },
+                {"release_tag": "${deploy.tag}"},
+                [],
+                {},
+                id="missing-required-output",
+            ),
+            pytest.param(
+                {
+                    "type": "object",
+                    "properties": {"build_number": {"type": "integer"}},
+                    "required": ["build_number"],
+                },
+                {"build_number": "${deploy.number}"},
+                [],
+                {"deploy": {"number": "not-an-integer"}},
+                id="output-type-mismatch",
+            ),
+            pytest.param(
+                {
+                    "type": "object",
+                    "properties": {"release_tag": {"type": "string"}},
+                    "required": ["release_tag"],
+                },
+                {"release_tag": "${deploy.missing}"},
+                [{"id": "deploy"}],
+                {"deploy": {}},
+                id="stale-source-mapping",
+            ),
+        ],
+    )
+    def test_output_contract_violations_fail_non_retryably(
+        self,
+        output_schema: dict[str, Any],
+        output_mapping: dict[str, str],
+        nodes: list[dict[str, str]],
+        namespaces: dict[str, dict[str, Any]],
+    ) -> None:
+        from temporalio.exceptions import ApplicationError
+
+        wf = _make_workflow()
+        wf._workflow_definition = {
+            "nodes": nodes,
+            "triggers": [
+                {
+                    "id": "child_trigger",
+                    "type": "subworkflow_trigger",
+                    "parameters": {
+                        "output_schema": output_schema,
+                        "output_mapping": output_mapping,
+                    },
+                }
+            ],
+        }
+        wf._trigger_node_id = "child_trigger"
+        for namespace_id, values in namespaces.items():
+            wf.resolver.set_namespace(namespace_id, values)
+
+        with pytest.raises(ApplicationError, match="output contract violation") as exc_info:
+            wf._build_declared_outputs()
+
+        assert exc_info.value.type == "SubWorkflowOutputContractError"
+        assert exc_info.value.non_retryable is True
+
+
 class TestHandleNodeFailureCancellation:
     """_handle_node_failure maps InvocationCancelledError to cancelled, not failed."""
 

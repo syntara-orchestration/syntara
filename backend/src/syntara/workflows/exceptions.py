@@ -69,8 +69,8 @@ class WorkflowNameConflictError(WorkflowError):
 class WorkflowVersionNotFoundError(WorkflowError):
     """Raised when a workflow version is not found."""
 
-    def __init__(self, workflow_id: UUID, version: int) -> None:
-        """Initialize exception with workflow ID and version."""
+    def __init__(self, workflow_id: UUID, version: int | UUID) -> None:
+        """Initialize exception with workflow ID and version number or ID."""
         self.workflow_id = workflow_id
         self.version = version
         super().__init__(f"Workflow {workflow_id} version {version} not found")
