@@ -212,6 +212,35 @@ describe('buildEditSchema', () => {
     })
   })
 
+  describe('OpenShift (Execution plane infrastructure)', () => {
+    const validOpenShift = {
+      name: 'EP Control Plane',
+      description: '',
+      integration_type: 'openshift',
+      base_url: 'https://api.cluster.example.com:6443',
+      scope: 'global' as const,
+      management_credential_id: null,
+      ...securityDefaults,
+    }
+
+    it('accepts valid OpenShift data', () => {
+      const result = schema.safeParse(validOpenShift)
+      expect(result.success).toBe(true)
+    })
+
+    it.each([
+      ['empty base_url', '', 'API endpoint is required'],
+      ['HTTP URL (HTTPS only)', 'http://api.cluster.example.com:6443', 'Must be an HTTPS URL'],
+      ['invalid URL', 'not-a-url', 'Must be a valid URL'],
+    ])('rejects %s', (_label, url, expectedMessage) => {
+      const result = schema.safeParse({ ...validOpenShift, base_url: url })
+      expect(result.success).toBe(false)
+      if (!result.success) {
+        expect(result.error.issues.some((i) => i.message === expectedMessage)).toBe(true)
+      }
+    })
+  })
+
   describe('shared fields', () => {
     it('rejects empty name', () => {
       const result = schema.safeParse({ ...validMcp, name: '' })
