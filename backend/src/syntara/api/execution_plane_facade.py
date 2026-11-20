@@ -35,8 +35,7 @@ from execution_plane_client.models.work_item import (
 from fastapi import Depends, HTTPException, Query, Request, Response, status
 from pydantic import BaseModel, Field, ValidationError
 
-from syntara.authz.dependencies import PermissionChecker, ProjectScopeFilter
-from syntara.authz.engine import AllowedProjectsResult  # noqa: TC001 — FastAPI resolves dependency annotations
+from syntara.authz.dependencies import PermissionChecker
 from syntara.core.models.base import BaseListParams
 from syntara.core.syntara_router import SyntaraRouter
 from syntara.execution_plane.client import (
@@ -57,8 +56,6 @@ if TYPE_CHECKING:
 logger = structlog.stdlib.get_logger(__name__)
 
 router = SyntaraRouter(prefix="/api/execution_plane/v1", tags=["Execution Plane"])
-_target_scope = ProjectScopeFilter("execution_target", "read")
-_work_item_scope = ProjectScopeFilter("work_item", "read")
 _ACTIVE_WORK_ITEM_STATUSES: tuple[WorkItemStatus, ...] = (
     WorkItemStatus.CLAIMED,
     WorkItemStatus.DISPATCHED,
@@ -279,6 +276,7 @@ async def delete_execution_target(target_id: UUID) -> ExecutionTargetDeleteAccep
     "/execution_targets",
     operation_id="list_execution_targets",
     summary="List execution targets",
+    dependencies=[Depends(PermissionChecker("execution_target", "read"))],
     description=(
         "Retrieve registered execution targets. Filters use field=value or field[operator]=value; "
         "labels[key]=value matches a label and an empty value tests key existence. "
@@ -291,7 +289,6 @@ async def delete_execution_target(target_id: UUID) -> ExecutionTargetDeleteAccep
 )
 async def list_execution_targets(
     request: Request,
-    allowed_projects: Annotated[AllowedProjectsResult, Depends(_target_scope)],
     params: Annotated[ExecutionTargetListParams, Query()],
 ) -> ResourcesResponse[ExecutionTargetRead]:
     """Read registered execution targets from EP after AO permission checks."""
@@ -308,7 +305,6 @@ async def list_execution_targets(
             page = await _list_ep_resources(
                 client,
                 operation="execution_targets",
-                allowed_projects=allowed_projects,
                 params=params,
                 query_params=request.query_params.multi_items(),
             )
@@ -333,6 +329,7 @@ async def list_execution_targets(
     "/work_items",
     operation_id="list_work_items",
     summary="List work items",
+    dependencies=[Depends(PermissionChecker("work_item", "read"))],
     description=(
         "Retrieve work items. Filters use field=value or field[operator]=value; comma-separated "
         "values within one field/operator use OR and different fields/operators use AND. "
@@ -347,7 +344,6 @@ async def list_execution_targets(
 )
 async def list_work_items(
     request: Request,
-    allowed_projects: Annotated[AllowedProjectsResult, Depends(_work_item_scope)],
     params: Annotated[WorkItemListParams, Query()],
 ) -> ResourcesResponse[WorkItemRead]:
     """Read work-item state from EP after AO permission checks."""
@@ -365,7 +361,6 @@ async def list_work_items(
             page = await _list_ep_resources(
                 client,
                 operation="work_items",
-                allowed_projects=allowed_projects,
                 params=params,
                 query_params=request.query_params.multi_items(),
             )
@@ -390,13 +385,10 @@ async def _list_ep_resources(
     client: ExecutionPlaneHttpClient,
     *,
     operation: Literal["execution_targets", "work_items"],
-    allowed_projects: AllowedProjectsResult,
     params: EPListParams,
     query_params: list[tuple[str, str]],
 ) -> dict[str, Any]:
-    """List EP resources after AO permission checks. EP has no project scope."""
-    if not allowed_projects.all_projects and not allowed_projects.project_ids:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No project-scoped access to EP resources")
+    """Forward EP queries after the route's system-scoped permission check."""
     filters = {key: value for key, value in query_params if key not in BaseListParams.model_fields}
     sort = params.sort if any(key == "sort" for key, _ in query_params) else None
     try:

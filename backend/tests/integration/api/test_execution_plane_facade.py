@@ -1,25 +1,35 @@
-"""Integration tests for the AO Execution Plane facade pagination contract.
+"""Integration tests for the AO Execution Plane facade authorization and proxy contracts.
 
 Query controls, dynamic bracket filters, and opaque cursors are forwarded to EP.
 EP's response envelope and validation errors retain their public semantics.
 
-EP HTTP calls are intercepted by respx; the AO database (postgres) is real.
+EP HTTP calls are intercepted by respx; the AO database and Rego evaluation are real.
 """
 
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 from unittest.mock import patch
+from uuid import uuid4
 
 import pytest
 import respx
-from httpx import AsyncClient, Response
+from execution_plane_client.catalog import CommandCatalog
+from execution_plane_client.protocol import MessageEnvelope
+from httpx import AsyncClient, Request, Response
+from sqlalchemy import insert
 
+from syntara.authz.models import Policy, Project, Role, RoleAssignment
+from syntara.core.models.group import Group, user_groups
 from syntara.execution_plane import client as ep_client_module
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Generator
+    from collections.abc import Awaitable, Callable, Generator
     from contextlib import AbstractContextManager
+
+    from sqlmodel.ext.asyncio.session import AsyncSession
+
+    from syntara.core.models import User
 
 _EP_BASE = "https://ep.test"
 
@@ -560,3 +570,292 @@ async def test_malformed_context_filters_are_rejected_before_ep(auth_client: Asy
         response = await auth_client.get("/api/execution_plane/v1/work_items", params={key: "value"})
     assert response.status_code == 422
     assert not ep.calls
+
+
+# Each operation is exercised through real policy resolution and Rego. Only the
+# outbound EP HTTP boundary is mocked, using the shared command/receipt contract.
+_PREFIX = "/api/execution_plane/v1"
+_TARGET_PATH = f"{_PREFIX}/execution_targets/{_TARGET_1['id']}"
+_CREATE_BODY = {"name": "workers", "placement": {"type": "kubernetes", "namespace": "workers"}}
+_OPERATIONS = [
+    ("GET", f"{_PREFIX}/execution_targets", None, "execution_target:read", 200),
+    ("GET", _TARGET_PATH, None, "execution_target:read", 200),
+    ("GET", f"{_TARGET_PATH}/health", None, "execution_target:read", 200),
+    ("GET", f"{_TARGET_PATH}/usage", None, "execution_target:read", 200),
+    ("POST", f"{_PREFIX}/execution_targets", _CREATE_BODY, "execution_target:create", 201),
+    ("PATCH", _TARGET_PATH, {"enabled": False}, "execution_target:update", 200),
+    ("DELETE", _TARGET_PATH, None, "execution_target:delete", 202),
+    ("GET", f"{_PREFIX}/work_items", None, "work_item:read", 200),
+]
+_PERMISSIONS = sorted({operation[3] for operation in _OPERATIONS})
+
+
+@pytest.fixture
+def ep_inventory() -> Generator[respx.MockRouter, None, None]:
+    """Serve inventory and valid target command receipts through real HTTP transport."""
+    target = dict(_TARGET_1)
+
+    def command_response(request: Request) -> Response:
+        message = MessageEnvelope.model_validate_json(request.content)
+        CommandCatalog().validate(message)
+        target["id"] = message.command.payload["resource_id"]
+        result = None
+        if message.command.command_type == "execution_target.health":
+            result = {
+                "command_type": "execution_target.health",
+                "command_revision": 1,
+                "healthy": True,
+                "message": "probe succeeded",
+                "skipped": False,
+            }
+        return Response(
+            200,
+            json={
+                "received": True,
+                "message_id": str(message.message_id),
+                "resource": {"kind": "execution_target", "resource_id": target["id"]},
+                "result": result,
+            },
+        )
+
+    with respx.mock(base_url=_EP_BASE, assert_all_called=False) as ep:
+        ep.get("/v1/execution-targets").respond(200, json={"resources": [target], "total": 1})
+        ep.get(url__regex=r"/v1/execution-targets/[^/]+$").mock(side_effect=lambda _request: Response(200, json=target))
+        ep.get("/v1/work-items").respond(200, json={"resources": [_WORK_ITEM_1], "total": 1})
+        ep.get("/v1/clusters").respond(
+            200,
+            json={
+                "resources": [
+                    {
+                        "id": _TARGET_1["cluster_id"],
+                        "endpoint": _TARGET_1["endpoint"],
+                    }
+                ]
+            },
+        )
+        ep.post("/v1/commands").mock(side_effect=command_response)
+        yield ep
+
+
+@pytest.mark.parametrize(("method", "path", "body", "permission", "success"), _OPERATIONS)
+@pytest.mark.parametrize("grant", ["none", "user", "project-admin", "auditor", "admin", *_PERMISSIONS])
+async def test_facade_permission_matrix(
+    auth_client: AsyncClient,
+    test_db_session: AsyncSession,
+    user_factory: Callable[..., Awaitable[User]],
+    auth_as: Callable[[User], None],
+    ep_inventory: respx.MockRouter,
+    method: str,
+    path: str,
+    body: dict[str, Any] | None,
+    permission: str,
+    success: int,
+    grant: str,
+) -> None:
+    """Discover policies and create custom grants via the same APIs as the role editor."""
+    user = await user_factory(group_names=[])
+    if grant in _PERMISSIONS:
+        policy_name = f"{grant}:any"
+        catalog = await auth_client.get("/api/v1/policies", params={"name[contains]": policy_name})
+        assert catalog.status_code == 200, catalog.text
+        policies = catalog.json()["resources"]
+        assert len(policies) == 1
+        assert policies[0]["name"] == policy_name
+        assert policies[0]["is_builtin"] is True
+        assert policies[0]["project_id"] is None
+        assert policies[0]["scope"] == "any"
+
+        role = await auth_client.post(
+            "/api/v1/roles",
+            json={
+                "name": f"ep-role-{uuid4()}",
+                "policies": [policies[0]["name"]],
+            },
+        )
+        assert role.status_code == 201, role.text
+        assert role.json()["scope"] == "system"
+        assert role.json()["policies"] == [policy_name]
+        assert role.json()["is_builtin"] is False
+        assignment = await auth_client.post(
+            f"/api/v1/users/{user.id}/role_assignments",
+            json={
+                "role_name": role.json()["name"],
+            },
+        )
+        assert assignment.status_code == 201, assignment.text
+    elif grant == "project-admin":
+        project = Project(name=f"ep-project-{uuid4()}")
+        test_db_session.add(project)
+        await test_db_session.flush()
+        test_db_session.add(RoleAssignment(principal_id=user.id, role_name=grant, project_id=project.id))
+    elif grant != "none":
+        test_db_session.add(RoleAssignment(principal_id=user.id, role_name=grant))
+    await test_db_session.commit()
+    auth_as(user)
+
+    resource_type, action = permission.split(":")
+    expected = grant in ("admin", permission) or (grant == "auditor" and action == "read")
+    can_i = await auth_client.post("/api/v1/authz/can_i", json={"resource_type": resource_type, "action": action})
+    assert can_i.status_code == 200, can_i.text
+    assert can_i.json()["allowed"] is expected
+
+    response = await auth_client.request(method, path, json=body)
+    assert response.status_code == (success if expected else 403), response.text
+    if expected:
+        assert ep_inventory.calls
+        if method == "GET" and path in (f"{_PREFIX}/execution_targets", f"{_PREFIX}/work_items"):
+            assert len(response.json()["resources"]) == 1
+            assert response.json()["total"] == 1
+    else:
+        assert not ep_inventory.calls
+        assert "resources" not in response.json()
+        assert "total" not in response.json()
+        assert "next" not in response.json()
+
+
+@pytest.mark.parametrize(
+    ("path", "resource_type"),
+    [
+        (f"{_PREFIX}/execution_targets", "execution_target"),
+        (f"{_PREFIX}/work_items", "work_item"),
+    ],
+)
+async def test_project_grant_cannot_unlock_global_ep_inventory(
+    auth_client: AsyncClient,
+    test_db_session: AsyncSession,
+    user_factory: Callable[..., Awaitable[User]],
+    auth_as: Callable[[User], None],
+    ep_inventory: respx.MockRouter,
+    path: str,
+    resource_type: str,
+) -> None:
+    """Even a persisted project EP grant must not authorize the unfiltered list.
+
+    The policy API rejects these grants today; seed one directly to reproduce
+    the old ProjectScopeFilter loophole and protect against legacy policy data.
+    """
+    user = await user_factory(group_names=[])
+    project = Project(name=f"ep-project-{uuid4()}")
+    test_db_session.add(project)
+    await test_db_session.flush()
+    policy = Policy(
+        name=f"ep-policy-{uuid4()}",
+        project_id=project.id,
+        scope="project",
+        statements=[
+            {
+                "effect": "allow",
+                "actions": [f"{resource_type}:read"],
+                "scope": "project",
+            }
+        ],
+    )
+    role = Role(name=f"ep-role-{uuid4()}", project_id=project.id, scope="project", policy_names=[policy.name])
+    test_db_session.add_all([policy, role])
+    await test_db_session.flush()
+    test_db_session.add(RoleAssignment(principal_id=user.id, role_name=role.name, project_id=project.id))
+    await test_db_session.commit()
+    auth_as(user)
+
+    query = {"include_total": "true", "cursor": "opaque-cursor"}
+    if resource_type == "work_item":
+        query["runtime_context[project_id]"] = str(project.id)
+    response = await auth_client.get(path, params=query)
+    assert response.status_code == 403, response.text
+    assert not ep_inventory.calls
+
+
+async def test_group_role_grant_and_revocation(
+    auth_client: AsyncClient,
+    test_db_session: AsyncSession,
+    user_factory: Callable[..., Awaitable[User]],
+    auth_as: Callable[[User], None],
+    ep_inventory: respx.MockRouter,
+) -> None:
+    """Group membership grants target reads, and revoking the role removes them."""
+    user = await user_factory(group_names=[])
+    auth_as(user)
+    path = f"{_PREFIX}/execution_targets"
+    assert (await auth_client.get(path)).status_code == 403
+    assert not ep_inventory.calls
+
+    role = Role(name=f"ep-role-{uuid4()}", policy_names=["execution_target:read:any"])
+    group = Group(name=f"ep-group-{uuid4()}")
+    test_db_session.add_all([role, group])
+    await test_db_session.flush()
+    assignment = RoleAssignment(group_id=group.id, role_name=role.name)
+    test_db_session.add(assignment)
+    await test_db_session.exec(insert(user_groups).values(user_id=user.id, group_id=group.id))
+    await test_db_session.commit()
+    response = await auth_client.get(path)
+    assert response.status_code == 200, response.text
+    assert response.json()["resources"][0]["id"] == _TARGET_1["id"]
+
+    await test_db_session.delete(assignment)
+    await test_db_session.commit()
+    call_count = len(ep_inventory.calls)
+    assert (await auth_client.get(path)).status_code == 403
+    assert len(ep_inventory.calls) == call_count
+
+
+@pytest.mark.parametrize("effect", ["allow", "deny"])
+@pytest.mark.parametrize("matches", [False, True])
+async def test_facade_evaluates_policy_conditions_and_denies(
+    auth_client: AsyncClient,
+    test_db_session: AsyncSession,
+    user_factory: Callable[..., Awaitable[User]],
+    auth_as: Callable[[User], None],
+    ep_inventory: respx.MockRouter,
+    effect: str,
+    *,
+    matches: bool,
+) -> None:
+    """Evaluate user-label conditions and deny precedence without mocking Rego."""
+    user = await user_factory(group_names=[], labels={"team": "operations" if matches else "other"})
+    policy = Policy(
+        name=f"ep-policy-{uuid4()}",
+        statements=[
+            {
+                "effect": effect,
+                "actions": ["execution_target:read"],
+                "scope": "any",
+                "conditions": {"user_labels": {"team": "operations"}},
+            }
+        ],
+    )
+    # Deny creation is intentionally disabled in the policy API. Persist the
+    # fixture directly to exercise the evaluator's existing deny precedence.
+    policies = [policy.name]
+    if effect == "deny":
+        policies.append("execution_target:read:any")
+    role = Role(name=f"ep-role-{uuid4()}", policy_names=policies)
+    test_db_session.add_all([policy, role])
+    await test_db_session.flush()
+    test_db_session.add(RoleAssignment(principal_id=user.id, role_name=role.name))
+    await test_db_session.commit()
+    auth_as(user)
+
+    expected = matches if effect == "allow" else not matches
+    response = await auth_client.get(f"{_PREFIX}/execution_targets")
+    assert response.status_code == (200 if expected else 403), response.text
+    assert bool(ep_inventory.calls) is expected
+
+
+async def test_ep_permission_catalog_and_project_policy_validation(auth_client: AsyncClient) -> None:
+    """EP permissions are discoverable and cannot be added to project policies."""
+    catalog = await auth_client.get("/api/v1/authz/resource_actions")
+    assert catalog.status_code == 200, catalog.text
+    assert catalog.json()["resource_actions"]["execution_target"] == ["create", "delete", "read", "update"]
+    assert catalog.json()["resource_actions"]["work_item"] == ["read"]
+
+    project = await auth_client.post("/api/v1/projects", json={"name": f"ep-project-{uuid4()}"})
+    assert project.status_code == 201, project.text
+    for permission in _PERMISSIONS:
+        response = await auth_client.post(
+            f"/api/v1/projects/{project.json()['id']}/policies",
+            json={
+                "name": f"ep-policy-{uuid4()}",
+                "statements": [{"effect": "allow", "actions": [permission], "scope": "project"}],
+            },
+        )
+        assert response.status_code == 422, response.text

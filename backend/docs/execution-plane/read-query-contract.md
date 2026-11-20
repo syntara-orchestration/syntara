@@ -34,7 +34,11 @@ GET /api/execution_plane/v1/execution_targets?labels[env]=prod&enabled=true&sort
 GET /api/execution_plane/v1/execution_targets?labels[env]=prod&enabled=true&sort=name&limit=2&cursor=<next-or-prev-token>
 ```
 
-This patch changes query transport and response handling. Existing authorization
-checks are preserved; project associations and RBAC are a separate next step.
+AO authorizes each list request with its normal system-scoped permissions:
+`execution_target:read` for targets and `work_item:read` for work items. These
+permissions grant access to the EP inventory across projects. Project roles do
+not grant access, and query filters (including `runtime_context[project_id]`)
+never establish authorization. A denied request returns 403 before contacting EP.
+
 EP also has a cluster list, but this AO router currently exposes only
 work items and execution targets. No cluster list route is introduced here.
