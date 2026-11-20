@@ -2004,6 +2004,9 @@ export const handlers = [
           typeof parameters.success_message === 'string' && parameters.success_message.length > 0
             ? parameters.success_message
             : 'Thank you — the workflow will continue.'
+        const respondersConfigured =
+          (Array.isArray(parameters.responder_users) && parameters.responder_users.length > 0) ||
+          (Array.isArray(parameters.responder_groups) && parameters.responder_groups.length > 0)
         formPrompts.push({
           id: uuidv4(),
           created_at: timestamp,
@@ -2028,6 +2031,7 @@ export const handlers = [
           },
           submit_label: submitLabel,
           success_message: successMessage,
+          responders_configured: respondersConfigured,
           responder_users: Array.isArray(parameters.responder_users)
             ? mockFormPromptResponderUsers(parameters.responder_users)
             : [{ id: 'user-admin', username: 'admin' }],
