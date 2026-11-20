@@ -20,7 +20,7 @@ import { useWatch, type UseFormSetValue } from 'react-hook-form'
 import { SynFormField } from '../../../../components/forms/SynFormField'
 import { SynTextField } from '../../../../components/forms/SynTextField'
 import { SynSelect } from '../../../../components/SynSelect'
-import { getIntegrationFieldConfig, integrationHelp } from '../integrationFieldHelp'
+import { integrationHelp } from '../integrationFieldHelp'
 import { PROVIDERS_HIDING_BASE_URL, PROVIDERS_REQUIRING_BASE_URL } from '../integrationFilters'
 
 import { INTEGRATION_TYPE_OPTIONS, PROVIDER_HINT_OPTIONS, type IntegrationFormData } from './integrationFormSchema'
@@ -143,9 +143,6 @@ function SecurityFields() {
     name: 'configuration.insecure_skip_tls_verify',
   })
 
-  const integrationType = useWatch<IntegrationFormData, 'integration_type'>({ name: 'integration_type' })
-  const isOpenShift = integrationType === IntegrationTypeEnum.OPENSHIFT
-
   return (
     <ExpandableSection
       toggleText="Security"
@@ -154,53 +151,49 @@ function SecurityFields() {
       isIndented
     >
       <div className={styles.securityFields}>
-        {!isOpenShift && (
-          <>
-            <SynFormField<IntegrationFormData, 'configuration.allow_http'>
-              name="configuration.allow_http"
+        <SynFormField<IntegrationFormData, 'configuration.allow_http'>
+          name="configuration.allow_http"
+          label="Allow HTTP connections"
+          fieldId="allow-http"
+          hideFormGroupLabel
+          hideFooter
+        >
+          {({ field }) => (
+            <Checkbox
+              id="allow-http"
               label="Allow HTTP connections"
-              fieldId="allow-http"
-              hideFormGroupLabel
-              hideFooter
-            >
-              {({ field }) => (
-                <Checkbox
-                  id="allow-http"
-                  label="Allow HTTP connections"
-                  description="Permits unencrypted HTTP URLs for this integration"
-                  isChecked={field.value}
-                  onChange={(_event, checked) => field.onChange(checked)}
-                />
-              )}
-            </SynFormField>
-            <SynFormField<IntegrationFormData, 'configuration.insecure_skip_tls_verify'>
-              name="configuration.insecure_skip_tls_verify"
+              description="Permits unencrypted HTTP URLs for this integration"
+              isChecked={field.value}
+              onChange={(_event, checked) => field.onChange(checked)}
+            />
+          )}
+        </SynFormField>
+        <SynFormField<IntegrationFormData, 'configuration.insecure_skip_tls_verify'>
+          name="configuration.insecure_skip_tls_verify"
+          label="Disable TLS certificate verification"
+          fieldId="insecure-skip-tls-verify"
+          hideFormGroupLabel
+          hideFooter
+        >
+          {({ field }) => (
+            <Checkbox
+              id="insecure-skip-tls-verify"
               label="Disable TLS certificate verification"
-              fieldId="insecure-skip-tls-verify"
-              hideFormGroupLabel
-              hideFooter
-            >
-              {({ field }) => (
-                <Checkbox
-                  id="insecure-skip-tls-verify"
-                  label="Disable TLS certificate verification"
-                  description="Skips validation of the server's TLS certificate on connections"
-                  isChecked={field.value}
-                  onChange={(_event, checked) => field.onChange(checked)}
-                  body={
-                    skipTlsVerify ? (
-                      <HelperText>
-                        <HelperTextItem variant="warning">
-                          The server's TLS certificate will not be verified. Only enable in trusted networks.
-                        </HelperTextItem>
-                      </HelperText>
-                    ) : undefined
-                  }
-                />
-              )}
-            </SynFormField>
-          </>
-        )}
+              description="Skips validation of the server's TLS certificate on connections"
+              isChecked={field.value}
+              onChange={(_event, checked) => field.onChange(checked)}
+              body={
+                skipTlsVerify ? (
+                  <HelperText>
+                    <HelperTextItem variant="warning">
+                      The server's TLS certificate will not be verified. Only enable in trusted networks.
+                    </HelperTextItem>
+                  </HelperText>
+                ) : undefined
+              }
+            />
+          )}
+        </SynFormField>
         {!skipTlsVerify && (
           <SynFormField<IntegrationFormData, 'configuration.ca_certificate'>
             name="configuration.ca_certificate"
@@ -233,53 +226,6 @@ type IntegrationDetailsStepProps = Readonly<{
   onTypeChange: (newType: string) => void
 }>
 
-function getTypeConfig(
-  integrationType: string,
-  providerHint: string | undefined
-): {
-  nameLabel: string
-  namePlaceholder: string
-  showProviderHint: boolean
-  hideBaseUrl: boolean
-  requireBaseUrl: boolean
-  baseUrlPlaceholder: string
-} {
-  const isLLM = integrationType === IntegrationTypeEnum.LLM_PROVIDER
-  const isAAP = integrationType === IntegrationTypeEnum.ANSIBLE_AUTOMATION_PLATFORM
-  const isOpenShift = integrationType === IntegrationTypeEnum.OPENSHIFT
-
-  if (isLLM) {
-    return {
-      nameLabel: 'Name',
-      namePlaceholder: 'Enter provider name',
-      showProviderHint: true,
-      hideBaseUrl: typeof providerHint === 'string' && PROVIDERS_HIDING_BASE_URL.has(providerHint),
-      requireBaseUrl: typeof providerHint === 'string' && PROVIDERS_REQUIRING_BASE_URL.has(providerHint),
-      baseUrlPlaceholder: 'https://api.example.com/v1',
-    }
-  }
-
-  if (isOpenShift) {
-    return {
-      nameLabel: 'Cluster name',
-      namePlaceholder: 'Enter cluster name',
-      showProviderHint: false,
-      hideBaseUrl: false,
-      requireBaseUrl: true,
-      baseUrlPlaceholder: 'https://api.example.com:6443',
-    }
-  }
-
-  return {
-    nameLabel: 'Server name / ID',
-    namePlaceholder: 'Enter server name / ID',
-    showProviderHint: false,
-    hideBaseUrl: false,
-    requireBaseUrl: true,
-    baseUrlPlaceholder: isAAP ? 'e.g. https://aap.example.com' : 'https://mcp-server.example.com/mcp',
-  }
-}
-
 export function IntegrationDetailsStep({ setValue, onTypeChange }: IntegrationDetailsStepProps) {
   const scope = useWatch<IntegrationFormData, 'scope'>({ name: 'scope' })
   const integrationType = useWatch<IntegrationFormData, 'integration_type'>({ name: 'integration_type' })
@@ -289,9 +235,25 @@ export function IntegrationDetailsStep({ setValue, onTypeChange }: IntegrationDe
   const [isTypeOpen, setIsTypeOpen] = useState(false)
   const [isProviderOpen, setIsProviderOpen] = useState(false)
 
-  const fieldConfig = getIntegrationFieldConfig(integrationType)
-  const isOpenShift = integrationType === IntegrationTypeEnum.OPENSHIFT
-  const typeConfig = getTypeConfig(integrationType, providerHint)
+  const isLLM = integrationType === IntegrationTypeEnum.LLM_PROVIDER
+  const isAAP = integrationType === IntegrationTypeEnum.ANSIBLE_AUTOMATION_PLATFORM
+  const typeConfig = isLLM
+    ? {
+        nameLabel: 'Name',
+        namePlaceholder: 'Enter provider name',
+        showProviderHint: true,
+        hideBaseUrl: typeof providerHint === 'string' && PROVIDERS_HIDING_BASE_URL.has(providerHint),
+        requireBaseUrl: typeof providerHint === 'string' && PROVIDERS_REQUIRING_BASE_URL.has(providerHint),
+        baseUrlPlaceholder: 'https://api.example.com/v1',
+      }
+    : {
+        nameLabel: 'Server name / ID',
+        namePlaceholder: 'Enter server name / ID',
+        showProviderHint: false,
+        hideBaseUrl: false,
+        requireBaseUrl: true,
+        baseUrlPlaceholder: isAAP ? 'e.g. https://aap.example.com' : 'https://mcp-server.example.com/mcp',
+      }
 
   const renderTypeToggle = useCallback(
     (toggleRef: Ref<MenuToggleElement>) => (
@@ -354,7 +316,7 @@ export function IntegrationDetailsStep({ setValue, onTypeChange }: IntegrationDe
           fieldId="name"
           placeholder={typeConfig.namePlaceholder}
           isRequired
-          labelHelp={fieldConfig.nameHelp}
+          labelHelp={isLLM ? integrationHelp.name : integrationHelp.serverName}
         />
         <SynTextField<IntegrationFormData, 'description'>
           name="description"
@@ -393,22 +355,11 @@ export function IntegrationDetailsStep({ setValue, onTypeChange }: IntegrationDe
         {!typeConfig.hideBaseUrl && (
           <SynTextField<IntegrationFormData, 'configuration.base_url'>
             name="configuration.base_url"
-            label={fieldConfig.urlLabel}
+            label="API URL"
             fieldId="base-url"
             placeholder={typeConfig.baseUrlPlaceholder}
             isRequired={typeConfig.requireBaseUrl}
-            labelHelp={fieldConfig.urlHelp}
-          />
-        )}
-
-        {isOpenShift && (
-          <SynTextField<IntegrationFormData, 'configuration.namespace'>
-            name="configuration.namespace"
-            label="Namespace"
-            fieldId="namespace"
-            placeholder="e.g., syntara-workers"
-            isRequired
-            hint="Namespace for future execution workloads"
+            labelHelp={isAAP ? integrationHelp.aapUrl : integrationHelp.apiUrl}
           />
         )}
 

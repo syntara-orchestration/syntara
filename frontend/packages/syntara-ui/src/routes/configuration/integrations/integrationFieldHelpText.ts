@@ -1,7 +1,7 @@
 /** Help popover body text for integration create/edit form fields. */
 
 export const INTEGRATION_TYPE_HELP =
-  'Registers a connection to an external service. MCP servers expose tools for agent workflows. LLM providers supply models. Automation platform integrations verify gateway connectivity. OpenShift integrations register cluster connections.'
+  'Registers a connection to an external service. MCP servers expose tools for agent workflows. LLM providers supply models. Automation platform integrations verify gateway connectivity.'
 
 export const NAME_HELP =
   'A unique name that identifies this integration. Use a name that describes the service or environment, such as "Production MCP" or "Dev LLM Gateway."'
@@ -23,9 +23,3 @@ export const PROJECTS_HELP =
 
 export const HEALTH_CHECK_CREDENTIAL_HELP =
   'Management credential used for health checks, connection testing, and resource discovery only. Workflow nodes use separate execution credentials configured per integration when a workflow runs.'
-
-export const OPENSHIFT_URL_HELP =
-  'HTTPS URL of the OpenShift Kubernetes API, such as https://api.example.com:6443. Include only the hostname and optional port. TLS certificate verification is required; provide a CA certificate for clusters using a private CA.'
-
-export const OPENSHIFT_CREDENTIAL_HELP =
-  'An HTTP Bearer Token credential for the OpenShift API. Connection testing confirms the authenticated identity; it does not check namespace access or workload permissions.'

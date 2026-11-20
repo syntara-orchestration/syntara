@@ -2,7 +2,7 @@ import { EdgeHandleEnum } from '@syntara/contracts'
 import type { Connection, OnConnect } from '@xyflow/react'
 import { useCallback, useRef, type Dispatch, type SetStateAction } from 'react'
 
-import { FlowNodeType } from '../../../constants'
+import { FlowNodeType } from '../../../constants/nodeTypes'
 import type { NodeType } from '../../workflows/canvas/nodes/NodeType'
 import type { ConnectionState, OnAddNodeFromEdge, PendingEdge } from '../types'
 import { EdgeFactory } from '../utils/EdgeFactory'

@@ -13,7 +13,6 @@ if TYPE_CHECKING:
     from ..models.aap_configuration import AAPConfiguration
     from ..models.llm_provider_configuration import LLMProviderConfiguration
     from ..models.mcp_server_configuration_input import MCPServerConfigurationInput
-    from ..models.openshift_configuration import OpenShiftConfiguration
 
 
 T = TypeVar("T", bound="IntegrationTestConnection")
@@ -25,17 +24,16 @@ class IntegrationTestConnection:
 
     Attributes:
         integration_type (IntegrationType): Type of external integration.
-        configuration (AAPConfiguration | LLMProviderConfiguration | MCPServerConfigurationInput |
-            OpenShiftConfiguration): Integration-specific configuration
+        configuration (AAPConfiguration | LLMProviderConfiguration | MCPServerConfigurationInput): Integration-specific
+            configuration
         credential_id (None | Unset | UUID): Credential to use for the connection test
     """
 
     integration_type: IntegrationType
-    configuration: AAPConfiguration | LLMProviderConfiguration | MCPServerConfigurationInput | OpenShiftConfiguration
+    configuration: AAPConfiguration | LLMProviderConfiguration | MCPServerConfigurationInput
     credential_id: None | Unset | UUID = UNSET
 
     def to_dict(self) -> dict[str, Any]:
-        from ..models.aap_configuration import AAPConfiguration
         from ..models.llm_provider_configuration import LLMProviderConfiguration
         from ..models.mcp_server_configuration_input import MCPServerConfigurationInput
 
@@ -45,8 +43,6 @@ class IntegrationTestConnection:
         if isinstance(self.configuration, MCPServerConfigurationInput):
             configuration = self.configuration.to_dict()
         elif isinstance(self.configuration, LLMProviderConfiguration):
-            configuration = self.configuration.to_dict()
-        elif isinstance(self.configuration, AAPConfiguration):
             configuration = self.configuration.to_dict()
         else:
             configuration = self.configuration.to_dict()
@@ -77,14 +73,13 @@ class IntegrationTestConnection:
         from ..models.aap_configuration import AAPConfiguration
         from ..models.llm_provider_configuration import LLMProviderConfiguration
         from ..models.mcp_server_configuration_input import MCPServerConfigurationInput
-        from ..models.openshift_configuration import OpenShiftConfiguration
 
         d = dict(src_dict)
         integration_type = IntegrationType(d.pop("integration_type"))
 
         def _parse_configuration(
             data: object,
-        ) -> AAPConfiguration | LLMProviderConfiguration | MCPServerConfigurationInput | OpenShiftConfiguration:
+        ) -> AAPConfiguration | LLMProviderConfiguration | MCPServerConfigurationInput:
             try:
                 if not isinstance(data, dict):
                     raise TypeError()
@@ -101,19 +96,11 @@ class IntegrationTestConnection:
                 return configuration_type_1
             except (TypeError, ValueError, AttributeError, KeyError):
                 pass
-            try:
-                if not isinstance(data, dict):
-                    raise TypeError()
-                configuration_type_2 = AAPConfiguration.from_dict(data)
-
-                return configuration_type_2
-            except (TypeError, ValueError, AttributeError, KeyError):
-                pass
             if not isinstance(data, dict):
                 raise TypeError()
-            configuration_type_3 = OpenShiftConfiguration.from_dict(data)
+            configuration_type_2 = AAPConfiguration.from_dict(data)
 
-            return configuration_type_3
+            return configuration_type_2
 
         configuration = _parse_configuration(d.pop("configuration"))
 

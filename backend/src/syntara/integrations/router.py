@@ -9,8 +9,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 import syntara.integrations.adapters.aap  # register AAP adapter
 import syntara.integrations.adapters.llm_provider  # register LLM provider adapter
-import syntara.integrations.adapters.mcp_server
-import syntara.integrations.adapters.openshift  # noqa: F401 — register OpenShift adapter
+import syntara.integrations.adapters.mcp_server  # noqa: F401 — register MCP adapter
 from syntara.audit.decorators import audit
 from syntara.audit.models.audit_event import EventCategory
 from syntara.auth import get_current_user

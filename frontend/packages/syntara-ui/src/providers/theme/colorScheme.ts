@@ -1,19 +1,22 @@
 /**
  * Color scheme: PatternFly `pf-v6-theme-dark` on `<html>` selects light vs dark.
- * `pf-v6-theme-glass` stays on for both themes (set in `index.html`); runtime only toggles `pf-v6-theme-dark`.
- * Keep `resolveColorScheme` and `applyDocumentColorScheme` in sync with the inline script in `packages/syntara-ui/index.html`.
+ * Contrast classes (`pf-v6-theme-glass`, `pf-v6-theme-high-contrast`) are owned by `contrastMode.ts`.
+ * Keep `resolveColorScheme` and `applyDocumentColorScheme` in sync with the inline script in `index.html`.
  */
-/** `localStorage` key for persisted light/dark preference. */
+/** `localStorage` key for the light, dark, or system color-scheme preference. */
 export const COLOR_SCHEME_STORAGE_KEY = 'syntara-ui-color-scheme'
 
 /** Resolved appearance: PatternFly light (no `pf-v6-theme-dark`) or dark. */
 export type ColorScheme = 'light' | 'dark'
 
-/** Returns a valid stored scheme, or `null` if missing, invalid, or storage is unavailable. */
-export function readStoredColorScheme(): ColorScheme | null {
+/** User choice. `system` follows `prefers-color-scheme` (else dark). */
+export type ColorSchemePreference = 'system' | ColorScheme
+
+/** Returns a valid stored preference, or `null` if missing, invalid, or storage is unavailable. */
+export function readStoredColorSchemePreference(): ColorSchemePreference | null {
   try {
     const value = globalThis.localStorage?.getItem(COLOR_SCHEME_STORAGE_KEY)
-    if (value === 'light' || value === 'dark') {
+    if (value === 'system' || value === 'light' || value === 'dark') {
       return value
     }
   } catch {
@@ -23,12 +26,13 @@ export function readStoredColorScheme(): ColorScheme | null {
 }
 
 /**
- * Effective scheme: stored preference, else `prefers-color-scheme`, else `dark`.
+ * Effective scheme: explicit light/dark preference, else `prefers-color-scheme`, else `dark`.
+ * A missing preference and an explicit `system` preference resolve the same way.
  * Must stay aligned with `index.html` inline bootstrap script.
  */
 export function resolveColorScheme(): ColorScheme {
-  const stored = readStoredColorScheme()
-  if (stored) {
+  const stored = readStoredColorSchemePreference()
+  if (stored === 'light' || stored === 'dark') {
     return stored
   }
   try {
@@ -44,6 +48,12 @@ export function resolveColorScheme(): ColorScheme {
   return 'dark'
 }
 
+/** True when color scheme should track the OS, including when nothing is stored yet. */
+export function colorSchemeFollowsSystem(): boolean {
+  const stored = readStoredColorSchemePreference()
+  return stored === null || stored === 'system'
+}
+
 /** Reads the active scheme from `document.documentElement` (`pf-v6-theme-dark`). */
 export function getColorSchemeFromDocument(): ColorScheme {
   return document.documentElement.classList.contains('pf-v6-theme-dark') ? 'dark' : 'light'
@@ -51,16 +61,16 @@ export function getColorSchemeFromDocument(): ColorScheme {
 
 /**
  * Sets or clears `pf-v6-theme-dark` on `<html>` to match `scheme`.
- * Does not remove `pf-v6-theme-glass` — the glass shell is intentional for both light and dark.
+ * Does not change contrast classes.
  */
 export function applyDocumentColorScheme(scheme: ColorScheme): void {
   document.documentElement.classList.toggle('pf-v6-theme-dark', scheme === 'dark')
 }
 
-/** Writes `scheme` to `localStorage` under {@link COLOR_SCHEME_STORAGE_KEY}; no-ops if storage fails. */
-export function persistColorScheme(scheme: ColorScheme): void {
+/** Writes `preference` to `localStorage` under {@link COLOR_SCHEME_STORAGE_KEY}; no-ops if storage fails. */
+export function persistColorScheme(preference: ColorSchemePreference): void {
   try {
-    globalThis.localStorage?.setItem(COLOR_SCHEME_STORAGE_KEY, scheme)
+    globalThis.localStorage?.setItem(COLOR_SCHEME_STORAGE_KEY, preference)
   } catch {
     // ignore
   }

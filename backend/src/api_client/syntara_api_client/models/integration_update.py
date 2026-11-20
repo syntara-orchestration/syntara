@@ -14,7 +14,6 @@ if TYPE_CHECKING:
     from ..models.integration_update_labels_type_0 import IntegrationUpdateLabelsType0
     from ..models.llm_provider_configuration import LLMProviderConfiguration
     from ..models.mcp_server_configuration_input import MCPServerConfigurationInput
-    from ..models.openshift_configuration import OpenShiftConfiguration
 
 
 T = TypeVar("T", bound="IntegrationUpdate")
@@ -27,8 +26,8 @@ class IntegrationUpdate:
     Attributes:
         name (None | str | Unset): Human-readable name for the integration
         description (None | str | Unset): Detailed description of the integration
-        configuration (AAPConfiguration | LLMProviderConfiguration | MCPServerConfigurationInput | None |
-            OpenShiftConfiguration | Unset): Integration-specific configuration
+        configuration (AAPConfiguration | LLMProviderConfiguration | MCPServerConfigurationInput | None | Unset):
+            Integration-specific configuration
         management_credential_id (None | Unset | UUID): Optional credential for admin operations
         enabled (bool | None | Unset): Whether the integration is active
         scope (IntegrationScope | None | Unset): Visibility scope: global or project
@@ -37,14 +36,7 @@ class IntegrationUpdate:
 
     name: None | str | Unset = UNSET
     description: None | str | Unset = UNSET
-    configuration: (
-        AAPConfiguration
-        | LLMProviderConfiguration
-        | MCPServerConfigurationInput
-        | None
-        | OpenShiftConfiguration
-        | Unset
-    ) = UNSET
+    configuration: AAPConfiguration | LLMProviderConfiguration | MCPServerConfigurationInput | None | Unset = UNSET
     management_credential_id: None | Unset | UUID = UNSET
     enabled: bool | None | Unset = UNSET
     scope: IntegrationScope | None | Unset = UNSET
@@ -55,7 +47,6 @@ class IntegrationUpdate:
         from ..models.integration_update_labels_type_0 import IntegrationUpdateLabelsType0
         from ..models.llm_provider_configuration import LLMProviderConfiguration
         from ..models.mcp_server_configuration_input import MCPServerConfigurationInput
-        from ..models.openshift_configuration import OpenShiftConfiguration
 
         name: None | str | Unset
         if isinstance(self.name, Unset):
@@ -77,8 +68,6 @@ class IntegrationUpdate:
         elif isinstance(self.configuration, LLMProviderConfiguration):
             configuration = self.configuration.to_dict()
         elif isinstance(self.configuration, AAPConfiguration):
-            configuration = self.configuration.to_dict()
-        elif isinstance(self.configuration, OpenShiftConfiguration):
             configuration = self.configuration.to_dict()
         else:
             configuration = self.configuration
@@ -139,7 +128,6 @@ class IntegrationUpdate:
         from ..models.integration_update_labels_type_0 import IntegrationUpdateLabelsType0
         from ..models.llm_provider_configuration import LLMProviderConfiguration
         from ..models.mcp_server_configuration_input import MCPServerConfigurationInput
-        from ..models.openshift_configuration import OpenShiftConfiguration
 
         d = dict(src_dict)
 
@@ -163,14 +151,7 @@ class IntegrationUpdate:
 
         def _parse_configuration(
             data: object,
-        ) -> (
-            AAPConfiguration
-            | LLMProviderConfiguration
-            | MCPServerConfigurationInput
-            | None
-            | OpenShiftConfiguration
-            | Unset
-        ):
+        ) -> AAPConfiguration | LLMProviderConfiguration | MCPServerConfigurationInput | None | Unset:
             if data is None:
                 return data
             if isinstance(data, Unset):
@@ -199,23 +180,7 @@ class IntegrationUpdate:
                 return configuration_type_0_type_2
             except (TypeError, ValueError, AttributeError, KeyError):
                 pass
-            try:
-                if not isinstance(data, dict):
-                    raise TypeError()
-                configuration_type_0_type_3 = OpenShiftConfiguration.from_dict(data)
-
-                return configuration_type_0_type_3
-            except (TypeError, ValueError, AttributeError, KeyError):
-                pass
-            return cast(
-                AAPConfiguration
-                | LLMProviderConfiguration
-                | MCPServerConfigurationInput
-                | None
-                | OpenShiftConfiguration
-                | Unset,
-                data,
-            )
+            return cast(AAPConfiguration | LLMProviderConfiguration | MCPServerConfigurationInput | None | Unset, data)
 
         configuration = _parse_configuration(d.pop("configuration", UNSET))
 

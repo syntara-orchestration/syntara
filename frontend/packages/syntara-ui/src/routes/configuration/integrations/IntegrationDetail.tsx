@@ -34,7 +34,7 @@ import type { KebabAction } from '../../../components/SynKebabMenu'
 import { SynKebabMenu } from '../../../components/SynKebabMenu'
 import { SynLink } from '../../../components/SynLink'
 import { SynPageTitle } from '../../../components/SynPageTitle'
-import { DateCell } from '../../../components/table/DateCell.tsx'
+import { DateCell } from '../../../components/table/DateCell'
 import { SynUrlTabs } from '../../../components/tabs/SynUrlTabs'
 import { useUrlTab } from '../../../hooks/useUrlTab'
 import { detachPromise } from '../../../utils/detachPromise'
@@ -42,7 +42,6 @@ import { useDocLink } from '../../../utils/docs/useDocLink'
 
 import styles from './IntegrationDetail.module.css'
 import { IntegrationDialogs } from './IntegrationDialogs'
-import { getIntegrationFieldConfig } from './integrationFieldHelp'
 import { INTEGRATION_TYPE_LABELS, PROVIDER_HINT_LABELS } from './integrationFilters'
 import {
   getBaseUrl,
@@ -101,9 +100,7 @@ function IntegrationDetailsTab({
     <Stack hasGutter className={styles.tabContent}>
       <StackItem>
         <DescriptionList isHorizontal>
-          <SynDetail label={getIntegrationFieldConfig(integration.integration_type).nameLabel}>
-            {integration.name}
-          </SynDetail>
+          <SynDetail label={isLLMProvider(integration) ? 'Name' : 'Server name / ID'}>{integration.name}</SynDetail>
           <SynDetail label="Description">{integration.description}</SynDetail>
           <SynDetail label="Integration type">
             {INTEGRATION_TYPE_LABELS[integration.integration_type ?? ''] ?? integration.integration_type ?? ''}
@@ -129,9 +126,6 @@ function IntegrationDetailsTab({
             </SynDetail>
           )}
           <SynDetail label="URL">{getBaseUrl(integration) || '—'}</SynDetail>
-          {integration.configuration && 'namespace' in integration.configuration && (
-            <SynDetail label="Namespace">{integration.configuration.namespace}</SynDetail>
-          )}
           <SynDetail label="Connection credential">
             {!credentialId || !credentialName ? (
               <>None</>
@@ -284,6 +278,18 @@ function getFooterState({
   return { isDirty: toolsDirty, isSaving: isToolsSaving, onSave: handleToolsSave, saveLabel: 'Save tools' }
 }
 
+function shouldShowResourcesFooter(
+  isLLM: boolean,
+  tools: ReturnType<typeof useAllIntegrationTools>['tools'],
+  modelsState: ReturnType<typeof useIntegrationModelsState>
+): boolean {
+  if (isLLM) {
+    if (modelsState.isLoading || modelsState.error) return false
+    return modelsState.models.length > 0
+  }
+  return tools.length > 0
+}
+
 function hasResourcesTab(integration: IntegrationsAPI.components['schemas']['IntegrationRead']): boolean {
   return isLLMProvider(integration) || integration.integration_type === IntegrationTypeEnum.MCP_SERVER
 }
@@ -390,7 +396,8 @@ export function IntegrationDetail() {
   if (!integration?.id) return null
 
   const integrationCrumbs = breadcrumbsIntegrationDetail(integration.name)
-  const footer = activeTab === 'resources' ? <ResourcesFooter {...footerState} /> : undefined
+  const showResourcesFooter = shouldShowResourcesFooter(isLLM, tools, modelsState)
+  const footer = activeTab === 'resources' && showResourcesFooter ? <ResourcesFooter {...footerState} /> : undefined
 
   return (
     <SynPage>

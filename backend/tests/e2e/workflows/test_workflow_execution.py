@@ -34,6 +34,9 @@ from syntara_api_client.models.execution_status import ExecutionStatus
 
 pytestmark = [pytest.mark.e2e]
 
+# Cancel while paused on approval: Temporal + API propagation can exceed 60s on loaded CI runners.
+_CANCEL_WHILE_PAUSED_POLL_SECONDS = 120
+
 
 def _workflow_definition_with_nodes(
     workflow_name: str,
@@ -525,8 +528,8 @@ class TestWorkflowExecution:
             f"Expected 202 Accepted, got {cancel_response.status_code}: {cancel_response.content!r}"
         )
 
-        max_polls = 60
         poll_interval = 1
+        max_polls = _CANCEL_WHILE_PAUSED_POLL_SECONDS // poll_interval
         cancelled_execution = None
 
         for _ in range(max_polls):
@@ -541,7 +544,7 @@ class TestWorkflowExecution:
             time.sleep(poll_interval)
 
         assert cancelled_execution is not None, (
-            f"Execution did not transition to cancelled within {max_polls * poll_interval}s. "
+            f"Execution did not transition to cancelled within {_CANCEL_WHILE_PAUSED_POLL_SECONDS}s. "
             f"Last status: {current_execution.status!s}"
         )
 

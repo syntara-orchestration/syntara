@@ -157,7 +157,6 @@ export type WorkflowVersionStatus = (typeof WorkflowVersionStatusEnum)[keyof typ
  * Use these constants instead of string literals when comparing integration.integration_type values
  */
 export const IntegrationTypeEnum = {
-  OPENSHIFT: 'openshift',
   MCP_SERVER: 'mcp_server',
   LLM_PROVIDER: 'llm_provider',
   ANSIBLE_AUTOMATION_PLATFORM: 'ansible_automation_platform',

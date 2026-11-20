@@ -7,8 +7,8 @@ from uuid import uuid4
 import pytest
 from temporalio.exceptions import ApplicationError
 
-from syntara.workflows.clients.agent_orchestrator_client import AgentOrchestratorClientConnectionError
-from syntara.workflows.workflow_engine.activities.agentic_activity import execute_agentic_activity
+from syntara.workflow_runtime.clients.agent_orchestrator_client import AgentOrchestratorClientConnectionError
+from syntara.workflow_runtime.engines.temporal.activities.agentic_activity import execute_agentic_activity
 
 AGENT_SERVICE_UNAVAILABLE_MESSAGE = (
     "The AI Agent service is temporarily unavailable. This is a system issue. "
@@ -27,9 +27,11 @@ def mock_agent_client() -> Generator[AsyncMock, None, None]:
     """Mock Agent Orchestrator client and activity heartbeat."""
     with (
         patch("temporalio.activity.heartbeat"),
-        patch("syntara.workflows.workflow_engine.activities.agentic_activity.AgentOrchestratorClient") as mock_cls,
         patch(
-            "syntara.workflows.workflow_engine.activities.agentic_activity._inject_runtime_settings",
+            "syntara.workflow_runtime.engines.temporal.activities.agentic_activity.AgentOrchestratorClient"
+        ) as mock_cls,
+        patch(
+            "syntara.workflow_runtime.engines.temporal.activities.agentic_activity._inject_runtime_settings",
             side_effect=_fake_inject_runtime_settings,
         ),
     ):

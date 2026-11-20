@@ -18,8 +18,7 @@ from sqlmodel import col, or_, select
 
 import syntara.integrations.adapters.aap
 import syntara.integrations.adapters.llm_provider
-import syntara.integrations.adapters.mcp_server
-import syntara.integrations.adapters.openshift  # noqa: F401 — register OpenShift adapter
+import syntara.integrations.adapters.mcp_server  # noqa: F401 — register MCP adapter
 from syntara.core.config.base import get_settings
 from syntara.core.database.session import AsyncSessionLocal
 from syntara.core.models.principal import make_service_user

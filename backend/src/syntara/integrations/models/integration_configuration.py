@@ -141,34 +141,8 @@ class AAPConfiguration(IntegrationSecurityMixin):
         return self
 
 
-class OpenShiftConfiguration(IntegrationSecurityMixin):
-    """Non-secret connection settings for an OpenShift cluster."""
-
-    integration_type: Literal["openshift"] = "openshift"
-    base_url: str = Field(description="OpenShift Kubernetes API URL", json_schema_extra={"format": "uri"})
-    namespace: str = Field(
-        min_length=1,
-        max_length=63,
-        pattern=r"^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
-        description="Namespace reserved for future execution workloads",
-    )
-
-    model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")  # type: ignore[assignment]
-
-    @model_validator(mode="after")
-    def validate_base_url_scheme(self) -> Self:
-        """Require a TLS-protected API endpoint without a path or query."""
-        self.base_url = validate_host_url(self.base_url, allow_http=self.allow_http)
-        if self.allow_http or self.insecure_skip_tls_verify or not self.base_url.startswith("https://"):
-            msg = "OpenShift integrations require HTTPS with TLS verification"
-            raise ValueError(msg)
-        return self
-
-
 # Configuration types (used by DB model, read schema, and create/patch)
-IntegrationConfigurationTypes = (
-    MCPServerConfigurationInput | LLMProviderConfiguration | AAPConfiguration | OpenShiftConfiguration
-)
+IntegrationConfigurationTypes = MCPServerConfigurationInput | LLMProviderConfiguration | AAPConfiguration
 IntegrationConfiguration = Annotated[
     IntegrationConfigurationTypes,
     Field(discriminator="integration_type"),

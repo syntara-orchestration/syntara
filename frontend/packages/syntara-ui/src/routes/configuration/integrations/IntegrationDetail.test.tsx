@@ -1,5 +1,4 @@
 import type { IntegrationsAPI, Tool } from '@syntara/contracts'
-import { IntegrationTypeEnum } from '@syntara/contracts'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useParams } from '@tanstack/react-router'
 import { render, screen, within, act, waitFor } from '@testing-library/react'
@@ -9,7 +8,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { axe } from 'vitest-axe'
 
 import { credentialsClient, integrationsClient } from '../../../client'
-import { AlertProvider } from '../../../providers/alerts'
+import { AlertProvider } from '../../../providers/alerts/AlertProvider'
 import { formatDateTime } from '../../../utils/dateUtils'
 
 import { IntegrationDetail } from './IntegrationDetail'
@@ -38,26 +37,13 @@ vi.mock('./useItemSelection', () => ({
     mockUseItemSelection(...args) as ReturnType<typeof import('./useItemSelection').useItemSelection>,
 }))
 
+const mockUseIntegrationModelsState = vi.fn()
+
 vi.mock('./useIntegrationModelsState', () => ({
-  useIntegrationModelsState: () => ({
-    models: [],
-    isLoading: false,
-    error: null,
-    refetchModels: vi.fn().mockResolvedValue(undefined),
-    enabledModelIds: new Set<string>(),
-    enabledCount: 0,
-    allSelected: false,
-    isDirty: false,
-    isSaving: false,
-    handleSave: vi.fn(),
-    handleSelectAll: vi.fn(),
-    defaultModelId: null,
-    handleSelectWithDefaultClear: vi.fn(),
-    handleSetDefault: vi.fn(),
-    handleRemoveDefault: vi.fn(),
-    resetSelectionToServer: vi.fn(),
-    resetDefault: vi.fn(),
-  }),
+  useIntegrationModelsState: (...args: unknown[]) =>
+    mockUseIntegrationModelsState(...args) as ReturnType<
+      typeof import('./useIntegrationModelsState').useIntegrationModelsState
+    >,
 }))
 
 const mockNavigate = vi.fn()
@@ -259,6 +245,25 @@ describe('IntegrationDetail', () => {
       handleSelectItem: vi.fn(),
       resetToServer: vi.fn(),
     })
+    mockUseIntegrationModelsState.mockReturnValue({
+      models: [],
+      isLoading: false,
+      error: null,
+      refetchModels: vi.fn().mockResolvedValue(undefined),
+      enabledModelIds: new Set<string>(),
+      enabledCount: 0,
+      allSelected: false,
+      isDirty: false,
+      isSaving: false,
+      handleSave: vi.fn(),
+      handleSelectAll: vi.fn(),
+      defaultModelId: null,
+      handleSelectWithDefaultClear: vi.fn(),
+      handleSetDefault: vi.fn(),
+      handleRemoveDefault: vi.fn(),
+      resetSelectionToServer: vi.fn(),
+      resetDefault: vi.fn(),
+    })
   })
 
   describe('Details tab rendering', () => {
@@ -277,30 +282,6 @@ describe('IntegrationDetail', () => {
       expect(screen.getByText('Global')).toBeInTheDocument()
       expect(screen.getByText('https://mcp.example.com')).toBeInTheDocument()
       expect(screen.getAllByText('2').length).toBeGreaterThanOrEqual(1)
-    })
-
-    it('shows OpenShift cluster details and namespace', () => {
-      setupDefaultMocks({
-        integration: {
-          name: 'Production cluster',
-          integration_type: IntegrationTypeEnum.OPENSHIFT,
-          configuration: {
-            integration_type: IntegrationTypeEnum.OPENSHIFT,
-            base_url: 'https://api.example.com:6443',
-            namespace: 'workers',
-            allow_http: false,
-            insecure_skip_tls_verify: false,
-          },
-        },
-      })
-      render(<IntegrationDetail />, { wrapper })
-
-      expect(screen.getByRole('heading', { name: 'Production cluster', level: 1 })).toBeInTheDocument()
-      expect(screen.getByText('Cluster name')).toBeInTheDocument()
-      expect(screen.getByText('OpenShift')).toBeInTheDocument()
-      expect(screen.getByText('https://api.example.com:6443')).toBeInTheDocument()
-      expect(screen.getByText('Namespace')).toBeInTheDocument()
-      expect(screen.getByText('workers')).toBeInTheDocument()
     })
 
     it('shows credential name as a link when credential is assigned', () => {
@@ -683,6 +664,12 @@ describe('IntegrationDetail', () => {
 
     it('shows save button disabled on resources tab when no changes are made', () => {
       mockActiveTab = 'resources'
+      mockUseAllIntegrationTools.mockReturnValue({
+        tools: [{ id: 't1', name: 'tool-1', description: 'A tool', status: 'available' }],
+        isLoading: false,
+        error: null,
+        refetch: vi.fn(),
+      })
       render(<IntegrationDetail />, { wrapper })
 
       const saveButton = screen.getByRole('button', { name: 'Save tools' })
@@ -691,6 +678,12 @@ describe('IntegrationDetail', () => {
 
     it('shows save button enabled on resources tab when changes are made', () => {
       mockActiveTab = 'resources'
+      mockUseAllIntegrationTools.mockReturnValue({
+        tools: [{ id: 't1', name: 'tool-1', description: 'A tool', status: 'available' }],
+        isLoading: false,
+        error: null,
+        refetch: vi.fn(),
+      })
       mockUseItemSelection.mockReturnValue({
         enabledIds: new Set(['t1']),
         enabledCount: 1,
@@ -1249,7 +1242,6 @@ describe('IntegrationDetail', () => {
       render(<IntegrationDetail />, { wrapper })
 
       expect(screen.queryByText('Security')).not.toBeInTheDocument()
-      expect(screen.queryByText('Namespace')).not.toBeInTheDocument()
     })
 
     it('does not show Security section without security fields in configuration', () => {
@@ -1325,19 +1317,59 @@ describe('IntegrationDetail', () => {
       enabled_tool_count: 0,
     }
 
-    it('shows Save model changes button on LLM resources tab', () => {
+    it('shows Save model changes button on LLM resources tab when models exist', () => {
       setupDefaultMocks({ integration: llmIntegration })
+      mockUseIntegrationModelsState.mockReturnValue({
+        models: [{ id: 'm1', name: 'model-1' }],
+        isLoading: false,
+        error: null,
+        refetchModels: vi.fn().mockResolvedValue(undefined),
+        enabledModelIds: new Set<string>(['m1']),
+        enabledCount: 1,
+        allSelected: false,
+        isDirty: false,
+        isSaving: false,
+        handleSave: vi.fn(),
+        handleSelectAll: vi.fn(),
+        defaultModelId: null,
+        handleSelectWithDefaultClear: vi.fn(),
+        handleSetDefault: vi.fn(),
+        handleRemoveDefault: vi.fn(),
+        resetSelectionToServer: vi.fn(),
+        resetDefault: vi.fn(),
+      })
       mockActiveTab = 'resources'
       render(<IntegrationDetail />, { wrapper })
 
       expect(screen.getByRole('button', { name: 'Save models' })).toBeInTheDocument()
     })
 
-    it('shows Save tools button on MCP server resources tab', () => {
+    it('hides Save models footer on LLM resources tab when no models discovered', () => {
+      setupDefaultMocks({ integration: llmIntegration })
+      mockActiveTab = 'resources'
+      render(<IntegrationDetail />, { wrapper })
+
+      expect(screen.queryByRole('button', { name: 'Save models' })).not.toBeInTheDocument()
+    })
+
+    it('shows Save tools button on MCP server resources tab when tools exist', () => {
+      mockUseAllIntegrationTools.mockReturnValue({
+        tools: [{ id: 't1', name: 'tool-1', description: 'A tool', status: 'available' }],
+        isLoading: false,
+        error: null,
+        refetch: vi.fn(),
+      })
       mockActiveTab = 'resources'
       render(<IntegrationDetail />, { wrapper })
 
       expect(screen.getByRole('button', { name: 'Save tools' })).toBeInTheDocument()
+    })
+
+    it('hides Save tools footer on MCP resources tab when no tools discovered', () => {
+      mockActiveTab = 'resources'
+      render(<IntegrationDetail />, { wrapper })
+
+      expect(screen.queryByRole('button', { name: 'Save tools' })).not.toBeInTheDocument()
     })
   })
 })

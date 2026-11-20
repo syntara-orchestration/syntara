@@ -1106,9 +1106,9 @@ describe('workflowFactories', () => {
       })
 
       it('creates a generic activity with custom message', () => {
-        const activity = createGenericActivity('gen-1', 'Step', 'Select a node type')
+        const activity = createGenericActivity('gen-1', 'Step', 'Select a step type')
 
-        expect((activity.metadata as { __customMessage?: string })?.__customMessage).toBe('Select a node type')
+        expect((activity.metadata as { __customMessage?: string })?.__customMessage).toBe('Select a step type')
       })
     })
 

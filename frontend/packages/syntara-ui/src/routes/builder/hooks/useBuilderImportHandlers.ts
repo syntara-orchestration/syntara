@@ -1,6 +1,6 @@
 import { useCallback } from 'react'
 
-import type { AlertConfig, AlertMessage } from '../../../providers/alerts'
+import type { AlertConfig, AlertMessage } from '../../../providers/alerts/AlertContext'
 import { getErrorMessage } from '../../../utils/apiErrors'
 import type { BuilderAction } from '../builderReducer'
 import { applyImportToCanvas, type PendingImportData } from '../useWorkflowImportExport'

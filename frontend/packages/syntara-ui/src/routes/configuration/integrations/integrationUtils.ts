@@ -8,7 +8,6 @@ const integrationTypeSchema = z.discriminatedUnion('integration_type', [
   z.object({ integration_type: z.literal(IntegrationTypeEnum.MCP_SERVER) }),
   z.object({ integration_type: z.literal(IntegrationTypeEnum.LLM_PROVIDER) }),
   z.object({ integration_type: z.literal(IntegrationTypeEnum.ANSIBLE_AUTOMATION_PLATFORM) }),
-  z.object({ integration_type: z.literal(IntegrationTypeEnum.OPENSHIFT) }),
 ])
 
 const PROVIDER_DEFAULT_URLS: Record<string, string> = {

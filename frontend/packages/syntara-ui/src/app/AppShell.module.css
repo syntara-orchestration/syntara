@@ -2,6 +2,10 @@
   min-width: 0;
 }
 
+.compass :global(.pf-v6-c-masthead) :global(.pf-v6-c-brand) {
+  --pf-v6-c-brand--Height: 37px;
+}
+
 .mainContent {
   outline: none;
   min-width: 0;

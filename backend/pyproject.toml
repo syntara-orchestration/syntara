@@ -121,8 +121,10 @@ integration = []
 [tool.uv]
 constraint-dependencies = [
     "aiohttp>=3.14.2",
+    "certifi>=2026.10.19",
     "joserfc>=1.6.8",
     "langgraph-sdk>=0.4.5",
+    "pyasn1>=0.6.5",
     "starlette>=1.3.1",
     "urllib3>=2.8.0",
     "attrs<26",
@@ -214,7 +216,7 @@ ignore = [
     "T201",   # print() is intentional CLI output
     "BLE001", # broad Exception needed for external lib error handling
 ]
-"src/syntara/workflows/workflow_engine/unified_eval.py" = ["PLR0911"]  # _eval_node dispatcher needs 7 returns for clarity
+"src/syntara/workflow_runtime/engines/unified_eval.py" = ["PLR0911"]  # _eval_node dispatcher needs 7 returns for clarity
 
 # Pyrefly configuration — used in pre-commit for fast local type checking (~3s).
 # Mypy (strict) continues to run in CI via a dedicated GitHub Actions job.
@@ -313,7 +315,6 @@ markers = [
     "k8s_required: marks tests that need KUBECONFIG + PERF_K8S_NAMESPACE to reach a Kubernetes cluster",
     "ssrf_enforced: keep write-time SSRF base_url validation active (opt out of the autouse bypass)",
     "xfail_from_url: dynamically applied by --xfail-from-url from a remote URL",
-    "requires_httpbin: marks tests that need httpbin reachable at runtime (skipped if unreachable)",
 ]
 
 # Coverage configuration
@@ -329,8 +330,8 @@ omit = [
     "src/api_client/*",  # Auto-generated API client, not production code
     "src/cli/*",  # CLI package, tested separately
     "src/syntara/core/database/migrations/**",  # Alembic migrations, not unit-testable
-    "src/syntara/workflows/worker.py",  # Entrypoint scripts, not unit-testable
-    "src/syntara/workflows/background_worker.py",
+    "src/syntara/workflow_runtime/workers/worker.py",  # Entrypoint scripts, not unit-testable
+    "src/syntara/workflow_runtime/workers/background_worker.py",
 ]
 
 [tool.coverage.report]

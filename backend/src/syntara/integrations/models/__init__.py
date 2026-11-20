@@ -28,7 +28,6 @@ from syntara.integrations.models.integration_configuration import (
     LLMProviderHint,
     MCPServerConfiguration,
     MCPServerConfigurationInput,
-    OpenShiftConfiguration,
 )
 from syntara.integrations.models.llm_model import (
     LLMModel,
@@ -70,6 +69,5 @@ __all__ = [
     "LLMProviderHint",
     "MCPServerConfiguration",
     "MCPServerConfigurationInput",
-    "OpenShiftConfiguration",
     "RefreshResult",
 ]

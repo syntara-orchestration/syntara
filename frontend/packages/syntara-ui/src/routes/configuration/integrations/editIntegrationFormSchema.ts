@@ -2,8 +2,6 @@ import type { IntegrationsAPI } from '@syntara/contracts'
 import { IntegrationTypeEnum } from '@syntara/contracts'
 import { z } from 'zod'
 
-import { openshiftConfigurationSchema } from './form/integrationFormSchema'
-
 function isLoopback(hostname: string): boolean {
   return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1' || hostname === '[::1]'
 }
@@ -29,27 +27,6 @@ function validateUrl(
   return undefined
 }
 
-function validateOpenShiftFields(
-  data: Omit<Partial<z.input<typeof openshiftConfigurationSchema>>, 'integration_type'> & {
-    management_credential_id: string | null
-  },
-  ctx: z.RefinementCtx
-) {
-  const result = openshiftConfigurationSchema.safeParse({ ...data, integration_type: IntegrationTypeEnum.OPENSHIFT })
-  if (!result.success) {
-    for (const issue of result.error.issues) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: issue.message, path: issue.path })
-    }
-  }
-  if (!data.management_credential_id) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: 'A bearer token credential is required',
-      path: ['management_credential_id'],
-    })
-  }
-}
-
 export function buildEditSchema(requiresBaseUrl: boolean) {
   return z
     .object({
@@ -57,7 +34,6 @@ export function buildEditSchema(requiresBaseUrl: boolean) {
       description: z.string(),
       integration_type: z.string(),
       base_url: z.string().optional(),
-      namespace: z.string().optional(),
       allow_http: z.boolean(),
       insecure_skip_tls_verify: z.boolean(),
       ca_certificate: z.string().optional().nullable(),
@@ -72,9 +48,6 @@ export function buildEditSchema(requiresBaseUrl: boolean) {
           message: 'At least one project must be selected',
           path: ['project_ids'],
         })
-      }
-      if (data.integration_type === IntegrationTypeEnum.OPENSHIFT) {
-        validateOpenShiftFields(data, ctx)
       }
       if (data.integration_type === IntegrationTypeEnum.MCP_SERVER) {
         const err = validateUrl(data.base_url, {
@@ -119,14 +92,6 @@ function securityFields(values: EditIntegrationFormValues) {
 }
 
 export function buildConfiguration(integrationType: string, values: EditIntegrationFormValues, providerHint?: string) {
-  if (integrationType === IntegrationTypeEnum.OPENSHIFT) {
-    return {
-      integration_type: IntegrationTypeEnum.OPENSHIFT,
-      base_url: values.base_url ?? '',
-      namespace: values.namespace ?? '',
-      ...securityFields(values),
-    }
-  }
   if (integrationType === IntegrationTypeEnum.ANSIBLE_AUTOMATION_PLATFORM) {
     return {
       integration_type: IntegrationTypeEnum.ANSIBLE_AUTOMATION_PLATFORM,

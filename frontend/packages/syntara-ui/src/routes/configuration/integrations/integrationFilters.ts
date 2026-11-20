@@ -5,7 +5,6 @@ import { FilterOperatorEnum, FilterTypeEnum } from '../../../types/filters'
 
 /** Credential type names allowed per integration type. Maps to the backend's ALLOWED_CREDENTIAL_TYPES. */
 export const CREDENTIAL_TYPES_BY_INTEGRATION: Record<string, string[]> = {
-  [IntegrationTypeEnum.OPENSHIFT]: ['HTTP Bearer Token'],
   [IntegrationTypeEnum.MCP_SERVER]: ['HTTP Bearer Token'],
   [IntegrationTypeEnum.LLM_PROVIDER]: ['LLM Provider'],
   [IntegrationTypeEnum.ANSIBLE_AUTOMATION_PLATFORM]: ['Ansible Automation Platform'],
@@ -13,13 +12,11 @@ export const CREDENTIAL_TYPES_BY_INTEGRATION: Record<string, string[]> = {
 
 /** Integration types that require a management credential for discovery and validation. */
 export const CREDENTIAL_REQUIRED_TYPES: ReadonlySet<string> = new Set([
-  IntegrationTypeEnum.OPENSHIFT,
   IntegrationTypeEnum.LLM_PROVIDER,
   IntegrationTypeEnum.ANSIBLE_AUTOMATION_PLATFORM,
 ])
 
 export const INTEGRATION_TYPE_LABELS: Record<string, string> = {
-  [IntegrationTypeEnum.OPENSHIFT]: 'OpenShift',
   [IntegrationTypeEnum.MCP_SERVER]: 'MCP Server',
   [IntegrationTypeEnum.LLM_PROVIDER]: 'LLM Provider',
   [IntegrationTypeEnum.ANSIBLE_AUTOMATION_PLATFORM]: 'Ansible Automation Platform',

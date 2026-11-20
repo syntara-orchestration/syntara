@@ -1,6 +1,6 @@
 # Integrations
 
-Integrations connect the application to external services — MCP servers, LLM providers, Ansible Automation Platform instances, and OpenShift clusters. The OpenShift integration in this change records connection details and validates credentials; it does not yet run workloads.
+Integrations connect the application to external services — MCP servers, LLM providers, and Ansible Automation Platform instances — providing the tools, models, and automation endpoints that workflows consume at execution time.
 
 > For field-level details, see `Integration` in `models/integration.py` and per-type configuration classes in `models/integration_configuration.py`. This doc covers the architectural patterns and design decisions.
 
@@ -13,11 +13,9 @@ graph TD
     C --> D[MCPServerAdapter]
     C --> E[LLMProviderAdapter]
     C --> F[AAPAdapter]
-    C --> P[OpenShiftAdapter]
     D --> G[MCP Server<br>tool discovery via MCP SDK]
     E --> H[LLM Provider API<br>model listing via HTTP]
     F --> I[Ansible Automation Platform<br>connectivity ping]
-    P --> Q[OpenShift API<br>bearer identity check]
     B --> J[(PostgreSQL<br>Integration, Tool, LLMModel)]
     B --> K[SecretService + InjectorResolver<br>credential decryption]
     L[Health Check Worker] --> B
@@ -28,7 +26,7 @@ graph TD
 
 Key properties:
 
-- **Four integration types** — MCP servers provide tools, LLM providers provide models, AAP instances provide automation endpoints, and OpenShift clusters provide a registered connection for future execution support
+- **Three integration types** — MCP servers provide tools, LLM providers provide models, AAP instances provide automation endpoints
 - **Adapter protocol** — each type implements a common two-method protocol (`validate` + `discover`) via a registry-based factory
 - **Two credential roles** — management credentials for admin-controlled health checks and discovery; execution credentials for workflow-time operations
 - **Project scoping** — integrations are either globally visible or restricted to assigned projects
@@ -41,13 +39,12 @@ Key properties:
 | `mcp_server` | Tools (name, description, parameters) |
 | `llm_provider` | Models (id, name, capability profile) |
 | `ansible_automation_platform` | None (connectivity check only) |
-| `openshift` | None (authenticated identity check only) |
 
 ## Configuration Schema
 
-Each integration type has a single configuration class — `MCPServerConfigurationInput`, `LLMProviderConfiguration`, `AAPConfiguration`, and `OpenShiftConfiguration`. The same class is used for create/patch input, the database model, and read responses. Discovered resources (tools, models) are stored as separate `Tool` and `LLMModel` records rather than embedded in the configuration, so there is no need for separate input and full variants.
+Each integration type has a single configuration class — `MCPServerConfigurationInput`, `LLMProviderConfiguration`, and `AAPConfiguration`. The same class is used for create/patch input, the database model, and read responses. Discovered resources (tools, models) are stored as separate `Tool` and `LLMModel` records rather than embedded in the configuration, so there is no need for separate input and full variants.
 
-The four configuration types are unified as a discriminated union on the `integration_type` literal field. All configuration types inherit `IntegrationSecurityMixin`, which provides shared TLS fields (`allow_http`, `insecure_skip_tls_verify`, `ca_certificate`). The defaults encourage secure configurations — HTTPS and verified certificates — while accommodating self-signed certificates via a custom CA field. A model validator nullifies `ca_certificate` when `insecure_skip_tls_verify` is `True`, since a custom CA is meaningless when verification is disabled. OpenShift additionally requires HTTPS and TLS verification, even if the shared override flags are supplied.
+The three configuration types are unified as a discriminated union on the `integration_type` literal field. All configuration types inherit `IntegrationSecurityMixin`, which provides shared TLS fields (`allow_http`, `insecure_skip_tls_verify`, `ca_certificate`). The defaults encourage secure configurations — HTTPS and verified certificates — while accommodating self-signed certificates via a custom CA field. A model validator nullifies `ca_certificate` when `insecure_skip_tls_verify` is `True`, since a custom CA is meaningless when verification is disabled.
 
 See `IntegrationSecurityMixin` in `models/integration_configuration.py` for field definitions and validators.
 
@@ -215,29 +212,6 @@ The AAP integration stores the API URL and TLS configuration. It does not discov
 - **Single endpoint.** Uses `/api/gateway/v1/me/` (not `/ping/`) because `/ping/` doesn't require authentication and cannot validate the management credential.
 - **No refresh.** `discover()` delegates to `validate()` — calling refresh on an AAP integration returns `IntegrationRefreshNotSupportedError` (422).
 
-### OpenShift
-
-An OpenShift integration stores the Kubernetes API URL and the namespace intended for future execution workloads. Its management credential must be an existing Syntara **HTTP Bearer Token** credential. The token is resolved only when validating the connection; it is not stored in the integration configuration or returned by the integration API. A custom CA certificate is supported for clusters using a private CA.
-
-Create the integration through the existing `POST /integrations` API with a payload shaped like:
-
-```json
-{
-  "name": "dev-openshift-cluster",
-  "integration_type": "openshift",
-  "configuration": {
-    "integration_type": "openshift",
-    "base_url": "https://api.example.com:6443",
-    "namespace": "workers"
-  },
-  "management_credential_id": "<existing HTTP Bearer Token credential UUID>"
-}
-```
-
-The `validate` and unsaved `discover` actions ask the cluster to identify the bearer credential through Kubernetes `SelfSubjectReview`. That API returns identity information without persisting a resource. The adapter does not list, create, exec into, or delete pods, and it does not check permissions for future workload operations. Resource refresh is unsupported. Pod lifecycle and workflow routing remain separate follow-up work.
-
-> **Security note:** The connection test verifies the token's identity only; it does not check access to the configured namespace. Before a future workflow activity uses this integration, ensure the service account has the RBAC permissions that activity requires in that namespace.
-
 ## TLS and Security
 
 All adapters, the AAP proxy, and the agent orchestrator share `build_integration_httpx_verify()` (in `src/syntara/core/lib/tls_utils.py`) which maps `IntegrationSecurityMixin` fields to `httpx.AsyncClient` verification:
@@ -248,7 +222,7 @@ All adapters, the AAP proxy, and the agent orchestrator share `build_integration
 | `False` | PEM string | `ssl.SSLContext` with the custom CA loaded |
 | `False` | `None` | `True` (system default trust store) |
 
-Integration `base_url` fields are additionally validated for SSRF before connection, at both write time (create/patch) and each runtime resolve/connect. Private, reserved, and loopback targets (RFC1918, 127.0.0.0/8, `::1`, `localhost`) are **rejected unless the hostname is explicitly allowlisted** via `APP_INTEGRATION_URL_ALLOWED_HOSTS`, so reaching an internal MCP server is an opt-in rather than an always-on bypass. The allowlist matches on hostname, so the entry must match the host in the URL (e.g. `localhost` for `http://localhost:8765`, `127.0.0.1` for `http://127.0.0.1:8765`). Cloud metadata endpoints (e.g. `169.254.169.254`) are always blocked regardless of the allowlist. HTTPS is required by default; HTTP needs `allow_http=true` on the configuration, except for loopback hosts on integration types that permit HTTP. OpenShift always requires HTTPS and TLS verification, including on loopback hosts.
+Integration `base_url` fields are additionally validated for SSRF before connection, at both write time (create/patch) and each runtime resolve/connect. Private, reserved, and loopback targets (RFC1918, 127.0.0.0/8, `::1`, `localhost`) are **rejected unless the hostname is explicitly allowlisted** via `APP_INTEGRATION_URL_ALLOWED_HOSTS`, so reaching an internal MCP server is an opt-in rather than an always-on bypass. The allowlist matches on hostname, so the entry must match the host in the URL (e.g. `localhost` for `http://localhost:8765`, `127.0.0.1` for `http://127.0.0.1:8765`). Cloud metadata endpoints (e.g. `169.254.169.254`) are always blocked regardless of the allowlist. HTTPS is required by default; HTTP needs `allow_http=true` on the configuration, except for loopback hosts, which are always reachable over HTTP.
 
 ## Health and Observability
 

@@ -11,8 +11,6 @@ import type { IntegrationFormData } from './integrationFormSchema'
 import styles from './WizardSteps.module.css'
 
 const STEP_DESCRIPTION: Record<string, string> = {
-  [IntegrationTypeEnum.OPENSHIFT]:
-    'This bearer token is used to check connectivity and authenticate with the OpenShift API. A successful connection test does not verify workload permissions.',
   [IntegrationTypeEnum.MCP_SERVER]:
     'This credential is used to discover resources for this integration. Workflow credentials are configured separately in the workflow builder. Test the connection to discover available resources for this integration.',
   [IntegrationTypeEnum.LLM_PROVIDER]:
@@ -55,11 +53,7 @@ export function CredentialStep({
           label="Health check credential"
           fieldId="credential-select"
           isRequired={isRequired}
-          labelHelp={
-            integrationTypeValue === IntegrationTypeEnum.OPENSHIFT
-              ? integrationHelp.openshiftCredential
-              : integrationHelp.healthCheckCredential
-          }
+          labelHelp={integrationHelp.healthCheckCredential}
           hideFormGroupLabel
           hideFooter
         >
@@ -76,11 +70,7 @@ export function CredentialStep({
               isRequired={isRequired}
               allowCreate
               placeholder="Select a credential"
-              labelHelp={
-                integrationTypeValue === IntegrationTypeEnum.OPENSHIFT
-                  ? integrationHelp.openshiftCredential
-                  : integrationHelp.healthCheckCredential
-              }
+              labelHelp={integrationHelp.healthCheckCredential}
             />
           )}
         </SynFormField>
