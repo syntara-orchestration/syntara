@@ -1,6 +1,6 @@
 import { ExecutorTypeEnum } from '@syntara/contracts'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ReactNode } from 'react'
 import { FormProvider, useForm, type UseFormReturn } from 'react-hook-form'
@@ -135,6 +135,34 @@ describe('ScriptExecutionTab', () => {
     await user.click(screen.getByRole('button', { name: 'Execution target' }))
     expect(screen.getByRole('option', { name: 'worker-central-01' })).toBeInTheDocument()
     expect(screen.getByRole('option', { name: 'worker-west-01' })).toBeInTheDocument()
+  })
+
+  it('shows a Default badge next to the default execution target in the select', async () => {
+    const user = userEvent.setup()
+    vi.mocked(useAllEnabledExecutionTargets).mockReturnValue({
+      targets: [
+        { id: 'target-1', name: 'worker-central-01', is_default: false },
+        { id: 'target-2', name: 'worker-east-01', is_default: true },
+        { id: 'target-3', name: 'worker-west-01', is_default: false },
+      ] as never,
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    })
+    const { container } = renderTab({ affinity: ScriptAffinityEnum.REQUIRED_TARGET })
+
+    await user.click(screen.getByRole('button', { name: 'Execution target' }))
+
+    const defaultOption = screen.getByRole('option', { name: /worker-east-01/ })
+    expect(within(defaultOption).getByText('Default')).toBeInTheDocument()
+    expect(
+      within(screen.getByRole('option', { name: 'worker-central-01' })).queryByText('Default')
+    ).not.toBeInTheDocument()
+    expect(
+      within(screen.getByRole('option', { name: 'worker-west-01' })).queryByText('Default')
+    ).not.toBeInTheDocument()
+    expect(await axe(container)).toHaveNoViolations()
   })
 
   it('shows empty guidance with a new-tab configure CTA when required target has no targets', () => {

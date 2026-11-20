@@ -7,6 +7,8 @@ import {
   EmptyStateActions,
   EmptyStateBody,
   EmptyStateFooter,
+  Flex,
+  FlexItem,
   MenuToggle,
   type MenuToggleElement,
   SelectList,
@@ -21,6 +23,7 @@ import { useFormContext, useWatch } from 'react-hook-form'
 
 import { AppRoute } from '../../../app/AppRoute'
 import { SynFormField } from '../../../components/forms/SynFormField'
+import { SynLabel } from '../../../components/labels/SynLabel'
 import { SynErrorState } from '../../../components/states/SynErrorState'
 import { SynSelect } from '../../../components/SynSelect'
 import { detachPromise } from '../../../utils/detachPromise'
@@ -247,7 +250,14 @@ function ExecutionTargetSelect({
         )}
         {targets.map((target) => (
           <SelectOption key={target.id} value={target.id} isSelected={target.id === value}>
-            {target.name}
+            <Flex spaceItems={{ default: 'spaceItemsSm' }} alignItems={{ default: 'alignItemsCenter' }}>
+              <FlexItem>{target.name}</FlexItem>
+              {target.is_default ? (
+                <FlexItem>
+                  <SynLabel color="grey">Default</SynLabel>
+                </FlexItem>
+              ) : null}
+            </Flex>
           </SelectOption>
         ))}
       </SelectList>
