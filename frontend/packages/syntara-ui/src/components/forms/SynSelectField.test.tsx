@@ -122,6 +122,10 @@ describe('SynSelectField', () => {
 
     expect(await screen.findByText('Project is required')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Project' })).toHaveAccessibleDescription(/Project is required/)
+    expect(screen.getByRole('button', { name: 'Project' })).toHaveAttribute('aria-invalid', 'true')
+    await user.click(screen.getByRole('button', { name: 'Project' }))
+    await user.click(screen.getByRole('option', { name: 'Project One' }))
+    expect(screen.getByRole('button', { name: 'Project' })).toHaveAttribute('aria-invalid', 'false')
   })
 
   it('associates helper text with the select toggle', () => {

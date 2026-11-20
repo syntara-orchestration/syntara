@@ -18,6 +18,7 @@ describe('SynSelectFieldToggle', () => {
     )
 
     expect(screen.getByRole('button', { name: 'Project One' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Project One' })).toHaveAttribute('aria-invalid', 'false')
   })
 
   it('marks the toggle as disabled when isDisabled is true', () => {
@@ -49,6 +50,7 @@ describe('SynSelectFieldToggle', () => {
     )
 
     expect(screen.getByRole('button', { name: 'Project One' })).toHaveClass('pf-m-danger')
+    expect(screen.getByRole('button', { name: 'Project One' })).toHaveAttribute('aria-invalid', 'true')
   })
 
   it('calls onToggle when clicked', async () => {
