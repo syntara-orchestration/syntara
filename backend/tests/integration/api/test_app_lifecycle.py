@@ -1,25 +1,102 @@
 """Integration tests for application lifecycle - audit system startup and shutdown."""
 
-from collections.abc import AsyncGenerator
+import logging
+from collections.abc import AsyncGenerator, Iterator
 from contextlib import asynccontextmanager
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from fastapi import APIRouter, FastAPI
 from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from syntara.api.main import app
+from syntara.api.main import app, lifespan
 from syntara.audit.dispatcher import AuditEventDispatcher
+from syntara.audit.logging import AUDIT_LOGGER_NAME
 from syntara.audit.outbox import session as outbox_session
 from syntara.audit.outbox import worker as outbox_worker
 from syntara.audit.outbox.session import AuditWorkerAsyncSessionLocal
+from syntara.authz import resource_actions
 from syntara.core.database.session import AsyncSessionLocal
+from syntara.core.logging import lifecycle as logging_lifecycle
+from syntara.core.logging.logging import _UVICORN_LOGGER_NAMES
+from syntara.settings.cache import settings_cache as settings_cache_module
+
+_RegistryState = tuple[dict[str, list[str]] | None, frozenset[str], frozenset[str]]
+"""Snapshot of the process-global resource-actions registry holder."""
+
+_seeded_engines: set[int] = set()
+"""Engines already seeded by _test_lifespan_context (seeding is per-engine, not per-entry)."""
+
+
+def _snapshot_resource_actions() -> _RegistryState:
+    """Capture the process-global resource-actions registry state."""
+    return (
+        resource_actions._registry,
+        resource_actions._all_pairs,
+        resource_actions._project_eligible,
+    )
+
+
+def _restore_resource_actions(state: _RegistryState) -> None:
+    """Reinstall a captured resource-actions registry state."""
+    (
+        resource_actions._registry,
+        resource_actions._all_pairs,
+        resource_actions._project_eligible,
+    ) = state
+
+
+@pytest.fixture(autouse=True)
+def _preserve_logging_state() -> Iterator[None]:
+    """Restore logging handlers stripped by the lifespan shutdown.
+
+    ``_lifespan_shutdown`` calls ``stop_loggers()``, which removes every root
+    and audit logger handler — including the per-worker FileHandler installed
+    by the session app fixture — and marks logging unconfigured so the next
+    startup reconfigures it from scratch. Without this restore, every later
+    test on the same xdist worker silently loses its app log capture.
+
+    Startup also applies the runtime log level to the uvicorn loggers via
+    ``_set_log_level``; those named levels are restored too.
+    """
+    root_logger = logging.getLogger()
+    audit_logger = logging.getLogger(AUDIT_LOGGER_NAME)
+    saved_root_handlers = list(root_logger.handlers)
+    saved_root_level = root_logger.level
+    saved_audit_handlers = list(audit_logger.handlers)
+    saved_audit_level = audit_logger.level
+    saved_uvicorn_levels = {name: logging.getLogger(name).level for name in _UVICORN_LOGGER_NAMES}
+    saved_state = logging_lifecycle._logging_state
+
+    yield
+
+    root_logger.handlers[:] = saved_root_handlers
+    root_logger.setLevel(saved_root_level)
+    audit_logger.handlers[:] = saved_audit_handlers
+    audit_logger.setLevel(saved_audit_level)
+    for name, level in saved_uvicorn_levels.items():
+        logging.getLogger(name).setLevel(level)
+    logging_lifecycle._logging_state = saved_state
 
 
 @asynccontextmanager
 async def _test_lifespan_context(test_db_engine: AsyncEngine) -> AsyncGenerator[None, None]:
     """Run the app lifespan with test database properly configured.
+
+    The lifespan runs on a throwaway FastAPI instance. Re-entering it on the
+    shared module-level app re-registered every router mid-session; with
+    FastAPI >= 0.162 the re-included routes stopped honouring
+    ``dependency_overrides[get_authz_evaluator]``, so list endpoints in later
+    tests on the same xdist worker evaluated the real Rego policy instead of
+    the conftest evaluator mock and returned empty results for users without
+    role assignments.
+
+    Router (re-)registration is stubbed out and the process globals the
+    startup still writes (resource-actions registry, runtime settings cache)
+    are snapshotted and restored, so nothing leaks to later tests on the
+    worker.
 
     Args:
         test_db_engine: Test database engine with migrations applied
@@ -46,15 +123,63 @@ async def _test_lifespan_context(test_db_engine: AsyncEngine) -> AsyncGenerator[
         patch("syntara.audit.outbox.worker.AuditWorkerAsyncSessionLocal", test_session_factory),
         patch("syntara.audit.outbox.session.AuditWorkerAsyncSessionLocal", test_session_factory),
         patch("syntara.api.main.RegoEvaluator", return_value=mock_evaluator),
+        # Never (re-)register routers from the lifespan: the domain routers are
+        # module-level singletons shared with every other test. Including them
+        # here while the api-conftest evaluator monkeypatch is active leaves
+        # route dispatch state that bypasses dependency_overrides in later
+        # tests on the same worker. session_app already registered them once.
+        patch("syntara.api.main.discover_and_register_routers", return_value=[]),
+        patch("syntara.api.main.build_websocket_router", return_value=APIRouter()),
     ):
-        # Seed required data before app startup
-        from syntara.core.seed import run_seeders
+        # Seed required data before app startup (once per engine: the
+        # lifecycle tests do not restore the template database between
+        # entries, so repeated seeding is redundant work).
+        if id(test_db_engine) not in _seeded_engines:
+            from syntara.core.seed import run_seeders
 
-        await run_seeders(test_session_factory)
+            await run_seeders(test_session_factory)
+            _seeded_engines.add(id(test_db_engine))
 
-        # Run the app lifespan
-        async with app.router.lifespan_context(app):
-            yield
+        # Run the lifespan on a throwaway app so router (re-)registration and
+        # app.state writes stay away from the app shared with other tests.
+        lifespan_app = FastAPI(lifespan=lifespan)
+        saved_route_count = len(app.routes)
+        saved_registry = _snapshot_resource_actions()
+        saved_runtime_settings = settings_cache_module._runtime_settings
+        try:
+            async with lifespan_app.router.lifespan_context(lifespan_app):
+                # In-body guard: startup must not touch the shared app's
+                # route table. The patches above neutralise the two known
+                # registration paths; this catches any new path the moment
+                # it happens rather than after the fact.
+                assert len(app.routes) == saved_route_count, (
+                    "app lifespan must not (de)register routes on the shared app"
+                )
+                yield
+        finally:
+            # Startup writes three process globals that the throwaway app
+            # cannot contain; restore each so later tests on this worker see
+            # the pre-startup state:
+            #
+            # - build_resource_actions() installs a near-empty registry
+            #   (project_eligible shrinks to {"project"}), degrading policy
+            #   validation and the project_eligible filter.
+            # - set_runtime_settings() replaces the global settings cache
+            #   with one whose watcher the shutdown then stops.
+            _restore_resource_actions(saved_registry)
+            settings_cache_module._runtime_settings = saved_runtime_settings
+
+        # Post-restore guards: these verify the restores above ran and held.
+        # They are intentionally after the finally block — their job is to
+        # fail loudly if a future refactor drops or weakens a restore, not
+        # to re-detect the (known) in-startup writes.
+        assert _snapshot_resource_actions() == saved_registry, (
+            "resource-actions registry must be restored after the lifespan"
+        )
+        assert settings_cache_module._runtime_settings is saved_runtime_settings, (
+            "runtime settings cache must be restored after the lifespan"
+        )
+        assert len(app.routes) == saved_route_count, "app lifespan must not (de)register routes on the shared app"
 
 
 @pytest.mark.asyncio
