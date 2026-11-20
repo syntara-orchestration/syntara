@@ -15,6 +15,7 @@ from uuid import UUID, uuid4
 
 import httpx
 import jwt
+from execution_plane_client.commands.bulk_work import WorkCancelBulk, WorkDeleteBulk, WorkItemSelector
 from execution_plane_client.commands.control import WorkCancel
 from execution_plane_client.commands.results import TransportReceipt
 from execution_plane_client.commands.work import WorkDelete
@@ -32,7 +33,8 @@ EP_CLIENT_ID = "syntara-orchestration"
 EP_AUDIENCE = "execution-plane"
 EP_TOKEN_LIFETIME_SECONDS = 300
 EP_SCOPES = (
-    "work.execute work.cancel work.delete cluster.register cluster.update cluster.delete "
+    "work.execute work.cancel work.delete work.cancel_bulk work.delete_bulk "
+    "cluster.register cluster.update cluster.delete "
     "execution_target.register execution_target.update execution_target.delete "
     "execution_target.health "
     "work-items:read execution-targets:read clusters:read"
@@ -148,6 +150,26 @@ class ExecutionPlaneHttpClient:
             client_id=EP_CLIENT_ID,
         )
         return await self.submit_command(message)
+
+    async def cancel_work_items(self, *, selector: WorkItemSelector) -> TransportReceipt:
+        """Acknowledge committed cancellation intent for matching client-owned work."""
+        return await self.submit_command(
+            WorkCancelBulk(selector=selector).to_message(
+                source_id=EP_CLIENT_ID,
+                destination_id=EP_AUDIENCE,
+                client_id=EP_CLIENT_ID,
+            )
+        )
+
+    async def delete_work_items(self, *, selector: WorkItemSelector) -> TransportReceipt:
+        """Acknowledge committed deletion and cancellation intent; cleanup is asynchronous."""
+        return await self.submit_command(
+            WorkDeleteBulk(selector=selector).to_message(
+                source_id=EP_CLIENT_ID,
+                destination_id=EP_AUDIENCE,
+                client_id=EP_CLIENT_ID,
+            )
+        )
 
     async def list_work_items(
         self,

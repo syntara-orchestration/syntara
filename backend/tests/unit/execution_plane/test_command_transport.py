@@ -116,3 +116,32 @@ async def test_delete_work_item_sends_versioned_command(monkeypatch):
     assert requests[0]["command"]["command_revision"] == 1
     assert requests[0]["command"]["payload"] == {"work_item_id": str(item_id)}
     assert "work.delete" in client_module.EP_SCOPES.split()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("command", ["cancel", "delete"])
+@pytest.mark.parametrize("field", ["work_item_ids", "project_id", "workflow_id", "execution_id"])
+async def test_bulk_command_selector_wire_contract(monkeypatch, command, field):
+    from execution_plane_client.commands.bulk_work import WorkItemSelector
+
+    owner_id = uuid4()
+    value = [str(owner_id)] if field == "work_item_ids" else str(owner_id)
+    messages = []
+
+    def handle(request) -> httpx.Response:
+        message = json.loads(request.content)
+        messages.append(message)
+        return httpx.Response(202, json={"received": True, "message_id": message["message_id"]})
+
+    monkeypatch.setattr(client_module, "create_ep_service_token", lambda: "test-token")
+    client = object.__new__(ExecutionPlaneHttpClient)
+    client._client = httpx.AsyncClient(base_url="https://ep.example", transport=httpx.MockTransport(handle))
+    async with client:
+        method = client.cancel_work_items if command == "cancel" else client.delete_work_items
+        selector = {field: value} if field == "work_item_ids" else {"runtime_context": {field: value}}
+        await method(selector=WorkItemSelector.model_validate(selector))
+    assert len(messages) == 1
+    assert messages[0]["command"]["command_type"] == f"work.{command}_bulk"
+    wire_selector = messages[0]["command"]["payload"]["selector"]
+    assert {key: value for key, value in wire_selector.items() if value is not None} == selector
+    assert f"work.{command}_bulk" in client_module.EP_SCOPES.split()

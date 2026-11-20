@@ -253,7 +253,7 @@ class TestCancelExecution:
         ):
             await service.cancel_execution(execution.id)
 
-        mock_cancel_work.assert_awaited_once_with(mock_session, execution.id)
+        mock_cancel_work.assert_awaited_once_with(execution.id)
 
     @pytest.mark.asyncio
     async def test_cancel_execution_plane_failure_does_not_block(self) -> None:

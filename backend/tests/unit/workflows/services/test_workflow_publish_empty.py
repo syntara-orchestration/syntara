@@ -19,6 +19,8 @@ from syntara.workflows.services import scheduled_trigger_service as scheduled_tr
 from syntara.workflows.services.scheduled_trigger_service import ScheduledTriggerService
 from syntara.workflows.services.workflow_service import WorkflowService, _pending_schedule_delete_tasks
 
+pytestmark = pytest.mark.usefixtures("ep_deletion_acknowledged")
+
 
 @pytest.fixture
 def mock_service() -> WorkflowService:

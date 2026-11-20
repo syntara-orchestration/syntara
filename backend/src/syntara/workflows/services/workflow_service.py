@@ -30,7 +30,7 @@ from syntara.core.services.user_reference_resolution import UserReferenceResolve
 from syntara.credentials.lib.auth_types import AUTH_TYPE_URL
 from syntara.credentials.models.credential import Credential
 from syntara.credentials.models.credential_type import CredentialType
-from syntara.execution_plane.deletion import schedule_work_item_deletion
+from syntara.execution_plane.deletion import delete_execution_plane_work_items
 from syntara.metrics.dependencies import get_metrics_recorder
 from syntara.metrics.types import ComponentLabel, MetricType
 from syntara.workflows.audit.workflow_lifecycle import WorkflowAction, WorkflowLifecycleEvent
@@ -1703,6 +1703,8 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
         if non_terminal_count:
             raise WorkflowHasActiveExecutionsError(non_terminal_count, workflow_id=workflow_id)
 
+        await delete_execution_plane_work_items(owner_field="workflow_id", owner_id=workflow_id)
+
         # Explicit cleanup retained so trigger deletion is logged individually
         # (delete_triggers_for_workflow logs each removal); DB CASCADE would also
         # remove these rows, but silently.
@@ -1736,8 +1738,6 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
                 error_type=type(exc).__name__,
             )
             raise
-
-        schedule_work_item_deletion(owner_field="workflow_id", owner_id=workflow_id)
 
         self._emit_lifecycle_event(
             workflow_id=workflow.id,

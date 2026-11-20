@@ -34,6 +34,9 @@ from tests.integration.api.conftest import (
 BASE_URL = "/api/v1/integrations"
 
 
+pytestmark = pytest.mark.usefixtures("ep_deletion_acknowledged")
+
+
 async def _create_project(session: AsyncSession, name: str | None = None) -> Project:
     project = Project(name=name or f"pa-proj-{uuid4().hex[:8]}", description="Test project")
     session.add(project)

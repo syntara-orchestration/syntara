@@ -22,6 +22,7 @@ from tests.helpers.workflow import (
 
 
 @pytest.mark.asyncio
+@pytest.mark.usefixtures("ep_deletion_acknowledged")
 async def test_workflow_complete_lifecycle(jwt_client: AsyncClient, test_project_id: UUID) -> None:  # noqa: PLR0915
     """Test complete workflow lifecycle from creation to deletion.
 
