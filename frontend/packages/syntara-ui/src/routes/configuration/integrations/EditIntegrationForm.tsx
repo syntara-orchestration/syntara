@@ -331,16 +331,19 @@ export function EditIntegrationForm() {
   const formValues = useMemo<EditIntegrationFormValues | undefined>(() => {
     if (!integration) return undefined
     const config = integration.configuration
-    const coerceOpenShiftGlobal = integration.integration_type === IntegrationTypeEnum.OPENSHIFT
-    const scope = coerceOpenShiftGlobal ? 'global' : ((integration.scope as 'global' | 'project') ?? 'global')
+    const isOpenShift = integration.integration_type === IntegrationTypeEnum.OPENSHIFT
+    // OpenShift always requires HTTPS + TLS verification — coerce like scope:global.
+    const scope = isOpenShift ? 'global' : ((integration.scope as 'global' | 'project') ?? 'global')
     const projectIds = isProjectScoped ? initialProjectIds : []
+    const allowHttp = 'allow_http' in config ? Boolean(config.allow_http) : false
+    const skipTls = 'insecure_skip_tls_verify' in config ? Boolean(config.insecure_skip_tls_verify) : false
     return {
       name: integration.name ?? '',
       description: integration.description ?? '',
       integration_type: integration.integration_type ?? IntegrationTypeEnum.MCP_SERVER,
       base_url: 'base_url' in config ? String(config.base_url ?? '') : '',
-      allow_http: 'allow_http' in config ? Boolean(config.allow_http) : false,
-      insecure_skip_tls_verify: 'insecure_skip_tls_verify' in config ? Boolean(config.insecure_skip_tls_verify) : false,
+      allow_http: isOpenShift ? false : allowHttp,
+      insecure_skip_tls_verify: isOpenShift ? false : skipTls,
       ca_certificate: 'ca_certificate' in config ? (config.ca_certificate ?? null) : null,
       scope,
       project_ids: projectIds,
