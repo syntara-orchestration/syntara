@@ -239,6 +239,22 @@ describe('buildEditSchema', () => {
         expect(result.error.issues.some((i) => i.message === expectedMessage)).toBe(true)
       }
     })
+
+    it('rejects allow_http=true', () => {
+      const result = schema.safeParse({ ...validOpenShift, allow_http: true })
+      expect(result.success).toBe(false)
+      if (!result.success) {
+        expect(result.error.issues.some((i) => i.message === 'OpenShift requires HTTPS')).toBe(true)
+      }
+    })
+
+    it('rejects insecure_skip_tls_verify=true', () => {
+      const result = schema.safeParse({ ...validOpenShift, insecure_skip_tls_verify: true })
+      expect(result.success).toBe(false)
+      if (!result.success) {
+        expect(result.error.issues.some((i) => i.message === 'OpenShift requires TLS verification')).toBe(true)
+      }
+    })
   })
 
   describe('shared fields', () => {
@@ -377,6 +393,21 @@ describe('buildConfiguration', () => {
         allow_http: false,
         insecure_skip_tls_verify: false,
         ca_certificate: '-----BEGIN CERTIFICATE-----\n...',
+      })
+    })
+
+    it('forces allow_http and insecure_skip_tls_verify to false', () => {
+      const openshiftValues = {
+        ...baseValues,
+        integration_type: 'openshift',
+        base_url: 'https://ep-control-plane:6443',
+        allow_http: true,
+        insecure_skip_tls_verify: true,
+      }
+      const config = buildConfiguration('openshift', openshiftValues)
+      expect(config).toMatchObject({
+        allow_http: false,
+        insecure_skip_tls_verify: false,
       })
     })
 

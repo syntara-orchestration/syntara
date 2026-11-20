@@ -883,6 +883,37 @@ describe('EditIntegrationForm', () => {
       expect(mockSyncAssignments).not.toHaveBeenCalled()
     })
 
+    it('PATCHes allow_http and insecure_skip_tls_verify false when record has them true', async () => {
+      setupMocks({
+        integration: {
+          ...mockOpenShiftIntegration,
+          configuration: {
+            ...mockOpenShiftIntegration.configuration,
+            allow_http: true,
+            insecure_skip_tls_verify: true,
+          },
+        },
+      })
+      const { patchMutate } = setupMutationMocks()
+      const user = userEvent.setup()
+      render(<EditIntegrationForm />, { wrapper })
+
+      await user.click(screen.getByRole('button', { name: 'Save integration' }))
+
+      await waitFor(() => {
+        expect(patchMutate).toHaveBeenCalledWith(
+          expect.objectContaining({
+            body: expect.objectContaining({
+              configuration: expect.objectContaining({
+                allow_http: false,
+                insecure_skip_tls_verify: false,
+              }) as Record<string, unknown>,
+            }) as Record<string, unknown>,
+          })
+        )
+      })
+    })
+
     it('calls discover with matching openshift integration_type values on test connection', async () => {
       const { discoverMutate } = setupMutationMocks()
       const user = userEvent.setup()
