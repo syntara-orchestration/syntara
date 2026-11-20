@@ -226,7 +226,7 @@ function buildKebabActions(
     },
   ]
 
-  if (!integration || !isExecutionPlaneInfrastructure(integration)) {
+  if (integration && !isExecutionPlaneInfrastructure(integration)) {
     actions.push(
       { key: 'separator', isSeparator: true },
       {
@@ -235,11 +235,7 @@ function buildKebabActions(
         isDanger: true,
         isAriaDisabled: !permissions.canDelete,
         tooltipProps: permissions.canDelete ? undefined : { content: permissions.tooltips.delete },
-        onClick: permissions.canDelete
-          ? () => {
-              if (integration) deleteDialog.open(integration)
-            }
-          : undefined,
+        onClick: permissions.canDelete ? () => deleteDialog.open(integration) : undefined,
       }
     )
   }
