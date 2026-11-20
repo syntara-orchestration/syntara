@@ -320,6 +320,14 @@ describe('AAP credential gating', () => {
 
       expect(orgInput).toHaveValue('')
       expect(templateInput).toHaveValue('')
+
+      // The browser stops tracking the cleared template: its detail query is disabled
+      const detailCalls = mockAapUseQuery.mock.calls.filter(
+        (c: unknown[]) => c[1] === '/proxies/aap/job_templates/{job_template_id}'
+      )
+      const lastDetailCall = detailCalls.at(-1)
+      expect(lastDetailCall).toBeDefined()
+      expect(lastDetailCall?.[3]).toMatchObject({ enabled: false })
     })
 
     it('clears only the template when the new credential keeps the organization', async () => {
@@ -414,6 +422,14 @@ describe('AAP credential gating', () => {
 
       expect(orgInput).toHaveValue('')
       expect(templateInput).toHaveValue('')
+
+      // The browser stops tracking the cleared template: its detail query is disabled
+      const detailCalls = mockAapUseQuery.mock.calls.filter(
+        (c: unknown[]) => c[1] === '/proxies/aap/workflow_job_templates/{workflow_job_template_id}'
+      )
+      const lastDetailCall = detailCalls.at(-1)
+      expect(lastDetailCall).toBeDefined()
+      expect(lastDetailCall?.[3]).toMatchObject({ enabled: false })
     })
   })
 })
