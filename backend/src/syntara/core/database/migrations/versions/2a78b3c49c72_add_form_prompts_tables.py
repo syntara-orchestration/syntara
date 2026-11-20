@@ -62,6 +62,7 @@ def upgrade() -> None:
         ),
         sa.Column("submit_label", sa.String(length=FieldLimits.FORM_SUBMIT_LABEL_MAX_LENGTH), nullable=True),
         sa.Column("success_message", sa.String(length=FieldLimits.FORM_SUCCESS_MESSAGE_MAX_LENGTH), nullable=True),
+        sa.Column("responders_configured", sa.Boolean(), server_default=sa.text("false"), nullable=False),
         sa.Column("response_data", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
         sa.Column("responded_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("responded_by", sa.Uuid(), nullable=True),

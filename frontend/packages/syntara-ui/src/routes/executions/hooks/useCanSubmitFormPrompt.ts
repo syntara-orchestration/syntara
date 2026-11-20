@@ -6,9 +6,8 @@ import { usersFetchClient } from '../../../client'
 import { useAuthStore } from '../../../stores/useAuthStore'
 import { fetchAllPages, MAX_PAGE_SIZE } from '../../../utils/fetchAllPages'
 
-type ResponderConfig = Partial<
-  Pick<FormsAPI.components['schemas']['FormPromptRead'], 'responder_users' | 'responder_groups'>
->
+type ResponderConfig = Pick<FormsAPI.components['schemas']['FormPromptRead'], 'responders_configured'> &
+  Partial<Pick<FormsAPI.components['schemas']['FormPromptRead'], 'responder_users' | 'responder_groups'>>
 
 type GroupMembership = { id?: string }
 
@@ -58,7 +57,8 @@ export function useCanSubmitFormPrompt(prompt: ResponderConfig | undefined): {
     }
 
     if (!hasResponders) {
-      return { canSubmit: true, isLoading: false, isError: false, refetch: groupsQuery.refetch }
+      const canSubmit = !prompt.responders_configured
+      return { canSubmit, isLoading: false, isError: false, refetch: groupsQuery.refetch }
     }
 
     if (isDirectMatch) {

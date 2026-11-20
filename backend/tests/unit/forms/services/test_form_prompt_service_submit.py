@@ -15,6 +15,7 @@ from syntara.forms.exceptions import (
     FormPromptAlreadyRespondedError,
     FormPromptCancelledError,
     FormPromptExpiredError,
+    FormPromptNotAuthorizedError,
     FormPromptNotFoundError,
 )
 from syntara.forms.models.api_models import FormPromptStatus
@@ -52,6 +53,11 @@ def _make_service_with_user(
         prompt.response_data = None
         prompt.responded_by = None
         prompt.responded_at = None
+        prompt.responders_configured = False
+        if getattr(prompt, "execution_id", None) is None:
+            prompt.execution_id = uuid4()
+        if getattr(prompt, "prompt_node_id", None) is None:
+            prompt.prompt_node_id = "form1"
         prompt.responder_user_records = []
         prompt.responder_group_records = []
         prompt.responder = None  # type: ignore[assignment]
@@ -69,6 +75,7 @@ def _make_service_with_user(
                 "labels": prompt.labels,
                 "response_data": prompt.response_data,
                 "responded_at": prompt.responded_at,
+                "responders_configured": prompt.responders_configured,
             }
 
         prompt.model_dump = Mock(side_effect=dump_prompt)  # type: ignore[method-assign]
@@ -291,6 +298,30 @@ class TestFormPromptServiceSubmit:
 
             # Should still emit telemetry
             mock_dispatcher.dispatch.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_submit_fails_closed_when_all_configured_responder_records_are_gone(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """A restricted prompt with no remaining responder records denies without updating."""
+        prompt_id = uuid4()
+        prompt = Mock(spec=FormPrompt)
+        prompt.id = prompt_id
+        prompt.status = FormPromptStatus.PENDING
+        prompt.timeout_at = None
+        prompt.form_definition = _MINIMAL_FORM_DEFINITION
+
+        service, session, _user = _make_service_with_user(prompt=prompt)
+        prompt.responders_configured = True
+        prompt.execution_id = uuid4()
+        prompt.prompt_node_id = "form1"
+
+        with pytest.raises(FormPromptNotAuthorizedError):
+            await service.submit(prompt_id, {"field1": "test value"})
+
+        assert session.exec.await_count == 1
+        session.commit.assert_not_awaited()
+        assert any("lost all configured responder records" in record.message for record in caplog.records)
 
     @pytest.mark.asyncio
     async def test_submit_not_found_raises_error(self) -> None:

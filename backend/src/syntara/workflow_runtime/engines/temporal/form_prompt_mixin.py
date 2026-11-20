@@ -17,6 +17,7 @@ from temporalio.exceptions import TimeoutError as TemporalTimeoutError
 with workflow.unsafe.imports_passed_through():
     from syntara.core.constants import FieldLimits
     from syntara.core.exceptions import SafeValueError
+    from syntara.forms.exceptions import FORM_PROMPT_NO_RESOLVED_RESPONDERS_MESSAGE
     from syntara.forms.validators.options import resolve_dynamic_options
     from syntara.workflow_core.models import (
         ActivityName,
@@ -43,6 +44,29 @@ from syntara.workflow_runtime.engines.temporal.utils.loop_iteration_ids import (
 from syntara.workflow_runtime.engines.temporal.utils.resolved_prompt_text import process_prompt_field
 
 _FORM_PROMPT_MESSAGE_MAX_LENGTH = FieldLimits.DESCRIPTION_MAX_LENGTH
+
+
+def _validate_responder_names(value: object, *, field_name: str) -> list[str]:
+    """Validate resolved responder values before passing them to the ID resolver.
+
+    Workflow definitions validate responder arrays as strings when saved, but template
+    substitution can replace a string entry with a non-string value at runtime. This keeps
+    malformed resolved values from reaching the resolver without changing authored names.
+    """
+    if value is None:
+        return []
+    if not isinstance(value, list):
+        msg = f"Form prompt '{field_name}' must be a list of names"
+        raise SafeValueError(msg)
+
+    names: list[str] = []
+    for name in value:
+        if not isinstance(name, str):
+            msg = f"Form prompt '{field_name}' entries must be strings"
+            raise SafeValueError(msg)
+        names.append(name)
+
+    return names
 
 
 class WorkflowFormPromptMixin:
@@ -189,17 +213,40 @@ class WorkflowFormPromptMixin:
 
         name = node.name or f"Form prompt for {node.id}"
 
+        # Snapshot authored intent from the node before template substitution can
+        # turn a configured responder list into an empty resolved list.
+        authored_responder_users = node.parameters.get("responder_users")
+        authored_responder_groups = node.parameters.get("responder_groups")
+        responders_configured = bool(authored_responder_users or authored_responder_groups)
+        responder_users = _validate_responder_names(
+            resolved_parameters.get("responder_users"),
+            field_name="responder_users",
+        )
+        responder_groups = _validate_responder_names(
+            resolved_parameters.get("responder_groups"),
+            field_name="responder_groups",
+        )
+
         # Resolve responders (reuse the approver resolution activity - it's generic)
-        responder_users = resolved_parameters.get("responder_users") or []
-        responder_groups = resolved_parameters.get("responder_groups") or []
         resolution_result = await workflow.execute_activity(
             ActivityName.APPROVER_RESOLUTION,
             args=[responder_users, responder_groups],
             start_to_close_timeout=timedelta(seconds=DEFAULT_ACTIVITY_TIMEOUT_SECONDS),
             retry_policy=RetryPolicy(maximum_attempts=3),
         )
-        responder_user_ids = resolution_result.get("user_ids")
-        responder_group_ids = resolution_result.get("group_ids")
+        responder_user_ids = resolution_result.get("user_ids") or []
+        responder_group_ids = resolution_result.get("group_ids") or []
+
+        if responders_configured and not responder_user_ids and not responder_group_ids:
+            workflow.logger.warning(
+                "Form prompt node failed because no configured responders resolved",
+                extra={
+                    "node_id": node.id,
+                    "responder_users": authored_responder_users,
+                    "responder_groups": authored_responder_groups,
+                },
+            )
+            raise SafeValueError(FORM_PROMPT_NO_RESOLVED_RESPONDERS_MESSAGE)
 
         # Compute timeout_at
         response_window = resolve_form_prompt_response_window(node, self._runtime_settings)
@@ -225,6 +272,7 @@ class WorkflowFormPromptMixin:
             "timeout_at": timeout_at,
             "responder_user_ids": responder_user_ids,
             "responder_group_ids": responder_group_ids,
+            "responders_configured": responders_configured,
             "project_id": self._project_id,
             "loop_iteration_path": loop_index_chain(node.id, self.loop_body_map, self.node_control_data),
             "temporal_activity_id": form_prompt_temporal_activity_id(

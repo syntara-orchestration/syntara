@@ -13,6 +13,7 @@ class FormPromptActivityInput(TypedDict):
     timeout_at: str | None
     responder_user_ids: list[str] | None
     responder_group_ids: list[str] | None
+    responders_configured: bool
     project_id: str
     loop_iteration_path: list[int]
     temporal_activity_id: str | None

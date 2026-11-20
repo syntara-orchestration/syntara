@@ -46,7 +46,7 @@
           "type": "string"
         },
         "maxItems": 100,
-        "description": "Usernames allowed to respond. Leave empty to allow any user with form_prompt:submit permission."
+        "description": "Usernames allowed to respond. Leave empty to allow any user with form_prompt:submit permission. If a configured list resolves to no users, the form-prompt node fails before creating a prompt."
       },
       "responder_groups": {
         "type": "array",
@@ -54,7 +54,7 @@
           "type": "string"
         },
         "maxItems": 50,
-        "description": "Group names whose members may respond. Leave empty to allow any user with form_prompt:submit permission."
+        "description": "Group names whose members may respond. Leave empty to allow any user with form_prompt:submit permission. If a configured list resolves to no groups, the form-prompt node fails before creating a prompt."
       },
       "response_window": {
         "type": "integer",

@@ -113,6 +113,7 @@ describe('FormPromptResponseContent dynamic options', () => {
         ],
       },
       submit_label: 'Submit',
+      responders_configured: false,
     }
 
     renderContent(prompt)
@@ -146,6 +147,7 @@ describe('FormPromptResponseContent dynamic options', () => {
           },
         ],
       },
+      responders_configured: false,
     }
 
     const { container } = renderContent(prompt)

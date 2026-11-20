@@ -69,10 +69,13 @@ A `form_prompt` step has two output ports, `submitted` and `fallback`. The `fall
 
 `responder_users` and `responder_groups` limit who can answer. They use usernames and group
 names so references are preserved during workflow export and import. The names are resolved when the
-step starts; unresolved names are ignored. Every submitter must also have
+step starts. Any names that resolve are enforced, while unresolved names grant no access.
+If all names in a nonempty configured list fail to resolve, the workflow node fails before
+creating a prompt. If some names
+resolve, only those responders may submit. Every submitter must also have
 `form_prompt:submit` permission in the prompt's project; responder lists only narrow who
-may submit. If both lists are empty, any user with that permission may submit. See
-[Authorization](#authorization) for the full checks.
+may submit. If both authored lists are empty, any user with that permission may
+submit. See [Authorization](#authorization) for the full checks.
 
 ### The response window
 
@@ -224,9 +227,10 @@ flowchart TD
     RBAC -->|deny| D403a["403"]
     RBAC -->|allow| Resp{"_validate_responder()"}
     Resp -->|"no responders configured"| OK["Proceed"]
-    Resp -->|"caller in responder_users"| OK
-    Resp -->|"caller in a responder group"| OK
-    Resp -->|otherwise| D403b["FormPromptNotAuthorizedError → 403"]
+    Resp -->|"resolved responder entries exist"| Match{"caller matches resolved user/group?"}
+    Match -->|yes| OK
+    Match -->|no| D403b["FormPromptNotAuthorizedError → 403"]
+    Resp -->|"all resolved responder records were later removed"| D403b
 ```
 
 **Tier 1 — RBAC.** For a GET or submit request on one prompt, the API checks the matching

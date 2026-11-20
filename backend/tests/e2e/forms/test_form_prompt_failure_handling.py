@@ -107,6 +107,33 @@ _FAILURE_CASES = [
         "HTTP 422",
         id="form-api-422-cof-fallback",
     ),
+    pytest.param(
+        "unresolved_responders",
+        False,
+        None,
+        ExecutionStatus.FAILED,
+        "none",
+        "none of its configured responders could be resolved",
+        id="unresolved-responders-cof-disabled",
+    ),
+    pytest.param(
+        "unresolved_responders",
+        True,
+        "fallback",
+        ExecutionStatus.COMPLETED_WITH_ERRORS,
+        "fallback",
+        "none of its configured responders could be resolved",
+        id="unresolved-responders-cof-fallback",
+    ),
+    pytest.param(
+        "unresolved_responders",
+        True,
+        "submit",
+        ExecutionStatus.COMPLETED_WITH_ERRORS,
+        "submitted",
+        "none of its configured responders could be resolved",
+        id="unresolved-responders-cof-submit",
+    ),
 ]
 
 
@@ -209,7 +236,7 @@ def _start_failure_case(
     first_project_id: UUID,
     track_execution: Callable[[UUID], None],
     *,
-    failure_kind: Literal["timeout", "invalid_dynamic_options", "form_api_validation"],
+    failure_kind: Literal["timeout", "invalid_dynamic_options", "form_api_validation", "unresolved_responders"],
     continue_on_failure: bool,
     fallback_decision: Literal["submit", "fallback"] | None,
 ) -> tuple[UUID, UUID | None]:
@@ -217,12 +244,17 @@ def _start_failure_case(
     form_fields = [dict(_DEFAULT_TEXT_FIELD)]
     producer_output: dict[str, object] = {}
     submit_label: str | None = None
+    responder_users: list[str] | None = None
+    responder_groups: list[str] | None = None
     if failure_kind == "invalid_dynamic_options":
         producer_output = {"environments": "production"}
         form_fields.append(dynamic_option_field("environment", "${producer.stdout_json.environments}"))
     elif failure_kind == "form_api_validation":
         producer_output = {"submit_label": "x" * (FieldLimits.FORM_SUBMIT_LABEL_MAX_LENGTH + 1)}
         submit_label = "${producer.stdout_json.submit_label}"
+    elif failure_kind == "unresolved_responders":
+        responder_users = ["fp-missing-user"]
+        responder_groups = ["fp-missing-group"]
 
     workflow_name_prefix = f"e2e-form-prompt-failure-{failure_kind}"
     description = "E2E: form prompt failure and continue-on-failure routing"
@@ -241,6 +273,8 @@ def _start_failure_case(
             submit_label=submit_label,
             fallback_decision=fallback_decision,
             capture_form_prompt_result=continue_on_failure,
+            responder_users=responder_users,
+            responder_groups=responder_groups,
         )
         prompt_id = UUID(str(prompt_row.id))
         _assert_default_is_configured(get_form_prompt(syntara_api, prompt_id))
@@ -259,6 +293,8 @@ def _start_failure_case(
         submit_label=submit_label,
         fallback_decision=fallback_decision,
         capture_form_prompt_result=continue_on_failure,
+        responder_users=responder_users,
+        responder_groups=responder_groups,
     )
     return exec_id, None
 
@@ -280,17 +316,18 @@ def test_form_prompt_failures_follow_continue_on_failure_routing(
     first_project_id: UUID,
     form_execution_cleanup: Callable[[UUID], None],
     *,
-    failure_kind: Literal["timeout", "invalid_dynamic_options", "form_api_validation"],
+    failure_kind: Literal["timeout", "invalid_dynamic_options", "form_api_validation", "unresolved_responders"],
     continue_on_failure: bool,
     fallback_decision: Literal["submit", "fallback"] | None,
     expected_execution_status: ExecutionStatus,
     expected_route: Literal["none", "submitted", "fallback"],
     expected_error_fragment: str,
 ) -> None:
-    """Cover timeout, option-resolution, and form-service failures with applicable settings.
+    """Cover timeout, option-resolution, responder-resolution, and form-service failures.
 
     Timeout cases wait for a pending form prompt and intentionally do not submit a
-    response. Invalid dynamic options fail before the form activity is scheduled.
+    response. Invalid dynamic options and unresolved responders fail before the form
+    activity is scheduled.
     An overlong resolved submit label is rejected by the Forms API during the
     Temporal form-creation activity. Existing type-mismatch E2E cases cover
     invalid dynamic options with continue-on-failure disabled and fallback

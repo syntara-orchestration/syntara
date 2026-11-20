@@ -27,6 +27,7 @@ def _form_prompt_input(overrides: dict[str, Any] | None = None) -> FormPromptAct
         "timeout_at": None,
         "responder_user_ids": None,
         "responder_group_ids": None,
+        "responders_configured": False,
         "project_id": str(uuid4()),
         "loop_iteration_path": [],
         "temporal_activity_id": "form1",
@@ -167,6 +168,7 @@ class TestCreateFormPromptActivity:
                         "timeout_at": "2024-01-01T00:00:00Z",
                         "responder_user_ids": [str(uuid4())],
                         "responder_group_ids": [str(uuid4())],
+                        "responders_configured": True,
                         "project_id": proj_id,
                         "loop_iteration_path": [0, 1],
                         "temporal_activity_id": "form1_iter_0_iter_1",
@@ -185,6 +187,7 @@ class TestCreateFormPromptActivity:
         assert call_args["form_definition"] == {"fields": []}
         assert call_args["loop_iteration_path"] == [0, 1]
         assert call_args["temporal_activity_id"] == "form1_iter_0_iter_1"
+        assert call_args["responders_configured"] is True
         assert call_args["message"] == "Please fill this out"
         assert call_args["submit_label"] == "Submit"
         assert call_args["success_message"] == "Done!"

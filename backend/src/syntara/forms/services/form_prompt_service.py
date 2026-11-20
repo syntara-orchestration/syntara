@@ -24,6 +24,7 @@ if TYPE_CHECKING:
     from syntara.core.models import User
 
 from syntara.audit.dispatcher import AuditEventDispatcher
+from syntara.core.exceptions import SafeValueError
 from syntara.core.models.user_reference import UserReference, UserReferenceType
 from syntara.core.services import BaseService, GroupMembershipService
 from syntara.core.services.extensions import EnrichQueryMixin
@@ -34,6 +35,7 @@ from syntara.forms.audit.form_prompt import (
     FormPromptSubmittedEvent,
 )
 from syntara.forms.exceptions import (
+    FORM_PROMPT_NO_RESOLVED_RESPONDERS_MESSAGE,
     FormPromptAlreadyRequestedError,
     FormPromptAlreadyRespondedError,
     FormPromptNotAuthorizedError,
@@ -145,24 +147,40 @@ class FormPromptService(UserReferenceResolverMixin, BaseService):
         return result.one_or_none()
 
     async def _validate_responder(self, prompt: FormPrompt) -> None:
-        """Ensure the current user is configured to respond to this prompt."""
+        """Ensure the current user is configured to respond to this prompt.
+
+        Resolved responder records always narrow access. A prompt with no resolved
+        responders at creation is rejected before persistence. If all responder records are
+        later deleted but responders_configured remains true, deny submission rather than
+        falling back to the project submit permission.
+        """
         responder_users = prompt.responder_user_records
         responder_groups = prompt.responder_group_records
 
-        # Empty responder lists preserve the permission-based fallback.
-        if not responder_users and not responder_groups:
-            return
+        if responder_users or responder_groups:
+            if self.user.id in {responder.id for responder in responder_users}:
+                return
 
-        if self.user.id in {responder.id for responder in responder_users}:
-            return
+            if responder_groups and await GroupMembershipService(self.session).is_user_in_any_group_by_ids(
+                user_id=self.user.id,
+                group_ids=[group.id for group in responder_groups],
+            ):
+                return
 
-        if responder_groups and await GroupMembershipService(self.session).is_user_in_any_group_by_ids(
-            user_id=self.user.id,
-            group_ids=[group.id for group in responder_groups],
-        ):
-            return
+            raise FormPromptNotAuthorizedError(prompt.id, self.user.id)
 
-        raise FormPromptNotAuthorizedError(prompt.id, self.user.id)
+        if prompt.responders_configured:
+            logger.warning(
+                "Form prompt lost all configured responder records; refusing submission",
+                prompt_id=prompt.id,
+                execution_id=prompt.execution_id,
+                prompt_node_id=prompt.prompt_node_id,
+                project_id=prompt.project_id,
+                user_id=self.user.id,
+            )
+            raise FormPromptNotAuthorizedError(prompt.id, self.user.id)
+
+        # No responders were configured: the route's form_prompt:submit check is sufficient.
 
     @staticmethod
     def _to_read_model(prompt: FormPrompt, *, signal_delivery_error: str | None = None) -> FormPromptRead:
@@ -312,8 +330,18 @@ class FormPromptService(UserReferenceResolverMixin, BaseService):
             FormPromptAlreadyRequestedError: If the conflicting row is missing or belongs to a different activity
             FormPromptNotPendingError: If a same-activity duplicate is already submitted, expired or cancelled
             FormPromptExpiredError: If a same-activity pending duplicate is past its deadline
+            SafeValueError: If responders were configured but none resolved to user or group IDs
 
         """
+        if request.responders_configured and not request.responder_user_ids and not request.responder_group_ids:
+            logger.warning(
+                "Rejected form prompt creation because no configured responders resolved",
+                execution_id=request.execution_id,
+                prompt_node_id=request.prompt_node_id,
+                project_id=request.project_id,
+            )
+            raise SafeValueError(FORM_PROMPT_NO_RESOLVED_RESPONDERS_MESSAGE)
+
         execution = await self._validate_execution_project(request)
 
         try:
@@ -330,6 +358,7 @@ class FormPromptService(UserReferenceResolverMixin, BaseService):
                 form_definition=request.form_definition,
                 submit_label=request.submit_label,
                 success_message=request.success_message,
+                responders_configured=request.responders_configured,
                 status=FormPromptStatus.PENDING,
             )
             self.session.add(form_prompt)

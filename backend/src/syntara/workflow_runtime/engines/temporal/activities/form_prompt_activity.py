@@ -68,6 +68,7 @@ async def create_form_prompt_activity(activity_input: FormPromptActivityInput) -
         "timeout_at": activity_input["timeout_at"],
         "responder_user_ids": activity_input["responder_user_ids"],
         "responder_group_ids": activity_input["responder_group_ids"],
+        "responders_configured": activity_input["responders_configured"],
         "loop_iteration_path": activity_input["loop_iteration_path"] or [],
         "temporal_activity_id": activity_input["temporal_activity_id"],
         "message": activity_input["message"],

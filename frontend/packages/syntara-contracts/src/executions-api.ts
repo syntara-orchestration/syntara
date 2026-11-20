@@ -1477,12 +1477,12 @@ export interface components {
       } | null
       /**
        * Responder Users
-       * @description Usernames allowed to respond. Empty/omitted = any user with form_prompt:submit.
+       * @description Usernames allowed to respond. Empty/omitted = any user with form_prompt:submit. If a configured list resolves to no users, the form-prompt node fails before creating a prompt.
        */
       responder_users?: string[] | null
       /**
        * Responder Groups
-       * @description Group names whose members may respond. Empty/omitted = any user with form_prompt:submit.
+       * @description Group names whose members may respond. Empty/omitted = any user with form_prompt:submit. If a configured list resolves to no groups, the form-prompt node fails before creating a prompt.
        */
       responder_groups?: string[] | null
       /**

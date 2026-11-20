@@ -24,6 +24,7 @@ async def _create_prompt(
     *,
     name: str = "Test form",
     form_definition: dict[str, object] | None = None,
+    responders_configured: bool = False,
 ) -> FormPrompt:
     """Persist a form prompt for endpoint tests."""
     prompt = FormPrompt(
@@ -33,6 +34,7 @@ async def _create_prompt(
         temporal_activity_id="form-activity",
         name=name,
         form_definition=form_definition or _FORM_DEFINITION,
+        responders_configured=responders_configured,
     )
     session.add(prompt)
     await session.commit()
@@ -96,6 +98,7 @@ class TestFormPromptGetAPI:
         }
         assert data["responder_users"] == []
         assert data["responder_groups"] == []
+        assert data["responders_configured"] is False
 
     async def test_get_returns_resolved_options_without_authoring_expression(
         self,
@@ -169,7 +172,7 @@ class TestFormPromptGetAPI:
         test_user: User,
         test_group: Group,
     ) -> None:
-        prompt = await _create_prompt(test_db_session, test_project_id)
+        prompt = await _create_prompt(test_db_session, test_project_id, responders_configured=True)
         test_db_session.add_all(
             [
                 FormPromptResponderUser(form_prompt_id=prompt.id, user_id=test_user.id),
@@ -182,6 +185,7 @@ class TestFormPromptGetAPI:
 
         assert response.status_code == 200
         data = response.json()
+        assert data["responders_configured"] is True
         assert data["responder_users"] == [{"id": str(test_user.id), "username": test_user.username}]
         assert data["responder_groups"] == [{"id": str(test_group.id), "name": test_group.name}]
         assert data["signal_delivery_error"] is None

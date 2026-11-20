@@ -190,13 +190,18 @@ export interface components {
        */
       responded_at?: string | null
       /**
+       * Responders Configured
+       * @description Whether the workflow author supplied any responder users or groups. True with no resolved responder entries means nobody can submit.
+       */
+      responders_configured: boolean
+      /**
        * Responder Users
-       * @description Users who can respond to this prompt (empty = any user with permission)
+       * @description Resolved users who can respond. Empty lists allow any user with submit permission only when responders_configured is false.
        */
       responder_users?: components['schemas']['ResponderUserSummary'][]
       /**
        * Responder Groups
-       * @description Groups whose members can respond to this prompt
+       * @description Resolved groups whose members can respond. Empty lists allow any user with submit permission only when responders_configured is false.
        */
       responder_groups?: components['schemas']['ResponderGroupSummary'][]
       /** @description User who submitted the response */

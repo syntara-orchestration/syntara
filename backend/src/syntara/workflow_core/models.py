@@ -905,12 +905,19 @@ class FormPromptNodeParameters(BaseFormParameters):
     responder_users: list[str] | None = Field(
         default=None,
         max_length=100,
-        description="Usernames allowed to respond. Empty/omitted = any user with form_prompt:submit.",
+        description=(
+            "Usernames allowed to respond. Empty/omitted = any user with form_prompt:submit. "
+            "If a configured list resolves to no users, the form-prompt node fails before creating a prompt."
+        ),
     )
     responder_groups: list[str] | None = Field(
         default=None,
         max_length=50,
-        description="Group names whose members may respond. Empty/omitted = any user with form_prompt:submit.",
+        description=(
+            "Group names whose members may respond. Empty/omitted = any user with "
+            "form_prompt:submit. If a configured list resolves to no groups, the form-prompt node fails before "
+            "creating a prompt."
+        ),
     )
     response_window: int | None = Field(
         default=None,
