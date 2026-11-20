@@ -45,7 +45,7 @@ info:
     Available node types and their configuration schemas are defined in the
     [Node Type Catalog](./catalog/node_type_catalog.json). Individual node schemas
     (config and result) are in the `executors/`, `control-nodes/`, and `triggers/` directories.
-  version: 2.3.0
+  version: 2.4.0
   contact:
     name: Syntara Team
 servers:
@@ -1021,6 +1021,36 @@ components:
           maxLength: 16384
           description: Complete CEL expression (maximum 16,384 characters).
           title: Expression
+    KafkaStartPosition:
+      type: string
+      enum:
+        - latest
+        - earliest
+      title: KafkaStartPosition
+      description: Positions available when a partition has no saved starting boundary.
+    KafkaOffsetGapPolicy:
+      type: string
+      enum:
+        - fail
+        - earliest
+        - latest
+      title: KafkaOffsetGapPolicy
+      description: Permitted responses to a missing or invalid established checkpoint.
+    KafkaStartConfiguration:
+      properties:
+        position:
+          $ref: '#/components/schemas/KafkaStartPosition'
+          default: latest
+        added_partition_position:
+          $ref: '#/components/schemas/KafkaStartPosition'
+          default: earliest
+        offset_gap_policy:
+          $ref: '#/components/schemas/KafkaOffsetGapPolicy'
+          default: earliest
+      additionalProperties: false
+      type: object
+      title: KafkaStartConfiguration
+      description: Reading defaults applied only when a new position decision is needed.
     KafkaSubscribeParameters:
       properties:
         filter:
@@ -1041,6 +1071,16 @@ components:
           minLength: 1
           pattern: ^[a-zA-Z0-9._-]+$
           title: Topic
+        start:
+          $ref: '#/components/schemas/KafkaStartConfiguration'
+        group_id:
+          anyOf:
+            - type: string
+              minLength: 1
+              maxLength: 512
+              pattern: ^[a-zA-Z0-9._-]+$
+            - type: 'null'
+          title: Group Id
         input_schema:
           anyOf:
             - additionalProperties: true
@@ -1054,10 +1094,7 @@ components:
         - credential_id
         - topic
       title: KafkaSubscribeParameters
-      description: |-
-        One exact topic; consumer groups and connection settings are not inputs.
-
-        Tightens the transport-neutral ``topic`` with Kafka's naming constraints.
+      description: One exact topic and approved reading controls; no connection overrides.
     EventSubscriptionTestResponse:
       properties:
         success:

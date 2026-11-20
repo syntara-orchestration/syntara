@@ -140,6 +140,95 @@ class TestAuditEventWriterEnqueue:
 # ------------------------------------------------------------------ #
 
 
+@pytest.mark.asyncio
+async def test_best_effort_limit_bounds_pending_tasks_without_dropping_transactional_events(monkeypatch) -> None:
+    worker = AuditOutboxWorker(name="bounded-audit", interval_seconds=1, coordinate=False)
+    release = asyncio.Event()
+    write = AsyncMock(side_effect=lambda _event: None)
+
+    async def blocked_write(_event: AuditEvent) -> None:
+        await release.wait()
+
+    write.side_effect = blocked_write
+    monkeypatch.setattr(worker, "_write", write)
+    event = _make_event()
+    try:
+        for _ in range(100):
+            worker.write_to_outbox(event, max_pending=2)
+        assert len(worker._pending) == 2
+
+        # Other audit callers retain their existing behavior.
+        worker.write_to_outbox(event)
+        assert len(worker._pending) == 3
+        session = MagicMock()
+        worker.write_to_outbox(event, session, max_pending=2)
+        session.add.assert_called_once()
+        assert len(worker._pending) == 3
+    finally:
+        release.set()
+        await asyncio.gather(*worker._pending)
+    assert not worker._pending
+    assert write.await_count == 3
+
+    worker.write_to_outbox(event, max_pending=2)
+    await asyncio.gather(*worker._pending)
+    assert write.await_count == 4
+    assert not worker._pending
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("phase", ["drain", "stop", "drain_error"])
+async def test_bounded_shutdown_cancels_writes_and_stops_poller(monkeypatch, phase) -> None:
+    worker = AuditOutboxWorker(name="bounded-shutdown", interval_seconds=1, coordinate=False)
+    write_cancelled, poll_cancelled, stop_cancelled = asyncio.Event(), asyncio.Event(), asyncio.Event()
+
+    async def blocked_write(_event: AuditEvent) -> None:
+        try:
+            await asyncio.Event().wait()
+        finally:
+            write_cancelled.set()
+
+    async def poll() -> None:
+        try:
+            await asyncio.Event().wait()
+        finally:
+            poll_cancelled.set()
+
+    async def drain() -> None:
+        if phase == "drain_error":
+            msg = "audit storage unavailable"
+            raise OSError(msg)
+        if phase == "drain":
+            await asyncio.Event().wait()
+
+    stop = worker.stop
+
+    async def slow_stop() -> None:
+        await stop()
+        try:
+            await asyncio.Event().wait()
+        finally:
+            stop_cancelled.set()
+
+    monkeypatch.setattr(worker, "_write", blocked_write)
+    monkeypatch.setattr(worker, "drain", drain)
+    if phase == "stop":
+        monkeypatch.setattr(worker, "stop", slow_stop)
+    monkeypatch.setattr(worker, "_task", asyncio.create_task(poll()))
+    worker.write_to_outbox(_make_event(), max_pending=2)
+    await asyncio.sleep(0)
+
+    async with asyncio.timeout(1):
+        await worker.shutdown(timeout_seconds=0.02)
+        await asyncio.sleep(0)
+    assert write_cancelled.is_set()
+    assert poll_cancelled.is_set()
+    assert not worker._pending
+    assert worker._task is None
+    if phase == "stop":
+        assert stop_cancelled.is_set()
+
+
 class TestAuditEventWriterWrite:
     """Test AuditEventWriter._write method."""
 

@@ -205,6 +205,8 @@ messages. Healthy partitions continue when another partition is held.
 
 Auto-commit is disabled. Offsets are committed after durable workflow scheduling
 or another durable resolution, without waiting for workflow completion.
+Filter skips and audited invalid-content skips complete locally under the
+offset-safety checks; logging alone never authorizes a commit.
 Runtime-access testing remains non-consuming and does not verify group permissions,
 position selection, or recovery. CEL sample testing remains independent.
 

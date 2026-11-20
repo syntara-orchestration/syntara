@@ -220,6 +220,7 @@ class KafkaInitialPositionStore:
         boundary: int,
         *,
         initialization_kind: InitializationKind,
+        existing_group_position: bool = False,
     ) -> KafkaPartitionInitialPosition:
         """Insert once, reload the winner, and populate verified source identifiers once."""
         async with self._session_factory() as session, session.begin():
@@ -234,6 +235,13 @@ class KafkaInitialPositionStore:
             self._identity(source, observation)
             self._partitions(request, observation)
             if row is None:
+                if (
+                    existing_group_position
+                    and source.initialized_at is not None
+                    and initialization_kind != InitializationKind.ADDED_PARTITION
+                ):
+                    msg = GapReason.INITIAL_METADATA_MISSING.value
+                    raise KafkaPositionError(msg)
                 if initialization_kind != self.initialization_kind(source.configuration, request.partition):
                     msg = "initialization_kind_changed"
                     raise KafkaPositionError(msg, PositionStatus.REVISION_CHANGED)

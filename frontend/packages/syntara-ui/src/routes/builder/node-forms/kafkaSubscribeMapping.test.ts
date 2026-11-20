@@ -240,6 +240,106 @@ describe('Kafka Subscribe configuration', () => {
     expect(buildKafkaSubscribeTrigger('subscribe', 'Orders', reopened)).toEqual(trigger)
   })
 
+  it.each(['orders-reader', null])('preserves saved reading settings and group %s when renamed', (groupId) => {
+    const saved = buildKafkaSubscribeTrigger('subscribe', 'Orders', data)
+    const trigger = {
+      ...saved,
+      parameters: {
+        ...saved.parameters,
+        start: { offset_gap_policy: 'fail' },
+        group_id: groupId,
+      },
+    }
+    const reopened = kafkaSubscribeFormDefaults(trigger)
+
+    const updated = buildKafkaSubscribeTrigger('subscribe', 'Renamed orders', reopened, trigger)
+
+    expect(updated).toStrictEqual({ ...trigger, name: 'Renamed orders' })
+  })
+
+  it('preserves omitted consumption controls when editing an older trigger', () => {
+    const trigger = buildKafkaSubscribeTrigger('subscribe', 'Orders', data)
+
+    const updated = buildKafkaSubscribeTrigger(
+      'subscribe',
+      'Renamed orders',
+      kafkaSubscribeFormDefaults(trigger),
+      trigger
+    )
+
+    expect(updated).toStrictEqual({ ...trigger, name: 'Renamed orders' })
+  })
+
+  it.each([
+    { integrationId, topic: 'orders.v2' },
+    { integrationId: '33333333-3333-4333-8333-333333333333', topic: data.topic },
+  ])('resets the custom group and preserves reading settings when the source becomes %j', (source) => {
+    const saved = buildKafkaSubscribeTrigger('subscribe', 'Orders', data)
+    const start = { position: 'earliest', added_partition_position: 'latest', offset_gap_policy: 'fail' }
+    const trigger = { ...saved, parameters: { ...saved.parameters, start, group_id: 'orders-reader' } }
+
+    const updated = buildKafkaSubscribeTrigger('subscribe', 'Orders', { ...data, ...source }, trigger)
+
+    expect(updated.parameters).toStrictEqual({
+      integration_id: source.integrationId,
+      credential_id: credentialId,
+      topic: source.topic,
+      filter: null,
+      start,
+      group_id: null,
+    })
+  })
+
+  it('keeps an omitted group omitted when the source changes', () => {
+    const trigger = buildKafkaSubscribeTrigger('subscribe', 'Orders', data)
+
+    const updated = buildKafkaSubscribeTrigger('subscribe', 'Orders', { ...data, topic: 'orders.v2' }, trigger)
+
+    expect(updated.parameters).toStrictEqual({ ...trigger.parameters, topic: 'orders.v2' })
+  })
+
+  it('preserves the group and partial reading settings when only the credential changes', () => {
+    const saved = buildKafkaSubscribeTrigger('subscribe', 'Orders', data)
+    const start = { offset_gap_policy: 'fail' }
+    const trigger = { ...saved, parameters: { ...saved.parameters, start, group_id: 'orders-reader' } }
+    const runtimeCredentialId = '33333333-3333-4333-8333-333333333333'
+
+    const updated = buildKafkaSubscribeTrigger('subscribe', 'Orders', { ...data, runtimeCredentialId }, trigger)
+
+    expect(updated.parameters).toStrictEqual({ ...trigger.parameters, credential_id: runtimeCredentialId })
+  })
+
+  it('preserves reading controls while allowing the payload schema to be cleared and excluding unsupported fields', () => {
+    const saved = buildKafkaSubscribeTrigger('subscribe', 'Orders', data)
+    const start = { position: 'earliest', added_partition_position: 'latest', offset_gap_policy: 'fail' }
+    const trigger = {
+      ...saved,
+      parameters: {
+        ...saved.parameters,
+        input_schema: { type: 'object' },
+        start,
+        group_id: 'orders-reader',
+        enable_auto_commit: true,
+      },
+    }
+
+    const updated = buildKafkaSubscribeTrigger('subscribe', 'Orders', { ...data, inputSchema: '' }, trigger)
+
+    expect(updated.parameters).toStrictEqual({ ...saved.parameters, start, group_id: 'orders-reader' })
+  })
+
+  it('does not copy parameters from another trigger type when switching to Kafka', () => {
+    const previousTrigger = {
+      id: 'subscribe',
+      type: TriggerTypeEnum.MANUAL_TRIGGER,
+      parameters: { start: { position: 'earliest' }, group_id: 'unrelated-group' },
+    }
+
+    const trigger = buildKafkaSubscribeTrigger('subscribe', 'Orders', data, previousTrigger)
+
+    expect(trigger).toStrictEqual(buildKafkaSubscribeTrigger('subscribe', 'Orders', data))
+  })
+
   it('preserves optional schema omission and excludes execution-account and tuning fields', () => {
     const trigger = buildKafkaSubscribeTrigger('subscribe', 'Orders', {
       ...data,

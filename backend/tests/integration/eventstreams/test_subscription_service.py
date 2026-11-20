@@ -104,6 +104,8 @@ def _trigger_node(
     credential_id: UUID,
     topic: str = "infra.alerts",
     input_schema: dict[str, Any] | None = None,
+    start: dict[str, str] | None = None,
+    group_id: str | None = None,
 ) -> dict[str, Any]:
     parameters: dict[str, Any] = {
         "topic": topic,
@@ -112,6 +114,10 @@ def _trigger_node(
     }
     if input_schema is not None:
         parameters["input_schema"] = input_schema
+    if start is not None:
+        parameters["start"] = start
+    if group_id is not None:
+        parameters["group_id"] = group_id
     return {"id": node_id, "type": "event_subscribe_trigger", "parameters": parameters}
 
 
@@ -198,6 +204,115 @@ async def test_publish_creates_subscription_and_source(
     assert source.transport == "kafka"
     assert source.configuration.group_id == f"syntara.{source.deployment_id}.{sub.id}.1"
     assert source.retired_at is None
+
+
+@pytest.mark.parametrize("group_mode", ["omitted", "null", "same"])
+async def test_consumption_settings_persist_and_republish_keeps_group(
+    test_db_session: AsyncSession,
+    test_user: User,
+    workflow: Workflow,
+    kafka_integration: Integration,
+    runtime_credential: Credential,
+    group_mode: str,
+) -> None:
+    service = EventSubscriptionService(test_db_session, test_user)
+    group_id = f"orders-{uuid4().hex}"
+    first_node = _trigger_node(
+        node_id="incoming",
+        integration_id=kafka_integration.id,
+        credential_id=runtime_credential.id,
+        group_id=group_id,
+        start={"position": "earliest", "added_partition_position": "latest", "offset_gap_policy": "fail"},
+    )
+    first_version = await _make_version(test_db_session, workflow, test_user, [first_node], version=1)
+    first = (await service.sync_from_published_definition(workflow, first_version, enabled=True)).created[0]
+    sources = await _sources(test_db_session, first.subscription_id)
+    await test_db_session.refresh(sources[0])
+    assert sources[0].configuration.start.model_dump(mode="json") == first_node["parameters"]["start"]
+    assert sources[0].configuration.group_id == group_id
+    assert sources[0].initialized_at is None
+
+    second_node = _trigger_node(
+        node_id="incoming",
+        integration_id=kafka_integration.id,
+        credential_id=runtime_credential.id,
+        start={"offset_gap_policy": "latest"},
+        group_id=group_id if group_mode == "same" else None,
+    )
+    if group_mode == "null":
+        second_node["parameters"]["group_id"] = None
+    second_version = await _make_version(test_db_session, workflow, test_user, [second_node], version=2)
+
+    second = (await service.sync_from_published_definition(workflow, second_version, enabled=True)).updated[0]
+
+    assert second.source_id == first.source_id
+    assert second.source_generation == first.source_generation
+    assert second.configuration.group_id == group_id
+    assert second.configuration.start.model_dump(mode="json") == {
+        "position": "latest",
+        "added_partition_position": "earliest",
+        "offset_gap_policy": "latest",
+    }
+    assert second.configuration_revision == first.configuration_revision + 1
+    sources = await _sources(test_db_session, first.subscription_id)
+    await test_db_session.refresh(sources[0])
+    assert sources[0].configuration.start == second.configuration.start
+
+
+async def test_group_is_locked_before_worker_activation(
+    test_db_session: AsyncSession,
+    test_user: User,
+    workflow: Workflow,
+    kafka_integration: Integration,
+    runtime_credential: Credential,
+) -> None:
+    service = EventSubscriptionService(test_db_session, test_user)
+    node = _trigger_node(
+        node_id="incoming",
+        integration_id=kafka_integration.id,
+        credential_id=runtime_credential.id,
+        group_id=f"orders-{uuid4().hex}",
+    )
+    first_version = await _make_version(test_db_session, workflow, test_user, [node], version=1)
+    first = (await service.sync_from_published_definition(workflow, first_version, enabled=True)).created[0]
+    node = deepcopy(node)
+    node["parameters"]["group_id"] = f"changed-{uuid4().hex}"
+    second_version = await _make_version(test_db_session, workflow, test_user, [node], version=2)
+
+    with pytest.raises(SafeValueError, match="fixed after the first successful publication"):
+        await service.sync_from_published_definition(workflow, second_version, enabled=True)
+
+    sources = await _sources(test_db_session, first.subscription_id)
+    assert len(sources) == 1
+    assert sources[0].initialized_at is None
+    assert sources[0].configuration.group_id == first.configuration.group_id
+
+
+async def test_duplicate_custom_group_is_rejected_atomically(
+    test_db_session: AsyncSession,
+    test_user: User,
+    workflow: Workflow,
+    kafka_integration: Integration,
+    runtime_credential: Credential,
+) -> None:
+    group_id = f"shared-{uuid4().hex}"
+    nodes = [
+        _trigger_node(
+            node_id=node_id,
+            integration_id=kafka_integration.id,
+            credential_id=runtime_credential.id,
+            group_id=group_id,
+        )
+        for node_id in ("first", "second")
+    ]
+    version = await _make_version(test_db_session, workflow, test_user, nodes, version=1)
+    service = EventSubscriptionService(test_db_session, test_user)
+
+    with pytest.raises(SafeValueError, match="already assigned to another source"):
+        async with test_db_session.begin_nested():
+            await service.sync_from_published_definition(workflow, version, enabled=True)
+
+    assert await _subscriptions(test_db_session, workflow.id) == []
 
 
 async def test_filter_republication_preserves_source_group_and_stored_position(

@@ -48,7 +48,7 @@ execution_id_context_var: ContextVar[UUID | None] = ContextVar("execution_id", d
 request_id_context_var: ContextVar[UUID | None] = ContextVar("request_id", default=None)
 
 
-def emit_audit_event(event: AuditEvent, session: Session | None = None) -> None:
+def emit_audit_event(event: AuditEvent, session: Session | None = None, *, max_pending: int | None = None) -> None:
     """Emit structured audit log entry to stdout and outbox with automatic context injection.
 
     Args:
@@ -57,6 +57,8 @@ def emit_audit_event(event: AuditEvent, session: Session | None = None) -> None:
                 If provided, the event is written to the outbox in the same
                 transaction as the caller's business logic (guaranteeing
                 at-least-once delivery).
+        max_pending: Optional pending background-write limit for best-effort
+            events. Does not limit transactional writes.
 
     Fail-safe: any exception raised during context injection, sanitisation,
     payload enforcement, or the underlying log/outbox write is caught and
@@ -93,7 +95,10 @@ def emit_audit_event(event: AuditEvent, session: Session | None = None) -> None:
         event.structured_data = sanitizer.sanitize(event.structured_data)
         event.structured_data = enforce_payload_limit(event.structured_data, DEFAULT_MAX_PAYLOAD_BYTES)
 
-        _do_emit_audit_event(event, session)
+        if max_pending is None:
+            _do_emit_audit_event(event, session)
+        else:
+            _do_emit_audit_event(event, session, max_pending=max_pending)
     except Exception:
         logger.exception(
             "Audit event emission failed — event dropped",
@@ -103,7 +108,7 @@ def emit_audit_event(event: AuditEvent, session: Session | None = None) -> None:
         )
 
 
-def _do_emit_audit_event(event: AuditEvent, session: Session | None = None) -> None:
+def _do_emit_audit_event(event: AuditEvent, session: Session | None = None, *, max_pending: int | None = None) -> None:
     """Emit audit event to structured logs and outbox.
 
     Args:
@@ -112,6 +117,7 @@ def _do_emit_audit_event(event: AuditEvent, session: Session | None = None) -> N
                 If provided, writes the outbox record to the session (caller must commit).
                 This guarantees atomic write with business logic changes.
                 If None, creates a background task to write to outbox with a new session.
+        max_pending: Optional background-write limit; transactional writes bypass it.
 
     """
     # Write to outbox table for guaranteed delivery
@@ -122,4 +128,7 @@ def _do_emit_audit_event(event: AuditEvent, session: Session | None = None) -> N
 
     logger.info("Writing AuditEvent to Audit outbox")
     outbox_worker = get_outbox_worker()
-    outbox_worker.write_to_outbox(event, session)
+    if max_pending is None:
+        outbox_worker.write_to_outbox(event, session)
+    else:
+        outbox_worker.write_to_outbox(event, session, max_pending=max_pending)

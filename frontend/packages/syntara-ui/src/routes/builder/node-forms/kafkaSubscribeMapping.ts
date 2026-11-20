@@ -82,7 +82,7 @@ export function buildKafkaSubscribeTrigger(
       ...(previous?.start !== undefined && { start: previous.start }),
       ...(previous?.group_id !== undefined && { group_id: previous.group_id }),
       ...parameters,
-      ...(sourceChanged && data.kafkaGroupId === undefined && { group_id: null }),
+      ...(sourceChanged && previous?.group_id !== undefined && data.kafkaGroupId === undefined && { group_id: null }),
     },
   }
 }
