@@ -219,6 +219,7 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
         self.node_control_data: dict[str, dict[str, Any]] = {}
         self.skipped_nodes: set[str] = set()
         self.failed_nodes: dict[str, str] = {}
+        self.failed_node_temporal_ids: dict[str, str] = {}
         self.loop_state: dict[str, LoopState] = {}
         self.loop_body_map: dict[str, str] = {}
         self.loop_iteration_results: dict[str, dict[str, list[Any]]] = {}
@@ -539,6 +540,17 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
         error_message = self._resolve_failure_message(node_id, error, app_error, graph)
         is_cancellation = app_error is not None and app_error.type == "InvocationCancelledError"
 
+        # Expression/setup failures can abort before `_record_input_history`.
+        # Keep the configured parameters so activity sync can persist them the
+        # same way credential/reference failures do after resolution. The canvas
+        # ID can still hold a previous loop iteration, so check this occurrence.
+        failed_node = graph.get_node(node_id)
+        failed_node_temporal_ids = getattr(self, "failed_node_temporal_ids", {})
+        failed_node_temporal_ids[node_id] = self._source_temporal_activity_id(failed_node)
+        self.failed_node_temporal_ids = failed_node_temporal_ids
+        if not self._inputs_recorded_for_current_occurrence(failed_node):
+            self._record_input_history(failed_node, failed_node.parameters)
+
         namespace_entry = self._failure_namespace_entry(app_error, restored_output)
 
         # If no output from executor (e.g. parameters resolution failed), build empty output from model
@@ -616,6 +628,15 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
                     copy.deepcopy(resolved_parameters)
                 )
         self._record_occurrence_aliases(node.id, inputs=self.node_inputs[node.id])
+
+    def _inputs_recorded_for_current_occurrence(self, node: ActivityNode) -> bool:
+        """Return True if this loop occurrence already published inputs.
+
+        ``node_inputs`` is keyed by canvas ID and overwritten each iteration, so a
+        later loop body can fail during parameter resolution while the map still
+        holds the previous occurrence. Temporal IDs are append-only.
+        """
+        return self._source_temporal_activity_id(node) in self.node_inputs
 
     def _route_failure_after_recording(
         self,
@@ -873,6 +894,16 @@ class OrchestratorWorkflow(WorkflowRetryMixin, WorkflowConvergeMixin, WorkflowAp
             "activity_inputs": (
                 {k: self._scrub_data(v) for k, v in self.node_inputs.items()} if include_node_results else {}
             ),
+            "failed_activity_inputs": {
+                node_id: self._scrub_data(self.node_inputs[node_id])
+                for node_id in self.failed_nodes
+                if node_id in self.node_inputs
+            },
+            "failed_activity_occurrences": {
+                node_id: temporal_id
+                for node_id, temporal_id in getattr(self, "failed_node_temporal_ids", {}).items()
+                if node_id in self.failed_nodes and temporal_id != node_id
+            },
             "completed_activities": list(node_outputs.keys()),
             "failed_activities": self.failed_nodes,
         }

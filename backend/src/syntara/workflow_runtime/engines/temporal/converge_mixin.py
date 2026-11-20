@@ -43,6 +43,8 @@ class WorkflowConvergeMixin:
     failed_nodes: dict[str, str]
     skipped_nodes: set[str]
     resolver: NamespaceResolver
+    node_inputs: dict[str, dict[str, Any]]
+    failed_node_temporal_ids: dict[str, str]
     node_control_data: dict[str, dict[str, Any]]
     _runtime_settings: dict[str, Any]
     _cof_failed_nodes: set[str]
@@ -58,6 +60,12 @@ class WorkflowConvergeMixin:
 
     # Methods provided by OrchestratorWorkflow (resolved via MRO)
     def _are_predecessors_complete(self, node_id: str, graph: WorkflowGraph) -> bool: ...  # type: ignore[empty-body]
+
+    def _source_temporal_activity_id(self, node: ActivityNode) -> str: ...  # type: ignore[empty-body]
+
+    def _record_input_history(self, node: ActivityNode, resolved_parameters: dict[str, Any]) -> None: ...
+
+    def _inputs_recorded_for_current_occurrence(self, node: ActivityNode) -> bool: ...  # type: ignore[empty-body]
 
     @staticmethod
     def _build_failure_output(
@@ -230,7 +238,13 @@ class WorkflowConvergeMixin:
         )
         defer_to_retry = self._is_retry_converge_candidate(converge_id) and pending_tasks is not None
         if error_msg is not None and not defer_to_retry:
-            self._fail_converge_node(converge_id, error_msg, graph, pending_tasks)
+            self._fail_converge_node(
+                converge_id,
+                error_msg,
+                graph,
+                pending_tasks,
+                input_parameters=converge_node.parameters,
+            )
 
     def _converge_failure_message(
         self,
@@ -422,6 +436,8 @@ class WorkflowConvergeMixin:
         error_msg: str,
         graph: WorkflowGraph,
         pending_tasks: dict[str, asyncio.Task[Any]] | None = None,
+        *,
+        input_parameters: dict[str, Any] | None = None,
     ) -> None:
         """Mark a converge node as failed and clean up.
 
@@ -430,6 +446,18 @@ class WorkflowConvergeMixin:
         skipped (via ``_timed_out_converge_nodes``).
         """
         node = graph.get_node(node_id)
+        failed_node_temporal_ids = getattr(self, "failed_node_temporal_ids", {})
+        failed_node_temporal_ids[node_id] = self._source_temporal_activity_id(node)
+        self.failed_node_temporal_ids = failed_node_temporal_ids
+
+        # Gate/timeout can fail before `_execute_single_node` records inputs.
+        # If this occurrence already published resolved parameters, keep those
+        # instead of overwriting them with the unresolved definition. Canvas ID
+        # membership is not enough: a nested converge can fail on a later loop
+        # iteration while ``node_inputs`` still holds the previous occurrence.
+        if input_parameters is not None and not self._inputs_recorded_for_current_occurrence(node):
+            self._record_input_history(node, input_parameters)
+
         cof = resolve_continue_on_failure(node, self._runtime_settings)
 
         self.failed_nodes[node_id] = error_msg
@@ -555,11 +583,23 @@ class WorkflowConvergeMixin:
                         error_msg,
                     )
                     return
-                self._fail_converge_node(node_id, error_msg, graph, pending_tasks)
+                self._fail_converge_node(
+                    node_id,
+                    error_msg,
+                    graph,
+                    pending_tasks,
+                    input_parameters=graph.get_node(node_id).parameters,
+                )
         except Exception as exc:  # noqa: BLE001
             error_msg = f"Converge timeout handler error for {node_id}: {exc}"
             workflow.logger.error(error_msg)
-            self._fail_converge_node(node_id, error_msg, graph, pending_tasks)
+            self._fail_converge_node(
+                node_id,
+                error_msg,
+                graph,
+                pending_tasks,
+                input_parameters=graph.get_node(node_id).parameters,
+            )
 
     def _skip_incomplete_predecessors(
         self,
