@@ -304,9 +304,10 @@ type StepDetailsPanelProps = {
 
 function createAddStepHandler(
   nodeId: string | undefined,
-  onAddStep: ((sourceNodeId: string, sourceHandle?: string) => void) | undefined
+  onAddStep: ((sourceNodeId: string, sourceHandle?: string) => void) | undefined,
+  readOnly: boolean | undefined
 ): ((handle?: string) => void) | undefined {
-  if (!nodeId || !onAddStep) return undefined
+  if (readOnly || !nodeId || !onAddStep) return undefined
   return (handle?: string) => onAddStep(nodeId, handle)
 }
 
@@ -339,7 +340,7 @@ export function StepDetailsPanel(props: StepDetailsPanelProps) {
   const isTriggerNode = node?.type === FlowNodeType.TRIGGER
   const triggerIndex = isTriggerNode ? parseTriggerIndex(nodeId ?? '') : undefined
   const stepMenuCategory = resolveStepMenuCategory(node?.type)
-  const nodeAddStepHandler = createAddStepHandler(nodeId, onAddStep)
+  const nodeAddStepHandler = createAddStepHandler(nodeId, onAddStep, readOnly)
   const menuActions = useStepMenuActions({
     nodeId: nodeId ?? 'unknown',
     stepCategory: stepMenuCategory,
@@ -347,7 +348,8 @@ export function StepDetailsPanel(props: StepDetailsPanelProps) {
     disabled: getNodeDisabledState(node),
   })
   const panelMenuActions = buildPanelMenuActions(mode, node, menuActions, onClose)
-  const headerActions = panelMenuActions.length > 0 ? <SynStepMenu menuActions={panelMenuActions} /> : null
+  const headerActions =
+    readOnly || panelMenuActions.length === 0 ? null : <SynStepMenu menuActions={panelMenuActions} />
 
   const iconDescriptor =
     mode === 'edit' && node
@@ -410,6 +412,10 @@ export function StepDetailsPanel(props: StepDetailsPanelProps) {
 
       const handleCreate = (data: Record<string, unknown>): Promise<boolean> =>
         new Promise((resolve) => {
+          if (readOnly) {
+            resolve(false)
+            return
+          }
           let settled = false
           const settle = (ok: boolean) => {
             if (settled) {

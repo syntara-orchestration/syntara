@@ -1,6 +1,7 @@
 import type { Dispatch, SetStateAction } from 'react'
 
 import type { DialogState } from '../../../hooks/useDialogState'
+import type { WorkflowDefinition } from '../../../stores/workflowStoreTypes'
 import { parseTriggerIndex } from '../../../utils/triggerNodeIds'
 import type { BuilderAction } from '../builderReducer'
 import type { RunStepDialogData } from '../components/RunStepDialog'
@@ -13,8 +14,10 @@ export type BuilderDialogPropsParams = {
   workflowId: string | null
   confirmDialogOpen: boolean
   deleteDialogOpen: boolean
-  selectedTriggerIndex: number
-  currentWorkflow: { triggers?: unknown[] } | null
+  selectedTriggerId?: string
+  currentWorkflow: Pick<WorkflowDefinition, 'triggers'> | null
+  runWorkflow?: WorkflowDefinition | null
+  runReadOnly?: boolean
   dispatch: Dispatch<BuilderAction>
   handleRunWorkflow: (inputData?: Record<string, unknown>, triggerNodeId?: string) => void
   handleDeleteWorkflow: () => void
@@ -35,8 +38,10 @@ export function useBuilderDialogProps(params: BuilderDialogPropsParams) {
     workflowId,
     confirmDialogOpen,
     deleteDialogOpen,
-    selectedTriggerIndex,
+    selectedTriggerId,
     currentWorkflow,
+    runWorkflow,
+    runReadOnly,
     dispatch,
     handleRunWorkflow,
     handleDeleteWorkflow,
@@ -51,29 +56,29 @@ export function useBuilderDialogProps(params: BuilderDialogPropsParams) {
     pinnedMockDataForDialog,
   } = params
 
-  const triggers = currentWorkflow?.triggers ?? []
-  const selectedTrigger = triggers[selectedTriggerIndex] ?? triggers[0]
-
+  const selectedTrigger = runWorkflow?.triggers?.find((trigger) => trigger.id === selectedTriggerId)
   const triggerPred = runStepDialog.item?.predecessors?.find((p) => p.isTrigger)
-  const runStepTriggerNodeId = triggerPred
-    ? (triggers[parseTriggerIndex(triggerPred.id) ?? -1] as { id?: string } | undefined)?.id
-    : undefined
+  const stepTrigger = triggerPred ? currentWorkflow?.triggers?.[parseTriggerIndex(triggerPred.id) ?? -1] : undefined
 
   return {
     workflowName,
     workflowId,
+    // The caller already masks this flag when the run dialog goes stale
+    // (permission flip or missing selected trigger), so no extra guard here.
     confirmDialogOpen,
     deleteDialogOpen,
     dispatch,
     handleRunWorkflow,
     handleDeleteWorkflow,
     isDeleting,
-    triggerName: (selectedTrigger as { name?: string } | undefined)?.name ?? 'Trigger',
-    triggerNodeId: (selectedTrigger as { id?: string } | undefined)?.id,
-    triggerInputSchema: ((selectedTrigger as { parameters?: Record<string, unknown> } | undefined)?.parameters
-      ?.input_schema ?? undefined) as Record<string, unknown> | undefined,
+    triggerName: selectedTrigger?.name ?? 'Trigger',
+    triggerNodeId: selectedTrigger?.id,
+    triggerInputSchema: getTriggerSchema(selectedTrigger),
+    runWorkflow,
+    runReadOnly,
     runStepDialog,
-    runStepTriggerNodeId,
+    runStepTriggerNodeId: stepTrigger?.id,
+    runStepTriggerInputSchema: getTriggerSchema(stepTrigger),
     onRunStepExecutionCreated: (executionId: string, { clearMocksOnComplete }: { clearMocksOnComplete: boolean }) => {
       lastRunStepNodeIdRef.current = clearMocksOnComplete ? (runStepDialog.item?.nodeId ?? null) : null
       dispatch({ type: 'SET_MOST_RECENT_EXECUTION', payload: { executionId } })
@@ -87,4 +92,10 @@ export function useBuilderDialogProps(params: BuilderDialogPropsParams) {
     },
     pinnedMockData: pinnedMockDataForDialog,
   }
+}
+
+function getTriggerSchema(trigger: NonNullable<WorkflowDefinition['triggers']>[number] | undefined) {
+  const schema = trigger?.parameters?.input_schema
+  if (typeof schema === 'object' && schema !== null && !Array.isArray(schema)) return schema as Record<string, unknown>
+  return undefined
 }

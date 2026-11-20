@@ -18,7 +18,7 @@ describe('getImportWorkflowApiErrorMessage', () => {
           blocked_step_types: [{ kind: 'script', label: 'Script', reason: 'explicit_deny', project: null }],
         },
       })
-    ).toBe("You can't import workflow: Script (write denied).")
+    ).toBe("This workflow includes Script steps, but your assigned policies don't allow you to write them.")
   })
 
   it('maps workflow name conflict to a friendly message', () => {

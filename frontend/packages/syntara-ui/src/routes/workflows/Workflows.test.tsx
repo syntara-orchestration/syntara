@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen, within, waitFor } from '@testing-library/react'
+import { act, render, screen, within, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ReactNode } from 'react'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
@@ -11,6 +11,17 @@ import { assertUrlParam, assertUrlParamIsNull } from '../../test/filter-test-hel
 import { expectPageTitle } from '../../test/pageTitle'
 import { routerTestState } from '../../test/setup'
 import { accessClient } from '../access/accessClient'
+
+vi.mock('./useStepTypePermissions', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./useStepTypePermissions')>()),
+  useStepTypePermissions: () => ({
+    canAuthor: true,
+    blockedStepTypes: [],
+    isChecking: false,
+    isError: false,
+    retry: vi.fn(),
+  }),
+}))
 
 import Workflows from './Workflows'
 
@@ -50,6 +61,7 @@ vi.mock('../access/useAllProjects', () => ({
 // 1. projectSelectorReady is true (queries are enabled)
 // 2. the flat table body is rendered (most tests expect flat rows)
 type MockProjectSelector = {
+  selectedProjectId?: string | null
   selectedProject: { id: string; name: string } | null
   isAllProjects: boolean
   projects: { id: string; name: string }[]
@@ -1468,6 +1480,59 @@ describe('Workflows Component', () => {
     })
   })
 
+  it.each([false, true])('formats project deletion denials from the workflow page (grouped=%s)', async (grouped) => {
+    const user = userEvent.setup()
+    const project = { id: 'project-1', name: 'Project Alpha' }
+    mockUseProjectSelector.mockReturnValue({
+      selectedProject: grouped ? null : project,
+      selectedProjectId: grouped ? null : project.id,
+      isAllProjects: grouped,
+      projects: [project],
+      ProjectSelector: null,
+    })
+    const deleteMutate = vi.fn()
+    vi.mocked(accessClient.useMutation).mockReturnValue({ mutate: deleteMutate, isPending: false })
+    const projectQueryClient = new QueryClient()
+    for (const action of ['update', 'delete']) {
+      projectQueryClient.setQueryData(
+        ['authz', 'can_i', { action, resource_type: 'project', resource_project: project.id }],
+        { data: { allowed: true } }
+      )
+    }
+    render(
+      <QueryClientProvider client={projectQueryClient}>
+        <Workflows />
+      </QueryClientProvider>,
+      { wrapper }
+    )
+
+    await user.click(screen.getByRole('button', { name: grouped ? 'Actions for Project Alpha' : 'Project actions' }))
+    await user.click(screen.getByRole('menuitem', { name: /delete project/i }))
+    const dialog = screen.getByRole('dialog')
+    await user.click(within(dialog).getByRole('checkbox'))
+    await user.click(within(dialog).getByRole('button', { name: 'Delete project' }))
+    const callbacks = deleteMutate.mock.calls[0][1] as { onError: (error: unknown) => void; onSettled: () => void }
+    act(() => {
+      callbacks.onError({
+        cause: {
+          code: 'NODE_KIND_WRITE_DENIED',
+          title: 'Step types not allowed',
+          detail: "You can't delete project: REST API (no matching write grant).",
+          blocked_step_types: [{ kind: 'http_request', label: 'REST API', reason: 'no_matching_allow' }],
+        },
+      })
+      callbacks.onSettled()
+    })
+
+    expect(screen.getByText('Cannot delete project "Project Alpha"')).toBeInTheDocument()
+    expect(
+      screen.getByText(
+        "This project includes workflows with REST API steps, but your assigned policies don't allow you to write them."
+      )
+    ).toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
   describe('Grouped view (All Projects)', () => {
     it('renders grouped workflows when all projects are selected', () => {
       mockUseProjectSelector.mockReturnValue({
@@ -1811,7 +1876,10 @@ describe('Workflows Component', () => {
       })
     })
 
-    it('shows error alert when creating duplicate fails', async () => {
+    it.each([
+      { code: 'WORKFLOW_NAME_CONFLICT', detail: 'Name conflict' },
+      { code: 'NODE_KIND_WRITE_DENIED', detail: "You can't create workflow: Script (write denied)." },
+    ])('shows the duplicate failure message for $code', async ({ code, detail }) => {
       const user = userEvent.setup()
       vi.mocked(workflowFetchClient.GET).mockResolvedValue(
         mockGetResponse({
@@ -1832,8 +1900,8 @@ describe('Workflows Component', () => {
         mockPostResponse(undefined, {
           type: 'https://api.example.com/errors/name-conflict',
           title: 'Workflow Name Conflict',
-          detail: 'Name conflict',
-          code: 'WORKFLOW_NAME_CONFLICT',
+          detail,
+          code,
           retryable: false,
         })
       )
@@ -1845,6 +1913,7 @@ describe('Workflows Component', () => {
 
       await waitFor(() => {
         expect(screen.getByText('Failed to duplicate workflow')).toBeInTheDocument()
+        expect(screen.getByText(detail)).toBeInTheDocument()
       })
     })
 

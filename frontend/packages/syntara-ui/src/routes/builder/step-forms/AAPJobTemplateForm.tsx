@@ -10,7 +10,7 @@ import { AAPIntegrationSection } from '../components/AAPIntegrationSection'
 import type { ExpandableCodeEditorHandle } from '../components/ExpandableCodeEditor'
 import { StepEditorAutoSubmitContext, useRegisterAutoSubmit } from '../hooks/useStepEditorAutoSubmit'
 import { hasExpressionValue } from '../utils/aapHelpers'
-import { useIsVersionView } from '../VersionViewContext'
+import { useIsStepFormReadOnly } from '../VersionViewContext'
 
 import { applyDefaultValues, sanitizeArrayField } from './aapFormHelpers'
 import { aapJobTemplateSchema, type AAPJobTemplateFormData } from './aapJobTemplateSchema'
@@ -50,7 +50,7 @@ function AAPFormFields({
   selectedIntegrationId: string | undefined
   projectId?: string
 }>) {
-  const isVersionView = useIsVersionView()
+  const isVersionView = useIsStepFormReadOnly()
   const { control, setValue, getValues } = useFormContext<AAPJobTemplateFormData>()
 
   const expressionMode = Boolean(useWatch({ name: 'use_input_variables' }))

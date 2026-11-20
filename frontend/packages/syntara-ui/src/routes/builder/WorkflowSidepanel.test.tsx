@@ -36,6 +36,7 @@ describe('WorkflowSidepanel', () => {
 
   const defaultProps = {
     workflow: createMockWorkflow(),
+    canEdit: true,
     workflowName: 'Test Workflow',
     workflowDescription: 'Test description',
     onNameChange: mockOnNameChange,
@@ -85,6 +86,18 @@ describe('WorkflowSidepanel', () => {
     await user.type(nameInput, 'X')
 
     expect(mockOnNameChange).toHaveBeenCalledWith('Test WorkflowX')
+  })
+
+  it('disables metadata fields when workflow authoring is locked', async () => {
+    const user = userEvent.setup()
+    render(<WorkflowSidepanel {...defaultProps} canEdit={false} />)
+
+    const nameInput = screen.getByLabelText('Workflow name in workflow details')
+    const descriptionInput = screen.getByLabelText('Description')
+    expect(nameInput).toBeDisabled()
+    expect(descriptionInput).toBeDisabled()
+    await user.type(nameInput, 'changed')
+    expect(mockOnNameChange).not.toHaveBeenCalled()
   })
 
   it('renders description textarea with value', () => {

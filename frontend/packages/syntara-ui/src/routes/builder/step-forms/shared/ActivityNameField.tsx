@@ -1,7 +1,7 @@
 import type { Control, FieldValues, Path } from 'react-hook-form'
 
 import { SynTextField } from '../../../../components/forms/SynTextField'
-import { useIsVersionView } from '../../VersionViewContext'
+import { useIsStepFormReadOnly } from '../../VersionViewContext'
 
 import styles from './ActivityNameField.module.css'
 
@@ -25,7 +25,7 @@ export function ActivityNameField<T extends FieldValues & { name?: string }>({
   hideFormGroupLabel = true,
   control,
 }: ActivityNameFieldProps<T>) {
-  const isVersionView = useIsVersionView()
+  const isVersionView = useIsStepFormReadOnly()
   const label = ariaLabel ?? placeholder
 
   return (

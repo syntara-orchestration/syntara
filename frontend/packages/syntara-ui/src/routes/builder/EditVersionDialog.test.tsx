@@ -70,6 +70,31 @@ describe('EditVersionDialog', () => {
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled()
   })
 
+  it('disables version metadata fields when the selected version contains a blocked type', () => {
+    render(<EditVersionDialog {...defaultProps} canEdit={false} editTooltip="Blocked step type: Script" />)
+
+    expect(screen.getByRole('textbox', { name: 'Version name' })).toBeDisabled()
+    expect(screen.getByRole('textbox', { name: 'Description' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Save version' })).toBeDisabled()
+  })
+
+  it('offers a retry when selected version permission checks fail', async () => {
+    const user = userEvent.setup()
+    const onRetryPermissionCheck = vi.fn()
+    render(
+      <EditVersionDialog
+        {...defaultProps}
+        canEdit={false}
+        permissionCheckError
+        onRetryPermissionCheck={onRetryPermissionCheck}
+      />
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Retry permission check' }))
+
+    expect(onRetryPermissionCheck).toHaveBeenCalledOnce()
+  })
+
   it('does not render when isOpen is false', () => {
     render(<EditVersionDialog {...defaultProps} isOpen={false} />)
 

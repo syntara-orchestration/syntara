@@ -12,7 +12,7 @@ import { useWorkflowStore } from '../../../stores/useWorkflowStore'
 import { StepEditorAutoSubmitContext, useRegisterAutoSubmit } from '../hooks/useStepEditorAutoSubmit'
 import { useWorkflowEngineDefaults } from '../hooks/useWorkflowEngineDefaults'
 import { formatDuration } from '../utils/timeUtils'
-import { useIsVersionView } from '../VersionViewContext'
+import { useIsStepFormReadOnly } from '../VersionViewContext'
 
 import { approvalFormSchema, type ApprovalFormData } from './approvalFormSchema'
 import {
@@ -180,7 +180,7 @@ function ApprovalFormFields({
   validationErrors?: { approver_users?: { message?: string }; approver_groups?: { message?: string } }
   projectId?: string
 }) {
-  const isVersionView = useIsVersionView()
+  const isVersionView = useIsStepFormReadOnly()
   const { control } = useFormContext<ApprovalFormData>()
   const { defaults } = useWorkflowEngineDefaults()
   const approvalTimeoutDefault = defaults?.timeoutSeconds.approval ?? null

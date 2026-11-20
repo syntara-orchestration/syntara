@@ -18,6 +18,8 @@ export type ValidationError = {
 }
 
 // Builder state interface
+type RunSelection = { triggerId: string; readOnly: boolean }
+
 export type BuilderState = {
   confirmDialogOpen: boolean
   deleteDialogOpen: boolean
@@ -43,7 +45,7 @@ export type BuilderState = {
   /** Activity IDs from a copied run; skip inference is limited to this allowlist when set. */
   copiedRunActivityIds: ReadonlySet<string> | null
   mostRecentRunPanelOpen: boolean
-  selectedTriggerIndex: number
+  runSelection: RunSelection | null
   workflowName: string
   workflowDescription: string
   validationErrors: ValidationError[]
@@ -103,7 +105,7 @@ export type BuilderAction =
       payload: { executionId: string; copiedRunActivityIds?: readonly string[] }
     }
   | { type: 'CLOSE_MOST_RECENT_RUN_PANEL' }
-  | { type: 'SET_SELECTED_TRIGGER'; payload: number }
+  | { type: 'OPEN_RUN_DIALOG'; payload: RunSelection }
   | {
       type: 'INIT_WORKFLOW'
       payload: { name: string; description: string; initialViewVersion?: number | null }
@@ -138,7 +140,6 @@ const SIMPLE_STATE_KEY_MAP: Record<
     | 'replacementNodeId'
     | 'workflowName'
     | 'workflowDescription'
-    | 'selectedTriggerIndex'
     | 'validationErrors'
   >
 > = {
@@ -160,7 +161,6 @@ const SIMPLE_STATE_KEY_MAP: Record<
   SET_REPLACEMENT_NODE_ID: 'replacementNodeId',
   SET_WORKFLOW_NAME: 'workflowName',
   SET_WORKFLOW_DESCRIPTION: 'workflowDescription',
-  SET_SELECTED_TRIGGER: 'selectedTriggerIndex',
 }
 
 /**
@@ -192,6 +192,8 @@ function clearEditorAndOtherPanels(): Partial<BuilderState> {
 function handlePanelActions(state: BuilderState, action: BuilderAction): BuilderState {
   // eslint-disable-next-line @typescript-eslint/switch-exhaustiveness-check -- intentional pass-through to main reducer
   switch (action.type) {
+    case 'OPEN_RUN_DIALOG':
+      return { ...state, confirmDialogOpen: true, runSelection: action.payload }
     case 'OPEN_NODE_EDITOR_ADD':
       return {
         ...state,
@@ -348,11 +350,11 @@ const SIMPLE_ACTIONS = [
   'SET_REPLACEMENT_NODE_ID',
   'SET_WORKFLOW_NAME',
   'SET_WORKFLOW_DESCRIPTION',
-  'SET_SELECTED_TRIGGER',
 ] as const
 
 // Panel action types
 const PANEL_ACTIONS = [
+  'OPEN_RUN_DIALOG',
   'OPEN_NODE_EDITOR_ADD',
   'CLOSE_NODE_EDITOR',
   'OPEN_ADD_NODE_FROM_EDGE',
@@ -493,7 +495,7 @@ export function builderReducer(state: BuilderState, action: BuilderAction): Buil
         historyCardOpen: false,
         versionHistoryOpen: action.payload.initialViewVersion != null,
         viewingVersion: action.payload.initialViewVersion ?? null,
-        selectedTriggerIndex: 0,
+        runSelection: null,
         mostRecentExecutionId: null,
         copiedRunActivityIds: null,
         mostRecentRunPanelOpen: false,
@@ -540,7 +542,7 @@ export function getInitialBuilderState(): BuilderState {
     mostRecentExecutionId: null,
     copiedRunActivityIds: null,
     mostRecentRunPanelOpen: false,
-    selectedTriggerIndex: 0,
+    runSelection: null,
     workflowName: '',
     workflowDescription: '',
     validationErrors: [],

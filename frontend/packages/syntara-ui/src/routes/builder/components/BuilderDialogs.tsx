@@ -1,11 +1,11 @@
 import { Checkbox, Content, Stack, StackItem } from '@patternfly/react-core'
-import { useMemo, useEffect, useRef, useState, type Dispatch } from 'react'
+import { useEffect, useRef, useState, type Dispatch } from 'react'
 
 import { SynConfirmationDialog } from '../../../components/dialogs/SynConfirmationDialog'
 import type { DialogState } from '../../../hooks/useDialogState'
 import { useAlerts } from '../../../providers/alerts'
 import { useWorkflowStore } from '../../../stores/useWorkflowStore'
-import { selectActivities, selectTriggers } from '../../../stores/workflowStoreSelectors'
+import type { WorkflowDefinition } from '../../../stores/workflowStoreTypes'
 import { WorkflowDeleteDialog } from '../../workflows/WorkflowDeleteDialog'
 import type { BuilderAction } from '../builderReducer'
 import { useBuilderImportHandlers, type UseBuilderImportHandlersParams } from '../hooks/useBuilderImportHandlers'
@@ -49,6 +49,8 @@ type BuilderDialogsProps = Readonly<{
   triggerName: string
   triggerNodeId?: string
   triggerInputSchema?: Record<string, unknown>
+  runWorkflow?: WorkflowDefinition | null
+  runReadOnly?: boolean
   pendingImport: PendingImportData | null
   setPendingImport: (data: PendingImportData | null) => void
   importDeps: Omit<
@@ -57,6 +59,7 @@ type BuilderDialogsProps = Readonly<{
   >
   runStepDialog: DialogState<RunStepDialogData>
   runStepTriggerNodeId?: string
+  runStepTriggerInputSchema?: Record<string, unknown>
   onRunStepExecutionCreated?: (executionId: string, options: RunStepExecutionCreatedOptions) => void
   pinnedMockData?: Record<string, Record<string, unknown>>
   conflictDialogProps?: {
@@ -136,6 +139,11 @@ function useRunConfirmState({
   }
 }
 
+function workflowNeedsRunInput(workflow: WorkflowDefinition | null | undefined) {
+  const triggerNodeIds = workflow?.triggers?.map((trigger) => trigger.id) ?? []
+  return activitiesReferenceTrigger(workflow?.workflow.activities ?? [], triggerNodeIds)
+}
+
 export function BuilderDialogs({
   workflowName,
   workflowId,
@@ -148,11 +156,14 @@ export function BuilderDialogs({
   triggerName,
   triggerNodeId,
   triggerInputSchema,
+  runWorkflow,
+  runReadOnly,
   pendingImport,
   setPendingImport,
   importDeps,
   runStepDialog,
   runStepTriggerNodeId,
+  runStepTriggerInputSchema,
   onRunStepExecutionCreated,
   pinnedMockData,
   conflictDialogProps,
@@ -165,11 +176,8 @@ export function BuilderDialogs({
     pendingImport,
     setPendingImport
   )
-  const activities = useWorkflowStore(selectActivities)
-  const triggers = useWorkflowStore(selectTriggers)
-  const triggerNodeIds = useMemo(() => (triggers ?? []).map((t) => t.id).filter(Boolean), [triggers])
-  const showInputDialog =
-    hasNonEmptyInputSchema(triggerInputSchema) || activitiesReferenceTrigger(activities ?? [], triggerNodeIds)
+  const willSaveChanges = isDirty && !runReadOnly
+  const showInputDialog = hasNonEmptyInputSchema(triggerInputSchema) || workflowNeedsRunInput(runWorkflow)
   const { showConfirmStep, showInputStep, doNotShowAgain, setDoNotShowAgain, closeAll, handleConfirmRun } =
     useRunConfirmState({ confirmDialogOpen, showInputDialog, dispatch, handleRunWorkflow, triggerNodeId })
   return (
@@ -179,7 +187,7 @@ export function BuilderDialogs({
         onClose={closeAll}
         onConfirm={handleConfirmRun}
         title="Run workflow?"
-        confirmLabel={isDirty ? 'Save and run' : 'Run now'}
+        confirmLabel={willSaveChanges ? 'Save and run' : 'Run now'}
         aria-labelledby="run-workflow-modal-title"
         aria-describedby="run-workflow-modal-description"
       >
@@ -187,7 +195,7 @@ export function BuilderDialogs({
           <StackItem>
             <Content component="p">
               You are about to manually run the workflow <strong>{workflowName}</strong>.
-              {isDirty
+              {willSaveChanges
                 ? ' Unsaved changes will be saved before the workflow starts, bypassing its normal trigger conditions.'
                 : ` This action will immediately start the workflow from ${triggerName}, bypassing its normal trigger conditions.`}
             </Content>
@@ -231,7 +239,7 @@ export function BuilderDialogs({
         workflowId={workflowId ?? ''}
         predecessors={runStepDialog.item?.predecessors}
         pinnedMockData={pinnedMockData}
-        triggerInputSchema={triggerInputSchema}
+        triggerInputSchema={runStepTriggerInputSchema}
         triggerNodeId={runStepTriggerNodeId}
       />
       <ImportConfirmationDialog
