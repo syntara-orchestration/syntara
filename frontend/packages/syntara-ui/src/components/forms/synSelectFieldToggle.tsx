@@ -35,6 +35,7 @@ export function SynSelectFieldToggle({
       id={fieldId}
       aria-label={ariaLabel}
       aria-describedby={describedBy}
+      aria-invalid={hasError}
       onClick={onToggle}
       onBlur={onBlur}
       isExpanded={isOpen}
