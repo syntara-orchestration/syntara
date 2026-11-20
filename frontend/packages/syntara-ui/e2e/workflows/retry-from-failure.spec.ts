@@ -156,7 +156,7 @@ test.describe('Retry from failure', { tag: '@local-only' }, () => {
       ).toBeVisible()
       await expect(panel.getByText(/Steps outside the selected retry scope will not re-execute/)).toBeVisible()
       await expect(panel.getByText(/may repeat external side effects/)).toBeVisible()
-      await expect(panel.getByText(/To change the parameters for this retry, select the failed node/)).toBeVisible()
+      await expect(panel.getByText(/To change the parameters for this retry, select the failed step/)).toBeVisible()
       await expect(panel.getByRole('heading', { name: 'Retry plan' })).toBeVisible()
       const retryPlanCard = panel.getByTestId('retry-plan-card')
       await expect(retryPlanCard).toBeVisible()
@@ -175,9 +175,9 @@ test.describe('Retry from failure', { tag: '@local-only' }, () => {
       expect(retryPlanCardBorderWidth).toBe(1)
       await expect(app.getByRole('tab', { name: 'Details' })).toHaveAttribute('aria-selected', 'true')
       await expect(panel.getByRole('button', { name: 'Retry 2 steps' })).toBeVisible()
-      await expect(app.getByRole('button', { name: 'Copy to editor' })).toHaveCount(0)
-      await expect(app.getByRole('button', { name: 'Back to editor' })).toHaveCount(0)
-      await expect(app.getByRole('button', { name: 'Run history' })).toHaveCount(0)
+      await expect(app.getByRole('button', { name: 'Copy to editor' })).toBeVisible()
+      await expect(app.getByRole('button', { name: 'Back to editor' })).toBeVisible()
+      await expect(app.getByRole('button', { name: 'Run history' })).toBeVisible()
       await app.screenshot({ path: testInfo.outputPath('retry-plan-prototype-copy.png') })
 
       await panel.getByRole('button', { name: 'Cancel' }).click()
@@ -197,8 +197,8 @@ test.describe('Retry from failure', { tag: '@local-only' }, () => {
       await app.getByTestId('retry-from-failure-button').click()
 
       const panel = app.getByRole('complementary', { name: 'Retry run from failure review' })
-      const allPoints = panel.getByRole('radio', { name: 'Retry all affected branches' })
-      const choosePoints = panel.getByRole('radio', { name: 'Choose branches' })
+      const allPoints = panel.getByRole('radio', { name: 'Retry from all affected steps' })
+      const choosePoints = panel.getByRole('radio', { name: 'Choose steps' })
       const retryPlanCard = panel.getByTestId('retry-plan-card')
       await expect(retryPlanCard.getByRole('radiogroup', { name: 'Retry scope' })).toBeVisible()
       const retryOrigin = app.getByTestId('retry-origin-step2')
@@ -265,7 +265,8 @@ test.describe('Retry from failure', { tag: '@local-only' }, () => {
       await app.getByTestId('retry-from-failure-button').click()
 
       await expect(app.getByRole('tab', { name: 'Details' })).toHaveAttribute('aria-selected', 'true')
-      await expect(app.getByText(/^Elapsed time:/)).toHaveCount(1)
+      // The run header and selected step details each show their elapsed time.
+      await expect(app.getByText(/^Elapsed time:/)).toHaveCount(2)
       await expect(app.getByText(/"language": "bash"/, { exact: false })).toBeVisible()
       await app.getByRole('button', { name: 'Edit parameters for retry' }).click()
 

@@ -59,6 +59,7 @@ type RetryPlanProps = Readonly<{
   notRetriedFailureCount: number
   scopeMode: RetryScopeMode
   scopeId: string
+  emptySelectionWarningId: string
   isRetryPending: boolean
   onSelectAll: () => void
   onChoosePoints: () => void
@@ -76,6 +77,7 @@ type RetryPlanContentProps = Readonly<{
   selectedPointCount: number
   affectedPointCount: number
   notRetriedFailureCount: number
+  emptySelectionWarningId: string
 }>
 
 /** Retry scope controls and the stateful retry plan view. */
@@ -95,6 +97,7 @@ export function RetryPlan({
   notRetriedFailureCount,
   scopeMode,
   scopeId,
+  emptySelectionWarningId,
   isRetryPending,
   onSelectAll,
   onChoosePoints,
@@ -161,6 +164,7 @@ export function RetryPlan({
           selectedPointCount={selectedPointCount}
           affectedPointCount={selectablePoints.length}
           notRetriedFailureCount={notRetriedFailureCount}
+          emptySelectionWarningId={emptySelectionWarningId}
         />
       </StackItem>
     </Stack>
@@ -197,7 +201,7 @@ function RetryScopeSelector({
           <Radio
             id={`${scopeId}-all`}
             name={`${scopeId}-scope`}
-            label="Retry all affected branches"
+            label="Retry from all affected steps"
             isChecked={scopeMode === 'all'}
             isDisabled={isRetryPending}
             onChange={onSelectAll}
@@ -205,7 +209,7 @@ function RetryScopeSelector({
           <Radio
             id={`${scopeId}-selected`}
             name={`${scopeId}-scope`}
-            label="Choose branches"
+            label="Choose steps"
             isChecked={scopeMode === 'selected'}
             isDisabled={isRetryPending}
             onChange={onChoosePoints}
@@ -219,7 +223,7 @@ function RetryScopeSelector({
               <FormGroup
                 fieldId={`${scopeId}-retry-points`}
                 role="group"
-                label="Select the branches where the retry should begin"
+                label="Select the steps where the retry should begin"
               >
                 <List isPlain>
                   {selectablePoints.map((point) => (
@@ -254,13 +258,8 @@ function RetryScopeSelector({
             </StackItem>
             {selectedPointIds.length > 0 && selectedPointIds.length < affectedPointCount && (
               <StackItem>
-                <Alert
-                  isInline
-                  variant="warning"
-                  title="Some branches may fail"
-                  data-testid="retry-partial-scope-warning"
-                >
-                  Skipped branches may leave downstream dependencies or the merge step without the inputs they need.
+                <Alert isInline variant="warning" title="Workflow may fail" data-testid="retry-partial-scope-warning">
+                  Skipped steps may leave downstream dependencies or the merge step without the inputs they need.
                 </Alert>
               </StackItem>
             )}
@@ -282,11 +281,12 @@ function RetryPlanContent({
   selectedPointCount,
   affectedPointCount,
   notRetriedFailureCount,
+  emptySelectionWarningId,
 }: RetryPlanContentProps) {
   if (isEmptySelection) {
     return (
-      <Alert isInline variant="info" title="Choose at least one branch">
-        Select one or more branches to see the retry plan for that selection.
+      <Alert id={emptySelectionWarningId} isInline variant="info" title="Choose at least one step">
+        Select one or more steps to see the retry plan for that selection.
       </Alert>
     )
   }
@@ -309,8 +309,8 @@ function RetryPlanContent({
 
   if (!preview) {
     return (
-      <Alert isInline variant="info" title="Choose at least one branch">
-        Select one or more branches to see the retry plan for that selection.
+      <Alert isInline variant="info" title="Choose at least one step">
+        Select one or more steps to see the retry plan for that selection.
       </Alert>
     )
   }
@@ -318,7 +318,7 @@ function RetryPlanContent({
   if (!preview.eligible) {
     return (
       <Alert isInline variant="warning" title="This retry selection cannot be used" data-testid="retry-rejected">
-        {preview.reason ?? 'The selected branches cannot be retried.'}
+        {preview.reason ?? 'The selected steps cannot be retried.'}
       </Alert>
     )
   }
@@ -369,7 +369,7 @@ function RetryPlanSummary({
         <DescriptionListGroup>
           <DescriptionListTerm>Scope</DescriptionListTerm>
           <DescriptionListDescription>
-            {selectedPointCount} of {affectedPointCount} affected branches selected
+            {selectedPointCount} of {affectedPointCount} affected steps selected
           </DescriptionListDescription>
         </DescriptionListGroup>
       )}
@@ -490,9 +490,11 @@ type RetryFooterProps = Readonly<{
   isRetryDisabled: boolean
   isRetryPending: boolean
   stepCount?: number
+  retryButtonDescribedBy?: string
 }>
 
-export function RetryFooter({ onRetry, onCancel, isRetryDisabled, isRetryPending, stepCount }: RetryFooterProps) {
+export function RetryFooter(props: RetryFooterProps) {
+  const { onRetry, onCancel, isRetryDisabled, isRetryPending, stepCount, retryButtonDescribedBy } = props
   return (
     <Flex justifyContent={{ default: 'justifyContentSpaceBetween' }} alignItems={{ default: 'alignItemsCenter' }}>
       <FlexItem>
@@ -501,6 +503,7 @@ export function RetryFooter({ onRetry, onCancel, isRetryDisabled, isRetryPending
           onClick={onRetry}
           isLoading={isRetryPending}
           isDisabled={isRetryDisabled}
+          aria-describedby={retryButtonDescribedBy}
           data-testid="retry-from-failure-confirm"
         >
           {getRetryButtonLabel(stepCount)}
@@ -516,7 +519,7 @@ export function RetryFooter({ onRetry, onCancel, isRetryDisabled, isRetryPending
 }
 
 function getRetryButtonLabel(stepCount: number | undefined): string {
-  if (stepCount === undefined) return 'Retry run from failure'
+  if (stepCount == null || stepCount <= 0) return 'Retry run from failure'
   const stepLabel = stepCount === 1 ? 'step' : 'steps'
   return `Retry ${stepCount} ${stepLabel}`
 }

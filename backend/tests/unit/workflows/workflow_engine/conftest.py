@@ -3,8 +3,8 @@
 from typing import Any
 
 from syntara.settings.catalog import SETTINGS_CATALOG
-from syntara.workflows.workflow_engine.dynamic_workflow import OrchestratorWorkflow
-from syntara.workflows.workflow_engine.graph import ActivityNode, WorkflowGraph
+from syntara.workflow_core.graph import ActivityNode, WorkflowGraph
+from syntara.workflow_runtime.engines.temporal.dynamic_workflow import OrchestratorWorkflow
 
 
 def make_workflow_runtime_settings() -> dict[str, object]:
@@ -20,6 +20,10 @@ def init_workflow_runtime(wf: OrchestratorWorkflow) -> None:
     """
     wf._runtime_settings = make_workflow_runtime_settings()
     wf._has_unhandled_failure = False
+    if not hasattr(wf, "activity_input_history"):
+        wf.activity_input_history = {}
+    if not hasattr(wf, "activity_output_history"):
+        wf.activity_output_history = {}
     # Retry-from-failure state. Set in __init__ for a real run; defaulted here so
     # a workflow built for a non-retry test behaves as one.
     wf.retry_context = {}

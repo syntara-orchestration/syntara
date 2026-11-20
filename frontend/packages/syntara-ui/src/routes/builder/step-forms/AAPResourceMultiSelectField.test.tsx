@@ -149,7 +149,7 @@ describe('AAPResourceMultiSelectField', () => {
     expect(screen.getByText('No credentials selected')).toBeInTheDocument()
   })
 
-  it('sets aria-describedby on toggle for helper text', () => {
+  it('associates the helper text with the toggle', () => {
     render(
       <TestWrapper>
         <AAPResourceMultiSelectField
@@ -165,7 +165,7 @@ describe('AAPResourceMultiSelectField', () => {
     )
 
     const toggle = screen.getByRole('button', { name: /no credentials selected/i })
-    expect(toggle).toHaveAttribute('aria-describedby', 'test-multiselect-helper')
+    expect(toggle).toHaveAccessibleDescription('Select credentials')
   })
 
   it('renders search input when onSearchChange is provided', async () => {

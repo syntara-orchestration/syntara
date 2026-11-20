@@ -898,18 +898,6 @@ export const pages: PageEntry[] = [
   ...credentialEditPages,
 
   // ══════════════════════════════════════════════════════════════════════════
-  // SUPPORT
-  // ══════════════════════════════════════════════════════════════════════════
-  {
-    section: 'support',
-    name: 'glossary',
-    path: AppRoute.Support.Glossary,
-    waitFor: async (page) => {
-      await expect(page.getByRole('heading', { name: 'Glossary' })).toBeVisible()
-    },
-  },
-
-  // ══════════════════════════════════════════════════════════════════════════
   // INTERACTIVE STATES — status variants, detail tabs, settings tabs,
   // authentication (entries defined in page-entries-interactive.ts)
   // ══════════════════════════════════════════════════════════════════════════
@@ -1106,12 +1094,7 @@ export const loginPages: PageEntry[] = [
 // ---------------------------------------------------------------------------
 
 /** Routes in AppRoute.tsx that have no implementation (placeholder/unimplemented) */
-export const excludedUnimplemented: string[] = [
-  AppRoute.Dashboard,
-  AppRoute.Configuration.Overview,
-  AppRoute.Support.Documentation,
-  AppRoute.Support.FAQ,
-]
+export const excludedUnimplemented: string[] = [AppRoute.Dashboard, AppRoute.Configuration.Overview]
 
 /** Routes excluded because they need dynamic setup or have no seeded mock data */
 export const excludedDynamic: string[] = [

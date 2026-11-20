@@ -14,16 +14,16 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from syntara.core.exceptions import SafeValueError
-from syntara.workflows.models.activity_execution import ActivityStatus
-from syntara.workflows.workflow_engine.dynamic_workflow import OrchestratorWorkflow
-from syntara.workflows.workflow_engine.graph import ActivityNode, WorkflowGraph
-from syntara.workflows.workflow_engine.graph_backend import InMemoryGraphBackend
-from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName
-from syntara.workflows.workflow_engine.retry_mixin import (
+from syntara.workflow_core.graph import ActivityNode, WorkflowGraph
+from syntara.workflow_core.graph_backend import InMemoryGraphBackend
+from syntara.workflow_core.models import ActivityName
+from syntara.workflow_runtime.engines.temporal.dynamic_workflow import OrchestratorWorkflow
+from syntara.workflow_runtime.engines.temporal.retry_mixin import (
     _INFERABLE_CONTROL_NODE_TYPES,
     _MIN_BRANCHES_FOR_INFERENCE,
     WorkflowRetryMixin,
 )
+from syntara.workflows.models.activity_execution import ActivityStatus
 
 from .conftest import init_workflow_runtime
 
@@ -36,8 +36,8 @@ def mock_wf() -> Generator[MagicMock, None, None]:
     ``workflow.logger`` refuses to emit unless a workflow event loop is active.
     """
     with (
-        patch("syntara.workflows.workflow_engine.dynamic_workflow.workflow") as patched,
-        patch("syntara.workflows.workflow_engine.retry_mixin.workflow", patched),
+        patch("syntara.workflow_runtime.engines.temporal.dynamic_workflow.workflow") as patched,
+        patch("syntara.workflow_runtime.engines.temporal.retry_mixin.workflow", patched),
     ):
         patched.logger = MagicMock()
         # execute_activity is awaited on the real workflow module.
@@ -47,7 +47,7 @@ def mock_wf() -> Generator[MagicMock, None, None]:
 
 def _make_workflow(retry_context: dict[str, Any] | None = None) -> OrchestratorWorkflow:
     """Create an OrchestratorWorkflow with initialized state, bypassing __init__."""
-    from syntara.workflows.utils.namespace_resolver import NamespaceResolver
+    from syntara.workflow_core.utils.namespace_resolver import NamespaceResolver
 
     wf = OrchestratorWorkflow.__new__(OrchestratorWorkflow)
     wf.skipped_nodes = set()
@@ -134,6 +134,17 @@ def _retry_inside_loop_graph() -> WorkflowGraph:
     backend.add_edge("before", "failed", None)
     backend.add_edge("failed", "after", None)
     backend.add_edge("after", "loop_1", {"to_port": "iterate"})
+    return WorkflowGraph(backend)
+
+
+def _parallel_failed_conditions_graph() -> WorkflowGraph:
+    """Fan-out of two conditions with no downstream work — the QA two-failure fixture."""
+    backend = InMemoryGraphBackend()
+    backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
+    backend.add_node("first", {"id": "first", "type": "condition", "parameters": {}})
+    backend.add_node("second", {"id": "second", "type": "condition", "parameters": {}})
+    backend.add_edge("trigger", "first", None)
+    backend.add_edge("trigger", "second", None)
     return WorkflowGraph(backend)
 
 
@@ -381,6 +392,48 @@ def test_condition_is_not_restorable_when_the_branch_is_unknown() -> None:
     assert wf._should_restore_node("cond_1", graph) is False
 
 
+def test_unselected_failed_condition_is_restored_without_a_branch() -> None:
+    """A failed condition never took a port; an unselected sibling must stay failed."""
+    wf = _make_workflow({"retry_from_execution_id": "src-1", "eligible_point_ids": ["first"]})
+    graph = _parallel_failed_conditions_graph()
+    wf._retry_source_statuses = {
+        "first": ActivityStatus.FAILED.value,
+        "second": ActivityStatus.FAILED.value,
+    }
+
+    assert "second" in wf._retry_restorable_nodes(graph)
+    assert wf._should_restore_node("second", graph) is True
+    assert wf._should_restore_node("first", graph) is False
+
+
+@pytest.mark.asyncio
+async def test_unselected_failed_condition_replays_as_retained_failure(mock_wf: MagicMock) -> None:
+    """Replay publishes the source failure instead of evaluating the condition again."""
+    wf = _make_workflow({"retry_from_execution_id": "src-1", "eligible_point_ids": ["first"]})
+    graph = _parallel_failed_conditions_graph()
+    wf._retry_source_statuses = {
+        "first": ActivityStatus.FAILED.value,
+        "second": ActivityStatus.FAILED.value,
+    }
+    mock_wf.execute_activity.return_value = {
+        "output_data": {"error": "missing_scope_b"},
+        "status": ActivityStatus.FAILED.value,
+        "error_details": "Failed to evaluate condition",
+        "input_data": {"condition": "missing_scope_b == true"},
+        "started_at": "2026-11-19T16:34:44Z",
+        "completed_at": "2026-11-19T16:34:44Z",
+    }
+
+    result = await wf._restore_node_state(_node(graph, "second"), graph)
+
+    assert result is not None
+    assert result["control"] is None
+    assert result["output"]["status"] == "failed"
+    assert wf.failed_nodes["second"] == "Failed to evaluate condition"
+    assert wf._restored_node_statuses["second"] == ActivityStatus.FAILED.value
+    assert "second" not in wf.skipped_nodes
+
+
 def test_loop_body_statuses_do_not_imply_a_branch() -> None:
     """A completed loop body must not be read as evidence for the true branch."""
     wf = _make_workflow()
@@ -403,7 +456,7 @@ async def test_restoring_a_condition_needs_no_manually_initialised_retry_state(
     of these tests passed. This one builds the workflow the way ``__init__`` does
     — nothing seeded by hand — so an uninitialised field fails loudly here.
     """
-    from syntara.workflows.utils.namespace_resolver import NamespaceResolver
+    from syntara.workflow_core.utils.namespace_resolver import NamespaceResolver
 
     wf = OrchestratorWorkflow.__new__(OrchestratorWorkflow)
     wf.retry_context = {"retry_from_execution_id": "src-1", "eligible_point_ids": ["step_true"]}

@@ -1,3 +1,4 @@
+import { ActivityTypeEnum } from '@syntara/contracts'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
@@ -21,7 +22,10 @@ function state(id: string, overrides: Partial<ActivityState> = {}): [string, Act
   return [id, { activityId: id, status: 'pending', ...overrides }]
 }
 
-const order: ActivityOrderItem[] = [{ id: 'task-1', name: 'Fetch Data' }, { id: 'task-2' }]
+const order: ActivityOrderItem[] = [
+  { id: 'task-1', name: 'Fetch Data', type: ActivityTypeEnum.SCRIPT },
+  { id: 'task-2', type: ActivityTypeEnum.SCRIPT },
+]
 
 const states = new Map([
   state('task-1', { status: 'completed', startedAt: '2024-01-01T00:00:00Z', completedAt: '2024-01-01T00:01:00Z' }),
@@ -82,6 +86,27 @@ describe('CompactActivityList', () => {
     expect(rows[1]).not.toHaveClass('pf-m-selected')
   })
 
+  it('highlights only the selected loop iteration', () => {
+    const loopOrder: ActivityOrderItem[] = [
+      { id: 'task-1', name: 'Fetch Data (iter 0)' },
+      { id: 'task-1#iter-1', name: 'Fetch Data (iter 1)' },
+      { id: 'task-1#iter-2', name: 'Fetch Data (iter 2)' },
+    ]
+
+    render(
+      <CompactActivityList
+        activityStates={new Map(loopOrder.map(({ id }) => state(id)))}
+        activityOrder={loopOrder}
+        selectedNodeId="task-1#iter-1"
+      />
+    )
+
+    const rows = screen.getAllByRole('row')
+    expect(rows[0]).not.toHaveClass('pf-m-selected')
+    expect(rows[1]).toHaveClass('pf-m-selected')
+    expect(rows[2]).not.toHaveClass('pf-m-selected')
+  })
+
   it('marks a row replayed when its start predates the retry baseline', () => {
     render(
       <CompactActivityList activityStates={states} activityOrder={order} replayBaselineAt="2024-01-02T00:00:00Z" />
@@ -90,11 +115,11 @@ describe('CompactActivityList', () => {
     expect(screen.getAllByTestId('activity-status-label-replayed')).toHaveLength(1)
   })
 
-  it('does not mark a retained failure as replayed', () => {
+  it('does not mark a retained failure without output as replayed', () => {
     render(
       <CompactActivityList
         activityStates={new Map([state('task-1', { status: 'failed', startedAt: '2024-01-01T00:00:00Z' })])}
-        activityOrder={[{ id: 'task-1', name: 'Script' }]}
+        activityOrder={[{ id: 'task-1', name: 'Script', type: ActivityTypeEnum.SCRIPT }]}
         replayBaselineAt="2024-01-02T00:00:00Z"
       />
     )

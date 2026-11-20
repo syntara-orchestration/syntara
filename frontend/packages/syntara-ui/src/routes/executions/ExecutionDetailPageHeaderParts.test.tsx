@@ -120,8 +120,49 @@ describe('ExecutionDetailPageHeaderParts', () => {
     expect(await axe(container)).toHaveNoViolations()
   })
 
-  it('hides the normal execution actions while retry mode is active', () => {
+  it('keeps non-retry actions visible while retry mode is active', () => {
     const queryClient = new QueryClient()
+    const execution = {
+      id: 'exec-123',
+      workflow_id: 'wf-1',
+      workflow_version_id: 'wfv-1',
+      project_id: 'proj-1',
+      status: 'failed',
+    } as never
+    render(
+      <QueryClientProvider client={queryClient}>
+        <ExecutionDetailHeaderToolbar
+          showApprovalActionStrip={false}
+          isApprovalLoading={false}
+          onReviewClick={() => {}}
+          historyCardOpen={false}
+          onToggleHistory={() => {}}
+          onBackToEditor={() => {}}
+          onCopyToEditor={() => {}}
+          isCancellable={false}
+          executionId="exec-123"
+          execution={execution}
+          isRetryMode
+          onRetryFromFailureClick={() => {}}
+        />
+      </QueryClientProvider>
+    )
+
+    expect(screen.getByRole('button', { name: 'Copy to editor' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Back to editor' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Run history' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Retry run' })).not.toBeInTheDocument()
+  })
+
+  it('keeps the cancel action visible while retry mode is active', () => {
+    const queryClient = new QueryClient()
+    const execution = {
+      id: 'exec-123',
+      workflow_id: 'wf-1',
+      workflow_version_id: 'wfv-1',
+      project_id: 'proj-1',
+      status: 'running',
+    } as never
     render(
       <QueryClientProvider client={queryClient}>
         <ExecutionDetailHeaderToolbar
@@ -134,13 +175,13 @@ describe('ExecutionDetailPageHeaderParts', () => {
           onCopyToEditor={() => {}}
           isCancellable
           executionId="exec-123"
-          execution={undefined}
+          execution={execution}
           isRetryMode
         />
       </QueryClientProvider>
     )
 
-    expect(screen.queryByRole('button')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Cancel run' })).toBeInTheDocument()
   })
 
   it('renders cancel button when execution is cancellable', () => {

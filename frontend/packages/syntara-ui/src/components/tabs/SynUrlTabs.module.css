@@ -1,0 +1,7 @@
+.routePanel {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  margin-block-start: var(--pf-t--global--spacer--md);
+  min-height: 0;
+}

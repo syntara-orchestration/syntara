@@ -22,22 +22,23 @@ import pytest
 from temporalio.exceptions import ApplicationError
 
 from syntara.core.exceptions import SafeValueError
-from syntara.workflows.utils.namespace_resolver import NamespaceResolver
-from syntara.workflows.workflow_engine.constants import INTERNAL_ACTIVITY_HEARTBEAT_TIMEOUT_SECONDS
-from syntara.workflows.workflow_engine.dynamic_workflow import (
-    ALLOWED_TRIGGER_TYPES,
-    OrchestratorWorkflow,
-)
-from syntara.workflows.workflow_engine.graph import ActivityNode, WorkflowGraph
-from syntara.workflows.workflow_engine.graph_backend import InMemoryGraphBackend
-from syntara.workflows.workflow_engine.models.workflow_definition import (
+from syntara.workflow_core.graph import ActivityNode, WorkflowGraph
+from syntara.workflow_core.graph_backend import InMemoryGraphBackend
+from syntara.workflow_core.models import (
     ActivityName,
     DoWhileLoopState,
     ForEachLoopState,
     NodeSettingsNoRetry,
     NodeType,
 )
-from syntara.workflows.workflow_engine.node_settings_resolver import get_default_timeout
+from syntara.workflow_core.utils.namespace_resolver import NamespaceResolver
+from syntara.workflow_runtime.engines.temporal.constants import INTERNAL_ACTIVITY_HEARTBEAT_TIMEOUT_SECONDS
+from syntara.workflow_runtime.engines.temporal.dynamic_workflow import (
+    ALLOWED_TRIGGER_TYPES,
+    LOOP_WAIT_COMPLETION_ACTIVITY_ID_PATCH,
+    OrchestratorWorkflow,
+)
+from syntara.workflow_runtime.engines.temporal.node_settings_resolver import get_default_timeout
 from tests.unit.workflows.workflow_engine.conftest import init_workflow_runtime
 
 
@@ -45,7 +46,7 @@ from tests.unit.workflows.workflow_engine.conftest import init_workflow_runtime
 def _mock_temporal_workflow() -> Generator[MagicMock]:
     """Mock the Temporal workflow module to avoid 'Not in workflow event loop' errors."""
     mock_logger = MagicMock()
-    with patch("syntara.workflows.workflow_engine.dynamic_workflow.workflow") as mock_wf:
+    with patch("syntara.workflow_runtime.engines.temporal.dynamic_workflow.workflow") as mock_wf:
         mock_wf.logger = mock_logger
         mock_wf.info.return_value = MagicMock(workflow_id="test-wf-id")
         mock_wf.execute_activity = AsyncMock(return_value={"output": {}})
@@ -107,11 +108,14 @@ def _build_diamond_graph() -> WorkflowGraph:
     return WorkflowGraph(backend)
 
 
-def _build_chain_graph() -> WorkflowGraph:
+def _build_chain_graph(node_a_outputs: dict[str, str] | None = None) -> WorkflowGraph:
     """Build: trigger -> A -> B -> C (three-node chain)."""
     backend = InMemoryGraphBackend()
     backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
-    backend.add_node("node_a", {"id": "node_a", "type": "script", "parameters": {}})
+    backend.add_node(
+        "node_a",
+        {"id": "node_a", "type": "script", "parameters": {}, "outputs": node_a_outputs},
+    )
     backend.add_node("node_b", {"id": "node_b", "type": "script", "parameters": {}})
     backend.add_node("node_c", {"id": "node_c", "type": "script", "parameters": {}})
     backend.add_edge("trigger", "node_a", None)
@@ -215,6 +219,75 @@ class TestExecuteExecutorNodeUnknownType:
         assert "totally_unknown" in result["output"]["reason"]
 
 
+class TestExecuteWaitNode:
+    """Loop waits must complete the right Temporal activity for each history version."""
+
+    @pytest.mark.parametrize(
+        ("loop_body_map", "node_control_data", "temporal_activity_id", "completion_mode"),
+        [
+            ({"wait_node": "loop_node"}, {"loop_node": {"current_index": 0}}, "wait_node_iter_0", "new"),
+            ({"wait_node": "loop_node"}, {"loop_node": {"current_index": 1}}, "wait_node_iter_1", "new"),
+            (
+                {"wait_node": "inner_loop", "inner_loop": "outer_loop"},
+                {"outer_loop": {"current_index": 2}, "inner_loop": {"current_index": 1}},
+                "wait_node_iter_2_iter_1",
+                "new",
+            ),
+            ({"wait_node": "loop_node"}, {"loop_node": {"current_index": 0}}, "wait_node_iter_0", "legacy"),
+            ({"wait_node": "loop_node"}, {"loop_node": {"current_index": 1}}, "wait_node_iter_1", "legacy"),
+            (
+                {"wait_node": "inner_loop", "inner_loop": "outer_loop"},
+                {"outer_loop": {"current_index": 2}, "inner_loop": {"current_index": 1}},
+                "wait_node_iter_2_iter_1",
+                "legacy",
+            ),
+        ],
+    )
+    @pytest.mark.asyncio
+    async def test_completes_wait_using_iteration_activity_id(
+        self,
+        request: pytest.FixtureRequest,
+        loop_body_map: dict[str, str],
+        node_control_data: dict[str, dict[str, int]],
+        temporal_activity_id: str,
+        completion_mode: str,
+    ) -> None:
+        mock_temporal_workflow = request.getfixturevalue("_mock_temporal_workflow")
+        wf = _make_workflow()
+        wf.loop_body_map = loop_body_map
+        wf.node_control_data = node_control_data
+        workflow_result = {"output": {"status": "completed"}}
+        wait_handle = asyncio.get_running_loop().create_future()
+        wait_handle.set_result(workflow_result)
+        mock_temporal_workflow.start_activity.return_value = wait_handle
+        mock_temporal_workflow.sleep = AsyncMock()
+        mock_temporal_workflow.execute_local_activity = AsyncMock()
+        mock_temporal_workflow.info.return_value = MagicMock(workflow_id="test-wf-id", run_id="test-run-id")
+        mock_temporal_workflow.patched.return_value = completion_mode == "new"
+
+        result = await wf._execute_wait_node("wait_node", {"duration": 1}, None)
+
+        mock_temporal_workflow.start_activity.assert_called_once()
+        assert mock_temporal_workflow.start_activity.call_args.kwargs["activity_id"] == temporal_activity_id
+        mock_temporal_workflow.patched.assert_called_once_with(LOOP_WAIT_COMPLETION_ACTIVITY_ID_PATCH)
+        expected_completions = (
+            [(temporal_activity_id, f"__internal__complete_wait_{temporal_activity_id}")]
+            if completion_mode == "new"
+            else [
+                ("wait_node", "__internal__complete_wait_wait_node"),
+                (temporal_activity_id, f"__internal__recover_wait_{temporal_activity_id}"),
+            ]
+        )
+        assert [
+            (call.kwargs["args"], call.kwargs["activity_id"])
+            for call in mock_temporal_workflow.execute_local_activity.await_args_list
+        ] == [
+            (["test-wf-id", "test-run-id", completion_target], local_activity_id)
+            for completion_target, local_activity_id in expected_completions
+        ]
+        assert result == workflow_result
+
+
 class TestExecuteExecutorNodeHeartbeatTimeout:
     """Internal activities must be scheduled with a heartbeat_timeout.
 
@@ -230,11 +303,11 @@ class TestExecuteExecutorNodeHeartbeatTimeout:
         node = ActivityNode("n1", node_type, {})
         with (
             patch(
-                "syntara.workflows.workflow_engine.dynamic_workflow.workflow.execute_activity",
+                "syntara.workflow_runtime.engines.temporal.dynamic_workflow.workflow.execute_activity",
                 new=AsyncMock(return_value={"output": {}}),
             ) as mock_exec,
             patch(
-                "syntara.workflows.workflow_engine.dynamic_workflow.resolve_retry_policy",
+                "syntara.workflow_runtime.engines.temporal.dynamic_workflow.resolve_retry_policy",
                 return_value=None,
             ),
         ):
@@ -461,7 +534,7 @@ class TestUnselectedTriggerSkipping:
         assert len(wf.skipped_nodes) == 0
 
     @pytest.mark.asyncio
-    async def test_retry_reexecutes_trigger_but_preserves_source_timestamps(self) -> None:
+    async def test_retry_reexecutes_trigger_while_preserving_source_timestamps(self) -> None:
         backend = InMemoryGraphBackend()
         backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
         graph = WorkflowGraph(backend)
@@ -476,7 +549,7 @@ class TestUnselectedTriggerSkipping:
         }
 
         with patch(
-            "syntara.workflows.workflow_engine.dynamic_workflow.workflow.execute_activity",
+            "syntara.workflow_runtime.engines.temporal.dynamic_workflow.workflow.execute_activity",
             new_callable=AsyncMock,
             return_value={"output": {"status": "ok"}},
         ) as execute_activity:
@@ -488,7 +561,10 @@ class TestUnselectedTriggerSkipping:
             )
 
         execute_activity.assert_awaited_once()
-        assert wf._restored_node_timestamps["trigger"] == wf._retry_source_timestamps["trigger"]
+        assert wf._restored_node_timestamps["trigger"] == {
+            "started_at": "2026-01-01T00:00:00+00:00",
+            "completed_at": "2026-01-01T00:05:00+00:00",
+        }
         assert wf.resolver.get_namespace("trigger") == {"status": "ok"}
 
     @pytest.mark.asyncio
@@ -502,7 +578,7 @@ class TestUnselectedTriggerSkipping:
 
         wf = _make_workflow()
         with patch(
-            "syntara.workflows.workflow_engine.dynamic_workflow.workflow.execute_activity",
+            "syntara.workflow_runtime.engines.temporal.dynamic_workflow.workflow.execute_activity",
             new_callable=AsyncMock,
             return_value={"output": {"env": "prod"}},
         ):
@@ -1107,7 +1183,7 @@ class TestLoopMaxIterationsEnforcement:
 
         with (
             patch(
-                "syntara.workflows.workflow_engine.dynamic_workflow.safe_eval_with_namespace",
+                "syntara.workflow_runtime.engines.temporal.dynamic_workflow.safe_eval_with_namespace",
                 return_value=True,
             ),
             pytest.raises(ApplicationError) as exc_info,
@@ -1136,7 +1212,7 @@ class TestLoopMaxIterationsEnforcement:
         wf.loop_iteration_results["loop_1"] = {}
 
         with patch(
-            "syntara.workflows.workflow_engine.dynamic_workflow.safe_eval_with_namespace",
+            "syntara.workflow_runtime.engines.temporal.dynamic_workflow.safe_eval_with_namespace",
             return_value=False,
         ):
             result = await wf._execute_loop_node("loop_1", node, node.parameters)
@@ -1331,6 +1407,45 @@ class TestExtractFailureOutput:
 
         assert isinstance(result, dict)
         assert "response_code" not in result
+
+    def test_failed_loop_body_output_is_available_by_iteration(self) -> None:
+        """A failed loop-body node keeps its structured output in iteration history."""
+        wf = _make_workflow()
+        graph = _build_chain_graph()
+        app_error = ApplicationError(
+            "boom",
+            {"output": {"response_code": 500, "body": "err"}},
+            type="TaskError",
+        )
+
+        wf._handle_node_failure("node_a", app_error, graph, pending_tasks={}, continue_on_failure=True)
+
+        assert wf.get_activity_output("node_a", 0) == {
+            "response_code": 500,
+            "body": "err",
+            "status": "failed",
+            "error": "boom",
+        }
+
+    def test_invalid_mapping_does_not_break_workflow_failure_handling(self) -> None:
+        """Failure fallback must not evaluate an already-invalid output mapping."""
+        wf = _make_workflow()
+        graph = _build_chain_graph()
+        graph = _build_chain_graph({"value": "${result.stdout_json.value}"})
+
+        result = wf._extract_failure_output("node_a", None, graph)
+
+        assert result["stdout_json"] is None
+
+    def test_valid_mapping_is_preserved_in_workflow_failure_handling(self) -> None:
+        """Failure fallback must retain aliases used by downstream recovery steps."""
+        wf = _make_workflow()
+        graph = _build_chain_graph()
+        graph = _build_chain_graph({"value": "${result.stdout}"})
+
+        result = wf._extract_failure_output("node_a", None, graph)
+
+        assert result == {"value": None}
 
 
 class TestEvaluatePredecessor:

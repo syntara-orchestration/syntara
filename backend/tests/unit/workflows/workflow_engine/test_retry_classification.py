@@ -15,16 +15,16 @@ import pytest
 from temporalio.exceptions import ApplicationError
 
 from syntara.core.exceptions import SafeValueError
-from syntara.workflows.models.activity_execution import ActivityStatus
-from syntara.workflows.utils.namespace_resolver import NamespaceResolver
-from syntara.workflows.workflow_engine.dynamic_workflow import PRE_RESOLVED_MARKER, OrchestratorWorkflow
-from syntara.workflows.workflow_engine.graph import ActivityNode, WorkflowGraph
-from syntara.workflows.workflow_engine.graph_backend import InMemoryGraphBackend
-from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName, NodeType
-from syntara.workflows.workflow_engine.retry_mixin import (
+from syntara.workflow_core.graph import ActivityNode, WorkflowGraph
+from syntara.workflow_core.graph_backend import InMemoryGraphBackend
+from syntara.workflow_core.models import ActivityName, NodeType
+from syntara.workflow_core.utils.namespace_resolver import NamespaceResolver
+from syntara.workflow_runtime.engines.temporal.dynamic_workflow import PRE_RESOLVED_MARKER, OrchestratorWorkflow
+from syntara.workflow_runtime.engines.temporal.retry_mixin import (
     _CONTROL_NODE_TYPES_FOR_RETRY,
     WorkflowRetryMixin,
 )
+from syntara.workflows.models.activity_execution import ActivityStatus
 
 from .conftest import init_workflow_runtime
 
@@ -33,8 +33,8 @@ from .conftest import init_workflow_runtime
 def mock_wf() -> Generator[MagicMock, None, None]:
     """Patch the Temporal workflow module so execute_activity is awaitable."""
     with (
-        patch("syntara.workflows.workflow_engine.dynamic_workflow.workflow") as patched,
-        patch("syntara.workflows.workflow_engine.retry_mixin.workflow", patched),
+        patch("syntara.workflow_runtime.engines.temporal.dynamic_workflow.workflow") as patched,
+        patch("syntara.workflow_runtime.engines.temporal.retry_mixin.workflow", patched),
     ):
         patched.logger = MagicMock()
         yield patched
@@ -220,6 +220,135 @@ async def test_retry_converge_executes_live_when_a_quorum_branch_is_a_rerun(mock
 
 
 @pytest.mark.asyncio
+async def test_retry_converge_with_cancelled_source_falls_through_to_live_execution(mock_wf: MagicMock) -> None:
+    wf = _make_workflow({"retry_from_execution_id": "src-1", "eligible_point_ids": ["b1", "b2"]})
+    graph = _two_branch_converge_graph("any", 1)
+    wf._retry_replay_candidates = {"join"}
+    cancelled_source_state = {
+        "converge": {"status": ActivityStatus.CANCELLED.value},
+        "predecessors": {},
+    }
+    live_result = {"output": {"status": "completed", "converged": True}, "control": None}
+
+    async def _activity(name: Any, *_args: Any, **_kwargs: Any) -> Any:  # noqa: ANN401
+        if name == ActivityName.RETRY_CONVERGE_METADATA:
+            return cancelled_source_state
+        if name == ActivityName.CONVERGE:
+            return live_result
+        pytest.fail(f"unexpected activity {name}")
+
+    mock_wf.wait_condition = AsyncMock()
+    mock_wf.execute_activity = AsyncMock(side_effect=_activity)
+
+    result = await wf._execute_converge_node("join", {"strategy": "any", "n_required": 1}, None, graph)
+
+    assert result == live_result
+    activities = [call.args[0] for call in mock_wf.execute_activity.call_args_list]
+    assert ActivityName.CONVERGE in activities
+    assert ActivityName.RETRY_NODE_REPLAY not in activities
+    assert "join" not in wf._retry_replay_candidates
+
+
+def _trigger_and_branch_converge_graph() -> WorkflowGraph:
+    """Build trigger + b2 -> join so the trigger is a direct converge predecessor."""
+    backend = InMemoryGraphBackend()
+    backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
+    backend.add_node("b2", {"id": "b2", "type": "script", "parameters": {}})
+    backend.add_node(
+        "join",
+        {"id": "join", "type": "converge", "parameters": {"strategy": "all", "n_required": 2}},
+    )
+    backend.add_edge("trigger", "join", None)
+    backend.add_edge("b2", "join", None)
+    return WorkflowGraph(backend)
+
+
+def test_display_only_trigger_timestamps_are_not_a_restore_signal() -> None:
+    """Retry plants trigger source times for display, without restoring trigger output."""
+    wf = _make_workflow({"retry_from_execution_id": "src-1", "eligible_point_ids": ["b2"]})
+    graph = _trigger_and_branch_converge_graph()
+    trigger = graph.get_node("trigger")
+    wf._restored_node_timestamps = {
+        "trigger": {
+            "started_at": "2026-01-01T00:00:00+00:00",
+            "completed_at": "2026-01-01T00:05:00+00:00",
+        }
+    }
+
+    will_replay = wf._converge_predecessor_will_replay(
+        trigger,
+        "trigger",
+        {"status": ActivityStatus.COMPLETED.value, "result_digest": "old"},
+        graph,
+    )
+
+    assert will_replay is False
+
+
+@pytest.mark.asyncio
+async def test_retry_converge_executes_live_when_trigger_predecessor_reran(mock_wf: MagicMock) -> None:
+    """A live trigger with display-only source times must not restore a stale converge."""
+    wf = _make_workflow({"retry_from_execution_id": "src-1", "eligible_point_ids": ["b2"]})
+    graph = _trigger_and_branch_converge_graph()
+    wf._retry_replay_candidates = {"join"}
+    wf._retry_source_statuses = {"trigger": "completed", "b2": "completed", "join": "completed"}
+    wf._retry_source_temporal_statuses = {"trigger": "completed", "b2": "completed", "join": "completed"}
+    wf._restored_node_timestamps = {
+        "trigger": {
+            "started_at": "2026-01-01T00:00:00+00:00",
+            "completed_at": "2026-01-01T00:05:00+00:00",
+        },
+        "b2": {
+            "started_at": "2026-01-01T00:00:00+00:00",
+            "completed_at": "2026-01-01T00:01:00+00:00",
+            "status": ActivityStatus.COMPLETED.value,
+        },
+    }
+    old_trigger_output = {"payload": "old"}
+    new_trigger_output = {"payload": "new"}
+    b2_output = {"v": 2, "status": "completed"}
+    wf.resolver.set_namespace("trigger", new_trigger_output)
+    wf.resolver.set_namespace("b2", b2_output)
+    source_state = {
+        "converge": {
+            "status": ActivityStatus.COMPLETED.value,
+            "input_data": {"strategy": "all", "n_required": 2},
+            "output_branch_count": 2,
+            "gate_metadata": {"strategy": "all", "n_required": 2, "total_branches": 2},
+        },
+        "predecessors": {
+            "trigger": {
+                "status": ActivityStatus.COMPLETED.value,
+                "result_digest": wf._retry_converge_result_digest(old_trigger_output),
+            },
+            "b2": {
+                "status": ActivityStatus.COMPLETED.value,
+                "result_digest": wf._retry_converge_result_digest(b2_output),
+            },
+        },
+    }
+    live_result = {"output": {"status": "completed", "converged": True}, "control": None}
+
+    async def _activity(name: Any, *_args: Any, **_kwargs: Any) -> Any:  # noqa: ANN401
+        if name == ActivityName.RETRY_CONVERGE_METADATA:
+            return source_state
+        if name == ActivityName.CONVERGE:
+            return live_result
+        pytest.fail(f"unexpected activity {name}")
+
+    mock_wf.wait_condition = AsyncMock()
+    mock_wf.execute_activity = AsyncMock(side_effect=_activity)
+
+    result = await wf._execute_converge_node("join", {"strategy": "all", "n_required": 2}, None, graph)
+
+    assert result == live_result
+    activities = [call.args[0] for call in mock_wf.execute_activity.call_args_list]
+    assert ActivityName.CONVERGE in activities
+    assert ActivityName.RETRY_NODE_REPLAY not in activities
+    assert "join" not in wf._retry_replay_candidates
+
+
+@pytest.mark.asyncio
 async def test_retry_converge_restores_when_every_branch_matches_source(mock_wf: MagicMock) -> None:
     """Every predecessor is restored and matches the source, so the converge restores.
 
@@ -395,6 +524,39 @@ async def test_retry_converge_raises_timeout_failure_verbatim(mock_wf: MagicMock
     assert excinfo.value.type == "RetryConvergeGateFailure"
     assert excinfo.value.message == timeout_reason
     mock_wf.execute_activity.assert_not_called()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("failure_reason", "should_query_source"),
+    [
+        ("Converge node join timed out after 30s waiting for predecessors", False),
+        ("External service timed out after 3 retries", True),
+    ],
+)
+async def test_retry_converge_timeout_marker_only_matches_converge_failures(
+    mock_wf: MagicMock,
+    failure_reason: str,
+    *,
+    should_query_source: bool,
+) -> None:
+    """Only the space-bounded converge timeout phrase should block replay lookup."""
+    wf = _make_workflow({"retry_from_execution_id": "src-1"})
+    graph = _two_branch_converge_graph("any", 1)
+    node = graph.get_node("join")
+    wf._retry_replay_candidates = {"join"}
+    wf._retry_converge_failure_reasons = {"join": failure_reason}
+    mock_wf.execute_activity = AsyncMock(return_value=None)
+
+    result = await wf._maybe_restore_retry_converge(node, {"strategy": "any", "n_required": 1}, graph)
+
+    assert result is None
+    if should_query_source:
+        mock_wf.execute_activity.assert_awaited_once()
+        assert mock_wf.execute_activity.await_args.args[0] == ActivityName.RETRY_CONVERGE_METADATA
+    else:
+        mock_wf.execute_activity.assert_not_called()
+    assert "join" not in wf._retry_replay_candidates
 
 
 # ---------------------------------------------------------------------------
@@ -605,8 +767,8 @@ def test_has_iteration_suffix(*, activity_name: str, expected: bool) -> None:
 
 def _chain_graph(*, cof_nodes: set[str] | None = None) -> WorkflowGraph:
     """Build trigger -> step_1 -> step_2 -> step_3, optionally with CoF on some nodes."""
-    from syntara.workflows.workflow_engine.graph import WorkflowGraph
-    from syntara.workflows.workflow_engine.graph_backend import InMemoryGraphBackend
+    from syntara.workflow_core.graph import WorkflowGraph
+    from syntara.workflow_core.graph_backend import InMemoryGraphBackend
 
     cof_nodes = cof_nodes or set()
     backend = InMemoryGraphBackend()
@@ -693,8 +855,8 @@ def test_control_nodes_are_never_restored(node_type: str) -> None:
     downstream expressions would resolve against a namespace the retry never
     populated.
     """
-    from syntara.workflows.workflow_engine.graph import WorkflowGraph
-    from syntara.workflows.workflow_engine.graph_backend import InMemoryGraphBackend
+    from syntara.workflow_core.graph import WorkflowGraph
+    from syntara.workflow_core.graph_backend import InMemoryGraphBackend
 
     backend = InMemoryGraphBackend()
     backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
@@ -745,8 +907,8 @@ def _loop_graph() -> WorkflowGraph:
     ``iterate`` port, with the feedback edges stripped at graph build time. The
     loop itself exits to ``step_2`` via its ``complete`` port.
     """
-    from syntara.workflows.workflow_engine.graph import WorkflowGraph
-    from syntara.workflows.workflow_engine.graph_backend import InMemoryGraphBackend
+    from syntara.workflow_core.graph import WorkflowGraph
+    from syntara.workflow_core.graph_backend import InMemoryGraphBackend
 
     backend = InMemoryGraphBackend()
     backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
@@ -815,8 +977,8 @@ async def test_restoring_a_loop_body_uses_its_canonical_temporal_path(mock_wf: M
 
 def test_a_loop_node_uses_its_probe_instead_of_generic_node_restoration() -> None:
     """The loop must reach its executor so it can probe each source iteration."""
-    from syntara.workflows.workflow_engine.models.workflow_definition import NodeType
-    from syntara.workflows.workflow_engine.retry_mixin import _CONTROL_NODE_TYPES_FOR_RETRY
+    from syntara.workflow_core.models import NodeType
+    from syntara.workflow_runtime.engines.temporal.retry_mixin import _CONTROL_NODE_TYPES_FOR_RETRY
 
     wf = _make_workflow(_retry("step_2"))
     graph = _loop_graph()
@@ -844,6 +1006,23 @@ def test_non_loop_successors_of_a_loop_stay_restorable() -> None:
     assert downstream._should_restore_node("body_a", graph) is True
     assert downstream._should_restore_node("body_b", graph) is False
     assert restorable == {"body_a", "loop_1", "step_2"}
+
+
+def test_skipped_loop_successors_run_after_retrying_a_body_failure() -> None:
+    """A body failure can leave completion successors skipped before they run."""
+    downstream = _make_workflow(_retry("body_b"))
+    graph = _loop_graph()
+    downstream._loop_bodies = {"loop_1": {"body_a", "body_b"}}
+    downstream._retry_source_statuses = {
+        "body_a": ActivityStatus.COMPLETED.value,
+        "body_b": ActivityStatus.FAILED.value,
+        "step_2": ActivityStatus.SKIPPED.value,
+    }
+
+    restorable = downstream._retry_restorable_nodes(graph)
+
+    assert "step_2" not in restorable
+    assert downstream._should_restore_node("step_2", graph) is False
 
 
 # ---------------------------------------------------------------------------
@@ -1207,7 +1386,7 @@ class TestReplayedTimestampUpdateHandler:
             seen["timeout"] = timeout
 
         with patch(
-            "syntara.workflows.workflow_engine.dynamic_workflow.workflow.wait_condition",
+            "syntara.workflow_runtime.engines.temporal.dynamic_workflow.workflow.wait_condition",
             _wait,
         ):
             result = await cast("Any", wf).get_replayed_node_timestamps_when_ready(activity_id)
@@ -1459,8 +1638,8 @@ async def test_restored_unselected_failure_replays_exclusive_recorded_successor(
     import asyncio
     from unittest.mock import AsyncMock
 
-    from syntara.workflows.workflow_engine.graph import WorkflowGraph
-    from syntara.workflows.workflow_engine.graph_backend import InMemoryGraphBackend
+    from syntara.workflow_core.graph import WorkflowGraph
+    from syntara.workflow_core.graph_backend import InMemoryGraphBackend
 
     backend = InMemoryGraphBackend()
     backend.add_node("east", {"id": "east", "type": "script", "parameters": {}})
@@ -1724,8 +1903,8 @@ async def test_a_restored_completion_does_not_stash_its_output_as_failure_fallba
 
 def _converge_fanin_graph() -> WorkflowGraph:
     """b1 and b2 both feed join (converge, strategy=any, n=2), then step_3."""
-    from syntara.workflows.workflow_engine.graph import WorkflowGraph
-    from syntara.workflows.workflow_engine.graph_backend import InMemoryGraphBackend
+    from syntara.workflow_core.graph import WorkflowGraph
+    from syntara.workflow_core.graph_backend import InMemoryGraphBackend
 
     backend = InMemoryGraphBackend()
     backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
@@ -1778,8 +1957,8 @@ class TestConvergeAlwaysGoesThroughItsGate:
 
 def _approval_graph() -> WorkflowGraph:
     """Trigger -> approval -> (approved | rejected) -> failed_step."""
-    from syntara.workflows.workflow_engine.graph import WorkflowGraph
-    from syntara.workflows.workflow_engine.graph_backend import InMemoryGraphBackend
+    from syntara.workflow_core.graph import WorkflowGraph
+    from syntara.workflow_core.graph_backend import InMemoryGraphBackend
 
     backend = InMemoryGraphBackend()
     backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
@@ -1839,7 +2018,7 @@ def test_a_restored_approval_would_schedule_both_of_its_branches() -> None:
     approval unsafe. If this ever starts returning one branch, the exclusion above is
     no longer strictly necessary, though it would still be the safer default.
     """
-    from syntara.workflows.workflow_engine.graph import ActivityNode
+    from syntara.workflow_core.graph import ActivityNode
 
     graph = _approval_graph()
     approval = ActivityNode("approval", "approval", {})
@@ -1855,7 +2034,7 @@ def test_a_wait_node_is_restored_rather_than_rerun() -> None:
     the full window again or skip it entirely depending on how far the clock has
     moved since. Restoring keeps what actually happened.
     """
-    from syntara.workflows.workflow_engine.models.workflow_definition import NodeType
+    from syntara.workflow_core.models import NodeType
 
     assert NodeType.WAIT not in _CONTROL_NODE_TYPES_FOR_RETRY
     assert NodeType.APPROVAL not in _CONTROL_NODE_TYPES_FOR_RETRY

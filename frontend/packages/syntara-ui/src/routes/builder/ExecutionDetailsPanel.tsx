@@ -200,6 +200,7 @@ function ThreePanelLayout({
               executionId={executionId}
               stepState={selectedNodeState}
               stepType={selectedNodeType}
+              replayBaselineAt={replayBaselineAt}
               retryInputOverride={retryInputOverride}
             />
           ) : (
@@ -411,15 +412,14 @@ export function ExecutionDetailsPanel({
   const hasFilteredOutActivities = hasActiveFilters && activityOrder.length > 0
   const showFilters = activityOrder.length > 0 || hasActiveFilters
 
-  const { resolvedNodeId, effectiveKey, displayStepName, selectedNodeState, selectedNodeType, handleRowClick } =
-    useSelectedActivity({
-      selectedNodeId,
-      selectedNodeNameProp,
-      activityStates,
-      activityOrder,
-      nameMap,
-      onNodeSelect,
-    })
+  const { effectiveKey, displayStepName, selectedNodeState, selectedNodeType, handleRowClick } = useSelectedActivity({
+    selectedNodeId,
+    selectedNodeNameProp,
+    activityStates,
+    activityOrder,
+    nameMap,
+    onNodeSelect,
+  })
 
   const effectiveViewMode: ViewMode = retryMode ? retryModeViewMode : viewMode
 
@@ -459,7 +459,7 @@ export function ExecutionDetailsPanel({
         showFilters={showFilters}
         filters={filters}
         onFilterChange={handleFilterChange}
-        selectedNodeId={resolvedNodeId}
+        selectedNodeId={effectiveKey}
         detailNodeId={effectiveKey}
         displayStepName={displayStepName}
         executionId={executionId}
@@ -493,7 +493,7 @@ export function ExecutionDetailsPanel({
       viewMode={effectiveViewMode}
       onViewModeChange={handleViewModeChange}
       onRowClick={handleRowClick}
-      selectedNodeId={resolvedNodeId}
+      selectedNodeId={effectiveKey}
       headerLabel={headerLabel}
       onClosePanel={onClosePanel}
       replayBaselineAt={replayBaselineAt}

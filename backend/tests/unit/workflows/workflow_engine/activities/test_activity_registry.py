@@ -2,11 +2,11 @@
 
 from typing import ClassVar
 
-from syntara.workflows.seed_builtin import _BUILTIN_DEFINITIONS
-from syntara.workflows.workflow_engine.activities.registry import (
+from syntara.workflow_runtime.engines.temporal.activities.registry import (
     ACTIVITY_REGISTRY,
     BACKGROUND_ACTIVITY_REGISTRY,
 )
+from syntara.workflows.seed_builtin import _BUILTIN_DEFINITIONS
 
 
 class TestBackgroundActivityRegistry:

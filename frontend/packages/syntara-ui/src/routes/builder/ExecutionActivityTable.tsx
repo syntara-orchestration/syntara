@@ -9,11 +9,10 @@ import { SynScrollableTableContainer } from '../../components/table/SynScrollabl
 import { extractAAPJobUrl, isAAPNodeType } from '../../utils/aapJobUrl'
 import { formatElapsedTime } from '../../utils/dateUtils'
 import type { ActivityState } from '../workflows/execution/types'
-import { parseCompositeKey } from '../workflows/execution/utils/activityState'
 
 import { ActivityStatusLabel } from './ExecutionStatus'
 import { ACTIVITY_STATUS } from './utils/executionState/executionHelpers'
-import { isReplayedStep } from './utils/replayedNodes'
+import { getRetryActivityMarkers } from './utils/replayedNodes'
 
 function parseTimeMs(value: string | null | undefined): number | null {
   if (value == null) return null
@@ -131,7 +130,7 @@ function ActivityRow({
   const displayName = name ?? id
   const jobUrl = isAAPNodeType(type) ? extractAAPJobUrl(state?.outputData) : null
   const columnCount = hasAAPColumn ? 6 : 5
-  const replayed = isReplayedStep(state?.startedAt, replayBaselineAt, state?.status)
+  const { replayed, retainedFailure, triggerInputReused } = getRetryActivityMarkers(state, replayBaselineAt, type)
 
   return (
     <Fragment>
@@ -145,7 +144,13 @@ function ActivityRow({
         <Td dataLabel="Ended">{state?.completedAt ? <ExecutionTimestamp dateString={state.completedAt} /> : DASH}</Td>
         <Td dataLabel="Elapsed time">{elapsedMs === undefined ? DASH : formatElapsedTime(elapsedMs)}</Td>
         <Td dataLabel="Status" modifier="nowrap">
-          <ActivityStatusLabel status={state?.status ?? 'pending'} nodeType={type} replayed={replayed} />
+          <ActivityStatusLabel
+            status={state?.status ?? 'pending'}
+            nodeType={type}
+            replayed={replayed}
+            retainedFailure={retainedFailure}
+            triggerInputReused={triggerInputReused}
+          />
         </Td>
         {hasAAPColumn && <Td dataLabel="AAP Job">{jobUrl ? <AAPJobLink url={jobUrl} /> : null}</Td>}
       </Tr>
@@ -170,7 +175,7 @@ export function ExecutionActivityTable({
   const hasAAPColumn = useMemo(() => activityOrder.some((a) => isAAPNodeType(a.type)), [activityOrder])
 
   return (
-    <SynScrollableTableContainer caption="Activity states" useFixedLayout={false} variant="compact">
+    <SynScrollableTableContainer caption="Activity states" useFixedLayout={false}>
       <Thead>
         <Tr>
           <Th modifier="nowrap">Name</Th>
@@ -192,7 +197,7 @@ export function ExecutionActivityTable({
             now={now}
             executionError={executionError}
             onRowClick={onRowClick}
-            isSelected={parseCompositeKey(id).baseId === selectedNodeId}
+            isSelected={id === selectedNodeId}
             hasAAPColumn={hasAAPColumn}
             replayBaselineAt={replayBaselineAt}
           />

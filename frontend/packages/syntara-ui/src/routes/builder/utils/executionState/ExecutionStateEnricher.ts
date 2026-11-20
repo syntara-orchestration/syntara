@@ -3,7 +3,7 @@ import { ActivityTypeEnum, EdgeHandleEnum, type Activity } from '@syntara/contra
 import type { ActivityState } from '../../../workflows/execution/types'
 import { buildLatestIterationMap } from '../../../workflows/execution/utils/activityState'
 import type { EdgeConnection } from '../../types/edge'
-import { isReplayedStep } from '../replayedNodes'
+import { isReplayedStep, isRetainedFailure, isReusedTriggerInput } from '../replayedNodes'
 
 import { ACTIVITY_STATUS, TERMINAL_ACTIVITY_STATUSES, isBranchHandle } from './executionHelpers'
 import { WorkflowTraversal } from './traversal'
@@ -18,6 +18,10 @@ export type ExecutionState = {
   error_details?: string
   /** True when this step reused a previous run's output instead of executing. */
   replayed?: boolean
+  /** True when a trigger ran again using input from the source run. */
+  triggerInputReused?: boolean
+  /** True when this failed step still shows the failure from the source run. */
+  retainedFailure?: boolean
 }
 
 function isConvergeSource(edge: { source: string }, activities?: Activity[]): boolean {
@@ -225,7 +229,18 @@ export class ExecutionStateEnricher {
           started_at: activityState.startedAt ?? undefined,
           completed_at: activityState.completedAt ?? undefined,
           error_details: activityState.errorDetails ?? undefined,
-          replayed: isReplayedStep(activityState.startedAt, replayBaselineAt, activityState.status),
+          replayed: isReplayedStep(activityState.startedAt, replayBaselineAt, activityState.status, {
+            nodeType: activity.type,
+          }),
+          retainedFailure: isRetainedFailure(
+            activityState.startedAt,
+            replayBaselineAt,
+            activityState.status,
+            activity.type
+          ),
+          ...(isReusedTriggerInput(activityState.startedAt, replayBaselineAt, activity.type) && {
+            triggerInputReused: true,
+          }),
         },
       }
 
@@ -262,9 +277,9 @@ export class ExecutionStateEnricher {
   /**
    * Enrich trigger node data with execution state.
    *
-   * Trigger status and source timestamps are read from `activityStates` using
-   * the trigger's real ID. Triggers execute again for retries, so their preserved
-   * source timestamps must not mark them as reused output.
+   * Trigger status and timestamps are read from `activityStates` using the
+   * trigger's real ID. Triggers execute again for retries, so their output is
+   * never marked as reused; the original input can still be identified.
    *
    * @param options - Trigger data and execution context used to enrich it
    * @returns Trigger data enriched with execution metadata
@@ -274,6 +289,7 @@ export class ExecutionStateEnricher {
     triggerData,
     executionStatus,
     activityStates,
+    replayBaselineAt,
   }: {
     triggerRealId: string | undefined
     triggerData: T
@@ -294,6 +310,8 @@ export class ExecutionStateEnricher {
       executionStatus === 'failed'
 
     const status = triggerState?.status ?? (executionHasStarted ? ACTIVITY_STATUS.COMPLETED : ACTIVITY_STATUS.PENDING)
+    const triggerType = typeof triggerData.triggerType === 'string' ? triggerData.triggerType : undefined
+    const triggerInputReused = isReusedTriggerInput(triggerState?.startedAt, replayBaselineAt, triggerType)
 
     return {
       ...triggerData,
@@ -307,6 +325,8 @@ export class ExecutionStateEnricher {
         completed_at: triggerState?.completedAt ?? undefined,
         error_details: triggerState?.errorDetails ?? undefined,
         replayed: false,
+        retainedFailure: false,
+        ...(triggerInputReused && { triggerInputReused: true }),
       },
     }
   }

@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 
-import { useAlerts } from '../providers/alerts'
+import { useAlerts } from '../providers/alerts/AlertContext'
 import {
   getErrorMessage,
   getErrorStatus,

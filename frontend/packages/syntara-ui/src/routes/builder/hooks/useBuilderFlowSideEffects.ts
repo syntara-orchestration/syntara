@@ -1,7 +1,7 @@
 import type { ReactFlowInstance } from '@xyflow/react'
 import type { Dispatch, RefObject, SetStateAction } from 'react'
 
-import { useAlerts } from '../../../providers/alerts'
+import { useAlerts } from '../../../providers/alerts/AlertContext'
 import { useWorkflowStoreActions } from '../../../stores/useWorkflowStore'
 import type { WorkflowDefinition } from '../../../stores/workflowStoreTypes'
 import type { NodeType } from '../../workflows/canvas/nodes/NodeType'

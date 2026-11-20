@@ -5,37 +5,39 @@ import json
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 from typing import Any
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import AsyncMock, Mock, call, patch
 from uuid import UUID, uuid4
 
 import pytest
+from sqlalchemy import Select
 from temporalio.api.enums.v1 import EventType
 from temporalio.client import WorkflowExecutionStatus, WorkflowQueryRejectedError
 from temporalio.exceptions import ApplicationError
 from temporalio.service import RPCError, RPCStatusCode
 
 from syntara.core.exceptions import SafeValueError
-from syntara.workflows.models.activity_execution import ActivityExecution, ActivityStatus
-from syntara.workflows.models.execution import Execution, ExecutionStatus
-from syntara.workflows.workflow_engine.activities.internal import register_activity_monitoring
-from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName, NodeType
-from syntara.workflows.workflow_engine.services.activity_execution_synchronizer import (
+from syntara.workflow_core.models import ActivityName, NodeType
+from syntara.workflow_runtime.engines.temporal.activities.internal import register_activity_monitoring
+from syntara.workflow_runtime.engines.temporal.services.activity_execution_sync import ActivityExecutionSyncMixin
+from syntara.workflow_runtime.engines.temporal.services.activity_execution_synchronizer import (
     ActivityExecutionSynchronizer,
 )
-from syntara.workflows.workflow_engine.services.activity_sync_service import (
+from syntara.workflow_runtime.engines.temporal.services.activity_sync_service import (
     _PENDING_ACTIVITY_STATE_STARTED as STARTED_STATE,
 )
-from syntara.workflows.workflow_engine.services.activity_sync_service import (
+from syntara.workflow_runtime.engines.temporal.services.activity_sync_service import (
     ActivitySyncService,
     ExecutionMonitorMetadata,
     SyntheticActivityStarted,
     SyntheticPartialOutput,
 )
-from syntara.workflows.workflow_engine.utils.loop_iteration_ids import retry_loop_record_activity_id
-from syntara.workflows.workflow_engine.utils.timeout_messages import (
+from syntara.workflow_runtime.engines.temporal.utils.loop_iteration_ids import retry_loop_record_activity_id
+from syntara.workflow_runtime.engines.utils.timeout_messages import (
     build_timeout_error_message,
     format_timeout_friendly,
 )
+from syntara.workflows.models.activity_execution import ActivityExecution, ActivityStatus
+from syntara.workflows.models.execution import Execution, ExecutionStatus
 
 
 def create_test_metadata(
@@ -206,7 +208,7 @@ class TestPublishHelpersTreatRedisFailureAsNonFatal:
         )
         execution.activities = []
 
-        with patch("syntara.workflows.workflow_engine.services.activity_sync_service.logger") as mock_logger:
+        with patch("syntara.workflow_runtime.engines.temporal.services.activity_sync_service.logger") as mock_logger:
             await service._publish_snapshot(execution, "initial_snapshot")  # does not raise
 
         mock_logger.exception.assert_called_once()
@@ -223,7 +225,7 @@ class TestPublishHelpersTreatRedisFailureAsNonFatal:
         service, mock_publisher = self._make_service(mock_session_factory)
         mock_publisher.publish_execution_patch.side_effect = RedisConnectionError("pool exhausted")
 
-        with patch("syntara.workflows.workflow_engine.services.activity_sync_service.logger") as mock_logger:
+        with patch("syntara.workflow_runtime.engines.temporal.services.activity_sync_service.logger") as mock_logger:
             await service._publish_execution_patch(uuid4(), [])  # does not raise
 
         mock_logger.exception.assert_called_once()
@@ -256,11 +258,11 @@ class TestRegisterActivityMonitoring:
 
         with (
             patch(
-                "syntara.workflows.workflow_engine.activities.internal.activity_monitoring.get_activity_sync_service",
+                "syntara.workflow_runtime.engines.temporal.activities.internal.activity_monitoring.get_activity_sync_service",
                 return_value=mock_sync_service,
             ),
             patch(
-                "syntara.workflows.workflow_engine.activities.internal.activity_monitoring.AsyncSessionLocal",
+                "syntara.workflow_runtime.engines.temporal.activities.internal.activity_monitoring.AsyncSessionLocal",
                 return_value=mock_session,
             ),
         ):
@@ -281,7 +283,7 @@ class TestRegisterActivityMonitoring:
         mock_sync_service.start_monitoring_execution = Mock()
 
         with patch(
-            "syntara.workflows.workflow_engine.activities.internal.activity_monitoring.get_activity_sync_service",
+            "syntara.workflow_runtime.engines.temporal.activities.internal.activity_monitoring.get_activity_sync_service",
             return_value=mock_sync_service,
         ):
             await register_activity_monitoring(execution_id, temporal_workflow_id)
@@ -314,15 +316,15 @@ class TestRegisterActivityMonitoring:
 
         with (
             patch(
-                "syntara.workflows.workflow_engine.activities.internal.activity_monitoring.get_activity_sync_service",
+                "syntara.workflow_runtime.engines.temporal.activities.internal.activity_monitoring.get_activity_sync_service",
                 return_value=mock_sync_service,
             ),
             patch(
-                "syntara.workflows.workflow_engine.activities.internal.activity_monitoring.AsyncSessionLocal",
+                "syntara.workflow_runtime.engines.temporal.activities.internal.activity_monitoring.AsyncSessionLocal",
                 return_value=mock_session,
             ),
             patch(
-                "syntara.workflows.workflow_engine.activities.internal.activity_monitoring.asyncio.sleep",
+                "syntara.workflow_runtime.engines.temporal.activities.internal.activity_monitoring.asyncio.sleep",
                 new_callable=AsyncMock,
             ),
         ):
@@ -350,15 +352,15 @@ class TestRegisterActivityMonitoring:
 
         with (
             patch(
-                "syntara.workflows.workflow_engine.activities.internal.activity_monitoring.get_activity_sync_service",
+                "syntara.workflow_runtime.engines.temporal.activities.internal.activity_monitoring.get_activity_sync_service",
                 return_value=mock_sync_service,
             ),
             patch(
-                "syntara.workflows.workflow_engine.activities.internal.activity_monitoring.AsyncSessionLocal",
+                "syntara.workflow_runtime.engines.temporal.activities.internal.activity_monitoring.AsyncSessionLocal",
                 return_value=mock_session,
             ),
             patch(
-                "syntara.workflows.workflow_engine.activities.internal.activity_monitoring.asyncio.sleep",
+                "syntara.workflow_runtime.engines.temporal.activities.internal.activity_monitoring.asyncio.sleep",
                 new_callable=AsyncMock,
             ),
         ):
@@ -375,7 +377,7 @@ class TestRegisterActivityMonitoring:
 
         with (
             patch(
-                "syntara.workflows.workflow_engine.activities.internal.activity_monitoring.get_activity_sync_service",
+                "syntara.workflow_runtime.engines.temporal.activities.internal.activity_monitoring.get_activity_sync_service",
                 return_value=None,
             ),
             pytest.raises(RuntimeError, match="Activity sync service not available"),
@@ -2589,6 +2591,34 @@ class TestExtractFailedActivitiesFromEvent:
         result = self.service._extract_failed_activities_from_event(event)
         assert result == {"loop-1": "exceeded max_iterations", "loop-2": "exceeded max_iterations"}
 
+    def test_extracts_failed_activity_inputs(self) -> None:
+        event = self._make_completed_event(
+            {
+                "failed_activity_inputs": {
+                    "rest-api": {"method": "GET", "credential_id": "[REDACTED]"},
+                    "malformed": "not a dict",
+                }
+            }
+        )
+
+        result = self.service._extract_failed_activity_inputs_from_event(event)
+
+        assert result == {"rest-api": {"method": "GET", "credential_id": "[REDACTED]"}}
+
+    def test_extracts_failed_activity_occurrences(self) -> None:
+        event = self._make_completed_event(
+            {
+                "failed_activity_occurrences": {
+                    "rest-api": "rest-api_iter_1",
+                    "malformed": 1,
+                }
+            }
+        )
+
+        result = self.service._extract_failed_activity_occurrences_from_event(event)
+
+        assert result == {"rest-api": "rest-api_iter_1"}
+
     def test_returns_empty_for_non_completed_event(self) -> None:
         event = Mock()
         event.event_type = EventType.EVENT_TYPE_WORKFLOW_EXECUTION_FAILED
@@ -2654,6 +2684,7 @@ class TestSyncNodesToTerminalStatus:
         activity.completed_at = None
         activity.error_details = None
         activity.updated_at = None
+        activity.input_data = {}
         return activity
 
     def _mock_session(
@@ -2690,15 +2721,274 @@ class TestSyncNodesToTerminalStatus:
         metadata = self._create_metadata(activity_index_map={"node-A": 0})
 
         handle = AsyncMock()
-        handle.query = AsyncMock(return_value={"node-A": "Key 'output' not found in namespace path"})
+        handle.query = AsyncMock(side_effect=[{"node-A": "Key 'output' not found in namespace path"}, None])
 
         result = await self.service._sync_failed_nodes(metadata, handle)
 
-        handle.query.assert_awaited_once_with("get_failed_nodes")
+        handle.query.assert_has_awaits([call("get_failed_nodes"), call("get_activity_input", "node-A")])
         assert activity.status == ActivityStatus.FAILED
         assert activity.completed_at is not None
         assert activity.error_details == "Key 'output' not found in namespace path"
         assert result == {"node-A": "Key 'output' not found in namespace path"}
+
+    @pytest.mark.asyncio
+    async def test_failed_converge_inputs_are_persisted_for_retry_review(self) -> None:
+        """Synthetic gate failures persist queried inputs on the activity record."""
+        activity = self._create_mock_activity_execution("converge_node")
+        self._mock_session([activity])
+        metadata = self._create_metadata(activity_index_map={"converge_node": 0})
+        metadata.activity_definitions_map = {"converge_node": {"type": "converge"}}
+        converge_inputs = {"strategy": "any", "n_required": 2, "wait_duration": 30}
+        handle = AsyncMock()
+        handle.query = AsyncMock(
+            side_effect=[{"converge_node": "branch failure made the gate impossible"}, converge_inputs]
+        )
+
+        result = await self.service._sync_failed_nodes(metadata, handle)
+
+        assert result == {"converge_node": "branch failure made the gate impossible"}
+        assert activity.status == ActivityStatus.FAILED
+        assert activity.input_data == converge_inputs
+        handle.query.assert_any_await("get_activity_input", "converge_node")
+
+    @pytest.mark.asyncio
+    async def test_failed_converge_input_query_error_does_not_block_failure_sync(self) -> None:
+        """An unavailable input query must not prevent a converge failure from syncing."""
+        activity = self._create_mock_activity_execution("converge_node")
+        self._mock_session([activity])
+        metadata = self._create_metadata(activity_index_map={"converge_node": 0})
+        metadata.activity_definitions_map = {"converge_node": {"type": "converge"}}
+        handle = AsyncMock()
+        input_query_error = RuntimeError("input query unavailable")
+        handle.query = AsyncMock(
+            side_effect=[{"converge_node": "branch failure made the gate impossible"}, input_query_error]
+        )
+
+        result = await self.service._sync_failed_nodes(metadata, handle)
+
+        assert result == {"converge_node": "branch failure made the gate impossible"}
+        assert activity.status == ActivityStatus.FAILED
+        assert activity.input_data == {}
+
+    @pytest.mark.asyncio
+    async def test_failed_http_node_persists_scrubbed_inputs_before_activity_starts(self) -> None:
+        """HTTP nodes failing during credential resolution retain their scrubbed inputs."""
+        from syntara.workflow_core.utils.credential_scrubber import REDACTED
+
+        activity = self._create_mock_activity_execution("rest-api")
+        activity.output_data = {"previous": "[REDACTED]"}
+        self._mock_session([activity])
+        metadata = self._create_metadata(activity_index_map={"rest-api": 0})
+        metadata.activity_definitions_map = {"rest-api": {"type": "http_request"}}
+        resolved_inputs = {
+            "method": "GET",
+            "url": "https://httpbin.org/anything",
+            "credential_id": REDACTED,
+        }
+        handle = AsyncMock()
+        handle.query = AsyncMock(side_effect=[{"rest-api": "Failed to decrypt credential"}, resolved_inputs])
+
+        await self.service._sync_failed_nodes(metadata, handle)
+
+        assert activity.status == ActivityStatus.FAILED
+        assert activity.input_data == resolved_inputs
+        assert activity.output_data == {"previous": "[REDACTED]"}
+        handle.query.assert_any_await("get_activity_input", "rest-api")
+
+    @pytest.mark.asyncio
+    async def test_failed_nodes_of_different_types_persist_available_inputs(self) -> None:
+        """Pre-activity failures persist inputs without a node-type-specific exception."""
+        approval = self._create_mock_activity_execution("approval")
+        script = self._create_mock_activity_execution("script")
+        self._mock_session([approval, script])
+        metadata = self._create_metadata(activity_index_map={"approval": 0, "script": 1})
+        metadata.activity_definitions_map = {
+            "approval": {"type": "approval"},
+            "script": {"type": "script"},
+        }
+        approval_inputs = {"decision_window": 60}
+        script_inputs = {"language": "python", "code": "print('hello')"}
+        handle = AsyncMock()
+        handle.query = AsyncMock(
+            side_effect=[
+                {"approval": "approval setup failed", "script": "script setup failed"},
+                approval_inputs,
+                script_inputs,
+            ]
+        )
+
+        await self.service._sync_failed_nodes(metadata, handle)
+
+        assert approval.input_data == approval_inputs
+        assert script.input_data == script_inputs
+
+    @pytest.mark.asyncio
+    async def test_failed_inputs_from_completion_event_persist_when_temporal_query_is_rejected(self) -> None:
+        """The completion payload restores inputs when closed workflows reject queries."""
+        activity = self._create_mock_activity_execution("rest-api")
+        self._mock_session([activity])
+        metadata = self._create_metadata(activity_index_map={"rest-api": 0})
+        handle = AsyncMock()
+        handle.query = AsyncMock(side_effect=RuntimeError("workflow is already closed"))
+        fallback_error = {"rest-api": "Failed to decrypt credential"}
+        fallback_inputs = {"rest-api": {"method": "GET", "credential_id": "[REDACTED]"}}
+
+        result = await self.service._sync_failed_nodes(
+            metadata,
+            handle,
+            fallback_failed_nodes=fallback_error,
+            fallback_input_data=fallback_inputs,
+        )
+
+        assert result is None
+        assert activity.status == ActivityStatus.FAILED
+        assert activity.error_details == "Failed to decrypt credential"
+        assert activity.input_data == fallback_inputs["rest-api"]
+
+    @pytest.mark.asyncio
+    async def test_missing_failed_loop_occurrence_is_created_from_completion_fallback(self) -> None:
+        """Closed-workflow fallback preserves a later loop failure as a separate row."""
+        completed = self._create_mock_activity_execution("rest-api", status=ActivityStatus.COMPLETED)
+        completed.temporal_activity_id = "rest-api_iter_0"
+        completed.node_type = NodeType.HTTP_REQUEST
+        completed.iteration = 0
+        completed.input_data = {"method": "GET", "url": "https://example.com/item-0"}
+        session = self._session_with_result([completed])
+        session.add = Mock()
+        self.mock_session_factory.side_effect = [self._session_context(session)]
+        metadata = self._create_metadata(activity_index_map={"rest-api": 0})
+        handle = AsyncMock()
+        handle.query = AsyncMock(side_effect=RuntimeError("workflow is already closed"))
+        fallback_error = {"rest-api": "Key 'host' not found"}
+        fallback_inputs = {"rest-api": {"method": "GET", "url": "https://example.com/${loop.item.host}"}}
+
+        result = await self.service._sync_failed_nodes(
+            metadata,
+            handle,
+            fallback_failed_nodes=fallback_error,
+            fallback_input_data=fallback_inputs,
+            fallback_occurrence_ids={"rest-api": "rest-api_iter_1"},
+        )
+
+        new_activity = session.add.call_args.args[0]
+        assert result is None
+        assert completed.status == ActivityStatus.COMPLETED
+        assert new_activity.activity_name == "rest-api#iter-1"
+        assert new_activity.temporal_activity_id == "rest-api_iter_1"
+        assert new_activity.status == ActivityStatus.FAILED
+        assert new_activity.error_details == "Key 'host' not found"
+        assert new_activity.input_data == fallback_inputs["rest-api"]
+
+    @pytest.mark.asyncio
+    async def test_already_failed_row_backfills_empty_inputs_without_changing_status(self) -> None:
+        """A Temporal-failed row with empty inputs still receives the completion-payload fallback."""
+        activity = self._create_mock_activity_execution("rest-api", status=ActivityStatus.FAILED)
+        activity.error_details = "Failed to decrypt credential"
+        activity.input_data = {}
+        session = self._session_with_result([activity])
+        self.mock_session_factory.side_effect = [self._session_context(session)]
+        metadata = self._create_metadata(activity_index_map={"rest-api": 0})
+        fallback_inputs = {"rest-api": {"method": "GET", "credential_id": "[REDACTED]"}}
+
+        await self.service._sync_nodes_to_terminal_status(
+            metadata,
+            ["rest-api"],
+            ActivityStatus.FAILED,
+            error_map={"rest-api": "expression fallback must not replace Temporal error"},
+            input_data_map=fallback_inputs,
+        )
+
+        assert activity.status == ActivityStatus.FAILED
+        assert activity.error_details == "Failed to decrypt credential"
+        assert activity.completed_at is None
+        assert activity.input_data == fallback_inputs["rest-api"]
+        session.commit.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_already_failed_row_keeps_existing_inputs(self) -> None:
+        """Backfill must not overwrite inputs Temporal already persisted on a FAILED row."""
+        existing_inputs = {"method": "POST", "url": "https://example.com"}
+        activity = self._create_mock_activity_execution("rest-api", status=ActivityStatus.FAILED)
+        activity.error_details = "HTTP 500"
+        activity.input_data = existing_inputs
+        session = self._session_with_result([activity])
+        self.mock_session_factory.side_effect = [self._session_context(session)]
+        metadata = self._create_metadata(activity_index_map={"rest-api": 0})
+
+        await self.service._sync_nodes_to_terminal_status(
+            metadata,
+            ["rest-api"],
+            ActivityStatus.FAILED,
+            error_map={"rest-api": "must not replace Temporal error"},
+            input_data_map={"rest-api": {"method": "GET"}},
+        )
+
+        assert activity.status == ActivityStatus.FAILED
+        assert activity.error_details == "HTTP 500"
+        assert activity.input_data == existing_inputs
+        session.commit.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_completed_row_is_not_backfilled_from_failed_input_map(self) -> None:
+        """Completed earlier iterations must keep their own inputs when a later occurrence fails."""
+        completed = self._create_mock_activity_execution("rest-api#iter-0", status=ActivityStatus.COMPLETED)
+        completed.input_data = {"method": "GET", "url": "https://example.com/item-0"}
+        failed = self._create_mock_activity_execution("rest-api#iter-1", status=ActivityStatus.FAILED)
+        failed.error_details = "Key 'host' not found"
+        failed.input_data = {}
+        session = self._session_with_result([completed, failed])
+        self.mock_session_factory.side_effect = [self._session_context(session)]
+        metadata = self._create_metadata(activity_index_map={"rest-api#iter-0": 0, "rest-api#iter-1": 1})
+        fallback_inputs = {"rest-api": {"method": "GET", "url": "https://example.com/${loop.item.host}"}}
+
+        await self.service._sync_nodes_to_terminal_status(
+            metadata,
+            ["rest-api"],
+            ActivityStatus.FAILED,
+            error_map={"rest-api": "Key 'host' not found"},
+            input_data_map=fallback_inputs,
+        )
+
+        assert completed.status == ActivityStatus.COMPLETED
+        assert completed.input_data == {"method": "GET", "url": "https://example.com/item-0"}
+        assert failed.status == ActivityStatus.FAILED
+        assert failed.error_details == "Key 'host' not found"
+        assert failed.input_data == fallback_inputs["rest-api"]
+
+    @pytest.mark.asyncio
+    async def test_missing_failed_loop_occurrence_creates_row_and_preserves_completed_row(self) -> None:
+        """A pre-dispatch loop failure gets its own row without changing an earlier success."""
+        completed = self._create_mock_activity_execution("rest-api", status=ActivityStatus.COMPLETED)
+        completed.temporal_activity_id = "rest-api_iter_0"
+        completed.node_type = NodeType.HTTP_REQUEST
+        completed.iteration = 0
+        completed.input_data = {"method": "GET", "url": "https://example.com/item-0"}
+        session = self._session_with_result([completed])
+        session.add = Mock()
+        self.mock_session_factory.side_effect = [self._session_context(session)]
+        metadata = self._create_metadata(activity_index_map={"rest-api": 0})
+        fallback_inputs = {"rest-api": {"method": "GET", "url": "https://example.com/${loop.item.host}"}}
+
+        await self.service._sync_nodes_to_terminal_status(
+            metadata,
+            ["rest-api"],
+            ActivityStatus.FAILED,
+            error_map={"rest-api": "Key 'host' not found"},
+            input_data_map=fallback_inputs,
+            occurrence_id_map={"rest-api": "rest-api_iter_1"},
+        )
+
+        new_activity = session.add.call_args.args[0]
+        assert completed.status == ActivityStatus.COMPLETED
+        assert completed.input_data == {"method": "GET", "url": "https://example.com/item-0"}
+        assert new_activity.activity_name == "rest-api#iter-1"
+        assert new_activity.temporal_activity_id == "rest-api_iter_1"
+        assert new_activity.status == ActivityStatus.FAILED
+        assert new_activity.error_details == "Key 'host' not found"
+        assert new_activity.input_data == fallback_inputs["rest-api"]
+        assert new_activity.iteration == 1
+        session.commit.assert_awaited_once()
+        self.mock_activity_publisher.publish_activity_patch.assert_awaited_once()
 
     @pytest.mark.asyncio
     async def test_retry_converge_failure_uses_current_run_timestamp(self) -> None:
@@ -2766,10 +3056,11 @@ class TestSyncNodesToTerminalStatus:
 
         handle = AsyncMock()
         handle.query = AsyncMock(
-            return_value={
-                "node-A": "Key 'output' not found",
-                "node-B": "Namespace 'missing' not found",
-            }
+            side_effect=[
+                {"node-A": "Key 'output' not found", "node-B": "Namespace 'missing' not found"},
+                None,
+                None,
+            ]
         )
 
         await self.service._sync_failed_nodes(metadata, handle)
@@ -2801,7 +3092,7 @@ class TestSyncNodesToTerminalStatus:
         metadata = self._create_metadata()
 
         handle = AsyncMock()
-        handle.query = AsyncMock(return_value={"node-A": "some error"})
+        handle.query = AsyncMock(side_effect=[{"node-A": "some error"}, None])
 
         await self.service._sync_failed_nodes(metadata, handle)
 
@@ -2820,7 +3111,7 @@ class TestSyncNodesToTerminalStatus:
         metadata = self._create_metadata()
 
         handle = AsyncMock()
-        handle.query = AsyncMock(return_value={"node-A": "Key 'output' not found in namespace path"})
+        handle.query = AsyncMock(side_effect=[{"node-A": "Key 'output' not found in namespace path"}, None])
 
         with patch.object(self.service, "_publish_activity_patches", new_callable=AsyncMock) as mock_publish:
             await self.service._sync_failed_nodes(metadata, handle)
@@ -2836,7 +3127,7 @@ class TestSyncNodesToTerminalStatus:
         metadata = self._create_metadata(activity_index_map={"node-A": 0})
 
         handle = AsyncMock()
-        handle.query = AsyncMock(return_value={"node-A": "expression error"})
+        handle.query = AsyncMock(side_effect=[{"node-A": "expression error"}, None])
 
         with patch.object(self.service, "_publish_activity_patches", new_callable=AsyncMock) as mock_publish:
             await self.service._sync_failed_nodes(metadata, handle)
@@ -3080,7 +3371,7 @@ class TestInputDataCredentialScrubbing(TestActivitySyncTerminalCleanup):
     @pytest.mark.asyncio
     async def test_scrubbed_credential_fields_persisted(self) -> None:
         """Pre-scrubbed input data from the workflow query should be persisted as-is."""
-        from syntara.workflows.workflow_engine.utils.credential_scrubber import REDACTED
+        from syntara.workflow_core.utils.credential_scrubber import REDACTED
 
         activity = self._create_mock_activity_execution(activity_name="approval-node")
         self._mock_session_with_activities([activity])
@@ -3314,7 +3605,8 @@ class TestScheduleDescribeProbe:
         queue: asyncio.Queue[Any] = asyncio.Queue()
 
         with patch(
-            "syntara.workflows.workflow_engine.services.activity_sync_service.asyncio.sleep", new_callable=AsyncMock
+            "syntara.workflow_runtime.engines.temporal.services.activity_sync_service.asyncio.sleep",
+            new_callable=AsyncMock,
         ):
             await self.service._schedule_describe_probe(
                 handle=mock_handle,
@@ -3349,7 +3641,8 @@ class TestScheduleDescribeProbe:
         queue: asyncio.Queue[Any] = asyncio.Queue()
 
         with patch(
-            "syntara.workflows.workflow_engine.services.activity_sync_service.asyncio.sleep", new_callable=AsyncMock
+            "syntara.workflow_runtime.engines.temporal.services.activity_sync_service.asyncio.sleep",
+            new_callable=AsyncMock,
         ):
             await self.service._schedule_describe_probe(
                 handle=mock_handle,
@@ -3376,7 +3669,8 @@ class TestScheduleDescribeProbe:
         queue: asyncio.Queue[Any] = asyncio.Queue()
 
         with patch(
-            "syntara.workflows.workflow_engine.services.activity_sync_service.asyncio.sleep", new_callable=AsyncMock
+            "syntara.workflow_runtime.engines.temporal.services.activity_sync_service.asyncio.sleep",
+            new_callable=AsyncMock,
         ):
             await self.service._schedule_describe_probe(
                 handle=mock_handle,
@@ -3413,7 +3707,8 @@ class TestScheduleDescribeProbe:
         queue: asyncio.Queue[Any] = asyncio.Queue()
 
         with patch(
-            "syntara.workflows.workflow_engine.services.activity_sync_service.asyncio.sleep", new_callable=AsyncMock
+            "syntara.workflow_runtime.engines.temporal.services.activity_sync_service.asyncio.sleep",
+            new_callable=AsyncMock,
         ):
             await self.service._schedule_describe_probe(
                 handle=mock_handle,
@@ -3441,7 +3736,8 @@ class TestScheduleDescribeProbe:
         queue: asyncio.Queue[Any] = asyncio.Queue()
 
         with patch(
-            "syntara.workflows.workflow_engine.services.activity_sync_service.asyncio.sleep", new_callable=AsyncMock
+            "syntara.workflow_runtime.engines.temporal.services.activity_sync_service.asyncio.sleep",
+            new_callable=AsyncMock,
         ):
             await self.service._schedule_describe_probe(
                 handle=mock_handle,
@@ -3477,7 +3773,7 @@ class TestScheduleDescribeProbe:
     @pytest.mark.asyncio
     async def test_partial_output_is_scrubbed_at_source(self) -> None:
         """Partial output containing credential fields should be scrubbed before entering the queue."""
-        from syntara.workflows.workflow_engine.utils.credential_scrubber import REDACTED
+        from syntara.workflow_core.utils.credential_scrubber import REDACTED
 
         pa = self._make_started_pa_with_heartbeat(
             partial_output={"job_id": 42, "bearer_token": "sk-secret-123"},
@@ -3490,7 +3786,7 @@ class TestScheduleDescribeProbe:
         queue: asyncio.Queue[Any] = asyncio.Queue()
 
         with patch(
-            "syntara.workflows.workflow_engine.services.activity_sync_service.asyncio.sleep",
+            "syntara.workflow_runtime.engines.temporal.services.activity_sync_service.asyncio.sleep",
             new_callable=AsyncMock,
         ):
             await self.service._schedule_describe_probe(
@@ -3827,15 +4123,25 @@ class TestProcessHistoryEvent:
 
     @pytest.mark.asyncio
     async def test_sync_failed_nodes_none_falls_back_to_event_extraction(self) -> None:
-        """When _sync_failed_nodes returns None, _extract_failed_activities_from_event is used."""
+        """Completion fallback forwards the failed node, inputs, and loop occurrence ID."""
         event = self._create_event(EventType.EVENT_TYPE_WORKFLOW_EXECUTION_COMPLETED, event_id=20)
         fallback_map = {"node-X": "expression error"}
+        fallback_inputs = {"node-X": {"method": "GET"}}
+        fallback_occurrences = {"node-X": "node-X_iter_1"}
 
         with (
-            patch.object(self.service, "_sync_failed_nodes", new_callable=AsyncMock, return_value=None),
+            patch.object(self.service, "_sync_failed_nodes", new_callable=AsyncMock, return_value=None) as mock_failed,
             patch.object(
                 self.service, "_extract_failed_activities_from_event", return_value=fallback_map
             ) as mock_extract,
+            patch.object(
+                self.service, "_extract_failed_activity_inputs_from_event", return_value=fallback_inputs
+            ) as mock_extract_inputs,
+            patch.object(
+                self.service,
+                "_extract_failed_activity_occurrences_from_event",
+                return_value=fallback_occurrences,
+            ) as mock_extract_occurrences,
             patch.object(self.service, "_sync_skipped_nodes", new_callable=AsyncMock),
             patch.object(self.service, "_sync_detached_nodes", new_callable=AsyncMock),
             patch.object(self.service, "_update_execution_status_from_event", new_callable=AsyncMock) as mock_update,
@@ -3850,6 +4156,15 @@ class TestProcessHistoryEvent:
 
         assert result is True
         mock_extract.assert_called_once_with(event)
+        mock_extract_inputs.assert_called_once_with(event)
+        mock_extract_occurrences.assert_called_once_with(event)
+        mock_failed.assert_awaited_once_with(
+            self.metadata,
+            self.mock_handle,
+            fallback_failed_nodes=fallback_map,
+            fallback_input_data=fallback_inputs,
+            fallback_occurrence_ids=fallback_occurrences,
+        )
         mock_update.assert_called_once()
         passed_failed_map = mock_update.call_args[0][2]
         assert passed_failed_map == fallback_map
@@ -3957,7 +4272,7 @@ class TestProcessHistoryEvent:
     @pytest.mark.asyncio
     async def test_caps_probe_tasks(self) -> None:
         """Test that probe tasks are capped at _DESCRIBE_PROBE_MAX_TASKS."""
-        from syntara.workflows.workflow_engine.services.activity_sync_service import _DESCRIBE_PROBE_MAX_TASKS
+        from syntara.workflow_runtime.engines.temporal.services.activity_sync_service import _DESCRIBE_PROBE_MAX_TASKS
 
         # Fill probe_tasks with non-done tasks to hit the cap
         for _ in range(_DESCRIBE_PROBE_MAX_TASKS):
@@ -3992,7 +4307,7 @@ class TestProcessHistoryEvent:
     @pytest.mark.asyncio
     async def test_prunes_done_tasks_before_cap_check(self) -> None:
         """Test that completed probe tasks are pruned before checking the cap."""
-        from syntara.workflows.workflow_engine.services.activity_sync_service import _DESCRIBE_PROBE_MAX_TASKS
+        from syntara.workflow_runtime.engines.temporal.services.activity_sync_service import _DESCRIBE_PROBE_MAX_TASKS
 
         # Fill with done tasks
         for _ in range(_DESCRIBE_PROBE_MAX_TASKS):
@@ -4318,8 +4633,10 @@ class TestRunMonitorLoop:
 class TestMonitorExecutionRetry:
     """Tests for _monitor_execution retry logic with exponential backoff."""
 
-    _SLEEP_PATH = "syntara.workflows.workflow_engine.services.activity_sync_service.asyncio.sleep"
-    _RANDOM_PATH = "syntara.workflows.workflow_engine.services.activity_sync_monitor.secrets.SystemRandom.random"
+    _SLEEP_PATH = "syntara.workflow_runtime.engines.temporal.services.activity_sync_service.asyncio.sleep"
+    _RANDOM_PATH = (
+        "syntara.workflow_runtime.engines.temporal.services.activity_sync_monitor.secrets.SystemRandom.random"
+    )
 
     def setup_method(self) -> None:
         """Set up test fixtures."""
@@ -5466,6 +5783,63 @@ class TestReconcileStaleExecutions:
 
         mock_session.commit.assert_not_awaited()
 
+    def _make_paused_approval_execution(self) -> Mock:
+        """Create a mock execution PAUSED awaiting an approval decision."""
+        execution = Mock(spec=Execution)
+        execution.id = uuid4()
+        execution.temporal_workflow_id = f"workflow-{execution.id}"
+        execution.status = ExecutionStatus.PAUSED
+        execution.created_at = datetime(2026, 1, 1, tzinfo=UTC)
+        execution.activities = []
+        return execution
+
+    @staticmethod
+    def _status_query_matches(stmt: Select[tuple[Execution]], status: ExecutionStatus) -> bool:
+        """Return True if a status-filtering ``select(Execution)`` statement matches ``status``.
+
+        Compiles the real statement with literal binds so this holds regardless
+        of whether the filter is a plain equality, an ``IN`` clause, or an
+        ``OR`` chain of equalities.
+        """
+        compiled = str(stmt.compile(compile_kwargs={"literal_binds": True})).lower()
+        return f"'{status.value}'" in compiled
+
+    @pytest.mark.asyncio
+    async def test_paused_approval_execution_is_reconciled_after_worker_restart(self) -> None:
+        """A worker restart must not leave an approval-paused execution stuck forever.
+
+        The underlying Temporal workflow can finish (the approval gets decided
+        and downstream nodes run) while the worker that was monitoring it is
+        down. Startup reconciliation must bring a PAUSED execution's DB status
+        in line with Temporal's terminal status, the same way it already does
+        for RUNNING (see test_completed_workflow_updates_db above) — otherwise
+        the run is stuck showing "Paused - Pending Approval" forever even
+        though it finished.
+        """
+        service, mock_session, mock_client = self._make_service()
+        execution = self._make_paused_approval_execution()
+
+        mock_event = Mock()
+        mock_event.event_type = EventType.EVENT_TYPE_WORKFLOW_EXECUTION_COMPLETED
+        mock_event.event_time = datetime(2026, 1, 1, 0, 5, tzinfo=UTC)
+        mock_event.workflow_execution_completed_event_attributes = None
+        mock_client.get_workflow_handle = Mock(
+            return_value=self._make_temporal_handle("COMPLETED", events=[mock_event]),
+        )
+
+        async def _exec(stmt: Select[tuple[Execution]]) -> Mock:
+            result = Mock()
+            result.all.return_value = [execution] if self._status_query_matches(stmt, execution.status) else []
+            result.one_or_none.return_value = execution
+            return result
+
+        mock_session.exec = _exec
+
+        with patch.object(service, "_publish_snapshot", new_callable=AsyncMock):
+            await service.reconcile_stale_executions()
+
+        assert execution.status == ExecutionStatus.COMPLETED
+
 
 class TestQueryActivityIoOutputMerge:
     """Test _query_activity_io merges partial output with final output."""
@@ -5538,6 +5912,22 @@ class TestQueryActivityIoOutputMerge:
         )
 
         assert output_data == {"invocation_id": "abc-123"}
+
+    @pytest.mark.asyncio
+    async def test_queries_loop_iteration_with_named_args(self) -> None:
+        """Loop I/O queries pass both activity ID and iteration via ``args``."""
+        mock_handle = AsyncMock()
+        mock_handle.query.side_effect = [{"value": 2}, {"stdout": "2\\n"}]
+        activity_data: dict[str, Any] = {"status": ActivityStatus.COMPLETED, "iteration": 1}
+
+        input_data, output_data = await self.service._query_activity_io(mock_handle, "my-activity", activity_data, None)
+
+        assert input_data == {"value": 2}
+        assert output_data == {"stdout": "2\\n"}
+        assert mock_handle.query.await_args_list == [
+            call("get_activity_input", args=["my-activity", 1]),
+            call("get_activity_output", args=["my-activity", 1]),
+        ]
 
     @pytest.mark.asyncio
     async def test_completed_query_returns_output_skips_update(self) -> None:
@@ -5880,7 +6270,7 @@ class TestQueryActivityIoQueryFailure:
         )
         activity_data: dict[str, Any] = {"status": ActivityStatus.RUNNING}
 
-        with patch("syntara.workflows.workflow_engine.services.activity_execution_sync.logger") as mock_logger:
+        with patch("syntara.workflow_runtime.engines.temporal.services.activity_execution_sync.logger") as mock_logger:
             with pytest.raises(RPCError):
                 await self.service._query_activity_io(mock_handle, "my-activity", activity_data, None)
 
@@ -6512,13 +6902,16 @@ class TestReplayedNodeStateOverride:
         self.service._apply_replayed_state(
             {
                 "status": "skipped",
-                "started_at": datetime(2026, 1, 1, 0, 0, 0, tzinfo=UTC),
+                # A skipped source node never started; do not keep the replay
+                # activity's later start time beside this earlier completion.
+                "started_at": None,
                 "completed_at": datetime(2026, 1, 1, 0, 1, 0, tzinfo=UTC),
             },
             activity_data,
         )
 
         assert activity_data["status"] == ActivityStatus.SKIPPED
+        assert activity_data["started_at"] is None
         assert activity_data["completed_at"] == datetime(2026, 1, 1, 0, 1, 0, tzinfo=UTC)
 
     def test_apply_restores_an_unselected_failure_with_its_reason(self) -> None:
@@ -7104,3 +7497,25 @@ class TestInitializeMonitoringSetsRetryFlag:
         await service._initialize_monitoring(uuid4())
 
         handle.query.assert_awaited_once_with("is_retry_from_failure")
+
+
+class TestOccurrenceQueryId:
+    """Loop body I/O must be loaded from the Temporal ID, not the live canvas slot."""
+
+    def test_loop_body_uses_temporal_id(self) -> None:
+        assert (
+            ActivityExecutionSyncMixin._occurrence_query_id(
+                {"activity_id": "body", "temporal_activity_id": "body_iter_0"},
+                is_body_iteration=True,
+            )
+            == "body_iter_0"
+        )
+
+    def test_non_body_keeps_canvas_id(self) -> None:
+        assert (
+            ActivityExecutionSyncMixin._occurrence_query_id(
+                {"activity_id": "loop", "temporal_activity_id": "loop_iter_0"},
+                is_body_iteration=False,
+            )
+            == "loop"
+        )
