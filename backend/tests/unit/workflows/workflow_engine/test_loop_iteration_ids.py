@@ -4,8 +4,11 @@ from unittest.mock import patch
 
 from syntara.workflow_runtime.engines.temporal.utils.loop_iteration_ids import (
     approval_temporal_activity_id,
+    canonical_loop_iteration_id,
     innermost_iteration_index,
+    iteration_indices,
     join_loop_iteration_id,
+    legacy_loop_iteration_id,
     loop_body_temporal_activity_id,
     loop_control_activity_id,
     loop_index_chain,
@@ -43,6 +46,15 @@ def test_loop_iteration_path_extracts_all_suffixes() -> None:
     assert loop_iteration_path("approval") == []
     assert loop_iteration_path("approval_iter_3") == [3]
     assert loop_iteration_path("approval_iter_2_iter_0") == [2, 0]
+    assert strip_loop_iteration_suffixes("approval#iter-2#iter-0") == "approval"
+    assert loop_iteration_path("approval#iter-2#iter-0") == [2, 0]
+    assert iteration_indices("approval#iter-2#iter-0") == [2, 0]
+    assert loop_iteration_path("approval_iter_2#iter-0") == [2, 0]
+
+
+def test_legacy_and_canonical_loop_ids_normalize_to_each_other() -> None:
+    assert canonical_loop_iteration_id("approval#iter-2#iter-0") == "approval_iter_2_iter_0"
+    assert legacy_loop_iteration_id("approval_iter_2_iter_0") == "approval#iter-2#iter-0"
 
 
 def test_join_loop_iteration_id() -> None:
@@ -166,9 +178,14 @@ def test_loop_body_temporal_id_uses_full_path() -> None:
     assert loop_body_temporal_activity_id("step", body_map, control) == "step_iter_2_iter_0"
 
 
-def test_loop_body_temporal_id_always_uses_the_full_path() -> None:
+def test_loop_body_temporal_id_preserves_in_flight_activity_ids() -> None:
     body_map = {"step": "inner", "inner": "outer"}
     control = {"outer": {"current_index": 2}, "inner": {"current_index": 4}}
+    with patch(
+        "syntara.workflow_runtime.engines.temporal.utils.loop_iteration_ids.use_unique_loop_iteration_ids",
+        return_value=False,
+    ):
+        assert loop_body_temporal_activity_id("step", body_map, control) == "step"
     assert loop_body_temporal_activity_id("step", body_map, control) == "step_iter_2_iter_4"
 
 

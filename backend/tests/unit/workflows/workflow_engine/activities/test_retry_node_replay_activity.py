@@ -21,6 +21,7 @@ from syntara.workflow_runtime.engines.temporal.activities.retry_node_replay_acti
     retry_control_ports,
 )
 from syntara.workflow_runtime.engines.temporal.constants import RESTORABLE_SOURCE_STATUSES
+from syntara.workflow_runtime.engines.temporal.utils.loop_iteration_ids import loop_iteration_id_aliases
 from syntara.workflows.models.activity_execution import ActivityStatus
 
 
@@ -65,10 +66,11 @@ async def _run(
     temporal_activity_id: str | None = None,
 ) -> dict[str, Any] | None:
     # The mock session does not execute SQL, so apply its predicates here: row
-    # identity is the canonical Temporal ID, never the display activity name.
+    # identity is an exact canonical or legacy Temporal ID, never the display name.
     wanted = temporal_activity_id or (node_id.strip() if node_id else "")
+    wanted_ids = loop_iteration_id_aliases(wanted)
     matching_rows = [
-        row for row in rows if row.status in RESTORABLE_SOURCE_STATUSES and row.temporal_activity_id == wanted
+        row for row in rows if row.status in RESTORABLE_SOURCE_STATUSES and row.temporal_activity_id in wanted_ids
     ]
     session = _mock_session(matching_rows)
 
@@ -229,8 +231,29 @@ async def test_an_iteration_row_is_matched_only_by_its_temporal_activity_id() ->
 
 
 @pytest.mark.asyncio
+async def test_a_legacy_iteration_id_restores_only_the_exact_legacy_occurrence() -> None:
+    rows = [
+        _Row(
+            "step_1#iter-1",
+            ActivityStatus.COMPLETED,
+            {"result": "legacy-iter-1"},
+        ),
+        _Row(
+            "step_1#iter-2",
+            ActivityStatus.COMPLETED,
+            {"result": "legacy-iter-2"},
+        ),
+    ]
+
+    restored = await _run(rows, "step_1#iter-1", temporal_activity_id="step_1_iter_1")
+
+    assert restored is not None
+    assert restored["output_data"] == {"result": "legacy-iter-1"}
+
+
+@pytest.mark.asyncio
 async def test_the_lookup_filters_by_temporal_id_in_the_query() -> None:
-    """The canonical ID predicate belongs in the query, not in Python.
+    """The exact occurrence-ID predicate belongs in the query, not in Python.
 
     This activity runs once per restored node. Reading the run's completed rows
     and filtering in Python made each call cost the whole execution, and pulled
@@ -261,10 +284,11 @@ async def test_the_lookup_filters_by_temporal_id_in_the_query() -> None:
     assert len(captured) == 1
     statement = captured[0]
     sql = str(statement)
-    assert "activity_execution.temporal_activity_id = " in sql
+    assert "activity_execution.temporal_activity_id IN " in sql
     assert "activity_execution.activity_name =" not in sql
     assert "LIMIT" in sql.upper()
-    assert statement.compile().params["temporal_activity_id_1"] == "step_target"
+    params = statement.compile().params
+    assert "step_target" in str(params.values())
 
 
 @pytest.mark.asyncio
@@ -568,6 +592,13 @@ async def test_control_ports_keep_only_the_exact_iteration_path() -> None:
 
 
 @pytest.mark.asyncio
+async def test_control_ports_normalize_legacy_iteration_ids() -> None:
+    ports = await _run_ports([("cond_1#iter-2#iter-3", {"next_port": "true"})])
+
+    assert ports == {"cond_1_iter_2_iter_3": "true"}
+
+
+@pytest.mark.asyncio
 async def test_control_ports_skips_rows_with_no_port() -> None:
     """Control data without a next_port is left to the caller's inference."""
     ports = await _run_ports([("cond_1", {"other": 1}), ("sw_1", {"next_port": "a"})])
@@ -657,6 +688,29 @@ async def test_converge_metadata_returns_gate_and_branch_state() -> None:
     assert result["predecessors"]["b1"] == {"status": "completed", "result_digest": _result_digest({"v": 1})}
     # A branch with no stored output still reports its status, with a null digest.
     assert result["predecessors"]["b2"] == {"status": "failed", "result_digest": None}
+
+
+@pytest.mark.asyncio
+async def test_converge_metadata_reads_legacy_loop_occurrences() -> None:
+    rows = [
+        (
+            "join#iter-1",
+            ActivityStatus.COMPLETED,
+            {"strategy": "any", "n_required": 1},
+            {"branch_count": 1},
+            {"retry_gate_metadata": {"strategy": "any", "n_required": 1}},
+        ),
+        ("branch#iter-1", ActivityStatus.COMPLETED, {}, {"value": 1}, {}),
+    ]
+
+    result = await _run_metadata(rows, "join_iter_1", {"branch": "branch_iter_1"})
+
+    assert result is not None
+    assert result["converge"]["status"] == "completed"
+    assert result["predecessors"]["branch"] == {
+        "status": "completed",
+        "result_digest": _result_digest({"value": 1}),
+    }
 
 
 @pytest.mark.asyncio

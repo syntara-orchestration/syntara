@@ -597,6 +597,13 @@ def test_selected_failure_path_uses_the_full_temporal_id_not_the_display_counter
     assert wf._selected_failure_iteration_paths() == {"body_a": [[2, 1]]}
 
 
+def test_selected_failure_path_accepts_legacy_iteration_ids() -> None:
+    wf = _wf(retry_points=["body_a"], bodies={"outer": {"inner", "body_a"}, "inner": {"body_a"}})
+    wf._retry_source_temporal_statuses = {"body_a#iter-2#iter-1": "failed"}
+
+    assert wf._selected_failure_iteration_paths() == {"body_a": [[2, 1]]}
+
+
 def test_display_name_cannot_supply_a_missing_failure_iteration_path() -> None:
     wf = _wf(retry_points=["body_a"], bodies={"loop_1": {"body_a"}})
     wf._retry_source_statuses = {"body_a": "failed"}

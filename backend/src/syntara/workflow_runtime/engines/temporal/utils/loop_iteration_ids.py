@@ -19,7 +19,8 @@ Examples::
     inner_iter_1_iter_0         # nested loop control, outer 1, inner 0
 
 ``workflow.patched`` keeps in-flight executions on pre-upgrade Temporal IDs
-(canvas ID for loop-body approvals; own index only for nested loop control).
+(canvas IDs for ordinary loop-body activities and approvals; own index only for
+nested loop control). Parsers also accept legacy ``#iter-N`` row IDs.
 """
 
 from __future__ import annotations
@@ -60,31 +61,32 @@ def use_unique_loop_iteration_ids() -> bool:
     return workflow.patched(LOOP_ITERATION_UNIQUE_IDS_PATCH)
 
 
-_LOOP_ITER_CHAIN_RE = re.compile(r"(?:_iter_\d+)+$")
-_LOOP_ITER_CAPTURE_RE = re.compile(r"_iter_(\d+)$")
+_LOOP_ITERATION_SUFFIX_PATTERN = r"(?:_iter_|#iter-)\d+"
+_LOOP_ITER_CHAIN_RE = re.compile(rf"(?:{_LOOP_ITERATION_SUFFIX_PATTERN})+$")
+_LOOP_ITER_CAPTURE_RE = re.compile(r"(?:_iter_|#iter-)(\d+)$")
 
 
 def strip_loop_iteration_suffixes(activity_id: str) -> str:
-    """Return the canvas node ID, removing every trailing ``_iter_N`` suffix."""
+    """Return the canvas node ID, removing trailing canonical or legacy suffixes."""
     return _LOOP_ITER_CHAIN_RE.sub("", activity_id)
 
 
 def innermost_iteration_index(activity_id: str) -> int | None:
-    """Return the last ``_iter_N`` index, or None if the ID has no iteration suffix."""
+    """Return the last iteration index, or None if the ID has no iteration suffix."""
     match = _LOOP_ITER_CAPTURE_RE.search(activity_id)
     return int(match.group(1)) if match else None
 
 
 def iteration_indices(activity_id: str) -> list[int]:
-    """Return every loop index in a Temporal activity ID, outermost first."""
-    return [int(value) for value in re.findall(r"_iter_(\d+)", activity_id)]
+    """Return every loop index in a canonical or legacy activity ID, outermost first."""
+    return [int(value) for value in re.findall(r"(?:_iter_|#iter-)(\d+)", activity_id)]
 
 
 def loop_iteration_path(activity_id: str) -> list[int]:
-    """Return all trailing loop indices from an activity ID, outermost first."""
+    """Return trailing loop indices from a canonical or legacy activity ID."""
     base = strip_loop_iteration_suffixes(activity_id)
     suffix = activity_id[len(base) :]
-    return [int(index) for index in re.findall(r"_iter_(\d+)", suffix)]
+    return [int(index) for index in re.findall(r"(?:_iter_|#iter-)(\d+)", suffix)]
 
 
 def join_loop_iteration_id(node_id: str, indices: Sequence[int]) -> str:
@@ -92,6 +94,24 @@ def join_loop_iteration_id(node_id: str, indices: Sequence[int]) -> str:
     if not indices:
         return node_id
     return node_id + "".join(f"_iter_{i}" for i in indices)
+
+
+def canonical_loop_iteration_id(activity_id: str) -> str:
+    """Normalize a legacy ``#iter-N`` ID to the canonical ``_iter_N`` form."""
+    return join_loop_iteration_id(strip_loop_iteration_suffixes(activity_id), loop_iteration_path(activity_id))
+
+
+def legacy_loop_iteration_id(activity_id: str) -> str:
+    """Return the legacy activity-name form for a canonical or legacy occurrence ID."""
+    base = strip_loop_iteration_suffixes(activity_id)
+    return base + "".join(f"#iter-{index}" for index in loop_iteration_path(activity_id))
+
+
+def loop_iteration_id_aliases(activity_id: str) -> tuple[str, ...]:
+    """Return exact canonical and legacy IDs for the same loop occurrence."""
+    canonical_id = canonical_loop_iteration_id(activity_id)
+    legacy_id = legacy_loop_iteration_id(canonical_id)
+    return (canonical_id,) if canonical_id == legacy_id else (canonical_id, legacy_id)
 
 
 def loop_index_chain(
@@ -137,7 +157,13 @@ def loop_body_temporal_activity_id(
     loop_body_map: Mapping[str, str],
     node_control_data: Mapping[str, Mapping[str, Any]],
 ) -> str:
-    """Temporal ID for an ordinary activity, including its full loop path."""
+    """Temporal ID for an ordinary activity, including its full loop path.
+
+    Histories created before the unique-ID patch keep the canvas ID so replay
+    schedules the same Temporal command.
+    """
+    if not use_unique_loop_iteration_ids():
+        return node_id
     path = loop_index_chain(node_id, loop_body_map, node_control_data)
     return join_loop_iteration_id(node_id, path)
 

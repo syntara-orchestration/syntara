@@ -118,6 +118,22 @@ async def test_strips_the_iteration_suffix_so_a_loop_body_appears_once() -> None
 
 
 @pytest.mark.asyncio
+async def test_legacy_temporal_iteration_ids_are_returned_as_canonical_ids() -> None:
+    states, _ = await _run(
+        [
+            ("body#iter-1", "completed", "body#iter-1"),
+            ("body#iter-2", "failed", "body#iter-2"),
+        ]
+    )
+
+    assert states["activity_statuses"] == {"body": "failed"}
+    assert states["temporal_activity_statuses"] == {
+        "body_iter_1": "completed",
+        "body_iter_2": "failed",
+    }
+
+
+@pytest.mark.asyncio
 async def test_the_last_row_for_a_repeated_node_wins() -> None:
     """Ordering is by iteration then creation, so the newest attempt is the truth."""
     states, _ = await _run([("body#iter-1", "failed", "body_iter_1"), ("body#iter-2", "completed", "body_iter_2")])

@@ -31,7 +31,10 @@ with workflow.unsafe.imports_passed_through():
     from syntara.core.exceptions import SafeValueError
     from syntara.workflow_core.models import NodeType
     from syntara.workflow_runtime.engines.temporal.utils.loop_iteration_ids import (
+        canonical_loop_iteration_id,
         join_loop_iteration_id,
+        legacy_loop_iteration_id,
+        loop_iteration_id_aliases,
         strip_loop_iteration_suffixes,
     )
     from syntara.workflows.models.activity_execution import ActivityExecution, ActivityStatus
@@ -63,7 +66,8 @@ async def fetch_retry_converge_metadata_activity(
     if not source_execution_id or not converge_temporal_activity_id:
         return None
 
-    temporal_ids = {converge_temporal_activity_id, *predecessor_temporal_activity_ids.values()}
+    requested_temporal_ids = [converge_temporal_activity_id, *predecessor_temporal_activity_ids.values()]
+    temporal_ids = {alias for temporal_id in requested_temporal_ids for alias in loop_iteration_id_aliases(temporal_id)}
     rows_by_temporal_id: dict[str, tuple[Any, Any, Any, Any]] = {}
     async for session in get_db():
         rows = (
@@ -81,7 +85,7 @@ async def fetch_retry_converge_metadata_activity(
             )
         ).all()
         rows_by_temporal_id = {
-            temporal_id: (status, input_data, output_data, control_data)
+            canonical_loop_iteration_id(temporal_id): (status, input_data, output_data, control_data)
             for temporal_id, status, input_data, output_data, control_data in rows
             if temporal_id
         }
@@ -202,7 +206,7 @@ async def replay_retry_node_activity(
         query = select(ActivityExecution).where(ActivityExecution.execution_id == source_execution_id)
         if wanted_activity_id is not None:
             query = query.where(
-                ActivityExecution.temporal_activity_id == wanted_activity_id,
+                col(ActivityExecution.temporal_activity_id).in_(loop_iteration_id_aliases(wanted_activity_id)),
                 col(ActivityExecution.status).in_(RESTORABLE_SOURCE_STATUSES),
             )
         else:
@@ -294,8 +298,9 @@ async def fetch_retry_source_state_activity(source_execution_id: str) -> dict[st
         for status, temporal_activity_id in rows:
             if temporal_activity_id:
                 status_value = ActivityStatus(status).value
-                states[strip_loop_iteration_suffixes(temporal_activity_id)] = status_value
-                temporal_states[temporal_activity_id] = status_value
+                canonical_id = canonical_loop_iteration_id(temporal_activity_id)
+                states[strip_loop_iteration_suffixes(canonical_id)] = status_value
+                temporal_states[canonical_id] = status_value
 
         trigger_rows = (
             await session.exec(
@@ -361,7 +366,7 @@ async def retry_control_ports(source_execution_id: str) -> dict[str, str]:
                 continue
             port = control_data.get("next_port")
             if port and temporal_activity_id:
-                ports[temporal_activity_id] = str(port)
+                ports[canonical_loop_iteration_id(temporal_activity_id)] = str(port)
     return ports
 
 
@@ -385,10 +390,23 @@ async def probe_retry_loop_iteration(
     if not iterate_entry_node_ids and not child_loop_entry_ids:
         return False
 
-    exact_activity_ids = [join_loop_iteration_id(node_id, iteration_path) for node_id in iterate_entry_node_ids]
-    child_loop_prefixes = [
-        join_loop_iteration_id(node_id, iteration_path) + "_iter_" for node_id in child_loop_entry_ids
-    ]
+    exact_activity_ids = list(
+        dict.fromkeys(
+            alias
+            for node_id in iterate_entry_node_ids
+            for alias in loop_iteration_id_aliases(join_loop_iteration_id(node_id, iteration_path))
+        )
+    )
+    child_loop_prefixes = list(
+        dict.fromkeys(
+            prefix
+            for node_id in child_loop_entry_ids
+            for prefix in (
+                join_loop_iteration_id(node_id, iteration_path) + "_iter_",
+                legacy_loop_iteration_id(join_loop_iteration_id(node_id, iteration_path)) + "#iter-",
+            )
+        )
+    )
     async for session in get_db():
         direct_conditions: list[ColumnElement[bool]] = [
             col(ActivityExecution.temporal_activity_id).in_(exact_activity_ids)

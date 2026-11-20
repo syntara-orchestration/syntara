@@ -59,6 +59,16 @@ async def test_exact_full_path_record_means_iteration_was_reached_regardless_of_
 
 
 @pytest.mark.asyncio
+async def test_exact_full_path_probe_includes_legacy_iteration_ids() -> None:
+    answer, queries = await _run(["body_a"], [2, 3], found=[True])
+
+    assert answer is True
+    sql = _render(queries[0])
+    assert "body_a_iter_2_iter_3" in sql
+    assert "body_a#iter-2#iter-3" in sql
+
+
+@pytest.mark.asyncio
 async def test_missing_exact_path_is_not_iteration_evidence() -> None:
     answer, queries = await _run(["body_a"], [2], found=[False])
 
