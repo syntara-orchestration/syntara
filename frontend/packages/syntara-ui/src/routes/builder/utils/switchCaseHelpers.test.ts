@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { SWITCH_CASE_PORT_PREFIX, buildSwitchCasePort, isSwitchCasePort } from './switchCaseHelpers'
+import { SWITCH_CASE_PORT_PREFIX, buildSwitchCasePort, isSwitchCasePort, isValidSwitchPort } from './switchCaseHelpers'
 
 describe('SWITCH_CASE_PORT_PREFIX', () => {
   it('equals "case_"', () => {
@@ -54,4 +54,18 @@ describe('isSwitchCasePort', () => {
   it('returns false for source handle', () => {
     expect(isSwitchCasePort('source')).toBe(false)
   })
+})
+
+describe('isValidSwitchPort', () => {
+  it('accepts safe switch output handles', () => {
+    expect(isValidSwitchPort('case_0')).toBe(true)
+    expect(isValidSwitchPort('custom-default')).toBe(true)
+  })
+
+  it.each([null, '', 'contains a space', 'invalid/port', 'x'.repeat(101)])(
+    'rejects an invalid switch output handle: %s',
+    (port) => {
+      expect(isValidSwitchPort(port)).toBe(false)
+    }
+  )
 })

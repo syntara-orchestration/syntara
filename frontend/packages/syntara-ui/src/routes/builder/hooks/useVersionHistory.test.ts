@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { renderHook, act } from '@testing-library/react'
+import { renderHook, act, waitFor } from '@testing-library/react'
 import { createElement } from 'react'
 import type { ReactNode } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -9,6 +9,7 @@ import { workflowClient } from '../../../client'
 import { isVersionStatus, useVersionHistory } from './useVersionHistory'
 
 const mockMutate = vi.fn()
+const mockCheckBreakingChangesMutate = vi.fn()
 const mockRefetch = vi.fn()
 const mockShowSuccess = vi.fn()
 const mockShowError = vi.fn()
@@ -49,8 +50,8 @@ vi.mock('../../../client', () => ({
       data: opts.enabled ? { resources: mockVersions, next: mockNextCursor, prev: null, total: mockTotal } : undefined,
       refetch: mockRefetch,
     })),
-    useMutation: vi.fn(() => ({
-      mutate: mockMutate,
+    useMutation: vi.fn((_method: string, path: string) => ({
+      mutate: path.includes('/check_subworkflow_output_contract_changes') ? mockCheckBreakingChangesMutate : mockMutate,
       isPending: false,
     })),
   },
@@ -85,6 +86,14 @@ describe('useVersionHistory', () => {
     mockNextCursor = 'cursor-page-2'
     mockTotal = 45
     mockRefetch.mockResolvedValue({ data: { resources: mockVersions } })
+    mockCheckBreakingChangesMutate.mockImplementation(
+      (
+        _params: unknown,
+        callbacks?: {
+          onSuccess?: (response: { has_breaking_changes: boolean; triggers: [] }) => void
+        }
+      ) => callbacks?.onSuccess?.({ has_breaking_changes: false, triggers: [] })
+    )
     mockDownloadVersionExport.mockResolvedValue(undefined)
     queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
     mockVersions = [
@@ -389,7 +398,7 @@ describe('useVersionHistory', () => {
   })
 
   describe('publishVersion', () => {
-    it('calls publish mutation with correct params', () => {
+    it('checks output contracts then publishes with the selected version definition', async () => {
       const { result } = renderHook(() => useVersionHistory({ workflowId: 'wf-1', isNew: false }), {
         wrapper: makeWrapper(queryClient),
       })
@@ -398,6 +407,15 @@ describe('useVersionHistory', () => {
         result.current.publishVersion(2)
       })
 
+      await waitFor(() => expect(mockMutate).toHaveBeenCalled())
+
+      expect(mockCheckBreakingChangesMutate).toHaveBeenCalledWith(
+        {
+          params: { path: { workflow_id: 'wf-1' } },
+          body: { workflow_definition: { name: 'v2' } },
+        },
+        expect.objectContaining({ onSuccess: expect.any(Function) as unknown })
+      )
       expect(mockMutate).toHaveBeenCalledWith(
         {
           params: { path: { workflow_id: 'wf-1', version: 2 } },
@@ -410,7 +428,7 @@ describe('useVersionHistory', () => {
       )
     })
 
-    it('passes publishName and changeDescription when provided', () => {
+    it('passes publishName and changeDescription when provided', async () => {
       const { result } = renderHook(() => useVersionHistory({ workflowId: 'wf-1', isNew: false }), {
         wrapper: makeWrapper(queryClient),
       })
@@ -419,10 +437,15 @@ describe('useVersionHistory', () => {
         result.current.publishVersion(2, 'Release 1.0', 'First public release')
       })
 
+      await waitFor(() => expect(mockMutate).toHaveBeenCalled())
+
       expect(mockMutate).toHaveBeenCalledWith(
         {
           params: { path: { workflow_id: 'wf-1', version: 2 } },
-          body: { name: 'Release 1.0', change_description: 'First public release' },
+          body: {
+            name: 'Release 1.0',
+            change_description: 'First public release',
+          },
         },
         expect.objectContaining({
           onSuccess: expect.any(Function) as unknown,
@@ -431,7 +454,40 @@ describe('useVersionHistory', () => {
       )
     })
 
-    it('refetches versions and invalidates queries on publish success', () => {
+    it('waits for confirmation before publishing a breaking version', async () => {
+      mockCheckBreakingChangesMutate.mockImplementation(
+        (
+          _params: unknown,
+          callbacks?: {
+            onSuccess?: (response: {
+              has_breaking_changes: boolean
+              triggers: [{ trigger_id: string; trigger_name: string; changes: [] }]
+            }) => void
+          }
+        ) =>
+          callbacks?.onSuccess?.({
+            has_breaking_changes: true,
+            triggers: [{ trigger_id: 'child-trigger', trigger_name: 'Child trigger', changes: [] }],
+          })
+      )
+
+      const { result } = renderHook(() => useVersionHistory({ workflowId: 'wf-1', isNew: false }), {
+        wrapper: makeWrapper(queryClient),
+      })
+
+      act(() => result.current.publishVersion(2, 'Release'))
+
+      await waitFor(() => expect(result.current.breakingChanges).toHaveLength(1))
+
+      expect(result.current.breakingChanges).toHaveLength(1)
+      expect(mockMutate).not.toHaveBeenCalled()
+
+      act(() => result.current.confirmPublishVersion())
+
+      expect(mockMutate).toHaveBeenCalledOnce()
+    })
+
+    it('refetches versions and invalidates queries on publish success', async () => {
       mockMutate.mockImplementation((_params: unknown, callbacks?: { onSuccess?: () => void }) => {
         callbacks?.onSuccess?.()
       })
@@ -444,11 +500,13 @@ describe('useVersionHistory', () => {
         result.current.publishVersion(2)
       })
 
+      await waitFor(() => expect(mockRefetch).toHaveBeenCalled())
+
       expect(mockRefetch).toHaveBeenCalled()
       expect(mockShowSuccess).toHaveBeenCalledWith({ title: 'Version published' })
     })
 
-    it('calls onVersionUpdated when publish response includes current_version', () => {
+    it('calls onVersionUpdated when publish response includes current_version', async () => {
       const onVersionUpdated = vi.fn()
       mockMutate.mockImplementation(
         (_params: unknown, callbacks?: { onSuccess?: (data: { current_version: number }) => void }) => {
@@ -464,10 +522,12 @@ describe('useVersionHistory', () => {
         result.current.publishVersion(2)
       })
 
+      await waitFor(() => expect(onVersionUpdated).toHaveBeenCalledWith(9))
+
       expect(onVersionUpdated).toHaveBeenCalledWith(9)
     })
 
-    it('does not call onVersionUpdated when publish response omits current_version', () => {
+    it('does not call onVersionUpdated when publish response omits current_version', async () => {
       const onVersionUpdated = vi.fn()
       mockMutate.mockImplementation((_params: unknown, callbacks?: { onSuccess?: (data: object) => void }) => {
         callbacks?.onSuccess?.({})
@@ -480,6 +540,8 @@ describe('useVersionHistory', () => {
       act(() => {
         result.current.publishVersion(2)
       })
+
+      await waitFor(() => expect(mockMutate).toHaveBeenCalled())
 
       expect(onVersionUpdated).not.toHaveBeenCalled()
     })
@@ -496,7 +558,7 @@ describe('useVersionHistory', () => {
       expect(mockMutate).not.toHaveBeenCalled()
     })
 
-    it('shows success alert on publish success', () => {
+    it('shows success alert on publish success', async () => {
       mockMutate.mockImplementation((_params: unknown, callbacks?: { onSuccess?: () => void }) => {
         callbacks?.onSuccess?.()
       })
@@ -509,10 +571,12 @@ describe('useVersionHistory', () => {
         result.current.publishVersion(2)
       })
 
+      await waitFor(() => expect(mockShowSuccess).toHaveBeenCalledWith({ title: 'Version published' }))
+
       expect(mockShowSuccess).toHaveBeenCalledWith({ title: 'Version published' })
     })
 
-    it('shows error alert on publish failure', () => {
+    it('shows error alert on publish failure', async () => {
       const mockError = new Error('Publish failed')
       mockMutate.mockImplementation((_params: unknown, callbacks?: { onError?: (error: unknown) => void }) => {
         callbacks?.onError?.(mockError)
@@ -525,6 +589,8 @@ describe('useVersionHistory', () => {
       act(() => {
         result.current.publishVersion(2)
       })
+
+      await waitFor(() => expect(mockShowError).toHaveBeenCalled())
 
       expect(mockShowError).toHaveBeenCalledWith({
         title: 'Failed to publish version',

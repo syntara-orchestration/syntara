@@ -1317,4 +1317,87 @@ describe('TriggerNodeDetails Component', () => {
       expect(results).toHaveNoViolations()
     })
   })
+
+  describe('Sub-workflow Trigger', () => {
+    it('loads the declared output schema and mappings into form rows', () => {
+      const trigger = {
+        id: 'child_entry',
+        type: TriggerTypeEnum.SUBWORKFLOW_TRIGGER,
+        name: 'Child entry',
+        parameters: {
+          input_schema: { type: 'object', properties: { request_id: { type: 'string' } } },
+          output_schema: {
+            type: 'object',
+            properties: { status: { type: 'string', description: 'Run status' } },
+            required: ['status'],
+          },
+          output_mapping: { status: '${deploy.stdout}', ignored: 42 },
+        },
+      }
+
+      render(<TriggerNodeDetails trigger={trigger} triggerIndex={1} onClose={mockOnClose} />)
+
+      const initialData = JSON.parse(screen.getByTestId('initial-data').textContent ?? '{}') as Record<string, unknown>
+      expect(initialData).toMatchObject({
+        triggerId: 'child_entry',
+        triggerIndex: 1,
+        inputSchema:
+          '{\n  "type": "object",\n  "properties": {\n    "request_id": {\n      "type": "string"\n    }\n  }\n}',
+        outputMapping: { status: '${deploy.stdout}' },
+        outputFields: [
+          {
+            path: 'status',
+            type: 'string',
+            required: true,
+            description: 'Run status',
+            expression: '${deploy.stdout}',
+          },
+        ],
+      })
+    })
+
+    it('saves the public output contract on submit', async () => {
+      const user = userEvent.setup()
+      const formSpy = vi.spyOn(TriggerNodeFormModule, 'TriggerNodeForm')
+      formSpy.mockImplementation(({ onSubmit }) => (
+        <button
+          data-testid="submit-subworkflow-trigger"
+          onClick={() =>
+            onSubmit({
+              name: 'Child entry',
+              triggerType: TriggerTypeEnum.SUBWORKFLOW_TRIGGER,
+              inputSchema: '{"type":"object","properties":{"request_id":{"type":"string"}}}',
+              outputSchema: '{"type":"object","properties":{"status":{"type":"string"}}}',
+              outputMapping: { status: '${deploy.stdout}' },
+            })
+          }
+          type="button"
+        >
+          Submit
+        </button>
+      ))
+      const trigger = {
+        id: 'child_entry',
+        type: TriggerTypeEnum.SUBWORKFLOW_TRIGGER,
+        name: 'Child entry',
+        parameters: {},
+      }
+
+      render(<TriggerNodeDetails trigger={trigger} triggerIndex={0} onClose={mockOnClose} />)
+      await user.click(screen.getByTestId('submit-subworkflow-trigger'))
+
+      expect(mockUpdateTrigger).toHaveBeenCalledWith(0, {
+        id: 'child_entry',
+        type: TriggerTypeEnum.SUBWORKFLOW_TRIGGER,
+        name: 'Child entry',
+        parameters: {
+          input_schema: { type: 'object', properties: { request_id: { type: 'string' } } },
+          output_schema: { type: 'object', properties: { status: { type: 'string' } } },
+          output_mapping: { status: '${deploy.stdout}' },
+        },
+      })
+      expect(mockOnClose).toHaveBeenCalledOnce()
+      formSpy.mockRestore()
+    })
+  })
 })

@@ -11,7 +11,7 @@
         "type": "string",
         "maxLength": 36,
         "format": "uuid",
-        "description": "UUID of the selected child workflow in the same Project (latest published version)."
+        "description": "UUID of the selected child workflow in the same Project (latest published version per run)."
       },
       "trigger_node_id": {
         "type": "string",
@@ -34,33 +34,35 @@
     "$ref": "#/$defs/SubWorkflowOutput"
   },
   "$defs": {
-    "StandardOutputWrapper": {
-      "type": "object",
-      "description": "Standard output envelope for Step SDK. All step outputs follow this structure.",
-      "properties": {
-        "Result": {
-          "description": "Primary task return payload (type varies by step)"
-        },
-        "StatusCode": {
-          "type": ["integer", "null"],
-          "description": "Execution status code (0=success, non-zero=failure per POSIX convention)"
-        },
-        "StatusMessage": {
-          "type": ["string", "null"],
-          "maxLength": 500,
-          "description": "Human-readable status summary (max 500 chars)"
-        },
-        "ErrorMessage": {
-          "type": ["string", "null"],
-          "maxLength": 10000,
-          "description": "Detailed error diagnostics (max 10k chars)"
-        }
-      },
-      "additionalProperties": false
+    "JSONFloat": {
+      "type": "number"
     },
-    "SubWorkflowOutputResult": {
-      "type": ["object", "null"],
-      "description": "Child execution metadata for Sub-workflow steps.",
+    "JSONList": {
+      "items": {
+        "$ref": "#/$defs/JSONValue"
+      },
+      "type": "array"
+    },
+    "JSONObject": {
+      "additionalProperties": {
+        "$ref": "#/$defs/JSONValue"
+      },
+      "type": "object"
+    },
+    "JSONValue": {
+      "anyOf": [
+        { "type": "boolean" },
+        { "type": "integer" },
+        { "$ref": "#/$defs/JSONFloat" },
+        { "type": "string" },
+        { "$ref": "#/$defs/JSONList" },
+        { "$ref": "#/$defs/JSONObject" },
+        { "type": "null" }
+      ]
+    },
+    "SubWorkflowOutput": {
+      "type": "object",
+      "description": "Public Sub-workflow step result with child execution metadata and declared outputs, independent of the SDK/Execution Plane wrapper.",
       "properties": {
         "child_execution_id": {
           "type": ["string", "null"],
@@ -88,37 +90,9 @@
         },
         "outputs": {
           "type": ["object", "null"],
-          "description": "Child workflow terminal step outputs. Keys are child step IDs, values are StandardOutputWrapper envelopes. May be null if authorization denied.",
+          "description": "Values mapped to the selected SubWorkflow Trigger's declared public output contract. Internal child step names are not exposed.",
           "maxProperties": 1000,
-          "additionalProperties": {
-            "$ref": "#/$defs/StandardOutputWrapper"
-          }
-        }
-      },
-      "additionalProperties": false
-    },
-    "SubWorkflowOutput": {
-      "allOf": [
-        {
-          "$ref": "#/$defs/StandardOutputWrapper"
-        }
-      ],
-      "type": "object",
-      "description": "Output model for Sub-workflow steps. Follows StandardOutputWrapper structure with Result containing child execution metadata.",
-      "properties": {
-        "Result": {
-          "$ref": "#/$defs/SubWorkflowOutputResult"
-        },
-        "StatusCode": {
-          "type": ["integer", "null"]
-        },
-        "StatusMessage": {
-          "type": ["string", "null"],
-          "maxLength": 500
-        },
-        "ErrorMessage": {
-          "type": ["string", "null"],
-          "maxLength": 10000
+          "additionalProperties": { "$ref": "#/$defs/JSONValue" }
         }
       },
       "additionalProperties": false

@@ -52,12 +52,25 @@ describe('workflow invocation schema mock', () => {
                   properties: { username: { type: 'string' } },
                   required: ['username'],
                 },
+                output_schema: {
+                  type: 'object',
+                  properties: { release_tag: { type: 'string', description: 'Published release' } },
+                  required: ['release_tag'],
+                },
+                output_mapping: { release_tag: '${child_script.image_tag}' },
               },
             },
             { id: 'child_entry_secondary', type: 'subworkflow_trigger', parameters: {} },
           ],
-          nodes: [],
-          edges: [],
+          nodes: [
+            {
+              id: 'child_script',
+              type: 'script',
+              parameters: { language: 'python', code: "print('child')" },
+              outputs: { image_tag: '${result.stdout_json.tag}' },
+            },
+          ],
+          edges: [{ from: 'manual_entry', to: 'child_script' }],
         },
       }),
     })
@@ -80,6 +93,12 @@ describe('workflow invocation schema mock', () => {
     })
     expect(publishResponse.status).toBe(200)
 
+    const detailResponse = await fetch(`${baseUrl}/api/v1/workflows/${workflowId}`)
+    expect(detailResponse.status).toBe(200)
+    const detailResult: unknown = await detailResponse.json()
+    if (!isRecord(detailResult)) throw new Error('workflow detail response was not an object')
+    expect(detailResult).not.toHaveProperty('published_step_metadata')
+
     const response = await fetch(invocationSchemaUrl)
     expect(response.status).toBe(200)
     const result: unknown = await response.json()
@@ -87,6 +106,8 @@ describe('workflow invocation schema mock', () => {
       workflow_id: workflowId,
       published_version_id: expect.any(String),
       published_version: 1,
+      published_version_name: null,
+      published_version_created_at: expect.any(String),
       is_eligible: true,
       triggers: [
         {
@@ -96,6 +117,11 @@ describe('workflow invocation schema mock', () => {
             type: 'object',
             properties: { username: { type: 'string' } },
             required: ['username'],
+          },
+          output_schema: {
+            type: 'object',
+            properties: { release_tag: { type: 'string', description: 'Published release' } },
+            required: ['release_tag'],
           },
         },
         { trigger_node_id: 'child_entry_secondary', name: null, input_schema: {} },
