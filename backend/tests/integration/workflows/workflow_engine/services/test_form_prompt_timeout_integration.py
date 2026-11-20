@@ -456,6 +456,16 @@ edges:
             # Should have at least 2 expire calls (one per iteration)
             assert len(_expire_calls) >= 2
 
+            # Activity sync queries I/O by the suffixed Temporal activity ID, so each
+            # iteration's input and output must be retrievable under that ID.
+            for activity_id in ("form_in_loop_iter_0", "form_in_loop_iter_1"):
+                activity_input = await handle.query("get_activity_input", activity_id)
+                activity_output = await handle.query("get_activity_output", activity_id)
+                assert activity_input, f"no input recorded for {activity_id}"
+                assert activity_input.get("name") == "Loop Form"
+                assert activity_output, f"no output recorded for {activity_id}"
+                assert activity_output.get("status") == "failed"
+
     async def test_no_submitted_port_raises_safe_value_error(self, temporal_env: WorkflowEnvironment) -> None:
         """Form prompt node without submitted port raises SafeValueError during validation."""
         task_queue = "form-prompt-no-port-queue"
