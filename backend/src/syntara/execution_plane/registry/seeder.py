@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime
 from importlib.resources import files
 from typing import TYPE_CHECKING, Any
@@ -27,6 +28,7 @@ _PLUGIN_SEEDS = (
         "syntara.script-python.script-python",
         "script-python.yaml",
         "quay.io/aap/ansible-automation-platform/ao-python-rhel9:devel",
+        None,
     ),
     (
         "script-bash",
@@ -34,6 +36,7 @@ _PLUGIN_SEEDS = (
         "syntara.script-bash.script-bash",
         "script-bash.yaml",
         "quay.io/aap/ansible-automation-platform/ao-bash-rhel9:devel",
+        None,
     ),
     (
         "agent-runtime",
@@ -41,6 +44,7 @@ _PLUGIN_SEEDS = (
         "syntara.agent-runtime.agent-runtime",
         "agent-runtime.yaml",
         "quay.io/aap/ansible-automation-platform/ao-agent-runtime:devel",
+        "agent-runtime-resolved-execution.json",
     ),
 )
 
@@ -59,6 +63,24 @@ def _load_manifest(filename: str, expected_name: str) -> dict[str, Any]:
     return manifest
 
 
+def _load_resolved_execution(filename: str | None, expected_identity: str) -> dict[str, Any] | None:
+    """Load compiled SDK binding metadata paired with a packaged Action manifest."""
+    if filename is None:
+        return None
+    contents = files("syntara.execution_plane.registry.manifests").joinpath(filename).read_text(encoding="utf-8")
+    document = json.loads(contents)
+    bindings = document.get("bindings") if isinstance(document, dict) else None
+    if (
+        not isinstance(bindings, list)
+        or len(bindings) != 1
+        or not isinstance(bindings[0], dict)
+        or bindings[0].get("step_identity") != expected_identity
+    ):
+        message = f"Packaged resolved execution data {filename!r} has the wrong Action identity"
+        raise ValueError(message)
+    return document
+
+
 async def seed_execution_plane_plugins(session: AsyncSession) -> None:
     """Idempotently seed the SDK Actions and their devel image refs."""
     now = datetime.now(UTC)
@@ -69,12 +91,13 @@ async def seed_execution_plane_plugins(session: AsyncSession) -> None:
             "node_type": node_type,
             "step_identity": step_identity,
             "manifest": _load_manifest(filename, name),
+            "resolved_execution": _load_resolved_execution(resolved_filename, step_identity),
             "image_reference": get_settings().agent_runtime_image if name == "agent-runtime" else image_reference,
             "created_at": now,
             "updated_at": now,
             "labels": {},
         }
-        for name, node_type, step_identity, filename, image_reference in _PLUGIN_SEEDS
+        for name, node_type, step_identity, filename, image_reference, resolved_filename in _PLUGIN_SEEDS
     ]
     statement = insert(ExecutionPlanePlugin).values(rows)
     statement = statement.on_conflict_do_update(
@@ -83,6 +106,7 @@ async def seed_execution_plane_plugins(session: AsyncSession) -> None:
             "step_identity": statement.excluded.step_identity,
             "node_type": statement.excluded.node_type,
             "manifest": statement.excluded.manifest,
+            "resolved_execution": statement.excluded.resolved_execution,
             "image_reference": statement.excluded.image_reference,
             "updated_at": now,
         },

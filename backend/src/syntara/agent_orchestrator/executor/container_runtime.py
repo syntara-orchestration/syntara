@@ -40,6 +40,7 @@ from syntara.execution_plane.client import (
 )
 from syntara.execution_plane.registry.repository import (
     execution_plane_plugin_input_schema,
+    execution_plane_plugin_supports_revision,
     get_execution_plane_plugin,
 )
 from syntara.execution_plane.utils import execution_plane_work_item_id
@@ -296,7 +297,7 @@ async def execute_container_agent(  # noqa: C901, PLR0912, PLR0915 -- preserves 
     return result_dict
 
 
-async def _submit_and_wait(  # noqa: C901, PLR0915 -- keeps submit, recovery, polling, cancellation, and timeout handling together.
+async def _submit_and_wait(  # noqa: C901, PLR0912, PLR0915 -- keeps submit, recovery, polling, cancellation, and timeout handling together.
     invocation: Invocation, ctx: InvocationContextData, inputs: dict[str, Any]
 ) -> dict[str, Any]:
     """Submit one stable WorkExecute and poll its terminal outcome."""
@@ -315,6 +316,22 @@ async def _submit_and_wait(  # noqa: C901, PLR0915 -- keeps submit, recovery, po
                 "Agent Runtime Action is not registered in AO", type="AgentRuntimeConfigError", non_retryable=True
             )
         image = plugin.image_reference
+        resolved_execution = plugin.resolved_execution
+        resolved_bindings = resolved_execution.get("bindings") if isinstance(resolved_execution, dict) else None
+        if (
+            not isinstance(resolved_bindings, list)
+            or len(resolved_bindings) != 1
+            or not isinstance(resolved_bindings[0], dict)
+            or resolved_bindings[0].get("step_identity") != plugin.step_identity
+            or not isinstance(resolved_bindings[0].get("step_revision_id"), str)
+            or not execution_plane_plugin_supports_revision(plugin, str(resolved_bindings[0].get("step_revision_id")))
+        ):
+            raise ApplicationError(
+                "Agent Runtime compiled binding is missing or inconsistent in AO",
+                type="AgentRuntimeConfigError",
+                non_retryable=True,
+            )
+        step_revision_id = resolved_bindings[0]["step_revision_id"]
         try:
             Draft202012Validator(execution_plane_plugin_input_schema(plugin)).validate(inputs)
         except (ValueError, JsonSchemaValidationError) as error:
@@ -323,16 +340,18 @@ async def _submit_and_wait(  # noqa: C901, PLR0915 -- keeps submit, recovery, po
             ) from None
 
     runtime_context = await _runtime_context(execution_id, invocation.id)
-    if "host_operations" not in WorkloadInvocation.model_fields:
+    required_invocation_fields = {"host_operations", "resolved_execution"}
+    if not required_invocation_fields.issubset(WorkloadInvocation.model_fields):
         raise ApplicationError(
-            "Agent Runtime requires an execution-plane-client build with host operations",
+            "Agent Runtime requires an execution-plane-client build with host operations and resolved execution",
             type="AgentRuntimeConfigError",
             non_retryable=True,
         )
     invocation_payload = WorkloadInvocation(
-        step_revision_id=plugin.step_identity,
+        step_revision_id=step_revision_id,
         inputs=inputs,
         host_operations=["agent.model.turn", "agent.mcp.call"],
+        resolved_execution=resolved_execution,
         timeout_seconds=timeout_seconds,
     )
     command = WorkExecute(

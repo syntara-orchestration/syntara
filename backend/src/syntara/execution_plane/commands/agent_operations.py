@@ -30,7 +30,10 @@ from syntara.agent_orchestrator.utils.response_metadata import normalize_respons
 from syntara.audit.dispatcher import AuditEventDispatcher
 from syntara.core.config.base import get_settings
 from syntara.execution_plane.commands.errors import CommandResourceNotFoundError, CommandResourceStateError
-from syntara.execution_plane.registry.repository import get_execution_plane_plugin
+from syntara.execution_plane.registry.repository import (
+    execution_plane_plugin_supports_revision,
+    get_execution_plane_plugin,
+)
 from syntara.execution_plane.utils import execution_plane_work_item_id
 from syntara.metrics.dependencies import get_metrics_recorder
 from syntara.metrics.instrumentation import record_llm_call
@@ -83,7 +86,7 @@ class AgentOperationCommandHandler:
         if (
             plugin is None
             or plugin.node_type is not NodeType.AGENTIC
-            or plugin.step_identity != payload.step_revision_id
+            or not execution_plane_plugin_supports_revision(plugin, payload.step_revision_id)
         ):
             raise CommandResourceStateError
 
