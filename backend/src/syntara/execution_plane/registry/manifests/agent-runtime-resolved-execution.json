@@ -1,0 +1,16 @@
+{
+  "bindings": [
+    {
+      "abi": "syntara.container/v1alpha1",
+      "entry_point": "syntara_node_agent_runtime:AgentRuntimeStep",
+      "runtime_kind": "custom-runner",
+      "schema_digests": {
+        "error": "sha256:54e5431ce455b8c4ec940d12700ed1be5be44d3cdd576f093f0ba301d5dbf423",
+        "input": "sha256:bfc227c023a89f75341772d20db825f667933551ae561348c2214c8e211ff10c",
+        "output": "sha256:fed2ace7f9e7f76894bfa70fd845ae8e19917aaf89f7232084b614fd935e67ff"
+      },
+      "step_identity": "syntara.agent-runtime.agent-runtime",
+      "step_revision_id": "sha256:175488512f41beb168f45cd237f90a4c11cbfcd9104323f19a63c1730a9816ca"
+    }
+  ]
+}

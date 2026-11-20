@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import json
 from datetime import UTC, datetime
 from importlib.resources import files
 from typing import TYPE_CHECKING, Any
@@ -29,6 +30,8 @@ _PLUGIN_SEEDS = (
         "script-python.yaml",
         "RELATED_IMAGE_SCRIPT_PYTHON",
         "quay.io/aap/ansible-automation-platform/ao-python-rhel9:devel",
+        None,
+        None,
     ),
     (
         "script-bash",
@@ -37,6 +40,8 @@ _PLUGIN_SEEDS = (
         "script-bash.yaml",
         "RELATED_IMAGE_SCRIPT_BASH",
         "quay.io/aap/ansible-automation-platform/ao-bash-rhel9:devel",
+        None,
+        None,
     ),
     (
         "agent-runtime",
@@ -45,6 +50,8 @@ _PLUGIN_SEEDS = (
         "agent-runtime.yaml",
         None,
         "quay.io/aap/ansible-automation-platform/ao-agent-runtime:devel",
+        "agent-runtime-resolved-execution.json",
+        "agent-runtime-resolved-execution.json",
     ),
 )
 
@@ -63,6 +70,24 @@ def _load_manifest(filename: str, expected_name: str) -> dict[str, Any]:
     return manifest
 
 
+def _load_resolved_execution(filename: str | None, expected_identity: str) -> dict[str, Any] | None:
+    """Load compiled SDK binding metadata paired with a packaged Action manifest."""
+    if filename is None:
+        return None
+    contents = files("syntara.execution_plane.registry.manifests").joinpath(filename).read_text(encoding="utf-8")
+    document = json.loads(contents)
+    bindings = document.get("bindings") if isinstance(document, dict) else None
+    if (
+        not isinstance(bindings, list)
+        or len(bindings) != 1
+        or not isinstance(bindings[0], dict)
+        or bindings[0].get("step_identity") != expected_identity
+    ):
+        message = f"Packaged resolved execution data {filename!r} has the wrong Action identity"
+        raise ValueError(message)
+    return document
+
+
 async def seed_execution_plane_plugins(session: AsyncSession) -> None:
     """Idempotently seed SDK Actions, applying configured image overrides."""
     now = datetime.now(UTC)
@@ -78,11 +103,12 @@ async def seed_execution_plane_plugins(session: AsyncSession) -> None:
                 if name == "agent-runtime"
                 else os.environ.get(image_env_var) or image_reference
             ),
+            "resolved_execution": _load_resolved_execution(resolved_filename, step_identity),
             "created_at": now,
             "updated_at": now,
             "labels": {},
         }
-        for name, node_type, step_identity, filename, image_env_var, image_reference in _PLUGIN_SEEDS
+        for name, node_type, step_identity, filename, image_env_var, image_reference, resolved_filename in _PLUGIN_SEEDS
     ]
     statement = insert(ExecutionPlanePlugin).values(rows)
     statement = statement.on_conflict_do_update(
@@ -91,6 +117,7 @@ async def seed_execution_plane_plugins(session: AsyncSession) -> None:
             "step_identity": statement.excluded.step_identity,
             "node_type": statement.excluded.node_type,
             "manifest": statement.excluded.manifest,
+            "resolved_execution": statement.excluded.resolved_execution,
             "image_reference": statement.excluded.image_reference,
             "updated_at": now,
         },
