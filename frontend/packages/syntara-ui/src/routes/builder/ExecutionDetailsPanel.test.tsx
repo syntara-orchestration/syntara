@@ -108,11 +108,8 @@ function getViewModeNav() {
   return screen.getByRole('navigation', { name: VIEW_MODE_NAV_LABEL })
 }
 
-/** PF NavItem with preventDefault renders anchor without href — not exposed as role "link". */
 function getViewModeControl(name: 'Overview' | 'Details') {
-  return within(getViewModeNav()).getByText(
-    (_content, element) => element?.tagName === 'A' && element.textContent?.trim() === name
-  )
+  return within(getViewModeNav()).getByRole('link', { name })
 }
 
 async function selectViewMode(user: ReturnType<typeof userEvent.setup>, mode: 'Overview' | 'Details') {
@@ -362,8 +359,21 @@ describe('ExecutionDetailsPanel', () => {
     it('renders Overview and Details nav links', () => {
       renderPanel(WORKFLOW_DEF)
 
-      expect(getViewModeControl('Overview')).toBeInTheDocument()
-      expect(getViewModeControl('Details')).toBeInTheDocument()
+      expect(getViewModeControl('Overview')).toHaveAttribute('href', '#run-overview')
+      expect(getViewModeControl('Details')).toHaveAttribute('href', '#run-details')
+    })
+
+    it('allows keyboard focus on Overview and Details nav links', () => {
+      renderPanel(WORKFLOW_DEF)
+
+      const overview = getViewModeControl('Overview')
+      const details = getViewModeControl('Details')
+
+      overview.focus()
+      expect(overview).toHaveFocus()
+
+      details.focus()
+      expect(details).toHaveFocus()
     })
 
     it('defaults to Overview mode with activity table visible', () => {
