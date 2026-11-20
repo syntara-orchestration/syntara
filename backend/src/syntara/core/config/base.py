@@ -1773,6 +1773,23 @@ class WorkflowClientSettings(BaseSettings):
         ge=0,
     )
 
+    agent_runtime_enabled: bool = Field(
+        default=False,
+        description=(
+            "Run workflow-backed agent invocations in the Execution Plane agent-runtime container. "
+            "Requires the agent-runtime Action image and agent.operation callback command to be deployed."
+        ),
+    )
+
+    agent_runtime_image: str = Field(
+        default="quay.io/aap/ansible-automation-platform/ao-agent-runtime:devel",
+        description=(
+            "Container image reference seeded for the Agent Runtime Action. Set a customer-controlled registry "
+            "reference pinned by sha256 digest before enabling the container backend."
+        ),
+        min_length=1,
+    )
+
     workflow_client_initial_backoff_seconds: float = Field(
         default=1.0,
         description="Initial delay before first retry in seconds",
@@ -1822,7 +1839,7 @@ class WorkflowClientSettings(BaseSettings):
 
     ep_callback_service_cn: str = Field(
         default="execution-plane-callback.ao.svc",
-        description="mTLS service identity permitted to deliver EP completion events.",
+        description="mTLS service identity permitted to deliver authenticated Execution Plane callback commands.",
     )
 
     @model_validator(mode="after")
@@ -1839,6 +1856,9 @@ class WorkflowClientSettings(BaseSettings):
                 f"must be >= workflow_client_initial_backoff_seconds ({self.workflow_client_initial_backoff_seconds})"
             )
             raise SafeValueError(msg)
+        if self.agent_runtime_enabled and not re.fullmatch(r"[^@\s]+@sha256:[0-9a-f]{64}", self.agent_runtime_image):
+            message = "APP_AGENT_RUNTIME_IMAGE must use an immutable sha256 digest when Agent Runtime is enabled"
+            raise SafeValueError(message)
         return self
 
 

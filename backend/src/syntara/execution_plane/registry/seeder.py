@@ -1,4 +1,4 @@
-"""Seed Python and Bash Actions with configured workload images."""
+"""Seed SDK Action manifests with configured workload images."""
 
 from __future__ import annotations
 
@@ -12,6 +12,7 @@ import structlog
 import yaml
 from sqlalchemy.dialects.postgresql import insert
 
+from syntara.core.config.base import get_settings
 from syntara.execution_plane.registry.models import ExecutionPlanePlugin
 from syntara.workflow_core.models import NodeType
 
@@ -37,6 +38,14 @@ _PLUGIN_SEEDS = (
         "RELATED_IMAGE_SCRIPT_BASH",
         "quay.io/aap/ansible-automation-platform/ao-bash-rhel9:devel",
     ),
+    (
+        "agent-runtime",
+        NodeType.AGENTIC,
+        "syntara.agent-runtime.agent-runtime",
+        "agent-runtime.yaml",
+        None,
+        "quay.io/aap/ansible-automation-platform/ao-agent-runtime:devel",
+    ),
 )
 
 
@@ -55,7 +64,7 @@ def _load_manifest(filename: str, expected_name: str) -> dict[str, Any]:
 
 
 async def seed_execution_plane_plugins(session: AsyncSession) -> None:
-    """Seed script Actions, allowing the operator to override their image refs."""
+    """Idempotently seed SDK Actions, applying configured image overrides."""
     now = datetime.now(UTC)
     rows = [
         {
@@ -64,7 +73,11 @@ async def seed_execution_plane_plugins(session: AsyncSession) -> None:
             "node_type": node_type,
             "step_identity": step_identity,
             "manifest": _load_manifest(filename, name),
-            "image_reference": os.environ.get(image_env_var) or image_reference,
+            "image_reference": (
+                get_settings().agent_runtime_image
+                if name == "agent-runtime"
+                else os.environ.get(image_env_var) or image_reference
+            ),
             "created_at": now,
             "updated_at": now,
             "labels": {},

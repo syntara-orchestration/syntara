@@ -41,6 +41,7 @@ registry = build_ao_registry()
 
 _COMMAND_ACTIONS = {
     "work.execute.completed": "complete",
+    "agent.operation": "agent-operation",
     "credential.resolve.cluster": "resolve-credential-cluster",
     "credential.resolve.workload": "resolve-credential-workload",
 }
