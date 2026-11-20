@@ -105,6 +105,7 @@ describe('WorkflowsListView', () => {
       expect(screen.getByRole('columnheader', { name: 'Name' })).toBeInTheDocument()
       expect(screen.getByRole('columnheader', { name: 'Created at' })).toBeInTheDocument()
       expect(screen.getByRole('columnheader', { name: /State/i })).toBeInTheDocument()
+      expect(screen.getByRole('columnheader', { name: 'Used by' })).toBeInTheDocument()
     })
 
     it('shows workflow state help in the State column header popover', async () => {

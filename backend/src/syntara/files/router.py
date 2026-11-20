@@ -213,7 +213,7 @@ async def upload_files(
                     input_data={"file_id": str(metadata.id)},
                     project_name=BUILTIN_PROJECT_NAME,
                 )
-            except Exception:  # noqa: BLE001
+            except Exception:
                 logger.warning(
                     "Document conversion dispatch failed, file uploaded but conversion skipped",
                     file_id=str(metadata.id),

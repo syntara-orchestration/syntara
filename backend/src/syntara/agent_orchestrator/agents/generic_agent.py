@@ -313,7 +313,7 @@ class GenericAgent(BaseAgent):
                 model=getattr(self.llm, "model_name", None),
             )
             parsed_output, raw_message = self._unpack_structured_response(structured_response)
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             # Emit ERROR event before fallback
             AuditEventDispatcher.dispatch(
                 LLMInteractionEvent(
@@ -471,7 +471,7 @@ class GenericAgent(BaseAgent):
             result_dict["content"] = parsed_output
             result_dict["structured_output_metadata"] = {"fallback_strategy_used": "native"}
             return state
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             # Emit ERROR event before fallback
             AuditEventDispatcher.dispatch(
                 LLMInteractionEvent(

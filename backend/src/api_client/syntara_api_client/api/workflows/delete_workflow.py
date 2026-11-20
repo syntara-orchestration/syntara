@@ -7,15 +7,24 @@ import httpx
 from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.error_data import ErrorData
-from ...types import Response
+from ...types import UNSET, Response, Unset
 
 
 def _get_kwargs(
-    workflow_id: UUID,
+    workflow_id: UUID, *, confirm: bool | Unset = False, additional_params: dict[str, Any] | None = None
 ) -> dict[str, Any]:
+    params: dict[str, Any] = {}
+    if isinstance(additional_params, dict):
+        params = additional_params
+
+    params["confirm"] = confirm
+
+    params = {k: v for k, v in params.items() if v is not UNSET and v is not None}
+
     _kwargs: dict[str, Any] = {
         "method": "delete",
         "url": f"/workflows/{workflow_id}",
+        "params": params,
     }
 
     return _kwargs
@@ -87,13 +96,19 @@ def sync_detailed(
     workflow_id: UUID,
     *,
     client: AuthenticatedClient,
+    confirm: bool | Unset = False,
+    additional_params: dict[str, Any] | None = None,
 ) -> Response[Any | ErrorData]:
     """Delete workflow
 
      Permanently delete a workflow and cascade-delete all its versions and executions.
 
+    If the workflow is referenced by published parents, deletion requires ``confirm=true``;
+    otherwise it returns 409 with the count of referencing parents (no parent details).
+
     Args:
         workflow_id (UUID):
+        confirm (bool | Unset):  Default: False.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -103,9 +118,7 @@ def sync_detailed(
         Response[Any | ErrorData]
     """
 
-    kwargs = _get_kwargs(
-        workflow_id=workflow_id,
-    )
+    kwargs = _get_kwargs(workflow_id=workflow_id, confirm=confirm, additional_params=additional_params)
 
     response = client.get_httpx_client().request(
         **kwargs,
@@ -118,13 +131,18 @@ def sync(
     workflow_id: UUID,
     *,
     client: AuthenticatedClient,
+    confirm: bool | Unset = False,
 ) -> Any | ErrorData | None:
     """Delete workflow
 
      Permanently delete a workflow and cascade-delete all its versions and executions.
 
+    If the workflow is referenced by published parents, deletion requires ``confirm=true``;
+    otherwise it returns 409 with the count of referencing parents (no parent details).
+
     Args:
         workflow_id (UUID):
+        confirm (bool | Unset):  Default: False.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -137,6 +155,7 @@ def sync(
     return sync_detailed(
         workflow_id=workflow_id,
         client=client,
+        confirm=confirm,
     ).parsed
 
 
@@ -144,13 +163,18 @@ async def asyncio_detailed(
     workflow_id: UUID,
     *,
     client: AuthenticatedClient,
+    confirm: bool | Unset = False,
 ) -> Response[Any | ErrorData]:
     """Delete workflow
 
      Permanently delete a workflow and cascade-delete all its versions and executions.
 
+    If the workflow is referenced by published parents, deletion requires ``confirm=true``;
+    otherwise it returns 409 with the count of referencing parents (no parent details).
+
     Args:
         workflow_id (UUID):
+        confirm (bool | Unset):  Default: False.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -162,6 +186,7 @@ async def asyncio_detailed(
 
     kwargs = _get_kwargs(
         workflow_id=workflow_id,
+        confirm=confirm,
     )
 
     response = await client.get_async_httpx_client().request(**kwargs)
@@ -173,13 +198,18 @@ async def asyncio(
     workflow_id: UUID,
     *,
     client: AuthenticatedClient,
+    confirm: bool | Unset = False,
 ) -> Any | ErrorData | None:
     """Delete workflow
 
      Permanently delete a workflow and cascade-delete all its versions and executions.
 
+    If the workflow is referenced by published parents, deletion requires ``confirm=true``;
+    otherwise it returns 409 with the count of referencing parents (no parent details).
+
     Args:
         workflow_id (UUID):
+        confirm (bool | Unset):  Default: False.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -193,5 +223,6 @@ async def asyncio(
         await asyncio_detailed(
             workflow_id=workflow_id,
             client=client,
+            confirm=confirm,
         )
     ).parsed

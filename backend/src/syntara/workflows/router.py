@@ -43,6 +43,9 @@ from syntara.workflows.models import (
     WorkflowRead,
     WorkflowReadWithVersion,
     WorkflowUpdate,
+    WorkflowUsedByCountsResponse,
+    WorkflowUsedByListParams,
+    WorkflowUsedByResponse,
     WorkflowValidateRequest,
     WorkflowVersion,
     WorkflowVersionListParams,
@@ -338,6 +341,37 @@ async def list_workflows(
 
 
 @router.get(
+    "/used_by_counts",
+    summary="Batch Used-By totals for multiple workflows",
+    operation_id="get_workflow_used_by_counts",
+    response_description="Used-By totals for the requested workflows the caller may read",
+)
+async def get_workflow_used_by_counts(
+    service: Annotated[WorkflowService, Depends(get_workflow_service)],
+    visibility: Annotated[VisibilityResult, Depends(VisibilityFilter("workflow", "read"))],
+    workflow_ids: Annotated[
+        list[UUID],
+        Query(
+            max_length=100,
+            description=(
+                "Workflow ids to fetch Used-By totals for (max 100). Ids outside the caller's "
+                "visibility are omitted from the response."
+            ),
+        ),
+    ],
+) -> WorkflowUsedByCountsResponse:
+    """Return the Used-By total for each requested workflow the caller may read.
+
+    Totals count distinct published parents across all projects (matching the Used-By badge),
+    so a workflow list can show per-row counts with one request instead of one call per row.
+    """
+    return await service.count_published_parents_batch(
+        workflow_ids,
+        allowed_projects=visibility.to_allowed_projects(),
+    )
+
+
+@router.get(
     "/{workflow_id}",
     summary="Get workflow",
     dependencies=[Depends(_wf_perm_read)],
@@ -420,9 +454,23 @@ async def update_workflow(
 async def delete_workflow(
     workflow_id: UUID,
     service: Annotated[WorkflowService, Depends(get_workflow_service)],
+    *,
+    confirm: Annotated[
+        bool,
+        Query(
+            description=(
+                "Confirm deletion when the workflow is referenced by published parent workflows. "
+                "Without it, such a deletion returns 409 so the caller can warn first."
+            ),
+        ),
+    ] = False,
 ) -> None:
-    """Permanently delete a workflow and cascade-delete all its versions and executions."""
-    await service.delete_workflow(workflow_id)
+    """Permanently delete a workflow and cascade-delete all its versions and executions.
+
+    If the workflow is referenced by published parents, deletion requires ``confirm=true``;
+    otherwise it returns 409 with the count of referencing parents (no parent details).
+    """
+    await service.delete_workflow(workflow_id, confirm=confirm)
 
 
 @router.post(
@@ -480,6 +528,37 @@ async def list_workflow_versions(
         sort=params.sort,
         query_params_items=request.query_params.items(),
         include_total=params.include_total,
+    )
+
+
+@router.get(
+    "/{workflow_id}/used_by",
+    summary="List published workflows that reference this workflow",
+    dependencies=[Depends(_wf_perm_read)],
+    operation_id="list_workflow_used_by",
+    response_description="Published parent workflows that reference this workflow",
+)
+async def list_workflow_used_by(
+    workflow_id: UUID,
+    service: Annotated[WorkflowService, Depends(get_workflow_service)],
+    params: Annotated[WorkflowUsedByListParams, Query()],
+    visibility: Annotated[VisibilityResult, Depends(VisibilityFilter("workflow", "read"))],
+) -> WorkflowUsedByResponse:
+    """List published workflows whose published version references this workflow (Used-By).
+
+    ``total_count`` is every distinct published parent across all projects; ``resources`` is the
+    page of parents the caller may view. Access requires read permission on this workflow.
+    """
+    # _wf_perm_read authorizes the action but does not assert the target exists (an admin may read
+    # any id), so confirm existence here to return 404 for an unknown workflow instead of an empty page.
+    await service.get_workflow_by_id(workflow_id)
+    return await service.list_published_parents(
+        child_workflow_id=workflow_id,
+        limit=params.limit,
+        cursor=params.cursor,
+        sort=params.sort,
+        trigger_node_ids=params.trigger_node_ids,
+        allowed_projects=visibility.to_allowed_projects(),
     )
 
 
@@ -625,8 +704,22 @@ async def publish_workflow_version(
     version: int,
     request: PublishVersionRequest,
     service: Annotated[WorkflowService, Depends(get_workflow_service)],
+    *,
+    confirm: Annotated[
+        bool,
+        Query(
+            description=(
+                "Confirm publishing when it removes a Subworkflow Trigger still invoked by published "
+                "parent workflows. Without it, such a publish returns 409 so the caller can warn first."
+            ),
+        ),
+    ] = False,
 ) -> PublishWorkflowVersionResponse:
-    """Publish a specific workflow version."""
+    """Publish a specific workflow version.
+
+    If publishing removes a Subworkflow Trigger that published parents invoke, it requires
+    ``confirm=true``; otherwise it returns 409 with the count of affected parents (no parent details).
+    """
     workflow, published_version, warning = await service.publish_workflow_version(
         workflow_id=workflow_id,
         version=version,
@@ -636,6 +729,7 @@ async def publish_workflow_version(
         if request.workflow_definition is not None
         else None,
         expected_version=request.expected_version,
+        confirm=confirm,
     )
     return await _build_workflow_with_version_response(workflow, published_version, service, warning=warning)
 

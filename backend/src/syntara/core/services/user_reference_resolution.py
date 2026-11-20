@@ -72,7 +72,7 @@ def _record_resolution_failure() -> None:
             1,
             labels={"error_type": "user_reference_resolution", "interface": "api"},
         )
-    except Exception:  # noqa: BLE001
+    except Exception:
         logger.debug("user_reference_metrics_recording_failed", exc_info=True)
 
 

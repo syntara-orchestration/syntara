@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useCallback, useState } from 'react'
 
 import { workflowClient } from '../../../client'
+import { useTriggerRemovalPublishConfirm } from '../../../hooks/useTriggerRemovalPublishConfirm'
 import { useAlerts } from '../../../providers/alerts'
 import { useWorkflowStore } from '../../../stores/useWorkflowStore'
 import { extractVersionConflictInfo, getErrorMessage, isWorkflowVersionConflictError } from '../../../utils/apiErrors'
@@ -12,7 +13,7 @@ import type { ConflictInfo } from '../VersionConflictDialog'
 
 import { useOutputContractReview } from './useOutputContractReview'
 
-function isWorkflowQuery(query: Query): boolean {
+export function isWorkflowQuery(query: Query): boolean {
   return (
     query.queryKey[0] === 'get' && typeof query.queryKey[1] === 'string' && query.queryKey[1].startsWith('/workflows')
   )
@@ -69,6 +70,7 @@ export function usePublishWorkflow({
 }: UsePublishWorkflowOptions) {
   const queryClient = useQueryClient()
   const { showSuccess, showError, showWarning } = useAlerts()
+  const { guardPublishError, triggerRemovalConfirmDialog } = useTriggerRemovalPublishConfirm()
   const {
     breakingChanges,
     contractChanges,
@@ -96,40 +98,61 @@ export function usePublishWorkflow({
   )
 
   const publishNow = useCallback(
-    (pending: PendingPublish) => {
-      publishMutation(
-        {
-          params: { path: { workflow_id: workflowId ?? '', version: pending.version } },
-          body: {
-            name: pending.publishName ?? null,
-            change_description: pending.description ?? null,
-            ...(pending.workflowDefinition ? { workflow_definition: pending.workflowDefinition } : {}),
-            ...(pending.expectedVersion != null ? { expected_version: pending.expectedVersion } : {}),
+    (pending: PendingPublish, confirm = false) => {
+      // `attempt` is hoisted, so onError can retry with confirm=true after a trigger-removal 409
+      // without capturing the memoized callback (which React Compiler disallows).
+      function attempt(useConfirm: boolean) {
+        publishMutation(
+          {
+            params: {
+              path: { workflow_id: workflowId ?? '', version: pending.version },
+              query: { confirm: useConfirm },
+            },
+            body: {
+              name: pending.publishName ?? null,
+              change_description: pending.description ?? null,
+              ...(pending.workflowDefinition ? { workflow_definition: pending.workflowDefinition } : {}),
+              ...(pending.expectedVersion != null ? { expected_version: pending.expectedVersion } : {}),
+            },
           },
-        },
-        {
-          onSuccess: (data) => {
-            if (data.warning) {
-              showWarning({ title: 'Workflow published with warnings', description: data.warning })
-            } else {
-              showSuccess({ title: 'Workflow published' })
-            }
-            if (useWorkflowStore.getState().isDirty) useWorkflowStore.getState().markClean()
-            if (data?.current_version != null) onVersionUpdated?.(data.current_version)
-            detachPromise(queryClient.invalidateQueries({ predicate: isWorkflowQuery }))
-          },
-          onError: (error: unknown) => {
-            if (isWorkflowVersionConflictError(error) && onConflict) {
-              onConflict(extractVersionConflictInfo(error))
-              return
-            }
-            showError({ title: 'Failed to publish workflow', description: getErrorMessage(error) })
-          },
-          onSettled: pending.onSettled,
-        }
-      )
+          {
+            onSuccess: (data) => {
+              if (data.warning) {
+                showWarning({ title: 'Workflow published with warnings', description: data.warning })
+              } else {
+                showSuccess({ title: 'Workflow published' })
+              }
+              if (useWorkflowStore.getState().isDirty) useWorkflowStore.getState().markClean()
+              if (data?.current_version != null) onVersionUpdated?.(data.current_version)
+              detachPromise(queryClient.invalidateQueries({ predicate: isWorkflowQuery }))
+            },
+            onError: (error: unknown) => {
+              if (isWorkflowVersionConflictError(error) && onConflict) {
+                onConflict(extractVersionConflictInfo(error))
+                return
+              }
+              // Trigger-removal fallback: on a 409 that publishing would remove a Subworkflow Trigger a
+              // published parent uses, confirm and retry with confirm=true.
+              if (guardPublishError(error, () => attempt(true))) return
+              showError({ title: 'Failed to publish workflow', description: getErrorMessage(error) })
+            },
+            onSettled: pending.onSettled,
+          }
+        )
+      }
+      attempt(confirm)
     },
-    [workflowId, publishMutation, showWarning, showSuccess, onVersionUpdated, queryClient, onConflict, showError]
+    [
+      workflowId,
+      publishMutation,
+      showWarning,
+      showSuccess,
+      onVersionUpdated,
+      queryClient,
+      onConflict,
+      showError,
+      guardPublishError,
+    ]
   )
 
   const publish = useCallback(
@@ -137,13 +160,14 @@ export function usePublishWorkflow({
       publishName?: string,
       description?: string,
       onSettled?: () => void,
-      callOptions?: { expectedVersionOverride?: number; versionOverride?: number }
+      callOptions?: { expectedVersionOverride?: number; versionOverride?: number; confirm?: boolean }
     ) => {
       const versionToPublish = callOptions?.versionOverride ?? currentVersion
       if (!workflowId || versionToPublish == null) return
 
       const workflowDefinition = getCurrentWorkflowDefinition(workflowName, workflowDescription)
       const expectedVersion = callOptions?.expectedVersionOverride ?? optionsExpectedVersion
+      const confirm = callOptions?.confirm ?? false
       const pending: PendingPublish = {
         publishName,
         description,
@@ -153,7 +177,7 @@ export function usePublishWorkflow({
         ...(expectedVersion != null ? { expectedVersion } : {}),
       }
       if (!workflowDefinition) {
-        publishNow(pending)
+        publishNow(pending, confirm)
         return
       }
       clearContractReview()
@@ -168,7 +192,7 @@ export function usePublishWorkflow({
             return
           }
           setPendingPublish(null)
-          publishNow(pending)
+          publishNow(pending, confirm)
         })
       )
     },
@@ -207,6 +231,7 @@ export function usePublishWorkflow({
     confirmPublish,
     cancelBreakingChangeWarning,
     reviewOutputContract,
+    triggerRemovalConfirmDialog,
   }
 }
 

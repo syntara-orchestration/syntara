@@ -664,7 +664,7 @@ class InvocationExecutor:
                 completion_tokens=total_completion,
                 token_count=total_tokens,
             )
-        except Exception:  # noqa: BLE001
+        except Exception:
             logger.warning(
                 "Failed to update post-LLM token usage (non-blocking)",
                 user_id=str(invocation.created_by),

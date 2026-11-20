@@ -96,6 +96,22 @@ class WorkflowsApi:
         endpoint_module = self._load_endpoint_module("list_workflow_versions")
         return await endpoint_module.asyncio_detailed(client=self._client, **kwargs)
 
+    def get_used_by_counts(self, **kwargs: Any) -> Response[Any]:
+        endpoint_module = self._load_endpoint_module("get_workflow_used_by_counts")
+        return endpoint_module.sync_detailed(client=self._client, **kwargs)
+
+    async def async_get_used_by_counts(self, **kwargs: Any) -> Response[Any]:
+        endpoint_module = self._load_endpoint_module("get_workflow_used_by_counts")
+        return await endpoint_module.asyncio_detailed(client=self._client, **kwargs)
+
+    def list_used_by(self, **kwargs: Any) -> Response[Any]:
+        endpoint_module = self._load_endpoint_module("list_workflow_used_by")
+        return endpoint_module.sync_detailed(client=self._client, **kwargs)
+
+    async def async_list_used_by(self, **kwargs: Any) -> Response[Any]:
+        endpoint_module = self._load_endpoint_module("list_workflow_used_by")
+        return await endpoint_module.asyncio_detailed(client=self._client, **kwargs)
+
     def get_version(self, **kwargs: Any) -> Response[Any]:
         endpoint_module = self._load_endpoint_module("get_workflow_version")
         return endpoint_module.sync_detailed(client=self._client, **kwargs)

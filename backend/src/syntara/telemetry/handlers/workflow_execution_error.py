@@ -50,7 +50,7 @@ class WorkflowExecutionErrorTelemetryHandler(AuditEventHandler[WorkflowExecution
                 execution_id=str(event.execution_id),
                 timed_out_component=str(event.timed_out_component),
             )
-        except Exception:  # noqa: BLE001
+        except Exception:
             logger.warning("Failed to emit workflow_error telemetry (non-fatal)", exc_info=True)
 
         return None

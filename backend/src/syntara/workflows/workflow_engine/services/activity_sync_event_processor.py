@@ -272,7 +272,7 @@ class ActivitySyncEventProcessorMixin:
             if isinstance(codec, CredentialPayloadCodec):
                 payload = codec.decode_payload(payload)
             result_data = json.loads(payload.data)
-        except Exception:  # noqa: BLE001
+        except Exception:
             logger.warning("Failed to decode/parse sub-workflow setup result", exc_info=True)
             return None
         return result_data if isinstance(result_data, dict) else None

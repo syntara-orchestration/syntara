@@ -19,6 +19,9 @@ exclusions:
   - operation_id: get_files_metadata
     reason: "Batch metadata lookup by file IDs, not a paginated list endpoint"
 
+  - operation_id: get_workflow_used_by_counts
+    reason: "Batch Used-By lookup by explicit workflow IDs (max 100), not a paginated list — mirrors get_files_metadata"
+
   - operation_id: get_internal_metrics_kpis
     reason: "Aggregation, not paginated list"
 

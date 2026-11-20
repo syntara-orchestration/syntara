@@ -165,7 +165,7 @@ class PeriodicCollector:
         self._worker.start()
         try:
             await _collect_and_send(self._session_factory, self._registry)
-        except Exception:  # noqa: BLE001
+        except Exception:
             logger.warning("periodic_collector_immediate_cycle_error", exc_info=True)
 
     async def stop(self) -> None:

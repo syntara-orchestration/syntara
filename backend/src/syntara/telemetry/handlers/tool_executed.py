@@ -45,7 +45,7 @@ class ToolExecutedTelemetryHandler(AuditEventHandler[ToolExecutedEvent]):
                 status=event.status.value,
                 duration_ms=event.duration_ms,
             )
-        except Exception:  # noqa: BLE001
+        except Exception:
             logger.warning("Failed to emit tool_execution telemetry (non-fatal)", exc_info=True)
 
         return None

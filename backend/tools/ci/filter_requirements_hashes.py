@@ -56,7 +56,7 @@ def _query_pypi(name: str, version: str) -> dict[str, str]:
     """Query PyPI JSON API for hash -> filename mapping of a release."""
     url = f"https://pypi.org/pypi/{name}/{version}/json"
     try:
-        with urllib.request.urlopen(url, timeout=15) as resp:  # noqa: S310
+        with urllib.request.urlopen(url, timeout=15) as resp:
             data = json.loads(resp.read())
     except (OSError, ValueError) as exc:
         print(f"  Warning: PyPI lookup failed for {name}=={version}: {exc}", file=sys.stderr)

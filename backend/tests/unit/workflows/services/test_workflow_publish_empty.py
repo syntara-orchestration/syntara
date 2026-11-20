@@ -756,6 +756,7 @@ class TestScheduledTriggerSyncGracefulDegradation:
 
         with (
             patch.object(mock_service, "get_workflow_by_id", new_callable=AsyncMock, return_value=mock_workflow),
+            patch.object(mock_service, "get_referencing_published_parent_ids", new_callable=AsyncMock, return_value=[]),
             patch.object(mock_service.session, "scalar", new_callable=AsyncMock, return_value=0),
             patch.object(mock_service.session, "commit", new_callable=AsyncMock),
             patch("syntara.workflows.services.workflow_service.AuditEventDispatcher"),
@@ -853,6 +854,7 @@ class TestScheduledTriggerSyncGracefulDegradation:
 
         with (
             patch.object(mock_service, "get_workflow_by_id", new_callable=AsyncMock, return_value=mock_workflow),
+            patch.object(mock_service, "get_referencing_published_parent_ids", new_callable=AsyncMock, return_value=[]),
             patch.object(mock_service.session, "scalar", new_callable=AsyncMock, return_value=0),
             patch.object(mock_service.session, "commit", new_callable=AsyncMock) as mock_commit,
             patch("syntara.workflows.services.workflow_service.AuditEventDispatcher"),
@@ -1058,6 +1060,7 @@ class TestScheduledTriggerSyncGracefulDegradation:
 
         with (
             patch.object(mock_service, "get_workflow_by_id", new_callable=AsyncMock, return_value=mock_workflow),
+            patch.object(mock_service, "get_referencing_published_parent_ids", new_callable=AsyncMock, return_value=[]),
             patch.object(mock_service.session, "scalar", new_callable=AsyncMock, return_value=0),
             patch.object(mock_service.session, "commit", new_callable=AsyncMock, side_effect=RuntimeError("db down")),
             patch("syntara.workflows.services.workflow_service.AuditEventDispatcher"),

@@ -63,6 +63,6 @@ def lookup_model_profile(model_id: str) -> dict[str, Any] | None:
             return _search_registries(bare)
 
         return None
-    except Exception:  # noqa: BLE001
+    except Exception:
         logger.warning("model_profile_lookup_failed", model_id=model_id, exc_info=True)
         return None

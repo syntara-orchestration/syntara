@@ -153,7 +153,7 @@ async def _close_temporal_client(client: Client) -> None:
         result = close()
         if asyncio.iscoroutine(result):
             await result
-    except Exception:  # noqa: BLE001
+    except Exception:
         logger.warning("Failed to close discarded Temporal client", exc_info=True)
 
 

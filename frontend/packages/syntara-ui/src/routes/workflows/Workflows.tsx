@@ -30,6 +30,7 @@ import { useWorkflowPermissions } from './useWorkflowPermissions'
 import { useWorkflowProjectControls } from './useWorkflowProjectControls'
 import { useWorkflowsPageToolbar } from './useWorkflowsPageToolbar'
 import { useWorkflowsQuery } from './useWorkflowsQuery'
+import { useVisibleUsedByCounts } from './useWorkflowUsedBy'
 import { WorkflowDialogs } from './WorkflowDialogs'
 import { transformIsEnabledFilter, workflowFilterDefinitions } from './workflowFilterDefinitions'
 import type { WorkflowRowActionCallbacks } from './workflowRowActions'
@@ -189,6 +190,7 @@ export default function Workflows() {
     handleUnpublishWorkflow,
     isDeleting,
     isPublishing,
+    triggerRemovalConfirmDialog,
   } = useWorkflowActions({
     showSuccess,
     showError,
@@ -204,7 +206,6 @@ export default function Workflows() {
     projectsForGrouping,
     isAllProjects
   )
-
   useCursorReset({
     itemCount: sortedWorkflows.length,
     hasActiveFilters,
@@ -242,7 +243,6 @@ export default function Workflows() {
   })
 
   const hasQueryError = !!workflowsQuery.error
-  const isInitialWorkflowsLoad = workflowsQuery.isLoading
   return (
     <>
       <SynPage>
@@ -271,7 +271,8 @@ export default function Workflows() {
         <SynPageBody>
           <SynListPanel>
             <WorkflowsListView
-              isPending={isInitialWorkflowsLoad}
+              usedByCountsById={useVisibleUsedByCounts(sortedWorkflows)}
+              isPending={workflowsQuery.isLoading}
               error={workflowsQuery.error}
               onRetry={() => detachPromise(workflowsQuery.refetch())}
               isFetching={workflowsQuery.isFetching}
@@ -331,6 +332,7 @@ export default function Workflows() {
         isPublishing={isPublishing}
         isDeletingProject={isDeletingProject}
       />
+      {triggerRemovalConfirmDialog}
     </>
   )
 }

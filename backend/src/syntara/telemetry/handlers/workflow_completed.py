@@ -57,7 +57,7 @@ class WorkflowCompletedTelemetryHandler(AuditEventHandler[WorkflowCompletedEvent
                 execution_id=str(event.execution_id),
                 status=event.status.value,
             )
-        except Exception:  # noqa: BLE001
+        except Exception:
             logger.warning(
                 "Failed to emit workflow_execution_completed telemetry (non-fatal)",
                 exc_info=True,

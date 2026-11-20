@@ -252,7 +252,7 @@ async def record_llm_call[T](
 
         try:
             _record_llm_metrics(recorder, collected)
-        except Exception:  # noqa: BLE001
+        except Exception:
             logger.debug("Failed to record LLM metrics", exc_info=True)
 
     return result  # type: ignore[no-any-return]
@@ -307,5 +307,5 @@ class LLMStreamTracker:
                     unit="ms",
                     labels={"model": self.model},
                 )
-            except Exception:  # noqa: BLE001
+            except Exception:
                 logger.debug("Failed to record TTFT metric", exc_info=True)

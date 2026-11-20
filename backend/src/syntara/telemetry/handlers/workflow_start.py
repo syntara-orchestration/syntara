@@ -51,7 +51,7 @@ class WorkflowStartTelemetryHandler(AuditEventHandler[WorkflowStartEvent]):
                 "Emitted workflow_execution_start telemetry",
                 execution_id=str(event.execution_id),
             )
-        except Exception:  # noqa: BLE001
+        except Exception:
             logger.warning(
                 "Failed to emit workflow_execution_start telemetry (non-fatal)",
                 exc_info=True,

@@ -60,7 +60,7 @@ type ExecuteWorkflowMutate = (
 ) => void
 
 type DeleteWorkflowMutate = (
-  variables: { params: { path: { workflow_id: string } } },
+  variables: { params: { path: { workflow_id: string }; query?: { confirm?: boolean } } },
   options?: {
     onSuccess?: () => void
     onError?: (error: unknown) => void
@@ -228,7 +228,7 @@ export function useBuilderToolbarHandlers({
     if (!workflow?.id) return
 
     deleteWorkflow(
-      { params: { path: { workflow_id: workflow.id } } },
+      { params: { path: { workflow_id: workflow.id }, query: { confirm: true } } },
       {
         onSuccess: () => {
           showSuccess({ title: 'Workflow deleted', description: `Workflow "${workflowName}" has been deleted.` })

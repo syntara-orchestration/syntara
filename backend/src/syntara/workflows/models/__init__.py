@@ -40,6 +40,7 @@ from .query_params import (
     ExecutionListParams,
     ExecutionStreamingQueryParams,
     WorkflowListParams,
+    WorkflowUsedByListParams,
     WorkflowVersionListParams,
 )
 from .signal import ActivitySignalPayload, SignalResponse
@@ -65,6 +66,9 @@ from .workflow import (
     WorkflowRead,
     WorkflowReadWithVersion,
     WorkflowUpdate,
+    WorkflowUsedByCount,
+    WorkflowUsedByCountsResponse,
+    WorkflowUsedByResponse,
 )
 from .workflow_definition import WorkflowDefinition
 from .workflow_invocation_schema import WorkflowInvocationSchemaRead, WorkflowInvocationTriggerSchema
@@ -126,6 +130,10 @@ __all__ = [
     "WorkflowReadWithVersion",
     "WorkflowReferenceRead",
     "WorkflowUpdate",
+    "WorkflowUsedByCount",
+    "WorkflowUsedByCountsResponse",
+    "WorkflowUsedByListParams",
+    "WorkflowUsedByResponse",
     "WorkflowValidateRequest",
     "WorkflowVersion",
     "WorkflowVersionListParams",

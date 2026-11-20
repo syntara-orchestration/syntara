@@ -45,7 +45,7 @@ class WorkflowVersionExportedTelemetryHandler(AuditEventHandler[WorkflowVersionE
                 workflow_id=str(event.workflow_id),
                 version=event.version,
             )
-        except Exception:  # noqa: BLE001
+        except Exception:
             logger.warning(
                 "Failed to emit workflow_version_exported telemetry (non-fatal)",
                 workflow_id=str(event.workflow_id),

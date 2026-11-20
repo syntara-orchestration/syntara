@@ -186,7 +186,7 @@ class ScheduledExecutionLauncher:
                     value=latency_ms,
                     labels={},
                 )
-            except Exception:  # noqa: BLE001
+            except Exception:
                 logger.debug("Failed to record success metric", exc_info=True)
 
             return result
@@ -197,7 +197,7 @@ class ScheduledExecutionLauncher:
                     value=1,
                     labels={"status": "error"},
                 )
-            except Exception:  # noqa: BLE001
+            except Exception:
                 logger.debug("Failed to record error metric", exc_info=True)
             if isinstance(exc, WorkflowNotPublishedError):
                 # Permanent state: workflow is missing, disabled,

@@ -47,7 +47,7 @@ class WorkflowVersionRestoredTelemetryHandler(AuditEventHandler[WorkflowVersionR
                 restored_from_version=event.restored_from_version,
                 new_version=event.new_version,
             )
-        except Exception:  # noqa: BLE001
+        except Exception:
             logger.warning("Failed to emit workflow_version_restored telemetry (non-fatal)", exc_info=True)
 
         return None

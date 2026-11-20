@@ -246,7 +246,7 @@ describe('BuilderContent - Delete Workflow', () => {
     await screen.findByText('Delete workflow?')
     await user.click(
       screen.getByRole('checkbox', {
-        name: /I understand this workflow will be deleted and any in-progress runs will stop immediately/,
+        name: /I understand this workflow will be deleted/,
       })
     )
     await user.click(screen.getByRole('button', { name: 'Delete workflow' }))
@@ -255,7 +255,7 @@ describe('BuilderContent - Delete Workflow', () => {
     await waitFor(() => {
       expect(mockDeleteMutate).toHaveBeenCalledWith(
         expect.objectContaining({
-          params: { path: { workflow_id: 'workflow-1' } },
+          params: { path: { workflow_id: 'workflow-1' }, query: { confirm: true } },
         }),
         expect.any(Object)
       )
@@ -292,7 +292,7 @@ describe('BuilderContent - Delete Workflow', () => {
     await screen.findByText('Delete workflow?')
     await user.click(
       screen.getByRole('checkbox', {
-        name: /I understand this workflow will be deleted and any in-progress runs will stop immediately/,
+        name: /I understand this workflow will be deleted/,
       })
     )
     await user.click(screen.getByRole('button', { name: 'Delete workflow' }))

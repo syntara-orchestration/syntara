@@ -7,6 +7,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { accessFetchClient } from '../access/accessClient'
 
+import { WorkflowUsedByCountsContext } from './useWorkflowUsedBy'
 import type { WorkflowRowActionCallbacks } from './workflowRowActions'
 import { FlatWorkflowsTableBody, GroupedWorkflowsTableBody } from './WorkflowsTableBody'
 
@@ -225,5 +226,33 @@ describe('WorkflowsTableBody', () => {
       expect(screen.queryByRole('button', { name: 'Actions for Deploy Pipeline' })).not.toBeInTheDocument()
       expect(accessFetchClient.POST).not.toHaveBeenCalled()
     })
+  })
+})
+
+describe('Used-By column', () => {
+  it('renders the referenced-by count from context', () => {
+    renderInTable(
+      <WorkflowUsedByCountsContext.Provider value={new Map([['wf-1', 4]])}>
+        <FlatWorkflowsTableBody
+          workflows={[baseWorkflow]}
+          rowActionCallbacks={rowActionCallbacks}
+          isWorkflowProjectBuiltin={isWorkflowProjectBuiltin}
+        />
+      </WorkflowUsedByCountsContext.Provider>
+    )
+
+    expect(screen.getByText('4 workflows')).toBeInTheDocument()
+  })
+
+  it('shows a placeholder when the count is not yet known', () => {
+    renderInTable(
+      <FlatWorkflowsTableBody
+        workflows={[baseWorkflow]}
+        rowActionCallbacks={rowActionCallbacks}
+        isWorkflowProjectBuiltin={isWorkflowProjectBuiltin}
+      />
+    )
+
+    expect(screen.getByText('\u2014')).toBeInTheDocument()
   })
 })

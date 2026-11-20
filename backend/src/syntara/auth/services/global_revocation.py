@@ -41,7 +41,7 @@ logger = structlog.stdlib.get_logger(__name__)
 _CACHE_TTL = 10
 
 _SENTINEL = object()
-_revocation_ts_cache: TTLCache[str, datetime | None | object] = TTLCache(maxsize=1, ttl=_CACHE_TTL)
+_revocation_ts_cache: TTLCache[str, datetime | object | None] = TTLCache(maxsize=1, ttl=_CACHE_TTL)
 _CACHE_KEY = "global_revocation_ts"
 _fetch_lock = asyncio.Lock()
 

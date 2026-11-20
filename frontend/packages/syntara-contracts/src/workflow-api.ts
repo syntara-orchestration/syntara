@@ -76,6 +76,9 @@ export interface paths {
     /**
      * Delete workflow
      * @description Permanently delete a workflow and cascade-delete all its versions and executions.
+     *
+     *     If the workflow is referenced by published parents, deletion requires ``confirm=true``;
+     *     otherwise it returns 409 with the count of referencing parents (no parent details).
      */
     delete: operations['delete_workflow']
     options?: never
@@ -152,6 +155,50 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/workflows/used_by_counts': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * Batch Used-By totals for multiple workflows
+     * @description Return the Used-By total for each requested workflow the caller may read.
+     *
+     *     Totals count distinct published parents across all projects (matching the Used-By badge), so a workflow list can show per-row counts with one request instead of one call per row.
+     */
+    get: operations['get_workflow_used_by_counts']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/workflows/{workflow_id}/used_by': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * List published workflows that reference this workflow
+     * @description List published workflows whose published version references this workflow (Used-By).
+     *
+     *     ``total_count`` is every distinct published parent across all projects; ``resources`` is the page of parents the caller may view. Access requires read permission on this workflow.
+     */
+    get: operations['list_workflow_used_by']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/workflows/{workflow_id}/versions/{version}': {
     parameters: {
       query?: never
@@ -188,6 +235,9 @@ export interface paths {
     /**
      * Publish workflow version
      * @description Publish a specific workflow version.
+     *
+     *     If publishing removes a Subworkflow Trigger that published parents invoke, it requires
+     *     ``confirm=true``; otherwise it returns 409 with the count of affected parents (no parent details).
      */
     post: operations['publish_workflow_version']
     delete?: never
@@ -859,6 +909,73 @@ export interface components {
        * @description Array of resources in current page
        */
       resources: components['schemas']['WorkflowRead'][]
+    }
+    /**
+     * WorkflowUsedByResponse
+     * @description Paginated Used-By response: published workflows that reference a given workflow.
+     *
+     *     ``resources`` is the page of referencing parents the requester may view; ``total_count`` is the number of distinct published parents across all projects, not filtered by visibility.
+     * @example {
+     *       "next": "eyJpZCI6InV1aWQifQ",
+     *       "total": 150
+     *     }
+     * @example {
+     *       "next": "eyJpZCI6Im5leHQifQ",
+     *       "prev": "eyJpZCI6InByZXYifQ"
+     *     }
+     */
+    WorkflowUsedByResponse: {
+      /**
+       * Next
+       * @description Cursor for next page of results
+       */
+      next?: string | null
+      /**
+       * Prev
+       * @description Cursor for previous page of results
+       */
+      prev?: string | null
+      /**
+       * Total
+       * @description Total count of resources (only when include_total=true)
+       */
+      total?: number | null
+      /**
+       * Resources
+       * @description Array of resources in current page
+       */
+      resources: components['schemas']['WorkflowRead'][]
+      /**
+       * Total Count
+       * @description Distinct published parent workflows that reference this workflow, counted across all projects regardless of the requester's visibility.
+       */
+      total_count: number
+    }
+    /**
+     * WorkflowUsedByCount
+     * @description Used-By total for a single workflow, returned by the batch counts endpoint.
+     */
+    WorkflowUsedByCount: {
+      /**
+       * Workflow Id
+       * Format: uuid
+       */
+      workflow_id: string
+      /**
+       * Total Count
+       * @description Distinct published parent workflows that reference this workflow, across all projects.
+       */
+      total_count: number
+    }
+    /**
+     * WorkflowUsedByCountsResponse
+     * @description Batch Used-By totals for a set of workflows.
+     *
+     *     Totals are counted across all projects (matching the Used-By badge). Only workflows the caller may read are included; others are omitted so the endpoint cannot probe counts for workflows outside the caller's visibility.
+     */
+    WorkflowUsedByCountsResponse: {
+      /** Counts */
+      counts?: components['schemas']['WorkflowUsedByCount'][]
     }
     /**
      * WorkflowCreate
@@ -2900,7 +3017,9 @@ export interface operations {
   }
   delete_workflow: {
     parameters: {
-      query?: never
+      query?: {
+        confirm?: boolean
+      }
       header?: never
       path: {
         workflow_id: string
@@ -3059,6 +3178,72 @@ export interface operations {
       500: components['responses']['InternalServerError']
     }
   }
+  get_workflow_used_by_counts: {
+    parameters: {
+      query: {
+        workflow_ids: string[]
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Used-By totals for the requested workflows the caller may read */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['WorkflowUsedByCountsResponse']
+        }
+      }
+      400: components['responses']['BadRequestError']
+      401: components['responses']['UnauthorizedError']
+      403: components['responses']['ForbiddenError']
+      404: components['responses']['NotFoundError']
+      409: components['responses']['ConflictError']
+      422: components['responses']['ValidationError']
+      429: components['responses']['RateLimitError']
+      500: components['responses']['InternalServerError']
+    }
+  }
+  list_workflow_used_by: {
+    parameters: {
+      query?: {
+        limit?: number
+        cursor?: string | null
+        sort?: string | null
+        include_total?: boolean
+        trigger_node_ids?: string[] | null
+      }
+      header?: never
+      path: {
+        workflow_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Published parent workflows that reference this workflow */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['WorkflowUsedByResponse']
+        }
+      }
+      400: components['responses']['BadRequestError']
+      401: components['responses']['UnauthorizedError']
+      403: components['responses']['ForbiddenError']
+      404: components['responses']['NotFoundError']
+      409: components['responses']['ConflictError']
+      422: components['responses']['ValidationError']
+      429: components['responses']['RateLimitError']
+      500: components['responses']['InternalServerError']
+    }
+  }
   get_workflow_version: {
     parameters: {
       query?: never
@@ -3134,7 +3319,9 @@ export interface operations {
   }
   publish_workflow_version: {
     parameters: {
-      query?: never
+      query?: {
+        confirm?: boolean
+      }
       header?: never
       path: {
         workflow_id: string

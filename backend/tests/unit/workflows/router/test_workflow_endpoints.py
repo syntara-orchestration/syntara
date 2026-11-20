@@ -295,6 +295,7 @@ class TestWorkflowEndpoints:
             change_description=None,
             workflow_definition=None,
             expected_version=None,
+            confirm=False,
         )
         mock_build.assert_awaited_once_with(mock_workflow, mock_version, mock_service, warning="")
         assert result is mock_response
