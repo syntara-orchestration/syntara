@@ -37,7 +37,7 @@ import {
   getIntegrationTypeFilterDefinition,
 } from './integrationFilters'
 import { integrationDefaultSort, integrationTableColumns } from './integrationTableColumns'
-import { getBaseUrl, getEnabledResourceCount } from './integrationUtils'
+import { getBaseUrl, getEnabledResourceCount, isExecutionPlaneInfrastructure } from './integrationUtils'
 import { StatusLabel } from './StatusLabel'
 import { useIntegrationActions } from './useIntegrationActions'
 import { useIntegrationPermissions } from './useIntegrationPermissions'
@@ -50,7 +50,7 @@ function buildRowActions(
   deleteDialog: { open: (item: IntegrationRead) => void },
   permissions: ReturnType<typeof useIntegrationPermissions>
 ): KebabAction[] {
-  return [
+  const actions: KebabAction[] = [
     {
       key: 'validate',
       title: <IconLabel icon={<RhUiCheckCircleIcon />}>Validate integration</IconLabel>,
@@ -58,16 +58,23 @@ function buildRowActions(
       tooltipProps: permissions.canUpdate ? undefined : { content: permissions.tooltips.validate },
       onClick: permissions.canUpdate ? () => validateDialog.open(integration) : undefined,
     },
-    { key: 'separator', isSeparator: true },
-    {
-      key: 'delete',
-      title: <IconLabel icon={<RhUiTrashIcon />}>Delete integration</IconLabel>,
-      isDanger: true,
-      isAriaDisabled: !permissions.canDelete,
-      tooltipProps: permissions.canDelete ? undefined : { content: permissions.tooltips.delete },
-      onClick: permissions.canDelete ? () => deleteDialog.open(integration) : undefined,
-    },
   ]
+
+  if (!isExecutionPlaneInfrastructure(integration)) {
+    actions.push(
+      { key: 'separator', isSeparator: true },
+      {
+        key: 'delete',
+        title: <IconLabel icon={<RhUiTrashIcon />}>Delete integration</IconLabel>,
+        isDanger: true,
+        isAriaDisabled: !permissions.canDelete,
+        tooltipProps: permissions.canDelete ? undefined : { content: permissions.tooltips.delete },
+        onClick: permissions.canDelete ? () => deleteDialog.open(integration) : undefined,
+      }
+    )
+  }
+
+  return actions
 }
 
 function IntegrationsTableContent({
