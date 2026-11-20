@@ -57,12 +57,8 @@ export function useCanSubmitFormPrompt(prompt: ResponderConfig | undefined): {
     }
 
     if (!hasResponders) {
-      return {
-        canSubmit: !prompt.responders_configured,
-        isLoading: false,
-        isError: false,
-        refetch: groupsQuery.refetch,
-      }
+      const canSubmit = !prompt.responders_configured
+      return { canSubmit, isLoading: false, isError: false, refetch: groupsQuery.refetch }
     }
 
     if (isDirectMatch) {

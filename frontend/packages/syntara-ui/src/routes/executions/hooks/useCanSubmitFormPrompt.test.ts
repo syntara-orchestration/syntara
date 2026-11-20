@@ -54,13 +54,15 @@ describe('useCanSubmitFormPrompt', () => {
   })
 
   it('denies submit when responders were configured but none resolved', () => {
+    const refetch = vi.fn()
+    mockUseQuery.mockReturnValue({ isLoading: false, isError: false, data: [], refetch })
+
     const { result } = renderHook(
       () => useCanSubmitFormPrompt({ responder_users: [], responder_groups: [], responders_configured: true }),
       { wrapper: createWrapper() }
     )
 
-    expect(result.current.canSubmit).toBe(false)
-    expect(result.current.isLoading).toBe(false)
+    expect(result.current).toEqual({ canSubmit: false, isLoading: false, isError: false, refetch })
     expect(mockUseQuery.mock.lastCall?.[0]).toMatchObject({ enabled: false })
   })
 
