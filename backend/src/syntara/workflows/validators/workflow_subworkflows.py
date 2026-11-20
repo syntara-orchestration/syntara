@@ -98,11 +98,10 @@ async def _load_target_workflows(
         workflows[target_id].published_version_id for _, target_id, _, _ in node_targets if target_id in workflows
     }
     selected_ids.discard(None)
-    if not selected_ids:
-        return {}
-
-    version_result = await session.exec(select(WorkflowVersion).where(col(WorkflowVersion.id).in_(selected_ids)))
-    versions = {version.id: version for version in version_result.all()}
+    versions: dict[UUID, WorkflowVersion] = {}
+    if selected_ids:
+        version_result = await session.exec(select(WorkflowVersion).where(col(WorkflowVersion.id).in_(selected_ids)))
+        versions = {version.id: version for version in version_result.all()}
     targets: dict[UUID, TargetWorkflow] = {}
     for _, target_id, _, _ in node_targets:
         workflow = workflows.get(target_id)
