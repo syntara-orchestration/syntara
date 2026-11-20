@@ -73,8 +73,8 @@ import yaml
 
 
 DEFAULT_SPEC_PATH = "backend/src/syntara/schemas/openapi.yaml"
-# Privileged override label for breaking changes. Restricted to the
-# ``syntara-leads`` team via the Breaking Change Label Guard workflow; CI here
+# Privileged override label for breaking changes. The separate
+# ``approval-label-authorization`` workflow verifies who may change it; CI here
 # only checks for its presence.
 BREAKING_CHANGE_APPROVED_LABEL = "breaking-change-approved"
 
@@ -279,10 +279,10 @@ def check_approval_label(pr_labels_json: str) -> bool:
     ``["bug", "breaking-change-approved"]``), matched **exactly**. A JSON array
     is used instead of a comma-joined string so that a label name that itself
     contains a comma cannot be split into two and forge the approval label. The
-    match is case-sensitive to stay consistent with the exact-case ``if:``
-    conditions in ``breaking-change-label-guard.yml`` and
-    ``openapi-breaking-changes.yml``; a case-variant label that never triggers
-    those guards must not be accepted here either.
+    match is case-sensitive to stay consistent with the exact label comparison
+    in ``approval-label-authorization.yml`` and the label filter in
+    ``openapi-breaking-changes.yml``; a case-variant must not be accepted as
+    this exact approval label.
 
     Args:
         pr_labels_json: JSON-encoded array of PR label names
@@ -405,7 +405,7 @@ def evaluate_gate(
                 "  - A new major version must be a new spec served from a separate URL path "
                 "(it would not register as a breaking change here).\n"
                 f"  - For an approved emergency override, request the '{BREAKING_CHANGE_APPROVED_LABEL}' "
-                "label from engineering leadership (syntara-leads)."
+                "label from the ansible-staff-eng-leads team."
             ),
         )
 

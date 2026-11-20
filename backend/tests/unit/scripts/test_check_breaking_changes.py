@@ -1300,7 +1300,6 @@ class TestPostBreakingChangesComment:
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
 BACKEND_ROOT = Path(__file__).resolve().parents[3]
-LABEL_GUARD_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "breaking-change-label-guard.yml"
 
 
 class TestLegacyOverrideRemoved:
@@ -1385,52 +1384,6 @@ class TestLabelInjectionSafety:
         assert "MERGE_GROUP_HEAD_SHA: ${{ github.event.merge_group.head_sha || '' }}" in workflow
         assert 'test "$(git rev-parse HEAD)" = "$MERGE_GROUP_HEAD_SHA"' in workflow
         assert 'make check-openapi-breaking OPENAPI_BASE_REF="$MERGE_GROUP_BASE_SHA"' in workflow
-
-
-class TestBreakingChangeLabelGuard:
-    """Contract tests for unauthorized label application being removed.
-
-    The guard is a pull_request_target GitHub Action (inline JS, no PR code
-    executed). These tests lock the workflow to: verify syntara-leads
-    membership, and on failure remove the label, comment, and fail the check.
-    """
-
-    def test_workflow_exists(self):
-        assert LABEL_GUARD_WORKFLOW.is_file()
-
-    def test_triggers_on_label_added(self):
-        text = LABEL_GUARD_WORKFLOW.read_text()
-        assert "pull_request_target:" in text
-        # Broadened so the guard reports a (skipped) check on every PR and can be
-        # made a required status check; the labeled event is what actually runs it.
-        assert "labeled" in text
-        assert "github.event.label.name == 'breaking-change-approved'" in text
-
-    def test_verifies_syntara_leads_membership(self):
-        text = LABEL_GUARD_WORKFLOW.read_text()
-        assert "syntara-leads" in text
-        assert "getMembershipForUserInOrg" in text
-        assert "res.data.state === 'active'" in text
-
-    def test_unauthorized_application_removed(self):
-        text = LABEL_GUARD_WORKFLOW.read_text()
-        assert "issues.removeLabel" in text
-        assert "issues.createComment" in text
-        assert "core.setFailed" in text
-        assert "label has been removed" in text
-
-    def test_fails_closed_without_org_token(self):
-        text = LABEL_GUARD_WORKFLOW.read_text()
-        assert "SYNTARA_LEADS_READ_TOKEN" in text
-        # A missing token fails fast in a preflight step rather than silently
-        # falling back to GITHUB_TOKEN (which cannot read team membership).
-        assert "Ensure org-read token is configured" in text
-        assert "secrets.GITHUB_TOKEN" not in text
-        assert "isMember = false" in text
-
-    def test_membership_check_uses_only_org_read_token(self):
-        text = LABEL_GUARD_WORKFLOW.read_text()
-        assert "github-token: ${{ secrets.SYNTARA_LEADS_READ_TOKEN }}" in text
 
 
 class TestOpenapiBreakingChangesWorkflow:

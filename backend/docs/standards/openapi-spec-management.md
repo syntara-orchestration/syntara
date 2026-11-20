@@ -116,17 +116,16 @@ The only override for an in-place breaking change is the privileged `breaking-ch
 | Breaking change, no approval label | Blocked (`breaking_blocked`) |
 | Breaking change, `breaking-change-approved` label + minor increment | Allowed (`breaking_approved`) |
 
-### Privileged approval label (enforcement)
+### Privileged approval label (authorization)
 
-CI accepts the override when the PR has the `breaking-change-approved` label, but who may **apply** it is enforced by the **Breaking Change Label Guard** workflow (`.github/workflows/breaking-change-label-guard.yml`):
+CI accepts the override when the PR has the `breaking-change-approved` label. Authorization to add or remove it is enforced by `.github/workflows/approval-label-authorization.yml`, which calls the shared workflow in `ansible/actions` and checks the actor's active membership in `ansible/ansible-staff-eng-leads`.
 
-1. Create the label named exactly `breaking-change-approved`.
-2. When the label is added, the guard verifies the actor who added it is an active member of the `syntara-leads` team. If not, it **fails the check, removes the label, and posts a PR comment** explaining why.
-3. Team-membership lookups require a `read:org`-scoped token. Provision the `SYNTARA_LEADS_READ_TOKEN` secret (a fine-grained PAT or GitHub App token with organization **Members: read**). If it is missing, the guard **fails closed by failing the workflow run itself** (a configuration error); it does not remove the label or post a comment in that case, so making it a required status check (see #5) is what actually blocks the merge.
-4. After a lead applies the label to a failed PR, the OpenAPI Breaking Changes workflow re-runs on `labeled` / `unlabeled`. Re-run **(Backend) Check OpenAPI Breaking Changes** if that required check still shows the pre-label failure.
-5. Make **Breaking Change Label Guard** a required status check so an unauthorized label cannot merge during the window before the OpenAPI job re-runs.
+1. Use the label named exactly `breaking-change-approved`.
+2. When an authorized team member adds it, the workflow verifies the membership and records that verification in a follow-up comment. Unauthorized changes are reverted when possible, and the check reports whether the final label state is authorized.
+3. The caller needs the `ANSIBLE_ORG_MEMBERS_READ_ONLY_APP_CLIENT_ID` Actions variable and `ANSIBLE_ORG_MEMBERS_READ_ONLY_APP_PRIVATE_KEY` Actions secret. Ask an organization administrator to confirm that the Syntara repository can access them before relying on the workflow.
+4. After an authorized member applies the label to a failed PR, the OpenAPI Breaking Changes workflow re-runs on `labeled` / `unlabeled`. Re-run **(Backend) Check OpenAPI Breaking Changes** if that required check still shows the pre-label failure.
 
-GitHub has no native per-label permission; the label guard is the enforcement point. The contributor handbook for this process is in the [backend contributor guide](../../backend-contributing.md#breaking-change-override-process).
+GitHub has no native per-label permission; the shared authorization workflow enforces who may change this label. The contributor handbook for this process is in the [backend contributor guide](../../backend-contributing.md#breaking-change-override-process).
 
 ## CI Checks
 
