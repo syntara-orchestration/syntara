@@ -27,9 +27,9 @@ class FormPromptNodeParameters:
         response_schema (FormPromptNodeParametersResponseSchemaType0 | None | Unset): Backend-generated JSON Schema for
             normalized response_data values.
         responder_users (list[str] | None | Unset): Usernames allowed to respond. Empty/omitted = any user with
-            form_prompt:submit.
+            form_prompt:submit. A configured list whose names resolve to no users permits nobody to submit.
         responder_groups (list[str] | None | Unset): Group names whose members may respond. Empty/omitted = any user
-            with form_prompt:submit.
+            with form_prompt:submit. A configured list whose names resolve to no groups permits nobody to submit.
         response_window (int | None | Unset): Seconds the responder has before the prompt expires. Falls back to
             workflow_engine.form_prompt_response_window_seconds.
         fallback_decision (FormPromptNodeParametersFallbackDecisionType0 | None | Unset): Decision when form prompt

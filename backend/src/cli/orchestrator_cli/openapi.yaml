@@ -30800,18 +30800,22 @@ components:
             - type: 'null'
           title: Responded At
           description: When response was submitted
+        responders_configured:
+          type: boolean
+          title: Responders Configured
+          description: Whether the workflow author supplied any responder users or groups. True with no resolved responder entries means nobody can submit.
         responder_users:
           items:
             $ref: '#/components/schemas/ResponderUserSummary'
           type: array
           title: Responder Users
-          description: Users who can respond to this prompt (empty = any user with permission)
+          description: Resolved users who can respond. Empty lists allow any user with submit permission only when responders_configured is false.
         responder_groups:
           items:
             $ref: '#/components/schemas/ResponderGroupSummary'
           type: array
           title: Responder Groups
-          description: Groups whose members can respond to this prompt
+          description: Resolved groups whose members can respond. Empty lists allow any user with submit permission only when responders_configured is false.
         responded_by:
           anyOf:
             - $ref: '#/components/schemas/UserReference'
@@ -30832,6 +30836,7 @@ components:
         - execution_id
         - prompt_node_id
         - form_definition
+        - responders_configured
       title: FormPromptRead
       description: |-
         FormPrompt API response model with typed nested fields.
@@ -38302,7 +38307,7 @@ components:
               maxItems: 100
             - type: 'null'
           title: Responder Users
-          description: Usernames allowed to respond. Empty/omitted = any user with form_prompt:submit.
+          description: Usernames allowed to respond. Empty/omitted = any user with form_prompt:submit. If a configured list resolves to no users, the form-prompt node fails before creating a prompt.
         responder_groups:
           anyOf:
             - items:
@@ -38311,7 +38316,7 @@ components:
               maxItems: 50
             - type: 'null'
           title: Responder Groups
-          description: Group names whose members may respond. Empty/omitted = any user with form_prompt:submit.
+          description: Group names whose members may respond. Empty/omitted = any user with form_prompt:submit. If a configured list resolves to no groups, the form-prompt node fails before creating a prompt.
         response_window:
           anyOf:
             - type: integer

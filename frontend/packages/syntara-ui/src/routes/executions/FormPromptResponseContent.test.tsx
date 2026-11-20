@@ -108,6 +108,9 @@ const pendingPrompt: FormPromptRead = {
   timeout_at: '2027-08-04T16:41:00.000Z',
   form_definition: { fields: [] },
   submit_label: 'Send',
+  responder_users: [],
+  responder_groups: [],
+  responders_configured: false,
 }
 
 const submittedPrompt: FormPromptRead = {
@@ -317,10 +320,10 @@ describe('FormPromptResponseContent', () => {
     expect(screen.getByRole('progressbar', { name: 'Checking permissions' })).toBeInTheDocument()
   })
 
-  it('hides submit footer when user is not a configured responder', async () => {
+  it('hides submit footer for a configured prompt with no resolved responders', async () => {
     const user = userEvent.setup()
     mockFormsUseQuery.mockReturnValue({
-      data: pendingPrompt,
+      data: { ...pendingPrompt, responders_configured: true },
       isLoading: false,
       isError: false,
       error: null,
@@ -332,6 +335,7 @@ describe('FormPromptResponseContent', () => {
 
     expect(screen.queryByRole('button', { name: 'Send' })).not.toBeInTheDocument()
     const reasonField = screen.getByRole('textbox', { name: /Reason/i })
+    expect(reasonField).toHaveAttribute('readonly')
     await user.hover(reasonField)
     expect(await screen.findByText(/Contact your Admin to request access/)).toBeInTheDocument()
     expect(useCanSubmitFormPrompt).toHaveBeenCalled()

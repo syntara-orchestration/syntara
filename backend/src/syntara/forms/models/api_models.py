@@ -120,12 +120,25 @@ class FormPromptCreateRequest(SQLModel):
     responder_user_ids: list[UUID] | None = Field(
         None,
         max_length=FieldLimits.RESPONDER_LIST_MAX_LENGTH,
-        description="User IDs who can respond (null = any user with form_prompt:submit permission)",
+        description=(
+            "Resolved user IDs allowed to respond. Empty or null allows any user with "
+            "form_prompt:submit permission only when responders_configured is false."
+        ),
     )
     responder_group_ids: list[UUID] | None = Field(
         None,
         max_length=FieldLimits.RESPONDER_LIST_MAX_LENGTH,
-        description="Group IDs whose members can respond",
+        description=(
+            "Resolved group IDs whose members may respond. Empty or null allows any user with "
+            "form_prompt:submit permission only when responders_configured is false."
+        ),
+    )
+    responders_configured: bool = Field(
+        default=False,
+        description=(
+            "Whether the workflow author supplied any responder users or groups. "
+            "True with no resolved responder IDs rejects prompt creation."
+        ),
     )
 
     @field_validator("loop_iteration_path")

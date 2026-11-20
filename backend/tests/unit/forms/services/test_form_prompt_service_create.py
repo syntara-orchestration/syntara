@@ -6,13 +6,14 @@ duplicate detection, and database operations.
 
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import AsyncMock, Mock, patch
 from uuid import UUID, uuid4
 
 import pytest
 from sqlalchemy.exc import IntegrityError
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from syntara.core.exceptions import SafeValueError
 from syntara.forms.exceptions import (
     FormPromptAlreadyRequestedError,
     FormPromptExpiredError,
@@ -142,6 +143,56 @@ class TestFormPromptServiceCreate:
         assert result.prompt_node_id == "form1"
         assert result.name == "Test Form"
         assert result.status == "pending"
+
+    def test_responders_configured_defaults_false(self) -> None:
+        """Hand-built create requests default to the unrestricted case."""
+        assert _duplicate_request().responders_configured is False
+
+    @pytest.mark.asyncio
+    async def test_create_rejects_configured_responders_with_no_resolved_ids(self) -> None:
+        """A prompt with no resolvable configured responders fails before persistence."""
+        service, session = _make_service()
+        request = FormPromptCreateRequest(
+            execution_id=uuid4(),
+            project_id=_TEST_PROJECT_ID,
+            prompt_node_id="form1",
+            name="Restricted form",
+            form_definition=_MINIMAL_FORM_DEFINITION,
+            temporal_activity_id="form1",
+            responder_user_ids=[],
+            responder_group_ids=[],
+            responders_configured=True,
+        )
+
+        with pytest.raises(SafeValueError, match="none of its configured responders could be resolved"):
+            await service.create(request)
+
+        session.add.assert_not_called()
+        session.get.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_create_rejection_logs_workflow_context(self) -> None:
+        """An unresolvable restriction emits a warning linked to its workflow node."""
+        service, _session = _make_service()
+        request = FormPromptCreateRequest(
+            execution_id=uuid4(),
+            project_id=_TEST_PROJECT_ID,
+            prompt_node_id="form1",
+            name="Restricted form",
+            form_definition=_MINIMAL_FORM_DEFINITION,
+            temporal_activity_id="form1",
+            responder_user_ids=[],
+            responder_group_ids=[],
+            responders_configured=True,
+        )
+
+        with patch("syntara.forms.services.form_prompt_service.logger.warning") as warning:
+            with pytest.raises(SafeValueError):
+                await service.create(request)
+
+        warning.assert_called_once()
+        assert warning.call_args.kwargs["execution_id"] == request.execution_id
+        assert warning.call_args.kwargs["prompt_node_id"] == "form1"
 
     @pytest.mark.asyncio
     async def test_success_stages_created_event_in_transaction(self, mock_audit_dispatcher: Mock) -> None:

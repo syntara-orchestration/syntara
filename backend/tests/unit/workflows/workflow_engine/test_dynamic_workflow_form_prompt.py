@@ -135,6 +135,7 @@ class TestPrepareFormPromptArgs:
             "timeout_at",
             "responder_user_ids",
             "responder_group_ids",
+            "responders_configured",
             "project_id",
             "loop_iteration_path",
             "temporal_activity_id",
@@ -148,6 +149,7 @@ class TestPrepareFormPromptArgs:
         assert args["form_definition"] == {}
         assert args["responder_user_ids"] == []
         assert args["responder_group_ids"] == []
+        assert args["responders_configured"] is False
         assert args["loop_iteration_path"] == []
         assert args["temporal_activity_id"] == "form1"
 
@@ -193,11 +195,120 @@ class TestPrepareFormPromptArgs:
 
         assert args["responder_user_ids"] == [alice_id, bob_id]
         assert args["responder_group_ids"] == [data_team_id]
+        assert args["responders_configured"] is True
 
         # Verify the resolution activity was called
         mock_execute.assert_called_once()
         call_kwargs = mock_execute.call_args.kwargs
         assert call_kwargs["args"] == [["alice", "bob"], ["data-team"]]
+
+    @pytest.mark.asyncio
+    async def test_all_configured_names_unresolvable_fails_form_prompt_node(self) -> None:
+        """A configured restriction with no resolved IDs fails before creating a prompt."""
+        wf = _make_workflow()
+        graph = _build_form_prompt_graph()
+        config = {"responder_users": ["missing-user"], "responder_groups": ["missing-group"]}
+        node = ActivityNode("form1", "form_prompt", config, name="Restricted form")
+
+        mock_execute = AsyncMock(return_value={"user_ids": [], "group_ids": []})
+        with (
+            patch(
+                "syntara.workflow_runtime.engines.temporal.form_prompt_mixin.workflow.execute_activity", mock_execute
+            ),
+            patch("syntara.workflow_runtime.engines.temporal.form_prompt_mixin.workflow.logger.warning") as warning,
+            pytest.raises(SafeValueError, match="none of its configured responders could be resolved"),
+        ):
+            await wf._execute_form_prompt_node(node, graph, config)
+
+        assert mock_execute.await_count == 1
+        assert mock_execute.call_args.args[0] == "resolve_approvers"
+        warning.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_responders_configured_true_with_partial_resolution(self) -> None:
+        """Partially resolved responder lists keep the restriction flag and resolved IDs."""
+        wf = _make_workflow()
+        graph = _build_form_prompt_graph()
+        config = {
+            "responder_users": ["alice", "missing-user"],
+            "responder_groups": ["missing-group"],
+        }
+        node = ActivityNode("form1", "form_prompt", config, name="Restricted form")
+        alice_id = str(uuid4())
+
+        mock_execute = AsyncMock(return_value={"user_ids": [alice_id], "group_ids": []})
+        with patch(
+            "syntara.workflow_runtime.engines.temporal.form_prompt_mixin.workflow.execute_activity", mock_execute
+        ):
+            args = await wf._prepare_form_prompt_input(node, graph, config)
+
+        assert args["responders_configured"] is True
+        assert args["responder_user_ids"] == [alice_id]
+        assert args["responder_group_ids"] == []
+
+    @pytest.mark.asyncio
+    async def test_responders_configured_false_for_empty_authored_lists(self) -> None:
+        """Empty user and group lists preserve the permission-based fallback."""
+        wf = _make_workflow()
+        graph = _build_form_prompt_graph()
+        config: dict[str, Any] = {"responder_users": [], "responder_groups": []}
+        node = ActivityNode("form1", "form_prompt", config, name="Unrestricted form")
+
+        mock_execute = AsyncMock(return_value={"user_ids": [], "group_ids": []})
+        with patch(
+            "syntara.workflow_runtime.engines.temporal.form_prompt_mixin.workflow.execute_activity", mock_execute
+        ):
+            args = await wf._prepare_form_prompt_input(node, graph, config)
+
+        assert args["responders_configured"] is False
+        assert mock_execute.call_args.kwargs["args"] == [[], []]
+
+    @pytest.mark.asyncio
+    async def test_blank_responder_names_fail_node_as_unresolved_restrictions(self) -> None:
+        """Blank authored entries remain configured, resolve to no IDs, and fail safely."""
+        wf = _make_workflow()
+        graph = _build_form_prompt_graph()
+        config = {"responder_users": [""], "responder_groups": ["  "]}
+        node = ActivityNode("form1", "form_prompt", config, name="Restricted form")
+
+        mock_execute = AsyncMock(return_value={"user_ids": [], "group_ids": []})
+        with (
+            patch(
+                "syntara.workflow_runtime.engines.temporal.form_prompt_mixin.workflow.execute_activity", mock_execute
+            ),
+            pytest.raises(SafeValueError, match="none of its configured responders could be resolved"),
+        ):
+            await wf._prepare_form_prompt_input(node, graph, config)
+
+        assert mock_execute.call_args.kwargs["args"] == [[""], ["  "]]
+
+    @pytest.mark.asyncio
+    async def test_bare_responder_string_fails_workflow_configuration(self) -> None:
+        """A bare string is rejected instead of reaching the resolver as characters."""
+        wf = _make_workflow()
+        graph = _build_form_prompt_graph()
+        config = {"responder_users": "alice"}
+        node = ActivityNode("form1", "form_prompt", config, name="Restricted form")
+
+        mock_execute = AsyncMock(return_value={"user_ids": [], "group_ids": []})
+        with patch(
+            "syntara.workflow_runtime.engines.temporal.form_prompt_mixin.workflow.execute_activity", mock_execute
+        ):
+            with pytest.raises(SafeValueError, match=r"responder_users.*list of names"):
+                await wf._prepare_form_prompt_input(node, graph, config)
+
+        mock_execute.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_unexpected_responder_value_fails_workflow(self) -> None:
+        """Malformed responder data fails instead of falling back to unrestricted access."""
+        wf = _make_workflow()
+        graph = _build_form_prompt_graph()
+        config = {"responder_users": 42}
+        node = ActivityNode("form1", "form_prompt", config, name="Restricted form")
+
+        with pytest.raises(SafeValueError, match="responder_users"):
+            await wf._prepare_form_prompt_input(node, graph, config)
 
     @pytest.mark.asyncio
     async def test_timeout_at_computed_from_response_window(self) -> None:
@@ -630,6 +741,41 @@ class TestMalformedOptionsContinueOnFailure:
 
 class TestExecuteFormPromptNode:
     """Tests for _execute_form_prompt_node method."""
+
+    @pytest.mark.asyncio
+    async def test_unresolved_responders_error_is_recorded_and_cof_routes_to_fallback(self) -> None:
+        """The safe resolver error becomes node details and follows the COF fallback route."""
+        wf = _make_workflow()
+        graph = _build_form_prompt_graph()
+        config = {
+            "responder_users": ["missing-user"],
+            "responder_groups": ["missing-group"],
+            "fallback_decision": "fallback",
+        }
+        node = ActivityNode("form1", "form_prompt", config, name="Restricted form")
+        wf.node_inputs[node.id] = config
+        mock_execute = AsyncMock(return_value={"user_ids": [], "group_ids": []})
+
+        with (
+            patch(
+                "syntara.workflow_runtime.engines.temporal.form_prompt_mixin.workflow.execute_activity",
+                mock_execute,
+            ),
+            pytest.raises(SafeValueError) as error,
+        ):
+            await wf._execute_form_prompt_node(node, graph, config)
+
+        assert mock_execute.await_count == 1
+        wf._handle_node_failure(node.id, error.value, graph, continue_on_failure=True)
+        with patch.object(wf, "_schedule_successors", AsyncMock()):
+            await wf._handle_continued_failure(node.id, node, graph, {})
+
+        assert (
+            wf.failed_nodes[node.id]
+            == "This form can't be completed because none of its configured responders could be resolved."
+        )
+        assert wf.resolver.get_namespace(node.id)["error"] == wf.failed_nodes[node.id]
+        assert wf.node_control_data[node.id] == {"next_port": "fallback"}
 
     @pytest.mark.asyncio
     async def test_successful_submission_returns_submitted_outcome(self) -> None:

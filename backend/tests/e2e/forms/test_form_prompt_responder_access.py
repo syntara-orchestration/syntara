@@ -125,6 +125,8 @@ def _start(
     prefix: str,
     responder_users: list[str] | None = None,
     responder_groups: list[str] | None = None,
+    expected_users: list[str] | None = None,
+    expected_groups: list[str] | None = None,
 ) -> tuple[UUID, UUID]:
     """Start a workflow with configured responders and return its IDs."""
     exec_id, prompt_row = start_pending_form_prompt(
@@ -140,11 +142,13 @@ def _start(
         responder_groups=responder_groups,
     )
     prompt_id = UUID(str(prompt_row.id))
+    prompt = get_form_prompt(syntara_api, prompt_id)
     assert_responders_configured(
-        get_form_prompt(syntara_api, prompt_id),
-        expected_users=responder_users,
-        expected_groups=responder_groups,
+        prompt,
+        expected_users=responder_users if expected_users is None else expected_users,
+        expected_groups=responder_groups if expected_groups is None else expected_groups,
     )
+    assert prompt.responders_configured is bool(responder_users or responder_groups)
     return exec_id, prompt_id
 
 
@@ -450,6 +454,36 @@ class TestCombinedResponderLists:
             responder_groups=[responder_env["group_x_name"]],
         )
         response = submit_form_prompt(responder_env["user_d_api"], prompt_id, _RESPONSE)
+        assert_forbidden(response, expected_code="FORM_PROMPT_NOT_AUTHORIZED")
+        assert_prompt_not_consumed(syntara_api, exec_id, prompt_id)
+
+        response = submit_form_prompt(responder_env["user_a_api"], prompt_id, _RESPONSE)
+        assert response.status_code == HTTPStatus.OK
+        assert_consumer_completed(syntara_api, exec_id)
+
+
+class TestPartiallyStaleResponderNames:
+    """Names that resolve still allow their responders when other names are stale."""
+
+    def test_partial_stale_user_list_enforces_resolved_subset(
+        self,
+        syntara_api: SyntaraApiRegistry,
+        workflow_factory: Callable[[WorkflowCreate], WorkflowRead],
+        responder_env: dict[str, Any],
+        form_execution_cleanup: Callable[[UUID], None],
+    ) -> None:
+        """Only the resolved username in a partially stale list may submit."""
+        exec_id, prompt_id = _start(
+            syntara_api,
+            workflow_factory,
+            responder_env,
+            form_execution_cleanup,
+            prefix="partial-stale-responder-user",
+            responder_users=[responder_env["user_a_name"], "fp-missing-user"],
+            expected_users=[responder_env["user_a_name"]],
+        )
+
+        response = submit_form_prompt(responder_env["user_b_api"], prompt_id, _RESPONSE)
         assert_forbidden(response, expected_code="FORM_PROMPT_NOT_AUTHORIZED")
         assert_prompt_not_consumed(syntara_api, exec_id, prompt_id)
 

@@ -2319,7 +2319,7 @@ components:
               maxItems: 100
             - type: 'null'
           title: Responder Users
-          description: Usernames allowed to respond. Empty/omitted = any user with form_prompt:submit.
+          description: Usernames allowed to respond. Empty/omitted = any user with form_prompt:submit. If a configured list resolves to no users, the form-prompt node fails before creating a prompt.
         responder_groups:
           anyOf:
             - items:
@@ -2328,7 +2328,7 @@ components:
               maxItems: 50
             - type: 'null'
           title: Responder Groups
-          description: Group names whose members may respond. Empty/omitted = any user with form_prompt:submit.
+          description: Group names whose members may respond. Empty/omitted = any user with form_prompt:submit. If a configured list resolves to no groups, the form-prompt node fails before creating a prompt.
         response_window:
           anyOf:
             - type: integer

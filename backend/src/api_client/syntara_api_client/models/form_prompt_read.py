@@ -37,6 +37,8 @@ class FormPromptRead:
             execution_id (UUID): Parent execution ID
             prompt_node_id (str): Canvas node ID from the workflow definition
             form_definition (FormDefinition): Complete form definition with fields and metadata.
+            responders_configured (bool): Whether the workflow author supplied any responder users or groups. True with no
+                resolved responder entries means nobody can submit.
             id (UUID | Unset): Unique identifier for the resource Example: 550e8400-e29b-41d4-a716-446655440000.
             created_at (datetime.datetime | Unset): Timestamp when resource was created Example: 2025-10-09T12:00:00Z.
             updated_at (datetime.datetime | Unset): Timestamp when resource was last updated Example: 2025-10-09T12:30:00Z.
@@ -51,9 +53,10 @@ class FormPromptRead:
             success_message (None | str | Unset): Message shown after successful form submission
             response_data (FormPromptReadResponseDataType0 | None | Unset): Submitted form values
             responded_at (datetime.datetime | None | Unset): When response was submitted
-            responder_users (list[ResponderUserSummary] | Unset): Users who can respond to this prompt (empty = any user
-                with permission)
-            responder_groups (list[ResponderGroupSummary] | Unset): Groups whose members can respond to this prompt
+            responder_users (list[ResponderUserSummary] | Unset): Resolved users who can respond. Empty lists allow any user
+                with submit permission only when responders_configured is false.
+            responder_groups (list[ResponderGroupSummary] | Unset): Resolved groups whose members can respond. Empty lists
+                allow any user with submit permission only when responders_configured is false.
             responded_by (None | Unset | UserReference): User who submitted the response
             signal_delivery_error (None | str | Unset): Error if the workflow signal failed after a response. Only present
                 in the respond response; null on subsequent reads.
@@ -64,6 +67,7 @@ class FormPromptRead:
     execution_id: UUID
     prompt_node_id: str
     form_definition: FormDefinition
+    responders_configured: bool
     id: UUID | Unset = UNSET
     created_at: datetime.datetime | Unset = UNSET
     updated_at: datetime.datetime | Unset = UNSET
@@ -95,6 +99,8 @@ class FormPromptRead:
         prompt_node_id = self.prompt_node_id
 
         form_definition = self.form_definition.to_dict()
+
+        responders_configured = self.responders_configured
 
         id: str | Unset = UNSET
         if not isinstance(self.id, Unset):
@@ -205,6 +211,7 @@ class FormPromptRead:
                 "execution_id": execution_id,
                 "prompt_node_id": prompt_node_id,
                 "form_definition": form_definition,
+                "responders_configured": responders_configured,
             }
         )
         if id is not UNSET:
@@ -263,6 +270,8 @@ class FormPromptRead:
         prompt_node_id = d.pop("prompt_node_id")
 
         form_definition = FormDefinition.from_dict(d.pop("form_definition"))
+
+        responders_configured = d.pop("responders_configured")
 
         _id = d.pop("id", UNSET)
         id: UUID | Unset
@@ -438,6 +447,7 @@ class FormPromptRead:
             execution_id=execution_id,
             prompt_node_id=prompt_node_id,
             form_definition=form_definition,
+            responders_configured=responders_configured,
             id=id,
             created_at=created_at,
             updated_at=updated_at,

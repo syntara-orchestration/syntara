@@ -44,12 +44,24 @@ describe('useCanSubmitFormPrompt', () => {
   })
 
   it('allows submit when no responders are configured', () => {
-    const { result } = renderHook(() => useCanSubmitFormPrompt({ responder_users: [], responder_groups: [] }), {
-      wrapper: createWrapper(),
-    })
+    const { result } = renderHook(
+      () => useCanSubmitFormPrompt({ responder_users: [], responder_groups: [], responders_configured: false }),
+      { wrapper: createWrapper() }
+    )
 
     expect(result.current.canSubmit).toBe(true)
     expect(result.current.isLoading).toBe(false)
+  })
+
+  it('denies submit when responders were configured but none resolved', () => {
+    const { result } = renderHook(
+      () => useCanSubmitFormPrompt({ responder_users: [], responder_groups: [], responders_configured: true }),
+      { wrapper: createWrapper() }
+    )
+
+    expect(result.current.canSubmit).toBe(false)
+    expect(result.current.isLoading).toBe(false)
+    expect(mockUseQuery.mock.lastCall?.[0]).toMatchObject({ enabled: false })
   })
 
   it('allows submit when current user is a direct responder', () => {
@@ -58,6 +70,7 @@ describe('useCanSubmitFormPrompt', () => {
         useCanSubmitFormPrompt({
           responder_users: [{ id: 'user-1', username: 'me' }],
           responder_groups: [],
+          responders_configured: true,
         }),
       { wrapper: createWrapper() }
     )
@@ -71,6 +84,7 @@ describe('useCanSubmitFormPrompt', () => {
         useCanSubmitFormPrompt({
           responder_users: [{ id: 'other-user', username: 'other' }],
           responder_groups: [],
+          responders_configured: true,
         }),
       { wrapper: createWrapper() }
     )
@@ -98,6 +112,7 @@ describe('useCanSubmitFormPrompt', () => {
         useCanSubmitFormPrompt({
           responder_users: [],
           responder_groups: [{ id: 'group-a', name: 'Ops' }],
+          responders_configured: true,
         }),
       { wrapper: createWrapper() }
     )
@@ -120,6 +135,7 @@ describe('useCanSubmitFormPrompt', () => {
         useCanSubmitFormPrompt({
           responder_users: [],
           responder_groups: [{ id: 'group-a', name: 'Ops' }],
+          responders_configured: true,
         }),
       { wrapper: createWrapper() }
     )

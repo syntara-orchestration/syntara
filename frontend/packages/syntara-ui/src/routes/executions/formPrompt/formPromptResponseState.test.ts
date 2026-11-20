@@ -13,6 +13,7 @@ const basePrompt = {
   prompt_node_id: 'node',
   name: 'Form',
   status: 'pending' as const,
+  responders_configured: false,
   form_definition: { fields: [] },
   timeout_at: '2030-01-01T00:00:00.000Z',
 }

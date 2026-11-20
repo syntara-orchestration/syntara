@@ -135,6 +135,18 @@ class BaseFormPrompt(BaseResource, table=False):
         description="Message shown after successful form submission",
     )
 
+    # Snapshot of authored responder intent. The junction tables only store
+    # resolved IDs, so this distinguishes an unrestricted prompt from a
+    # restriction whose names resolved to no responders.
+    responders_configured: bool = Field(
+        default=False,
+        description=(
+            "Whether the workflow author supplied any responder users or groups. "
+            "True with no resolved responder entries means nobody can submit."
+        ),
+        sa_column_kwargs={"server_default": text("false")},
+    )
+
     # Response fields (without responded_by)
     response_data: dict[str, Any] | None = Field(
         default=None,
@@ -250,14 +262,29 @@ class FormPromptRead(UserReferenceFieldsMixin, BaseFormPrompt, table=False):
         description="Enclosing-loop indices, outermost first (empty when not inside a loop)",
     )
 
+    # The DB model has a default for existing rows; API responses always include this field.
+    responders_configured: bool = Field(
+        ...,
+        description=(
+            "Whether the workflow author supplied any responder users or groups. "
+            "True with no resolved responder entries means nobody can submit."
+        ),
+    )
+
     # Responder configuration - API returns summary objects
     responder_users: list[ResponderUserSummary] = Field(
         default_factory=list,
-        description="Users who can respond to this prompt (empty = any user with permission)",
+        description=(
+            "Resolved users who can respond. Empty lists allow any user with submit permission "
+            "only when responders_configured is false."
+        ),
     )
     responder_groups: list[ResponderGroupSummary] = Field(
         default_factory=list,
-        description="Groups whose members can respond to this prompt",
+        description=(
+            "Resolved groups whose members can respond. Empty lists allow any user with submit "
+            "permission only when responders_configured is false."
+        ),
     )
 
     # Response field - API returns UserReference object

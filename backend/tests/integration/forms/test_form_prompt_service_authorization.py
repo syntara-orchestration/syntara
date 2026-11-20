@@ -101,7 +101,12 @@ class _FormPromptAuthorizationSetup:
         await self.session.commit()
         return project
 
-    async def create_prompt(self, project_id: UUID | None = None) -> FormPrompt:
+    async def create_prompt(
+        self,
+        project_id: UUID | None = None,
+        *,
+        responders_configured: bool = False,
+    ) -> FormPrompt:
         """Persist a pending prompt in the selected or default test project."""
         prompt = FormPrompt(
             project_id=project_id if project_id is not None else self.project_id,
@@ -111,6 +116,7 @@ class _FormPromptAuthorizationSetup:
             name="Test form",
             form_definition=_FORM_DEFINITION,
             status=FormPromptStatus.PENDING,
+            responders_configured=responders_configured,
         )
         self.session.add(prompt)
         await self.session.commit()
@@ -145,7 +151,7 @@ class _FormPromptAuthorizationSetup:
             self.session.add(FormPromptResponderGroup(form_prompt_id=prompt.id, group_id=group.id))
         elif mode == "neither":
             self.session.add(FormPromptResponderUser(form_prompt_id=prompt.id, user_id=other_users[0].id))
-        elif mode != "empty":
+        elif mode not in {"empty", "stale"}:
             msg = f"Unknown responder test mode: {mode}"
             raise ValueError(msg)
         await self.session.commit()
@@ -193,6 +199,7 @@ class TestFormPromptServiceAuthorizationAPI:
         assert response.status_code == expected_status
         if expected_status == 200:
             assert response.json()["id"] == str(prompt.id)
+            assert response.json()["responders_configured"] is False
         else:
             assert response.json()["code"] == "AUTHORIZATION_DENIED"
 
@@ -326,3 +333,140 @@ async def test_service_submit_raises_not_authorized_for_nonresponder(
 
     assert exc_info.value.form_prompt_id == prompt.id
     assert exc_info.value.user_id == form_prompt_setup.user.id
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_service_submit_fails_closed_when_all_responder_rows_are_gone(
+    form_prompt_setup: _FormPromptAuthorizationSetup,
+) -> None:
+    """A previously restricted prompt with no remaining junction rows denies submitters."""
+    prompt = await form_prompt_setup.create_prompt(responders_configured=True)
+    service = FormPromptService(session=form_prompt_setup.session, user=form_prompt_setup.user)
+
+    with pytest.raises(FormPromptNotAuthorizedError):
+        await service.submit(prompt.id, {"reason": "not allowed"})
+
+    await form_prompt_setup.session.refresh(prompt)
+    assert prompt.status == FormPromptStatus.PENDING
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_service_submit_partial_resolution_allows_only_resolved_user(
+    form_prompt_setup: _FormPromptAuthorizationSetup,
+    multiple_local_users: list[User],
+) -> None:
+    """A partially resolved restriction allows its remaining direct responder only."""
+    prompt = await form_prompt_setup.create_prompt(responders_configured=True)
+    form_prompt_setup.session.add(FormPromptResponderUser(form_prompt_id=prompt.id, user_id=form_prompt_setup.user.id))
+    await form_prompt_setup.session.commit()
+
+    prompt_record = await FormPromptService(
+        session=form_prompt_setup.session,
+        user=form_prompt_setup.user,
+    )._get_form_prompt_record(prompt.id)
+    assert prompt_record is not None
+    await FormPromptService(session=form_prompt_setup.session, user=form_prompt_setup.user)._validate_responder(
+        prompt_record
+    )
+
+    nonresponder = FormPromptService(
+        session=form_prompt_setup.session,
+        user=multiple_local_users[0],
+    )
+    with pytest.raises(FormPromptNotAuthorizedError):
+        await nonresponder._validate_responder(prompt_record)
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_service_submit_fails_closed_after_last_responder_user_is_deleted(
+    form_prompt_setup: _FormPromptAuthorizationSetup,
+    multiple_local_users: list[User],
+) -> None:
+    """Deleting the final resolved responder leaves authored intent restricted."""
+    responder = multiple_local_users[0]
+    prompt = await form_prompt_setup.create_prompt(responders_configured=True)
+    form_prompt_setup.session.add(FormPromptResponderUser(form_prompt_id=prompt.id, user_id=responder.id))
+    await form_prompt_setup.session.commit()
+    await form_prompt_setup.session.delete(responder)
+    await form_prompt_setup.session.commit()
+
+    service = FormPromptService(session=form_prompt_setup.session, user=form_prompt_setup.user)
+    prompt_record = await service._get_form_prompt_record(prompt.id)
+    assert prompt_record is not None
+    with pytest.raises(FormPromptNotAuthorizedError):
+        await service._validate_responder(prompt_record)
+    assert prompt_record.responders_configured is True
+    assert prompt_record.status == FormPromptStatus.PENDING
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_service_submit_fails_closed_after_last_responder_group_is_deleted(
+    form_prompt_setup: _FormPromptAuthorizationSetup,
+    test_group: Group,
+) -> None:
+    """Deleting the final resolved responder group leaves authored intent restricted."""
+    prompt = await form_prompt_setup.create_prompt(responders_configured=True)
+    form_prompt_setup.session.add(FormPromptResponderGroup(form_prompt_id=prompt.id, group_id=test_group.id))
+    await form_prompt_setup.session.exec(
+        insert(user_groups).values(user_id=form_prompt_setup.user.id, group_id=test_group.id)
+    )
+    await form_prompt_setup.session.commit()
+
+    service = FormPromptService(session=form_prompt_setup.session, user=form_prompt_setup.user)
+    prompt_record = await service._get_form_prompt_record(prompt.id)
+    assert prompt_record is not None
+    await service._validate_responder(prompt_record)
+
+    await form_prompt_setup.session.delete(test_group)
+    await form_prompt_setup.session.commit()
+    prompt_record = await service._get_form_prompt_record(prompt.id)
+    assert prompt_record is not None
+    with pytest.raises(FormPromptNotAuthorizedError):
+        await service._validate_responder(prompt_record)
+    assert prompt_record.responders_configured is True
+    assert prompt_record.status == FormPromptStatus.PENDING
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_service_submit_keeps_remaining_group_after_another_is_deleted(
+    form_prompt_setup: _FormPromptAuthorizationSetup,
+    multiple_local_users: list[User],
+    test_group: Group,
+) -> None:
+    """Removing one of several resolved groups preserves the remaining responder rule."""
+    remaining_group = Group(name=f"remaining-{uuid4().hex[:8]}", description="", labels={})
+    form_prompt_setup.session.add(remaining_group)
+    await form_prompt_setup.session.flush()
+    prompt = await form_prompt_setup.create_prompt(responders_configured=True)
+    form_prompt_setup.session.add_all(
+        [
+            FormPromptResponderGroup(form_prompt_id=prompt.id, group_id=test_group.id),
+            FormPromptResponderGroup(form_prompt_id=prompt.id, group_id=remaining_group.id),
+        ]
+    )
+    await form_prompt_setup.session.exec(
+        insert(user_groups).values(user_id=form_prompt_setup.user.id, group_id=remaining_group.id)
+    )
+    await form_prompt_setup.session.commit()
+    await form_prompt_setup.session.delete(test_group)
+    await form_prompt_setup.session.commit()
+
+    prompt_record = await FormPromptService(
+        session=form_prompt_setup.session,
+        user=form_prompt_setup.user,
+    )._get_form_prompt_record(prompt.id)
+    assert prompt_record is not None
+    await FormPromptService(session=form_prompt_setup.session, user=form_prompt_setup.user)._validate_responder(
+        prompt_record
+    )
+
+    with pytest.raises(FormPromptNotAuthorizedError):
+        await FormPromptService(
+            session=form_prompt_setup.session,
+            user=multiple_local_users[0],
+        )._validate_responder(prompt_record)

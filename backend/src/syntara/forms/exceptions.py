@@ -12,6 +12,10 @@ from syntara.core.exceptions import SyntaraError
 from syntara.forms.models.api_models import FormPromptStatus
 from syntara.forms.models.form_errors import FormFieldError
 
+FORM_PROMPT_NO_RESOLVED_RESPONDERS_MESSAGE = (
+    "This form can't be completed because none of its configured responders could be resolved."
+)
+
 
 class FormError(SyntaraError):
     """Base exception for all form errors."""

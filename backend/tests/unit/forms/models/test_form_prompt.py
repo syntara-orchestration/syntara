@@ -104,6 +104,7 @@ class TestFormPromptValidation:
         assert prompt.status == FormPromptStatus.PENDING
         assert prompt.loop_iteration_path == []
         assert prompt.labels == {}
+        assert prompt.responders_configured is False
 
     def test_model_serialization(self) -> None:
         """Test model_dump and model_validate round trip."""
