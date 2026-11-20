@@ -45,9 +45,8 @@ nodes:
 
   - id: analyze_country
     name: Analyze Country Data
-    type: script
+    type: script_python
     parameters:
-      language: python
       environment:
         INPUT_NAME: ${fetch_country.body.0.name.common}
         INPUT_OFFICIAL_NAME: ${fetch_country.body.0.name.official}
