@@ -21,7 +21,7 @@ export async function fetchOpenShiftIntegrationExists(): Promise<boolean> {
 
 /**
  * Whether an openshift (Execution plane infrastructure) integration already exists.
- * Refetches on every mount so delete-then-recreate is not blocked by a stale cache.
+ * Refetches on every mount so create/delete is not interrupted by a stale cache.
  *
  * `isUnavailable` stays true until this mount's lookup succeeds with no existing
  * integration — so the create form does not offer the type while pending/failed,

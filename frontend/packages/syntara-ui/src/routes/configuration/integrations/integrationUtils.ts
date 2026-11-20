@@ -34,6 +34,10 @@ export function isLLMProvider(integration: IntegrationRead): boolean {
   return result.success && result.data.integration_type === IntegrationTypeEnum.LLM_PROVIDER
 }
 
+export function isExecutionPlaneInfrastructure(integration: IntegrationRead): boolean {
+  return integration.integration_type === IntegrationTypeEnum.OPENSHIFT
+}
+
 export function getProviderHint(integration: IntegrationRead): string {
   const config = integration.configuration
   if (config && 'provider_hint' in config) return String(config.provider_hint ?? '')

@@ -265,6 +265,8 @@ Integration permission gating uses `useIntegrationPermissions` hook checking `in
 | Enable/disable tools/models | `integration:update` | `canUpdate` prop on tab checkboxes + save button      |
 | Refresh tools/models        | `integration:update` | `isAriaDisabled` on refresh button                    |
 
+**Note**: Delete is also subject to an independent business rule (not a permission): for Execution plane infrastructure (`openshift`) integrations, the Delete kebab action is omitted on the list and detail views regardless of `integration:delete`. The other three integration types still use the permission gating above.
+
 ### Execution Plane — gated
 
 Execution target permission gating uses `useExecutionTargetPermissions` checking `execution_target:read`, `execution_target:create`, `execution_target:update`, and `execution_target:delete`. List/detail read access is gated by nav/`requiredPermissions` (`execution_target:read`); viewer/user are denied the route entirely. Workflow editors without `execution_target:read` can still edit workflows, but Script affinity **Required target** is disabled with an access explanation and the targets list is not requested.

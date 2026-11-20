@@ -473,6 +473,87 @@ describe('Integrations Component', () => {
         })
       ).toBeInTheDocument()
     })
+
+    it('hides Delete for execution plane infrastructure integrations', async () => {
+      const user = userEvent.setup()
+      vi.mocked(integrationsClient.useQuery).mockReturnValue({
+        data: {
+          resources: [
+            {
+              ...mockIntegrations[0],
+              id: 'openshift-1',
+              name: 'OpenShift Cluster',
+              integration_type: 'openshift',
+              configuration: {
+                integration_type: 'openshift',
+                base_url: 'https://api.openshift.example.com',
+              },
+            },
+          ],
+        },
+        isPending: false,
+        isError: false,
+        error: null,
+        refetch: vi.fn(),
+      })
+
+      render(<Integrations />, { wrapper })
+
+      await user.click(screen.getByRole('button', { name: /Actions for OpenShift Cluster/i }))
+
+      expect(await screen.findByRole('menuitem', { name: /validate integration/i })).toBeInTheDocument()
+      expect(screen.queryByRole('menuitem', { name: /delete integration/i })).not.toBeInTheDocument()
+    })
+
+    it.each([
+      {
+        name: 'MCP Server',
+        integration_type: 'mcp_server',
+        configuration: { integration_type: 'mcp_server', base_url: 'https://mcp.example.com' },
+      },
+      {
+        name: 'LLM Provider',
+        integration_type: 'llm_provider',
+        configuration: {
+          integration_type: 'llm_provider',
+          provider_hint: 'openai',
+          base_url: 'https://api.openai.com/v1',
+        },
+      },
+      {
+        name: 'Ansible Automation Platform',
+        integration_type: 'ansible_automation_platform',
+        configuration: {
+          integration_type: 'ansible_automation_platform',
+          base_url: 'https://gateway.example.com',
+        },
+      },
+    ] as const)('shows Delete for $name integrations', async ({ name, integration_type, configuration }) => {
+      const user = userEvent.setup()
+      vi.mocked(integrationsClient.useQuery).mockReturnValue({
+        data: {
+          resources: [
+            {
+              ...mockIntegrations[0],
+              id: `${integration_type}-1`,
+              name,
+              integration_type,
+              configuration,
+            },
+          ],
+        },
+        isPending: false,
+        isError: false,
+        error: null,
+        refetch: vi.fn(),
+      })
+
+      render(<Integrations />, { wrapper })
+
+      await user.click(screen.getByRole('button', { name: new RegExp(`Actions for ${name}`, 'i') }))
+
+      expect(await screen.findByRole('menuitem', { name: /delete integration/i })).toBeInTheDocument()
+    })
   })
 
   describe('Pagination', () => {
