@@ -15,7 +15,7 @@ import { render, screen } from '@testing-library/react'
 import { Position, ReactFlowProvider, type Node, type NodeProps } from '@xyflow/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { FlowNodeType } from '../../../../constants'
+import { FlowNodeType } from '../../../../constants/nodeTypes'
 import { buildSwitchCasePort } from '../../../builder/utils/switchCaseHelpers'
 
 const viewportState = vi.hoisted(() => ({ zoom: 0.5 }))

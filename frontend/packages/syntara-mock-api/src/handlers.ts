@@ -769,6 +769,12 @@ export const handlers = [
       last_ran_at: null,
     }
 
+    if (created.is_default) {
+      for (const item of executionTargets) {
+        item.is_default = false
+      }
+    }
+
     executionTargets.unshift(created)
 
     return HttpResponse.json(created, {

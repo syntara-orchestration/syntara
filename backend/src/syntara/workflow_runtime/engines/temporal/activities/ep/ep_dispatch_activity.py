@@ -283,10 +283,6 @@ async def _execute_script_activity(
     """Validate and submit one script Action, then await AO-owned callback completion."""
     activity.heartbeat({HEARTBEAT_STOP_MONITOR: True})
 
-    if not get_settings().script_nodes_enabled:
-        msg = "Script node execution is not enabled."
-        raise ApplicationError(msg, type="ScriptNodeDisabled", non_retryable=True)
-
     try:
         # The workflow engine adds internal control fields to the activity
         # payload. They are consumed during dispatch but are not node parameters.

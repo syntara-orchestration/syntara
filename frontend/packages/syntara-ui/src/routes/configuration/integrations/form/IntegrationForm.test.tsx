@@ -8,7 +8,7 @@ import { axe } from 'vitest-axe'
 
 import { tanstackRouter } from '../../../../app/tanstackRouter'
 import { integrationsClient } from '../../../../client'
-import { AlertProvider } from '../../../../providers/alerts'
+import { AlertProvider } from '../../../../providers/alerts/AlertProvider'
 import type { DocKey } from '../../../../utils/docs/types'
 
 import { IntegrationForm } from './IntegrationForm'

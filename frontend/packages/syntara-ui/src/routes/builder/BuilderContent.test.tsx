@@ -8,7 +8,7 @@ import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
 
 import { approvalsClient, executionsClient, workflowClient, workflowFetchClient } from '../../client'
 import * as useCursorPaginationModule from '../../hooks/useCursorPagination'
-import { AlertProvider } from '../../providers/alerts'
+import { AlertProvider } from '../../providers/alerts/AlertProvider'
 import { FeatureFlagsProvider } from '../../providers/feature-flags-provider'
 import { ColorSchemeProvider } from '../../providers/theme/ColorSchemeProvider'
 import { useWorkflowStore } from '../../stores/useWorkflowStore'

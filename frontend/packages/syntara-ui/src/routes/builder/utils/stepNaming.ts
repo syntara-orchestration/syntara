@@ -1,6 +1,6 @@
 import { ExecutorTypeEnum } from '@syntara/contracts'
 
-import { RegistryStepId } from '../../../constants'
+import { RegistryStepId } from '../../../constants/registryStepIds'
 import { useWorkflowStore } from '../../../stores/useWorkflowStore'
 import { generateUUID } from '../../../utils/generateUUID'
 

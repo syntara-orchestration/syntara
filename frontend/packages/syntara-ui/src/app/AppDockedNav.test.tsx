@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 
 import { authClient } from '../client'
-import { BrandProvider } from '../providers/brand'
+import { BrandProvider } from '../providers/brand/BrandProvider'
 import { COLOR_SCHEME_STORAGE_KEY } from '../providers/theme/colorScheme'
 import { ColorSchemeProvider } from '../providers/theme/ColorSchemeProvider'
 

@@ -8,7 +8,7 @@ import { axe } from 'vitest-axe'
 
 import { executionPlaneClient } from '../../client'
 import { useCanI } from '../../hooks/useCanI'
-import { AlertProvider } from '../../providers/alerts'
+import { AlertProvider } from '../../providers/alerts/AlertProvider'
 import { expectPageTitle } from '../../test/pageTitle'
 
 import ExecutionTargetDetail from './ExecutionTargetDetail'
@@ -139,6 +139,7 @@ describe('ExecutionTargetDetail', () => {
     expect(screen.getByRole('switch', { name: 'Toggle Prod OpenShift West' })).toBeChecked()
     expect(screen.getAllByText('Enabled').length).toBeGreaterThanOrEqual(1)
     expect(screen.getByText('Active')).toBeInTheDocument()
+    expect(screen.getByText('Default')).toBeInTheDocument()
     expect(screen.getByText('workload=automation')).toBeInTheDocument()
     expect(screen.queryByText('region=us-west')).not.toBeInTheDocument()
     expect(screen.queryByRole('tab')).not.toBeInTheDocument()
@@ -224,8 +225,9 @@ describe('ExecutionTargetDetail', () => {
     expect(screen.getByRole('heading', { name: 'Error loading execution target' })).toBeInTheDocument()
   })
 
-  it('opens delete confirmation from the header actions menu', async () => {
+  it('opens delete confirmation from the header actions menu for a non-default target', async () => {
     const user = userEvent.setup()
+    mockFacadeQuery({ data: { ...mockTarget, is_default: false } })
     render(<ExecutionTargetDetail />, { wrapper })
 
     await user.click(await screen.findByRole('button', { name: 'Actions for Prod OpenShift West' }))
@@ -260,6 +262,7 @@ describe('ExecutionTargetDetail', () => {
 
   it('navigates to the Execution Plane list after a successful delete', async () => {
     const user = userEvent.setup()
+    mockFacadeQuery({ data: { ...mockTarget, is_default: false } })
     mockDeleteMutate.mockImplementation(
       (_params: unknown, callbacks?: { onSuccess?: (data: unknown) => void; onSettled?: () => void }) => {
         callbacks?.onSuccess?.({ id: 'et-001', accepted: true })
@@ -283,30 +286,19 @@ describe('ExecutionTargetDetail', () => {
     expect(mockNavigate).toHaveBeenCalledWith({ to: '/execution-plane' })
   })
 
-  it('stays on the detail page and shows an error when delete returns 409', async () => {
+  it('opens the cannot-delete modal when deleting the default execution target', async () => {
     const user = userEvent.setup()
-    mockDeleteMutate.mockImplementation(
-      (_params: unknown, callbacks?: { onError?: (error: unknown) => void; onSettled?: () => void }) => {
-        callbacks?.onError?.({
-          status: 409,
-          detail: 'Cannot delete the default execution target; promote another target first',
-        })
-        callbacks?.onSettled?.()
-      }
-    )
-
     render(<ExecutionTargetDetail />, { wrapper })
 
     await user.click(await screen.findByRole('button', { name: 'Actions for Prod OpenShift West' }))
     await user.click(screen.getByRole('menuitem', { name: /Delete execution target/i }))
 
     const dialog = await screen.findByRole('dialog')
-    await user.click(within(dialog).getByRole('checkbox', { name: /permanently deleted/i }))
-    await user.click(within(dialog).getByRole('button', { name: 'Delete' }))
-
-    expect(await screen.findByText('Delete failed')).toBeInTheDocument()
+    expect(within(dialog).getByText('Cannot delete default execution target')).toBeInTheDocument()
+    expect(within(dialog).getByText(/Set another execution target as default before deleting/)).toBeInTheDocument()
+    expect(within(dialog).getByText('Prod OpenShift West')).toBeInTheDocument()
+    expect(mockDeleteMutate).not.toHaveBeenCalled()
     expect(mockNavigate).not.toHaveBeenCalled()
-    expect(screen.getByRole('heading', { level: 1, name: 'Prod OpenShift West' })).toBeInTheDocument()
   })
 
   it('disables edit button and delete kebab when update/delete are denied', async () => {

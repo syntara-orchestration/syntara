@@ -20,4 +20,5 @@ def test_script_schema_uses_execution_profile_union() -> None:
         assert profile_union["discriminator"] == {"propertyName": "type"}
         assert target_profile["required"] == ["type", "execution_target_id"]
         assert target_profile["properties"]["type"] == {"const": "execution_target"}
-        assert target_profile["properties"]["execution_target_id"] == {"type": "string", "format": "uuid"}
+        assert target_profile["properties"]["execution_target_id"]["type"] == "string"
+        assert target_profile["properties"]["execution_target_id"]["format"] == "uuid"

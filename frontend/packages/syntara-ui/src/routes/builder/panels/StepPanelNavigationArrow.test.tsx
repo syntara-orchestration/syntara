@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 
-import { RegistryStepId } from '../../../constants'
+import { RegistryStepId } from '../../../constants/registryStepIds'
 
 import type { UpstreamStepInfo } from './hooks/useUpstreamSteps'
 import { StepPanelNavigationArrow } from './StepPanelNavigationArrow'

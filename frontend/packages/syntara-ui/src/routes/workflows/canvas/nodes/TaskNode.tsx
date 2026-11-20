@@ -4,7 +4,7 @@ import { type Node, type NodeProps } from '@xyflow/react'
 import { SynDetailList } from '../../../../components/details/SynDetailList'
 import { SynStep } from '../../../../components/steps/SynStep'
 import { SynStepBody } from '../../../../components/steps/SynStepBody'
-import { FlowNodeType } from '../../../../constants'
+import { FlowNodeType } from '../../../../constants/nodeTypes'
 import type { ActivityStatus } from '../../execution/types'
 import { getStepTypeColor } from '../stepTypeColors'
 

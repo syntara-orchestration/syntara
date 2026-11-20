@@ -1,4 +1,4 @@
-import { Button, Content, StackItem, Switch, Truncate } from '@patternfly/react-core'
+import { Button, Content, Flex, FlexItem, StackItem, Switch, Truncate } from '@patternfly/react-core'
 import { RhUiAddIcon } from '@patternfly/react-icons'
 import { Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table'
 import type { ThProps } from '@patternfly/react-table'
@@ -9,6 +9,7 @@ import { useCallback, useMemo } from 'react'
 import { AppRoute } from '../../app/AppRoute'
 import { executionPlaneClient } from '../../client'
 import { DisabledWithTooltip } from '../../components/DisabledWithTooltip'
+import { SynLabel } from '../../components/labels/SynLabel'
 import { SynPage, SynPageBody } from '../../components/layout/SynPage'
 import { SynPageHeader } from '../../components/layout/SynPageHeader'
 import {
@@ -90,9 +91,18 @@ function ExecutionPlaneTableContent({
         {rows.map((target) => (
           <Tr key={target.id}>
             <Td dataLabel="Name">
-              <LinkCell href={AppRoute.ExecutionPlane.Detail.replace(':executionTargetId', target.id)}>
-                <Truncate content={target.name} />
-              </LinkCell>
+              <Flex spaceItems={{ default: 'spaceItemsSm' }} alignItems={{ default: 'alignItemsCenter' }}>
+                <FlexItem>
+                  <LinkCell href={AppRoute.ExecutionPlane.Detail.replace(':executionTargetId', target.id)}>
+                    <Truncate content={target.name} />
+                  </LinkCell>
+                </FlexItem>
+                {target.is_default ? (
+                  <FlexItem>
+                    <SynLabel color="blue">Default</SynLabel>
+                  </FlexItem>
+                ) : null}
+              </Flex>
             </Td>
             <Td dataLabel="OpenShift Cluster">
               <Truncate content={target.cluster_id} />

@@ -16,12 +16,13 @@ import { SynPageTitle } from '../../components/SynPageTitle'
 import { useDirtyFormGuard } from '../../hooks/useDirtyFormGuard'
 import { useFormMutationErrorHandler } from '../../hooks/useFormMutationErrorHandler'
 import { useSynForm } from '../../hooks/useSynForm'
-import { useAlerts } from '../../providers/alerts'
+import { useAlerts } from '../../providers/alerts/AlertContext'
 import { getValidationFieldErrors } from '../../utils/apiErrors'
 import { detachPromise } from '../../utils/detachPromise'
 import { useDocLink } from '../../utils/docs/useDocLink'
 
 import { CreateExecutionTargetFields } from './CreateExecutionTargetFields'
+import { CURRENT_DEFAULT_EXECUTION_TARGET_HINT, DEFAULT_EXECUTION_TARGET_HINT } from './executionTargetFieldHelp'
 import styles from './ExecutionTargetForm.module.css'
 import {
   EXECUTION_TARGET_FORM_DEFAULT_VALUES,
@@ -208,7 +209,14 @@ export function EditExecutionTarget() {
               }}
             >
               <SynForm form={form}>
-                <CreateExecutionTargetFields clusterName={clusterName} isClusterPending={isClusterPending} />
+                <CreateExecutionTargetFields
+                  clusterName={clusterName}
+                  isClusterPending={isClusterPending}
+                  isDefaultLocked={target.is_default}
+                  defaultCheckboxHint={
+                    target.is_default ? CURRENT_DEFAULT_EXECUTION_TARGET_HINT : DEFAULT_EXECUTION_TARGET_HINT
+                  }
+                />
               </SynForm>
             </Form>
           </Stack>

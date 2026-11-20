@@ -1,6 +1,7 @@
 import { ActionGroup, Button, Form, Stack } from '@patternfly/react-core'
 import { RhUiAddIcon } from '@patternfly/react-icons'
 import { useNavigate } from '@tanstack/react-router'
+import { useMemo } from 'react'
 
 import { AppRoute } from '../../app/AppRoute'
 import { breadcrumbsConfigureExecutionTarget } from '../../app/breadcrumbBuilders'
@@ -9,15 +10,17 @@ import { SynForm } from '../../components/forms/SynForm'
 import { SynPage, SynPageBody } from '../../components/layout/SynPage'
 import { SynPageHeader } from '../../components/layout/SynPageHeader'
 import { SynPanel } from '../../components/layout/SynPanel'
+import { useQueryState } from '../../components/states/useQueryState'
 import { SynPageTitle } from '../../components/SynPageTitle'
 import { useDirtyFormGuard } from '../../hooks/useDirtyFormGuard'
 import { useFormMutationErrorHandler } from '../../hooks/useFormMutationErrorHandler'
 import { useSynForm } from '../../hooks/useSynForm'
-import { useAlerts } from '../../providers/alerts'
+import { useAlerts } from '../../providers/alerts/AlertContext'
 import { detachPromise } from '../../utils/detachPromise'
 import { useDocLink } from '../../utils/docs/useDocLink'
 
 import { CreateExecutionTargetFields } from './CreateExecutionTargetFields'
+import { DEFAULT_EXECUTION_TARGET_HINT, FIRST_DEFAULT_EXECUTION_TARGET_HINT } from './executionTargetFieldHelp'
 import styles from './ExecutionTargetForm.module.css'
 import {
   EXECUTION_TARGET_FORM_DEFAULT_VALUES,
@@ -35,9 +38,30 @@ export function CreateExecutionTarget() {
   const { showAlert } = useAlerts()
   const { clusterName, isClusterPending } = useExecutionTargetClusterName()
 
+  const existingTargetsQuery = executionPlaneClient.useQuery('get', '/api/execution_plane/v1/execution_targets', {
+    params: { query: { limit: 1, include_total: true } },
+  })
+  const existingTargetsQueryState = useQueryState(existingTargetsQuery, {
+    title: 'Error loading execution targets',
+    onRetry: () => detachPromise(existingTargetsQuery.refetch()),
+  })
+
+  // Only treat count as zero after a successful fetch — a failed query must not lock default.
+  const existingTargetCount = existingTargetsQuery.isSuccess
+    ? (existingTargetsQuery.data.total ?? existingTargetsQuery.data.resources.length)
+    : undefined
+  const isDefaultLocked = existingTargetCount === 0
+
+  const formValues = useMemo(
+    () => ({ ...EXECUTION_TARGET_FORM_DEFAULT_VALUES, isDefault: isDefaultLocked }),
+    [isDefaultLocked]
+  )
+
   const form = useSynForm({
     schema: executionTargetFormSchema,
     defaultValues: EXECUTION_TARGET_FORM_DEFAULT_VALUES,
+    values: formValues,
+    resetOptions: { keepDirtyValues: true },
   })
   const {
     handleSubmit,
@@ -78,10 +102,24 @@ export function CreateExecutionTarget() {
     )
   }
 
+  const breadcrumbs = breadcrumbsConfigureExecutionTarget()
+
+  if (existingTargetsQueryState) {
+    return (
+      <SynPage>
+        <SynPageTitle segments={[PAGE_TITLE, 'Execution Plane']} />
+        <SynPageHeader title={PAGE_TITLE} docLink={docLink} breadcrumbs={breadcrumbs} />
+        <SynPageBody>
+          <SynPanel isFullHeight>{existingTargetsQueryState}</SynPanel>
+        </SynPageBody>
+      </SynPage>
+    )
+  }
+
   return (
     <SynPage>
       <SynPageTitle segments={[PAGE_TITLE, 'Execution Plane']} />
-      <SynPageHeader title={PAGE_TITLE} docLink={docLink} breadcrumbs={breadcrumbsConfigureExecutionTarget()} />
+      <SynPageHeader title={PAGE_TITLE} docLink={docLink} breadcrumbs={breadcrumbs} />
       <SynPageBody>
         <SynPanel
           isFullHeight
@@ -117,7 +155,14 @@ export function CreateExecutionTarget() {
           <Stack className={styles.formStack}>
             <Form id="execution-target-create-form" onSubmit={handleSubmit(onSubmit)}>
               <SynForm form={form}>
-                <CreateExecutionTargetFields clusterName={clusterName} isClusterPending={isClusterPending} />
+                <CreateExecutionTargetFields
+                  clusterName={clusterName}
+                  isClusterPending={isClusterPending}
+                  isDefaultLocked={isDefaultLocked}
+                  defaultCheckboxHint={
+                    isDefaultLocked ? FIRST_DEFAULT_EXECUTION_TARGET_HINT : DEFAULT_EXECUTION_TARGET_HINT
+                  }
+                />
               </SynForm>
             </Form>
           </Stack>

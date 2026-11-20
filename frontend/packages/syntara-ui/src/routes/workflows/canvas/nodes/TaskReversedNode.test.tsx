@@ -2,7 +2,7 @@ import type { TaskActivity } from '@syntara/contracts'
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
-import { FlowNodeType } from '../../../../constants'
+import { FlowNodeType } from '../../../../constants/nodeTypes'
 
 import { TaskReversedStepComponent } from './TaskReversedNode'
 
