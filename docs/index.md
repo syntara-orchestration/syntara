@@ -23,6 +23,7 @@ for the Python/FastAPI backend.
 - [Authentication](backend/authentication.md)
 - [Authorization](backend/authorization.md)
 - [Workflow Engine Overview](backend/workflow-engine/workflow-engine-overview.md)
+- [Script Step Security Review](backend/workflow-engine/script-step-architecture.md)
 - [Development Standards](backend/standards/README.md)
 
 ## Frontend
