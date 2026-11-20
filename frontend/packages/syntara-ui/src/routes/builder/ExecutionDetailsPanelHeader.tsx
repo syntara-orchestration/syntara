@@ -25,6 +25,12 @@ import { StatusLabel } from './ExecutionStatus'
 
 export type ViewMode = 'overview' | 'details'
 
+/** Inert hash targets so NavItem anchors are keyboard-focusable; selection stays in onSelect. */
+const VIEW_MODE_HREFS = {
+  overview: '#run-overview',
+  details: '#run-details',
+} as const satisfies Record<ViewMode, string>
+
 type ExecutionStatus = ExecutionsAPI.components['schemas']['ExecutionStatus']
 
 type HeaderMetadataProps = {
@@ -72,10 +78,20 @@ export function HeaderMetadata({
               onSelect={(_event, selected) => onViewModeChange(String(selected.itemId) as ViewMode)}
             >
               <NavList>
-                <NavItem itemId="overview" isActive={viewMode === 'overview'} preventDefault>
+                <NavItem
+                  itemId="overview"
+                  isActive={viewMode === 'overview'}
+                  href={VIEW_MODE_HREFS.overview}
+                  preventDefault
+                >
                   Overview
                 </NavItem>
-                <NavItem itemId="details" isActive={viewMode === 'details'} preventDefault>
+                <NavItem
+                  itemId="details"
+                  isActive={viewMode === 'details'}
+                  href={VIEW_MODE_HREFS.details}
+                  preventDefault
+                >
                   Details
                 </NavItem>
               </NavList>

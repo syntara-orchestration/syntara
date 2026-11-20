@@ -39,6 +39,14 @@ describe('CompactActivityList', () => {
     expect(screen.getByText('failed')).toBeInTheDocument()
   })
 
+  it('includes activity title and status in each row accessible name', () => {
+    render(<CompactActivityList activityStates={states} activityOrder={order} onRowClick={vi.fn()} />)
+
+    const list = screen.getByRole('list', { name: 'Activity list' })
+    expect(within(list).getByRole('listitem', { name: 'Fetch Data, Successful' })).toBeInTheDocument()
+    expect(within(list).getByRole('listitem', { name: 'task-2, Failed' })).toBeInTheDocument()
+  })
+
   it('shows time range when activity has start and end times', () => {
     render(<CompactActivityList activityStates={states} activityOrder={order} />)
 

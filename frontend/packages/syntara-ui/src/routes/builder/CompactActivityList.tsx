@@ -7,15 +7,26 @@ import {
   DataListItemCells,
   DataListItemRow,
 } from '@patternfly/react-core'
+import { ActivityTypeEnum } from '@syntara/contracts'
 import { useCallback, useMemo, type KeyboardEvent, type MouseEvent } from 'react'
 
 import { ExecutionTimeRange } from '../../components/table/ExecutionTimestamp'
-import type { ActivityState } from '../workflows/execution/types'
+import { capitalize } from '../../utils/capitalize'
+import type { ActivityState, ActivityStatus } from '../workflows/execution/types'
 
 import styles from './CompactActivityList.module.css'
 import type { ActivityOrderItem } from './ExecutionActivityTable'
 import { ActivityStatusLabel } from './ExecutionStatus'
+import { activityStatusDisplayLabels } from './executionStatusConstants'
 import { ACTIVITY_STATUS } from './utils/executionState/executionHelpers'
+
+function activityListItemAriaLabel(displayName: string, status: ActivityStatus, nodeType?: string): string {
+  if (nodeType === ActivityTypeEnum.WAIT && status === 'waiting') {
+    return `${displayName}, Running`
+  }
+  const statusLabel = activityStatusDisplayLabels[status] ?? capitalize(status)
+  return `${displayName}, ${statusLabel}`
+}
 
 export type CompactActivityListProps = {
   activityStates: Map<string, ActivityState>
@@ -61,9 +72,11 @@ export function CompactActivityList({
         const hasTimeRange = Boolean(state?.startedAt)
         const displayName = name ?? id
         const titleId = `activity-list-item-${id}-title`
+        const status = state?.status ?? ACTIVITY_STATUS.PENDING
+        const rowAriaLabel = activityListItemAriaLabel(displayName, status, type)
 
         return (
-          <DataListItem key={id} id={id} aria-labelledby={titleId}>
+          <DataListItem key={id} id={id} aria-labelledby={titleId} aria-label={rowAriaLabel}>
             <DataListItemRow>
               <DataListItemCells
                 dataListCells={
@@ -73,7 +86,7 @@ export function CompactActivityList({
                         {displayName}
                       </Content>
                       <div className={styles.statusCell}>
-                        <ActivityStatusLabel status={state?.status ?? ACTIVITY_STATUS.PENDING} nodeType={type} />
+                        <ActivityStatusLabel status={status} nodeType={type} />
                       </div>
                       {hasTimeRange && (
                         <Content component={ContentVariants.small} className={styles.subtleText}>
