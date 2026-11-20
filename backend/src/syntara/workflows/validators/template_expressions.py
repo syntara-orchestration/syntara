@@ -11,6 +11,7 @@ from collections import deque
 from typing import Any
 
 from syntara.workflows.models.validation_finding import ValidationCategory, ValidationFinding, ValidationSeverity
+from syntara.workflows.workflow_engine.models.workflow_definition import SubWorkflowOutput
 
 TEMPLATE_PATTERN = re.compile(r"\$\{([^}]+)\}")
 
@@ -27,17 +28,7 @@ _SKIP_FIELDS_BY_NODE_TYPE: dict[str, frozenset[str]] = {
     "script": frozenset({"code"}),
 }
 
-# Public fields from SubWorkflowOutput; only ``outputs`` allows dynamic nesting.
-_SUBWORKFLOW_OUTPUT_FIELDS = frozenset(
-    {
-        "child_execution_id",
-        "child_workflow_id",
-        "child_workflow_name",
-        "child_workflow_version",
-        "child_status",
-        "outputs",
-    }
-)
+_SUBWORKFLOW_OUTPUT_FIELDS = frozenset(SubWorkflowOutput.model_fields)
 
 
 def _validate_subworkflow_output_path(
@@ -134,8 +125,10 @@ def _extract_expressions(value: Any, path_prefix: str, *, _depth: int = 0) -> li
 
 def extract_element_expressions(
     node: dict[str, Any],
+    *,
+    include_script_code: bool = False,
 ) -> list[tuple[str, str]]:
-    """Extract template expressions from an element's parameters, skipping excluded fields."""
+    """Extract template expressions from element parameters, with optional Script code scanning."""
     node_type = node.get("type", "")
     skip_fields = _SKIP_FIELDS_BY_NODE_TYPE.get(node_type, frozenset())
 
@@ -144,10 +137,25 @@ def extract_element_expressions(
         return []
     results: list[tuple[str, str]] = []
     for key, val in params.items():
-        if key in skip_fields:
+        if key in skip_fields and not (include_script_code and node_type == "script" and key == "code"):
             continue
         results.extend(_extract_expressions(val, f"parameters.{key}"))
     return results
+
+
+def _script_subworkflow_expressions(
+    node: dict[str, Any],
+    subworkflow_node_ids: set[str],
+) -> list[tuple[str, str]]:
+    """Extract Script-code templates scoped to known Sub-workflow nodes only."""
+    if node.get("type") != "script":
+        return []
+
+    return [
+        (expr_body, field_path)
+        for expr_body, field_path in extract_element_expressions(node, include_script_code=True)
+        if field_path == "parameters.code" and expr_body.partition(".")[0] in subworkflow_node_ids
+    ]
 
 
 def check_template_expressions(
@@ -176,7 +184,10 @@ def check_template_expressions(
         if not isinstance(element, dict):
             continue
         element_id = element.get("id")
-        expressions = extract_element_expressions(element)
+        expressions = [
+            *extract_element_expressions(element),
+            *_script_subworkflow_expressions(element, subworkflow_node_ids),
+        ]
         in_loop_body = element_id in loop_body_map
 
         for expr_body, field_path in expressions:

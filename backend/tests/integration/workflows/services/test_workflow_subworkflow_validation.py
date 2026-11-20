@@ -162,6 +162,28 @@ async def test_subworkflow_reference_in_same_project_passes_validation(
 
 
 @pytest.mark.asyncio
+async def test_missing_child_workflow_reference_returns_error_finding(
+    test_db_session: AsyncSession,
+    test_project_id: UUID,
+) -> None:
+    missing_child_id = uuid4()
+
+    findings = await validate_subworkflow_project_references(
+        test_db_session,
+        _definition_with_subworkflow(missing_child_id),
+        test_project_id,
+    )
+
+    assert len(findings) == 1
+    finding = findings[0]
+    assert finding.severity == ValidationSeverity.error
+    assert finding.category == ValidationCategory.invalid_reference
+    assert finding.node_id == "call_child"
+    assert finding.field_path == "parameters.workflow_id"
+    assert finding.message == "The selected child workflow is no longer available."
+
+
+@pytest.mark.asyncio
 async def test_cross_project_subworkflow_reference_returns_error_finding(
     test_db_session: AsyncSession,
     test_user: User,
@@ -387,6 +409,49 @@ async def test_reference_to_declared_child_output_has_no_finding(
 
 
 @pytest.mark.asyncio
+async def test_declared_output_references_in_script_code_are_validated(
+    test_db_session: AsyncSession,
+    test_user: User,
+    test_project_id: UUID,
+) -> None:
+    child = await _create_child_workflow(
+        test_db_session,
+        test_user,
+        test_project_id,
+        output_schema={
+            "type": "object",
+            "properties": {
+                "release": {
+                    "type": "object",
+                    "properties": {"url": {"type": "string"}},
+                    "additionalProperties": False,
+                }
+            },
+        },
+    )
+    parent_definition = _definition_with_subworkflow(child.id)
+    parent_definition["nodes"].append(
+        {
+            "id": "consume_output",
+            "name": "Consume child output in script",
+            "type": "script",
+            "parameters": {
+                "language": "python",
+                "code": ('print("${call_child.outputs.release.url}")\nprint("${call_child.outputs.release.tag}")'),
+            },
+        }
+    )
+    parent_definition["edges"].append({"from": "call_child", "to": "consume_output"})
+
+    findings = await validate_subworkflow_project_references(test_db_session, parent_definition, test_project_id)
+
+    assert len(findings) == 1
+    assert findings[0].severity == ValidationSeverity.warning
+    assert findings[0].node_id == "call_child"
+    assert findings[0].field_path == "outputs.release.tag"
+
+
+@pytest.mark.asyncio
 async def test_undeclared_child_output_references_each_produce_warnings(
     test_db_session: AsyncSession,
     test_user: User,
@@ -590,6 +655,52 @@ async def test_nested_child_output_path_rejects_missing_property_in_closed_objec
 
     assert len(findings) == 1
     assert findings[0].field_path == "outputs.release.tag"
+
+
+@pytest.mark.asyncio
+async def test_array_child_output_paths_follow_item_schema(
+    test_db_session: AsyncSession,
+    test_user: User,
+    test_project_id: UUID,
+) -> None:
+    child = await _create_child_workflow(
+        test_db_session,
+        test_user,
+        test_project_id,
+        output_schema={
+            "type": "object",
+            "properties": {
+                "artifacts": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {"url": {"type": "string"}},
+                        "additionalProperties": False,
+                    },
+                }
+            },
+        },
+    )
+
+    findings = await validate_subworkflow_project_references(
+        test_db_session,
+        _definition_with_subworkflow_output_references(
+            child.id,
+            [
+                "call_child.outputs.artifacts.0.url",
+                "call_child.outputs.artifacts.0.tag",
+                "call_child.outputs.artifacts.url",
+            ],
+        ),
+        test_project_id,
+    )
+
+    assert len(findings) == 2
+    assert [finding.field_path for finding in findings] == [
+        "outputs.artifacts.0.tag",
+        "outputs.artifacts.url",
+    ]
+    assert all(finding.severity == ValidationSeverity.warning for finding in findings)
 
 
 @pytest.mark.asyncio

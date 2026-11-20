@@ -13,6 +13,7 @@ from syntara.workflows.validators.template_expressions import (
     check_template_expressions,
     extract_element_expressions,
 )
+from syntara.workflows.workflow_engine.models.workflow_definition import SubWorkflowOutput
 
 
 class TestModuleLevelCoverage:
@@ -277,6 +278,16 @@ class TestAllValidExpressions:
 class TestSubWorkflowDynamicOutputs:
     """Sub-workflow outputs allow dynamic paths only below outputs."""
 
+    def test_output_model_exposes_fields_directly(self) -> None:
+        assert set(SubWorkflowOutput.model_fields) == {
+            "child_execution_id",
+            "child_workflow_id",
+            "child_workflow_name",
+            "child_workflow_version",
+            "child_status",
+            "outputs",
+        }
+
     @pytest.mark.parametrize(
         "expression",
         [
@@ -328,6 +339,22 @@ class TestSubWorkflowDynamicOutputs:
         assert findings[0].category == ValidationCategory.invalid_reference
         assert findings[0].node_id == "consumer"
         assert findings[0].field_path == "parameters.environment.VALUE"
+
+    def test_script_code_validates_subworkflow_references_only(self) -> None:
+        code = 'print("${child.outputs.release.url}")\nprint("${child.unknown_field}")\nprint("${shell_variable}")'
+        defn = _base_definition(
+            nodes=[
+                {"id": "child", "type": "sub_workflow", "parameters": {}},
+                _script_node("consumer", code=code),
+            ],
+        )
+
+        findings = check_template_expressions(defn, {"t1", "child", "consumer"})
+
+        assert len(findings) == 1
+        assert findings[0].node_id == "consumer"
+        assert findings[0].field_path == "parameters.code"
+        assert "unknown Sub-workflow output field 'unknown_field'" in findings[0].message
 
     def test_dynamic_output_behavior_is_specific_to_subworkflow_nodes(self) -> None:
         defn = _base_definition(
@@ -610,6 +637,13 @@ class TestExtractElementExpressions:
         result = extract_element_expressions(node)
         codes = [expr for expr, _ in result if "something" in expr]
         assert codes == []
+
+    def test_includes_code_field_for_script_when_requested(self) -> None:
+        node = _script_node("n1", code='print("${child.outputs.value}")')
+
+        assert extract_element_expressions(node, include_script_code=True) == [
+            ("child.outputs.value", "parameters.code")
+        ]
 
     def test_includes_environment_for_script(self) -> None:
         node = _script_node("n1", environment={"K": "${step_1.val}"})

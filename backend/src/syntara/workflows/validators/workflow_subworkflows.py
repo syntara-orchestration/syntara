@@ -167,7 +167,7 @@ def _referenced_child_output_paths(
     for element in elements:
         if not isinstance(element, dict):
             continue
-        for expression, _field_path in extract_element_expressions(element):
+        for expression, _field_path in extract_element_expressions(element, include_script_code=True):
             scope, *path = expression.split(".")
             if scope != subworkflow_node_id or not path:
                 continue
