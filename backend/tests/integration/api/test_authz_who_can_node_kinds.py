@@ -104,6 +104,8 @@ async def test_can_i_reports_exact_effective_statement(
             "matched_policy": "",
             "denial_reason": "policy_deny",
             "denied_by": "a-mixed-policy",
+            "denied_scope": "project" if project_scoped else "any",
+            "denied_project": "payments" if project_scoped else "",
         }
     for kind, context in (("http_request", "payments"), ("script", "unassigned-project")):
         response = await auth_client.post(

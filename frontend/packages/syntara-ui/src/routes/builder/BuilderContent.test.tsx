@@ -98,7 +98,7 @@ const mockBuilderPermissions = vi.hoisted(() => ({
 
 const mockStepTypePermissions = vi.hoisted(() => ({
   canAuthor: true,
-  blockedStepTypes: [] as { kind: string; label: string; description?: string }[],
+  blockedStepTypes: [] as { kind: string; label: string }[],
   isChecking: false,
   isError: false,
   retry: vi.fn().mockResolvedValue(undefined),
@@ -3383,11 +3383,18 @@ describe('BuilderContent', () => {
     it('opens a blocked workflow read-only and unlocks it when permissions change', async () => {
       mockStepTypePermissions.canAuthor = false
       mockStepTypePermissions.blockedStepTypes = [
-        { kind: 'script', label: 'Script', description: 'Script (no-scripts, project payments).' },
+        {
+          kind: 'script',
+          label: 'Script',
+        },
       ]
       const props = { workflow: mockWorkflow, isNew: false, workflowId: 'workflow-1' }
       const view = await renderBuilder(props)
-      expect(screen.getByText('Script (no-scripts, project payments).')).toBeInTheDocument()
+      expect(
+        screen.getByText(
+          "This workflow includes Script steps, but your assigned policies don't allow you to write them."
+        )
+      ).toBeInTheDocument()
       expect(screen.getByPlaceholderText('Workflow name')).toBeDisabled()
       expect(screen.getByRole('button', { name: 'Save workflow' })).toHaveAttribute('aria-disabled', 'true')
       expect(screen.getByRole('button', { name: 'Run' })).toBeEnabled()
@@ -3395,7 +3402,7 @@ describe('BuilderContent', () => {
       mockStepTypePermissions.blockedStepTypes = []
       view.rerender(<BuilderContent {...props} />)
       expect(screen.getByPlaceholderText('Workflow name')).toBeEnabled()
-      expect(screen.queryByText('Script (no-scripts, project payments).')).not.toBeInTheDocument()
+      expect(screen.queryByText('You are viewing this workflow in read-only mode.')).not.toBeInTheDocument()
     })
 
     afterEach(() => {

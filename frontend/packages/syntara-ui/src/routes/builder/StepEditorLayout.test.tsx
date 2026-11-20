@@ -591,7 +591,7 @@ describe('StepEditorLayout', () => {
     })
   })
   it('explains blocked step types in the step editor', () => {
-    const reason = 'Script (no-scripts, project payments).'
+    const reason = "This workflow includes Script steps, but your assigned policies don't allow you to write them."
     render(
       <StepFormReadOnlyContext.Provider value={reason}>
         <StepEditorLayout parametersContent={<div>Parameters</div>} showInputPanel={false} readOnly />

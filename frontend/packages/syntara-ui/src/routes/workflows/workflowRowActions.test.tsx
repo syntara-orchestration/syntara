@@ -152,7 +152,12 @@ describe('buildWorkflowRowActions', () => {
     it('blocks authoring actions for denied step types but keeps Run and read actions available', () => {
       const stepTypePermissions: StepTypePermissions = {
         canAuthor: false,
-        blockedStepTypes: [{ kind: 'script', label: 'Script' }],
+        blockedStepTypes: [
+          {
+            kind: 'script',
+            label: 'Script',
+          },
+        ],
         isChecking: false,
         isError: false,
         retry: vi.fn().mockResolvedValue(undefined),
@@ -166,6 +171,9 @@ describe('buildWorkflowRowActions', () => {
 
       for (const key of ['edit', 'duplicate', 'publish', 'unpublish', 'delete']) {
         expect(actions.find((action) => action.key === key)?.isAriaDisabled).toBe(true)
+        expect(actions.find((action) => action.key === key)?.tooltipProps?.content).toBe(
+          "This workflow includes Script steps, but your assigned policies don't allow you to write them."
+        )
       }
       expect(actions.find((action) => action.key === 'run')?.isAriaDisabled).toBe(false)
       expect(actions.find((action) => action.key === 'history')?.isAriaDisabled).toBeUndefined()

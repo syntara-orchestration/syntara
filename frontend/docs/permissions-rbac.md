@@ -198,13 +198,24 @@ This is the correct pattern for editor-style pages where many controls are affec
 
 The builder also checks `step_type:write` for every type in the latest saved and published definitions,
 using `resource_project` and `resource_labels.kind`. A denied type or a failed check locks all authoring
-actions and shows each blocked type with the denying policy and statement scope. Missing allow grants
-are explained as "No policy grants write permission for Script in project payments", without naming
-a denying policy. Failed checks show a retryable permission-check error. The step editor shows the same
-reason; historical versions keep their previous-version explanation. The canvas and step
-forms remain available for inspection, Run continues to use execution permission, and read-only Run
+actions. The read-only info banner, permission tooltips, and step editor name the blocked step types
+without policy identifiers, scope, or project details: "This workflow includes Script steps, but your
+assigned policies don't allow you to write them." The same message applies to explicit denials and
+missing allow grants. The frontend formats this wording from blocked step labels; `POST /authz/can_i`
+keeps its original structured denial reasons.
+Failed checks show a retryable permission-check error; historical versions keep
+their previous-version explanation. The canvas and step forms remain available for inspection,
+Run continues to use execution permission, and read-only Run
 does not save local edits first. Workflow-list row checks are deferred until a row menu opens and share
 TanStack Query cache keys by project and kind.
+
+When project deletion is blocked by step-type permissions, all project deletion views show an error
+titled `Cannot delete project "<project name>"`, with the blocked step types in the message:
+"This project includes workflows with Script steps, but your assigned policies don't allow you to
+write them." The shared frontend deletion handler generates the title from the project name and
+the message from the response's structured `blocked_step_types`. Rejected workflow writes use the
+same frontend formatter as permission checks. Other deletion failures and malformed denials keep
+their existing error handling; the frontend does not parse backend error text.
 
 ## Cache Behavior
 

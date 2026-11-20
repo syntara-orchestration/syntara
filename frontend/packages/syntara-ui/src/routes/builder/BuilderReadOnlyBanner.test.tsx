@@ -54,8 +54,11 @@ describe('BuilderReadOnlyBanner', () => {
     )
 
     expect(screen.getByText('You are viewing this workflow in read-only mode.')).toBeInTheDocument()
-    expect(screen.getByText('Blocked step types: Script, REST API.')).toBeInTheDocument()
-    expect(screen.queryByText(/policy|scope/i)).not.toBeInTheDocument()
+    expect(
+      screen.getByText(
+        "This workflow includes Script, REST API steps, but your assigned policies don't allow you to write them."
+      )
+    ).toBeInTheDocument()
   })
 
   it('offers a retry action when permission checks fail', async () => {
@@ -85,8 +88,8 @@ describe('BuilderReadOnlyBanner', () => {
     const { container } = render(<BuilderReadOnlyBanner canEdit={false} isLoading={false} isBuiltin={false} />)
     expect(await axe(container)).toHaveNoViolations()
   })
-  it('shows policy scopes and missing allows without inventing a denying policy', () => {
-    render(
+  it('shows an info alert with the Script explanation instead of policy details', async () => {
+    const { container } = render(
       <BuilderReadOnlyBanner
         canEdit={false}
         isLoading={false}
@@ -95,20 +98,16 @@ describe('BuilderReadOnlyBanner', () => {
           {
             kind: 'script',
             label: 'Script',
-            description: 'Script (no-scripts, project payments).',
-          },
-          {
-            kind: 'http_request',
-            label: 'REST API',
-            description: 'No policy grants write permission for REST API in project payments.',
           },
         ]}
       />
     )
+    expect(screen.getByText('Info alert:')).toBeInTheDocument()
+    expect(screen.getByText('You are viewing this workflow in read-only mode.')).toBeInTheDocument()
     expect(
-      screen.getByText(
-        'Script (no-scripts, project payments). No policy grants write permission for REST API in project payments.'
-      )
+      screen.getByText("This workflow includes Script steps, but your assigned policies don't allow you to write them.")
     ).toBeInTheDocument()
+    expect(screen.queryByText(/step_type:write|step-type-readonly-denied/)).not.toBeInTheDocument()
+    expect(await axe(container)).toHaveNoViolations()
   })
 })
