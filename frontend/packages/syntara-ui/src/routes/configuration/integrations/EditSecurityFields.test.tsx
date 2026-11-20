@@ -1,3 +1,4 @@
+import { IntegrationTypeEnum } from '@syntara/contracts'
 import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useLayoutEffect } from 'react'
@@ -164,6 +165,18 @@ describe('EditSecurityFields', () => {
 
     await user.click(screen.getByText('Security'))
 
+    expect(screen.getByText(/PEM-encoded CA certificate/)).toBeInTheDocument()
+  })
+
+  it('hides HTTP and TLS checkboxes for Execution plane infrastructure but keeps CA certificate', async () => {
+    const user = userEvent.setup()
+    render(<TestWrapper defaultValues={{ integration_type: IntegrationTypeEnum.OPENSHIFT }} />)
+
+    await user.click(screen.getByText('Security'))
+
+    expect(screen.queryByRole('checkbox', { name: /allow http connections/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('checkbox', { name: /disable tls certificate verification/i })).not.toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: CA_CERTIFICATE_FIELD_NAME })).toBeInTheDocument()
     expect(screen.getByText(/PEM-encoded CA certificate/)).toBeInTheDocument()
   })
 

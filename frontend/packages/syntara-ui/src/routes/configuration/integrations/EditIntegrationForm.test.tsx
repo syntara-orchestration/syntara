@@ -823,6 +823,17 @@ describe('EditIntegrationForm', () => {
       expect(screen.queryByRole('textbox', { name: /^description$/i })).not.toBeInTheDocument()
     })
 
+    it('hides HTTP and TLS checkboxes but keeps CA certificate under Security', async () => {
+      const user = userEvent.setup()
+      render(<EditIntegrationForm />, { wrapper })
+
+      await user.click(screen.getByText('Security'))
+
+      expect(screen.queryByRole('checkbox', { name: /allow http connections/i })).not.toBeInTheDocument()
+      expect(screen.queryByRole('checkbox', { name: /disable tls certificate verification/i })).not.toBeInTheDocument()
+      expect(screen.getByRole('textbox', { name: /ca certificate/i })).toBeInTheDocument()
+    })
+
     it('shows Authentication section with service account token credential', () => {
       render(<EditIntegrationForm />, { wrapper })
 

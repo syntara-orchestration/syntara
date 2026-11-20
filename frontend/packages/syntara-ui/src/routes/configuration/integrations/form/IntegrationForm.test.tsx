@@ -48,14 +48,21 @@ vi.mock('../../../access/useAllProjects', () => {
   return { useAllProjects: projectsMock, useSelectableProjects: projectsMock }
 })
 
-vi.mock('./useOpenShiftIntegrationExists', () => ({
-  useOpenShiftIntegrationExists: () => ({
+const { mockUseOpenShiftIntegrationExists } = vi.hoisted(() => ({
+  mockUseOpenShiftIntegrationExists: vi.fn(() => ({
     exists: false,
     isLoading: false,
     isError: false,
     isUnavailable: false,
     refetch: vi.fn(),
-  }),
+  })),
+}))
+
+vi.mock('./useOpenShiftIntegrationExists', () => ({
+  useOpenShiftIntegrationExists: () =>
+    mockUseOpenShiftIntegrationExists() as ReturnType<
+      typeof import('./useOpenShiftIntegrationExists').useOpenShiftIntegrationExists
+    >,
   fetchOpenShiftIntegrationExists: vi.fn().mockResolvedValue(false),
   OPENSHIFT_INTEGRATION_EXISTS_QUERY_KEY: ['openshift-integration-exists'],
 }))
@@ -121,6 +128,13 @@ function mockMutations(discoverMutate?: Mock, createMutate?: Mock) {
 describe('IntegrationForm', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockUseOpenShiftIntegrationExists.mockReturnValue({
+      exists: false,
+      isLoading: false,
+      isError: false,
+      isUnavailable: false,
+      refetch: vi.fn(),
+    })
   })
 
   it('uses configureIntegration documentation key', () => {
@@ -479,6 +493,31 @@ describe('IntegrationForm', () => {
       await waitFor(() => {
         expect(screen.getByText('Unable to save integration')).toBeInTheDocument()
       })
+    })
+  })
+
+  describe('Execution plane infrastructure singleton', () => {
+    it('clears an EP selection when an openshift integration appears', async () => {
+      const user = userEvent.setup()
+      const { rerender } = render(<IntegrationForm />, { wrapper })
+
+      await user.click(screen.getByRole('button', { name: 'MCP Server' }))
+      await user.click(screen.getByRole('option', { name: /Execution plane infrastructure/i }))
+      expect(screen.getByRole('textbox', { name: /connection name/i })).toBeInTheDocument()
+
+      mockUseOpenShiftIntegrationExists.mockReturnValue({
+        exists: true,
+        isLoading: false,
+        isError: false,
+        isUnavailable: true,
+        refetch: vi.fn(),
+      })
+      rerender(<IntegrationForm />)
+
+      await waitFor(() => {
+        expect(screen.queryByRole('textbox', { name: /connection name/i })).not.toBeInTheDocument()
+      })
+      expect(screen.getByRole('button', { name: 'MCP Server' })).toBeInTheDocument()
     })
   })
 

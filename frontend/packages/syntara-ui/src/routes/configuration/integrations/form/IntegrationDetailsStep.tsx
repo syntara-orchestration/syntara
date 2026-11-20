@@ -15,7 +15,7 @@ import {
   Title,
 } from '@patternfly/react-core'
 import { IntegrationTypeEnum } from '@syntara/contracts'
-import { type ReactElement, type ReactNode, type Ref, useCallback, useEffect, useState } from 'react'
+import { type ReactElement, type ReactNode, type Ref, useCallback, useState } from 'react'
 import { useWatch, type UseFormSetValue } from 'react-hook-form'
 
 import { SynFormField } from '../../../../components/forms/SynFormField'
@@ -28,7 +28,6 @@ import { PROVIDERS_HIDING_BASE_URL, PROVIDERS_REQUIRING_BASE_URL } from '../inte
 import { ExecutionPlaneScopeField } from './ExecutionPlaneScopeField'
 import { INTEGRATION_TYPE_OPTIONS, PROVIDER_HINT_OPTIONS, type IntegrationFormData } from './integrationFormSchema'
 import { ScopeFields } from './ScopeFields'
-import { useOpenShiftIntegrationExists } from './useOpenShiftIntegrationExists'
 import styles from './WizardSteps.module.css'
 
 function ProviderHintMenuToggle({
@@ -156,9 +155,12 @@ function IntegrationTypeSelect({
 
 function SecurityFields() {
   const [isExpanded, setIsExpanded] = useState(false)
+  const integrationType = useWatch<IntegrationFormData, 'integration_type'>({ name: 'integration_type' })
   const skipTlsVerify = useWatch<IntegrationFormData, 'configuration.insecure_skip_tls_verify'>({
     name: 'configuration.insecure_skip_tls_verify',
   })
+  // Execution plane infrastructure always requires HTTPS + TLS verification.
+  const showHttpTlsOptions = integrationType !== IntegrationTypeEnum.OPENSHIFT
 
   return (
     <ExpandableSection
@@ -168,49 +170,53 @@ function SecurityFields() {
       isIndented
     >
       <div className={styles.securityFields}>
-        <SynFormField<IntegrationFormData, 'configuration.allow_http'>
-          name="configuration.allow_http"
-          label="Allow HTTP connections"
-          fieldId="allow-http"
-          hideFormGroupLabel
-          hideFooter
-        >
-          {({ field }) => (
-            <Checkbox
-              id="allow-http"
+        {showHttpTlsOptions && (
+          <>
+            <SynFormField<IntegrationFormData, 'configuration.allow_http'>
+              name="configuration.allow_http"
               label="Allow HTTP connections"
-              description="Permits unencrypted HTTP URLs for this integration"
-              isChecked={field.value}
-              onChange={(_event, checked) => field.onChange(checked)}
-            />
-          )}
-        </SynFormField>
-        <SynFormField<IntegrationFormData, 'configuration.insecure_skip_tls_verify'>
-          name="configuration.insecure_skip_tls_verify"
-          label="Disable TLS certificate verification"
-          fieldId="insecure-skip-tls-verify"
-          hideFormGroupLabel
-          hideFooter
-        >
-          {({ field }) => (
-            <Checkbox
-              id="insecure-skip-tls-verify"
+              fieldId="allow-http"
+              hideFormGroupLabel
+              hideFooter
+            >
+              {({ field }) => (
+                <Checkbox
+                  id="allow-http"
+                  label="Allow HTTP connections"
+                  description="Permits unencrypted HTTP URLs for this integration"
+                  isChecked={field.value}
+                  onChange={(_event, checked) => field.onChange(checked)}
+                />
+              )}
+            </SynFormField>
+            <SynFormField<IntegrationFormData, 'configuration.insecure_skip_tls_verify'>
+              name="configuration.insecure_skip_tls_verify"
               label="Disable TLS certificate verification"
-              description="Skips validation of the server's TLS certificate on connections"
-              isChecked={field.value}
-              onChange={(_event, checked) => field.onChange(checked)}
-              body={
-                skipTlsVerify ? (
-                  <HelperText>
-                    <HelperTextItem variant="warning">
-                      The server's TLS certificate will not be verified. Only enable in trusted networks.
-                    </HelperTextItem>
-                  </HelperText>
-                ) : undefined
-              }
-            />
-          )}
-        </SynFormField>
+              fieldId="insecure-skip-tls-verify"
+              hideFormGroupLabel
+              hideFooter
+            >
+              {({ field }) => (
+                <Checkbox
+                  id="insecure-skip-tls-verify"
+                  label="Disable TLS certificate verification"
+                  description="Skips validation of the server's TLS certificate on connections"
+                  isChecked={field.value}
+                  onChange={(_event, checked) => field.onChange(checked)}
+                  body={
+                    skipTlsVerify ? (
+                      <HelperText>
+                        <HelperTextItem variant="warning">
+                          The server's TLS certificate will not be verified. Only enable in trusted networks.
+                        </HelperTextItem>
+                      </HelperText>
+                    ) : undefined
+                  }
+                />
+              )}
+            </SynFormField>
+          </>
+        )}
         {!skipTlsVerify && (
           <SynFormField<IntegrationFormData, 'configuration.ca_certificate'>
             name="configuration.ca_certificate"
@@ -241,6 +247,10 @@ function SecurityFields() {
 type IntegrationDetailsStepProps = Readonly<{
   setValue: UseFormSetValue<IntegrationFormData>
   onTypeChange: (newType: string) => void
+  /** True when an Execution plane infrastructure integration already exists. */
+  openShiftExists: boolean
+  /** True while the singleton lookup is pending/failed, or when one already exists. */
+  isOpenShiftUnavailable: boolean
 }>
 
 function getTypeConfig(
@@ -302,7 +312,12 @@ function getTypeConfig(
   }
 }
 
-export function IntegrationDetailsStep({ setValue, onTypeChange }: IntegrationDetailsStepProps) {
+export function IntegrationDetailsStep({
+  setValue,
+  onTypeChange,
+  openShiftExists,
+  isOpenShiftUnavailable,
+}: IntegrationDetailsStepProps) {
   const scope = useWatch<IntegrationFormData, 'scope'>({ name: 'scope' })
   const integrationType = useWatch<IntegrationFormData, 'integration_type'>({ name: 'integration_type' })
   const providerHint = useWatch<IntegrationFormData, 'configuration.provider_hint'>({
@@ -310,18 +325,9 @@ export function IntegrationDetailsStep({ setValue, onTypeChange }: IntegrationDe
   })
   const [isTypeOpen, setIsTypeOpen] = useState(false)
   const [isProviderOpen, setIsProviderOpen] = useState(false)
-  const { exists: openShiftExists, isUnavailable: isOpenShiftUnavailable } = useOpenShiftIntegrationExists()
 
   const isOpenShift = integrationType === IntegrationTypeEnum.OPENSHIFT
   const typeConfig = getTypeConfig(integrationType, providerHint)
-
-  // If a singleton appears after the user already selected EP (e.g. race with another
-  // create), clear the selection so a disabled menu option is not left as the value.
-  useEffect(() => {
-    if (isOpenShift && openShiftExists) {
-      onTypeChange(IntegrationTypeEnum.MCP_SERVER)
-    }
-  }, [isOpenShift, openShiftExists, onTypeChange])
 
   const renderTypeToggle = useCallback(
     (toggleRef: Ref<MenuToggleElement>) => (

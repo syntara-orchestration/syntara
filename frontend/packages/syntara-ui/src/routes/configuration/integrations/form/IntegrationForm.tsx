@@ -41,6 +41,7 @@ import {
   type IntegrationFormData,
 } from './integrationFormSchema'
 import { useCreateIntegration } from './useCreateIntegration'
+import { useOpenShiftIntegrationExists } from './useOpenShiftIntegrationExists'
 import styles from './WizardSteps.module.css'
 
 type DiscoverResult = IntegrationsAPI.components['schemas']['DiscoverResult']
@@ -305,6 +306,7 @@ export function IntegrationForm() {
   const isLLM = integrationTypeValue === IntegrationTypeEnum.LLM_PROVIDER
   const isOpenShift = integrationTypeValue === IntegrationTypeEnum.OPENSHIFT
   const isCredentialRequired = CREDENTIAL_REQUIRED_TYPES.has(integrationTypeValue)
+  const { exists: openShiftExists, isUnavailable: isOpenShiftUnavailable } = useOpenShiftIntegrationExists()
 
   const onTypeChange = useCallback(
     (newType: string) => {
@@ -320,6 +322,13 @@ export function IntegrationForm() {
     },
     [setValue, resetTestState]
   )
+
+  // If a singleton appears after the user already selected EP (e.g. race with another
+  // create), clear the selection so a disabled menu option is not left as the value.
+  // Adjust during render (not an effect) per React "adjusting state when props change".
+  if (isOpenShift && openShiftExists) {
+    onTypeChange(IntegrationTypeEnum.MCP_SERVER)
+  }
 
   const onSubmit = handleSubmit(
     (formData) => {
@@ -376,7 +385,12 @@ export function IntegrationForm() {
               }
             >
               <WizardStep name="Integration details" id="integration-details">
-                <IntegrationDetailsStep setValue={setValue} onTypeChange={onTypeChange} />
+                <IntegrationDetailsStep
+                  setValue={setValue}
+                  onTypeChange={onTypeChange}
+                  openShiftExists={openShiftExists}
+                  isOpenShiftUnavailable={isOpenShiftUnavailable}
+                />
               </WizardStep>
 
               <WizardStep
