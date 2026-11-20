@@ -23,7 +23,7 @@ info:
     - Format: `{"key": "value"}` (both key and value must be strings)
     - Use cases: environment tags, team ownership, priority levels, cost centers
     - Queryable: Filter resources by label selectors in list endpoints
-  version: 2.0.0
+  version: 2.2.0
   contact:
     name: Syntara Team
 
@@ -254,6 +254,119 @@ paths:
         '500':
           $ref: '../../base/shared-resources.openapi.yaml#/components/responses/InternalServerError'
 
+  /executions/{execution_id}/retry_from_failure_preview:
+    get:
+      summary: Preview retry from failure
+      description: >-
+        Report whether an execution can be retried from its failure points, and what would re-run. An
+        optional retry_point_ids query parameter previews a selected subset; when omitted, the preview
+        uses all currently failed nodes. Returns the eligible retry points, the re-run step count for
+        each, the deduplicated total, and completed results retained outside the retry paths. Purely
+        informational: the retry endpoint independently re-validates the selection and any input
+        parameter overrides. Never mutates any state.
+      operationId: retry_from_failure_preview
+      tags:
+        - Executions
+      security:
+        - bearerAuth: []
+      x-app-permission:
+        resource: execution
+        action: run
+      parameters:
+        - name: execution_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+            title: Execution Id
+        - name: retry_point_ids
+          in: query
+          required: false
+          description: >-
+            Optional failure points to preview. Repeat the parameter to
+            preview a subset; omitting it previews all currently failed points.
+          schema:
+            anyOf:
+              - items:
+                  type: string
+                type: array
+              - type: 'null'
+            title: Retry Point Ids
+      responses:
+        '200':
+          description: Retry preview
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RetryFromFailureValidationResponse'
+        '400':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/BadRequestError'
+        '401':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError'
+        '404':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/NotFoundError'
+        '409':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ConflictError'
+        '422':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ValidationError'
+        '500':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/InternalServerError'
+        '429':
+          $ref: "../../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+
+  /executions/{execution_id}/retry_from_failure:
+    post:
+      summary: Retry from failure
+      description: Retry a failed execution from the given failure points, optionally overriding input parameters of the starting nodes for this run only. Independently repeats all validation checks, then creates a new execution linked to the source and triggers a Temporal run carrying retry context.
+      operationId: retry_from_failure
+      tags:
+        - Executions
+      security:
+        - bearerAuth: []
+      x-app-permission:
+        resource: execution
+        action: run
+      parameters:
+        - name: execution_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+            title: Execution Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RetryFailureRequest'
+      responses:
+        '201':
+          description: New execution created from retry
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExecutionRead'
+        '400':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/BadRequestError'
+        '401':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ForbiddenError'
+        '404':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/NotFoundError'
+        '409':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ConflictError'
+        '422':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ValidationError'
+        '500':
+          $ref: '../../base/shared-resources.openapi.yaml#/components/responses/InternalServerError'
+        '429':
+          $ref: "../../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
+
   /executions/{execution_id}/activities:
     get:
       summary: List activity executions
@@ -394,6 +507,13 @@ components:
 
     ExecutionCreate:
       $ref: ./shared-schemas.yaml#/components/schemas/ExecutionCreate
+
+
+    RetryFailureRequest:
+      $ref: ./shared-schemas.yaml#/components/schemas/RetryFailureRequest
+
+    RetryFromFailureValidationResponse:
+      $ref: ./shared-schemas.yaml#/components/schemas/RetryFromFailureValidationResponse
 
     TestExecutionCreate:
       $ref: ./shared-schemas.yaml#/components/schemas/TestExecutionCreate

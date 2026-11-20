@@ -149,6 +149,7 @@ vi.mock('../workflows/stores/useExecutionStore', () => {
   const stableState = { activityStates: new Map<string, unknown>(), visualization: undefined }
   return {
     useExecutionStore: (selector: (state: typeof stableState) => unknown) => selector(stableState),
+    selectRetryReplayBaseline: () => null,
   }
 })
 

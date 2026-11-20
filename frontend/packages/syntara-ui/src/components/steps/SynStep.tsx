@@ -1,5 +1,5 @@
-import { Icon, Label } from '@patternfly/react-core'
-import { RhUiWarningFillIcon } from '@patternfly/react-icons'
+import { Icon, Label, Stack, StackItem } from '@patternfly/react-core'
+import { RhUiHistoryIcon, RhUiWarningFillIcon } from '@patternfly/react-icons'
 import type { NodeProps } from '@xyflow/react'
 import React, { useEffect, useMemo, useState } from 'react'
 
@@ -10,6 +10,8 @@ import { SEMANTIC_ZOOM_TILE_HANDLE_TOP_PX } from '../../routes/workflows/canvas/
 import type { SemanticZoomBranchSource } from '../../routes/workflows/canvas/semanticZoomTypes'
 import { STEP_TYPE_COLORS } from '../../routes/workflows/canvas/stepTypeColors'
 import type { ActivityStatus } from '../../routes/workflows/execution/types'
+import { SynLabel } from '../labels/SynLabel'
+import { SynReplayedOutputBadge } from '../labels/SynReplayedOutputBadge'
 import { SynPanel } from '../layout/SynPanel'
 
 import stepStyles from './SynStep.module.css'
@@ -25,14 +27,12 @@ type ExecutionState = {
   completed_at?: string
   error_details?: string
   retry_count?: number
-}
-
-const NODE_BOTTOM_BADGE_STYLE: React.CSSProperties = {
-  position: 'absolute',
-  bottom: 'calc(-1 * var(--pf-t--global--spacer--lg))',
-  left: '50%',
-  transform: 'translateX(-50%)',
-  whiteSpace: 'nowrap',
+  /** True when this step reused a previous run's output instead of executing. */
+  replayed?: boolean
+  /** True when a trigger ran again using input from the source run. */
+  triggerInputReused?: boolean
+  /** True when this failed step still shows the failure from the source run. */
+  retainedFailure?: boolean
 }
 
 /**
@@ -73,6 +73,55 @@ function ValidationErrorBadge() {
         <RhUiWarningFillIcon style={{ color: 'var(--pf-t--global--color--status--warning--default)' }} />
       </Icon>
     </div>
+  )
+}
+
+/** Centred status markers under a step. Mock-pinned data keeps its existing precedence over reused output. */
+function StepBottomBadge({
+  mockDataPinned,
+  replayed,
+  retainedFailure,
+  triggerInputReused,
+}: Readonly<{
+  mockDataPinned: boolean
+  replayed: boolean
+  retainedFailure: boolean
+  triggerInputReused: boolean
+}>) {
+  const showReplayedOutput = replayed && !mockDataPinned
+  const showTriggerInput = triggerInputReused && !mockDataPinned
+
+  if (!mockDataPinned && !showReplayedOutput && !retainedFailure && !showTriggerInput) return null
+
+  return (
+    <Stack data-testid="step-bottom-badges" className={stepStyles.bottomBadges}>
+      {retainedFailure && (
+        <StackItem>
+          <SynLabel variant="outline" status="warning">
+            Retained failure
+          </SynLabel>
+        </StackItem>
+      )}
+      {showReplayedOutput && (
+        <StackItem>
+          <SynReplayedOutputBadge />
+        </StackItem>
+      )}
+      {showTriggerInput && (
+        <StackItem>
+          <SynLabel variant="outline" icon={<RhUiHistoryIcon />}>
+            Reused trigger input
+          </SynLabel>
+        </StackItem>
+      )}
+      {mockDataPinned && (
+        <StackItem>
+          <Label isCompact color="purple">
+            Mock data pinned
+          </Label>
+        </StackItem>
+      )}
+    </Stack>
   )
 }
 
@@ -236,56 +285,67 @@ export function SynStep(props: {
 
   return (
     <SynStepExpandedContext.Provider value={expandedContext}>
-      <SynPanel
-        hasNoPadding
-        variant="raised"
-        className={panelClassName || undefined}
-        data-testid={props.rootTestId}
-        data-syn-step-root=""
-        style={panelStyle}
+      <div
+        className={stepStyles.nodeContainer}
+        data-testid="step-node-container"
+        style={{ width: panelStyle.width, minWidth: panelStyle.minWidth, maxWidth: panelStyle.maxWidth }}
       >
-        {isSemanticZoom && summary ? (
-          <SynStepSemanticZoomBody
-            title={summary.title}
-            typeLabel={summary.typeLabel}
-            accentColor={semanticFillColor}
-            icon={props.semanticZoomIcon}
-            previewIcon={props.semanticZoomPreviewIcon}
-            menuActions={props.semanticZoomMenuActions}
-            branchSources={props.semanticZoomBranchSources}
-            selected={isSelected}
-            hasDashedBorder={props.hasDashedBorder ?? false}
-            tileStyle={semanticZoomTileStyle}
-            previewCardStyle={semanticZoomPreviewCardStyle}
+        <SynPanel
+          hasNoPadding
+          variant="raised"
+          className={panelClassName || undefined}
+          data-testid={props.rootTestId}
+          data-syn-step-root=""
+          style={panelStyle}
+        >
+          {isSemanticZoom && summary ? (
+            <SynStepSemanticZoomBody
+              title={summary.title}
+              typeLabel={summary.typeLabel}
+              accentColor={semanticFillColor}
+              icon={props.semanticZoomIcon}
+              previewIcon={props.semanticZoomPreviewIcon}
+              menuActions={props.semanticZoomMenuActions}
+              branchSources={props.semanticZoomBranchSources}
+              selected={isSelected}
+              hasDashedBorder={props.hasDashedBorder ?? false}
+              tileStyle={semanticZoomTileStyle}
+              previewCardStyle={semanticZoomPreviewCardStyle}
+            />
+          ) : (
+            props.children
+          )}
+          {props.showExecutionBadge !== false && props.executionState && (
+            <ExecutionStatusBadge
+              status={props.executionState?.status ?? 'pending'}
+              retryCount={props.executionState?.retry_count}
+              nodeType={props.nodeProps.type}
+              replayed={props.executionState?.replayed ?? false}
+              triggerInputReused={props.executionState?.triggerInputReused ?? false}
+              retainedFailure={props.executionState?.retainedFailure ?? false}
+              retryOrigin={props.nodeProps.data.__retryPreviewOrigin === true}
+            />
+          )}
+          {hasValidationError && <ValidationErrorBadge />}
+          <SynStepConnectionHandles
+            isSemanticZoom={isSemanticZoom}
+            semanticZoomHandleTop={semanticZoomHandleTop}
+            disableTarget={props.disableTarget}
+            disableSource={props.disableSource}
+            enableStart={props.enableStart}
+            enableEnd={props.enableEnd}
+            reverseHandles={props.reverseHandles}
           />
-        ) : (
-          props.children
-        )}
-        {props.showExecutionBadge !== false && props.executionState && (
-          <ExecutionStatusBadge
-            status={props.executionState?.status ?? 'pending'}
-            retryCount={props.executionState?.retry_count}
-            nodeType={props.nodeProps.type}
+        </SynPanel>
+        {!isSemanticZoom && (
+          <StepBottomBadge
+            mockDataPinned={mockDataPinned}
+            replayed={props.executionState?.replayed ?? false}
+            retainedFailure={props.executionState?.retainedFailure ?? false}
+            triggerInputReused={props.executionState?.triggerInputReused ?? false}
           />
         )}
-        {!isSemanticZoom && mockDataPinned && (
-          <div style={NODE_BOTTOM_BADGE_STYLE}>
-            <Label isCompact color="purple">
-              Mock data pinned
-            </Label>
-          </div>
-        )}
-        {hasValidationError && <ValidationErrorBadge />}
-        <SynStepConnectionHandles
-          isSemanticZoom={isSemanticZoom}
-          semanticZoomHandleTop={semanticZoomHandleTop}
-          disableTarget={props.disableTarget}
-          disableSource={props.disableSource}
-          enableStart={props.enableStart}
-          enableEnd={props.enableEnd}
-          reverseHandles={props.reverseHandles}
-        />
-      </SynPanel>
+      </div>
     </SynStepExpandedContext.Provider>
   )
 }

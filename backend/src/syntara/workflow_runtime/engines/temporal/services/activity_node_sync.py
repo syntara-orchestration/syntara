@@ -7,11 +7,16 @@ from uuid import UUID
 import structlog
 from sqlalchemy import or_
 from sqlmodel import select
+from sqlmodel.ext.asyncio.session import AsyncSession
 from temporalio.client import WorkflowHandle
 
 from syntara.core.constants import FieldLimits
 from syntara.workflow_core.models import NodeType
 from syntara.workflow_runtime.engines.temporal.services.activity_sync_types import ExecutionMonitorMetadata
+from syntara.workflow_runtime.engines.temporal.utils.loop_iteration_ids import (
+    loop_iteration_path,
+    strip_loop_iteration_suffixes,
+)
 from syntara.workflows.models.activity_execution import TERMINAL_ACTIVITY_STATUSES, ActivityExecution, ActivityStatus
 from syntara.workflows.models.workflow_version import WorkflowVersion
 
@@ -19,6 +24,19 @@ logger = structlog.stdlib.get_logger(__name__)
 
 PRE_RESOLVED_ACTIVITY_ID_PREFIX = "pre-resolved-"
 _COMPOSITE_ITER_SEP = "#iter-"
+
+
+def _input_data_for_activity(
+    input_data_map: dict[str, dict[str, Any]] | None,
+    activity_name: str,
+) -> dict[str, Any] | None:
+    """Return mapped inputs for an activity name, falling back to its canvas ID."""
+    if not input_data_map:
+        return None
+    if activity_name in input_data_map:
+        return input_data_map[activity_name]
+    base_name = activity_name.split(_COMPOSITE_ITER_SEP)[0]
+    return input_data_map.get(base_name)
 
 
 class ActivityNodeSyncMixin:
@@ -247,6 +265,10 @@ class ActivityNodeSyncMixin:
         self,
         metadata: ExecutionMonitorMetadata,
         handle: WorkflowHandle[Any, Any],
+        *,
+        fallback_failed_nodes: dict[str, str] | None = None,
+        fallback_input_data: dict[str, dict[str, Any]] | None = None,
+        fallback_occurrence_ids: dict[str, str] | None = None,
     ) -> dict[str, str] | None:
         """Query workflow for failed nodes and update them in database.
 
@@ -254,6 +276,8 @@ class ActivityNodeSyncMixin:
         resolution errors) have no Temporal events, so their ActivityExecution
         records remain PENDING. Nodes that already have a non-PENDING status
         (synced via Temporal events) are left untouched.
+        When completion-time queries are rejected, failed nodes and their scrubbed
+        inputs are recovered from the workflow completion result.
 
         Returns:
             Map of node ID to error message for failed nodes, or ``None`` when
@@ -262,11 +286,55 @@ class ActivityNodeSyncMixin:
         """
         try:
             failed_node_map: dict[str, str] = await handle.query("get_failed_nodes")
+        except Exception:  # noqa: BLE001
+            logger.warning(
+                "Could not query failed nodes; using workflow completion data",
+                execution_id=metadata.execution_id,
+                exc_info=True,
+            )
+            if fallback_failed_nodes:
+                try:
+                    await self._sync_nodes_to_terminal_status(
+                        metadata,
+                        node_ids=list(fallback_failed_nodes),
+                        target_status=ActivityStatus.FAILED,
+                        error_map=fallback_failed_nodes,
+                        input_data_map=fallback_input_data,
+                        occurrence_id_map=fallback_occurrence_ids,
+                    )
+                except Exception:
+                    logger.exception(
+                        "Error syncing failed nodes from workflow completion data",
+                        execution_id=metadata.execution_id,
+                    )
+            return None
+
+        try:
+            if fallback_failed_nodes:
+                failed_node_map.update(fallback_failed_nodes)
+            failed_node_inputs = dict(fallback_input_data or {})
+            for node_id in failed_node_map:
+                base_node_id = node_id.split(_COMPOSITE_ITER_SEP, maxsplit=1)[0]
+                try:
+                    input_data = await handle.query("get_activity_input", base_node_id)
+                except Exception:  # noqa: BLE001
+                    logger.warning(
+                        "Could not query inputs for failed node",
+                        activity_id=node_id,
+                        execution_id=metadata.execution_id,
+                        exc_info=True,
+                    )
+                    continue
+                if input_data is not None:
+                    failed_node_inputs.setdefault(base_node_id, input_data)
+
             await self._sync_nodes_to_terminal_status(
                 metadata,
                 node_ids=list(failed_node_map.keys()),
                 target_status=ActivityStatus.FAILED,
                 error_map=failed_node_map,
+                input_data_map=failed_node_inputs,
+                occurrence_id_map=fallback_occurrence_ids,
             )
         except Exception:
             logger.exception(
@@ -277,24 +345,116 @@ class ActivityNodeSyncMixin:
         else:
             return failed_node_map
 
+    def _create_missing_failed_loop_occurrences(
+        self,
+        session: AsyncSession,
+        metadata: ExecutionMonitorMetadata,
+        activities: list[ActivityExecution],
+        node_ids: list[str],
+        error_map: dict[str, str] | None,
+        input_data_map: dict[str, dict[str, Any]] | None,
+        occurrence_id_map: dict[str, str] | None,
+        now: datetime,
+    ) -> list[ActivityExecution]:
+        """Create failed records for loop occurrences with no scheduled activity event."""
+        created: list[ActivityExecution] = []
+        if not occurrence_id_map:
+            return created
+
+        for base_name, temporal_activity_id in occurrence_id_map.items():
+            if (
+                base_name not in node_ids
+                or strip_loop_iteration_suffixes(temporal_activity_id) != base_name
+                or not loop_iteration_path(temporal_activity_id)
+            ):
+                continue
+
+            base_activities = [
+                activity
+                for activity in activities
+                if activity.activity_name == base_name
+                or activity.activity_name.startswith(f"{base_name}{_COMPOSITE_ITER_SEP}")
+            ]
+            if any(activity.temporal_activity_id == temporal_activity_id for activity in base_activities):
+                continue
+            if not any(activity.status in TERMINAL_ACTIVITY_STATUSES for activity in base_activities):
+                continue
+
+            original = next(
+                (activity for activity in base_activities if activity.activity_name == base_name),
+                base_activities[0] if base_activities else None,
+            )
+            if original is None:
+                continue
+            latest_iteration = max(
+                (
+                    activity.iteration
+                    if activity.iteration is not None
+                    else int(activity.activity_name.rpartition(_COMPOSITE_ITER_SEP)[2])
+                    if _COMPOSITE_ITER_SEP in activity.activity_name
+                    else 0
+                    for activity in base_activities
+                ),
+                default=0,
+            )
+            iteration = max(latest_iteration, metadata.iteration_counters.get(base_name, 0)) + 1
+            composite_key = f"{base_name}{_COMPOSITE_ITER_SEP}{iteration}"
+            while any(activity.activity_name == composite_key for activity in base_activities):
+                iteration += 1
+                composite_key = f"{base_name}{_COMPOSITE_ITER_SEP}{iteration}"
+
+            if original.iteration is None:
+                original.iteration = 0
+            failed_activity = ActivityExecution(
+                execution_id=metadata.execution_id,
+                activity_name=composite_key,
+                node_type=original.node_type,
+                temporal_activity_id=temporal_activity_id,
+                status=ActivityStatus.FAILED,
+                started_at=None,
+                completed_at=now,
+                input_data=_input_data_for_activity(input_data_map, base_name) or {},
+                output_data=None,
+                error_details=(error_map or {}).get(base_name),
+                retry_count=0,
+                iteration=iteration,
+            )
+            session.add(failed_activity)
+            created.append(failed_activity)
+            metadata.iteration_counters[base_name] = iteration
+            metadata.activity_index_map[composite_key] = metadata.next_activity_index
+            metadata.next_activity_index += 1
+
+        return created
+
     async def _sync_nodes_to_terminal_status(
         self,
         metadata: ExecutionMonitorMetadata,
         node_ids: list[str],
         target_status: ActivityStatus,
         error_map: dict[str, str] | None = None,
+        input_data_map: dict[str, dict[str, Any]] | None = None,
+        occurrence_id_map: dict[str, str] | None = None,
     ) -> None:
         """Update ActivityExecution records to a terminal status and publish patches.
 
         Fetches all activities matching node_ids, then skips any that are already
         in a terminal status. This prevents overwriting one terminal state with
         another (e.g. a COMPLETED activity should not be changed to SKIPPED).
+        Already-FAILED rows with empty ``input_data`` still receive a backfill
+        from ``input_data_map`` so a completion-payload fallback can fill inputs
+        after Temporal already marked the row failed.
 
         Args:
             metadata: Monitoring metadata containing execution and activity index map
             node_ids: Node IDs to update
             target_status: Terminal status to set (SKIPPED, FAILED, etc.)
             error_map: Optional mapping of node ID to error message
+            input_data_map: Optional mapping of failed node IDs to inputs that were
+                recorded without a Temporal activity event.
+            occurrence_id_map: Optional mapping of failed canvas node IDs to their
+                exact Temporal activity IDs, used to persist loop failures that
+                occurred before that iteration scheduled an activity.
 
         """
         if not node_ids:
@@ -321,14 +481,39 @@ class ActivityNodeSyncMixin:
                 )
             )
             activities = result.all()
-
-            if not activities:
-                return
-
             updated_activities: list[tuple[ActivityExecution, dict[str, Any]]] = []
             now = datetime.now(UTC)
+            new_iteration_activities = (
+                self._create_missing_failed_loop_occurrences(
+                    session,
+                    metadata,
+                    activities,
+                    node_ids,
+                    error_map,
+                    input_data_map,
+                    occurrence_id_map,
+                    now,
+                )
+                if target_status == ActivityStatus.FAILED
+                else []
+            )
+
             for activity in activities:
+                input_data = _input_data_for_activity(input_data_map, activity.activity_name)
                 if activity.status in TERMINAL_ACTIVITY_STATUSES:
+                    if activity.status == ActivityStatus.FAILED and not activity.input_data and input_data is not None:
+                        old_values = {
+                            "status": activity.status,
+                            "started_at": activity.started_at,
+                            "completed_at": activity.completed_at,
+                            "error_details": activity.error_details,
+                            "output_data": activity.output_data,
+                            "iteration": activity.iteration,
+                            "input_data": activity.input_data,
+                        }
+                        activity.input_data = input_data
+                        activity.updated_at = now
+                        updated_activities.append((activity, old_values))
                     continue
                 old_values = {
                     "status": activity.status,
@@ -338,15 +523,17 @@ class ActivityNodeSyncMixin:
                     "output_data": activity.output_data,
                     "iteration": activity.iteration,
                 }
+                base_name = activity.activity_name.split(_COMPOSITE_ITER_SEP)[0]
                 activity.status = target_status
                 activity.completed_at = now
                 if error_map is not None:
-                    base_name = activity.activity_name.split(_COMPOSITE_ITER_SEP)[0]
                     activity.error_details = error_map.get(base_name)
+                if input_data is not None:
+                    activity.input_data = input_data
                 activity.updated_at = now
                 updated_activities.append((activity, old_values))
 
-            if not updated_activities:
+            if not updated_activities and not new_iteration_activities:
                 return
 
             await session.commit()
@@ -358,4 +545,8 @@ class ActivityNodeSyncMixin:
                 count=len(updated_activities),
             )
 
-            await self._publish_activity_patches(metadata, updated_activities)
+            await self._publish_activity_patches(
+                metadata,
+                updated_activities,
+                new_iteration_activities=new_iteration_activities,
+            )

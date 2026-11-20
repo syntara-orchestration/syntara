@@ -9,12 +9,15 @@ import styles from './CompactActivityList.module.css'
 import type { ActivityOrderItem } from './ExecutionActivityTable'
 import { ActivityStatusLabel } from './ExecutionStatus'
 import { ACTIVITY_STATUS } from './utils/executionState/executionHelpers'
+import { getRetryActivityMarkers } from './utils/replayedNodes'
 
 export type CompactActivityListProps = {
   activityStates: Map<string, ActivityState>
   activityOrder: ActivityOrderItem[]
   onRowClick?: (nodeId: string, nodeName: string) => void
   selectedNodeId?: string | null
+  /** Timestamp replayed steps predate; set only for retry executions. */
+  replayBaselineAt?: string | null
 }
 
 export function CompactActivityList({
@@ -22,12 +25,14 @@ export function CompactActivityList({
   activityOrder,
   onRowClick,
   selectedNodeId,
+  replayBaselineAt,
 }: Readonly<CompactActivityListProps>) {
   return (
     <SynScrollableTableContainer caption="Activity list" useFixedLayout={false}>
       <Tbody>
         {activityOrder.map(({ id, name, type }) => {
           const state = activityStates.get(id)
+          const retryMarkers = getRetryActivityMarkers(state, replayBaselineAt, type)
           const hasTimeRange = Boolean(state?.startedAt)
           const displayName = name ?? id
           const isSelected = id === selectedNodeId
@@ -52,7 +57,13 @@ export function CompactActivityList({
                 </Stack>
               </Td>
               <Td dataLabel="Status" modifier="nowrap" className={styles.statusCell}>
-                <ActivityStatusLabel status={state?.status ?? ACTIVITY_STATUS.PENDING} nodeType={type} />
+                <ActivityStatusLabel
+                  status={state?.status ?? ACTIVITY_STATUS.PENDING}
+                  nodeType={type}
+                  replayed={retryMarkers.replayed}
+                  retainedFailure={retryMarkers.retainedFailure}
+                  triggerInputReused={retryMarkers.triggerInputReused}
+                />
               </Td>
             </Tr>
           )

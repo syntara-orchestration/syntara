@@ -66,6 +66,21 @@ TERMINAL_EXECUTION_STATUSES = frozenset(
 )
 
 
+class RetryKind(StrEnum):
+    """Classification of retry execution type.
+
+    Used for retry telemetry and metrics. Inferred from execution metadata, not persisted.
+
+    Attributes:
+        STANDARD: Complete workflow retry via retry_execution() (same inputs, trigger node).
+        FROM_FAILURE: Replay-based retry via retry_from_failure() (from failed state, optional overrides).
+
+    """
+
+    STANDARD = "standard"
+    FROM_FAILURE = "from_failure"
+
+
 class Execution(UserOwnedResource, table=True):
     """Execution model representing workflow runtime instances.
 
@@ -305,6 +320,31 @@ class Execution(UserOwnedResource, table=True):
         ),
     )
 
+    @property
+    def inferred_retry_kind(self) -> str | None:
+        """Infer retry kind from execution metadata.
+
+        Classification rules:
+        - If retried_from_execution_id is None → not a retry (returns None)
+        - If retried_from_execution_id is set AND execution_metadata has 'eligible_point_ids' → 'from_failure'
+        - If retried_from_execution_id is set AND execution_metadata lacks 'eligible_point_ids' → 'standard'
+
+        Older retry executions do not have ``eligible_point_ids`` and are
+        intentionally classified as standard retries for compatibility.
+
+        Returns:
+            Retry kind value ('standard', 'from_failure') or None if not a retry
+
+        """
+        if self.retried_from_execution_id is None:
+            return None
+
+        # Check if execution_metadata contains eligible_point_ids
+        if self.execution_metadata and "eligible_point_ids" in self.execution_metadata:
+            return RetryKind.FROM_FAILURE.value
+
+        return RetryKind.STANDARD.value
+
     def __repr__(self) -> str:
         """Return string representation of Execution.
 
@@ -411,6 +451,79 @@ class TestExecutionCreate(SQLModel):
             )
             raise ValueError(msg)
         return self
+
+
+#: Description for the retry_from_failure input-override map (SDP AC-14/R10c).
+_INPUT_PARAMETER_OVERRIDES_DESCRIPTION = (
+    "Input parameter overrides for the retry's starting nodes, keyed by node id then parameter name "
+    "(SDP AC-14/R10c). Each override replaces the value the node would otherwise receive, after upstream "
+    "outputs are injected, so the supplied value is what executes. Parameter names must already exist on "
+    "that node in the retained workflow version, and node ids must be among the retry's starting points; "
+    "anything else is rejected. Overrides apply to this retry run only — the workflow definition is never "
+    "modified, and a permanent change requires editing, saving, and publishing the workflow."
+)
+
+
+class RetryFailureRequest(SQLModel):
+    """Request body for POST /executions/{id}/retry_from_failure."""
+
+    __test__ = False  # Prevent pytest from collecting this as a test class
+
+    retry_point_ids: list[str] = Field(
+        default_factory=list,
+        description="Retry points to resume from (node IDs from the source execution). "
+        "A subset may be passed when multiple parallel branches failed; unselected branches reuse "
+        "their recorded output (completed results are retained, unselected failures stay failed). "
+        "Empty selects the default: all currently failed nodes. "
+        "This is what the caller asks for; the points that will actually run come back as "
+        "eligible_point_ids on the response, which can differ.",
+    )
+    input_parameter_overrides: dict[str, dict[str, Any]] = Field(
+        default_factory=dict,
+        description=_INPUT_PARAMETER_OVERRIDES_DESCRIPTION,
+    )
+
+
+class RetryFromFailureValidationResponse(SQLModel):
+    """Retry preview (GET /executions/{id}/retry_from_failure_preview)."""
+
+    eligible: bool = Field(description="Whether the retry is allowed to proceed")
+    reason: str | None = Field(default=None, description="Rejection reason when eligible is false, null otherwise")
+    eligible_point_ids: list[str] = Field(
+        default_factory=list,
+        description="The retry points that will actually run, after cleanup (trimmed, deduped, sorted). "
+        "Equal to the requested retry_point_ids except where sanitized nodes are auto-included and "
+        "superseded failed points are dropped, so it is not always a verbatim echo of the request. "
+        "On a rejection it reports the pre-expansion selection that was assessed.",
+    )
+    sanitized_node_ids: list[str] = Field(
+        default_factory=list,
+        description="Upstream nodes with sanitized stored outputs referenced on the retry path. "
+        "Populated when the verdict rejects; empty on eligible verdicts (see auto_included_node_ids).",
+    )
+    auto_included_node_ids: list[str] = Field(
+        default_factory=list,
+        description="Sanitized nodes added as retry points so redacted outputs can be regenerated. "
+        "Set on the default path and when an explicit sanitized replacement still has further "
+        "sanitized ancestors. Empty when that chain was already selected, or when an explicit "
+        "failed node with sanitized dependencies is rejected.",
+    )
+    sanitized_replacements: dict[str, list[str]] = Field(
+        default_factory=dict,
+        description="For each currently-failed node, the sanitized nodes it must be replaced by, if any.",
+    )
+    step_count_by_eligible_point: dict[str, int] = Field(
+        default_factory=dict,
+        description="Re-run step count for each eligible retry point.",
+    )
+    total_step_count: int = Field(
+        default=0,
+        description="Deduplicated total of steps that will re-run across the eligible points.",
+    )
+    retained_result_count: int = Field(
+        default=0,
+        description="Number of completed activity results outside the selected retry paths that will be retained.",
+    )
 
 
 class CurrentActivity(SQLModel):

@@ -90,3 +90,32 @@ class WorkflowExecutionCompletedEvent(BaseTelemetryEvent):
         description="Whether the run executed the workflow's published version",
     )
     is_retry: bool = Field(default=False, description="Whether this run was started as a retry")
+
+
+class WorkflowRetryRequestedEvent(BaseTelemetryEvent):
+    """Telemetry event emitted when a retry request is accepted.
+
+    Emitted after the new retry execution is successfully persisted to the database.
+    Carries retry classification and normalized failure context for product analytics.
+
+    Attributes:
+        execution_id: The new retry execution identifier (UUID v4).
+        source_execution_id: The parent execution being retried (UUID v4).
+        retry_kind: Type of retry (standard, from_failure).
+        node_count: Total nodes in the workflow (from_failure only, optional).
+        failed_step_types: Normalized, sorted, deduplicated list of failed node types
+            (from_failure only). Bounded to maximum 50 entries. Uses existing
+            node-type vocabulary. Empty list for standard retries.
+        execution_mode: Legacy field, always "retry" (kept for backward compatibility).
+
+    """
+
+    execution_id: UUID = Field(description="New retry execution identifier")
+    source_execution_id: UUID = Field(description="Parent execution being retried")
+    retry_kind: str = Field(description="Type of retry (standard, from_failure)")
+    node_count: int | None = Field(default=None, ge=0, description="Total nodes (from_failure only)")
+    failed_step_types: list[str] = Field(
+        default_factory=list,
+        description="Normalized, sorted failed node types (from_failure only, max 50)",
+    )
+    execution_mode: str = Field(default="retry", description="Legacy field (backward compatibility)")

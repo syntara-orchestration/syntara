@@ -1,5 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import type { ReactNode } from 'react'
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
 import { axe } from 'vitest-axe'
 
@@ -12,6 +14,10 @@ vi.mock('../../hooks/useCanI', () => ({
   useCanI: vi.fn(() => ({ allowed: true, isChecking: false, isError: false })),
 }))
 
+vi.mock('../../components/SynLink', () => ({
+  SynLink: ({ to, children }: { to: string; children: ReactNode }) => <a href={to}>{children}</a>,
+}))
+
 vi.mock('../../client', () => ({
   authMiddleware: { onRequest: vi.fn() },
   interfaceTagMiddleware: { onRequest: vi.fn() },
@@ -19,6 +25,11 @@ vi.mock('../../client', () => ({
     useMutation: vi.fn(() => ({
       mutate: vi.fn(),
       isPending: false,
+    })),
+    useQuery: vi.fn(() => ({
+      data: null,
+      isPending: false,
+      isError: false,
     })),
   },
   workflowClient: {
@@ -112,6 +123,70 @@ describe('ExecutionDetailPageHeaderParts', () => {
       </QueryClientProvider>
     )
     expect(await axe(container)).toHaveNoViolations()
+  })
+
+  it('keeps non-retry actions visible while retry mode is active', () => {
+    const queryClient = new QueryClient()
+    const execution = {
+      id: 'exec-123',
+      workflow_id: 'wf-1',
+      workflow_version_id: 'wfv-1',
+      project_id: 'proj-1',
+      status: 'failed',
+    } as never
+    render(
+      <QueryClientProvider client={queryClient}>
+        <ExecutionDetailHeaderToolbar
+          showApprovalActionStrip={false}
+          isApprovalLoading={false}
+          onReviewClick={() => {}}
+          historyCardOpen={false}
+          onToggleHistory={() => {}}
+          onBackToEditor={() => {}}
+          onCopyToEditor={() => {}}
+          isCancellable={false}
+          executionId="exec-123"
+          execution={execution}
+          isRetryMode
+          onRetryFromFailureClick={() => {}}
+        />
+      </QueryClientProvider>
+    )
+
+    expect(screen.getByRole('button', { name: 'Copy to editor' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Back to editor' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Run history' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Retry run' })).not.toBeInTheDocument()
+  })
+
+  it('keeps the cancel action visible while retry mode is active', () => {
+    const queryClient = new QueryClient()
+    const execution = {
+      id: 'exec-123',
+      workflow_id: 'wf-1',
+      workflow_version_id: 'wfv-1',
+      project_id: 'proj-1',
+      status: 'running',
+    } as never
+    render(
+      <QueryClientProvider client={queryClient}>
+        <ExecutionDetailHeaderToolbar
+          showApprovalActionStrip={false}
+          isApprovalLoading={false}
+          onReviewClick={() => {}}
+          historyCardOpen={false}
+          onToggleHistory={() => {}}
+          onBackToEditor={() => {}}
+          onCopyToEditor={() => {}}
+          isCancellable
+          executionId="exec-123"
+          execution={execution}
+          isRetryMode
+        />
+      </QueryClientProvider>
+    )
+
+    expect(screen.getByRole('button', { name: 'Cancel run' })).toBeInTheDocument()
   })
 
   it('renders cancel button when execution is cancellable', () => {
@@ -326,8 +401,9 @@ describe('ExecutionDetailPageHeaderParts', () => {
     expect(useCanI).toHaveBeenCalledWith('run', 'execution', { resourceProject: 'proj-42' })
   })
 
-  it('renders retry button when execution is in terminal state', () => {
+  it('groups both retry actions in a dropdown for a failed execution', async () => {
     const queryClient = new QueryClient()
+    const user = userEvent.setup()
     const execution = {
       id: 'exec-terminal',
       workflow_id: 'wf-1',
@@ -352,7 +428,93 @@ describe('ExecutionDetailPageHeaderParts', () => {
         />
       </QueryClientProvider>
     )
-    expect(screen.getByRole('button', { name: 'Retry run' })).toBeInTheDocument()
+    const retryToggle = screen.getByRole('button', { name: 'Retry run' })
+    expect(retryToggle).toBeInTheDocument()
+
+    await user.click(retryToggle)
+
+    expect(screen.getByRole('menuitem', { name: 'Retry run' })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: 'Retry run from failure' })).toBeInTheDocument()
+    await user.click(screen.getByRole('menuitem', { name: 'Retry run' }))
+
+    expect(screen.getByText('Retry run?')).toBeInTheDocument()
+  })
+
+  it.each([
+    ['failed' as const, true],
+    ['completed_with_errors' as const, true],
+    ['cancelled' as const, false],
+    ['completed' as const, false],
+    ['running' as const, false],
+  ])('shows retry from failure for %s: %s', async (status, expected) => {
+    const queryClient = new QueryClient()
+    const user = userEvent.setup()
+    const execution = {
+      id: 'exec-status',
+      workflow_id: 'wf-1',
+      workflow_version_id: 'wfv-1',
+      project_id: 'proj-1',
+      status,
+      mode: 'standard',
+    } as never
+    render(
+      <QueryClientProvider client={queryClient}>
+        <ExecutionDetailHeaderToolbar
+          showApprovalActionStrip={false}
+          isApprovalLoading={false}
+          onReviewClick={() => {}}
+          historyCardOpen={false}
+          onToggleHistory={() => {}}
+          onBackToEditor={() => {}}
+          onCopyToEditor={() => {}}
+          isCancellable={false}
+          executionId="exec-status"
+          execution={execution}
+        />
+      </QueryClientProvider>
+    )
+    if (status === 'running') {
+      expect(screen.queryByRole('button', { name: 'Retry run' })).not.toBeInTheDocument()
+    } else {
+      const retryToggle = screen.getByRole('button', { name: 'Retry run' })
+      await user.click(retryToggle)
+      if (expected) {
+        expect(screen.getByRole('menuitem', { name: 'Retry run from failure' })).toBeInTheDocument()
+      } else {
+        expect(screen.queryByRole('menuitem', { name: 'Retry run from failure' })).not.toBeInTheDocument()
+        expect(screen.getByText('Retry run?')).toBeInTheDocument()
+      }
+    }
+  })
+
+  it('does not render retry from failure for a failed test execution', () => {
+    const queryClient = new QueryClient()
+    const execution = {
+      id: 'exec-test',
+      workflow_id: 'wf-1',
+      workflow_version_id: 'wfv-1',
+      project_id: 'proj-1',
+      status: 'failed' as const,
+      mode: 'test',
+    } as never
+    render(
+      <QueryClientProvider client={queryClient}>
+        <ExecutionDetailHeaderToolbar
+          showApprovalActionStrip={false}
+          isApprovalLoading={false}
+          onReviewClick={() => {}}
+          historyCardOpen={false}
+          onToggleHistory={() => {}}
+          onBackToEditor={() => {}}
+          onCopyToEditor={() => {}}
+          isCancellable={false}
+          executionId="exec-test"
+          execution={execution}
+        />
+      </QueryClientProvider>
+    )
+    expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument()
+    expect(screen.queryByTestId('retry-from-failure-button')).not.toBeInTheDocument()
   })
 
   it('does not render retry button for running execution', () => {
@@ -382,6 +544,7 @@ describe('ExecutionDetailPageHeaderParts', () => {
       </QueryClientProvider>
     )
     expect(screen.queryByRole('button', { name: 'Retry run' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument()
   })
 
   it('renders both status and viewing run label when execution has both', () => {
@@ -401,5 +564,25 @@ describe('ExecutionDetailPageHeaderParts', () => {
     } as never
     render(<ExecutionDetailTitleRowAddons execution={execution} />)
     expect(screen.getByText('Pending approval')).toBeInTheDocument()
+  })
+
+  it('links the retried-from label to the source execution', () => {
+    const execution = {
+      status: 'running' as const,
+      retried_from_execution_id: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
+    } as never
+    render(<ExecutionDetailTitleRowAddons execution={execution} />)
+    expect(screen.getByRole('link', { name: 'Retried from: aaaaaaaa' })).toHaveAttribute(
+      'href',
+      '/executions/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee?history=closed'
+    )
+  })
+
+  it('does not render retried-from label for an ordinary execution', () => {
+    const execution = {
+      status: 'running' as const,
+    } as never
+    render(<ExecutionDetailTitleRowAddons execution={execution} />)
+    expect(screen.queryByTestId('retried-from-badge')).not.toBeInTheDocument()
   })
 })

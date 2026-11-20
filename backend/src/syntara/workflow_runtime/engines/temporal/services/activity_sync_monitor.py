@@ -10,8 +10,9 @@ from sqlalchemy.exc import InterfaceError, OperationalError
 from sqlalchemy.exc import TimeoutError as SATimeoutError
 from temporalio.api.enums.v1 import EventType
 from temporalio.api.history.v1 import HistoryEvent
-from temporalio.client import WorkflowHandle
+from temporalio.client import WorkflowHandle, WorkflowQueryFailedError, WorkflowQueryRejectedError
 from temporalio.exceptions import TemporalError
+from temporalio.service import RPCError
 
 from syntara.audit.context_managers import actor_context
 from syntara.workflow_core.models import NodeType
@@ -38,6 +39,7 @@ class ActivitySyncMonitorMixin:
     _sync_activities_to_db: Any
     _update_execution_to_running: Any
     _sync_failed_nodes: Any
+    _sync_nodes_to_terminal_status: Any
     _sync_skipped_nodes: Any
     _sync_detached_nodes: Any
     _update_execution_status_from_event: Any
@@ -46,6 +48,8 @@ class ActivitySyncMonitorMixin:
     _process_synthetic_partial_output: Any
     _TRIGGER_ACTIVITY_TYPES: Any
     _extract_failed_activities_from_event: Any
+    _extract_failed_activity_inputs_from_event: Any
+    _extract_failed_activity_occurrences_from_event: Any
     temporal_client: Any
     _initialize_monitoring: Any
     _process_activity_scheduled: Any
@@ -54,6 +58,30 @@ class ActivitySyncMonitorMixin:
     _process_activity_failed: Any
     _process_activity_timed_out: Any
     _process_activity_canceled: Any
+
+    async def _is_retry_from_failure(
+        self,
+        handle: WorkflowHandle[Any, Any],
+        execution_id: UUID,
+    ) -> bool:
+        """Ask the workflow once whether it is replaying from a failure point.
+
+        Defaults to False when the query cannot be answered — a workflow that has
+        already closed, or one predating the query. Either way no node will be
+        replayed, so skipping the per-activity updates is the safe answer rather
+        than a guess.
+        """
+        try:
+            return bool(await handle.query("is_retry_from_failure"))
+        except (RPCError, WorkflowQueryFailedError, WorkflowQueryRejectedError) as exc:
+            # A closed workflow, one that predates the query, or one that rejected
+            # it. All mean nothing will be replayed.
+            logger.info(
+                "Could not determine retry-from-failure status; assuming not a retry",
+                execution_id=execution_id,
+                error=str(exc),
+            )
+            return False
 
     async def _handle_event_post_processing(
         self,
@@ -168,9 +196,18 @@ class ActivitySyncMonitorMixin:
             # which marks any remaining PENDING activities as SKIPPED. By syncing first,
             # converge nodes that were failed in the workflow (via _fail_converge_node)
             # are already FAILED in the DB, so _finalize_non_terminal_activities skips them.
-            failed_node_map = await self._sync_failed_nodes(metadata, handle)
+            event_failed_node_map = self._extract_failed_activities_from_event(event)
+            event_failed_node_inputs = self._extract_failed_activity_inputs_from_event(event)
+            event_failed_node_occurrences = self._extract_failed_activity_occurrences_from_event(event)
+            failed_node_map = await self._sync_failed_nodes(
+                metadata,
+                handle,
+                fallback_failed_nodes=event_failed_node_map,
+                fallback_input_data=event_failed_node_inputs,
+                fallback_occurrence_ids=event_failed_node_occurrences,
+            )
             if failed_node_map is None:
-                failed_node_map = self._extract_failed_activities_from_event(event)
+                failed_node_map = event_failed_node_map
             await self._sync_skipped_nodes(metadata, handle)
             await self._sync_detached_nodes(metadata, handle)
             await self._update_execution_status_from_event(metadata, event, failed_node_map)

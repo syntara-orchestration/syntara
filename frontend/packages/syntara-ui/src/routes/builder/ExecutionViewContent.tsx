@@ -39,6 +39,8 @@ type ExecutionViewContentProps = {
   onNodeClick?: NodeMouseHandler
   /** Activity ID of the externally selected node (e.g. from table row click). */
   selectedActivityId?: string | null
+  /** Retry start points to preview on the canvas while the retry review is open. */
+  retryPreviewPointIds?: readonly string[]
 }
 
 /**
@@ -46,7 +48,15 @@ type ExecutionViewContentProps = {
  * Handles workflow loading and execution state synchronization
  */
 function ExecutionViewContentInner(props: ExecutionViewContentProps) {
-  const { workflow, executionStatus, executionActivities, executionId, onNodeClick, selectedActivityId } = props
+  const {
+    workflow,
+    executionStatus,
+    executionActivities,
+    executionId,
+    onNodeClick,
+    selectedActivityId,
+    retryPreviewPointIds,
+  } = props
   const { loadWorkflowWithEdges, setWorkflow: setWorkflowInStore, setEdges: setStoredEdges } = useWorkflowStoreActions()
   const { setActivityExecutions } = useExecutionStoreActions()
   const hasLoadedRef = useRef(false)
@@ -182,6 +192,7 @@ function ExecutionViewContentInner(props: ExecutionViewContentProps) {
         executionStatus={executionStatus}
         onNodeClick={onNodeClick}
         selectedActivityId={selectedActivityId}
+        retryPreviewPointIds={retryPreviewPointIds}
         onAddNodeFromEdge={() => {
           // No-op: cannot add steps in execution view
         }}

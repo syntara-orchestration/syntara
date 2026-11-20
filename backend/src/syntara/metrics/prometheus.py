@@ -389,3 +389,25 @@ class OrchestratorPrometheusMetrics:
             ["component"],
             registry=self.registry,
         )
+        # Retry telemetry metrics
+        self.workflow_retry_requests_total = Counter(
+            "orchestrator_workflow_retry_requests_total",
+            "Total number of retry requests by kind and outcome",
+            ["retry_kind", "outcome"],
+            registry=self.registry,
+        )
+
+        self.workflow_retry_completions_total = Counter(
+            "orchestrator_workflow_retry_completions_total",
+            "Total number of retry executions that reached terminal status",
+            ["retry_kind", "status"],
+            registry=self.registry,
+        )
+
+        self.workflow_retry_duration_seconds = Histogram(
+            "orchestrator_workflow_retry_duration_seconds",
+            "Duration of retry executions from creation to completion",
+            ["retry_kind", "status"],
+            buckets=LATENCY_BUCKETS_SLOW,
+            registry=self.registry,
+        )
