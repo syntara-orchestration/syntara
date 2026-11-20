@@ -123,6 +123,7 @@ describe('Kafka consumer settings', () => {
     await user.type(group, 'valid.group_1-2')
     await user.click(screen.getByRole('button', { name: 'Save settings' }))
     expect(onSubmit).toHaveBeenCalled()
+    expect(group).toHaveAttribute('aria-invalid', 'false')
   })
 
   it('keeps all controls disabled in version views', async () => {

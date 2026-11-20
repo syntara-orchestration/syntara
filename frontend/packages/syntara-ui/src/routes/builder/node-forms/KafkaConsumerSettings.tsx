@@ -114,6 +114,7 @@ export function KafkaConsumerSettings({
                 placeholder={isPublishedSource ? 'Published group' : 'Auto-generated'}
                 isDisabled={isGroupLocked}
                 aria-describedby={describedBy}
+                aria-invalid={Boolean(fieldState.error)}
                 validated={fieldState.error ? 'error' : 'default'}
                 onBlur={field.onBlur}
                 onChange={(_event, value) => field.onChange(value)}
