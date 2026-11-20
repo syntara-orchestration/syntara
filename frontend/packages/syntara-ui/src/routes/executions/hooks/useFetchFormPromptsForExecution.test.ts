@@ -22,6 +22,7 @@ const mockListPrompts: FormPromptListRead[] = [
     execution_id: 'exec-1',
     project_id: 'proj-1',
     prompt_node_id: 'collect_input',
+    loop_iteration_path: [2],
     name: 'Collect input',
     status: 'pending',
   },
@@ -32,6 +33,7 @@ const expectedSummary: FormPromptSummary = {
   execution_id: 'exec-1',
   project_id: 'proj-1',
   prompt_node_id: 'collect_input',
+  loop_iteration_path: [2],
   name: 'Collect input',
   status: 'pending',
 }
@@ -178,5 +180,6 @@ describe('useFetchFormPromptsForExecution', () => {
 
     expect(fetched.map((p) => p.id)).toEqual(['fp-1', 'fp-minimal'])
     expect(fetched[1]?.name).toBe('step')
+    expect(fetched[1]?.loop_iteration_path).toEqual([])
   })
 })

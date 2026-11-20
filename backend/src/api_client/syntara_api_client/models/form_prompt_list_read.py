@@ -31,6 +31,7 @@ class FormPromptListRead:
         prompt_node_id (str): Canvas node ID from the workflow definition
         name (str): Display name for the form prompt
         status (FormPromptStatus): Form prompt status enumeration.
+        loop_iteration_path (list[int] | Unset): Enclosing-loop indices, outermost first (empty when not inside a loop)
         timeout_at (datetime.datetime | None | Unset): When this prompt expires (null = no timeout)
         responded_at (datetime.datetime | None | Unset): When the response was submitted (null until submitted)
         responded_by (None | Unset | UserReference): User who submitted the response
@@ -46,6 +47,7 @@ class FormPromptListRead:
     prompt_node_id: str
     name: str
     status: FormPromptStatus
+    loop_iteration_path: list[int] | Unset = UNSET
     timeout_at: datetime.datetime | None | Unset = UNSET
     responded_at: datetime.datetime | None | Unset = UNSET
     responded_by: None | Unset | UserReference = UNSET
@@ -70,6 +72,10 @@ class FormPromptListRead:
         name = self.name
 
         status = self.status.value
+
+        loop_iteration_path: list[int] | Unset = UNSET
+        if not isinstance(self.loop_iteration_path, Unset):
+            loop_iteration_path = self.loop_iteration_path
 
         timeout_at: None | str | Unset
         if isinstance(self.timeout_at, Unset):
@@ -128,6 +134,8 @@ class FormPromptListRead:
                 "status": status,
             }
         )
+        if loop_iteration_path is not UNSET:
+            field_dict["loop_iteration_path"] = loop_iteration_path
         if timeout_at is not UNSET:
             field_dict["timeout_at"] = timeout_at
         if responded_at is not UNSET:
@@ -161,6 +169,8 @@ class FormPromptListRead:
         name = d.pop("name")
 
         status = FormPromptStatus(d.pop("status"))
+
+        loop_iteration_path = cast(list[int], d.pop("loop_iteration_path", UNSET))
 
         def _parse_timeout_at(data: object) -> datetime.datetime | None | Unset:
             if data is None:
@@ -256,6 +266,7 @@ class FormPromptListRead:
             prompt_node_id=prompt_node_id,
             name=name,
             status=status,
+            loop_iteration_path=loop_iteration_path,
             timeout_at=timeout_at,
             responded_at=responded_at,
             responded_by=responded_by,
