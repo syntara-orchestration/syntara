@@ -640,6 +640,11 @@ export interface components {
        */
       prompt_node_id: string
       /**
+       * Loop Iteration Path
+       * @description Enclosing-loop indices, outermost first (empty when not inside a loop)
+       */
+      loop_iteration_path?: number[]
+      /**
        * Name
        * @description Display name for the form prompt
        */

@@ -20,8 +20,15 @@ type FormPromptNodeRef = {
 
 const LOOP_ITER_CHAIN = /(?:_iter_\d+)+$/
 
-function suffixIterationKey(promptNodeId: string): number[] {
-  const chain = LOOP_ITER_CHAIN.exec(promptNodeId)?.[0] ?? ''
+/**
+ * Loop path encoded in a Temporal activity ID.
+ *
+ * Inside loops the worker appends one `_iter_{n}` per enclosing loop, outermost
+ * first, so `collect_input_iter_1_iter_0` is the prompt with `loop_iteration_path`
+ * `[1, 0]`.
+ */
+function loopIterationPathFromActivityId(activityId: string): number[] {
+  const chain = LOOP_ITER_CHAIN.exec(activityId)?.[0] ?? ''
   const indices: number[] = []
   const iterNum = /_iter_(\d+)/g
   let match = iterNum.exec(chain)
@@ -33,10 +40,11 @@ function suffixIterationKey(promptNodeId: string): number[] {
 }
 
 export function formPromptIterationSortKey(prompt: FormPromptNodeRef): number[] {
-  if (prompt.loop_iteration_path && prompt.loop_iteration_path.length > 0) {
-    return prompt.loop_iteration_path
-  }
-  return suffixIterationKey(prompt.prompt_node_id)
+  return prompt.loop_iteration_path ?? []
+}
+
+function sameLoopIterationPath(left: readonly number[], right: readonly number[]): boolean {
+  return left.length === right.length && left.every((index, i) => index === right[i])
 }
 
 export function compareFormPromptIterationKeys(left: number[], right: number[]): number {
@@ -95,14 +103,15 @@ export function findFormPromptForCanvasNode<T extends FormPromptNodeRef>(
   const byTemporal = findByTemporalActivityId(prompts, canvasOrActivityId)
   if (byTemporal) return byTemporal
 
-  const canvasId = canvasNodeIdFromApprovalNodeId(canvasOrActivityId)
-  if (canvasOrActivityId !== canvasId) {
-    const exactSuffixed = prompts.find((prompt) => prompt.prompt_node_id === canvasOrActivityId)
-    if (exactSuffixed) return exactSuffixed
+  const candidates = prompts.filter((prompt) => matchesPromptNodeId(prompt.prompt_node_id, canvasOrActivityId))
+  const activityLoopPath = loopIterationPathFromActivityId(canvasOrActivityId)
+  if (activityLoopPath.length > 0) {
+    const exactIteration = candidates.find((prompt) =>
+      sameLoopIterationPath(formPromptIterationSortKey(prompt), activityLoopPath)
+    )
+    if (exactIteration) return exactIteration
   }
-  return pickLatestLoopPrompt(
-    prompts.filter((prompt) => matchesPromptNodeId(prompt.prompt_node_id, canvasOrActivityId))
-  )
+  return pickLatestLoopPrompt(candidates)
 }
 
 export function findFormPromptIndexForCanvasNode<T extends FormPromptNodeRef>(

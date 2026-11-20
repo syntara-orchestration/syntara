@@ -409,7 +409,9 @@ class TestFormPromptCreateAPI:
 
         # Create two form_prompts for same execution
         payload1 = _form_prompt_payload(exec_id, test_execution.project_id, prompt_node_id="form1", name="Form 1")
-        payload2 = _form_prompt_payload(exec_id, test_execution.project_id, prompt_node_id="form2", name="Form 2")
+        payload2 = _form_prompt_payload(
+            exec_id, test_execution.project_id, prompt_node_id="form2", name="Form 2", loop_iteration_path=[1, 0]
+        )
 
         response1 = await internal_service_client.post(FORM_PROMPTS_URL, json=payload1)
         response2 = await internal_service_client.post(FORM_PROMPTS_URL, json=payload2)
@@ -434,7 +436,9 @@ class TestFormPromptCreateAPI:
             assert "responded_at" in item
             assert "timeout_at" in item
             assert "temporal_activity_id" not in item
-            assert "loop_iteration_path" not in item
+
+        loop_paths = {p["name"]: p["loop_iteration_path"] for p in data["resources"]}
+        assert loop_paths == {"Form 1": [], "Form 2": [1, 0]}
 
     async def test_list_form_prompts_sort_by_workflow_name(
         self, internal_service_client: AsyncClient, jwt_client: AsyncClient, test_execution: Execution

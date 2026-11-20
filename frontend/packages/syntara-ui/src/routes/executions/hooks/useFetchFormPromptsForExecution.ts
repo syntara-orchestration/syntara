@@ -26,6 +26,7 @@ function toFormPromptSummary(item: FormPromptListRead): FormPromptSummary {
     execution_id: item.execution_id,
     project_id: item.project_id,
     prompt_node_id: item.prompt_node_id,
+    loop_iteration_path: item.loop_iteration_path ?? [],
     name: item.name,
     status: item.status,
   }

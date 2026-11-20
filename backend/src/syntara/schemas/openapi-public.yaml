@@ -30830,6 +30830,12 @@ components:
           type: string
           title: Prompt Node Id
           description: Canvas node ID from the workflow definition
+        loop_iteration_path:
+          type: array
+          title: Loop Iteration Path
+          description: Enclosing-loop indices, outermost first (empty when not inside a loop)
+          items:
+            type: integer
         name:
           type: string
           title: Name
