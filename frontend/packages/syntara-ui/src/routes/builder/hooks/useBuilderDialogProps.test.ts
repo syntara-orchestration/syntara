@@ -9,7 +9,6 @@ function makeParams(overrides: Partial<BuilderDialogPropsParams> = {}): BuilderD
     workflowId: 'wf-1',
     confirmDialogOpen: false,
     deleteDialogOpen: false,
-    selectedTriggerIndex: 0,
     currentWorkflow: null,
     dispatch: vi.fn(),
     handleRunWorkflow: vi.fn(),
@@ -39,7 +38,7 @@ describe('useBuilderDialogProps — runStepTriggerNodeId', () => {
   it('maps trigger-0 predecessor to the first trigger definition ID', () => {
     const params = makeParams({
       currentWorkflow: {
-        triggers: [{ id: 'def-trigger-1', type: 'manual_trigger', parameters: {} }],
+        triggers: [{ id: 'def-trigger-1', type: 'manual_trigger', name: 'Manual', parameters: {} }],
       },
       runStepDialog: {
         isOpen: true,
@@ -62,8 +61,8 @@ describe('useBuilderDialogProps — runStepTriggerNodeId', () => {
     const params = makeParams({
       currentWorkflow: {
         triggers: [
-          { id: 'def-trigger-1', type: 'manual_trigger', parameters: {} },
-          { id: 'def-trigger-2', type: 'webhook_trigger', parameters: {} },
+          { id: 'def-trigger-1', type: 'manual_trigger', name: 'Manual', parameters: {} },
+          { id: 'def-trigger-2', type: 'webhook_trigger', name: 'Webhook', parameters: {} },
         ],
       },
       runStepDialog: {
@@ -86,7 +85,7 @@ describe('useBuilderDialogProps — runStepTriggerNodeId', () => {
   it('returns undefined when no trigger predecessor exists', () => {
     const params = makeParams({
       currentWorkflow: {
-        triggers: [{ id: 'def-trigger-1', type: 'manual_trigger', parameters: {} }],
+        triggers: [{ id: 'def-trigger-1', type: 'manual_trigger', name: 'Manual', parameters: {} }],
       },
       runStepDialog: {
         isOpen: true,
@@ -108,7 +107,7 @@ describe('useBuilderDialogProps — runStepTriggerNodeId', () => {
   it('returns undefined when run step dialog is closed', () => {
     const params = makeParams({
       currentWorkflow: {
-        triggers: [{ id: 'def-trigger-1', type: 'manual_trigger', parameters: {} }],
+        triggers: [{ id: 'def-trigger-1', type: 'manual_trigger', name: 'Manual', parameters: {} }],
       },
     })
 

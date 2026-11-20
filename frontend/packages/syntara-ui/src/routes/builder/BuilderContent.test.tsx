@@ -3380,6 +3380,91 @@ describe('BuilderContent', () => {
   })
 
   describe('RBAC read-only mode', () => {
+    it('runs the saved trigger and schema after editing access is lost with local edits', async () => {
+      const user = userEvent.setup()
+      const execute = vi.fn()
+      const save = vi.fn()
+      vi.mocked(executionsClient.useMutation).mockReturnValue(createMockMutation(execute))
+      vi.mocked(workflowClient.useMutation).mockReturnValue(createMockMutation(save))
+      const props = { workflow: createWorkflowWithInputSchema(), isNew: false, workflowId: 'workflow-1' }
+      const view = await renderBuilder(props)
+      await waitFor(() => expect(screen.getByPlaceholderText('Workflow name')).toHaveValue('Test Workflow'))
+
+      act(() => {
+        const store = useWorkflowStore.getState()
+        store.updateWorkflow((workflow) => ({
+          ...workflow,
+          triggers: workflow.triggers?.map((trigger) => ({
+            ...trigger,
+            parameters: { input_schema: { type: 'object', required: ['localOnly'] } },
+          })),
+        }))
+        store.addTrigger({ id: 'local-only', type: 'manual_trigger', name: 'Local trigger', parameters: {} })
+      })
+      await user.click(screen.getByRole('button', { name: 'Run workflow' }))
+      await user.click(screen.getByRole('menuitem', { name: 'Local trigger' }))
+      expect(screen.getByRole('button', { name: 'Save and run' })).toBeInTheDocument()
+
+      act(() => useWorkflowStore.getState().setValidationErrorCount(1))
+      mockStepTypePermissions.canAuthor = false
+      mockStepTypePermissions.blockedStepTypes = [{ kind: 'script', label: 'Script' }]
+      view.rerender(<BuilderContent {...props} />)
+
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Run workflow' })).not.toBeInTheDocument()
+      expect(screen.getByText(/Run uses the last saved version/)).toBeInTheDocument()
+      expect(useWorkflowStore.getState().currentWorkflow?.triggers).toEqual(
+        expect.arrayContaining([expect.objectContaining({ id: 'local-only' })])
+      )
+
+      await user.click(screen.getByRole('button', { name: 'Run' }))
+      await user.click(await screen.findByRole('button', { name: 'Run now' }))
+      const inputDialog = await screen.findByRole('dialog', { name: 'Run workflow modal' })
+      expect(
+        within(inputDialog).getByRole('heading', { name: 'Set mock output data for Manual Trigger' })
+      ).toBeVisible()
+      await user.click(within(inputDialog).getByRole('button', { name: 'Run' }))
+
+      await waitFor(() => {
+        expect(execute).toHaveBeenCalledWith(
+          { body: { workflow_id: 'workflow-1', trigger_node_id: 'manual_trigger', input_data: { name: '' } } },
+          expect.anything()
+        )
+      })
+      expect(save).not.toHaveBeenCalled()
+    })
+
+    it('offers only the saved trigger choices when a read-only workflow has multiple triggers', async () => {
+      const user = userEvent.setup()
+      const workflow = createWorkflowWithInputSchema()
+      const definition = workflow.version.workflow_definition
+      workflow.version.workflow_definition = {
+        ...definition,
+        triggers: [
+          { id: 'manual_trigger', type: 'manual_trigger', name: 'Manual Trigger', parameters: {} },
+          { id: 'saved-trigger-2', type: 'manual_trigger', name: 'Another saved trigger', parameters: {} },
+        ],
+      }
+      const props = { workflow, isNew: false, workflowId: 'workflow-1' }
+      const view = await renderBuilder(props)
+      await waitFor(() => expect(screen.getByPlaceholderText('Workflow name')).toHaveValue('Test Workflow'))
+      act(() => {
+        useWorkflowStore.getState().addTrigger({
+          id: 'local-only',
+          type: 'manual_trigger',
+          name: 'Local trigger',
+          parameters: {},
+        })
+      })
+      mockStepTypePermissions.canAuthor = false
+      view.rerender(<BuilderContent {...props} />)
+
+      await user.click(screen.getByRole('button', { name: 'Run workflow' }))
+      expect(screen.getByRole('menuitem', { name: 'Manual Trigger' })).toBeVisible()
+      expect(screen.getByRole('menuitem', { name: 'Another saved trigger' })).toBeVisible()
+      expect(screen.queryByRole('menuitem', { name: 'Local trigger' })).not.toBeInTheDocument()
+    })
+
     it('opens a blocked workflow read-only and unlocks it when permissions change', async () => {
       mockStepTypePermissions.canAuthor = false
       mockStepTypePermissions.blockedStepTypes = [
@@ -3418,6 +3503,7 @@ describe('BuilderContent', () => {
 
       expect(screen.getByText('You are viewing this workflow in read-only mode.')).toBeInTheDocument()
       expect(screen.getByText(/You do not have permission to edit this workflow/)).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Run' })).toHaveAttribute('aria-disabled', 'true')
     })
 
     it('does not show read-only banner when canEdit is true', async () => {

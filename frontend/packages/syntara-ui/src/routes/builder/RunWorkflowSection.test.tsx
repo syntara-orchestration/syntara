@@ -204,14 +204,17 @@ describe('RunWorkflowSection', () => {
   })
 
   describe('click behavior', () => {
-    it('dispatches SET_CONFIRM_DIALOG when enabled and clicked', async () => {
+    it('opens confirmation for the only trigger', async () => {
       const user = userEvent.setup()
       const dispatch = vi.fn()
       render(<RunWorkflowSection {...defaultProps} dispatch={dispatch} />)
 
       await user.click(screen.getByRole('button', { name: /^Run$/i }))
 
-      expect(dispatch).toHaveBeenCalledWith({ type: 'SET_CONFIRM_DIALOG', payload: true })
+      expect(dispatch).toHaveBeenCalledWith({
+        type: 'OPEN_RUN_DIALOG',
+        payload: { triggerId: defaultProps.triggers[0]?.id, readOnly: false },
+      })
     })
 
     it('does not dispatch when disabled and clicked', async () => {

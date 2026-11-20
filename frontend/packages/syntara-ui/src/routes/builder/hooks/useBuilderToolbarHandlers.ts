@@ -12,7 +12,8 @@ import { detachPromise } from '../../../utils/detachPromise'
 import type { BuilderAction } from '../builderReducer'
 import { DEFAULT_MAX_WAIT_SECONDS, fetchMaxWaitDuration } from '../step-forms/useMaxWaitDuration'
 import type { EdgeConnection } from '../types/edge'
-import { parseImportedDefinition } from '../utils/parseImportedDefinition'
+import { hasTriggerId } from '../utils/hasTriggerId'
+import type { parseImportedDefinition } from '../utils/parseImportedDefinition'
 import { validateWorkflow } from '../utils/validation'
 import { validateMinimumWorkflow } from '../utils/validation/rules/validateMinimumWorkflow'
 import type { ConflictInfo } from '../VersionConflictDialog'
@@ -27,6 +28,13 @@ type CheckVersionConflictBeforeRunOptions = {
   loadedVersionCreatedAt?: string | null
 }
 
+async function fetchLatestWorkflow(workflowId: string) {
+  const { data } = await workflowFetchClient.GET('/workflows/{workflow_id}', {
+    params: { path: { workflow_id: workflowId } },
+  })
+  return data
+}
+
 async function checkVersionConflictBeforeRun({
   workflowId,
   loadedVersion,
@@ -34,9 +42,7 @@ async function checkVersionConflictBeforeRun({
   loadedVersionName,
   loadedVersionCreatedAt,
 }: CheckVersionConflictBeforeRunOptions): Promise<boolean> {
-  const { data: latest } = await workflowFetchClient.GET('/workflows/{workflow_id}', {
-    params: { path: { workflow_id: workflowId } },
-  })
+  const latest = await fetchLatestWorkflow(workflowId)
   const serverVersion = latest?.current_version ?? latest?.version?.version
   if (serverVersion != null && serverVersion > loadedVersion) {
     onRunConflict({
@@ -95,18 +101,37 @@ type WorkflowRunState = {
   edges: EdgeConnection[]
 }
 
-function getWorkflowRunState(
-  isReadOnly: boolean,
-  savedWorkflowDefinition: Record<string, unknown> | undefined,
-  currentWorkflow: WorkflowDefinition | null
-): WorkflowRunState | null {
-  if (isReadOnly) {
-    if (!savedWorkflowDefinition) return null
-    const saved = parseImportedDefinition(savedWorkflowDefinition)
-    return { workflow: saved.workflowDef, edges: saved.edges }
+const SAVED_VERSION_CHECK_FAILED = 'Could not check the saved workflow version. Try running again.'
+
+async function getSavedRunError({
+  workflowId,
+  savedVersion,
+  runState,
+  triggerNodeId,
+  refreshSavedWorkflow,
+}: {
+  workflowId: string
+  savedVersion: number | undefined
+  runState: WorkflowRunState
+  triggerNodeId: string | undefined
+  refreshSavedWorkflow?: () => Promise<unknown>
+}): Promise<string | undefined> {
+  if (savedVersion === undefined) return 'No saved workflow version is available.'
+  if (!hasTriggerId(runState.workflow.triggers, triggerNodeId)) {
+    return 'Select a trigger from the saved workflow.'
   }
-  if (!currentWorkflow) return null
-  return { workflow: currentWorkflow, edges: useWorkflowStore.getState().edges }
+  try {
+    const latest = await fetchLatestWorkflow(workflowId)
+    const serverVersion = latest?.current_version ?? latest?.version?.version
+    if (serverVersion === savedVersion) return undefined
+    if (serverVersion != null) {
+      await refreshSavedWorkflow?.()
+      return 'The saved workflow changed. Open Run again to use the latest version.'
+    }
+  } catch {
+    // Fall through to the shared failure message below.
+  }
+  return SAVED_VERSION_CHECK_FAILED
 }
 
 async function getWorkflowRunValidationError({ workflow, edges }: WorkflowRunState): Promise<string | null> {
@@ -160,7 +185,10 @@ export type UseBuilderToolbarHandlersOptions = {
   loadedVersionCreatedAt?: string | null
   onRunConflict?: (info: ConflictInfo) => void
   isReadOnly?: boolean
-  savedWorkflowDefinition?: Record<string, unknown>
+  savedRunState?: ReturnType<typeof parseImportedDefinition>
+  savedVersion?: number
+  refreshSavedWorkflow?: () => Promise<unknown>
+  canRun?: boolean
   canDelete?: boolean
 }
 
@@ -187,7 +215,10 @@ export function useBuilderToolbarHandlers({
   loadedVersionCreatedAt,
   onRunConflict,
   isReadOnly = false,
-  savedWorkflowDefinition,
+  savedRunState,
+  savedVersion,
+  refreshSavedWorkflow,
+  canRun = true,
   canDelete = true,
 }: UseBuilderToolbarHandlersOptions) {
   const handleRunWorkflow = useCallback(
@@ -196,10 +227,11 @@ export function useBuilderToolbarHandlers({
       triggerNodeId?: string,
       runOptions?: { skipPreflightCheck?: boolean }
     ) => {
-      if (!workflow?.id) return
+      if (!workflow?.id || !canRun) return
 
       if (
-        await stopForVersionConflict({
+        !isReadOnly &&
+        (await stopForVersionConflict({
           workflowId: workflow.id,
           loadedVersion,
           skipPreflightCheck: runOptions?.skipPreflightCheck === true,
@@ -207,14 +239,16 @@ export function useBuilderToolbarHandlers({
           loadedVersionName,
           loadedVersionCreatedAt,
           dispatch,
-        })
+        }))
       )
         return
 
       // Auto-layout positions do not mark dirty, so editable runs always save.
       if (!(await saveBeforeWorkflowRun(isReadOnly, handleSaveWorkflow, dispatch))) return
 
-      const runState = getWorkflowRunState(isReadOnly, savedWorkflowDefinition, currentWorkflow)
+      const runState = isReadOnly
+        ? savedRunState && { workflow: savedRunState.workflowDef, edges: savedRunState.edges }
+        : currentWorkflow && { workflow: currentWorkflow, edges: useWorkflowStore.getState().edges }
       if (!runState) {
         showError({
           title: 'Cannot run workflow',
@@ -229,6 +263,21 @@ export function useBuilderToolbarHandlers({
         showError({ title: 'Cannot run workflow', description: validationError })
         dispatch({ type: 'SET_CONFIRM_DIALOG', payload: false })
         return
+      }
+
+      if (isReadOnly) {
+        const savedRunError = await getSavedRunError({
+          workflowId: workflow.id,
+          savedVersion,
+          runState,
+          triggerNodeId,
+          refreshSavedWorkflow,
+        })
+        if (savedRunError) {
+          showError({ title: 'Cannot run workflow', description: savedRunError })
+          dispatch({ type: 'SET_CONFIRM_DIALOG', payload: false })
+          return
+        }
       }
 
       executeWorkflow(
@@ -270,7 +319,10 @@ export function useBuilderToolbarHandlers({
       loadedVersionCreatedAt,
       onRunConflict,
       isReadOnly,
-      savedWorkflowDefinition,
+      savedRunState,
+      savedVersion,
+      refreshSavedWorkflow,
+      canRun,
     ]
   )
 

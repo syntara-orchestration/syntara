@@ -62,9 +62,14 @@ export function RunWorkflowSection({
   isStepEditorOpen,
 }: RunWorkflowSectionProps) {
   const [isRunDropdownOpen, setIsRunDropdownOpen] = useState(false)
-  const hasTriggers = (triggers?.length ?? 0) > 0
+  const firstTrigger = triggers?.[0]
+  const hasTriggers = firstTrigger !== undefined
   const hasMultipleTriggers = (triggers?.length ?? 0) > 1
-  const hasValidationErrors = validationErrorCount > 0
+  const readOnly = !builderPermissions.canEdit
+  const hasValidationErrors = !readOnly && validationErrorCount > 0
+  const openRunDialog = (triggerId: string) => {
+    dispatch({ type: 'OPEN_RUN_DIALOG', payload: { triggerId, readOnly } })
+  }
 
   const isRunDisabled =
     !builderPermissions.canRun || !!isStepEditorOpen || !hasTriggers || !isSaved || hasValidationErrors
@@ -77,7 +82,7 @@ export function RunWorkflowSection({
   } else if (!isSaved) {
     runTooltipContent = SAVE_FIRST_TOOLTIP
   } else if (!hasTriggers) {
-    runTooltipContent = NO_TRIGGERS_TOOLTIP
+    runTooltipContent = readOnly ? 'No saved trigger is available.' : NO_TRIGGERS_TOOLTIP
   } else if (hasValidationErrors) {
     const suffix = validationErrorCount === 1 ? '' : 's'
     runTooltipContent = `Resolve validation issue${suffix} before running — ${validationErrorCount} found`
@@ -109,8 +114,8 @@ export function RunWorkflowSection({
               <DropdownItem
                 key={trigger.id}
                 onClick={() => {
-                  dispatch({ type: 'SET_SELECTED_TRIGGER', payload: index })
-                  dispatch({ type: 'SET_CONFIRM_DIALOG', payload: true })
+                  if (isRunDisabled) return
+                  openRunDialog(trigger.id)
                   setIsRunDropdownOpen(false)
                 }}
               >
@@ -128,7 +133,7 @@ export function RunWorkflowSection({
       <Button
         variant="plain"
         isAriaDisabled={isRunDisabled}
-        onClick={!isRunDisabled ? () => dispatch({ type: 'SET_CONFIRM_DIALOG', payload: true }) : undefined}
+        onClick={!isRunDisabled && firstTrigger ? () => openRunDialog(firstTrigger.id) : undefined}
         icon={
           <Icon isInline>
             <RhUiPlayIcon />

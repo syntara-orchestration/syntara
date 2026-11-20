@@ -42,7 +42,7 @@ export function getStepTypePermissionMessage(
     : 'Step-type permission is required.'
 }
 
-export function getStepTypeDisplayName(kind: string): string {
+function getStepTypeDisplayName(kind: string): string {
   return STEP_TYPE_LABELS[kind] ?? kind.replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase())
 }
 
@@ -91,13 +91,19 @@ export function useStepTypePermissions(
     }),
   })
 
-  const isChecking = enabled && queries.some((query) => query.isPending || query.isFetching)
-  const isError = enabled && (!hasContext || !resourceProject || queries.some((query) => query.isError))
-  const blockedStepTypes = kinds.flatMap((kind, index) => {
-    const decision = queries[index]?.data?.data
-    if (decision?.allowed === true) return []
-    return [{ kind, label: getStepTypeDisplayName(kind) }]
-  })
+  const canCheck = enabled && hasContext && Boolean(resourceProject)
+  const isChecking = canCheck && queries.some((query) => query.isPending || query.isFetching)
+  // A query has a usable decision once it settled without an error and returned
+  // an explicit allow or deny. openapi-fetch sets `error` on any non-ok response,
+  // so a successful query with no error always carries the decision payload.
+  const hasDecision = (query: (typeof queries)[number]) =>
+    !query.isError && query.data?.error === undefined && typeof query.data?.data?.allowed === 'boolean'
+  const isError = enabled && (!canCheck || (!isChecking && queries.some((query) => !hasDecision(query))))
+  const blockedStepTypes = enabled
+    ? kinds.flatMap((kind, index) =>
+        queries[index].data?.data?.allowed === false ? [{ kind, label: getStepTypeDisplayName(kind) }] : []
+      )
+    : []
   const retry = async () => {
     if (!hasContext || !resourceProject) {
       await options.retryContext?.()
@@ -107,8 +113,7 @@ export function useStepTypePermissions(
   }
 
   return {
-    canAuthor:
-      !enabled || (hasContext && Boolean(resourceProject) && !isChecking && !isError && blockedStepTypes.length === 0),
+    canAuthor: !enabled || (canCheck && !isChecking && !isError && blockedStepTypes.length === 0),
     blockedStepTypes,
     isChecking,
     isError,

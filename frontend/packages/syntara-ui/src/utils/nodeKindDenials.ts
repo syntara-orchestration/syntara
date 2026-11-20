@@ -37,8 +37,13 @@ export function extractNodeKindDenials(error: unknown): NodeKindDenial[] {
   )
 }
 
+/** Comma-joined display labels of blocked step types, e.g. "Script, REST API". */
+export function formatStepTypeLabels(blockedStepTypes: readonly { label: string }[]): string {
+  return blockedStepTypes.map(({ label }) => label).join(', ')
+}
+
 export function formatStepTypeWriteDenial(blockedStepTypes: readonly { label: string }[], project = false): string {
-  const labels = blockedStepTypes.map(({ label }) => label).join(', ')
+  const labels = formatStepTypeLabels(blockedStepTypes)
   const subject = project ? 'This project includes workflows with' : 'This workflow includes'
   return `${subject} ${labels} steps, but your assigned policies don't allow you to write them.`
 }
