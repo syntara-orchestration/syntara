@@ -158,6 +158,51 @@ def _script_subworkflow_expressions(
     ]
 
 
+def _subworkflow_node_ids(workflow_definition: dict[str, Any]) -> set[str]:
+    node_ids: set[str] = set()
+    for node in workflow_definition.get("nodes", []):
+        if not isinstance(node, dict) or node.get("type") != "sub_workflow":
+            continue
+        node_id = node.get("id")
+        if isinstance(node_id, str):
+            node_ids.add(node_id)
+    return node_ids
+
+
+def _validate_expression_reference(
+    expr_body: str,
+    field_path: str,
+    element_id: str | None,
+    *,
+    node_ids: set[str],
+    subworkflow_node_ids: set[str],
+    in_loop_body: bool,
+) -> ValidationFinding | None:
+    scope = expr_body.partition(".")[0]
+    if scope in BUILTIN_SCOPES:
+        return None
+
+    if scope in node_ids:
+        if scope in subworkflow_node_ids:
+            return _validate_subworkflow_output_path(expr_body, element_id, field_path)
+        return None
+
+    if scope == "loop":
+        if in_loop_body:
+            return None
+        message = f"Expression '${{{expr_body}}}' uses loop scope outside of a loop body"
+    else:
+        message = f"Expression '${{{expr_body}}}' references unknown activity or scope '{scope}'"
+
+    return ValidationFinding(
+        severity=ValidationSeverity.error,
+        category=ValidationCategory.invalid_reference,
+        message=message,
+        node_id=element_id,
+        field_path=field_path,
+    )
+
+
 def check_template_expressions(
     workflow_definition: dict[str, Any],
     node_ids: set[str],
@@ -169,17 +214,13 @@ def check_template_expressions(
 
     """
     loop_body_map = _identify_loop_body_nodes(workflow_definition)
+    subworkflow_node_ids = _subworkflow_node_ids(workflow_definition)
     findings: list[ValidationFinding] = []
 
     all_elements = [
         *workflow_definition.get("triggers", []),
         *workflow_definition.get("nodes", []),
     ]
-    subworkflow_node_ids = {
-        element.get("id")
-        for element in workflow_definition.get("nodes", [])
-        if isinstance(element, dict) and element.get("type") == "sub_workflow" and isinstance(element.get("id"), str)
-    }
     for element in all_elements:
         if not isinstance(element, dict):
             continue
@@ -191,38 +232,15 @@ def check_template_expressions(
         in_loop_body = element_id in loop_body_map
 
         for expr_body, field_path in expressions:
-            scope = expr_body.split(".")[0]
-
-            if scope in BUILTIN_SCOPES:
-                continue
-
-            if scope in node_ids:
-                if scope in subworkflow_node_ids:
-                    finding = _validate_subworkflow_output_path(expr_body, element_id, field_path)
-                    if finding is not None:
-                        findings.append(finding)
-                continue
-
-            if scope == "loop":
-                if in_loop_body:
-                    continue
-                findings.append(
-                    ValidationFinding(
-                        severity=ValidationSeverity.error,
-                        category=ValidationCategory.invalid_reference,
-                        message=(f"Expression '${{{expr_body}}}' uses loop scope outside of a loop body"),
-                        node_id=element_id,
-                    )
-                )
-                continue
-
-            findings.append(
-                ValidationFinding(
-                    severity=ValidationSeverity.error,
-                    category=ValidationCategory.invalid_reference,
-                    message=(f"Expression '${{{expr_body}}}' references unknown activity or scope '{scope}'"),
-                    node_id=element_id,
-                )
+            finding = _validate_expression_reference(
+                expr_body,
+                field_path,
+                element_id,
+                node_ids=node_ids,
+                subworkflow_node_ids=subworkflow_node_ids,
+                in_loop_body=in_loop_body,
             )
+            if finding is not None:
+                findings.append(finding)
 
     return findings
