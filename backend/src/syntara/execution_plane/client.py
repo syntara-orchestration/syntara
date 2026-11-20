@@ -16,9 +16,7 @@ from uuid import UUID, uuid4
 import httpx
 import jwt
 from execution_plane_client.commands.bulk_work import WorkCancelBulk, WorkDeleteBulk, WorkItemSelector
-from execution_plane_client.commands.control import WorkCancel
 from execution_plane_client.commands.results import TransportReceipt
-from execution_plane_client.commands.work import WorkDelete
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -33,7 +31,7 @@ EP_CLIENT_ID = "syntara-orchestration"
 EP_AUDIENCE = "execution-plane"
 EP_TOKEN_LIFETIME_SECONDS = 300
 EP_SCOPES = (
-    "work.execute work.cancel work.delete work.cancel_bulk work.delete_bulk "
+    "work.execute work.cancel_bulk work.delete_bulk "
     "cluster.register cluster.update cluster.delete "
     "execution_target.register execution_target.update execution_target.delete "
     "execution_target.health "
@@ -132,24 +130,6 @@ class ExecutionPlaneHttpClient:
         """Read accepted work by its UUID."""
         response = await self._request("GET", f"/v1/work-items/{work_item_id}")
         return self._as_object(response)
-
-    async def cancel_work_item(self, *, work_item_id: UUID) -> TransportReceipt:
-        """Request cancellation through the shared command contract."""
-        message = WorkCancel(work_item_id=work_item_id).to_message(
-            source_id=EP_CLIENT_ID,
-            destination_id=EP_AUDIENCE,
-            client_id=EP_CLIENT_ID,
-        )
-        return await self.submit_command(message)
-
-    async def delete_work_item(self, *, work_item_id: UUID) -> TransportReceipt:
-        """Request background cleanup through the shared command contract."""
-        message = WorkDelete(work_item_id=work_item_id).to_message(
-            source_id=EP_CLIENT_ID,
-            destination_id=EP_AUDIENCE,
-            client_id=EP_CLIENT_ID,
-        )
-        return await self.submit_command(message)
 
     async def cancel_work_items(self, *, selector: WorkItemSelector) -> TransportReceipt:
         """Acknowledge committed cancellation intent for matching client-owned work."""

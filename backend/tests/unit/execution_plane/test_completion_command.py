@@ -231,8 +231,8 @@ async def test_completion_rejects_invalid_correlation_or_command(callback, inval
     elif invalid == "revision":
         command["command_revision"] = 2
     else:
-        command["command_type"] = "work.cancel"
-        command["payload"] = {"work_item_id": str(uuid4())}
+        command["command_type"] = "work.cancel_bulk"
+        command["payload"] = {"selector": {"work_item_ids": [str(uuid4())]}}
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://ao") as client:
         response = await client.post("/api/execution_plane/v1/commands", json=body)
     assert response.status_code == 422
