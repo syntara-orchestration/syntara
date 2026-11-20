@@ -19,11 +19,14 @@ from typing import Any
 
 import jsonschema
 import pytest
+from pydantic import ValidationError
 from referencing import Registry
 from referencing.jsonschema import DRAFT202012
 
+from syntara.workflows.models.workflow_definition import SubWorkflowNode, WorkflowDefinition
 from syntara.workflows.workflow_engine.models.workflow_definition import (
     SubWorkflowExecutorParameters,
+    SubWorkflowOutput,
 )
 
 SCHEMA_DIR = Path(__file__).resolve().parents[3] / "src" / "syntara" / "schemas" / "workflows" / "v2"
@@ -41,7 +44,9 @@ def subworkflow_schema() -> dict[str, Any]:
         common: dict[str, Any] = json.load(f)
     common_id = common.get("$id", "../common-definitions.schema.json")
     resource = DRAFT202012.create_resource(common)
-    registry: Registry[Any] = Registry().with_resource(common_id, resource)
+    registry: Registry[Any] = (
+        Registry().with_resource(common_id, resource).with_resource(schema["$id"], DRAFT202012.create_resource(schema))
+    )
     schema["_registry"] = registry
     return schema
 
@@ -56,6 +61,19 @@ def _validate_params(config: dict[str, Any], schema: dict[str, Any]) -> None:
             format_checker=jsonschema.FormatChecker(),
         )
         validator.validate(config)
+    finally:
+        schema["_registry"] = registry
+
+
+def _validate_result(result: dict[str, Any], schema: dict[str, Any]) -> None:
+    """Validate a Sub-workflow result against its node JSON Schema definition."""
+    registry = schema.pop("_registry", Registry())
+    try:
+        validator = jsonschema.Draft202012Validator(
+            {"$ref": f"{schema['$id']}#/$defs/SubWorkflowOutput"},
+            registry=registry,
+        )
+        validator.validate(result)
     finally:
         schema["_registry"] = registry
 
@@ -109,6 +127,146 @@ class TestSubWorkflowNodeSchemaValidation:
         params = SubWorkflowExecutorParameters(**config)
         assert params.workflow_id == workflow_id
         assert params.trigger_node_id == trigger_node_id
+
+    @pytest.mark.parametrize(
+        "static_value",
+        [
+            "app.example.test",
+            8443,
+            True,
+            ["production", "blue"],
+            {"region": "west", "labels": ["stable"]},
+        ],
+    )
+    def test_static_input_mapping_passes_schema_and_model(
+        self,
+        static_value: object,
+        subworkflow_schema: dict[str, Any],
+    ) -> None:
+        config = {
+            "workflow_id": VALID_UUID,
+            "trigger_node_id": "child_entry",
+            "input_mapping": {"target": static_value},
+        }
+
+        _validate_params(config, subworkflow_schema)
+        params = SubWorkflowExecutorParameters(**config)
+
+        assert params.input_mapping == config["input_mapping"]
+
+    @pytest.mark.parametrize(
+        "expression",
+        ["${prepare_request.stdout}", "https://${prepare_request.outputs.host}"],
+    )
+    def test_template_expression_input_mapping_passes_schema_and_model(
+        self,
+        expression: str,
+        subworkflow_schema: dict[str, Any],
+    ) -> None:
+        config = {
+            "workflow_id": VALID_UUID,
+            "trigger_node_id": "child_entry",
+            "input_mapping": {"target": expression},
+        }
+
+        _validate_params(config, subworkflow_schema)
+        params = SubWorkflowExecutorParameters(**config)
+
+        assert params.input_mapping == {"target": expression}
+
+    def test_static_and_template_input_mappings_round_trip_through_workflow_node(self) -> None:
+        workflow_definition = {
+            "schema_version": "2.0.0",
+            "name": "sub-workflow model integration",
+            "triggers": [{"id": "start", "type": "manual_trigger", "parameters": {}}],
+            "nodes": [
+                {
+                    "id": "invoke_child",
+                    "type": "sub_workflow",
+                    "parameters": {
+                        "workflow_id": VALID_UUID,
+                        "trigger_node_id": "child_entry",
+                        "input_mapping": {
+                            "target": "${prepare_request.outputs.host}",
+                            "port": 8443,
+                            "options": {"region": "west", "tags": ["stable", "blue"]},
+                        },
+                    },
+                }
+            ],
+            "edges": [{"from": "start", "to": "invoke_child"}],
+        }
+        workflow = WorkflowDefinition.model_validate_json(json.dumps(workflow_definition))
+
+        node = workflow.nodes[0]
+        assert isinstance(node, SubWorkflowNode)
+        assert node.parameters.input_mapping == {
+            "target": "${prepare_request.outputs.host}",
+            "port": 8443,
+            "options": {"region": "west", "tags": ["stable", "blue"]},
+        }
+
+        restored = WorkflowDefinition.model_validate_json(workflow.model_dump_json())
+        assert isinstance(restored.nodes[0], SubWorkflowNode)
+        assert restored.nodes[0].parameters == node.parameters
+
+    def test_input_mapping_over_limit_is_rejected_by_schema_and_model(self, subworkflow_schema: dict[str, Any]) -> None:
+        config = {
+            "workflow_id": VALID_UUID,
+            "trigger_node_id": "child_entry",
+            "input_mapping": {f"field_{index}": index for index in range(101)},
+        }
+
+        with pytest.raises(jsonschema.ValidationError):
+            _validate_params(config, subworkflow_schema)
+        with pytest.raises(ValidationError):
+            SubWorkflowExecutorParameters(**config)
+
+    def test_subworkflow_output_matches_result_schema_and_model(self, subworkflow_schema: dict[str, Any]) -> None:
+        result = {
+            "child_execution_id": "550e8400-e29b-41d4-a716-446655440001",
+            "child_workflow_id": VALID_UUID,
+            "child_workflow_name": "Release workflow",
+            "child_workflow_version": 3,
+            "child_status": "completed",
+            "outputs": {
+                "release_tag": "v3.2.1",
+                "published": True,
+                "build_number": 42,
+                "artifacts": [{"url": "https://example.test/app", "labels": ["stable", "linux"]}],
+                "metadata": {"optional": None},
+            },
+        }
+
+        _validate_result(result, subworkflow_schema)
+        output = SubWorkflowOutput.model_validate(result)
+
+        assert output.model_dump(mode="json", exclude_none=True) == result
+        assert "Result" not in output.model_dump(mode="json")
+        assert "StatusCode" not in output.model_dump(mode="json")
+
+    def test_workflow_node_rejects_invalid_subworkflow_configuration(self) -> None:
+        with pytest.raises(ValidationError):
+            WorkflowDefinition.model_validate_json(
+                json.dumps(
+                    {
+                        "schema_version": "2.0.0",
+                        "name": "invalid sub-workflow model integration",
+                        "triggers": [{"id": "start", "type": "manual_trigger", "parameters": {}}],
+                        "nodes": [
+                            {
+                                "id": "invoke_child",
+                                "type": "sub_workflow",
+                                "parameters": {
+                                    "workflow_id": "not-a-uuid",
+                                    "trigger_node_id": "child_entry",
+                                },
+                            },
+                        ],
+                        "edges": [{"from": "start", "to": "invoke_child"}],
+                    }
+                )
+            )
 
     def test_workflow_id_exceeding_max_length_rejected_by_schema(
         self,
@@ -172,6 +330,8 @@ class TestSubWorkflowNodeSchemaValidation:
         }
         with pytest.raises(jsonschema.ValidationError):
             _validate_params(config, subworkflow_schema)
+        with pytest.raises(ValidationError):
+            SubWorkflowExecutorParameters(**config)
 
     @pytest.mark.parametrize("missing_field", ["workflow_id", "trigger_node_id"])
     def test_required_fields_enforced_by_schema(
@@ -187,3 +347,5 @@ class TestSubWorkflowNodeSchemaValidation:
             _validate_params(config, subworkflow_schema)
         # Verify the error is about the missing field
         assert missing_field in str(exc_info.value)
+        with pytest.raises(ValidationError):
+            SubWorkflowExecutorParameters(**config)
