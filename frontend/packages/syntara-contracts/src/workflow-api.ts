@@ -196,6 +196,35 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/workflows/{workflow_id}/check_subworkflow_output_contract_changes': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Check for Sub-workflow output contract changes before publishing
+     * @description Check a candidate workflow definition for Sub-workflow output contract changes.
+     *
+     *     Compares the submitted candidate definition against the currently published version
+     *     to detect breaking changes such as:
+     *     - Removed outputs
+     *     - Type changes
+     *     - New required outputs
+     *
+     *     This endpoint does not publish the candidate definition. It should be called before
+     *     publishing to warn users about breaking changes that may affect parent workflows.
+     */
+    post: operations['check_subworkflow_output_contract_changes']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/workflows/{workflow_id}/unpublish': {
     parameters: {
       query?: never
@@ -465,6 +494,13 @@ export interface components {
       input_schema?: {
         [key: string]: unknown
       }
+      /**
+       * Output Schema
+       * @description JSON Schema defining the outputs exposed to parent workflows. Provides encapsulation—parent sees only declared fields, not internal child step structure.
+       */
+      output_schema?: {
+        [key: string]: unknown
+      } | null
     }
     /**
      * WorkflowInvocationSchemaRead
@@ -656,6 +692,89 @@ export interface components {
        * @description Version the client was editing. If the server's current_version is higher, returns 409 Conflict.
        */
       expected_version?: number | null
+    }
+    /**
+     * BreakingChange
+     * @description A single breaking change detected in an output schema.
+     *
+     *     Attributes:
+     *         change_type: Type of breaking change (removed_output, type_change, new_required_output)
+     *         field_path: Dotted path to the affected field
+     *         old_type: Previous field type (for type changes)
+     *         new_type: New field type (for type changes and new required outputs)
+     *         description: Human-readable description
+     */
+    BreakingChange: {
+      /** Change Type */
+      change_type: string
+      /** Field Path */
+      field_path: string
+      /** Old Type */
+      old_type?: string | null
+      /** New Type */
+      new_type?: string | null
+      /** Description */
+      description: string
+      /**
+       * Is Breaking
+       * @default true
+       */
+      is_breaking?: boolean
+    }
+    /**
+     * TriggerBreakingChanges
+     * @description Breaking changes for a single SubWorkflow Trigger.
+     *
+     *     Attributes:
+     *         trigger_id: ID of the trigger node
+     *         trigger_name: Name of the trigger (if available)
+     *         changes: List of breaking changes detected for this trigger
+     */
+    TriggerBreakingChanges: {
+      /** Trigger Id */
+      trigger_id: string
+      /** Trigger Name */
+      trigger_name?: string | null
+      /** Changes */
+      changes: components['schemas']['BreakingChange'][]
+    }
+    /**
+     * BreakingChangesResponse
+     * @description Response containing the output contract diff and current parent references.
+     */
+    BreakingChangesResponse: {
+      /** Has Breaking Changes */
+      has_breaking_changes: boolean
+      /** Triggers */
+      triggers: components['schemas']['TriggerBreakingChanges'][]
+      /**
+       * Has Contract Changes
+       * @default false
+       */
+      has_contract_changes?: boolean
+      /** Contract Changes */
+      contract_changes?: components['schemas']['TriggerBreakingChanges'][]
+      /** Parent Workflows */
+      parent_workflows?: components['schemas']['WorkflowReferenceRead'][]
+    }
+    /**
+     * WorkflowReferenceRead
+     * @description A currently published parent workflow step that references this child.
+     */
+    WorkflowReferenceRead: {
+      /**
+       * Workflow Id
+       * Format: uuid
+       */
+      workflow_id: string
+      /** Workflow Name */
+      workflow_name: string
+      /** Workflow Version */
+      workflow_version: number
+      /** Step Id */
+      step_id: string
+      /** Step Name */
+      step_name?: string | null
     }
     /**
      * WorkflowVersionUpdate
@@ -1933,8 +2052,9 @@ export interface components {
      * @description Parameters for Sub-workflow executor.
      *
      *     Defines the design-time configuration for invoking a child workflow from
-     *     a parent workflow. The Sub-workflow step always invokes the latest published
-     *     version of the selected target workflow in the same Project (V1).
+     *     a parent workflow. Each new invocation resolves the latest published child
+     *     version. The child execution record pins that version for the run so retries
+     *     keep using the same workflow definition.
      *
      *     When a workflow has multiple Subworkflow Triggers, the calling step must
      *     select a specific trigger to invoke via the trigger_node_id field.
@@ -1950,7 +2070,7 @@ export interface components {
       /**
        * Workflow Id
        * Format: uuid
-       * @description UUID of the selected child workflow in the same Project (latest published version).
+       * @description UUID of the selected child workflow in the same Project (latest published version per run).
        */
       workflow_id: string
       /**
@@ -3036,6 +3156,40 @@ export interface operations {
         }
         content: {
           'application/json': components['schemas']['PublishWorkflowVersionResponse']
+        }
+      }
+      400: components['responses']['BadRequestError']
+      401: components['responses']['UnauthorizedError']
+      403: components['responses']['ForbiddenError']
+      404: components['responses']['NotFoundError']
+      409: components['responses']['ConflictError']
+      422: components['responses']['ValidationError']
+      429: components['responses']['RateLimitError']
+      500: components['responses']['InternalServerError']
+    }
+  }
+  check_subworkflow_output_contract_changes: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        workflow_id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['WorkflowValidateRequest']
+      }
+    }
+    responses: {
+      /** @description Sub-workflow output contract changes detection result */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['BreakingChangesResponse']
         }
       }
       400: components['responses']['BadRequestError']

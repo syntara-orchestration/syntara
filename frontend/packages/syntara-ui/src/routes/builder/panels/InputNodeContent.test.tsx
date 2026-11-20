@@ -9,6 +9,7 @@ import { getTriggerInputSchemaFields } from './utils/triggerSchemaUtils'
 
 // Mock the getNodeOutputSchema function
 vi.mock('@syntara/contracts', () => ({
+  ActivityTypeEnum: { SUB_WORKFLOW: 'sub_workflow' },
   getNodeOutputSchema: vi.fn((type: string) => {
     if (type === 'script') {
       return {

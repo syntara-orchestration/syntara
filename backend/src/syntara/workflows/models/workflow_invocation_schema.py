@@ -13,6 +13,13 @@ class WorkflowInvocationTriggerSchema(SQLModel):
     trigger_node_id: str
     name: str | None = None
     input_schema: dict[str, Any] = Field(default_factory=dict)
+    output_schema: dict[str, Any] | None = Field(
+        default=None,
+        description=(
+            "JSON Schema defining the outputs exposed to parent workflows. Provides encapsulation—"
+            "parent sees only declared fields, not internal child step structure."
+        ),
+    )
 
 
 class WorkflowInvocationSchemaRead(SQLModel):

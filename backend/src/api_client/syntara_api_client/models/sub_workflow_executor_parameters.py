@@ -21,8 +21,9 @@ class SubWorkflowExecutorParameters:
     """Parameters for Sub-workflow executor.
 
     Defines the design-time configuration for invoking a child workflow from
-    a parent workflow. The Sub-workflow step always invokes the latest published
-    version of the selected target workflow in the same Project (V1).
+    a parent workflow. Each new invocation resolves the latest published child
+    version. The child execution record pins that version for the run so retries
+    keep using the same workflow definition.
 
     When a workflow has multiple Subworkflow Triggers, the calling step must
     select a specific trigger to invoke via the trigger_node_id field.
@@ -35,7 +36,7 @@ class SubWorkflowExecutorParameters:
             expressions (${step_id.field.path}).
 
         Attributes:
-            workflow_id (UUID): UUID of the selected child workflow in the same Project (latest published version).
+            workflow_id (UUID): UUID of the selected child workflow in the same Project (latest published version per run).
             trigger_node_id (str): Graph node ID of the Subworkflow Trigger to invoke in the child workflow
             input_mapping (SubWorkflowExecutorParametersInputMapping | Unset): Mapping of child workflow input field names
                 to static values or template expressions. Keys are child workflow input field names; values can be static types

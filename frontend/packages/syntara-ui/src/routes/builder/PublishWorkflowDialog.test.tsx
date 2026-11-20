@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
@@ -77,6 +77,85 @@ describe('PublishWorkflowDialog', () => {
     await user.click(screen.getByRole('button', { name: 'Cancel' }))
 
     expect(onClose).toHaveBeenCalled()
+  })
+
+  it('shows breaking output changes and requires explicit publish confirmation', async () => {
+    const user = userEvent.setup()
+    const onConfirmContractChanges = vi.fn()
+    render(
+      <PublishWorkflowDialog
+        {...defaultProps}
+        breakingChanges={[
+          {
+            trigger_id: 'child-trigger',
+            trigger_name: 'Child trigger',
+            changes: [
+              {
+                change_type: 'removed_output',
+                field_path: 'release_tag',
+                old_type: 'string',
+                new_type: null,
+                description: 'Removed output: release_tag',
+              },
+            ],
+          },
+        ]}
+        onConfirmContractChanges={onConfirmContractChanges}
+      />
+    )
+
+    expect(screen.getByText('Breaking output contract changes')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'View details for 1 output changes' }))
+    expect(screen.getByText('Removed output: release_tag')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Publish anyway' }))
+
+    expect(onConfirmContractChanges).toHaveBeenCalledOnce()
+    expect(defaultProps.onPublish).not.toHaveBeenCalled()
+  })
+
+  it('shows published parent references for non-breaking output changes before publishing', async () => {
+    const user = userEvent.setup()
+    const onConfirmContractChanges = vi.fn()
+    render(
+      <PublishWorkflowDialog
+        {...defaultProps}
+        contractChanges={[
+          {
+            trigger_id: 'child-trigger',
+            trigger_name: 'Child trigger',
+            changes: [
+              {
+                change_type: 'added_output',
+                field_path: 'release.notes',
+                old_type: null,
+                new_type: 'string',
+                description: 'Added optional output: release.notes',
+                is_breaking: false,
+              },
+            ],
+          },
+        ]}
+        parentWorkflows={[
+          {
+            workflow_id: 'parent-id',
+            workflow_name: 'Deploy parent',
+            workflow_version: 2,
+            step_id: 'invoke_child',
+            step_name: 'Invoke child',
+          },
+        ]}
+        onConfirmContractChanges={onConfirmContractChanges}
+      />
+    )
+
+    expect(screen.getByText('Added optional output: release.notes')).toBeInTheDocument()
+    expect(screen.getByText('1 visible published parent workflows affected')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'View visible parent workflows' }))
+    const parentDialog = screen.getByRole('dialog', { name: 'Visible published parent workflows' })
+    expect(within(parentDialog).getByText(/Deploy parent \(parent v2\).*Invoke child/)).toBeInTheDocument()
+    await user.click(within(parentDialog).getByRole('button', { name: 'Done' }))
+    await user.click(screen.getByRole('button', { name: 'Publish workflow' }))
+    expect(onConfirmContractChanges).toHaveBeenCalledOnce()
   })
 
   it('disables buttons when publishing', () => {

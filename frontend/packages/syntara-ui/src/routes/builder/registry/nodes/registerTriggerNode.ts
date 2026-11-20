@@ -1,7 +1,8 @@
-import { RhUiCalendarIcon, RhUiLanguageIcon, RhUiNetworkIcon, RhUiPlayIcon } from '@patternfly/react-icons'
+import { RhUiCalendarIcon, RhUiLanguageIcon, RhUiPlayIcon } from '@patternfly/react-icons'
 import { type ScheduleType, TriggerTypeEnum, WEBHOOK_TRIGGER_TYPES } from '@syntara/contracts'
 
 import EdaIcon from '../../../../assets/eda.svg?react'
+import { WorkflowBuilderIcon } from '../../../../components/WorkflowBuilderIcon'
 import { RegistryNodeId } from '../../../../constants'
 import {
   createManualTrigger,
@@ -84,7 +85,7 @@ export default function registerTriggerNode() {
           {
             id: RegistryNodeId.TRIGGER_SUBWORKFLOW,
             label: 'Workflow trigger',
-            icon: RhUiNetworkIcon,
+            icon: WorkflowBuilderIcon,
             description: 'Workflow will start when invoked by another workflow.',
             formTitle: 'Configure Workflow Trigger',
             initialData: { triggerType: TriggerTypeEnum.SUBWORKFLOW_TRIGGER },
