@@ -3,7 +3,7 @@ import { useMemo, useEffect, useRef, useState, type Dispatch } from 'react'
 
 import { SynConfirmationDialog } from '../../../components/dialogs/SynConfirmationDialog'
 import type { DialogState } from '../../../hooks/useDialogState'
-import { useAlerts } from '../../../providers/alerts'
+import { useAlerts } from '../../../providers/alerts/AlertContext'
 import { useWorkflowStore } from '../../../stores/useWorkflowStore'
 import { selectActivities, selectTriggers } from '../../../stores/workflowStoreSelectors'
 import { WorkflowDeleteDialog } from '../../workflows/WorkflowDeleteDialog'

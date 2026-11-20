@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 
 import { filesFetchClient } from '../../../client'
-import type { UploadedFile } from '../components/file-upload'
+import type { UploadedFile } from '../components/file-upload/FileUpload'
 
 export function useFilesMetadata(fileIds: string[] | undefined): {
   data: UploadedFile[]

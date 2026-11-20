@@ -4,6 +4,12 @@
   position: relative;
 }
 
+/* React Flow node wrapper is the step-level tab stop; SynStep panel is not focusable separately. */
+.canvasContainer :global(.react-flow__node:focus-visible) {
+  outline: 2px solid var(--pf-t--global--color--brand--default);
+  outline-offset: 2px;
+}
+
 .executionSpinner {
   position: absolute;
   top: var(--pf-t--global--spacer--md);

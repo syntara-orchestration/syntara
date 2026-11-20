@@ -66,7 +66,7 @@ export function ProjectSelect({
   )
 }
 
-type CredentialType = { id?: string; name?: string }
+type CredentialType = { id?: string; name?: string; description?: string | null }
 
 export function CredentialTypeSelect({
   types,
@@ -120,7 +120,12 @@ export function CredentialTypeSelect({
     >
       <SelectList aria-label="Credential type options">
         {types.map((t) => (
-          <SelectOption key={t.id} value={t.id} isSelected={t.id === selectedTypeId}>
+          <SelectOption
+            key={t.id}
+            value={t.id}
+            isSelected={t.id === selectedTypeId}
+            description={t.description?.trim() ? t.description : undefined}
+          >
             {t.name}
           </SelectOption>
         ))}

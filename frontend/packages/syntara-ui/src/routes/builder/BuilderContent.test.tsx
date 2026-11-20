@@ -8,7 +8,7 @@ import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
 
 import { approvalsClient, executionsClient, workflowClient, workflowFetchClient } from '../../client'
 import * as useCursorPaginationModule from '../../hooks/useCursorPagination'
-import { AlertProvider } from '../../providers/alerts'
+import { AlertProvider } from '../../providers/alerts/AlertProvider'
 import { FeatureFlagsProvider } from '../../providers/feature-flags-provider'
 import { ColorSchemeProvider } from '../../providers/theme/ColorSchemeProvider'
 import { useWorkflowStore } from '../../stores/useWorkflowStore'
@@ -1321,7 +1321,7 @@ describe('BuilderContent', () => {
       await screen.findByText('Delete workflow?')
       await user.click(
         screen.getByRole('checkbox', {
-          name: /I understand this workflow will be deleted and any in-progress runs will stop immediately/,
+          name: /I understand this workflow will be deleted and any in-progress runs will stop immediately\. I also understand its run history will be permanently deleted/,
         })
       )
       await user.click(screen.getByRole('button', { name: 'Delete workflow' }))
@@ -1355,7 +1355,7 @@ describe('BuilderContent', () => {
       await screen.findByText('Delete workflow?')
       await user.click(
         screen.getByRole('checkbox', {
-          name: /I understand this workflow will be deleted and any in-progress runs will stop immediately/,
+          name: /I understand this workflow will be deleted and any in-progress runs will stop immediately\. I also understand its run history will be permanently deleted/,
         })
       )
       await user.click(screen.getByRole('button', { name: 'Delete workflow' }))
@@ -2503,7 +2503,7 @@ describe('BuilderContent', () => {
       // Acknowledge and confirm delete
       await user.click(
         screen.getByRole('checkbox', {
-          name: /I understand this workflow will be deleted and any in-progress runs will stop immediately/,
+          name: /I understand this workflow will be deleted and any in-progress runs will stop immediately\. I also understand its run history will be permanently deleted/,
         })
       )
       await user.click(screen.getByRole('button', { name: 'Delete workflow' }))

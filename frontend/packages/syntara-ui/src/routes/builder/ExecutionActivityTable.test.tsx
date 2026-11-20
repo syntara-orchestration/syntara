@@ -27,10 +27,12 @@ function renderTable({
   states = new Map<string, ActivityState>(),
   order = [],
   replayBaselineAt,
+  selectedNodeId,
 }: {
   states?: Map<string, ActivityState>
   order?: ActivityOrderItem[]
   replayBaselineAt?: string | null
+  selectedNodeId?: string | null
 } = {}) {
   return render(
     <ExecutionActivityTable
@@ -38,6 +40,7 @@ function renderTable({
       activityOrder={order}
       now={NOW}
       replayBaselineAt={replayBaselineAt}
+      selectedNodeId={selectedNodeId}
     />
   )
 }
@@ -122,6 +125,25 @@ describe('ExecutionActivityTable', () => {
       })
 
       expect(screen.queryByTestId('activity-status-label-replayed')).not.toBeInTheDocument()
+    })
+
+    it('highlights only the selected loop iteration', () => {
+      const order: ActivityOrderItem[] = [
+        { id: 'task-1', name: 'Task (iter 0)' },
+        { id: 'task-1#iter-1', name: 'Task (iter 1)' },
+        { id: 'task-1#iter-2', name: 'Task (iter 2)' },
+      ]
+
+      renderTable({
+        states: new Map(order.map(({ id }) => state(id))),
+        order,
+        selectedNodeId: 'task-1#iter-1',
+      })
+
+      const rows = screen.getAllByRole('row')
+      expect(rows[1]).not.toHaveClass('pf-m-selected')
+      expect(rows[2]).toHaveClass('pf-m-selected')
+      expect(rows[3]).not.toHaveClass('pf-m-selected')
     })
   })
 

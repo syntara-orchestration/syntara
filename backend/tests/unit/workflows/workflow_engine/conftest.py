@@ -3,8 +3,8 @@
 from typing import Any
 
 from syntara.settings.catalog import SETTINGS_CATALOG
-from syntara.workflows.workflow_engine.dynamic_workflow import OrchestratorWorkflow
-from syntara.workflows.workflow_engine.graph import ActivityNode, WorkflowGraph
+from syntara.workflow_core.graph import ActivityNode, WorkflowGraph
+from syntara.workflow_runtime.engines.temporal.dynamic_workflow import OrchestratorWorkflow
 
 
 def make_workflow_runtime_settings() -> dict[str, object]:
@@ -42,6 +42,10 @@ def init_workflow_runtime(wf: OrchestratorWorkflow) -> None:
     # iterating, so it must exist even on a workflow with nothing to do with retries.
     if not hasattr(wf, "node_control_data"):
         wf.node_control_data = {}
+    if not hasattr(wf, "activity_input_history"):
+        wf.activity_input_history = {}
+    if not hasattr(wf, "activity_output_history"):
+        wf.activity_output_history = {}
     if not hasattr(wf, "_cof_failed_nodes"):
         wf._cof_failed_nodes = set()
     wf._retry_replay_candidates = set()

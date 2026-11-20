@@ -1,6 +1,6 @@
 """Unit tests for loop-iteration Temporal / approval ID helpers."""
 
-from syntara.workflows.workflow_engine.utils.loop_iteration_ids import (
+from syntara.workflow_runtime.engines.temporal.utils.loop_iteration_ids import (
     approval_temporal_activity_id,
     innermost_iteration_index,
     join_loop_iteration_id,

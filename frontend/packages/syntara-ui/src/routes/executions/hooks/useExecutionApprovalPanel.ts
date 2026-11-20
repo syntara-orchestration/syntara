@@ -1,7 +1,7 @@
 import type { Approval } from '@syntara/contracts'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
-import { useAlerts } from '../../../providers/alerts'
+import { useAlerts } from '../../../providers/alerts/AlertContext'
 import { getApprovalLoadErrorAlert } from '../../approvals/approvalLoadErrors'
 import {
   canvasNodeIdFromApprovalNodeId,

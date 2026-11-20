@@ -11,16 +11,16 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from temporalio.exceptions import ApplicationError
 
-from syntara.workflows.utils.namespace_resolver import NamespaceResolver
-from syntara.workflows.workflow_engine.dynamic_workflow import OrchestratorWorkflow
-from syntara.workflows.workflow_engine.graph import ActivityNode, WorkflowGraph
-from syntara.workflows.workflow_engine.models.workflow_definition import (
+from syntara.workflow_core.graph import ActivityNode, WorkflowGraph
+from syntara.workflow_core.models import (
     DoWhileLoopState,
     ForEachLoopState,
     LoopType,
     NodeSettingsNoRetry,
 )
-from syntara.workflows.workflow_engine.utils.loop_iteration_ids import retry_loop_record_activity_id
+from syntara.workflow_core.utils.namespace_resolver import NamespaceResolver
+from syntara.workflow_runtime.engines.temporal.dynamic_workflow import OrchestratorWorkflow
+from syntara.workflow_runtime.engines.temporal.utils.loop_iteration_ids import retry_loop_record_activity_id
 
 _TEST_GRAPHS: dict[int, MagicMock] = {}
 
@@ -33,6 +33,8 @@ def _wf(
     downstream_successors: dict[str, list[ActivityNode]] | None = None,
 ) -> OrchestratorWorkflow:
     wf = OrchestratorWorkflow.__new__(OrchestratorWorkflow)
+    wf.activity_input_history = {}
+    wf.activity_output_history = {}
     wf.retry_context = {"retry_from_execution_id": "src-1", "eligible_point_ids": retry_points} if retry_points else {}
     wf.resolver = NamespaceResolver()
     wf.skipped_nodes = set()
@@ -94,8 +96,8 @@ async def _replay_loop(
 def patched_workflow():
     """The loop control calls the module-level workflow API, so patch that."""
     with (
-        patch("syntara.workflows.workflow_engine.dynamic_workflow.workflow") as patched,
-        patch("syntara.workflows.workflow_engine.retry_mixin.workflow", patched),
+        patch("syntara.workflow_runtime.engines.temporal.dynamic_workflow.workflow") as patched,
+        patch("syntara.workflow_runtime.engines.temporal.retry_mixin.workflow", patched),
     ):
         patched.execute_activity = AsyncMock()
         yield patched
@@ -139,7 +141,7 @@ async def test_the_iteration_being_replayed_is_recorded_for_its_body(patched_wor
     await _probe(wf, patched_workflow, reached=True)
 
     assert wf._active_loop_iteration["loop_1"] == 1
-    from syntara.workflows.workflow_engine.graph import ActivityNode
+    from syntara.workflow_core.graph import ActivityNode
 
     wf.loop_body_map = {"body_a": "loop_1"}
     wf.node_control_data = {"loop_1": {"current_index": 1}}
@@ -183,7 +185,7 @@ async def test_body_occurrence_switches_enclosing_loop_to_live_mode(patched_work
     assert result is not None
     patched_workflow.execute_activity.assert_awaited_once()
 
-    from syntara.workflows.workflow_engine.graph import ActivityNode
+    from syntara.workflow_core.graph import ActivityNode
 
     wf.node_control_data["loop_1"] = {"current_index": 2}
     wf._enter_live_retry_mode_at_selected_node(ActivityNode(node_id="body_a", node_type="script", parameters={}))
@@ -223,7 +225,7 @@ async def test_continue_on_failure_restarts_at_lowest_failed_iteration(patched_w
     assert result["control"]["next_port"] == "iterate"
     assert wf._active_loop_iteration["loop_1"] == 2
 
-    from syntara.workflows.workflow_engine.graph import ActivityNode
+    from syntara.workflow_core.graph import ActivityNode
 
     selected_node = ActivityNode(node_id="body_a", node_type="script", parameters={})
     assert wf._enter_live_retry_mode_at_selected_node(selected_node)
@@ -478,7 +480,7 @@ async def test_restore_loop_record_caches_resolved_inputs_and_source_times(patch
 async def test_retry_loop_uses_stored_resolved_inputs_without_resolving_expression(patched_workflow) -> None:
     from unittest.mock import MagicMock
 
-    from syntara.workflows.workflow_engine.graph import ActivityNode
+    from syntara.workflow_core.graph import ActivityNode
 
     wf = _wf(retry_points=["after"], bodies={"loop_1": {"body_a"}})
     wf.pre_resolved_outputs = {}
@@ -499,7 +501,7 @@ async def test_retry_loop_uses_stored_resolved_inputs_without_resolving_expressi
         patch.object(wf, "_resolve_node_parameters") as resolve_parameters,
         patch.object(wf, "_dispatch_node", dispatch),
         patch.object(wf, "_process_node_result", return_value={"output": {"iteration_count": 0}}),
-        patch("syntara.workflows.workflow_engine.dynamic_workflow.resolve_timeout", return_value=30),
+        patch("syntara.workflow_runtime.engines.temporal.dynamic_workflow.resolve_timeout", return_value=30),
         patch.object(wf, "_apply_input_overrides"),
     ):
         await wf._execute_node(node, MagicMock())
@@ -513,7 +515,7 @@ async def test_retry_loop_uses_stored_resolved_inputs_without_resolving_expressi
 
 @pytest.mark.asyncio
 async def test_replayed_loop_does_not_evaluate_do_while_condition(patched_workflow) -> None:
-    from syntara.workflows.workflow_engine.graph import ActivityNode
+    from syntara.workflow_core.graph import ActivityNode
 
     wf = _wf(retry_points=["after"], bodies={"loop_1": {"body_a"}})
     wf.loop_state["loop_1"] = DoWhileLoopState(condition="${body_a.done}", max_iterations=5, current_index=2)
@@ -522,9 +524,10 @@ async def test_replayed_loop_does_not_evaluate_do_while_condition(patched_workfl
 
     with (
         patch.object(wf, "_replayed_loop_control", new_callable=AsyncMock, return_value=replayed_result),
-        patch("syntara.workflows.workflow_engine.dynamic_workflow.safe_eval_with_namespace") as evaluate,
+        patch("syntara.workflow_runtime.engines.temporal.dynamic_workflow.safe_eval_with_namespace") as evaluate,
         patch(
-            "syntara.workflows.workflow_engine.dynamic_workflow.workflow.execute_activity", new_callable=AsyncMock
+            "syntara.workflow_runtime.engines.temporal.dynamic_workflow.workflow.execute_activity",
+            new_callable=AsyncMock,
         ) as execute,
     ):
         result = await wf._execute_loop_node(
@@ -560,7 +563,7 @@ def test_display_name_cannot_supply_a_missing_failure_iteration_path() -> None:
 def test_selected_nested_failure_refreshes_inner_items_from_the_target_outer_item(patched_workflow) -> None:
     from unittest.mock import MagicMock
 
-    from syntara.workflows.workflow_engine.graph import ActivityNode
+    from syntara.workflow_core.graph import ActivityNode
 
     wf = _wf(retry_points=["body_a"], bodies={"outer": {"inner", "body_a"}, "inner": {"body_a"}})
     wf.loop_body_map = {"inner": "outer", "body_a": "inner"}

@@ -83,6 +83,19 @@ describe('useBuilderFlowInteractionHandlers', () => {
     })
   })
 
+  it('handleNodeClick does not dispatch NODE_CLICK for non-generic nodes', () => {
+    const { result, dispatch } = renderWith()
+    const node = {
+      id: 'n1',
+      position: { x: 0, y: 0 },
+      data: { __isGeneric: false },
+    } as unknown as Node
+    act(() => {
+      result.current.handleNodeClick({} as React.MouseEvent, node)
+    })
+    expect(dispatch).not.toHaveBeenCalled()
+  })
+
   it('handleClearDesiredPosition dispatches CLEAR_NEW_NODE_DESIRED_POSITION', () => {
     const { result, dispatch } = renderWith()
     act(() => {

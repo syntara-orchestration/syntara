@@ -17,7 +17,7 @@ from pathlib import Path
 
 import pytest
 
-WORKFLOW_ENGINE = Path(__file__).resolve().parents[4] / "src/syntara/workflows/workflow_engine"
+WORKFLOW_ENGINE = Path(__file__).resolve().parents[4] / "src/syntara/workflow_runtime/engines/temporal"
 
 #: Modules that execute inside Temporal's workflow sandbox.
 SANDBOXED_ROOTS = ("dynamic_workflow.py", "retry_mixin.py")

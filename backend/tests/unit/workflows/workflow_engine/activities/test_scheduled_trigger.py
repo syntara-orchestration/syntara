@@ -7,7 +7,7 @@ Covers:
 - Empty config handling
 """
 
-from syntara.workflows.workflow_engine.activities.scheduled_trigger import scheduled_trigger
+from syntara.workflow_runtime.engines.temporal.activities.scheduled_trigger import scheduled_trigger
 
 
 async def test_scheduled_trigger_basic() -> None:

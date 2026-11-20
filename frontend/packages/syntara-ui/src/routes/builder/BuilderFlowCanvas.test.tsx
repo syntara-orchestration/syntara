@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 
-import { FlowNodeType } from '../../constants'
+import { FlowNodeType } from '../../constants/nodeTypes'
 import { type ButtonEdgePlaceholderNode, type NodeType } from '../workflows/canvas/nodes/NodeType'
 
 import { BuilderFlowCanvas } from './BuilderFlowCanvas'
