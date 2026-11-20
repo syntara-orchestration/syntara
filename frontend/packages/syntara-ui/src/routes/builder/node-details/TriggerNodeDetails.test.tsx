@@ -88,6 +88,96 @@ describe('TriggerNodeDetails Component', () => {
     vi.restoreAllMocks()
   })
 
+  describe('Kafka Subscribe trigger', () => {
+    const integrationId = '11111111-1111-4111-8111-111111111111'
+    const credentialId = '22222222-2222-4222-8222-222222222222'
+    const trigger: Trigger = {
+      id: 'incoming-orders',
+      type: TriggerTypeEnum.EVENT_SUBSCRIBE,
+      name: 'Orders',
+      parameters: {
+        integration_id: integrationId,
+        credential_id: credentialId,
+        topic: 'orders',
+        filter: null,
+        start: { offset_gap_policy: 'fail' },
+        group_id: 'orders-reader',
+      },
+    }
+
+    it('preserves saved consumption settings when saving a new name', async () => {
+      const user = userEvent.setup()
+      vi.spyOn(TriggerNodeFormModule, 'TriggerNodeForm').mockImplementation(({ onSubmit }) => (
+        <button
+          type="button"
+          onClick={() =>
+            onSubmit({
+              name: 'Renamed orders',
+              triggerType: TriggerTypeEnum.EVENT_SUBSCRIBE,
+              integrationId,
+              runtimeCredentialId: credentialId,
+              topic: 'orders',
+            })
+          }
+        >
+          Save trigger
+        </button>
+      ))
+      render(<TriggerNodeDetails trigger={trigger} triggerIndex={0} onClose={mockOnClose} />)
+
+      await user.click(screen.getByRole('button', { name: 'Save trigger' }))
+
+      expect(mockUpdateTrigger).toHaveBeenCalledWith(0, { ...trigger, name: 'Renamed orders' })
+      expect(mockOnClose).toHaveBeenCalledOnce()
+    })
+
+    it.each([
+      { integrationId, topic: 'orders-v2' },
+      { integrationId: '33333333-3333-4333-8333-333333333333', topic: 'orders' },
+    ])('clears the saved group when submitting source %j', async (source) => {
+      const user = userEvent.setup()
+      vi.spyOn(TriggerNodeFormModule, 'TriggerNodeForm').mockImplementation(({ onSubmit }) => (
+        <button
+          type="button"
+          onClick={() =>
+            onSubmit({
+              name: 'Orders',
+              triggerType: TriggerTypeEnum.EVENT_SUBSCRIBE,
+              ...source,
+              runtimeCredentialId: credentialId,
+            })
+          }
+        >
+          Save trigger
+        </button>
+      ))
+      render(<TriggerNodeDetails trigger={trigger} triggerIndex={0} onClose={mockOnClose} />)
+
+      await user.click(screen.getByRole('button', { name: 'Save trigger' }))
+
+      expect(mockUpdateTrigger).toHaveBeenCalledWith(0, {
+        ...trigger,
+        parameters: {
+          ...trigger.parameters,
+          integration_id: source.integrationId,
+          topic: source.topic,
+          group_id: null,
+        },
+      })
+      expect(mockOnClose).toHaveBeenCalledOnce()
+    })
+
+    it('does not mark an unchanged trigger with saved settings as changed', async () => {
+      const user = userEvent.setup()
+      render(<TriggerNodeDetails trigger={trigger} triggerIndex={0} onClose={mockOnClose} />)
+
+      await user.click(screen.getByRole('button', { name: 'Add step' }))
+
+      expect(mockUpdateTrigger).not.toHaveBeenCalled()
+      expect(mockOnClose).toHaveBeenCalledOnce()
+    })
+  })
+
   describe('Manual Trigger', () => {
     it('renders TriggerNodeForm with manual trigger data', () => {
       const trigger = {

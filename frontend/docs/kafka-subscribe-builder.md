@@ -7,13 +7,96 @@ the message payload. Publishing activates the subscription; later changes take e
 
 Kafka credentials authenticate to the broker. Workflow execution identity is
 provided by the platform. The UI does not offer or serialize an execution-account
-selector, webhook authorization, group IDs, offset overrides, tuning, filters, or
+selector, webhook authorization, manual offset overrides, arbitrary consumer tuning, or
 CloudEvents controls. The Integration's management credential is never used as a
 fallback for a missing runtime credential.
 
 Save/reopen uses flat `event_subscribe_trigger` parameters: `integration_id`,
-`credential_id`, `topic`, and optional `input_schema`. Leaving the schema blank
+`credential_id`, `topic`, optional `input_schema`, optional `filter`, optional `start`, and optional `group_id`. Leaving the schema blank
 omits it instead of inserting an empty schema or a default.
+
+## Optional CEL filter
+
+Use **Filter expression (CEL)** to author one complete boolean CEL expression. The editor
+preserves every non-empty expression exactly, including spaces, line breaks,
+parentheses and explicit condition composition. The limit is 16,384 characters.
+Removing the filter, clearing it, or entering only whitespace serializes `filter: null`;
+no filter accepts every otherwise valid message. Changes affect the active
+subscription on the next publication. Saved workflow version views show the
+expression read-only. Save/reopen, unrelated trigger edits and import/export use
+the same unchanged source text.
+
+The help icon beside **Filter expression (CEL)** gives a brief introduction, one example,
+and a documentation link. The step panel uses the same Kafka Subscribe documentation key.
+Clear the expression to remove the filter; the editor stays visible and retains focus.
+
+### Input fields and CEL reference
+
+The only root variable is `input`, bound directly to the supplied message object.
+A boolean `true` passes the message; `false` filters it out. Combine conditions
+explicitly with `&&`, `||`, `!`, and parentheses; the UI adds no implicit conditions.
+Supported comparisons include `==`, `!=`, `<`, `<=`, `>`, `>=`, and `in`.
+String methods include `contains()`, `startsWith()`, `endsWith()`, and `matches()`.
+
+- `input.key` and each header value have `kind` (`text`, `binary`, or `null`),
+  `base64`, and `text` when UTF-8 decoding succeeds.
+- `input.headers` uses case-sensitive names. Duplicate header values are lists in
+  occurrence order. An absent header is different from a present null value.
+- `input.metadata` includes `transport`, `topic`, `partition`, string `offset`,
+  `timestamp_ms`, and `timestamp_type`. Timestamps may be null.
+- `input.payload.state` is `decoded`, `not_decoded`, or `decode_error`. Decoded JSON
+  is in `input.payload.value`, which may be null. Check the state and value before
+  reading its properties.
+- After successful CloudEvents decoding, `input.cloudevents` contains normalized
+  attributes for Kafka binary and structured JSON modes, such as `type`, `source`,
+  and `extensions.priority`. It is null before decoding, on decode failure, and
+  for ordinary JSON. Guard attribute access with `input.cloudevents != null`;
+  event data remains under `input.payload.value`. The sample tester binds the
+  supplied JSON directly and does not perform CloudEvents decoding.
+
+Use `has()` or `in` to check presence. A present null still needs a null check;
+check value types before applying type-specific operations. Missing map keys
+produce No match, while incompatible types can produce Evaluation error.
+`matches()` uses RE2 search semantics: anchor with `^` and `$` for whole-string
+matching. Backreferences and lookarounds are unsupported.
+
+Each line below is a separate expression. Compose your complete condition explicitly:
+
+```cel
+input.key.kind == "text" && input.key.text.startsWith("order-")
+"region" in input.headers && input.headers["region"].exists(h, h.kind == "text" && h.text == "eu")
+input.metadata.topic == "orders" && input.metadata.partition == 0
+input.payload.state == "decoded" && input.payload.value != null && has(input.payload.value.status) && input.payload.value.status == "ready"
+input.key.kind == "text" && input.key.text.matches("^order-[0-9]+$")
+```
+
+### Sample testing
+
+Expand **Test filter expression** to edit sample JSON in the syntax-highlighted JSON code editor, then choose **Test filter**.
+Collapsing the tester preserves the sample. **Test filter** submits the current unsaved expression and editable sample JSON to
+`POST /api/v1/filtering/test` through the typed filtering client. No saved workflow,
+Integration, topic or credential selection is needed. The sample is bound directly
+as `input`: the endpoint does not decode Kafka messages, validate payload schemas,
+consume messages or trigger workflows. One matching sample does not establish
+that every message will evaluate successfully. This action is separate from
+**Test runtime access**.
+
+Testing distinguishes **Match**, **No match**, **Evaluation error**, configuration
+errors (plain-language compiler messages and line/column when provided), and compact inline request failures
+retried with **Test filter**. The help icon beside **Test filter** explains its scope and limitations. Invalid JSON is rejected before submission. Editing either input
+discards results, including pending responses. Server validation still runs on
+Save, Verify, and publication; a successful sample cannot bypass it. CEL workflow findings identify `parameters.filter.expression`, appear beside the relevant trigger filter, and retain the expression for correction. Correcting the expression hides its previous field finding; rerun Save or Verify to refresh workflow findings. Existing draft-save and publication behavior is unchanged.
+
+The mock API uses canned fixtures rather than a CEL engine: `true` matches;
+`false` and `input.missing` do not match. Missing map keys produce no match in the
+backend evaluator. With the Kafka-shaped sample, `input` returns an evaluation
+error (`filter_non_boolean`) because the input object is not boolean. `input.`
+returns a configuration error; unsupported mock fixtures return an evaluation
+error placeholder. Use the real backend for arbitrary CEL evaluation.
+Component tests cover all outcomes, JSON and
+length validation, safe errors, retry, stale responses and accessibility. The
+focused `e2e/kafka-subscribe-filter.spec.ts` covers unsaved testing, exact
+save/reopen preservation, unrelated edits and removal against the mock API.
 
 ## Backend dependency and requirement differences
 
@@ -53,25 +136,79 @@ Topic READ and consumer-group access remain unverified even after connectivity
 succeeds. Raw broker errors are not rendered. Editing configuration discards old
 results, including pending results for an earlier configuration.
 
-## Fixed reading behavior
+## Consumer settings
 
-The platform manages a separate group for each subscription and fixes its reading
-policies:
+The Parameters column shows **Consumer settings** immediately after the CEL filter
+and its tester. Each control has contextual help and a short description.
+The supported controls are:
 
-- Partitions in the saved first-activation set start with new messages at their
-  saved visible-end boundary. Each boundary is selected when that partition
-  initializes, rather than when Publish is clicked, and is reused after a setup
-  interruption.
-- Partitions added outside that saved set start at their earliest retained message,
-  including messages produced before discovery. This also applies if discovery
-  happens while first activation is still incomplete. The earliest retained offset
-  can be greater than zero.
-- Initialized partitions resume from valid committed group offsets on restart,
-  re-enable, or republish. Missing or invalid established checkpoints block reading
-  and require recovery; they never trigger an automatic reset to latest or earliest.
+| Control                | API parameter                    | Options                | Default                         |
+| ---------------------- | -------------------------------- | ---------------------- | ------------------------------- |
+| Start position         | `start.position`                 | Latest, Earliest       | Latest                          |
+| New partition position | `start.added_partition_position` | Earliest, Latest       | Earliest                        |
+| Offset gap policy      | `start.offset_gap_policy`        | Fail, Earliest, Latest | Earliest                        |
+| Consumer group ID      | `group_id`                       | Optional custom ID     | Auto-generated for a new source |
+
+The API defines concrete policy defaults without inheritance semantics.
+The server must support the optional `start` and `group_id` parameters.
+
+Opening and saving an unchanged form does not insert default policies. Partial
+`start` objects survive unrelated edits. Unpublished drafts retain optional group
+omissions. Same-source updates preserve established custom IDs; automatic groups
+remain omitted or null in definitions and exports, while the locked field displays
+their effective runtime ID. Copying such an export creates an independent automatic
+group for the new workflow.
+Clearing the group on a new source sends null. Custom IDs accept 1–512 ASCII letters, numbers, dots,
+underscores, or hyphens; whitespace is rejected rather than silently trimmed.
+Groups must be exclusive to their Syntara source. Backend publication remains
+authoritative for group uniqueness and immutability failures.
+
+Changing Integration or topic clears the saved group for a replacement source;
+a designer can then enter a different custom group. Reading policies are retained.
+Credential-only changes preserve the group. The existing workflow lifecycle
+controls activation: drafts do not affect consumption until publication.
+
+The group becomes fixed at the **first successful publication**, before worker
+activation. Workflow detail responses expose the current projected Kafka source,
+its generation and revision, its effective group ID, and whether that ID was
+automatically generated, including while unpublished.
+The UI reads this metadata directly without scanning version history, so large
+histories and definitions that omit the group do not hide the established ID.
+The group is disabled while this check loads or fails, with a retry on failure.
+Background refreshes preserve the raw draft value; Update reconciles against a
+fresh projection. A changed Integration or topic permits a replacement group.
+Published consumer groups appear as read-only text with an explanation of why the
+group is fixed. Saved version views also show the group as text and disable policy
+selectors.
+
+Publication from the main Publish action, Version History, and Workflows list checks the selected
+saved definition or unsaved changes against fresh source metadata. If a draft explicitly requests a different group for the same source,
+the designer can cancel without changing the draft or confirm carrying forward
+the established group into a new saved definition. Confirmation rechecks source
+generation and revision. Backend publication remains authoritative if another
+publication races with the request. Existing saved versions are never rewritten.
+A clean editor loads the corrected latest definition before advancing its version
+baseline. Pending local edits retain their original baseline and use the normal
+version-conflict flow when saved.
+Dismissing either initial Publish dialog cancels pending preparation before a
+publish request is sent; completing a submission closes the dialog separately.
+
+Valid committed offsets and saved initialization/recovery decisions take precedence
+over policy changes. Start position is not a replay or manual-reset control.
+Latest initialization saves a read-committed visible-end boundary when each
+partition initializes, rather than when Publish is clicked. Newly discovered
+partitions outside the saved initial set follow the new-partition policy, including
+during incomplete first activation. Earliest means the earliest retained offset,
+which may be greater than zero. For offset gaps, Fail holds only the affected
+partition, Earliest resumes at retained beginning, and Latest can skip retained
+messages. Healthy partitions continue when another partition is held.
 
 Auto-commit is disabled. Offsets are committed after durable workflow scheduling
 or another durable resolution, without waiting for workflow completion.
+Filter skips and audited invalid-content skips complete locally under the
+offset-safety checks; logging alone never authorizes a commit.
+Runtime-access testing remains non-consuming and does not verify group permissions,
+position selection, or recovery. CEL sample testing remains independent.
 
 ## Validation
 
@@ -84,8 +221,11 @@ acceptance prerequisites for this frontend story.
 
 ## Implementation verification
 
-- Affected UI tests: 353 passing across 14 files; mock API checks: 9 passing.
-- New Kafka UI/helper coverage: 91.57% statements and 85.38% branches.
+- Run `npm run check` and `TZ=UTC npm test` from `frontend/` for static analysis,
+  UI tests, coverage, and mock API contract checks.
+- Six focused CEL browser scenarios cover outcomes, keyboard/accessibility,
+  rejected saves, Verify field feedback, compact failure/retry, exact persistence, unrelated edits, removal, stale responses,
+  and a browser export/import round trip.
 - Frontend `npm run check` and production build pass. Existing repository lint
   warnings remain; the Kafka files introduce no warnings.
 - Browser verification against the isolated mock API covered creating the trigger,
@@ -131,9 +271,23 @@ The delayed-response layout regression can be run with:
 npm --prefix frontend/packages/syntara-ui run e2e -- e2e/kafka-subscribe-loading.spec.ts
 ```
 
-Delivery defaults are available under **Show message delivery details**; preflight
+Delivery defaults are available under **Message delivery behavior**; preflight
 scope is available in contextual help. Trigger output references use the Kafka
 envelope: `trigger.payload.order_id` reads an `order_id` payload property, while
 `trigger.metadata`, `trigger.original` and `trigger.envelope_version` remain
 top-level envelope fields. Payload schema properties are never flattened onto
 `trigger`.
+
+## Consumer settings verification
+
+Unit/component coverage includes optional/default serialization, partial settings,
+exact CEL persistence, export/import, group validation, source changes, keyboard
+selection, version views, effective source metadata, long version histories,
+older-version republishing, refresh races, cancellation, failure/retry, and axe checks. Shared select toggles associate helper
+text and validation errors with `aria-describedby`.
+
+`e2e/kafka-consumer-settings.spec.ts` checks draft save/reopen, replacement-topic
+groups, retained CEL, publication locking, locking after unpublish, and stale-draft
+carry-forward with export preservation against the mock API. It captures screenshots and audits the consumer-settings region and confirmation dialog. These
+checks do not prove broker consumption behavior; real Kafka verification requires
+a configured Kafka runtime environment.

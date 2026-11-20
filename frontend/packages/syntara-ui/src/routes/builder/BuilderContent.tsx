@@ -55,6 +55,7 @@ import { usePublishWorkflow, useUnpublishWorkflow } from './hooks/usePublishWork
 import { useRunStepDialog } from './hooks/useRunStepDialog'
 import { useUndoRedoKeyboard } from './hooks/useUndoRedoKeyboard'
 import { useWorkflowMetadata } from './hooks/useWorkflowMetadata'
+import { KafkaGroupConflictDialog } from './KafkaGroupConflictDialog'
 import { NodeActionsContext } from './NodeActionsContext'
 import { SaveBeforeViewDialog } from './SaveBeforeViewDialog'
 import type { BuilderContentProps } from './types/builderContent'
@@ -64,6 +65,7 @@ import { buildWorkflowDefinition, transformNodeParameters } from './utils/workfl
 import { ValidationBanner } from './ValidationBanner'
 import { VersionInfoCard } from './VersionInfoCard'
 import { VersionViewProvider } from './VersionViewProvider'
+import { WorkflowValidationContext } from './WorkflowValidationContext'
 
 type WorkflowVersion = WorkflowAPI.components['schemas']['WorkflowVersionRead']
 /* eslint-disable max-lines */
@@ -277,7 +279,13 @@ function BuilderContentBody(props: BuilderContentProps) {
     dispatch,
   })
 
-  const { publish: onPublish, isPublishing } = usePublishWorkflow({
+  const {
+    publish: onPublish,
+    isPublishing,
+    groupConflicts,
+    confirmGroups,
+    cancelGroups,
+  } = usePublishWorkflow({
     workflowId,
     currentVersion,
     workflowName,
@@ -596,6 +604,12 @@ function BuilderContentBody(props: BuilderContentProps) {
           <SynPage>
             <SynReactFlowViewportGuard>
               <StackItem>
+                <KafkaGroupConflictDialog
+                  conflicts={groupConflicts}
+                  isPending={isPublishing}
+                  onConfirm={confirmGroups}
+                  onCancel={cancelGroups}
+                />
                 <BuilderWorkflowPageHeader
                   workflowName={workflowName}
                   workflowDescription={workflowDescription}
@@ -616,6 +630,7 @@ function BuilderContentBody(props: BuilderContentProps) {
                   handleToggleDetails={handleToggleDetails}
                   handleSaveWorkflow={guardedSaveWorkflow}
                   onPublish={onPublish}
+                  onCancelPublish={cancelGroups}
                   onUnpublish={onUnpublish}
                   onDuplicate={handleDuplicateWorkflow}
                   onPendingImport={setPendingImport}
@@ -754,26 +769,28 @@ function BuilderContentBody(props: BuilderContentProps) {
                     }}
                   />
 
-                  <NodeEditorAutoSubmitContext.Provider value={autoSubmitRef}>
-                    <NodeEditorOverlay
-                      isOpen={isNodeEditorOpen}
-                      mode={nodeEditorMode}
-                      selectedNode={selectedNode}
-                      nodeTypeId={nodeEditorNodeTypeId}
-                      nodeSubtypeId={nodeEditorNodeSubtypeId}
-                      sourceNodeId={sourceNodeId}
-                      replacementNodeId={replacementNodeId}
-                      executionId={mostRecentExecutionId}
-                      workflowId={workflowId}
-                      onConnect={handleConnectFromPanel}
-                      onClose={handleCloseNodeEditor}
-                      onNavigateToNode={handleNavigateToNode}
-                      onAddStep={handleAddStepFromPanel}
-                      projectId={builderProjectId}
-                      workflowMetadata={workflowMetadata}
-                      onRunStep={selectedNode ? () => detachPromise(handleRunStep(selectedNode.id)) : undefined}
-                    />
-                  </NodeEditorAutoSubmitContext.Provider>
+                  <WorkflowValidationContext value={{ errors: state.validationErrors }}>
+                    <NodeEditorAutoSubmitContext.Provider value={autoSubmitRef}>
+                      <NodeEditorOverlay
+                        isOpen={isNodeEditorOpen}
+                        mode={nodeEditorMode}
+                        selectedNode={selectedNode}
+                        nodeTypeId={nodeEditorNodeTypeId}
+                        nodeSubtypeId={nodeEditorNodeSubtypeId}
+                        sourceNodeId={sourceNodeId}
+                        replacementNodeId={replacementNodeId}
+                        executionId={mostRecentExecutionId}
+                        workflowId={workflowId}
+                        onConnect={handleConnectFromPanel}
+                        onClose={handleCloseNodeEditor}
+                        onNavigateToNode={handleNavigateToNode}
+                        onAddStep={handleAddStepFromPanel}
+                        projectId={builderProjectId}
+                        workflowMetadata={workflowMetadata}
+                        onRunStep={selectedNode ? () => detachPromise(handleRunStep(selectedNode.id)) : undefined}
+                      />
+                    </NodeEditorAutoSubmitContext.Provider>
+                  </WorkflowValidationContext>
                 </Flex>
               </StackItem>
             </SynReactFlowViewportGuard>

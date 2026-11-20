@@ -10,6 +10,7 @@ export type SynSelectFieldToggleState = {
   onBlur: () => void
   isDisabled?: boolean
   hasError: boolean
+  describedBy?: string
 }
 
 type SynSelectFieldToggleProps = SynSelectFieldToggleState & {
@@ -26,12 +27,15 @@ export function SynSelectFieldToggle({
   onBlur,
   isDisabled,
   hasError,
+  describedBy,
 }: Readonly<SynSelectFieldToggleProps>) {
   return (
     <MenuToggle
       ref={toggleRef}
       id={fieldId}
       aria-label={ariaLabel}
+      aria-describedby={describedBy}
+      aria-invalid={hasError}
       onClick={onToggle}
       onBlur={onBlur}
       isExpanded={isOpen}

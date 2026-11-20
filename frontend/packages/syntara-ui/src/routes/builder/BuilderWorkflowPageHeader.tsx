@@ -324,6 +324,7 @@ export type BuilderWorkflowPageHeaderProps = Readonly<{
   handleToggleDetails: () => void
   handleSaveWorkflow: () => Promise<boolean>
   onPublish: (publishName?: string, description?: string, onSettled?: () => void) => void
+  onCancelPublish?: () => void
   onUnpublish: () => void
   onDuplicate: () => void
   isViewingVersion?: boolean
@@ -373,6 +374,7 @@ export function BuilderWorkflowPageHeader({
   handleToggleDetails,
   handleSaveWorkflow,
   onPublish,
+  onCancelPublish,
   onUnpublish,
   onDuplicate,
   isViewingVersion,
@@ -478,7 +480,10 @@ export function BuilderWorkflowPageHeader({
       <PublishWorkflowDialog
         isOpen={publishDialog.isOpen}
         isPublishing={isPublishing}
-        onClose={publishDialog.close}
+        onClose={() => {
+          onCancelPublish?.()
+          publishDialog.close()
+        }}
         onPublish={(publishName, description) => {
           onPublish(publishName, description, publishDialog.close)
         }}

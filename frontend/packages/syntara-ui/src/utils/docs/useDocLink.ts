@@ -7,8 +7,8 @@ import { docsConfig, docsUrls, type DocsConfig } from './loadDocsConfig'
 import type { DocKey, DocsUrlMap } from './types'
 
 /**
- * Pure resolver: community (or missing product base) → community homepage for
- * every key (intentional — community has no per-page docs yet); extended with
+ * Pure resolver: community (or missing product base) → configured per-page path
+ * or community homepage; extended with
  * productBaseUrl → base + path. Use this from hooks and tests.
  */
 export function resolveDocUrl(
@@ -24,7 +24,8 @@ export function resolveDocUrl(
   const urls = options.urls ?? (docsUrls as DocsUrlMap)
 
   if (isCommunityMode(options.mode) || !config.productBaseUrl) {
-    return config.communityBaseUrl
+    const communityPath = config.communityPaths?.[key]
+    return communityPath ? new URL(communityPath, config.communityBaseUrl).href : config.communityBaseUrl
   }
 
   const resolvedBase = config.productBaseUrl.replace('{version}', options.version)

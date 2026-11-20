@@ -7,8 +7,11 @@ import { useAlerts } from '../../../providers/alerts'
 import { useWorkflowStore } from '../../../stores/useWorkflowStore'
 import { extractVersionConflictInfo, getErrorMessage, isWorkflowVersionConflictError } from '../../../utils/apiErrors'
 import { detachPromise } from '../../../utils/detachPromise'
+import { configuredKafkaGroup } from '../node-forms/kafkaPublishedGroups'
 import { buildWorkflowDefinition } from '../utils/workflowDefinitionBuilder'
 import type { ConflictInfo } from '../VersionConflictDialog'
+
+import { useKafkaPublishGroups, type PreparedPublishOptions } from './useKafkaPublishGroups'
 
 function isWorkflowQuery(query: Query): boolean {
   return (
@@ -60,17 +63,13 @@ export function usePublishWorkflow({
     '/workflows/{workflow_id}/versions/{version}/publish'
   )
 
-  const publish = useCallback(
-    (
-      publishName?: string,
-      description?: string,
-      onSettled?: () => void,
-      callOptions?: { expectedVersionOverride?: number; versionOverride?: number }
-    ) => {
+  const submit = useCallback(
+    (publishName?: string, description?: string, onSettled?: () => void, callOptions?: PreparedPublishOptions) => {
       const versionToPublish = callOptions?.versionOverride ?? currentVersion
       if (!workflowId || versionToPublish == null) return
 
-      const workflowDefinition = getDirtyWorkflowDefinition(workflowName, workflowDescription)
+      const workflowDefinition = callOptions?.workflowDefinition
+      const submittedWorkflow = useWorkflowStore.getState().currentWorkflow
       const expectedVersion = callOptions?.expectedVersionOverride ?? optionsExpectedVersion
       publishMutation(
         {
@@ -92,7 +91,28 @@ export function usePublishWorkflow({
             } else {
               showSuccess({ title: 'Workflow published' })
             }
-            if (workflowDefinition) useWorkflowStore.getState().markClean()
+            const state = useWorkflowStore.getState()
+            if (
+              workflowDefinition &&
+              callOptions?.versionOverride === undefined &&
+              state.currentWorkflow === submittedWorkflow
+            ) {
+              submittedWorkflow?.triggers?.forEach((trigger, index) => {
+                const source = data.kafka_subscription_sources?.find(
+                  (item) =>
+                    item.trigger_node_id === trigger.id &&
+                    item.integration_id === trigger.parameters?.integration_id &&
+                    item.topic === trigger.parameters?.topic
+                )
+                if (source && trigger.parameters?.group_id !== configuredKafkaGroup(source)) {
+                  state.updateTrigger(index, {
+                    ...trigger,
+                    parameters: { ...trigger.parameters, group_id: configuredKafkaGroup(source) },
+                  })
+                }
+              })
+              state.markClean()
+            }
             if (data?.current_version != null) {
               onVersionUpdated?.(data.current_version)
             }
@@ -112,8 +132,6 @@ export function usePublishWorkflow({
     [
       workflowId,
       currentVersion,
-      workflowName,
-      workflowDescription,
       optionsExpectedVersion,
       onConflict,
       onVersionUpdated,
@@ -125,7 +143,12 @@ export function usePublishWorkflow({
     ]
   )
 
-  return { publish, isPublishing }
+  const getDefinition = useCallback(
+    () => getDirtyWorkflowDefinition(workflowName, workflowDescription),
+    [workflowName, workflowDescription]
+  )
+  const groups = useKafkaPublishGroups({ workflowId, currentVersion, getDefinition, submit })
+  return { ...groups, isPublishing: isPublishing || groups.isCheckingGroups }
 }
 
 export function useUnpublishWorkflow(workflowId: string | null) {

@@ -6,11 +6,14 @@ import { workflowClient } from '../../../client'
 import type { PaginationFooterProps } from '../../../components/table/PaginationFooter'
 import { useCursorPagination } from '../../../hooks/useCursorPagination'
 import { useAlerts } from '../../../providers/alerts'
+import { useWorkflowStore } from '../../../stores/useWorkflowStore'
 import { getErrorMessage } from '../../../utils/apiErrors'
 import { detachPromise } from '../../../utils/detachPromise'
 import { downloadVersionExport } from '../../../utils/downloadWorkflowExport'
+import { processExistingWorkflow } from '../utils/processExistingWorkflow'
 
 import { buildWorkflowVersionsQuery } from './buildWorkflowVersionsQuery'
+import { useKafkaPublishGroups, type PreparedPublishOptions } from './useKafkaPublishGroups'
 import { resolvePublishedVersionName } from './versionHistoryHelpers'
 
 export type VersionStatus = 'draft' | 'published' | 'previously_published'
@@ -99,18 +102,42 @@ export function useVersionHistory({ workflowId, isNew, onVersionUpdated }: UseVe
     [workflowId, showError]
   )
 
-  const publishVersion = useCallback(
-    (version: number, publishName?: string, changeDescription?: string) => {
-      if (!workflowId) return
+  const submitPublish = useCallback(
+    (publishName?: string, changeDescription?: string, onSettled?: () => void, options?: PreparedPublishOptions) => {
+      const version = options?.versionOverride
+      if (!workflowId || version == null) return
+      const submittedEditor = useWorkflowStore.getState()
+      const submittedWorkflow = submittedEditor.currentWorkflow
+      const wasDirty = submittedEditor.isDirty
       publishMutation.mutate(
         {
           params: { path: { workflow_id: workflowId, version } },
-          body: { name: publishName ?? null, change_description: changeDescription ?? null },
+          body: {
+            name: publishName ?? null,
+            change_description: changeDescription ?? null,
+            ...(options?.workflowDefinition ? { workflow_definition: options.workflowDefinition } : {}),
+          },
         },
         {
           onSuccess: (data) => {
             showSuccess({ title: 'Version published' })
-            if (data?.current_version != null) {
+            const editor = useWorkflowStore.getState()
+            if (
+              data?.current_version != null &&
+              data.version?.version === data.current_version &&
+              data.version.workflow_definition &&
+              !wasDirty &&
+              !editor.isDirty &&
+              editor.currentWorkflow === submittedWorkflow
+            ) {
+              const loaded = processExistingWorkflow(data)
+              editor.loadWorkflowWithEdges(
+                loaded.flattenedWorkflow,
+                loaded.generatedEdges,
+                loaded.nodePositions,
+                data.project_id
+              )
+              editor.markClean()
               onVersionUpdated?.(data.current_version)
             }
             detachPromise(versionsQuery.refetch())
@@ -126,11 +153,20 @@ export function useVersionHistory({ workflowId, isNew, onVersionUpdated }: UseVe
           onError: (error: unknown) => {
             showError({ title: 'Failed to publish version', description: getErrorMessage(error) })
           },
+          onSettled,
         }
       )
     },
     [workflowId, publishMutation, versionsQuery, queryClient, showSuccess, showError, onVersionUpdated]
   )
+
+  const publication = useKafkaPublishGroups({
+    workflowId,
+    getDefinition: () => undefined,
+    submit: submitPublish,
+  })
+  const publishVersion = (version: number, name?: string, description?: string, onSettled?: () => void) =>
+    publication.publish(name, description, onSettled, { versionOverride: version })
 
   const openInNewWindow = useCallback(
     (version: number) => {
@@ -172,6 +208,12 @@ export function useVersionHistory({ workflowId, isNew, onVersionUpdated }: UseVe
     exportVersion,
     openInNewWindow,
     publishVersion,
+    publication: {
+      groupConflicts: publication.groupConflicts,
+      confirmGroups: publication.confirmGroups,
+      cancelGroups: publication.cancelGroups,
+    },
+    isPublishing: publishMutation.isPending || publication.isCheckingGroups,
     updateVersionMetadata,
     updateMetadataMutation,
     paginationFooterProps,

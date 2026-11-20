@@ -223,9 +223,11 @@ describe('Workflows Component', () => {
     vi.mocked(workflowFetchClient.GET).mockResolvedValue({
       data: {
         id: '1',
+        kafka_subscription_sources: [],
         current_version: 1,
         published_version_number: 1,
         version: {
+          version: 1,
           workflow_definition: {
             triggers: [{ id: 'trigger-1', name: 'Manual Trigger', parameters: {} }],
           },
@@ -2194,6 +2196,12 @@ describe('Workflows Component', () => {
   })
 
   describe('Publish Workflow Mutation', () => {
+    beforeEach(() => {
+      vi.mocked(workflowFetchClient.GET).mockResolvedValue({
+        data: { kafka_subscription_sources: [], version: { version: 5, workflow_definition: {} } },
+        response: new Response(),
+      })
+    })
     const workflowWithVersion = {
       ...mockWorkflows[0],
       current_version: 5,

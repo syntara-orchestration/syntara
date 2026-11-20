@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 
-import { credentialsClient, integrationsFetchClient, workflowClient } from '../../../client'
+import { credentialsClient, integrationsFetchClient, workflowClient, workflowFetchClient } from '../../../client'
 import { FormFieldError } from '../../../components/FormFieldError'
 import { submitForm } from '../../../test/submit-form'
 import type { CredentialSelectorProps } from '../components/CredentialSelector'
@@ -12,14 +12,18 @@ import { useAllCredentials } from '../components/useAllCredentials'
 import { useBuilderPermissions } from '../useBuilderPermissions'
 import { VersionViewContext } from '../VersionViewContext'
 
+import { buildKafkaSubscribeTrigger } from './kafkaSubscribeMapping'
 import { renderWithHeader } from './test-utils/renderWithHeader'
 import type { TriggerFormData } from './triggerFormSchema'
 import { TriggerNodeForm } from './TriggerNodeForm'
+
+vi.mock('../../../providers/theme/useColorScheme', () => ({ useColorScheme: () => ({ colorScheme: 'light' }) }))
 
 const mutate = vi.fn()
 vi.mock('../../../client', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../client')>()),
   integrationsFetchClient: { GET: vi.fn() },
+  workflowFetchClient: { GET: vi.fn() },
   workflowClient: { useMutation: vi.fn() },
   credentialsClient: { useQuery: vi.fn() },
 }))
@@ -110,6 +114,210 @@ beforeEach(() => {
 })
 
 describe('Kafka Subscribe form', () => {
+  it('submits original CEL source after unrelated edits and submits cleared source after removal', async () => {
+    const expression = '  (input.key.kind == "text")\n && true  '
+    const expressionLabel = 'Filter expression (CEL)'
+    const user = userEvent.setup()
+    const onSubmit = vi.fn<(data: TriggerFormData) => void>()
+    renderWithHeader(
+      <TriggerNodeForm
+        initialData={{ ...initialData, filterExpression: expression }}
+        onSubmit={onSubmit}
+        workflowId="workflow-1"
+        projectId="project-1"
+      />
+    )
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Kafka Integration' })).toBeEnabled())
+    await user.clear(screen.getByRole('textbox', { name: 'Topic' }))
+    await user.type(screen.getByRole('textbox', { name: 'Topic' }), 'orders.updated')
+    await submitForm()
+    expect(onSubmit).toHaveBeenLastCalledWith(
+      expect.objectContaining({ filterExpression: expression, topic: 'orders.updated' })
+    )
+    expect(screen.getByRole('textbox', { name: expressionLabel })).toHaveValue(expression)
+    await user.clear(screen.getByRole('textbox', { name: expressionLabel }))
+    await submitForm()
+    expect(onSubmit).toHaveBeenLastCalledWith(expect.objectContaining({ filterExpression: '' }))
+  })
+
+  it('keeps over-limit source available for correction while blocking trigger submission and testing', async () => {
+    const expression = `${' '.repeat(16_381)}true`
+    const onSubmit = vi.fn()
+    renderWithHeader(
+      <TriggerNodeForm
+        initialData={{ ...initialData, filterExpression: expression }}
+        onSubmit={onSubmit}
+        workflowId="workflow-1"
+        projectId="project-1"
+      />
+    )
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Kafka Integration' })).toBeEnabled())
+    await submitForm()
+    expect(await screen.findByText('CEL expression must be 16,384 characters or fewer')).toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: 'Filter expression (CEL)' })).toHaveValue(expression)
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Test filter expression' }))
+    expect(screen.getByRole('button', { name: 'Test filter' })).toBeDisabled()
+    expect(onSubmit).not.toHaveBeenCalled()
+  })
+
+  it.each(['established-custom', 'stale-draft', null, 'invalid group'])(
+    'preserves the established custom group when updating a draft containing %s',
+    async (kafkaGroupId) => {
+      const source = {
+        trigger_node_id: 'subscribe',
+        source_id: 'source-1',
+        generation: 1,
+        configuration_revision: 1,
+        group_id_is_generated: false,
+        integration_id: integrationId,
+        topic: initialData.topic,
+        group_id: 'established-custom',
+      }
+      vi.mocked(workflowFetchClient.GET).mockResolvedValue({
+        data: { kafka_subscription_sources: [source] },
+        response: new Response(),
+      })
+      const onSubmit = vi.fn()
+      renderWithHeader(
+        <TriggerNodeForm
+          initialData={{ ...initialData, kafkaGroupId }}
+          kafkaTriggerId="subscribe"
+          workflowId="workflow-1"
+          onSubmit={onSubmit}
+        />
+      )
+      const group = await screen.findByRole('group', { name: 'Consumer group ID' })
+      expect(group).toHaveTextContent('established-custom')
+      expect(screen.queryByRole('textbox', { name: 'Consumer group ID' })).not.toBeInTheDocument()
+      await submitForm()
+      await waitFor(() =>
+        expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ kafkaGroupId: 'established-custom' }))
+      )
+      expect(workflowFetchClient.GET).toHaveBeenCalledTimes(2)
+    }
+  )
+
+  it.each([undefined, null, 'stale-custom'])('serializes automatic mode after Update from %s', async (kafkaGroupId) => {
+    vi.mocked(workflowFetchClient.GET).mockResolvedValue({
+      data: {
+        kafka_subscription_sources: [
+          {
+            trigger_node_id: 'subscribe',
+            source_id: 'source-1',
+            generation: 1,
+            configuration_revision: 1,
+            integration_id: integrationId,
+            topic: initialData.topic,
+            group_id: 'syntara.runtime-id',
+            group_id_is_generated: true,
+          },
+        ],
+      },
+      response: new Response(),
+    })
+    const onSubmit = vi.fn<(data: TriggerFormData) => void>()
+    renderWithHeader(
+      <TriggerNodeForm
+        initialData={{ ...initialData, kafkaGroupId }}
+        kafkaTriggerId="subscribe"
+        workflowId="workflow-1"
+        onSubmit={onSubmit}
+      />
+    )
+    const group = await screen.findByRole('group', { name: 'Consumer group ID' })
+    expect(group).toHaveTextContent('syntara.runtime-id')
+    await submitForm()
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled())
+    const previous = buildKafkaSubscribeTrigger('subscribe', 'Orders', { ...initialData, kafkaGroupId })
+    const submitted = onSubmit.mock.calls[0]?.[0]
+    expect(submitted).toBeDefined()
+    if (!submitted) throw new Error('Trigger was not submitted')
+    const serialized = buildKafkaSubscribeTrigger('subscribe', 'Orders', submitted, previous)
+    if (kafkaGroupId === undefined) expect(serialized.parameters).not.toHaveProperty('group_id')
+    else expect(serialized.parameters.group_id).toBeNull()
+  })
+
+  it('preserves the raw draft when the publication changes to a replacement before Update', async () => {
+    const source = {
+      trigger_node_id: 'subscribe',
+      source_id: 'source-1',
+      generation: 1,
+      configuration_revision: 1,
+      group_id_is_generated: false,
+      integration_id: integrationId,
+      topic: initialData.topic,
+      group_id: 'established-custom',
+    }
+    vi.mocked(workflowFetchClient.GET)
+      .mockResolvedValueOnce({ data: { kafka_subscription_sources: [source] }, response: new Response() })
+      .mockResolvedValue({
+        data: {
+          kafka_subscription_sources: [{ ...source, source_id: 'replacement-source', topic: 'another-session-topic' }],
+        },
+        response: new Response(),
+      })
+    const onSubmit = vi.fn()
+    renderWithHeader(
+      <TriggerNodeForm
+        initialData={{ ...initialData, kafkaGroupId: 'replacement-group' }}
+        kafkaTriggerId="subscribe"
+        workflowId="workflow-1"
+        onSubmit={onSubmit}
+      />
+    )
+    expect(await screen.findByRole('group', { name: 'Consumer group ID' })).toHaveTextContent('established-custom')
+    await submitForm()
+    await waitFor(() =>
+      expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ kafkaGroupId: 'replacement-group' }))
+    )
+  })
+
+  it('does not apply an update after its trigger editor is closed during the source lookup', async () => {
+    const metadata = {
+      data: {
+        kafka_subscription_sources: [
+          {
+            trigger_node_id: 'subscribe',
+            source_id: 'source-1',
+            generation: 1,
+            configuration_revision: 1,
+            group_id_is_generated: false,
+            integration_id: integrationId,
+            topic: initialData.topic,
+            group_id: 'established-custom',
+          },
+        ],
+      },
+      response: new Response(),
+    }
+    vi.mocked(workflowFetchClient.GET).mockResolvedValue(metadata)
+    const onSubmit = vi.fn()
+    const { unmount } = renderWithHeader(
+      <TriggerNodeForm
+        initialData={{ ...initialData, kafkaGroupId: 'draft-B' }}
+        kafkaTriggerId="subscribe"
+        workflowId="workflow-1"
+        onSubmit={onSubmit}
+      />
+    )
+    expect(await screen.findByRole('group', { name: 'Consumer group ID' })).toHaveTextContent('established-custom')
+    let finish: (() => void) | undefined
+    vi.mocked(workflowFetchClient.GET).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = () => resolve(metadata)
+        })
+    )
+    await submitForm()
+    await waitFor(() => expect(workflowFetchClient.GET).toHaveBeenCalledTimes(2))
+    unmount()
+    await act(async () => {
+      finish?.()
+      await Promise.resolve()
+    })
+    expect(onSubmit).not.toHaveBeenCalled()
+  })
+
   it('keeps the saved form present without transient validation rows while resources load', async () => {
     let finishIntegration: (() => void) | undefined
     vi.mocked(integrationsFetchClient.GET).mockImplementationOnce(
@@ -174,21 +382,14 @@ describe('Kafka Subscribe form', () => {
     )
   })
 
-  it('discloses fixed delivery policies and explains the next publish', async () => {
+  it('discloses saved-progress precedence and explains the next publish', async () => {
     const user = userEvent.setup()
     renderKafka()
     expect(screen.getByText(/Configuration changes apply on the next publish/)).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Show message delivery details' }))
+    await user.click(screen.getByRole('button', { name: 'Message delivery behavior' }))
 
     expect(
-      screen.getByText(
-        'Each subscription uses a platform-managed group. ' +
-          'Partitions present at first activation start with new messages at the visible-end boundary saved when each partition initializes. ' +
-          'Partitions added later start at their earliest retained message. ' +
-          'Initialized partitions resume from valid committed offsets. ' +
-          'Missing or invalid established checkpoints require recovery; they do not reset automatically. ' +
-          'Auto-commit is off. Commit follows durable scheduling or resolution, without waiting for workflow completion.'
-      )
+      screen.getByText(/Consumer settings control initial reading positions and offset-gap recovery/)
     ).toBeInTheDocument()
   })
 
@@ -229,7 +430,7 @@ describe('Kafka Subscribe form', () => {
     expect(mutate).toHaveBeenCalledWith(
       {
         params: { path: { workflow_id: 'workflow-1' } },
-        body: { integration_id: integrationId, credential_id: credentialId, topic: 'orders.created' },
+        body: { integration_id: integrationId, credential_id: credentialId, topic: 'orders.created', filter: null },
       },
       expect.any(Object)
     )
@@ -259,6 +460,34 @@ describe('Kafka Subscribe form', () => {
     expect(screen.getByRole('button', { name: 'Set up connection' })).toBeEnabled()
     expect(screen.queryByRole('textbox', { name: 'Kafka runtime credential' })).not.toBeInTheDocument()
     expect(screen.getByRole('textbox', { name: 'Kafka Integration' })).toHaveFocus()
+  })
+
+  it('clears the group on Integration changes while retaining consumption policies', async () => {
+    vi.mocked(integrationsFetchClient.GET).mockResolvedValue({
+      data: { resources: [integration, { ...integration, id: secondId, name: 'Other Kafka' }] },
+      response: new Response(),
+    })
+    const onSubmit = vi.fn()
+    const user = userEvent.setup()
+    renderWithHeader(
+      <TriggerNodeForm
+        initialData={{ ...initialData, kafkaGroupId: 'original-group', kafkaStart: { offset_gap_policy: 'fail' } }}
+        onSubmit={onSubmit}
+      />
+    )
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Kafka Integration' })).toBeEnabled())
+    await user.click(screen.getByRole('button', { name: 'Kafka Integration' }))
+    await user.click(screen.getByRole('option', { name: /Other Kafka/ }))
+    expect(screen.getByRole('textbox', { name: 'Consumer group ID' })).toHaveValue('')
+    expect(screen.getByRole('button', { name: 'Offset gap policy' })).toHaveTextContent('Fail')
+    await submitForm()
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        integrationId: secondId,
+        kafkaGroupId: null,
+        kafkaStart: { offset_gap_policy: 'fail' },
+      })
+    )
   })
 
   it('prevents requests without workflow update permission', async () => {

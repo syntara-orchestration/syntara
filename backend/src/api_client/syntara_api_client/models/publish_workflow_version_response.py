@@ -12,6 +12,7 @@ from dateutil.parser import isoparse
 from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
+    from ..models.kafka_subscription_source_read import KafkaSubscriptionSourceRead
     from ..models.publish_workflow_version_response_labels import PublishWorkflowVersionResponseLabels
     from ..models.user_reference import UserReference
     from ..models.validation_result import ValidationResult
@@ -44,6 +45,8 @@ class PublishWorkflowVersionResponse:
         published_version_number (int | None | Unset):
         validation_result (None | Unset | ValidationResult): Validation findings from the last save operation. Only
             included in create/update responses; use has_validation_issues for the durable indicator.
+        kafka_subscription_sources (list[KafkaSubscriptionSourceRead] | Unset): Current projected Kafka sources,
+            including while unpublished; excludes retired subscriptions.
         warning (str | Unset): Non-fatal warning from the publish operation Default: ''.
     """
 
@@ -64,6 +67,7 @@ class PublishWorkflowVersionResponse:
     published_version_id: None | Unset | UUID = UNSET
     published_version_number: int | None | Unset = UNSET
     validation_result: None | Unset | ValidationResult = UNSET
+    kafka_subscription_sources: list[KafkaSubscriptionSourceRead] | Unset = UNSET
     warning: str | Unset = ""
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
@@ -139,6 +143,13 @@ class PublishWorkflowVersionResponse:
         else:
             validation_result = self.validation_result
 
+        kafka_subscription_sources: list[dict[str, Any]] | Unset = UNSET
+        if not isinstance(self.kafka_subscription_sources, Unset):
+            kafka_subscription_sources = []
+            for kafka_subscription_sources_item_data in self.kafka_subscription_sources:
+                kafka_subscription_sources_item = kafka_subscription_sources_item_data.to_dict()
+                kafka_subscription_sources.append(kafka_subscription_sources_item)
+
         warning = self.warning
 
         field_dict: dict[str, Any] = {}
@@ -173,6 +184,8 @@ class PublishWorkflowVersionResponse:
             field_dict["published_version_number"] = published_version_number
         if validation_result is not UNSET:
             field_dict["validation_result"] = validation_result
+        if kafka_subscription_sources is not UNSET:
+            field_dict["kafka_subscription_sources"] = kafka_subscription_sources
         if warning is not UNSET:
             field_dict["warning"] = warning
 
@@ -180,6 +193,7 @@ class PublishWorkflowVersionResponse:
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
+        from ..models.kafka_subscription_source_read import KafkaSubscriptionSourceRead
         from ..models.publish_workflow_version_response_labels import PublishWorkflowVersionResponseLabels
         from ..models.user_reference import UserReference
         from ..models.validation_result import ValidationResult
@@ -299,6 +313,17 @@ class PublishWorkflowVersionResponse:
 
         validation_result = _parse_validation_result(d.pop("validation_result", UNSET))
 
+        _kafka_subscription_sources = d.pop("kafka_subscription_sources", UNSET)
+        kafka_subscription_sources: list[KafkaSubscriptionSourceRead] | Unset = UNSET
+        if _kafka_subscription_sources is not UNSET:
+            kafka_subscription_sources = []
+            for kafka_subscription_sources_item_data in _kafka_subscription_sources:
+                kafka_subscription_sources_item = KafkaSubscriptionSourceRead.from_dict(
+                    kafka_subscription_sources_item_data
+                )
+
+                kafka_subscription_sources.append(kafka_subscription_sources_item)
+
         warning = d.pop("warning", UNSET)
 
         publish_workflow_version_response = cls(
@@ -319,6 +344,7 @@ class PublishWorkflowVersionResponse:
             published_version_id=published_version_id,
             published_version_number=published_version_number,
             validation_result=validation_result,
+            kafka_subscription_sources=kafka_subscription_sources,
             warning=warning,
         )
 

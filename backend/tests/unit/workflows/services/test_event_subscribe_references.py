@@ -408,3 +408,16 @@ async def test_nonempty_filter_source_is_preserved(service: WorkflowService, def
     definition["triggers"][0]["parameters"] = {"filter": {"expression": expression}}
     await service._validate_event_subscribe_bindings(definition, allow_incomplete=True)
     assert definition["triggers"][0]["parameters"]["filter"] == {"expression": expression}
+
+
+async def test_invalid_cel_save_returns_field_finding(service: WorkflowService, definition: dict[str, Any]) -> None:
+    from syntara.workflows.exceptions import WorkflowDefinitionInvalidError
+
+    definition["triggers"][0]["parameters"]["filter"] = {"expression": "input."}
+    with pytest.raises(WorkflowDefinitionInvalidError) as caught:
+        await service._validate_credential_project_scope(definition, uuid4(), allow_incomplete_subscriptions=True)
+    finding = caught.value.validation_result.findings[0]
+    assert finding.field_path == "parameters.filter.expression"
+    assert finding.node_id == "incoming"
+    assert finding.message == "CEL filter: Syntax error at line 1, column 7."
+    assert definition["triggers"][0]["parameters"]["filter"]["expression"] == "input."

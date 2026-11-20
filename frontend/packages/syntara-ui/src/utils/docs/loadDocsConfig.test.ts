@@ -9,6 +9,7 @@ describe('loadDocsConfig (no overlay)', () => {
     const config = mergeDocsConfig(baseDocsConfig, undefined)
     expect(config).toEqual({
       communityBaseUrl: baseDocsConfig.communityBaseUrl,
+      communityPaths: baseDocsConfig.communityPaths,
       version: baseDocsConfig.version,
     })
     expect(config.productBaseUrl).toBeUndefined()

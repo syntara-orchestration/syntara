@@ -95,6 +95,13 @@ function renderDialogs(overrides: Partial<React.ComponentProps<typeof WorkflowDi
     runDialog: createDialogState<Workflow>(),
     deleteDialog: createDialogState<Workflow>(),
     publishDialog: createDialogState<Workflow>(),
+    publication: {
+      publish: vi.fn(),
+      confirmGroups: vi.fn(),
+      cancelGroups: vi.fn(),
+      isCheckingGroups: false,
+      groupConflicts: undefined,
+    },
     unpublishDialog: createDialogState<Workflow>(),
     importDialogOpen: false,
     setImportDialogOpen: vi.fn(),

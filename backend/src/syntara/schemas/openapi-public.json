@@ -52971,6 +52971,45 @@
           }
         }
       },
+      "KafkaStartPosition": {
+        "type": "string",
+        "enum": [
+          "latest",
+          "earliest"
+        ],
+        "title": "KafkaStartPosition",
+        "description": "Positions available when a partition has no saved starting boundary."
+      },
+      "KafkaOffsetGapPolicy": {
+        "type": "string",
+        "enum": [
+          "fail",
+          "earliest",
+          "latest"
+        ],
+        "title": "KafkaOffsetGapPolicy",
+        "description": "Permitted responses to a missing or invalid established checkpoint."
+      },
+      "KafkaStartConfiguration": {
+        "properties": {
+          "position": {
+            "$ref": "#/components/schemas/KafkaStartPosition",
+            "default": "latest"
+          },
+          "added_partition_position": {
+            "$ref": "#/components/schemas/KafkaStartPosition",
+            "default": "earliest"
+          },
+          "offset_gap_policy": {
+            "$ref": "#/components/schemas/KafkaOffsetGapPolicy",
+            "default": "earliest"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "KafkaStartConfiguration",
+        "description": "Reading defaults applied only when a new position decision is needed."
+      },
       "KafkaSubscribeParameters": {
         "properties": {
           "filter": {
@@ -53000,6 +53039,23 @@
             "pattern": "^[a-zA-Z0-9._-]+$",
             "title": "Topic"
           },
+          "start": {
+            "$ref": "#/components/schemas/KafkaStartConfiguration"
+          },
+          "group_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512,
+                "pattern": "^[a-zA-Z0-9._-]+$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Group Id"
+          },
           "input_schema": {
             "anyOf": [
               {
@@ -53021,7 +53077,7 @@
           "topic"
         ],
         "title": "KafkaSubscribeParameters",
-        "description": "One exact topic; consumer groups and connection settings are not inputs.\n\nTightens the transport-neutral ``topic`` with Kafka's naming constraints."
+        "description": "One exact topic and approved reading controls; no connection overrides."
       },
       "EventSubscriptionTestResponse": {
         "properties": {
@@ -53229,6 +53285,58 @@
           }
         }
       },
+      "KafkaSubscriptionSourceRead": {
+        "description": "Effective Kafka group for the current, non-retired subscription source.",
+        "properties": {
+          "trigger_node_id": {
+            "title": "Trigger Node Id",
+            "type": "string"
+          },
+          "source_id": {
+            "format": "uuid",
+            "title": "Source Id",
+            "type": "string"
+          },
+          "generation": {
+            "title": "Generation",
+            "type": "integer"
+          },
+          "configuration_revision": {
+            "title": "Configuration Revision",
+            "type": "integer"
+          },
+          "integration_id": {
+            "format": "uuid",
+            "title": "Integration Id",
+            "type": "string"
+          },
+          "topic": {
+            "title": "Topic",
+            "type": "string"
+          },
+          "group_id": {
+            "title": "Group Id",
+            "type": "string"
+          },
+          "group_id_is_generated": {
+            "description": "Whether the effective group is the automatic ID for this source identity.",
+            "title": "Group Id Is Generated",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "trigger_node_id",
+          "source_id",
+          "generation",
+          "configuration_revision",
+          "integration_id",
+          "topic",
+          "group_id",
+          "group_id_is_generated"
+        ],
+        "title": "KafkaSubscriptionSourceRead",
+        "type": "object"
+      },
       "WorkflowReadWithVersion": {
         "type": "object",
         "title": "WorkflowReadWithVersion",
@@ -53373,6 +53481,14 @@
           "version": {
             "$ref": "#/components/schemas/WorkflowVersionRead",
             "description": "Current active version details"
+          },
+          "kafka_subscription_sources": {
+            "description": "Current projected Kafka sources, including while unpublished; excludes retired subscriptions.",
+            "items": {
+              "$ref": "#/components/schemas/KafkaSubscriptionSourceRead"
+            },
+            "title": "Kafka Subscription Sources",
+            "type": "array"
           }
         }
       },
@@ -53520,6 +53636,14 @@
           "version": {
             "$ref": "#/components/schemas/WorkflowVersionRead",
             "description": "Current active version details"
+          },
+          "kafka_subscription_sources": {
+            "description": "Current projected Kafka sources, including while unpublished; excludes retired subscriptions.",
+            "items": {
+              "$ref": "#/components/schemas/KafkaSubscriptionSourceRead"
+            },
+            "title": "Kafka Subscription Sources",
+            "type": "array"
           },
           "warning": {
             "type": "string",

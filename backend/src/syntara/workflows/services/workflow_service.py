@@ -58,6 +58,7 @@ from syntara.workflows.exceptions import (
     BuiltinWorkflowDeleteError,
     BuiltinWorkflowModifyError,
     ScheduledTriggerSyncError,
+    WorkflowDefinitionInvalidError,
     WorkflowHasActiveExecutionsError,
     WorkflowNameConflictError,
     WorkflowNotFoundError,
@@ -285,7 +286,7 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
         workflow_definition: dict[str, Any],
         change_description: str | None,
     ) -> WorkflowVersion:
-        """Create a new version and flush, returning it or *fallback* if unchanged."""
+        """Return the corrected version, reusing the current record when identical."""
         new_version = await self._create_version_record(
             workflow,
             workflow_definition=workflow_definition,
@@ -294,7 +295,12 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
         if new_version:
             await self.session.flush()
             return new_version
-        return fallback
+        if fallback.version == workflow.current_version:
+            return fallback
+        current_version = await self._get_version_or_none(workflow.id, workflow.current_version)
+        if current_version is None:
+            raise WorkflowVersionNotFoundError(workflow.id, workflow.current_version)
+        return current_version
 
     @staticmethod
     async def _sync_scheduled_triggers(
@@ -478,6 +484,8 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
             workflow_definition, allow_incomplete=allow_incomplete_subscriptions
         )
         if findings:
+            if any(finding.field_path == "parameters.filter.expression" for finding in findings):
+                raise WorkflowDefinitionInvalidError(ValidationResult.from_findings(findings))
             raise SafeValueError(findings[0].message)
         if allow_incomplete_publish:
             publish_bindings(workflow_definition, allow_incomplete=True)

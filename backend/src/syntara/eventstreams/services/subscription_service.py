@@ -21,6 +21,7 @@ from uuid import UUID
 import structlog
 from pydantic import ConfigDict
 from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.sql.elements import ColumnElement
 from sqlmodel import SQLModel, col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -33,6 +34,8 @@ from syntara.credentials.models.credential import Credential
 from syntara.eventstreams.adapters.source_projection import (
     project_source_configuration,
     source_address_identity,
+    source_configuration_error,
+    update_source_configuration,
 )
 from syntara.eventstreams.adapters.subscribe_parameters import validate_event_subscribe_parameters
 from syntara.eventstreams.exceptions import EventStreamError, EventSubscriptionInUseError
@@ -234,7 +237,7 @@ class EventSubscriptionService(BaseService):
 
         source = self._build_source(subscription, integration, parameters, deployment_id, generation=1)
         self.session.add(source)
-        await self.session.flush()
+        await self._flush_projection()
         return SubscriptionSnapshot.from_models(subscription, source)
 
     async def _update_subscription(
@@ -273,9 +276,13 @@ class EventSubscriptionService(BaseService):
             self.session.add(active)
             subscription.active_source_generation = next_generation
 
+        configuration = (
+            active.configuration if source_changed else update_source_configuration(active.configuration, parameters)
+        )
         filter_configuration = parameters.filter.model_dump(mode="json") if parameters.filter is not None else None
         config_changed = (
             source_changed
+            or active.configuration != configuration
             or subscription.runtime_credential_id != parameters.credential_id
             or subscription.input_schema != parameters.input_schema
             or subscription.filter != filter_configuration
@@ -289,6 +296,7 @@ class EventSubscriptionService(BaseService):
         subscription.published_version_id = version.id
 
         if config_changed:
+            active.configuration = configuration
             subscription.runtime_credential_id = parameters.credential_id
             subscription.input_schema = parameters.input_schema
             subscription.filter = filter_configuration
@@ -298,8 +306,18 @@ class EventSubscriptionService(BaseService):
             subscription.updated_by = self.user.id
             subscription.configuration_revision += 1
 
-        await self.session.flush()
+        await self._flush_projection()
         return SubscriptionSnapshot.from_models(subscription, active)
+
+    async def _flush_projection(self) -> None:
+        """Translate source uniqueness failures; the publication owner rolls back on failure."""
+        try:
+            await self.session.flush()
+        except IntegrityError as exc:
+            configuration_error = source_configuration_error(exc)
+            if configuration_error is not None:
+                raise configuration_error from exc
+            raise
 
     async def _retire_subscription(self, subscription: EventSubscription) -> None:
         """Retire a subscription whose trigger node was removed; preserve its evidence."""

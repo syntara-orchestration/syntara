@@ -316,10 +316,32 @@ export interface components {
       expression: string
     }
     /**
+     * KafkaStartPosition
+     * @description Positions available when a partition has no saved starting boundary.
+     * @enum {string}
+     */
+    KafkaStartPosition: 'latest' | 'earliest'
+    /**
+     * KafkaOffsetGapPolicy
+     * @description Permitted responses to a missing or invalid established checkpoint.
+     * @enum {string}
+     */
+    KafkaOffsetGapPolicy: 'fail' | 'earliest' | 'latest'
+    /**
+     * KafkaStartConfiguration
+     * @description Reading defaults applied only when a new position decision is needed.
+     */
+    KafkaStartConfiguration: {
+      /** @default latest */
+      position?: components['schemas']['KafkaStartPosition']
+      /** @default earliest */
+      added_partition_position?: components['schemas']['KafkaStartPosition']
+      /** @default earliest */
+      offset_gap_policy?: components['schemas']['KafkaOffsetGapPolicy']
+    }
+    /**
      * KafkaSubscribeParameters
-     * @description One exact topic; consumer groups and connection settings are not inputs.
-     *
-     *     Tightens the transport-neutral ``topic`` with Kafka's naming constraints.
+     * @description One exact topic and approved reading controls; no connection overrides.
      */
     KafkaSubscribeParameters: {
       filter?: components['schemas']['FilterConfiguration'] | null
@@ -335,6 +357,9 @@ export interface components {
       credential_id: string
       /** Topic */
       topic: string
+      start?: components['schemas']['KafkaStartConfiguration']
+      /** Group Id */
+      group_id?: string | null
       /** Input Schema */
       input_schema?: {
         [key: string]: unknown
@@ -458,6 +483,37 @@ export interface components {
       validation_result?: components['schemas']['ValidationResult'] | null
     }
     /**
+     * KafkaSubscriptionSourceRead
+     * @description Effective Kafka group for the current, non-retired subscription source.
+     */
+    KafkaSubscriptionSourceRead: {
+      /** Trigger Node Id */
+      trigger_node_id: string
+      /**
+       * Source Id
+       * Format: uuid
+       */
+      source_id: string
+      /** Generation */
+      generation: number
+      /** Configuration Revision */
+      configuration_revision: number
+      /**
+       * Integration Id
+       * Format: uuid
+       */
+      integration_id: string
+      /** Topic */
+      topic: string
+      /** Group Id */
+      group_id: string
+      /**
+       * Group Id Is Generated
+       * @description Whether the effective group is the automatic ID for this source identity.
+       */
+      group_id_is_generated: boolean
+    }
+    /**
      * WorkflowReadWithVersion
      * @description Schema for workflow response with current version details.
      *
@@ -533,6 +589,11 @@ export interface components {
       validation_result?: components['schemas']['ValidationResult'] | null
       /** @description Current active version details */
       version: components['schemas']['WorkflowVersionRead']
+      /**
+       * Kafka Subscription Sources
+       * @description Current projected Kafka sources, including while unpublished; excludes retired subscriptions.
+       */
+      kafka_subscription_sources?: components['schemas']['KafkaSubscriptionSourceRead'][]
     }
     /**
      * PublishWorkflowVersionResponse
@@ -608,6 +669,11 @@ export interface components {
       validation_result?: components['schemas']['ValidationResult'] | null
       /** @description Current active version details */
       version: components['schemas']['WorkflowVersionRead']
+      /**
+       * Kafka Subscription Sources
+       * @description Current projected Kafka sources, including while unpublished; excludes retired subscriptions.
+       */
+      kafka_subscription_sources?: components['schemas']['KafkaSubscriptionSourceRead'][]
       /**
        * Warning
        * @description Non-fatal warning from the publish operation

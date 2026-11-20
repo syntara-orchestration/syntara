@@ -1256,3 +1256,39 @@ class TestWebhookServiceAccountSchemaFindings:
         sa_errors = [f for f in result.findings if f.field_path == "parameters.authorized_service_account_ids"]
         assert len(sa_errors) == 1
         assert sa_errors[0].node_id == "eda_trigger_1"
+
+
+@pytest.mark.parametrize("allow_incomplete", [False, True])
+@pytest.mark.parametrize(
+    ("expression", "expected"),
+    [
+        ("input.", "Syntax error at line 1, column 7."),
+        ("message.payload", "Use input as the message variable"),
+        ("1", "This expression must return true or false"),
+    ],
+)
+def test_cel_findings_identify_field_without_exposing_source(
+    expression: str, expected: str, *, allow_incomplete: bool
+) -> None:
+    from syntara.workflows.validators.workflow_definition import collect_event_subscribe_config_findings
+
+    definition = _valid_definition()
+    definition["triggers"] = [
+        {
+            "id": "incoming",
+            "type": "event_subscribe_trigger",
+            "parameters": {
+                "integration_id": "11111111-1111-4111-8111-111111111111",
+                "credential_id": "22222222-2222-4222-8222-222222222222",
+                "topic": "orders",
+                "filter": {"expression": expression},
+            },
+        }
+    ]
+    findings = collect_event_subscribe_config_findings(definition, allow_incomplete=allow_incomplete)
+    assert len(findings) == 1
+    assert expected in findings[0].message
+    assert findings[0].node_id == "incoming"
+    assert findings[0].field_path == "parameters.filter.expression"
+    assert "filter_invalid" not in findings[0].message
+    assert definition["triggers"][0]["parameters"]["filter"]["expression"] == expression

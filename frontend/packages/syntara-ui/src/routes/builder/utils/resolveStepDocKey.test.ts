@@ -19,6 +19,7 @@ function makeNode(type: string, data: Record<string, unknown> = {}): Node<NodeTy
 describe('resolveStepDocKey', () => {
   describe('add mode', () => {
     it.each([
+      [RegistryNodeId.TRIGGER, RegistryNodeId.TRIGGER_KAFKA, 'kafkaSubscribeTrigger'],
       [RegistryNodeId.TRIGGER, RegistryNodeId.TRIGGER_MANUAL, 'manualTrigger'],
       [RegistryNodeId.TRIGGER, RegistryNodeId.TRIGGER_SCHEDULED, 'scheduleTrigger'],
       [RegistryNodeId.TRIGGER, RegistryNodeId.TRIGGER_WEBHOOK, 'webhookTrigger'],
@@ -125,6 +126,7 @@ describe('resolveStepDocKey', () => {
 
   describe('edit mode', () => {
     it.each([
+      [TriggerTypeEnum.EVENT_SUBSCRIBE, 'kafkaSubscribeTrigger'],
       [TriggerTypeEnum.MANUAL_TRIGGER, 'manualTrigger'],
       [TriggerTypeEnum.SCHEDULED, 'scheduleTrigger'],
       [TriggerTypeEnum.WEBHOOK_TRIGGER, 'webhookTrigger'],

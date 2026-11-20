@@ -1,4 +1,5 @@
 import { createServer } from '@mswjs/http-middleware'
+import type { FilteringAPI } from '@syntara/contracts'
 import type { Server } from 'node:http'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
@@ -68,4 +69,96 @@ describe('Kafka subscription preflight mock', () => {
   ])('rejects invalid bindings', async (parameters) => {
     expect((await preflight('admin', parameters)).status).toBe(422)
   })
+})
+
+describe('Kafka filter test mock', () => {
+  const sampleInput = {
+    key: { kind: 'text', text: 'order-42' },
+    headers: {},
+    metadata: { topic: 'orders' },
+    payload: { state: 'decoded', value: { status: 'ready' } },
+  }
+
+  function testFilter(body: FilteringAPI.components['schemas']['FilterTestRequest']) {
+    return fetch(`${baseUrl}/api/v1/filtering/test`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+  }
+
+  it.each([
+    ['true', 'match'],
+    ['false', 'no_match'],
+    ['input.missing', 'no_match'],
+    ['constructor', 'evaluation_error'],
+    ['', 'match'],
+    ['  \n', 'match'],
+    [null, 'match'],
+    [undefined, 'match'],
+  ] as const)('returns the contracted outcome for fixture %s', async (expression, outcome) => {
+    const response = await testFilter({ expression, input: sampleInput })
+    expect(response.status).toBe(200)
+    expect(await response.json()).toStrictEqual(
+      outcome === 'evaluation_error' ? { outcome, error_code: 'filter_evaluation_failed' } : { outcome }
+    )
+  })
+
+  it('uses a non-boolean expression for the evaluation-error fixture', async () => {
+    const response = await testFilter({ expression: 'input', input: sampleInput })
+    expect(response.status).toBe(200)
+    expect(await response.json()).toStrictEqual({ outcome: 'evaluation_error', error_code: 'filter_non_boolean' })
+  })
+
+  it('returns safe configuration errors with compiler locations', async () => {
+    const response = await testFilter({ expression: 'input.', input: { private: 'sample data' } })
+    expect(response.status).toBe(422)
+    expect(await response.json()).toStrictEqual({
+      type: 'https://api.example.com/errors/validation-error',
+      title: 'Invalid CEL filter expression',
+      detail: 'filter_invalid_syntax',
+      code: 'filter_invalid_syntax',
+      retryable: false,
+      line: 1,
+      column: 7,
+    })
+  })
+})
+
+it('returns the same safe CEL field finding on Save and Verify without rewriting source', async () => {
+  const source = 'input.'
+  const definition = {
+    schema_version: '2.0.0',
+    name: 'Filter validation',
+    triggers: [{ id: 'incoming', type: 'event_subscribe_trigger', parameters: { filter: { expression: source } } }],
+    nodes: [],
+    edges: [],
+  }
+  const headers = { 'Content-Type': 'application/json' }
+  const expected = {
+    message: 'CEL filter: Syntax error at line 1, column 7.',
+    node_id: 'incoming',
+    field_path: 'parameters.filter.expression',
+  }
+  const saved = await fetch(`${baseUrl}/api/v1/workflows`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ name: 'Filter validation', project_id: 'p-001', workflow_definition: definition }),
+  })
+  expect(saved.status).toBe(422)
+  expect((await saved.json()).validation_result.findings).toContainEqual(expect.objectContaining(expected))
+  const verified = await fetch(`${baseUrl}/api/v1/workflows/validate`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ workflow_definition: definition }),
+  })
+  expect((await verified.json()).findings).toContainEqual(expect.objectContaining(expected))
+  const updated = await fetch(`${baseUrl}/api/v1/workflows/${workflow?.id}`, {
+    method: 'PATCH',
+    headers,
+    body: JSON.stringify({ workflow_definition: definition }),
+  })
+  expect(updated.status).toBe(422)
+  expect((await updated.json()).validation_result.findings).toContainEqual(expect.objectContaining(expected))
+  expect(definition.triggers[0].parameters.filter.expression).toBe(source)
 })

@@ -379,7 +379,9 @@ class AuditOutboxWorker(PeriodicWorker):
         # Update interval for next cycle (batch size already tracked in state machine)
         self._interval_seconds = next_interval
 
-    def write_to_outbox(self, event: AuditEvent, session: Session | None = None) -> None:
+    def write_to_outbox(
+        self, event: AuditEvent, session: Session | None = None, *, max_pending: int | None = None
+    ) -> None:
         """Write AuditEvent to outbox.
 
         Args:
@@ -388,13 +390,15 @@ class AuditOutboxWorker(PeriodicWorker):
                     If provided, the event is written to the outbox in the same
                     transaction as the caller's business logic (guaranteeing
                     at-least-once delivery).
+            max_pending: Optional limit on all pending background writes. Only
+                callers supplying this limit may have their event dropped.
 
         """
         if session is None:
             logger.debug(
                 "Writing AuditOutboxRecord to AuditOutbox database in new session.", event_action=event.event_action
             )
-            self._write_to_outbox_async(event)
+            self._write_to_outbox_async(event, max_pending=max_pending)
         else:
             logger.debug(
                 "Writing AuditOutboxRecord to AuditOutbox database in existing session.",
@@ -426,7 +430,12 @@ class AuditOutboxWorker(PeriodicWorker):
                 event_action=event.event_action,
             )
 
-    def _write_to_outbox_async(self, event: AuditEvent) -> None:
+    def _write_to_outbox_async(self, event: AuditEvent, *, max_pending: int | None = None) -> None:
+        # No await between checking capacity and registering the new task.
+        # The semaphore alone bounds active writes, not tasks waiting for it.
+        if max_pending is not None and len(self._pending) >= max_pending:
+            logger.warning("audit_event_write_skipped_capacity", event_action=event.event_action)
+            return
         try:
             task = asyncio.create_task(self._tracked_write(event))
             self._pending.add(task)
@@ -550,6 +559,59 @@ class AuditOutboxWorker(PeriodicWorker):
             # Database may be unavailable during shutdown or transient error
             logger.warning("Unable to query pending outbox count (database unavailable, likely during shutdown)")
             return None
+
+    async def shutdown(self, *, timeout_seconds: float) -> None:
+        """Bound optional audit draining and cancellation within one deadline."""
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + timeout_seconds
+        draining = asyncio.create_task(self.drain())
+        try:
+            # Reserve half the budget for stopping the poller and write tasks.
+            await asyncio.wait({draining}, timeout=max(0.0, timeout_seconds / 2))
+        finally:
+            if not draining.done():
+                logger.warning("audit_outbox_drain_deadline_reached", pending_writes=len(self._pending))
+                draining.cancel()
+            writes = set(self._pending)
+            for task in writes:
+                if not task.done() and not task.cancelling():
+                    task.cancel()
+            stopping = asyncio.create_task(self.stop())
+            tasks = {draining, stopping, *writes}
+            done, pending = await asyncio.wait(tasks, timeout=max(0.0, deadline - loop.time()))
+            for task in done:
+                self._shutdown_result(task)
+            for task in pending:
+                task.cancel()
+                task.add_done_callback(self._shutdown_result)
+            if pending:
+                logger.warning("audit_outbox_shutdown_incomplete", task_count=len(pending))
+
+    async def drain_writes(self, *, timeout_seconds: float) -> None:
+        """Settle only this process's inserts; never claim or export shared rows."""
+        writes = set(self._pending)
+        if not writes:
+            return
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + timeout_seconds
+        done, pending = await asyncio.wait(writes, timeout=max(0.0, timeout_seconds / 2))
+        for task in pending:
+            task.cancel()
+        if pending:
+            settled, pending = await asyncio.wait(pending, timeout=max(0.0, deadline - loop.time()))
+            done.update(settled)
+        for task in done:
+            self._shutdown_result(task)
+        for task in pending:
+            task.add_done_callback(self._shutdown_result)
+        if pending:
+            logger.warning("audit_outbox_writes_shutdown_incomplete", task_count=len(pending))
+
+    @staticmethod
+    def _shutdown_result(task: asyncio.Task[None]) -> None:
+        """Retrieve late task failures without extending the shutdown deadline."""
+        if not task.cancelled() and (error := task.exception()) is not None:
+            logger.warning("audit_outbox_shutdown_task_failed", exc_type=type(error).__name__)
 
     async def drain(self) -> None:
         """Wait for all in-flight writes to complete.
