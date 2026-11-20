@@ -1,4 +1,4 @@
-import { FormFieldDisplayEnum, type FormsAPI } from '@syntara/contracts'
+import { FormFieldDisplayEnum, FormFieldTypeEnum, type FormsAPI } from '@syntara/contracts'
 
 import { executions } from './executions'
 import { mockDate } from './mockDates'
@@ -88,6 +88,14 @@ const dynamicResolvedFormDefinition: FormsAPI.components['schemas']['FormDefinit
         ],
       },
     },
+  ],
+}
+
+const orderedResponseFormDefinition: FormsAPI.components['schemas']['FormDefinition'] = {
+  fields: [
+    { value_name: 'deployment_name', type: FormFieldTypeEnum.TEXT, label: 'Deployment name' },
+    { value_name: 'environment', type: FormFieldTypeEnum.TEXT, label: 'Environment' },
+    { value_name: 'id', type: FormFieldTypeEnum.TEXT, label: 'ID' },
   ],
 }
 
@@ -225,6 +233,27 @@ export const formPrompts: MutableFormPromptRead[] = [
     responder_users: [],
     responder_groups: [],
     response_data: { reason: 'Approved for production rollout' },
+    responded_at: mockDate.daysAgo1,
+    responded_by: { id: 'user-admin', name: 'Admin User', type: 'user' },
+  },
+  {
+    id: 'fp-exec-form-prompt-order',
+    created_at: mockDate.daysAgo2,
+    updated_at: mockDate.daysAgo1,
+    labels: {},
+    project_id: 'p-001',
+    execution_id: 'exec-form-prompt-order',
+    prompt_node_id: 'confirm_details',
+    name: 'Ordered deployment response',
+    message: 'Review the submitted deployment details.',
+    status: 'submitted',
+    timeout_at: mockDate.daysAgo1,
+    form_definition: orderedResponseFormDefinition,
+    submit_label: 'Submit response',
+    success_message: 'Thank you — the workflow will continue.',
+    responder_users: [],
+    responder_groups: [],
+    response_data: { id: '42', environment: 'stage', deployment_name: 'blue' },
     responded_at: mockDate.daysAgo1,
     responded_by: { id: 'user-admin', name: 'Admin User', type: 'user' },
   },

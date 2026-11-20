@@ -158,7 +158,8 @@ test.describe('Form trigger — form field builder', { tag: '@pr-check' }, () =>
       await setFormFieldLabel(app, 3, 'Gamma', FORM_TRIGGER_HOST)
       await setFormFieldLabel(app, 4, 'Delta', FORM_TRIGGER_HOST)
 
-      await reorderFormField(app, 4, 1, { assertFirstLabel: 'Delta', host: FORM_TRIGGER_HOST })
+      const expectedFieldOrder = ['Delta', 'Alpha', 'Beta', 'Gamma']
+      await reorderFormField(app, 4, 1, { assertLabelsInOrder: expectedFieldOrder, host: FORM_TRIGGER_HOST })
 
       await selectFormFieldType(app, 4, FORM_FIELD_TYPE_MENU_LABELS.checkbox, FORM_TRIGGER_HOST)
       await expect(
@@ -178,7 +179,7 @@ test.describe('Form trigger — form field builder', { tag: '@pr-check' }, () =>
       await saveFormTriggerAndWorkflow(app)
       const workflowId = workflowIdFromUrl(app)
       const stored = await readFormTriggerDefinitionFromApi(app, workflowId)
-      expect(stored.fields.map((field) => field.label)).toEqual(['Delta', 'Alpha', 'Beta', 'Gamma'])
+      expect(stored.fields.map((field) => field.label)).toEqual(expectedFieldOrder)
       expect(stored.fields.map((field) => field.type)).toEqual(['text', 'number', 'text', 'dropdown'])
 
       await reloadBuilderAndReopenFormTrigger(app, FORM_TRIGGER_NAME)

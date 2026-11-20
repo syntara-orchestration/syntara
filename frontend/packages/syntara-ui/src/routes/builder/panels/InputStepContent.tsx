@@ -1,6 +1,9 @@
 import { Alert, Button, Flex, FlexItem, Label, Stack, StackItem } from '@patternfly/react-core'
 import { RhUiCloseIcon } from '@patternfly/react-icons'
 import { TriggerTypeEnum } from '@syntara/contracts'
+import { useMemo } from 'react'
+
+import { formFieldOrderFromParameters, orderFormActivityData } from '../utils/formFieldOrder'
 
 import type { UpstreamStepInfo } from './hooks/useUpstreamSteps'
 import { InputEmptyState } from './InputEmptyState'
@@ -41,7 +44,12 @@ export function InputStepContent({
   onRunPreviousSteps,
   workflowId,
 }: Readonly<InputStepContentProps>) {
-  const nodeData = hasData ? (mergedExecutionData?.[upstreamNode.id] ?? null) : null
+  const rawNodeData = hasData ? (mergedExecutionData?.[upstreamNode.id] ?? null) : null
+  const formFieldOrder = useMemo(() => formFieldOrderFromParameters(upstreamNode.parameters), [upstreamNode.parameters])
+  const nodeData = useMemo(
+    () => orderFormActivityData(rawNodeData, upstreamNode.type, formFieldOrder, 'output'),
+    [rawNodeData, upstreamNode.type, formFieldOrder]
+  )
   const expressionNodeId = TRIGGER_TYPES.has(upstreamNode.type) ? 'trigger' : upstreamNode.id
 
   if (!nodeData) {

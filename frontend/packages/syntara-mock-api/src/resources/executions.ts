@@ -234,6 +234,18 @@ export const executions: ExecutionMockSeed[] = [
     input_data: {},
   },
   {
+    id: 'exec-form-prompt-order',
+    created_at: mockDate.daysAgo2,
+    updated_at: mockDate.daysAgo1,
+    workflow_id: HELLO_WORLD,
+    workflow_name: workflowNames[HELLO_WORLD],
+    status: 'completed',
+    started_at: mockDate.daysAgo2,
+    completed_at: mockDate.daysAgo1,
+    started_by: 'user-1',
+    input_data: {},
+  },
+  {
     id: 'exec-form-prompt-alice',
     created_at: mockDate.minutesAgo10,
     updated_at: mockDate.minutesAgo10,

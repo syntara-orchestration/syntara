@@ -1,3 +1,4 @@
+import { FormFieldTypeEnum } from '@syntara/contracts'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -80,6 +81,28 @@ describe('FormResponseExpandedDetail', () => {
 
     renderDetail(true)
     expect(screen.getByText(/"field": "value"/)).toBeInTheDocument()
+  })
+
+  it('formats submitted fields in form definition order', () => {
+    mockUseQuery.mockReturnValue({
+      isLoading: false,
+      isError: false,
+      data: {
+        message: 'Done',
+        form_definition: {
+          fields: [
+            { type: FormFieldTypeEnum.TEXT, value_name: 'deployment_name', label: 'Deployment' },
+            { type: FormFieldTypeEnum.TEXT, value_name: 'environment', label: 'Environment' },
+            { type: FormFieldTypeEnum.TEXT, value_name: 'id', label: 'ID' },
+          ],
+        },
+        response_data: { id: '42', environment: 'stage', deployment_name: 'blue' },
+      },
+    })
+
+    renderDetail(true)
+
+    expect(screen.getByText(/"deployment_name"/)).toHaveTextContent(/"deployment_name"[\s\S]*"environment"[\s\S]*"id"/)
   })
 
   it('renders message and submitted data when expanded', () => {

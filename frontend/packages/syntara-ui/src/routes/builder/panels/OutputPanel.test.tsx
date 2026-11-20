@@ -1,3 +1,4 @@
+import { ActivityTypeEnum, TriggerTypeEnum } from '@syntara/contracts'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ReactNode } from 'react'
@@ -127,6 +128,83 @@ describe('OutputPanel', () => {
 
     expect(screen.getByRole('button', { name: 'JSON' })).toHaveAttribute('aria-pressed', 'true')
     expect(screen.getByText(/"result": "success"/)).toBeInTheDocument()
+  })
+
+  it('orders form prompt response_data from execution output', () => {
+    const nodeId = 'prompt-order'
+    vi.mocked(useWorkflowStore).mockReturnValue([
+      {
+        id: nodeId,
+        type: ActivityTypeEnum.FORM_PROMPT,
+        parameters: {
+          form_definition: {
+            fields: [{ value_name: 'deployment_name' }, { value_name: 'environment' }, { value_name: 'id' }],
+          },
+        },
+      },
+    ] as never)
+
+    renderWithProviders(
+      <OutputPanel
+        nodeId={nodeId}
+        outputData={{
+          status: 'submitted',
+          response_data: { id: '42', environment: 'stage', deployment_name: 'blue' },
+        }}
+      />
+    )
+
+    expect(screen.getByRole('code')).toHaveTextContent(/"deployment_name"[\s\S]*"environment"[\s\S]*"id"/)
+  })
+
+  it('orders a form trigger output when its panel uses the canvas ID', () => {
+    vi.mocked(useWorkflowStore).mockReturnValue([
+      {
+        id: 'form-trigger-id',
+        type: TriggerTypeEnum.FORM_TRIGGER,
+        parameters: {
+          form_definition: {
+            fields: [{ value_name: 'deployment_name' }, { value_name: 'environment' }, { value_name: 'id' }],
+          },
+        },
+      },
+    ] as never)
+
+    renderWithProviders(
+      <OutputPanel
+        nodeId="trigger-0"
+        outputData={{ response_data: { id: '42', environment: 'stage', deployment_name: 'blue' } }}
+      />
+    )
+
+    expect(screen.getByRole('code')).toHaveTextContent(/"deployment_name"[\s\S]*"environment"[\s\S]*"id"/)
+  })
+
+  it('keeps pinned form output in the user-authored order', () => {
+    const nodeId = 'prompt-pinned-order'
+    vi.mocked(useWorkflowStore).mockReturnValue([
+      {
+        id: nodeId,
+        type: ActivityTypeEnum.FORM_PROMPT,
+        parameters: {
+          form_definition: {
+            fields: [{ value_name: 'deployment_name' }, { value_name: 'environment' }, { value_name: 'id' }],
+          },
+        },
+      },
+    ] as never)
+    mockGetOutputMock.mockReturnValue({
+      response_data: { id: '42', environment: 'stage', deployment_name: 'blue' },
+    })
+
+    renderWithProviders(
+      <OutputPanel
+        nodeId={nodeId}
+        outputData={{ response_data: { id: '42', environment: 'stage', deployment_name: 'blue' } }}
+      />
+    )
+
+    expect(screen.getByRole('code')).toHaveTextContent(/"id"[\s\S]*"environment"[\s\S]*"deployment_name"/)
   })
 
   it('does not show empty state when output data exists', () => {

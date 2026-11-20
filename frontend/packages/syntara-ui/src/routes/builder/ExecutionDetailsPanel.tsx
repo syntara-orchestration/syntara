@@ -13,6 +13,7 @@ import { formatElapsedTime } from '../../utils/dateUtils'
 import { detachPromise } from '../../utils/detachPromise'
 import { StepExecutionDetailsPanel } from '../executions/StepExecutionDetailsPanel'
 import type { ActivityState } from '../workflows/execution/types'
+import { parseCompositeKey } from '../workflows/execution/utils/activityState'
 import {
   useExecutionStore,
   useExecutionStoreActions,
@@ -29,6 +30,7 @@ import { HeaderMetadata, LoadingErrorState, NoSelectionState, type ViewMode } fr
 import { useSelectedActivity } from './hooks/useSelectedActivity'
 import { useActivityFilters } from './useActivityFilters'
 import { useActivityNameMap, type WorkflowDefShape } from './useActivityNameMap'
+import { buildFormFieldOrderMap } from './utils/formFieldOrder'
 
 export type { WorkflowDefShape } from './useActivityNameMap'
 
@@ -67,6 +69,7 @@ type ThreePanelLayoutProps = {
   executionId: string
   selectedNodeState?: ActivityState
   selectedNodeType?: string
+  formFieldOrder?: readonly string[]
   viewMode: ViewMode
   onViewModeChange: (mode: ViewMode) => void
   onRowClick?: (nodeId: string, nodeName: string) => void
@@ -90,6 +93,7 @@ function ThreePanelLayout({
   executionId,
   selectedNodeState,
   selectedNodeType,
+  formFieldOrder,
   viewMode,
   onViewModeChange,
   onRowClick,
@@ -166,6 +170,7 @@ function ThreePanelLayout({
               executionId={executionId}
               stepState={selectedNodeState}
               stepType={selectedNodeType}
+              formFieldOrder={formFieldOrder}
             />
           ) : (
             <NoSelectionState />
@@ -349,6 +354,7 @@ export function ExecutionDetailsPanel({
   }, [activities, executionMetadata, setActivityExecutions, injectPreResolvedStates, setExecutionMetadata])
 
   const { nameMap, activityOrder } = useActivityNameMap(workflowDefinition, activityStates)
+  const formFieldOrderMap = useMemo(() => buildFormFieldOrderMap(workflowDefinition), [workflowDefinition])
 
   const { filters, filteredActivityOrder, handleFilterChange, hasActiveFilters } = useActivityFilters(
     activityOrder,
@@ -366,6 +372,8 @@ export function ExecutionDetailsPanel({
     nameMap,
     onNodeSelect,
   })
+  const selectedNodeBaseId = effectiveKey ? parseCompositeKey(effectiveKey).baseId : undefined
+  const formFieldOrder = selectedNodeBaseId ? formFieldOrderMap.get(selectedNodeBaseId) : undefined
 
   const handleViewModeChange = useCallback(
     (mode: ViewMode) => {
@@ -405,6 +413,7 @@ export function ExecutionDetailsPanel({
         executionId={executionId}
         selectedNodeState={selectedNodeState}
         selectedNodeType={selectedNodeType}
+        formFieldOrder={formFieldOrder}
         viewMode={viewMode}
         onViewModeChange={handleViewModeChange}
         onRowClick={handleRowClick}
