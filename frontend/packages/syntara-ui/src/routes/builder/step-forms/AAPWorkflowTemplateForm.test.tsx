@@ -108,6 +108,7 @@ import { submitForm } from '../../../test/submit-form'
 import { useAllCredentials } from '../components/useAllCredentials'
 
 import { AAPWorkflowTemplateForm } from './AAPWorkflowTemplateForm'
+import { AAP_CREDENTIAL_REQUIRED_HINT } from './shared/stepFieldHelpText'
 import { renderWithHeader } from './test-utils/renderWithHeader'
 
 // Mock useAAPBrowser hook to provide test data without real API calls
@@ -132,15 +133,18 @@ const defaultWorkflowTemplateDetail: AAPWorkflowTemplateDetail = {
 }
 
 // Base mock data shared across all tests (static data that doesn't change)
+const baseMockWorkflowTemplates = [
+  { id: 20, name: 'Deploy Workflow', description: 'Deploy application workflow', organization_name: 'Default' },
+  { id: 21, name: 'Backup Workflow', description: 'Backup database workflow', organization_name: 'Default' },
+]
+
 const baseMockAAPBrowserData = {
   organizations: [
     { id: 1, name: 'Default' },
     { id: 2, name: 'Engineering' },
   ],
-  workflowTemplates: [
-    { id: 20, name: 'Deploy Workflow', description: 'Deploy application workflow', organization_name: 'Default' },
-    { id: 21, name: 'Backup Workflow', description: 'Backup database workflow', organization_name: 'Default' },
-  ],
+  workflowTemplates: baseMockWorkflowTemplates,
+  templates: baseMockWorkflowTemplates,
   inventories: [{ id: 1, name: 'Demo Inventory', description: 'Demo hosts', organization_name: 'Default' }],
   labels: [],
   selectedOrg: '',
@@ -155,6 +159,7 @@ const baseMockAAPBrowserData = {
   workflowTemplateDetail: undefined,
   error: null,
   retryAll: mockRetryAll,
+  isActive: true,
   searchOrganizations: vi.fn(),
   searchTemplates: vi.fn(),
   searchInventories: vi.fn(),
@@ -221,6 +226,18 @@ describe('AAPWorkflowTemplateForm', () => {
 
     const templateInput = screen.getByPlaceholderText(/Select a workflow template/i)
     expect(templateInput).toBeInTheDocument()
+  })
+
+  it('disables resource pickers until a credential is selected', () => {
+    mockUseAAPBrowser.mockReturnValue({ ...createMockAAPBrowser(defaultWorkflowTemplateDetail), isActive: false })
+
+    renderWithHeader(
+      <AAPWorkflowTemplateForm onSubmit={mockOnSubmit} onCancel={vi.fn()} initialData={{ integration_id: 'int-123' }} />
+    )
+
+    expect(screen.getByPlaceholderText(/Select an organization/i)).toBeDisabled()
+    expect(screen.getByPlaceholderText(/Select a workflow template/i)).toBeDisabled()
+    expect(screen.getByText(AAP_CREDENTIAL_REQUIRED_HINT)).toBeInTheDocument()
   })
 
   it('submits form even without organization selected (permissive schema)', async () => {

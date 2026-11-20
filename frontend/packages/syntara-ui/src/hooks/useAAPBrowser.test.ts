@@ -296,7 +296,7 @@ describe('useAAPBrowser', () => {
   })
 
   describe('integrationId parameter', () => {
-    it('is active when integrationId is provided but credentialId is undefined', () => {
+    it('is not active when integrationId is provided but credentialId is undefined', () => {
       mockUseQuery.mockReturnValue({
         data: undefined,
         isPending: true,
@@ -306,9 +306,9 @@ describe('useAAPBrowser', () => {
 
       const { result } = renderHook(() => useAAPBrowser(undefined, undefined, 'job', 'int-123'))
 
-      expect(result.current.loadingOrgs).toBe(true)
-      expect(result.current.loadingTemplates).toBe(true)
-      expect(result.current.loadingInventories).toBe(true)
+      expect(result.current.loadingOrgs).toBe(false)
+      expect(result.current.loadingTemplates).toBe(false)
+      expect(result.current.loadingInventories).toBe(false)
     })
 
     it('is active when both credentialId and integrationId are provided', () => {
@@ -339,15 +339,52 @@ describe('useAAPBrowser', () => {
       expect(result.current.loadingInventories).toBe(false)
     })
 
-    it('passes integrationId to query params', () => {
-      renderHook(() => useAAPBrowser(undefined, undefined, 'job', 'int-456'))
+    it('exposes isActive false on the result when only integrationId is provided', () => {
+      const { result } = renderHook(() => useAAPBrowser(undefined, undefined, 'job', 'int-123'))
 
-      // Verify useQuery was called with integration_id in query params
+      expect(result.current.isActive).toBe(false)
+    })
+
+    it('exposes isActive true on the result when credentialId is provided', () => {
+      const { result } = renderHook(() => useAAPBrowser('cred-1', undefined, 'job', 'int-123'))
+
+      expect(result.current.isActive).toBe(true)
+    })
+
+    it('disables every resource query when only integrationId is provided', () => {
+      renderHook(() => useAAPBrowser(undefined, undefined, 'job', 'int-123'))
+
+      const calls = mockUseQuery.mock.calls
+      expect(calls.length).toBeGreaterThan(0)
+      for (const call of calls) {
+        const options = call[3] as { enabled: boolean }
+        expect(options.enabled).toBe(false)
+      }
+    })
+
+    it('keeps the template detail query disabled with integration only even when a template is selected', () => {
+      renderHook(() => useAAPBrowser(undefined, { templateId: 10 }, 'job', 'int-123'))
+
+      const detailCall = mockUseQuery.mock.calls.find(
+        (c: unknown[]) => c[1] === '/proxies/aap/job_templates/{job_template_id}'
+      )
+      expect(detailCall).toBeDefined()
+      const options = detailCall![3] as { enabled: boolean }
+      expect(options.enabled).toBe(false)
+    })
+
+    it('passes integrationId and credentialId to query params together', () => {
+      renderHook(() => useAAPBrowser('cred-1', undefined, 'job', 'int-456'))
+
+      // Verify useQuery was called with both ids in query params
       const calls = mockUseQuery.mock.calls
       const orgCall = calls.find((c: unknown[]) => c[1] === '/proxies/aap/organizations')
       expect(orgCall).toBeDefined()
-      const orgCallOptions = orgCall![2] as { params: { query: { integration_id: string } } }
+      const orgCallOptions = orgCall![2] as {
+        params: { query: { integration_id: string; credential_id: string } }
+      }
       expect(orgCallOptions.params.query.integration_id).toBe('int-456')
+      expect(orgCallOptions.params.query.credential_id).toBe('cred-1')
     })
   })
 })

@@ -31,6 +31,8 @@ type AAPTypeaheadSelectProps = {
   readonly placeholder?: string
   readonly isLoading?: boolean
   readonly hasError?: boolean
+  /** Disables the picker: no typing, no dropdown, and no clear control. */
+  readonly isDisabled?: boolean
 }
 
 export function AAPTypeaheadSelect({
@@ -43,6 +45,7 @@ export function AAPTypeaheadSelect({
   placeholder = 'Select...',
   isLoading,
   hasError,
+  isDisabled,
 }: AAPTypeaheadSelectProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [filterValue, setFilterValue] = useState('')
@@ -74,11 +77,17 @@ export function AAPTypeaheadSelect({
     inputRef.current?.focus()
   }
 
+  // A disabled select never shows its menu, even if it was open when the prop
+  // flipped — derived here instead of syncing state in an effect.
+  const isMenuOpen = isOpen && !isDisabled
+
   const onToggle = () => {
+    if (isDisabled) return
     setIsOpen((prev) => !prev)
   }
 
   const onInputChange = (_e: React.FormEvent<HTMLInputElement>, val: string) => {
+    if (isDisabled) return
     setFilterValue(val)
     if (!isOpen) setIsOpen(true)
   }
@@ -88,16 +97,17 @@ export function AAPTypeaheadSelect({
       ref={toggleRef}
       variant="typeahead"
       onClick={onToggle}
-      isExpanded={isOpen}
+      isDisabled={isDisabled}
+      isExpanded={isMenuOpen}
       isFullWidth
       status={hasError ? 'danger' : undefined}
     >
-      <TextInputGroup isPlain>
+      <TextInputGroup isPlain isDisabled={isDisabled}>
         <TextInputGroupMain
-          value={isOpen ? filterValue : selectedLabel}
+          value={isMenuOpen ? filterValue : selectedLabel}
           onChange={onInputChange}
           onClick={() => {
-            if (!isOpen) setIsOpen(true)
+            if (!isDisabled && !isOpen) setIsOpen(true)
           }}
           placeholder={placeholder}
           autoComplete="off"
@@ -105,7 +115,7 @@ export function AAPTypeaheadSelect({
         />
         <TextInputGroupUtilities>
           {isLoading && <Spinner size="sm" aria-label="Loading" />}
-          {selected && !isLoading && (
+          {selected && !isLoading && !isDisabled && (
             <Button
               variant="plain"
               onClick={(e) => {
@@ -133,7 +143,7 @@ export function AAPTypeaheadSelect({
     <SynSelect
       id={id}
       aria-label={ariaLabel}
-      isOpen={isOpen}
+      isOpen={isMenuOpen}
       onOpenChange={handleOpenChange}
       onSelect={onSelect}
       selected={selected}

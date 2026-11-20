@@ -225,6 +225,43 @@ describe('AAPTypeaheadSelect', () => {
     })
   })
 
+  describe('Disabled state', () => {
+    it('renders the filter input as disabled when isDisabled is true', () => {
+      renderSelect({ isDisabled: true })
+      expect(getInput()).toBeDisabled()
+    })
+
+    it('renders an enabled filter input when isDisabled is not set', () => {
+      renderSelect()
+      expect(getInput()).toBeEnabled()
+    })
+
+    it('does not open the dropdown when clicked while disabled', async () => {
+      const user = userEvent.setup()
+      renderSelect({ isDisabled: true })
+
+      await user.click(getInput())
+
+      expect(screen.queryByRole('listbox')).not.toBeInTheDocument()
+      expect(screen.queryByRole('option', { name: /Alpha/i })).not.toBeInTheDocument()
+    })
+
+    it('does not show the clear button while disabled', () => {
+      renderSelect({ selected: 'opt-1', isDisabled: true })
+      expect(screen.queryByRole('button', { name: 'Clear selection' })).not.toBeInTheDocument()
+    })
+
+    it('keeps the selected value visible while disabled', () => {
+      renderSelect({ selected: 'opt-1', isDisabled: true })
+      expect(getInput()).toHaveValue('Alpha')
+    })
+
+    it('has no accessibility violations while disabled', async () => {
+      const { container } = renderSelect({ selected: 'opt-1', isDisabled: true })
+      expect(await axe(container)).toHaveNoViolations()
+    })
+  })
+
   describe('Debounced search', () => {
     it('calls onSearchChange after debounce when typing', async () => {
       const user = userEvent.setup()
