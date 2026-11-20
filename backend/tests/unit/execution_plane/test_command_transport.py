@@ -5,14 +5,14 @@ from uuid import uuid4
 
 import httpx
 import pytest
-from execution_plane_client.commands.control import WorkCancel
+from execution_plane_client.commands.bulk_work import WorkCancelBulk, WorkItemSelector
 
 from syntara.execution_plane import client as client_module
 from syntara.execution_plane.client import ExecutionPlaneHttpClient, ExecutionPlaneRejectedError
 
 
 def cancellation():
-    return WorkCancel(work_item_id=uuid4()).to_message(
+    return WorkCancelBulk(selector=WorkItemSelector(work_item_ids=[uuid4()])).to_message(
         source_id="syntara-orchestration", destination_id="execution-plane", client_id="syntara-orchestration"
     )
 
@@ -36,7 +36,8 @@ async def test_command_transport_sends_shared_envelope_and_checks_receipt(monkey
     assert requests[0].url.path == "/v1/commands"
     assert requests[0].headers["Authorization"] == "Bearer test-token"
     assert json.loads(requests[0].content) == message.model_dump(mode="json")
-    assert "work.cancel" in client_module.EP_SCOPES.split()
+    assert "work.cancel_bulk" in client_module.EP_SCOPES.split()
+    assert {"work.cancel", "work.delete"}.isdisjoint(client_module.EP_SCOPES.split())
     assert "work.execute" in client_module.EP_SCOPES.split()
     assert {"cluster.register", "cluster.update", "cluster.delete"} <= set(client_module.EP_SCOPES.split())
     assert "clusters:read" in client_module.EP_SCOPES.split()
@@ -98,32 +99,9 @@ async def test_cluster_inventory_uses_actual_cluster_ids(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_delete_work_item_sends_versioned_command(monkeypatch):
-    item_id = uuid4()
-    requests = []
-
-    def handle(request) -> httpx.Response:
-        message = json.loads(request.content)
-        requests.append(message)
-        return httpx.Response(202, json={"received": True, "message_id": message["message_id"]})
-
-    monkeypatch.setattr(client_module, "create_ep_service_token", lambda: "test-token")
-    client = object.__new__(ExecutionPlaneHttpClient)
-    client._client = httpx.AsyncClient(base_url="https://ep.example", transport=httpx.MockTransport(handle))
-    async with client:
-        await client.delete_work_item(work_item_id=item_id)
-    assert requests[0]["command"]["command_type"] == "work.delete"
-    assert requests[0]["command"]["command_revision"] == 1
-    assert requests[0]["command"]["payload"] == {"work_item_id": str(item_id)}
-    assert "work.delete" in client_module.EP_SCOPES.split()
-
-
-@pytest.mark.asyncio
 @pytest.mark.parametrize("command", ["cancel", "delete"])
 @pytest.mark.parametrize("field", ["work_item_ids", "project_id", "workflow_id", "execution_id"])
 async def test_bulk_command_selector_wire_contract(monkeypatch, command, field):
-    from execution_plane_client.commands.bulk_work import WorkItemSelector
-
     owner_id = uuid4()
     value = [str(owner_id)] if field == "work_item_ids" else str(owner_id)
     messages = []
@@ -142,6 +120,7 @@ async def test_bulk_command_selector_wire_contract(monkeypatch, command, field):
         await method(selector=WorkItemSelector.model_validate(selector))
     assert len(messages) == 1
     assert messages[0]["command"]["command_type"] == f"work.{command}_bulk"
+    assert messages[0]["command"]["command_revision"] == 1
     wire_selector = messages[0]["command"]["payload"]["selector"]
     assert {key: value for key, value in wire_selector.items() if value is not None} == selector
     assert f"work.{command}_bulk" in client_module.EP_SCOPES.split()
