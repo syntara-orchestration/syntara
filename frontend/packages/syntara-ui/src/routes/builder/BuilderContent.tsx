@@ -16,7 +16,7 @@ import { SynStepExpandedAllContext } from '../../components/steps/SynStepExpande
 import { useSearchParams } from '../../hooks/routing/useSearchParams'
 import { useCursorPagination } from '../../hooks/useCursorPagination'
 import { useProjectSelector } from '../../hooks/useProjectSelector'
-import { useAlerts } from '../../providers/alerts'
+import { useAlerts } from '../../providers/alerts/AlertContext'
 import { useFeatureFlag } from '../../providers/use-feature-flag'
 import { useWorkflowStore } from '../../stores/useWorkflowStore'
 import { getErrorMessage } from '../../utils/apiErrors'

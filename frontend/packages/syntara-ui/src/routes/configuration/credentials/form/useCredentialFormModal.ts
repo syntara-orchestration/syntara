@@ -4,7 +4,7 @@ import { useWatch } from 'react-hook-form'
 
 import { credentialsClient } from '../../../../client'
 import { useSynForm } from '../../../../hooks/useSynForm'
-import { useAlerts } from '../../../../providers/alerts'
+import { useAlerts } from '../../../../providers/alerts/AlertContext'
 import { useSelectableProjects } from '../../../access/useAllProjects'
 import type { Credential } from '../credentialConstants'
 

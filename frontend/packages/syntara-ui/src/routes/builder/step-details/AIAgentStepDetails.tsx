@@ -1,7 +1,7 @@
 import type { Activity } from '@syntara/contracts'
 import type { ReactNode } from 'react'
 
-import { useAlerts } from '../../../providers/alerts'
+import { useAlerts } from '../../../providers/alerts/AlertContext'
 import { createAgenticActivity, useWorkflowStoreActions } from '../../../stores/useWorkflowStore'
 import { AIAgentStepForm } from '../step-forms/AIAgentStepForm'
 import type { AIAgentFormInitialData, AIAgentFormSubmitData } from '../step-forms/AIAgentStepForm'
