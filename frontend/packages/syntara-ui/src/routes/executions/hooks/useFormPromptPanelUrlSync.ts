@@ -1,9 +1,9 @@
 import type { FormsAPI } from '@syntara/contracts'
 import { useEffect, type RefObject } from 'react'
 
-import type { FormPromptUrlLookupState } from './useFetchFormPromptForUrlParam'
+import type { FormPromptSummary } from '../formPromptTypes'
 
-type FormPromptSummary = FormsAPI.components['schemas']['FormPromptSummary']
+import type { FormPromptUrlLookupState } from './useFetchFormPromptForUrlParam'
 
 type UseFormPromptPanelUrlSyncOptions = {
   executionId: string | undefined
@@ -82,7 +82,6 @@ export function useFormPromptPanelUrlSync({
                 name: urlFormPrompt.name ?? '',
                 status: urlFormPrompt.status ?? 'pending',
                 loop_iteration_path: urlFormPrompt.loop_iteration_path ?? [],
-                temporal_activity_id: '',
               },
             ],
             0

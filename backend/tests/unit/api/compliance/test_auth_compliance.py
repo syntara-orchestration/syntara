@@ -25,7 +25,12 @@ from fastapi import FastAPI
 
 from syntara.api.constants import API_V1_PATH_PREFIX
 from syntara.auth.dependencies import get_current_user, get_token_payload
-from syntara.authz.dependencies import PermissionChecker, ProjectScopeFilter, VisibilityFilter
+from syntara.authz.dependencies import (
+    PermissionChecker,
+    ProjectScopeFilter,
+    VisibilityFilter,
+    require_internal_service,
+)
 from syntara.authz.resource_actions import _get_dep_instance, _iter_route_deps
 from syntara.core.router_discovery import discover_and_register_routers, iter_api_routes
 
@@ -42,6 +47,9 @@ def _has_rbac(route: object) -> bool:
     for dep in _iter_route_deps(route):
         inner = _get_dep_instance(dep)
         if isinstance(inner, _RBAC_TYPES):
+            return True
+        # mTLS-only internal endpoints: stricter than RBAC (no user may call them).
+        if inner is require_internal_service:
             return True
     return False
 

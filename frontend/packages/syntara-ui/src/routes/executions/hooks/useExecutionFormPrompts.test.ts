@@ -306,7 +306,6 @@ describe('useExecutionFormPrompts', () => {
             project_id: 'p',
             name: 'A',
             status: 'pending',
-            temporal_activity_id: '',
           },
         ],
         0
@@ -340,7 +339,6 @@ describe('useExecutionFormPrompts', () => {
             project_id: 'proj-1',
             name: 'Form A',
             status: 'pending',
-            temporal_activity_id: '',
           },
         ],
         0

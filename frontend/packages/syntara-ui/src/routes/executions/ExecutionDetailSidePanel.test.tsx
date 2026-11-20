@@ -1,8 +1,9 @@
-import type { Approval, FormsAPI } from '@syntara/contracts'
+import type { Approval } from '@syntara/contracts'
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
 import { ExecutionDetailSidePanel } from './ExecutionDetailSidePanel'
+import type { FormPromptSummary } from './formPromptTypes'
 
 vi.mock('./FormPromptSidePanel', () => ({
   FormPromptSidePanel: ({ formPrompt }: { formPrompt: { id: string } }) => (
@@ -16,14 +17,13 @@ vi.mock('./ApprovalSidePanel', () => ({
   ),
 }))
 
-const mockFormPrompt: FormsAPI.components['schemas']['FormPromptSummary'] = {
+const mockFormPrompt: FormPromptSummary = {
   id: 'fp-1',
   execution_id: 'exec-1',
   project_id: 'proj-1',
   prompt_node_id: 'form_a',
   name: 'Form A',
   status: 'pending',
-  temporal_activity_id: 'act-1',
 }
 
 const mockApproval: Approval = {

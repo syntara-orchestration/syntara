@@ -2,8 +2,8 @@ import type { FormsAPI } from '@syntara/contracts'
 import { useCallback, useState } from 'react'
 
 import { formsFetchClient } from '../../../client'
+import type { FormPromptSummary } from '../formPromptTypes'
 
-type FormPromptSummary = FormsAPI.components['schemas']['FormPromptSummary']
 type FormPromptListRead = FormsAPI.components['schemas']['FormPromptListRead']
 type ListQuery = NonNullable<FormsAPI.operations['list_form_prompts']['parameters']['query']>
 
@@ -28,7 +28,6 @@ function toFormPromptSummary(item: FormPromptListRead): FormPromptSummary {
     prompt_node_id: item.prompt_node_id,
     name: item.name,
     status: item.status,
-    temporal_activity_id: '',
   }
 }
 

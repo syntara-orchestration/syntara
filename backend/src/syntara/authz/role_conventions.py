@@ -123,7 +123,6 @@ BUILTIN_POLICIES: list[PolicyInfo] = [
     PolicyInfo("approval", "create", roles=("admin",)),
     PolicyInfo("approval", "delete", roles=("admin",)),
     # form prompts
-    PolicyInfo("form_prompt", "create", roles=("admin",)),
     PolicyInfo("form_prompt", "read", roles=("admin", "auditor")),
     PolicyInfo("form_prompt", "submit", roles=("admin",)),
     # projects
