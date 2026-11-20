@@ -17,7 +17,7 @@
                 "required": ["type", "execution_target_id"],
                 "properties": {
                   "type": {"const": "execution_target"},
-                  "execution_target_id": {"type": "string", "format": "uuid"}
+                  "execution_target_id": {"type": "string", "format": "uuid", "description": "UUID of the EP target to select via its reserved identity label; the target must be eligible for scheduling."}
                 },
                 "additionalProperties": false
               }
