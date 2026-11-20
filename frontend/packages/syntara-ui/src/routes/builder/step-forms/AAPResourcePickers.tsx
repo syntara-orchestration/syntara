@@ -5,6 +5,7 @@ import { useFormContext, useWatch } from 'react-hook-form'
 import { SynFormField } from '../../../components/forms/SynFormField'
 import type { useAAPBrowser } from '../../../hooks/useAAPBrowser'
 import { isValidAAPTemplateURL } from '../../../utils/urlValidation'
+import { useIsVersionView } from '../VersionViewContext'
 
 import type { AAPJobTemplateFormData } from './aapJobTemplateSchema'
 import { getAAPSelectionStaleness } from './aapSelectionStaleness'
@@ -19,6 +20,7 @@ type AAPResourcePickersProps = {
 
 export function AAPResourcePickers({ browser }: AAPResourcePickersProps) {
   const { setValue, reset, getValues, control } = useFormContext<AAPJobTemplateFormData>()
+  const isVersionView = useIsVersionView()
 
   const {
     organizations,
@@ -80,18 +82,35 @@ export function AAPResourcePickers({ browser }: AAPResourcePickersProps) {
     selectedTemplateName: templateName || undefined,
   })
 
+  /**
+   * Clear a stale organization selection. Also resets the browser's internal
+   * scope so the template list stops filtering by the cleared organization
+   * and the template detail query stops tracking the cleared template id
+   * under the new credential.
+   */
+  const clearStaleOrganization = useCallback(() => {
+    setValue('organization_name', '')
+    setValue('job_template_name', '')
+    setValue('job_template_id', undefined)
+    selectOrganization('')
+    clearPromptOverrides()
+  }, [setValue, selectOrganization, clearPromptOverrides])
+
+  /** Clear a stale template selection and the browser's tracked template id. */
+  const clearStaleTemplate = useCallback(() => {
+    setValue('job_template_name', '')
+    setValue('job_template_id', undefined)
+    selectJobTemplate(undefined)
+    clearPromptOverrides()
+  }, [setValue, selectJobTemplate, clearPromptOverrides])
+
   useEffect(() => {
-    if (staleness.organization) {
-      setValue('organization_name', '')
-      setValue('job_template_name', '')
-      setValue('job_template_id', undefined)
-      clearPromptOverrides()
-    } else if (staleness.template) {
-      setValue('job_template_name', '')
-      setValue('job_template_id', undefined)
-      clearPromptOverrides()
-    }
-  }, [staleness.organization, staleness.template, setValue, clearPromptOverrides])
+    // The read-only version view displays the saved selections exactly as
+    // stored — never reconcile them against the live resource lists.
+    if (isVersionView) return
+    if (staleness.organization) clearStaleOrganization()
+    else if (staleness.template) clearStaleTemplate()
+  }, [staleness.organization, staleness.template, isVersionView, clearStaleOrganization, clearStaleTemplate])
 
   return (
     <>

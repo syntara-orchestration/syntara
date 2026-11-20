@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 
 import type { useAAPBrowser } from '../../../hooks/useAAPBrowser'
+import { VersionViewProvider } from '../VersionViewProvider'
 
 import type { AAPJobTemplateFormData } from './aapJobTemplateSchema'
 import { AAPResourcePickers } from './AAPResourcePickers'
@@ -444,6 +445,98 @@ describe('AAPResourcePickers', () => {
       )
 
       expect(await axe(container)).toHaveNoViolations()
+    })
+  })
+
+  describe('selection reconciliation', () => {
+    const savedSelection = {
+      organization_name: 'Org 1',
+      job_template_name: 'Template 1',
+      job_template_id: 1,
+    }
+
+    it('clears a stale organization and resets the browser selection scope', () => {
+      const selectOrganization = vi.fn()
+      const selectJobTemplate = vi.fn()
+      const freshLists = createMockBrowser({ selectOrganization, selectJobTemplate })
+      const staleLists = createMockBrowser({ organizations: [], selectOrganization, selectJobTemplate })
+
+      const view = render(
+        <TestWrapper defaultValues={savedSelection}>
+          <AAPResourcePickers browser={freshLists} />
+        </TestWrapper>
+      )
+      expect(screen.getByLabelText('Organization')).toHaveValue('Org 1')
+
+      // Lists reload under a credential that no longer offers the saved organization
+      view.rerender(
+        <TestWrapper defaultValues={savedSelection}>
+          <AAPResourcePickers browser={staleLists} />
+        </TestWrapper>
+      )
+
+      expect(screen.getByLabelText('Organization')).toHaveValue('')
+      expect(screen.getByLabelText('Job template')).toHaveValue('')
+      expect(selectOrganization).toHaveBeenCalledWith('')
+    })
+
+    it('clears a stale template and resets the browser template selection', () => {
+      const selectOrganization = vi.fn()
+      const selectJobTemplate = vi.fn()
+      const freshLists = createMockBrowser({ selectOrganization, selectJobTemplate })
+      const staleLists = createMockBrowser({
+        templates: [{ id: 2, name: 'Template 2', description: null }],
+        selectOrganization,
+        selectJobTemplate,
+      })
+
+      const view = render(
+        <TestWrapper defaultValues={savedSelection}>
+          <AAPResourcePickers browser={freshLists} />
+        </TestWrapper>
+      )
+      expect(screen.getByLabelText('Job template')).toHaveValue('Template 1')
+
+      // Lists reload under a credential that no longer offers the saved template
+      view.rerender(
+        <TestWrapper defaultValues={savedSelection}>
+          <AAPResourcePickers browser={staleLists} />
+        </TestWrapper>
+      )
+
+      expect(screen.getByLabelText('Organization')).toHaveValue('Org 1')
+      expect(screen.getByLabelText('Job template')).toHaveValue('')
+      expect(selectJobTemplate).toHaveBeenCalledWith(undefined)
+      expect(selectOrganization).not.toHaveBeenCalledWith('')
+    })
+
+    it('keeps saved selections in the read-only version view', () => {
+      const selectOrganization = vi.fn()
+      const selectJobTemplate = vi.fn()
+      const freshLists = createMockBrowser({ selectOrganization, selectJobTemplate })
+      const staleLists = createMockBrowser({ organizations: [], selectOrganization, selectJobTemplate })
+
+      const view = render(
+        <VersionViewProvider value={true}>
+          <TestWrapper defaultValues={savedSelection}>
+            <AAPResourcePickers browser={freshLists} />
+          </TestWrapper>
+        </VersionViewProvider>
+      )
+      expect(screen.getByLabelText('Organization')).toHaveValue('Org 1')
+
+      view.rerender(
+        <VersionViewProvider value={true}>
+          <TestWrapper defaultValues={savedSelection}>
+            <AAPResourcePickers browser={staleLists} />
+          </TestWrapper>
+        </VersionViewProvider>
+      )
+
+      expect(screen.getByLabelText('Organization')).toHaveValue('Org 1')
+      expect(screen.getByLabelText('Job template')).toHaveValue('Template 1')
+      expect(selectOrganization).not.toHaveBeenCalled()
+      expect(selectJobTemplate).not.toHaveBeenCalled()
     })
   })
 })
