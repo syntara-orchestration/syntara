@@ -351,12 +351,11 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin, Workflo
             copy.deepcopy({**output, "status": "completed"})
         )
         completed_node = graph.get_node(completed_node_id)
-        if completed_node.type == NodeType.APPROVAL:
-            history_activity_id = self._approval_activity_id(completed_node_id)
-            if history_activity_id != completed_node_id:
-                self.activity_output_history.setdefault(history_activity_id, []).append(
-                    copy.deepcopy({**output, "status": "completed"})
-                )
+        history_activity_id = self._history_activity_id(completed_node)
+        if history_activity_id is not None:
+            self.activity_output_history.setdefault(history_activity_id, []).append(
+                copy.deepcopy({**output, "status": "completed"})
+            )
         workflow.logger.info(f"Node {completed_node_id} completed, pending: {list(pending_tasks.keys())}")
         await self._schedule_successors(completed_node_id=completed_node_id, graph=graph, pending_tasks=pending_tasks)
         self._cancel_skipped_pending_tasks(pending_tasks)
@@ -441,6 +440,22 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin, Workflo
         namespace_entry["status"] = "failed"
         workflow.logger.error(f"Node {node_id} failed: {error_message}")
 
+    def _history_activity_id(self, node: ActivityNode) -> str | None:
+        """Return the extra history key for a node whose Temporal activity ID differs from its canvas ID.
+
+        Inside loops, approval and form_prompt activities run under loop-index
+        suffixed IDs (``{node_id}_iter_{n}``). The activity sync monitor queries
+        I/O by that Temporal ID, so history must also be recorded under it.
+        Returns None when the node has no distinct Temporal ID.
+        """
+        if node.type == NodeType.APPROVAL:
+            activity_id = self._approval_activity_id(node.id)
+        elif node.type == NodeType.FORM_PROMPT:
+            activity_id = self._form_prompt_activity_id(node.id)
+        else:
+            return None
+        return activity_id if activity_id != node.id else None
+
     def _record_failure_history(
         self,
         node_id: str,
@@ -457,8 +472,8 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin, Workflo
             history_activity_id = loop_control_activity_id(
                 node_id, current_index, self.loop_body_map, self.node_control_data
             )
-        elif failed_node.type == NodeType.APPROVAL:
-            history_activity_id = self._approval_activity_id(node_id)
+        else:
+            history_activity_id = self._history_activity_id(failed_node)
         if history_activity_id and history_activity_id != node_id:
             self.activity_output_history.setdefault(history_activity_id, []).append(copy.deepcopy(namespace_entry))
 
@@ -1602,12 +1617,9 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin, Workflo
         timeout_seconds = resolve_timeout(node, self._runtime_settings)
         self.node_inputs[node.id] = copy.deepcopy(resolved_parameters)
         self.activity_input_history.setdefault(node.id, []).append(copy.deepcopy(resolved_parameters))
-        if node.type == NodeType.APPROVAL:
-            history_activity_id = self._approval_activity_id(node.id)
-            if history_activity_id != node.id:
-                self.activity_input_history.setdefault(history_activity_id, []).append(
-                    copy.deepcopy(resolved_parameters)
-                )
+        history_activity_id = self._history_activity_id(node)
+        if history_activity_id is not None:
+            self.activity_input_history.setdefault(history_activity_id, []).append(copy.deepcopy(resolved_parameters))
 
         result = await self._dispatch_node(node, resolved_parameters, graph, timeout_seconds)
         return self._process_node_result(node, result)
