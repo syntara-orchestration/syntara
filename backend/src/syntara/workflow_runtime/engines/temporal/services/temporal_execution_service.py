@@ -27,6 +27,11 @@ from syntara.workflow_runtime.engines.temporal.dynamic_workflow import Orchestra
 logger = structlog.stdlib.get_logger(__name__)
 
 
+def _is_async_activity_already_closed(error: RPCError) -> bool:
+    message = str(error).lower()
+    return "not found" in message or "workflow execution already completed" in message
+
+
 class TemporalExecutionService:
     """Service for managing workflow executions."""
 
@@ -215,7 +220,7 @@ class TemporalExecutionService:
             logger.info("Workflow cancelled successfully", temporal_workflow_id=temporal_workflow_id)
 
         except RPCError as e:
-            if "not found" in str(e).lower():
+            if _is_async_activity_already_closed(e):
                 logger.info(
                     "Workflow already completed, cancel is a no-op",
                     temporal_workflow_id=temporal_workflow_id,
@@ -253,7 +258,7 @@ class TemporalExecutionService:
             )
 
         except RPCError as e:
-            if "not found" in str(e).lower():
+            if _is_async_activity_already_closed(e):
                 logger.warning(
                     "Async activity already completed or timed out (idempotent no-op)",
                     activity_id=activity_id,
@@ -296,7 +301,7 @@ class TemporalExecutionService:
             )
 
         except RPCError as e:
-            if "not found" in str(e).lower():
+            if _is_async_activity_already_closed(e):
                 logger.warning(
                     "Async activity already completed or timed out (idempotent no-op)",
                     activity_id=activity_id,
@@ -337,7 +342,7 @@ class TemporalExecutionService:
             )
 
         except RPCError as e:
-            if "not found" in str(e).lower():
+            if _is_async_activity_already_closed(e):
                 logger.warning(
                     "Async activity already closed; cancellation report is a no-op",
                     activity_id=activity_id,
