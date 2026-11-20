@@ -10,6 +10,7 @@ from execution_plane_client.models.execution_target import (
     ExecutionTargetHealthResult,
     ExecutionTargetUpdate,
 )
+from execution_plane_client.types import BackendType
 from fastapi import HTTPException, status
 from sqlmodel import SQLModel
 
@@ -73,7 +74,7 @@ async def create_target(client: ExecutionPlaneHttpClient, data: ExecutionTargetC
         resource_id=target_id,
         cluster_id=cluster.id,
         name=data.name,
-        backend_type="kubernetes",
+        backend_type=BackendType.KUBERNETES,
         endpoint=cluster.endpoint,
         credential_ref=UUID(int=0),  # Kubernetes execution uses the cluster's credential reference.
         placement=data.placement,

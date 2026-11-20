@@ -12,16 +12,14 @@ nodes:
     type: fork
 
   - id: bash_branch
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       code: |
         echo "Bash branch executed"
 
   - id: python_branch
-    type: script
+    type: script_python
     parameters:
-      language: python
       code: |
         print("Python branch executed")
 

@@ -23,9 +23,8 @@ nodes:
       indexVariable: idx
 
   - id: process_item
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       environment:
         INPUT_ITEM: ${loop.item}
         INPUT_INDEX: ${loop.index}
@@ -33,9 +32,8 @@ nodes:
         echo "Processing item #$INPUT_INDEX: $INPUT_ITEM"
 
   - id: summary
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       code: |
         echo "All items processed!"
 edges:

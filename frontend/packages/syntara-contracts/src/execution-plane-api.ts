@@ -133,13 +133,18 @@ export interface components {
     ExecutionTargetCreate: {
       /** Name */
       name: string
+      /** @description Namespace and pod scheduling rules for this target. Updates require namespace; omitted scheduling lists retain their stored values. The placement type cannot be changed. */
       placement: components['schemas']['KubernetesTargetPlacement']
-      /** Labels */
+      /**
+       * Labels
+       * @description User labels matched by work.execute selectors when routing workloads. Updates replace user labels; {} clears them. EP retains its reserved identity labels.
+       */
       labels?: {
         [key: string]: string
       }
       /**
        * Is Default
+       * @description Promote this target to the cluster default, replacing the previous default. The target and cluster must be active and enabled. To demote a default, promote another target rather than setting this field to false.
        * @default false
        */
       is_default?: boolean
@@ -156,6 +161,7 @@ export interface components {
       id: string
       /**
        * Accepted
+       * @description Confirms that EP accepted the deletion request, not that draining or physical removal has finished.
        * @default true
        * @constant
        */
@@ -166,12 +172,16 @@ export interface components {
      * @description Shallow view of an EP on-demand target health probe.
      */
     ExecutionTargetHealthResult: {
-      /** Healthy */
+      /**
+       * Healthy
+       * @description Whether the namespace probe succeeded. For Kubernetes this checks namespace readability, not workload execution. Check skipped first: a skipped probe also returns true.
+       */
       healthy: boolean
       /** Message */
       message?: string | null
       /**
        * Skipped
+       * @description True when no health check ran because the backend, endpoint, or cluster/target lifecycle is outside probe scope; healthy then does not establish readiness.
        * @default false
        */
       skipped?: boolean
@@ -253,15 +263,27 @@ export interface components {
     ExecutionTargetUpdate: {
       /** Name */
       name?: string
-      /** Placement */
+      /**
+       * Placement
+       * @description Namespace and pod scheduling rules for this target. Updates require namespace; omitted scheduling lists retain their stored values. The placement type cannot be changed.
+       */
       placement?: components['schemas']['KubernetesTargetPlacement']
-      /** Labels */
+      /**
+       * Labels
+       * @description User labels matched by work.execute selectors when routing workloads. Updates replace user labels; {} clears them. EP retains its reserved identity labels.
+       */
       labels?: {
         [key: string]: string
       }
-      /** Is Default */
+      /**
+       * Is Default
+       * @description Promote this target to the cluster default, replacing the previous default. The target and cluster must be active and enabled. To demote a default, promote another target rather than setting this field to false.
+       */
       is_default?: boolean
-      /** Enabled */
+      /**
+       * Enabled
+       * @description Whether the scheduler may assign new workloads to this target; disabling it does not request cancellation of work already assigned.
+       */
       enabled?: boolean
     }
     /**
@@ -274,7 +296,10 @@ export interface components {
        * Format: uuid
        */
       target_id: string
-      /** Active Workload Count */
+      /**
+       * Active Workload Count
+       * @description Number of assigned work items in claimed, dispatched, running, or reconciliation_required state. These states block safe deletion; pending and terminal items are excluded.
+       */
       active_workload_count: number
     }
     /** HTTPValidationError */
@@ -297,9 +322,15 @@ export interface components {
        * @description Kubernetes namespace reserved for execution workloads
        */
       namespace: string
-      /** Node Selectors */
+      /**
+       * Node Selectors
+       * @description Pod nodeSelector entries in key=value form. Nodes must match every entry; an empty list imposes no label restriction. On update, omission preserves the stored list and [] clears it.
+       */
       node_selectors?: string[]
-      /** Tolerations */
+      /**
+       * Tolerations
+       * @description Pod taints to tolerate, using key=value:effect (Equal) or key:effect (Exists). Effect may be NoSchedule, PreferNoSchedule, or NoExecute; omitting it matches all effects. An empty key with Exists matches all keys. On update, omission preserves the list and [] clears it.
+       */
       tolerations?: string[]
     }
     /**
@@ -313,11 +344,20 @@ export interface components {
        * @constant
        */
       type?: 'kubernetes'
-      /** Namespace */
+      /**
+       * Namespace
+       * @description Existing Kubernetes namespace in which EP creates workload pods and checks target health.
+       */
       namespace: string
-      /** Node Selectors */
+      /**
+       * Node Selectors
+       * @description Pod nodeSelector entries in key=value form. Nodes must match every entry; an empty list imposes no label restriction. On update, omission preserves the stored list and [] clears it.
+       */
       node_selectors?: string[]
-      /** Tolerations */
+      /**
+       * Tolerations
+       * @description Pod taints to tolerate, using key=value:effect (Equal) or key:effect (Exists). Effect may be NoSchedule, PreferNoSchedule, or NoExecute; omitting it matches all effects. An empty key with Exists matches all keys. On update, omission preserves the list and [] clears it.
+       */
       tolerations?: string[]
     }
     /**

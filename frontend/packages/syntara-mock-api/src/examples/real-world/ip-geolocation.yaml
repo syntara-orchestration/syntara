@@ -34,9 +34,8 @@ nodes:
 
   - id: generate_report
     name: Generate Location Report
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       environment:
         INPUT_IP: ${trigger.ip_address}
         INPUT_COUNTRY: ${fetch_location.body.country}

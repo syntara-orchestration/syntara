@@ -20,16 +20,14 @@ nodes:
 
   - id: matched
     name: Matched Action
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       code: echo "Case matched"
 
   - id: fallback
     name: Fallback Action
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       code: echo "Default path"
 
 edges:
