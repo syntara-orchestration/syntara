@@ -54,6 +54,7 @@ export {
   validateFormSubmission,
 } from './formSubmissionValidation'
 export { labelToValueName, slugifyLabelToValueNameBase } from './labelToValueName'
+export { formFieldValueNames, orderValuesByFieldOrder } from './orderFormValues'
 export { formDefinitionToJsonSchema, formDefinitionToJsonSchemaString } from './formDefinitionToJsonSchema'
 export {
   jsonSchemaStringToFormDefinition,

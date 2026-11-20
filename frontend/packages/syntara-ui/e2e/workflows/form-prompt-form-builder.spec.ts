@@ -29,7 +29,9 @@ import {
   setFormFieldValueName,
   workflowIdFromUrl,
 } from '../helpers/formFieldBuilder'
+import { openExecutionFormPromptDeepLink, formPromptRespondPanelRegion } from '../helpers/formPromptPanel'
 import { buildUniqueName, deleteWorkflow } from '../helpers/workflows'
+import { isRealBackendE2e } from '../playwrightWebServerEnv'
 
 const FORM_PROMPT_NODE_NAME = 'Intake Form'
 
@@ -145,7 +147,8 @@ test.describe('Form prompt — form field builder', { tag: '@pr-check' }, () => 
       await setFormFieldLabel(app, 3, 'Gamma')
       await setFormFieldLabel(app, 4, 'Delta')
 
-      await reorderFormField(app, 4, 1, { assertFirstLabel: 'Delta' })
+      const expectedFieldOrder = ['Delta', 'Alpha', 'Beta', 'Gamma']
+      await reorderFormField(app, 4, 1, { assertLabelsInOrder: expectedFieldOrder })
 
       await selectFormFieldType(app, 4, FORM_FIELD_TYPE_MENU_LABELS.checkbox)
       await expect(formFieldBuilderCard(app, 4).getByRole('textbox', { name: 'Checkbox label' })).toBeVisible()
@@ -156,7 +159,7 @@ test.describe('Form prompt — form field builder', { tag: '@pr-check' }, () => 
       await saveFormPromptNodeAndWorkflow(app)
       const workflowId = workflowIdFromUrl(app)
       const stored = await readFormPromptDefinitionFromApi(app, workflowId)
-      expect(stored.fields.map((field) => field.label)).toEqual(['Delta', 'Alpha', 'Beta', 'Gamma'])
+      expect(stored.fields.map((field) => field.label)).toEqual(expectedFieldOrder)
       expect(stored.fields.map((field) => field.type)).toEqual(['text', 'number', 'text', 'dropdown'])
     } finally {
       await deleteWorkflow(app, workflowName)
@@ -201,5 +204,25 @@ test.describe('Form prompt — form field builder', { tag: '@pr-check' }, () => 
     } finally {
       await deleteWorkflow(app, workflowName)
     }
+  })
+})
+
+test.describe('Submitted form response order', { tag: '@local-only' }, () => {
+  test('orders submitted fields in the run details and response panel', async ({ app }) => {
+    test.skip(isRealBackendE2e, 'The ordering execution is seeded by the mock API.')
+    await openExecutionFormPromptDeepLink(app, 'exec-form-prompt-order', 'fp-exec-form-prompt-order')
+
+    const responsePanel = formPromptRespondPanelRegion(app)
+    await expect(responsePanel.getByText('Submitted response')).toBeVisible()
+    const terms = await responsePanel.getByRole('term').allTextContents()
+    expect(terms.slice(-3)).toEqual(['deployment_name', 'environment', 'id'])
+
+    await app.getByRole('tab', { name: 'Details' }).click()
+    await expect(app.getByRole('tab', { name: 'Details', selected: true })).toBeVisible()
+    const activityList = app.getByRole('grid', { name: 'Activity list' })
+    await activityList.getByRole('row').filter({ hasText: 'Confirm deployment details' }).click()
+
+    const outputJson = app.getByRole('code').filter({ hasText: 'response_data' })
+    await expect(outputJson).toHaveText(/"deployment_name"[\s\S]*"environment"[\s\S]*"id"/)
   })
 })

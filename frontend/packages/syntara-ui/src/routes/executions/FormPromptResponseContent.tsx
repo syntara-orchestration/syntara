@@ -19,6 +19,7 @@ import { SynCodeBlock } from '../../components/details/SynCodeBlock'
 import { DisabledWithTooltip } from '../../components/DisabledWithTooltip'
 import { SynEmptyStateAccessDenied } from '../../components/states/SynEmptyStateAccessDenied'
 import { useQueryState } from '../../components/states/useQueryState'
+import { formFieldValueNames, orderValuesByFieldOrder } from '../../forms'
 import { formDefinitionHasUnresolvedDynamicOptions } from '../../forms/formPromptDynamicOptions'
 import { invalidateAuthzCaches } from '../../hooks/invalidateAuthzCaches'
 import { useMutationErrorHandler } from '../../hooks/useMutationErrorHandler'
@@ -65,10 +66,15 @@ function resolvePromptStepLabel(prompt: FormPromptRead, activityNameMap?: Map<st
   )
 }
 
-function SubmittedDataReadOnly({ data }: Readonly<{ data: Record<string, unknown> }>) {
+function SubmittedDataReadOnly({
+  data,
+  definition,
+}: Readonly<{ data: Record<string, unknown>; definition: FormPromptRead['form_definition'] }>) {
+  const orderedData = orderValuesByFieldOrder(data, formFieldValueNames(definition))
+
   return (
     <DescriptionList isCompact isHorizontal>
-      {Object.entries(data).map(([key, value]) => (
+      {Object.entries(orderedData).map(([key, value]) => (
         <DescriptionListGroup key={key}>
           <DescriptionListTerm>{key}</DescriptionListTerm>
           <DescriptionListDescription>
@@ -196,7 +202,7 @@ function FormPromptResponseBody({
                   <DescriptionListTerm>Submitted response</DescriptionListTerm>
                   <DescriptionListDescription>
                     {prompt.response_data && Object.keys(prompt.response_data).length > 0 ? (
-                      <SubmittedDataReadOnly data={prompt.response_data} />
+                      <SubmittedDataReadOnly data={prompt.response_data} definition={prompt.form_definition} />
                     ) : (
                       'No response data was recorded for this submission.'
                     )}

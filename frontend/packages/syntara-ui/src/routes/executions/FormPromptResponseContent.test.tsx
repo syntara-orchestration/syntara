@@ -1,4 +1,4 @@
-import type { FormsAPI } from '@syntara/contracts'
+import { FormFieldTypeEnum, type FormsAPI } from '@syntara/contracts'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -181,6 +181,34 @@ describe('FormPromptResponseContent', () => {
     expect(screen.getByText('Submitted response')).toBeInTheDocument()
     expect(screen.getByText('yes')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Send' })).not.toBeInTheDocument()
+  })
+
+  it('renders submitted response fields in form definition order', () => {
+    mockFormsUseQuery.mockReturnValue({
+      data: {
+        ...submittedPrompt,
+        form_definition: {
+          fields: [
+            { type: FormFieldTypeEnum.TEXT, value_name: 'deployment_name', label: 'Deployment' },
+            { type: FormFieldTypeEnum.TEXT, value_name: 'environment', label: 'Environment' },
+            { type: FormFieldTypeEnum.TEXT, value_name: 'id', label: 'ID' },
+          ],
+        },
+        response_data: { id: '42', environment: 'stage', deployment_name: 'blue' },
+      },
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    })
+
+    renderContent()
+
+    expect(screen.getAllByText(/^(deployment_name|environment|id)$/)).toEqual([
+      screen.getByText('deployment_name'),
+      screen.getByText('environment'),
+      screen.getByText('id'),
+    ])
   })
 
   it('shows access denied when user lacks read permission', () => {

@@ -330,7 +330,11 @@ export async function reorderFormField(
   page: Page,
   fromFieldNumber: number,
   toFieldNumber: number,
-  options?: { assertFirstLabel?: string; host?: FormFieldBuilderHost }
+  options?: {
+    assertFirstLabel?: string
+    assertLabelsInOrder?: readonly string[]
+    host?: FormFieldBuilderHost
+  }
 ) {
   const host = options?.host ?? 'form_prompt'
   await scrollFormFieldBuilderIntoView(page, host)
@@ -338,6 +342,25 @@ export async function reorderFormField(
   const reorderTimeout = process.env.CI ? 45_000 : 20_000
   await expect(async () => {
     const labels = await fieldLabelValuesInOrder(page, host)
+
+    if (options?.assertLabelsInOrder) {
+      const targetIndex = options.assertLabelsInOrder.findIndex((label, index) => labels[index] !== label)
+      if (targetIndex < 0) {
+        return
+      }
+
+      const expectedLabel = options.assertLabelsInOrder[targetIndex]
+      if (expectedLabel === undefined) {
+        throw new Error(`Expected field ${targetIndex + 1} is missing from the requested order`)
+      }
+      const currentIndex = labels.indexOf(expectedLabel) + 1
+      expect(currentIndex, `Expected field "${expectedLabel}" is not in the current form`).toBeGreaterThan(
+        targetIndex + 1
+      )
+      await moveFormFieldToFieldNumber(page, currentIndex, targetIndex + 1, host)
+      expect(await fieldLabelValuesInOrder(page, host)).toEqual(options.assertLabelsInOrder)
+      return
+    }
 
     if (options?.assertFirstLabel) {
       if (labels[0] === options.assertFirstLabel) {

@@ -10,6 +10,7 @@ type ActivityLike = {
   id?: string
   name?: string | null
   type?: string
+  parameters?: Record<string, unknown>
   branches?: (ActivityLike[] | ActivityLike | string)[]
   steps?: ActivityLike[]
   then?: ActivityLike[]
@@ -24,6 +25,7 @@ export type WorkflowDefShape = {
   workflow?: { activities?: ActivityLike[] }
   /** v2 format stores nodes at top level */
   nodes?: ActivityLike[]
+  triggers?: ActivityLike[]
   edges?: Array<WorkflowDefEdge | Record<string, unknown>>
 }
 

@@ -1,3 +1,4 @@
+import { ActivityTypeEnum, FormFieldTypeEnum, TriggerTypeEnum } from '@syntara/contracts'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -49,21 +50,33 @@ vi.mock('./views/InputSchemaPreview', () => ({
 }))
 
 vi.mock('./views/InputSchemaView', () => ({
-  InputSchemaView: ({ nodeId, searchTerm }: { nodeId: string; searchTerm: string }) => (
+  InputSchemaView: ({
+    data,
+    nodeId,
+    searchTerm,
+  }: {
+    data: Record<string, unknown>
+    nodeId: string
+    searchTerm: string
+  }) => (
     <div data-testid="input-schema-view">
-      Schema view for {nodeId} (search: {searchTerm || 'none'})
+      Schema view for {nodeId} (search: {searchTerm || 'none'}){JSON.stringify(data)}
     </div>
   ),
 }))
 
 vi.mock('./views/InputTableView', () => ({
-  InputTableView: ({ searchTerm }: { searchTerm: string }) => (
-    <div data-testid="input-table-view">Table view (search: {searchTerm || 'none'})</div>
+  InputTableView: ({ data, searchTerm }: { data: Record<string, unknown>; searchTerm: string }) => (
+    <div data-testid="input-table-view">
+      Table view (search: {searchTerm || 'none'}) {JSON.stringify(data)}
+    </div>
   ),
 }))
 
 vi.mock('./views/InputJsonView', () => ({
-  InputJsonView: () => <div data-testid="input-json-view">JSON view</div>,
+  InputJsonView: ({ data }: { data: Record<string, unknown> }) => (
+    <div data-testid="input-json-view">JSON view {JSON.stringify(data)}</div>
+  ),
 }))
 
 vi.mock('./utils/triggerSchemaUtils', () => ({
@@ -250,7 +263,7 @@ describe('InputStepContent', () => {
       )
 
       expect(screen.getByTestId('input-json-view')).toBeInTheDocument()
-      expect(screen.getByText('JSON view')).toBeInTheDocument()
+      expect(screen.getByTestId('input-json-view')).toHaveTextContent(/^JSON view/)
     })
   })
 
@@ -332,6 +345,75 @@ describe('InputStepContent', () => {
     })
   })
 
+  it('orders an upstream form prompt response using its configured fields', () => {
+    const form_definition = {
+      fields: [
+        { type: FormFieldTypeEnum.TEXT, value_name: 'deployment_name', label: 'Deployment' },
+        { type: FormFieldTypeEnum.TEXT, value_name: 'environment', label: 'Environment' },
+        { type: FormFieldTypeEnum.TEXT, value_name: 'id', label: 'ID' },
+      ],
+    }
+
+    render(
+      <InputStepContent
+        upstreamNode={{
+          id: 'prompt-1',
+          name: 'Ask',
+          type: ActivityTypeEnum.FORM_PROMPT,
+          parameters: { form_definition },
+        }}
+        hasData
+        mergedExecutionData={{
+          'prompt-1': {
+            status: 'submitted',
+            response_data: { id: '42', environment: 'stage', deployment_name: 'blue' },
+          },
+        }}
+        triggers={undefined}
+        activeView="json"
+        searchTerm=""
+      />
+    )
+
+    expect(screen.getByTestId('input-json-view')).toHaveTextContent(
+      '{"status":"submitted","response_data":{"deployment_name":"blue","environment":"stage","id":"42"}}'
+    )
+  })
+
+  it('orders an upstream form trigger response_data', () => {
+    const form_definition = {
+      fields: [
+        { type: FormFieldTypeEnum.TEXT, value_name: 'deployment_name', label: 'Deployment' },
+        { type: FormFieldTypeEnum.TEXT, value_name: 'environment', label: 'Environment' },
+        { type: FormFieldTypeEnum.TEXT, value_name: 'id', label: 'ID' },
+      ],
+    }
+
+    render(
+      <InputStepContent
+        upstreamNode={{
+          id: 'form-trigger-id',
+          name: 'Launch',
+          type: TriggerTypeEnum.FORM_TRIGGER,
+          parameters: { form_definition },
+        }}
+        hasData
+        mergedExecutionData={{
+          'form-trigger-id': {
+            response_data: { id: '42', environment: 'stage', deployment_name: 'blue' },
+          },
+        }}
+        triggers={undefined}
+        activeView="json"
+        searchTerm=""
+      />
+    )
+
+    expect(screen.getByTestId('input-json-view')).toHaveTextContent(
+      '{"response_data":{"deployment_name":"blue","environment":"stage","id":"42"}}'
+    )
+  })
+
   describe('expressionNodeId computation', () => {
     it.each(['manual_trigger', 'form_trigger', 'scheduled_trigger', 'event', 'webhook_trigger', 'eda_trigger'])(
       'sets expressionNodeId to "trigger" for %s type',
@@ -347,7 +429,7 @@ describe('InputStepContent', () => {
           />
         )
 
-        expect(screen.getByText('Schema view for trigger (search: none)')).toBeInTheDocument()
+        expect(screen.getByTestId('input-schema-view')).toHaveTextContent(/^Schema view for trigger \(search: none\)/)
       }
     )
 
