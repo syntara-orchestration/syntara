@@ -1256,3 +1256,291 @@ class TestWebhookServiceAccountSchemaFindings:
         sa_errors = [f for f in result.findings if f.field_path == "parameters.authorized_service_account_ids"]
         assert len(sa_errors) == 1
         assert sa_errors[0].node_id == "eda_trigger_1"
+
+
+class TestSubWorkflowOutputMappingValidation:
+    """SubWorkflow Trigger output_mapping must reference existing steps."""
+
+    def test_valid_output_mapping(self, validator: WorkflowValidator) -> None:
+        """Valid output_mapping references existing step."""
+        definition: dict[str, Any] = {
+            "schema_version": "2.0.0",
+            "name": "test-subworkflow",
+            "triggers": [
+                {
+                    "id": "subworkflow_trigger",
+                    "type": "subworkflow_trigger",
+                    "parameters": {
+                        "output_schema": {
+                            "type": "object",
+                            "properties": {
+                                "artifact_url": {"type": "string"},
+                            },
+                        },
+                        "output_mapping": {
+                            "artifact_url": "${deploy.stdout}",
+                        },
+                    },
+                }
+            ],
+            "nodes": [
+                {"id": "deploy", "type": "script", "parameters": {"language": "python", "code": "print('deploy')"}}
+            ],
+            "edges": [{"from": "subworkflow_trigger", "to": "deploy"}],
+        }
+        validator.validate_workflow_definition(definition)
+
+    def test_output_mapping_rejects_step_unreachable_from_selected_trigger(self, validator: WorkflowValidator) -> None:
+        definition: dict[str, Any] = {
+            "schema_version": "2.0.0",
+            "name": "trigger-scoped-output-mapping",
+            "triggers": [
+                {
+                    "id": "deploy_trigger",
+                    "type": "subworkflow_trigger",
+                    "parameters": {
+                        "output_schema": {"type": "object", "properties": {"url": {"type": "string"}}},
+                        "output_mapping": {"url": "${deploy.stdout}"},
+                    },
+                },
+                {"id": "audit_trigger", "type": "subworkflow_trigger", "parameters": {}},
+            ],
+            "nodes": [
+                {"id": "deploy", "type": "script", "parameters": {"language": "python", "code": "print(1)"}},
+                {"id": "audit", "type": "script", "parameters": {"language": "python", "code": "print(2)"}},
+            ],
+            "edges": [
+                {"from": "deploy_trigger", "to": "audit"},
+                {"from": "audit_trigger", "to": "deploy"},
+            ],
+        }
+
+        with pytest.raises(SafeValueError, match="not reachable from Subworkflow Trigger 'deploy_trigger'"):
+            validator.validate_workflow_definition(definition)
+
+    def test_output_mapping_rejects_overlapping_parent_and_child_paths(self, validator: WorkflowValidator) -> None:
+        definition: dict[str, Any] = {
+            "schema_version": "2.0.0",
+            "name": "overlapping-output-mapping",
+            "triggers": [
+                {
+                    "id": "child_trigger",
+                    "type": "subworkflow_trigger",
+                    "parameters": {
+                        "output_schema": {
+                            "type": "object",
+                            "properties": {
+                                "release": {
+                                    "type": "object",
+                                    "properties": {"url": {"type": "string"}},
+                                }
+                            },
+                        },
+                        "output_mapping": {
+                            "release": "${deploy.stdout_json}",
+                            "release.url": "${deploy.stdout}",
+                        },
+                    },
+                }
+            ],
+            "nodes": [{"id": "deploy", "type": "script", "parameters": {"language": "python", "code": "print(1)"}}],
+            "edges": [{"from": "child_trigger", "to": "deploy"}],
+        }
+
+        with pytest.raises(SafeValueError, match=r"Output mappings 'release' and 'release\.url' overlap"):
+            validator.validate_workflow_definition(definition)
+
+    def test_output_schema_rejects_property_names_containing_dots(self, validator: WorkflowValidator) -> None:
+        definition: dict[str, Any] = {
+            "schema_version": "2.0.0",
+            "name": "dotted-output-property",
+            "triggers": [
+                {
+                    "id": "child_trigger",
+                    "type": "subworkflow_trigger",
+                    "parameters": {
+                        "output_schema": {
+                            "type": "object",
+                            "properties": {"release.tag": {"type": "string"}},
+                        },
+                        "output_mapping": {"release.tag": "${deploy.stdout}"},
+                    },
+                }
+            ],
+            "nodes": [{"id": "deploy", "type": "script", "parameters": {"language": "python", "code": "print(1)"}}],
+            "edges": [{"from": "child_trigger", "to": "deploy"}],
+        }
+
+        with pytest.raises(SafeValueError, match="contains a dot, which is reserved for nested output paths"):
+            validator.validate_workflow_definition(definition)
+
+    def test_output_mapping_references_unknown_step(self, validator: WorkflowValidator) -> None:
+        """output_mapping referencing unknown step raises error."""
+        definition: dict[str, Any] = {
+            "schema_version": "2.0.0",
+            "name": "test-subworkflow",
+            "triggers": [
+                {
+                    "id": "subworkflow_trigger",
+                    "type": "subworkflow_trigger",
+                    "parameters": {
+                        "output_schema": {
+                            "type": "object",
+                            "properties": {
+                                "artifact_url": {"type": "string"},
+                            },
+                        },
+                        "output_mapping": {
+                            "artifact_url": "${unknown_step.url}",
+                        },
+                    },
+                }
+            ],
+            "nodes": [
+                {"id": "deploy", "type": "script", "parameters": {"language": "python", "code": "print('deploy')"}}
+            ],
+            "edges": [{"from": "subworkflow_trigger", "to": "deploy"}],
+        }
+        # Template expression validator catches this first
+        with pytest.raises(SafeValueError, match="references unknown activity or scope 'unknown_step'"):
+            validator.validate_workflow_definition(definition)
+
+    def test_required_output_must_have_mapping(self, validator: WorkflowValidator) -> None:
+        definition = {
+            "schema_version": "2.0.0",
+            "name": "required-output",
+            "triggers": [
+                {
+                    "id": "child_trigger",
+                    "type": "subworkflow_trigger",
+                    "parameters": {
+                        "output_schema": {
+                            "type": "object",
+                            "properties": {"release_tag": {"type": "string"}},
+                            "required": ["release_tag"],
+                        },
+                    },
+                }
+            ],
+            "nodes": [{"id": "build", "type": "script", "parameters": {"language": "python", "code": "print(1)"}}],
+            "edges": [{"from": "child_trigger", "to": "build"}],
+        }
+
+        with pytest.raises(SafeValueError, match="Required output 'release_tag' has no output mapping"):
+            validator.validate_workflow_definition(definition)
+
+    def test_mapping_key_must_be_declared(self, validator: WorkflowValidator) -> None:
+        definition = {
+            "schema_version": "2.0.0",
+            "name": "unknown-output",
+            "triggers": [
+                {
+                    "id": "child_trigger",
+                    "type": "subworkflow_trigger",
+                    "parameters": {
+                        "output_schema": {"type": "object", "properties": {"release_tag": {"type": "string"}}},
+                        "output_mapping": {"internal_name": "${build.stdout}"},
+                    },
+                }
+            ],
+            "nodes": [{"id": "build", "type": "script", "parameters": {"language": "python", "code": "print(1)"}}],
+            "edges": [{"from": "child_trigger", "to": "build"}],
+        }
+
+        with pytest.raises(SafeValueError, match="not declared in output_schema"):
+            validator.validate_workflow_definition(definition)
+
+    def test_output_mapping_multiple_fields_one_invalid(self, validator: WorkflowValidator) -> None:
+        """output_mapping with one invalid reference raises error."""
+        definition: dict[str, Any] = {
+            "schema_version": "2.0.0",
+            "name": "test-subworkflow",
+            "triggers": [
+                {
+                    "id": "subworkflow_trigger",
+                    "type": "subworkflow_trigger",
+                    "parameters": {
+                        "output_schema": {
+                            "type": "object",
+                            "properties": {
+                                "artifact_url": {"type": "string"},
+                                "build_id": {"type": "string"},
+                            },
+                        },
+                        "output_mapping": {
+                            "artifact_url": "${deploy.stdout}",  # Valid
+                            "build_id": "${nonexistent.id}",  # Invalid
+                        },
+                    },
+                }
+            ],
+            "nodes": [
+                {"id": "deploy", "type": "script", "parameters": {"language": "python", "code": "print('deploy')"}}
+            ],
+            "edges": [{"from": "subworkflow_trigger", "to": "deploy"}],
+        }
+        # Template expression validator catches this first
+        with pytest.raises(SafeValueError, match="references unknown activity or scope 'nonexistent'"):
+            validator.validate_workflow_definition(definition)
+
+    def test_output_mapping_rejects_removed_step_output(self, validator: WorkflowValidator) -> None:
+        definition: dict[str, Any] = {
+            "schema_version": "2.0.0",
+            "name": "missing-source-output",
+            "triggers": [
+                {
+                    "id": "child_trigger",
+                    "type": "subworkflow_trigger",
+                    "parameters": {
+                        "output_schema": {"type": "object", "properties": {"url": {"type": "string"}}},
+                        "output_mapping": {"url": "${build.url}"},
+                    },
+                }
+            ],
+            "nodes": [{"id": "build", "type": "script", "parameters": {"language": "python", "code": "print(1)"}}],
+            "edges": [{"from": "child_trigger", "to": "build"}],
+        }
+
+        with pytest.raises(SafeValueError, match="references unavailable child output 'url'"):
+            validator.validate_workflow_definition(definition)
+
+    def test_output_mapping_rejects_incompatible_static_types(self, validator: WorkflowValidator) -> None:
+        definition: dict[str, Any] = {
+            "schema_version": "2.0.0",
+            "name": "incompatible-source-type",
+            "triggers": [
+                {
+                    "id": "child_trigger",
+                    "type": "subworkflow_trigger",
+                    "parameters": {
+                        "output_schema": {"type": "object", "properties": {"release_code": {"type": "string"}}},
+                        "output_mapping": {"release_code": "${build.return_code}"},
+                    },
+                }
+            ],
+            "nodes": [{"id": "build", "type": "script", "parameters": {"language": "python", "code": "print(1)"}}],
+            "edges": [{"from": "child_trigger", "to": "build"}],
+        }
+
+        with pytest.raises(SafeValueError, match=r"source type 'integer'.*declared output type is 'string'"):
+            validator.validate_workflow_definition(definition)
+
+    def test_output_mapping_allows_dynamic_step_output_fields(self, validator: WorkflowValidator) -> None:
+        definition: dict[str, Any] = {
+            "schema_version": "2.0.0",
+            "name": "dynamic-source-output",
+            "triggers": [
+                {
+                    "id": "child_trigger",
+                    "type": "subworkflow_trigger",
+                    "parameters": {
+                        "output_schema": {"type": "object", "properties": {"release_tag": {"type": "string"}}},
+                        "output_mapping": {"release_tag": "${build.stdout_json.tag}"},
+                    },
+                }
+            ],
+            "nodes": [{"id": "build", "type": "script", "parameters": {"language": "python", "code": "print(1)"}}],
+            "edges": [{"from": "child_trigger", "to": "build"}],
+        }
+
+        validator.validate_workflow_definition(definition)

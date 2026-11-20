@@ -9,6 +9,7 @@ import { useBuilderVersionHistory } from './useBuilderVersionHistory'
 const mockLoadWorkflowWithEdges = vi.fn()
 const mockRestoreMutate = vi.fn()
 const mockRefetch = vi.fn().mockResolvedValue({})
+const mockViewedVersionQuery = vi.hoisted(() => ({ value: null as Record<string, unknown> | null }))
 
 const mockVersions = [
   { version: 2, status: 'draft', workflow_definition: { name: 'v2' } },
@@ -47,20 +48,7 @@ vi.mock('./useVersionHistory', () => ({
 vi.mock('../../../client', () => ({
   workflowClient: {
     useQuery: vi.fn((_method: string, _path: string, _params: unknown, opts: { enabled: boolean }) => ({
-      data: opts.enabled
-        ? {
-            created_at: '2026-05-19T14:30:00.000Z',
-            change_description: 'Bug fix',
-            name: 'Release 1.0',
-            workflow_definition: {
-              schema_version: '2.0.0',
-              name: 'test',
-              triggers: [],
-              nodes: [],
-              edges: [],
-            },
-          }
-        : undefined,
+      data: opts.enabled ? mockViewedVersionQuery.value : undefined,
     })),
   },
   authMiddleware: { onRequest: vi.fn() },
@@ -112,6 +100,18 @@ describe('useBuilderVersionHistory', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    mockViewedVersionQuery.value = {
+      created_at: '2026-05-19T14:30:00.000Z',
+      change_description: 'Bug fix',
+      name: 'Release 1.0',
+      workflow_definition: {
+        schema_version: '2.0.0',
+        name: 'test',
+        triggers: [],
+        nodes: [],
+        edges: [],
+      },
+    }
     queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   })
 
@@ -196,6 +196,27 @@ describe('useBuilderVersionHistory', () => {
     })
 
     expect(mockLoadWorkflowWithEdges).toHaveBeenCalled()
+  })
+
+  it('does not replace the workflow when the viewed version has no definition', () => {
+    mockViewedVersionQuery.value = { created_at: '2026-05-19T14:30:00.000Z' }
+    const params = createDefaultParams()
+    params.viewingVersion = 2
+
+    renderHook(() => useBuilderVersionHistory(params), { wrapper: makeWrapper(queryClient) })
+
+    expect(mockLoadWorkflowWithEdges).not.toHaveBeenCalled()
+  })
+
+  it('dispatches expandAll after loading a viewed version when a listener is present', () => {
+    const expandAllEvent = new EventTarget()
+    const dispatchSpy = vi.spyOn(expandAllEvent, 'dispatchEvent')
+    const params = { ...createDefaultParams(), viewingVersion: 2, expandAllEvent }
+
+    renderHook(() => useBuilderVersionHistory(params), { wrapper: makeWrapper(queryClient) })
+
+    expect(mockLoadWorkflowWithEdges).toHaveBeenCalled()
+    expect(dispatchSpy).toHaveBeenCalledWith(expect.objectContaining({ type: 'expandAll' }))
   })
 
   describe('handleExitVersionView', () => {

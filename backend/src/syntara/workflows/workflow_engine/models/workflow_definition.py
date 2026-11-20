@@ -8,12 +8,23 @@ import json
 import re
 import uuid
 from enum import Enum, IntEnum, StrEnum
-from typing import Any, ClassVar, Literal
+from typing import Annotated, Any, ClassVar, Literal
 from urllib.parse import urlparse
 from zoneinfo import available_timezones
 
 import structlog
-from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    StrictBool,
+    StrictFloat,
+    StrictInt,
+    StrictStr,
+    ValidationInfo,
+    field_validator,
+    model_validator,
+)
 from pydantic.functional_validators import ModelWrapValidatorHandler
 
 from syntara.aap.models.responses import AAPJobType as AAPJobType  # noqa: PLC0414
@@ -25,6 +36,11 @@ from syntara.workflows.utils.output_mapping import apply_output_mapping
 from syntara.workflows.workflow_engine.models.aap_types import AAPResourceType
 
 logger = structlog.stdlib.get_logger(__name__)
+
+type JSONFloat = Annotated[StrictFloat, Field(allow_inf_nan=False)]
+type JSONList = Annotated[list[JSONValue], Field(strict=True)]
+type JSONObject = Annotated[dict[StrictStr, JSONValue], Field(strict=True)]
+type JSONValue = StrictBool | StrictInt | JSONFloat | StrictStr | JSONList | JSONObject | None
 
 # Template expression pattern - matches ${...} expressions
 TEMPLATE_PATTERN = re.compile(r"\$\{[^}]+\}")
@@ -788,8 +804,9 @@ class SubWorkflowExecutorParameters(BaseModel):
     """Parameters for Sub-workflow executor.
 
     Defines the design-time configuration for invoking a child workflow from
-    a parent workflow. The Sub-workflow step always invokes the latest published
-    version of the selected target workflow in the same Project (V1).
+    a parent workflow. Each new invocation resolves the latest published child
+    version. The child execution record pins that version for the run so retries
+    keep using the same workflow definition.
 
     When a workflow has multiple Subworkflow Triggers, the calling step must
     select a specific trigger to invoke via the trigger_node_id field.
@@ -808,7 +825,7 @@ class SubWorkflowExecutorParameters(BaseModel):
     workflow_id: str = Field(
         max_length=36,
         json_schema_extra={"format": "uuid"},
-        description="UUID of the selected child workflow in the same Project (latest published version).",
+        description="UUID of the selected child workflow in the same Project (latest published version per run).",
     )
     trigger_node_id: str = Field(
         pattern=r"^[a-zA-Z_][a-zA-Z0-9_]*$",
@@ -825,20 +842,26 @@ class SubWorkflowExecutorParameters(BaseModel):
         ),
     )
 
+    @staticmethod
+    def parse_workflow_id(v: str) -> uuid.UUID:
+        """Parse a canonical workflow UUID, rejecting template expressions."""
+        msg = (
+            f"Invalid UUID format for workflow_id: '{v}'. Must be a canonical UUID; "
+            "template expressions are not supported for V1 sub-workflow references."
+        )
+        try:
+            parsed_uuid = uuid.UUID(v)
+        except ValueError as exc:
+            raise SafeValueError(msg) from exc
+        if str(parsed_uuid) != v.lower():
+            raise SafeValueError(msg)
+        return parsed_uuid
+
     @field_validator("workflow_id")
     @classmethod
     def validate_workflow_id_format(cls, v: str) -> str:
         """Validate that workflow_id is a selected workflow UUID, never an expression."""
-        try:
-            parsed_uuid = uuid.UUID(v)
-        except ValueError:
-            parsed_uuid = None
-        if parsed_uuid is None or str(parsed_uuid) != v.lower():
-            msg = (
-                f"Invalid UUID format for workflow_id: '{v}'. Must be a canonical UUID; "
-                "template expressions are not supported for V1 sub-workflow references."
-            )
-            raise SafeValueError(msg)
+        cls.parse_workflow_id(v)
         return v
 
 
@@ -1084,31 +1107,16 @@ class WaitOutput(NodeOutput):
     """Output model for wait control nodes."""
 
 
-class StandardOutputWrapper(BaseModel):
-    """Standard output wrapper for Step SDK.
+class SubWorkflowOutput(NodeOutput):
+    """Public output model for Sub-workflow steps.
 
-    All steps in the Step SDK must return this envelope structure with:
-    - Result: Primary task return payload (type varies by step)
-    - StatusCode: Integer 0-255 (0=success, non-zero=failure per POSIX convention)
-    - StatusMessage: Human-readable summary (max 500 chars)
-    - ErrorMessage: Detailed error diagnostics (max 10k chars)
+    The step-specific result is independent of the SDK/Execution Plane output
+    wrapper. ``outputs`` contains only values declared by the selected
+    Subworkflow Trigger; internal child step names are never exposed.
 
-    This is a forward-compatible structure defined for sub-workflow outputs.
-    Existing NodeOutput models use flat structure but will eventually migrate
-    to this pattern when the Step SDK is fully implemented.
-    """
-
-    Result: Any = None  # Type varies by step - validated by step-specific models
-    StatusCode: int | None = None
-    StatusMessage: str | None = Field(default=None, max_length=500)
-    ErrorMessage: str | None = Field(default=None, max_length=10000)
-
-
-class SubWorkflowOutputResult(BaseModel):
-    """Result payload for Sub-workflow steps containing child execution metadata.
-
-    This is the Result field of the StandardOutputWrapper structure.
-    Contains aggregate child execution metadata and nested child step outputs.
+    Parent expressions address the declared public outputs directly:
+    ${sub_workflow_step.outputs.artifact_url}
+    ${sub_workflow_step.outputs.release.url}
     """
 
     child_execution_id: str | None = None
@@ -1116,26 +1124,12 @@ class SubWorkflowOutputResult(BaseModel):
     child_workflow_name: str | None = Field(default=None, max_length=255)
     child_workflow_version: int | None = None
     child_status: WorkflowTerminalStatus | None = None
-    outputs: dict[str, StandardOutputWrapper] | None = Field(default=None, max_length=1000)
-
-
-class SubWorkflowOutput(StandardOutputWrapper, NodeOutput):
-    """Output model for Sub-workflow steps (reference mode).
-
-    Inherits from StandardOutputWrapper to ensure field consistency (StatusCode,
-    StatusMessage, ErrorMessage) and from NodeOutput to provide the dump() method
-    for output mapping.
-
-    This model adopts the StandardOutputWrapper pattern proactively, even though
-    existing NodeOutput models use flat structure, to align with the Step SDK
-    specification and avoid future breaking changes.
-
-    The outputs field (nested in Result) is a dict where keys are child step IDs
-    and values are their StandardOutputWrapper outputs. This allows dotted-path
-    template expressions like: ${sub_workflow_step.Result.outputs.child_step_id.field}
-    """
-
-    Result: SubWorkflowOutputResult | None = None  # Override to specify concrete Result type
+    outputs: dict[StrictStr, JSONValue] | None = Field(
+        default=None,
+        max_length=1000,
+        strict=True,
+        description="Values mapped to the child workflow's declared public output contract.",
+    )
 
 
 NODE_OUTPUT_MODELS: dict[str, type[NodeOutput]] = {

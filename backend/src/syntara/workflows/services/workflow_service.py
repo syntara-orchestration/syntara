@@ -7,6 +7,7 @@ HTTP/API concerns in the FastAPI endpoints.
 import asyncio
 import threading
 from collections.abc import Iterable
+from copy import deepcopy
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 from uuid import UUID, uuid4
@@ -58,6 +59,7 @@ from syntara.workflows.models import (
     WorkflowInvocationTriggerSchema,
     WorkflowListResponse,
     WorkflowRead,
+    WorkflowReferenceRead,
     WorkflowVersion,
 )
 from syntara.workflows.models.execution import TERMINAL_EXECUTION_STATUSES, Execution
@@ -1049,17 +1051,74 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
 
         return workflow, current_version
 
-    async def get_workflow_invocation_schema(self, workflow: Workflow) -> WorkflowInvocationSchemaRead:
-        """Return eligible trigger schemas from a workflow's published version."""
-        if workflow.published_version_id is None:
-            raise WorkflowNotPublishedError(workflow.id)
+    async def get_published_parent_references(
+        self,
+        child_workflow_id: UUID,
+        project_id: UUID,
+        allowed_projects: AllowedProjectsResult,
+        changed_trigger_ids: set[str],
+    ) -> list[WorkflowReferenceRead]:
+        """Return visible, published parent steps referencing changed child triggers."""
+        if not allowed_projects.all_projects and project_id not in allowed_projects.project_ids:
+            return []
 
-        published_version = await self.session.get(WorkflowVersion, workflow.published_version_id)
-        if published_version is None:
-            raise WorkflowVersionNotFoundError(workflow.id, workflow.current_version)
+        result = await self.session.exec(
+            select(Workflow, WorkflowVersion)
+            .join(WorkflowVersion, col(WorkflowVersion.id) == col(Workflow.published_version_id))
+            .where(
+                col(Workflow.project_id) == project_id,
+                col(Workflow.id) != child_workflow_id,
+                col(Workflow.is_enabled).is_(True),
+            )
+        )
+        parent_versions = result.all()
+        matching_references: list[tuple[Workflow, WorkflowVersion, str, str | None]] = []
+
+        for parent, parent_version in parent_versions:
+            definition = parent_version.workflow_definition
+            nodes = definition.get("nodes", []) if isinstance(definition, dict) else []
+            if not isinstance(nodes, list):
+                continue
+            for node in nodes:
+                if not isinstance(node, dict) or node.get("type") != NodeType.SUB_WORKFLOW.value:
+                    continue
+                parameters = node.get("parameters")
+                if not isinstance(parameters, dict) or parameters.get("workflow_id") != str(child_workflow_id):
+                    continue
+                selected_trigger_id = parameters.get("trigger_node_id")
+                if isinstance(selected_trigger_id, str) and selected_trigger_id not in changed_trigger_ids:
+                    continue
+                matching_references.append(
+                    (
+                        parent,
+                        parent_version,
+                        str(node.get("id", "")),
+                        node.get("name") if isinstance(node.get("name"), str) else None,
+                    )
+                )
+
+        return [
+            WorkflowReferenceRead(
+                workflow_id=parent.id,
+                workflow_name=parent.name,
+                workflow_version=parent_version.version,
+                step_id=step_id,
+                step_name=step_name,
+            )
+            for parent, parent_version, step_id, step_name in matching_references
+        ]
+
+    async def get_workflow_invocation_schema(self, workflow: Workflow) -> WorkflowInvocationSchemaRead:
+        """Return trigger schemas from the latest published version."""
+        published_version_id = workflow.published_version_id
+        if published_version_id is None:
+            raise WorkflowNotPublishedError(workflow.id)
+        selected_version = await self.session.get(WorkflowVersion, published_version_id)
+        if selected_version is None:
+            raise WorkflowVersionNotFoundError(workflow.id, published_version_id)
 
         invocation_triggers: list[WorkflowInvocationTriggerSchema] = []
-        trigger_definitions = published_version.workflow_definition.get("triggers", [])
+        trigger_definitions = selected_version.workflow_definition.get("triggers", [])
         if isinstance(trigger_definitions, list):
             for trigger in trigger_definitions:
                 if not isinstance(trigger, dict) or trigger.get("type") != NodeType.SUBWORKFLOW_TRIGGER:
@@ -1069,20 +1128,22 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
                     continue
                 parameters = trigger.get("parameters")
                 input_schema = parameters.get("input_schema") if isinstance(parameters, dict) else None
+                output_schema = parameters.get("output_schema") if isinstance(parameters, dict) else None
                 invocation_triggers.append(
                     WorkflowInvocationTriggerSchema(
                         trigger_node_id=trigger_node_id,
                         name=trigger.get("name") if isinstance(trigger.get("name"), str) else None,
                         input_schema=input_schema if isinstance(input_schema, dict) else {},
+                        output_schema=output_schema if isinstance(output_schema, dict) else None,
                     )
                 )
 
         return WorkflowInvocationSchemaRead(
             workflow_id=workflow.id,
-            published_version_id=published_version.id,
-            published_version=published_version.version,
-            published_version_name=published_version.name,
-            published_version_created_at=published_version.created_at,
+            published_version_id=selected_version.id,
+            published_version=selected_version.version,
+            published_version_name=selected_version.name,
+            published_version_created_at=selected_version.created_at,
             is_eligible=bool(invocation_triggers),
             triggers=invocation_triggers,
         )
@@ -1425,9 +1486,12 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
         if not target_version:
             raise WorkflowVersionNotFoundError(workflow_id, version)
 
-        if workflow_definition is not None:
+        definition = deepcopy(
+            workflow_definition if workflow_definition is not None else target_version.workflow_definition
+        )
+        if workflow_definition is not None or definition != target_version.workflow_definition:
             target_version = await self._create_and_flush_version(
-                workflow, target_version, workflow_definition, change_description
+                workflow, target_version, definition, change_description
             )
 
         definition = target_version.workflow_definition
