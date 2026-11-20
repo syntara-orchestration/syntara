@@ -466,15 +466,28 @@ class InvocationExecutor:
             response_schema = opaque.get_data() if opaque else None
 
             timeout = ctx.timeout_seconds
-            execute_coro = orchestration_service.execute(
-                prompt=invocation.prompt,
-                session_id=invocation.session_id,
-                invocation_id=invocation.id,
-                actor_context=actor_context,
-                ctx=ctx,
-                execution_id=execution_id,
-                response_schema=response_schema,
-            )
+            if get_settings().agent_runtime_enabled and ctx.activity_id and execution_id:
+                from syntara.agent_orchestrator.executor.container_runtime import (  # noqa: PLC0415
+                    execute_container_agent,
+                )
+
+                execute_coro = execute_container_agent(
+                    invocation,
+                    orchestration_service,
+                    ctx,
+                    actor_context,
+                    response_schema,
+                )
+            else:
+                execute_coro = orchestration_service.execute(
+                    prompt=invocation.prompt,
+                    session_id=invocation.session_id,
+                    invocation_id=invocation.id,
+                    actor_context=actor_context,
+                    ctx=ctx,
+                    execution_id=execution_id,
+                    response_schema=response_schema,
+                )
             if timeout is not None:
                 result_dict = await asyncio.wait_for(execute_coro, timeout=timeout)
             else:
