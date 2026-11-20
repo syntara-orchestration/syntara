@@ -189,6 +189,12 @@ test.describe('Form trigger — run from workflows list', { tag: '@pr-check' }, 
       environment: 'stage',
       id: '42',
     }
+    // Match the length-then-bytewise key order returned by JSONB for persisted JSON.
+    const persistedValues = {
+      id: submittedValues.id,
+      environment: submittedValues.environment,
+      deployment_name: submittedValues.deployment_name,
+    }
     let activityDetailsRoute: string | undefined
 
     try {
@@ -223,8 +229,8 @@ test.describe('Form trigger — run from workflows list', { tag: '@pr-check' }, 
             resources: [
               {
                 activity_name: created.triggerNodeId,
-                input_data: submittedValues,
-                output_data: { response_data: submittedValues },
+                input_data: persistedValues,
+                output_data: { response_data: persistedValues },
                 status: 'completed',
               },
             ],
