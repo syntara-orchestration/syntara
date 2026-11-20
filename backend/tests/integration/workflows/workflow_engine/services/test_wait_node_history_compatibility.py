@@ -15,6 +15,9 @@ with workflow.unsafe.imports_passed_through():
     from syntara.workflow_core.models import ActivityName
     from syntara.workflow_runtime.engines.temporal.constants import DEFAULT_ACTIVITY_TIMEOUT_SECONDS
     from syntara.workflow_runtime.engines.temporal.dynamic_workflow import OrchestratorWorkflow
+    from syntara.workflow_runtime.engines.temporal.utils.loop_iteration_ids import (
+        LOOP_ITERATION_UNIQUE_IDS_PATCH,
+    )
 
 if TYPE_CHECKING:
     from temporalio.testing import WorkflowEnvironment
@@ -48,6 +51,9 @@ class _LegacyLoopWaitWorkflow:
 
     @workflow.run
     async def run(self) -> None:
+        # History already used unique loop wait IDs; record that patch so
+        # replay does not fall back to the canvas ID.
+        workflow.patched(LOOP_ITERATION_UNIQUE_IDS_PATCH)
         wait_handle = workflow.start_activity(
             ActivityName.WAIT,
             args=[{"duration": 1}, None],

@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import type { ReactNode } from 'react'
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
 import { axe } from 'vitest-axe'
 
@@ -11,6 +12,10 @@ import { executionDetailHasTitleRowExtras, executionDetailPageHeading } from './
 
 vi.mock('../../hooks/useCanI', () => ({
   useCanI: vi.fn(() => ({ allowed: true, isChecking: false, isError: false })),
+}))
+
+vi.mock('../../components/SynLink', () => ({
+  SynLink: ({ to, children }: { to: string; children: ReactNode }) => <a href={to}>{children}</a>,
 }))
 
 vi.mock('../../client', () => ({
@@ -561,13 +566,16 @@ describe('ExecutionDetailPageHeaderParts', () => {
     expect(screen.getByText('Pending approval')).toBeInTheDocument()
   })
 
-  it('renders retried-from label when execution was created by a retry', () => {
+  it('links the retried-from label to the source execution', () => {
     const execution = {
       status: 'running' as const,
       retried_from_execution_id: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
     } as never
     render(<ExecutionDetailTitleRowAddons execution={execution} />)
-    expect(screen.getByText('Retried from: aaaaaaaa')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Retried from: aaaaaaaa' })).toHaveAttribute(
+      'href',
+      '/executions/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee?history=closed'
+    )
   })
 
   it('does not render retried-from label for an ordinary execution', () => {
