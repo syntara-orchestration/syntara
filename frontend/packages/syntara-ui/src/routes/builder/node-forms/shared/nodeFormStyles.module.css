@@ -2,6 +2,22 @@
   border: none;
   padding: 0;
   margin: 0;
+  width: 100%;
+  min-width: 0;
+}
+
+.triggerFormContent {
+  width: 100%;
+  min-width: 0;
+}
+
+.triggerFormContent :global(.pf-v6-l-stack),
+.triggerFormContent :global(.pf-v6-l-stack__item),
+.triggerFormContent :global(.pf-v6-c-form__group-control),
+.triggerFormContent :global(.pf-v6-c-form-control),
+.triggerFormContent :global(.pf-v6-c-code-editor) {
+  max-width: 100%;
+  min-width: 0;
 }
 
 .compactAlert {

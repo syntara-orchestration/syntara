@@ -47,7 +47,7 @@ def _validation_constraints(schema: dict[str, Any], *, include_type: bool = Fals
 
 def _extract_validation_constraints_flat(schema: dict[str, Any], prefix: str = "") -> dict[str, dict[str, object]]:
     """Extract validation keywords by output path, including root-level constraints."""
-    result = {prefix or "outputs": _validation_constraints(schema, include_type=not prefix)}
+    result = {prefix or "$root": _validation_constraints(schema, include_type=not prefix)}
     properties = schema.get("properties")
     if not isinstance(properties, dict):
         return result
@@ -206,6 +206,14 @@ def _changed_output_changes(
     return changes
 
 
+def _workflow_triggers(definition: dict[str, Any] | None) -> list[dict[str, Any]]:
+    """Return workflow trigger objects only when the definition contains a valid list."""
+    raw_triggers = definition.get("triggers", []) if isinstance(definition, dict) else []
+    if not isinstance(raw_triggers, list):
+        return []
+    return [trigger for trigger in raw_triggers if isinstance(trigger, dict)]
+
+
 def _added_output_changes(
     old_fields: dict[str, tuple[str, bool]],
     new_fields: dict[str, tuple[str, bool]],
@@ -292,13 +300,13 @@ def detect_workflow_contract_changes(
     """Detect breaking and non-breaking output contract changes by trigger."""
     old_triggers = {
         trigger.get("id"): trigger
-        for trigger in (old_definition or {}).get("triggers", [])
-        if isinstance(trigger, dict) and trigger.get("type") == "subworkflow_trigger" and trigger.get("id") is not None
+        for trigger in _workflow_triggers(old_definition)
+        if trigger.get("type") == "subworkflow_trigger" and isinstance(trigger.get("id"), str)
     }
     new_triggers = {
         trigger.get("id"): trigger
-        for trigger in new_definition.get("triggers", [])
-        if isinstance(trigger, dict) and trigger.get("type") == "subworkflow_trigger" and trigger.get("id") is not None
+        for trigger in _workflow_triggers(new_definition)
+        if trigger.get("type") == "subworkflow_trigger" and isinstance(trigger.get("id"), str)
     }
 
     result: dict[str, list[dict[str, Any]]] = {}

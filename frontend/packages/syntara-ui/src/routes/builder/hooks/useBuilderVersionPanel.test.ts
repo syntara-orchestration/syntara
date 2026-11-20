@@ -9,6 +9,7 @@ const mockRefetch = vi.fn().mockResolvedValue({})
 const mockExportVersion = vi.fn()
 const mockOpenInNewWindow = vi.fn()
 const mockPublishVersion = vi.fn()
+const mockReviewVersionForPublish = vi.fn()
 const mockConfirmPublishVersion = vi.fn()
 const mockCancelBreakingChangeWarning = vi.fn()
 const mockHandleExitVersionView = vi.fn()
@@ -25,6 +26,7 @@ vi.mock('../../../providers/alerts', () => ({
 
 let mockIsViewingVersion = false
 let mockViewedVersionDate: string | null = null
+let mockReviewedPublishVersion: number | null = null
 const mockUpdateVersionMetadata = vi.fn()
 vi.mock('./useBuilderVersionHistory', () => ({
   useBuilderVersionHistory: () => ({
@@ -34,7 +36,10 @@ vi.mock('./useBuilderVersionHistory', () => ({
     exportVersion: mockExportVersion,
     openInNewWindow: mockOpenInNewWindow,
     publishVersion: mockPublishVersion,
+    reviewVersionForPublish: mockReviewVersionForPublish,
     isPublishingVersion: false,
+    isCheckingOutputContract: false,
+    reviewedPublishVersion: mockReviewedPublishVersion,
     breakingChanges: [],
     publishReview: { contractChanges: [], parentWorkflows: [] },
     confirmPublishVersion: mockConfirmPublishVersion,
@@ -95,6 +100,7 @@ describe('useBuilderVersionPanel', () => {
     mockIsDirty = false
     mockIsViewingVersion = false
     mockViewedVersionDate = null
+    mockReviewedPublishVersion = null
   })
 
   it('returns isViewingVersion from inner hook', () => {
@@ -386,6 +392,8 @@ describe('useBuilderVersionPanel', () => {
     })
 
     expect(result.current.versionSidePanel.publishDialog.isOpen).toBe(true)
+    expect(mockReviewVersionForPublish).toHaveBeenCalledWith(2)
+    expect(result.current.versionSidePanel.publishDialog.isPublishDisabled).toBe(true)
 
     act(() => {
       result.current.versionSidePanel.publishDialog.onPublish('Release', 'Description')
@@ -395,6 +403,18 @@ describe('useBuilderVersionPanel', () => {
     const publishCall = mockPublishVersion.mock.calls[0] as unknown as [number, string, string, () => void]
     act(() => publishCall[3]())
     expect(result.current.versionSidePanel.publishDialog.isOpen).toBe(false)
+  })
+
+  it('enables version publishing only after the selected version review completes', () => {
+    const { result, rerender } = renderHook(() => useBuilderVersionPanel(createParams()))
+
+    act(() => result.current.versionSidePanel.onPublishVersion(2))
+    expect(result.current.versionSidePanel.publishDialog.isPublishDisabled).toBe(true)
+
+    mockReviewedPublishVersion = 2
+    rerender()
+
+    expect(result.current.versionSidePanel.publishDialog.isPublishDisabled).toBe(false)
   })
 
   it('publishDialog.onClose closes without publishing', () => {

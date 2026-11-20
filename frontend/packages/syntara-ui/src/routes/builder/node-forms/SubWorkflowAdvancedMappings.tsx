@@ -115,6 +115,7 @@ export function SubWorkflowAdvancedMappings({
                 selectedLabel={getSourceLabel(sourceOption, expression, isSourceUnavailable, isDynamicSource)}
                 emptyOptionsMessage={NO_CHILD_OUTPUTS_AVAILABLE_MESSAGE}
                 noResultsMessage={getNoChildOutputMatchesMessage}
+                matchToggleWidth
                 onChange={(value) => onMappingChange(field.path, value)}
                 placeholder="Choose a step output…"
                 searchPromptThreshold={20}
@@ -137,7 +138,7 @@ export function SubWorkflowAdvancedMappings({
                   )}
                   {isDynamicSource && (
                     <HelperTextItem variant="warning" icon={<RhUiWarningIcon />}>
-                      This dynamic source path is checked when its step runs; a missing field fails the child run.
+                      Resolved at runtime; the child run fails if this path is missing.
                     </HelperTextItem>
                   )}
                   {isSourceTypeMismatch && sourceOption && (

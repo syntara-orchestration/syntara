@@ -1,7 +1,7 @@
 import type { WorkflowAPI } from '@syntara/contracts'
 import { useCallback, useState, type Dispatch } from 'react'
 
-import { useDialogState } from '../../../hooks/useDialogState'
+import { useDialogState, type DialogState } from '../../../hooks/useDialogState'
 import { useAlerts } from '../../../providers/alerts'
 import { useWorkflowStore } from '../../../stores/useWorkflowStore'
 import { detachPromise } from '../../../utils/detachPromise'
@@ -39,6 +39,62 @@ function publishSelectedVersion({
   description,
 }: PublishSelectedVersionArgs): void {
   if (version != null) publish(version, publishName, description, closeDialog)
+}
+
+function openVersionPublishDialog(
+  version: number,
+  open: (version: number) => void,
+  reviewVersion: (version: number) => void
+): void {
+  open(version)
+  reviewVersion(version)
+}
+
+function createVersionPublishDialogState({
+  dialog,
+  isPublishing,
+  isCheckingContractChanges,
+  reviewedVersion,
+  breakingChanges,
+  contractChanges,
+  parentWorkflows,
+  confirmPublish,
+  cancelReview,
+  publish,
+}: Readonly<{
+  dialog: DialogState<number>
+  isPublishing: boolean
+  isCheckingContractChanges: boolean
+  reviewedVersion: number | null
+  breakingChanges: WorkflowAPI.components['schemas']['TriggerBreakingChanges'][]
+  contractChanges: WorkflowAPI.components['schemas']['TriggerBreakingChanges'][]
+  parentWorkflows: WorkflowAPI.components['schemas']['WorkflowReferenceRead'][]
+  confirmPublish: (name?: string, description?: string, onSettled?: () => void) => void
+  cancelReview: () => void
+  publish: PublishVersionAction
+}>) {
+  const closeDialog = () => closeVersionPublishDialog(cancelReview, dialog.close)
+
+  return {
+    isOpen: dialog.isOpen,
+    isPublishing,
+    isCheckingContractChanges,
+    isPublishDisabled: dialog.item == null || reviewedVersion !== dialog.item,
+    breakingChanges,
+    contractChanges,
+    parentWorkflows,
+    onClose: closeDialog,
+    onConfirmContractChanges: (name?: string, description?: string) => confirmPublish(name, description, dialog.close),
+    onCancelBreakingChanges: cancelReview,
+    onPublish: (publishName?: string, description?: string) =>
+      publishSelectedVersion({
+        version: dialog.item,
+        publish,
+        closeDialog: dialog.close,
+        publishName,
+        description,
+      }),
+  }
 }
 
 function openVersionRunHistory(args: {
@@ -103,7 +159,10 @@ export function useBuilderVersionPanel(params: UseBuilderVersionPanelParams) {
     exportVersion,
     openInNewWindow,
     publishVersion,
+    reviewVersionForPublish,
     isPublishingVersion,
+    isCheckingOutputContract,
+    reviewedPublishVersion,
     breakingChanges,
     publishReview,
     confirmPublishVersion,
@@ -241,29 +300,23 @@ export function useBuilderVersionPanel(params: UseBuilderVersionPanelParams) {
       onRestoreVersion: (v: number, createdAt: string) => restoreDialog.open({ version: v, dateTime: createdAt }),
       onExportVersion: (v: number) => exportVersion(v),
       onOpenInNewWindow: openInNewWindow,
-      onPublishVersion: (v: number) => versionPublishDialog.open(v),
+      onPublishVersion: (v: number) => openVersionPublishDialog(v, versionPublishDialog.open, reviewVersionForPublish),
       onViewRunHistory: handleViewRunHistory,
       executedVersionNumbers,
       onEditVersion: (v: WorkflowVersion) => editVersionDialog.open(v),
       onDuplicateVersion,
 
-      publishDialog: {
-        isOpen: versionPublishDialog.isOpen,
+      publishDialog: createVersionPublishDialogState({
+        dialog: versionPublishDialog,
         isPublishing: isPublishingVersion,
+        isCheckingContractChanges: isCheckingOutputContract,
+        reviewedVersion: reviewedPublishVersion,
         breakingChanges,
         ...publishReview,
-        onClose: () => closeVersionPublishDialog(cancelBreakingChangeWarning, versionPublishDialog.close),
-        onConfirmContractChanges: confirmPublishVersion,
-        onCancelBreakingChanges: cancelBreakingChangeWarning,
-        onPublish: (publishName?: string, description?: string) =>
-          publishSelectedVersion({
-            version: versionPublishDialog.item,
-            publish: publishVersion,
-            closeDialog: versionPublishDialog.close,
-            publishName,
-            description,
-          }),
-      },
+        confirmPublish: confirmPublishVersion,
+        cancelReview: cancelBreakingChangeWarning,
+        publish: publishVersion,
+      }),
 
       saveBeforeViewDialog: {
         isOpen: pendingViewVersion !== null,

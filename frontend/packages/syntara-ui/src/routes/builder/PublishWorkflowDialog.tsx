@@ -19,18 +19,22 @@ function getDefaultVersionName(): string {
 type PublishWorkflowDialogProps = Readonly<{
   isOpen: boolean
   isPublishing: boolean
+  isCheckingContractChanges?: boolean
+  isPublishDisabled?: boolean
   onClose: () => void
   onPublish: (publishName?: string, description?: string) => void
   breakingChanges?: WorkflowAPI.components['schemas']['TriggerBreakingChanges'][]
   contractChanges?: WorkflowAPI.components['schemas']['TriggerBreakingChanges'][]
   parentWorkflows?: WorkflowAPI.components['schemas']['WorkflowReferenceRead'][]
-  onConfirmContractChanges?: () => void
+  onConfirmContractChanges?: (publishName?: string, description?: string) => void
   onCancelBreakingChanges?: () => void
 }>
 
 export function PublishWorkflowDialog({
   isOpen,
   isPublishing,
+  isCheckingContractChanges = false,
+  isPublishDisabled = false,
   onClose,
   onPublish,
   breakingChanges = [],
@@ -55,12 +59,15 @@ export function PublishWorkflowDialog({
   const onSubmit = (data: PublishWorkflowFormData) => {
     const name = data.name.trim()
     const desc = data.description?.trim()
+    if (requiresContractConfirmation && onConfirmContractChanges) {
+      onConfirmContractChanges(name || undefined, desc || undefined)
+      return
+    }
     onPublish(name || undefined, desc || undefined)
   }
   const hasBreakingChanges = breakingChanges.length > 0
   const reviewedContractChanges = contractChanges.length > 0 ? contractChanges : breakingChanges
-  const requiresContractConfirmation =
-    hasBreakingChanges || (reviewedContractChanges.length > 0 && parentWorkflows.length > 0)
+  const requiresContractConfirmation = hasBreakingChanges || reviewedContractChanges.length > 0
 
   return (
     <Modal isOpen={isOpen} onClose={handleClose} variant="small" aria-label="Publish workflow">
@@ -77,14 +84,17 @@ export function PublishWorkflowDialog({
             isInline
             title={hasBreakingChanges ? 'Breaking output contract changes' : 'Output contract changes'}
           >
-            <Content component="p">
-              Review the contract edits and any visible published parent workflows that reference this child.
-            </Content>
+            <Content component="p">Review the impact on parent workflows before publishing this version.</Content>
             <OutputContractChangeSummary
               context="publish"
               contractChanges={reviewedContractChanges}
               parentWorkflows={parentWorkflows}
             />
+          </Alert>
+        )}
+        {isCheckingContractChanges && (
+          <Alert variant="info" isInline title="Checking published parent impact">
+            Checking how this version may change the outputs used by published parent workflows.
           </Alert>
         )}
         <Form onSubmit={handleSubmit(onSubmit)} id="publish-workflow-form">
@@ -104,13 +114,12 @@ export function PublishWorkflowDialog({
       <ModalFooter>
         <Button
           variant="primary"
-          type={requiresContractConfirmation ? 'button' : 'submit'}
-          form={requiresContractConfirmation ? undefined : 'publish-workflow-form'}
-          onClick={requiresContractConfirmation ? onConfirmContractChanges : undefined}
+          type="submit"
+          form="publish-workflow-form"
           isLoading={isPublishing}
-          isDisabled={isPublishing}
+          isDisabled={isPublishing || isCheckingContractChanges || isPublishDisabled}
         >
-          {hasBreakingChanges ? 'Publish anyway' : 'Publish workflow'}
+          {requiresContractConfirmation ? 'Publish anyway' : 'Publish workflow'}
         </Button>
         <Button
           variant="link"
@@ -118,7 +127,7 @@ export function PublishWorkflowDialog({
             onCancelBreakingChanges?.()
             handleClose()
           }}
-          isDisabled={isPublishing}
+          isDisabled={isPublishing || isCheckingContractChanges}
         >
           Cancel
         </Button>

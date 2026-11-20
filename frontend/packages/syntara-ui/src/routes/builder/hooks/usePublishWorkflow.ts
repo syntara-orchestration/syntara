@@ -184,13 +184,44 @@ export function usePublishWorkflow({
     ]
   )
 
-  const confirmPublish = useCallback(() => {
-    if (!pendingPublish) return
-    const pending = pendingPublish
-    clearContractReview()
-    setPendingPublish(null)
-    publishNow(pending)
-  }, [pendingPublish, clearContractReview, publishNow])
+  const confirmPublish = useCallback(
+    (publishName?: string, description?: string, onSettled?: () => void) => {
+      let pending = pendingPublish
+      if (!pending) {
+        if (!workflowId || currentVersion == null) return
+        const workflowDefinition = getCurrentWorkflowDefinition(workflowName, workflowDescription)
+        pending = {
+          publishName,
+          description,
+          version: currentVersion,
+          ...(workflowDefinition ? { workflowDefinition } : {}),
+          ...(optionsExpectedVersion != null ? { expectedVersion: optionsExpectedVersion } : {}),
+          ...(onSettled ? { onSettled } : {}),
+        }
+      } else {
+        pending = {
+          ...pending,
+          publishName: publishName ?? pending.publishName,
+          description: description ?? pending.description,
+          ...(onSettled ? { onSettled } : {}),
+        }
+      }
+
+      clearContractReview()
+      setPendingPublish(null)
+      publishNow(pending)
+    },
+    [
+      pendingPublish,
+      workflowId,
+      currentVersion,
+      workflowName,
+      workflowDescription,
+      optionsExpectedVersion,
+      clearContractReview,
+      publishNow,
+    ]
+  )
 
   const cancelBreakingChangeWarning = useCallback(() => {
     clearContractReview()

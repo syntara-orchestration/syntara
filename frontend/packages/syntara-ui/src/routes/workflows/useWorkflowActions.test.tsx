@@ -34,6 +34,8 @@ type MutationCallbacks = {
   onSettled?: () => void
 }
 
+const mocks = vi.hoisted(() => ({ publishParams: vi.fn() }))
+
 // Mock the API clients
 vi.mock('../../client', () => ({
   executionsClient: {
@@ -68,7 +70,8 @@ vi.mock('../../client', () => ({
       if (typeof path === 'string' && path.includes('/publish')) {
         // Publish mutation
         return {
-          mutate: vi.fn((_params: unknown, callbacks?: MutationCallbacks) => {
+          mutate: vi.fn((params: unknown, callbacks?: MutationCallbacks) => {
+            mocks.publishParams(params)
             // Simulate successful publish
             callbacks?.onSuccess?.()
             callbacks?.onSettled?.()
@@ -151,7 +154,7 @@ describe('useWorkflowActions', () => {
       )
 
       const workflow = mockWorkflow()
-      result.current.handlePublishWorkflow(workflow)
+      result.current.handlePublishWorkflow(workflow, 1)
 
       await waitFor(() => {
         expect(mockOnPublishSettled).toHaveBeenCalledTimes(1)
@@ -218,12 +221,56 @@ describe('useWorkflowActions', () => {
       )
 
       const workflow = mockWorkflow({ name: 'My Workflow' })
-      result.current.handlePublishWorkflow(workflow)
+      result.current.handlePublishWorkflow(workflow, 1)
 
       await waitFor(() => {
         expect(mockShowSuccess).toHaveBeenCalledWith({
           title: 'Workflow published',
         })
+      })
+    })
+
+    it('publishes the explicitly reviewed version instead of the workflow row version', async () => {
+      const { result } = renderHook(
+        () =>
+          useWorkflowActions({
+            showSuccess: mockShowSuccess,
+            showError: mockShowError,
+            onNavigate: mockOnNavigate,
+            onRefetch: mockOnRefetch,
+          }),
+        { wrapper: createWrapper() }
+      )
+
+      const workflow = mockWorkflow({ current_version: 8 })
+      result.current.handlePublishWorkflow(workflow, 5, 'Reviewed version', 'Reviewed description')
+
+      await waitFor(() => expect(mocks.publishParams).toHaveBeenCalledOnce())
+      expect(mocks.publishParams).toHaveBeenCalledWith({
+        params: { path: { workflow_id: 'wf-1', version: 5 } },
+        body: { name: 'Reviewed version', change_description: 'Reviewed description' },
+      })
+    })
+
+    it('publishes the version whose contract was reviewed', async () => {
+      const { result } = renderHook(
+        () =>
+          useWorkflowActions({
+            showSuccess: mockShowSuccess,
+            showError: mockShowError,
+            onNavigate: mockOnNavigate,
+            onRefetch: mockOnRefetch,
+          }),
+        { wrapper: createWrapper() }
+      )
+
+      const workflow = mockWorkflow({ current_version: 8 })
+      result.current.handlePublishWorkflow(workflow, 5, 'Reviewed version', 'Description')
+
+      await waitFor(() => expect(mocks.publishParams).toHaveBeenCalledOnce())
+      expect(mocks.publishParams).toHaveBeenCalledWith({
+        params: { path: { workflow_id: 'wf-1', version: 5 } },
+        body: { name: 'Reviewed version', change_description: 'Description' },
       })
     })
 

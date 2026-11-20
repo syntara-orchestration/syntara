@@ -99,12 +99,12 @@ export function useWorkflowActions({
   )
 
   const handlePublishWorkflow = useCallback(
-    (workflow: Workflow, publishName?: string, description?: string) => {
-      if (!workflow?.id || !workflow.current_version) return
+    (workflow: Workflow, version: number, publishName?: string, description?: string) => {
+      if (!workflow?.id || !version) return
 
       publishWorkflow(
         {
-          params: { path: { workflow_id: workflow.id, version: workflow.current_version } },
+          params: { path: { workflow_id: workflow.id, version } },
           body: { name: publishName ?? null, change_description: description ?? null },
         },
         {

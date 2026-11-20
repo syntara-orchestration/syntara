@@ -105,11 +105,11 @@ describe('PublishWorkflowDialog', () => {
     )
 
     expect(screen.getByText('Breaking output contract changes')).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'View details for 1 output changes' }))
-    expect(screen.getByText('Removed output: release_tag')).toBeInTheDocument()
+    expect(screen.getByText('The child workflow’s declared output contract is changing.')).toBeInTheDocument()
+    expect(screen.queryByText('Removed output: release_tag')).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Publish anyway' }))
 
-    expect(onConfirmContractChanges).toHaveBeenCalledOnce()
+    expect(onConfirmContractChanges).toHaveBeenCalledWith(expect.stringMatching(/\w+ \d+, \d{4}/), undefined)
     expect(defaultProps.onPublish).not.toHaveBeenCalled()
   })
 
@@ -148,14 +148,15 @@ describe('PublishWorkflowDialog', () => {
       />
     )
 
-    expect(screen.getByText('Added optional output: release.notes')).toBeInTheDocument()
-    expect(screen.getByText('1 visible published parent workflows affected')).toBeInTheDocument()
+    expect(screen.getByText('The child workflow’s declared output contract is changing.')).toBeInTheDocument()
+    expect(screen.queryByText('Added optional output: release.notes')).not.toBeInTheDocument()
+    expect(screen.getByText('1 visible published parent workflow')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'View visible parent workflows' }))
     const parentDialog = screen.getByRole('dialog', { name: 'Visible published parent workflows' })
     expect(within(parentDialog).getByText(/Deploy parent \(parent v2\).*Invoke child/)).toBeInTheDocument()
     await user.click(within(parentDialog).getByRole('button', { name: 'Done' }))
-    await user.click(screen.getByRole('button', { name: 'Publish workflow' }))
-    expect(onConfirmContractChanges).toHaveBeenCalledOnce()
+    await user.click(screen.getByRole('button', { name: 'Publish anyway' }))
+    expect(onConfirmContractChanges).toHaveBeenCalledWith(expect.stringMatching(/\w+ \d+, \d{4}/), undefined)
   })
 
   it('disables buttons when publishing', () => {

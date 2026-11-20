@@ -16,6 +16,7 @@ from syntara.workflows.validators.workflow_definition import (
     _output_types_compatible,
     _schema_type_at_path,
 )
+from syntara.workflows.validators.workflow_subworkflow_cycles import validate_subworkflow_dependency_cycles
 from syntara.workflows.workflow_engine.models.workflow_definition import NodeType, SubWorkflowExecutorParameters
 
 from .template_expressions import extract_element_expressions
@@ -396,6 +397,7 @@ async def validate_subworkflow_project_references(
     session: AsyncSession,
     workflow_definition: dict[str, Any],
     project_id: UUID,
+    workflow_id: UUID | None = None,
 ) -> list[ValidationFinding]:
     """Validate child targets, declared outputs, required inputs, and compatible input mappings.
 
@@ -452,4 +454,5 @@ async def validate_subworkflow_project_references(
                     subworkflow_output_schemas=subworkflow_output_schemas,
                 )
             )
+    findings.extend(await validate_subworkflow_dependency_cycles(session, workflow_definition, project_id, workflow_id))
     return findings

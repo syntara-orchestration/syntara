@@ -111,10 +111,11 @@ function mockWorkflowQuery(returnValue: ReturnType<typeof workflowClient.useQuer
   vi.mocked(accessClient.useQuery).mockReturnValue(returnValue)
 }
 
-function mockWorkflowQueryForPublish(returnValue: ReturnType<typeof workflowClient.useQuery>) {
+function mockWorkflowQueryForPublish(returnValue: ReturnType<typeof workflowClient.useQuery>, version = 5) {
   mockWorkflowQuery(returnValue)
   const workflowDetail = {
     version: {
+      version,
       workflow_definition: { schema_version: '2.0.0', triggers: [], nodes: [], edges: [] },
     },
   }

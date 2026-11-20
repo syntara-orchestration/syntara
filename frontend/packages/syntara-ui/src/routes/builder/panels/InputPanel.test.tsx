@@ -125,7 +125,7 @@ describe('InputPanel', () => {
 
     await waitFor(
       () => {
-        expect(screen.getByText('Expected output fields (run step to see actual values)')).toBeInTheDocument()
+        expect(screen.getByText('Expected output fields')).toBeInTheDocument()
         expect(screen.getByRole('tree', { name: 'Schema preview' })).toBeInTheDocument()
         expect(screen.getByText('T stdout')).toBeInTheDocument()
         expect(screen.getByText('# return_code')).toBeInTheDocument()
@@ -163,7 +163,7 @@ describe('InputPanel', () => {
 
     render(<InputPanel nodeId="node-1" />)
 
-    expect(screen.getByText('Expected output fields (run step to see actual values)')).toBeInTheDocument()
+    expect(screen.getByText('Expected output fields')).toBeInTheDocument()
     expect(screen.getByText('T hostname')).toBeInTheDocument()
   })
 
@@ -297,7 +297,7 @@ describe('InputPanel', () => {
 
     render(<InputPanel nodeId="" sourceNodeId="source-1" />)
 
-    expect(screen.getByText('Expected output fields (run step to see actual values)')).toBeInTheDocument()
+    expect(screen.getByText('Expected output fields')).toBeInTheDocument()
     expect(screen.getByText('T stdout')).toBeInTheDocument()
     expect(screen.getByText('# return_code')).toBeInTheDocument()
   })
@@ -433,7 +433,7 @@ describe('InputPanel', () => {
       render(<InputPanel nodeId="node-e" />)
 
       // Shows schema preview for script node (Step D), no dropdown
-      expect(screen.getByText('Expected output fields (run step to see actual values)')).toBeInTheDocument()
+      expect(screen.getByText('Expected output fields')).toBeInTheDocument()
       expect(screen.getByText('T stdout')).toBeInTheDocument()
       expect(screen.queryByRole('button', { name: 'Step A' })).not.toBeInTheDocument()
     })
@@ -451,7 +451,7 @@ describe('InputPanel', () => {
       render(<InputPanel nodeId="node-e" />)
 
       // All ancestors visible as expandable sections with schema previews
-      expect(screen.getAllByText('Expected output fields (run step to see actual values)').length).toBeGreaterThan(0)
+      expect(screen.getAllByText('Expected output fields').length).toBeGreaterThan(0)
       expect(screen.getByRole('button', { name: 'Step D' })).toBeInTheDocument()
       expect(screen.getByRole('button', { name: 'Step B' })).toBeInTheDocument()
       expect(screen.getByRole('button', { name: 'Step A' })).toBeInTheDocument()

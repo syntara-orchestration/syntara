@@ -1,7 +1,6 @@
 import {
   Button,
   Content,
-  ExpandableSection,
   List,
   ListItem,
   Modal,
@@ -13,6 +12,8 @@ import {
 } from '@patternfly/react-core'
 import type { WorkflowAPI } from '@syntara/contracts'
 import { useState } from 'react'
+
+import { SynLabel } from '../../../components/labels/SynLabel'
 
 type ContractChange = WorkflowAPI.components['schemas']['TriggerBreakingChanges']
 type ParentReference = WorkflowAPI.components['schemas']['WorkflowReferenceRead']
@@ -28,16 +29,6 @@ type ParentWorkflowGroup = {
   workflowName: string
   workflowVersion: number
   stepDescriptions: string[]
-}
-
-const CHANGE_TYPE_LABELS: Record<string, string> = {
-  removed_trigger: 'Sub-workflow triggers removed',
-  removed_output: 'Outputs removed',
-  type_change: 'Output types changed',
-  new_required_output: 'Required outputs added',
-  added_output: 'Optional outputs added',
-  optional_output: 'Outputs made optional',
-  constraint_change: 'Output constraints changed',
 }
 
 function getParentWorkflowGroups(references: ParentReference[]): ParentWorkflowGroup[] {
@@ -59,17 +50,6 @@ function getParentWorkflowGroups(references: ParentReference[]): ParentWorkflowG
   return [...groups.values()]
 }
 
-function groupContractChanges(changes: ContractChange[]) {
-  const counts = new Map<string, number>()
-  for (const trigger of changes) {
-    for (const change of trigger.changes) {
-      const label = CHANGE_TYPE_LABELS[change.change_type] ?? 'Other output changes'
-      counts.set(label, (counts.get(label) ?? 0) + 1)
-    }
-  }
-  return [...counts.entries()]
-}
-
 function ParentWorkflowReferencesModal({
   isOpen,
   onClose,
@@ -80,13 +60,14 @@ function ParentWorkflowReferencesModal({
   parentWorkflows: ParentReference[]
 }>) {
   const parentGroups = getParentWorkflowGroups(parentWorkflows)
+  const parentNoun = parentGroups.length === 1 ? 'workflow' : 'workflows'
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} variant="medium" aria-label="Visible published parent workflows">
       <ModalHeader title="Visible published parent workflows" />
       <ModalBody>
         <Content component="p">
-          These {parentGroups.length} visible parent workflows will use the updated child version on their next run.
+          These {parentGroups.length} visible parent {parentNoun} will use the updated child version on their next run.
           References outside your visibility scope may not be listed.
         </Content>
         <List isPlain>
@@ -120,8 +101,7 @@ function ParentWorkflowImpact({
     return (
       <StackItem>
         <Content component="p">
-          Saving updates this draft only. Zero published parent workflows are affected; they continue using the latest
-          published child version.
+          Saving updates this draft only. Published parent workflows continue using the latest published child version.
         </Content>
       </StackItem>
     )
@@ -140,11 +120,12 @@ function ParentWorkflowImpact({
   return (
     <>
       <StackItem>
-        <Content component="h4">{parentWorkflowCount} visible published parent workflows affected</Content>
         <Content component="p">
-          They will use the updated child version on their next run. References outside your visibility scope may not be
-          listed.
+          Published parent workflows will use the updated child version on their next run.
         </Content>
+        <SynLabel color="blue">
+          {parentWorkflowCount} visible published parent {parentWorkflowCount === 1 ? 'workflow' : 'workflows'}
+        </SynLabel>
         <Button variant="link" onClick={() => setIsParentReferencesOpen(true)}>
           View visible parent workflows
         </Button>
@@ -159,44 +140,15 @@ function ParentWorkflowImpact({
 }
 
 export function OutputContractChangeSummary({ context, contractChanges, parentWorkflows }: Props) {
-  const changeCounts = groupContractChanges(contractChanges)
-  const totalChangeCount = changeCounts.reduce((total, [, count]) => total + count, 0)
-
   return (
     <Stack hasGutter>
       <StackItem>
-        <Content component="p">These changes affect the values and fields exposed by the child workflow.</Content>
+        <Content component="p">
+          {contractChanges.length > 0
+            ? 'The child workflow’s declared output contract is changing.'
+            : 'No declared output contract changes are included in this review.'}
+        </Content>
       </StackItem>
-      {totalChangeCount > 0 ? (
-        <StackItem>
-          <Content component="h4">Output contract changes</Content>
-          <List isPlain>
-            {changeCounts.map(([label, count]) => (
-              <ListItem key={label}>
-                {label}: {count}
-              </ListItem>
-            ))}
-          </List>
-          <ExpandableSection toggleText={`View details for ${totalChangeCount} output changes`} isIndented>
-            {contractChanges.map((trigger) => (
-              <Stack hasGutter key={trigger.trigger_id}>
-                <StackItem>
-                  <Content component="h4">{trigger.trigger_name || trigger.trigger_id}</Content>
-                  <List isPlain>
-                    {trigger.changes.map((change) => (
-                      <ListItem key={`${change.change_type}-${change.field_path}`}>{change.description}</ListItem>
-                    ))}
-                  </List>
-                </StackItem>
-              </Stack>
-            ))}
-          </ExpandableSection>
-        </StackItem>
-      ) : (
-        <StackItem>
-          <Content component="p">No output field changes are included in this review.</Content>
-        </StackItem>
-      )}
       <ParentWorkflowImpact context={context} parentWorkflows={parentWorkflows} />
     </Stack>
   )

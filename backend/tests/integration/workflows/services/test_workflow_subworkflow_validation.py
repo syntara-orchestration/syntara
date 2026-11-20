@@ -81,6 +81,40 @@ def _definition_with_subworkflow_output_references(
     return definition
 
 
+def _definition_with_dependencies(
+    entry_trigger_id: str,
+    references: list[tuple[str, UUID, str]],
+    *,
+    additional_trigger_ids: list[str] | None = None,
+) -> dict[str, Any]:
+    trigger_ids = [entry_trigger_id, *(additional_trigger_ids or [])]
+    return {
+        "schema_version": "2.0.0",
+        "triggers": [{"id": trigger_id, "type": "subworkflow_trigger", "parameters": {}} for trigger_id in trigger_ids],
+        "nodes": [
+            {
+                "id": node_id,
+                "type": "sub_workflow",
+                "parameters": {"workflow_id": str(child_id), "trigger_node_id": child_trigger_id},
+            }
+            for node_id, child_id, child_trigger_id in references
+        ],
+        "edges": [{"from": entry_trigger_id, "to": node_id} for node_id, _, _ in references],
+    }
+
+
+async def _replace_published_definition(
+    session: AsyncSession,
+    workflow: Workflow,
+    definition: dict[str, Any],
+) -> None:
+    assert workflow.published_version_id is not None
+    version = await session.get(WorkflowVersion, workflow.published_version_id)
+    assert version is not None
+    version.workflow_definition = definition
+    await session.flush()
+
+
 async def _create_child_workflow(
     session: AsyncSession,
     user: User,
@@ -181,6 +215,142 @@ async def test_missing_child_workflow_reference_returns_error_finding(
     assert finding.node_id == "call_child"
     assert finding.field_path == "parameters.workflow_id"
     assert finding.message == "The selected child workflow is no longer available."
+
+
+@pytest.mark.asyncio
+async def test_direct_self_reference_is_a_cycle_finding(
+    test_db_session: AsyncSession,
+    test_user: User,
+    test_project_id: UUID,
+) -> None:
+    workflow = await _create_child_workflow(test_db_session, test_user, test_project_id, trigger_node_id="entry")
+    definition = _definition_with_dependencies("entry", [("call_self", workflow.id, "entry")])
+
+    findings = await validate_subworkflow_project_references(
+        test_db_session,
+        definition,
+        test_project_id,
+        workflow_id=workflow.id,
+    )
+
+    cycle_findings = [finding for finding in findings if "dependency cycle" in finding.message.lower()]
+    assert len(cycle_findings) == 1
+    assert cycle_findings[0].severity == ValidationSeverity.error
+    assert cycle_findings[0].node_id == "call_self"
+    assert cycle_findings[0].field_path == "parameters.workflow_id"
+
+
+@pytest.mark.asyncio
+async def test_transitive_cycle_is_detected_through_the_selected_child_trigger(
+    test_db_session: AsyncSession,
+    test_user: User,
+    test_project_id: UUID,
+) -> None:
+    workflow_a = await _create_child_workflow(test_db_session, test_user, test_project_id, trigger_node_id="entry_a")
+    workflow_b = await _create_child_workflow(test_db_session, test_user, test_project_id, trigger_node_id="entry_b")
+    await _replace_published_definition(
+        test_db_session,
+        workflow_b,
+        _definition_with_dependencies("entry_b", [("call_a", workflow_a.id, "entry_a")]),
+    )
+    definition_a = _definition_with_dependencies("entry_a", [("call_b", workflow_b.id, "entry_b")])
+    service = WorkflowService(test_db_session, test_user)
+
+    with (
+        patch(
+            "syntara.workflows.services.workflow_service.workflow_validator",
+            _valid_workflow_validator(),
+        ),
+        patch(
+            "syntara.workflows.services.workflow_service.get_system_continue_on_failure",
+            new_callable=AsyncMock,
+            return_value=False,
+        ),
+    ):
+        version, validation_result = await service.create_workflow_version(
+            workflow_a,
+            definition_a,
+            "Add a cyclic child dependency",
+        )
+
+        cycle_findings = [
+            finding for finding in validation_result.findings if "dependency cycle" in finding.message.lower()
+        ]
+        assert version is not None
+        assert len(cycle_findings) == 1
+        assert cycle_findings[0].severity == ValidationSeverity.error
+        assert cycle_findings[0].node_id == "call_a"
+        assert "entry_a" in cycle_findings[0].message
+        assert "entry_b" in cycle_findings[0].message
+
+        with pytest.raises(WorkflowPublishValidationError) as exc_info:
+            await service.publish_workflow_version(workflow_id=workflow_a.id, version=version.version)
+
+    assert any("dependency cycle" in finding.message.lower() for finding in exc_info.value.validation_result.findings)
+
+
+@pytest.mark.asyncio
+async def test_shared_child_workflow_does_not_create_a_cycle(
+    test_db_session: AsyncSession,
+    test_user: User,
+    test_project_id: UUID,
+) -> None:
+    workflow_a = await _create_child_workflow(test_db_session, test_user, test_project_id, trigger_node_id="entry_a")
+    workflow_b = await _create_child_workflow(test_db_session, test_user, test_project_id, trigger_node_id="entry_b")
+    workflow_c = await _create_child_workflow(test_db_session, test_user, test_project_id, trigger_node_id="entry_c")
+    await _replace_published_definition(
+        test_db_session,
+        workflow_b,
+        _definition_with_dependencies("entry_b", [("call_c", workflow_c.id, "entry_c")]),
+    )
+    definition_a = _definition_with_dependencies(
+        "entry_a",
+        [("call_b", workflow_b.id, "entry_b"), ("call_c", workflow_c.id, "entry_c")],
+    )
+
+    findings = await validate_subworkflow_project_references(
+        test_db_session,
+        definition_a,
+        test_project_id,
+        workflow_id=workflow_a.id,
+    )
+
+    assert not [finding for finding in findings if "dependency cycle" in finding.message.lower()]
+
+
+@pytest.mark.asyncio
+async def test_cycle_check_ignores_an_unreachable_child_trigger_branch(
+    test_db_session: AsyncSession,
+    test_user: User,
+    test_project_id: UUID,
+) -> None:
+    workflow_a = await _create_child_workflow(
+        test_db_session,
+        test_user,
+        test_project_id,
+        trigger_node_id="entry_a",
+        additional_triggers=[{"id": "alternate_a", "type": "subworkflow_trigger", "parameters": {}}],
+    )
+    workflow_b = await _create_child_workflow(test_db_session, test_user, test_project_id, trigger_node_id="entry_b")
+    await _replace_published_definition(
+        test_db_session,
+        workflow_b,
+        _definition_with_dependencies("entry_b", [("call_a", workflow_a.id, "alternate_a")]),
+    )
+    definition_a = _definition_with_dependencies(
+        "entry_a",
+        [("call_b", workflow_b.id, "entry_b")],
+        additional_trigger_ids=["alternate_a"],
+    )
+
+    findings = await validate_subworkflow_project_references(
+        test_db_session,
+        definition_a,
+        test_project_id,
+        workflow_id=workflow_a.id,
+    )
+
+    assert not [finding for finding in findings if "dependency cycle" in finding.message.lower()]
 
 
 @pytest.mark.asyncio

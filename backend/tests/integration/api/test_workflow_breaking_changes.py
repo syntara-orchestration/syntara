@@ -127,6 +127,16 @@ class TestCheckBreakingChanges:
         assert len(data["triggers"]) == 0
 
     @pytest.mark.asyncio
+    async def test_rejects_malformed_trigger_collection(self, jwt_client: AsyncClient, test_workflow: Workflow) -> None:
+        workflow_id = await _create_unpublished_workflow(jwt_client, str(test_workflow.project_id))
+        response = await jwt_client.post(
+            f"/api/v1/workflows/{workflow_id}/check_subworkflow_output_contract_changes",
+            json={"workflow_definition": {"schema_version": "2.0.0", "triggers": None, "nodes": [], "edges": []}},
+        )
+
+        assert response.status_code == 422
+
+    @pytest.mark.asyncio
     async def test_detects_removed_output(
         self,
         jwt_client: AsyncClient,

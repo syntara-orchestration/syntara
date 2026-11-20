@@ -302,11 +302,13 @@ export type BuilderWorkflowPageHeaderProps = Readonly<{
   publishedVersionId: string | null
   currentVersionId?: string | null
   isPublishing: boolean
+  isCheckingContractChanges?: boolean
   breakingChanges?: WorkflowAPI.components['schemas']['TriggerBreakingChanges'][]
   contractChanges?: WorkflowAPI.components['schemas']['TriggerBreakingChanges'][]
   parentWorkflows?: WorkflowAPI.components['schemas']['WorkflowReferenceRead'][]
-  onConfirmPublish?: () => void
+  onConfirmPublish?: (publishName?: string, description?: string, onSettled?: () => void) => void
   onCancelBreakingChanges?: () => void
+  onReviewOutputContract?: () => void
   isLiveRunActive?: boolean
   executionId?: string | null
   executionStatus?: ExecutionStatus | null
@@ -356,11 +358,13 @@ export function BuilderWorkflowPageHeader({
   publishedVersionId,
   currentVersionId,
   isPublishing,
+  isCheckingContractChanges = false,
   breakingChanges,
   contractChanges,
   parentWorkflows,
   onConfirmPublish,
   onCancelBreakingChanges,
+  onReviewOutputContract,
   isLiveRunActive,
   executionId,
   executionStatus,
@@ -423,7 +427,10 @@ export function BuilderWorkflowPageHeader({
       currentVersionId={currentVersionId}
       handleToggleDetails={handleToggleDetails}
       handleSaveWorkflow={handleSaveWorkflow}
-      onPublishClick={() => publishDialog.open(true)}
+      onPublishClick={() => {
+        publishDialog.open(true)
+        onReviewOutputContract?.()
+      }}
       onUnpublish={onUnpublish}
       onDuplicate={onDuplicate}
       onPendingImport={onPendingImport}
@@ -488,11 +495,14 @@ export function BuilderWorkflowPageHeader({
       <PublishWorkflowDialog
         isOpen={publishDialog.isOpen}
         isPublishing={isPublishing}
+        isCheckingContractChanges={isCheckingContractChanges}
         breakingChanges={breakingChanges}
         contractChanges={contractChanges}
         parentWorkflows={parentWorkflows}
         onClose={publishDialog.close}
-        onConfirmContractChanges={onConfirmPublish}
+        onConfirmContractChanges={(publishName, description) =>
+          onConfirmPublish?.(publishName, description, publishDialog.close)
+        }
         onCancelBreakingChanges={onCancelBreakingChanges}
         onPublish={(publishName, description) => {
           onPublish(publishName, description, publishDialog.close)
