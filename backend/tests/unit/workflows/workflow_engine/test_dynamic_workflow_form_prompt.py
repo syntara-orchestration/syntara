@@ -7,6 +7,7 @@ Tests cover:
 - _fail_detached_form_prompt_activity: Temporal activity resolution
 """
 
+import asyncio
 import copy
 import json
 from collections.abc import Generator
@@ -945,3 +946,87 @@ class TestFormPromptCleanupMethods:
 
         # Should fail both detached activities
         assert mock_fail.call_count == 2
+
+
+class TestLoopActivityHistoryKeys:
+    """Loop-body approval/form_prompt I/O is also recorded under the suffixed Temporal activity ID.
+
+    The activity sync monitor queries get_activity_input/get_activity_output by the
+    Temporal activity ID (``{node_id}_iter_{n}`` inside loops), so history recorded only
+    under the canvas ID leaves the Parameters/Output panes empty for those iterations.
+    """
+
+    @staticmethod
+    def _loop_workflow(node_id: str, current_index: int) -> OrchestratorWorkflow:
+        wf = _make_workflow()
+        wf.loop_body_map[node_id] = "loop"
+        wf.node_control_data["loop"] = {"current_index": current_index}
+        return wf
+
+    @pytest.mark.parametrize("node_type", ["form_prompt", "approval"])
+    def test_history_activity_id_is_suffixed_inside_loop(self, node_type: str) -> None:
+        wf = self._loop_workflow("node1", 2)
+        node = ActivityNode(node_id="node1", node_type=node_type, parameters={})
+        assert wf._history_activity_id(node) == "node1_iter_2"
+
+    @pytest.mark.parametrize("node_type", ["form_prompt", "approval"])
+    def test_history_activity_id_is_none_outside_loop(self, node_type: str) -> None:
+        wf = _make_workflow()
+        node = ActivityNode(node_id="node1", node_type=node_type, parameters={})
+        assert wf._history_activity_id(node) is None
+
+    def test_history_activity_id_is_none_for_other_node_types_in_loop(self) -> None:
+        wf = self._loop_workflow("node1", 2)
+        node = ActivityNode(node_id="node1", node_type="script", parameters={})
+        assert wf._history_activity_id(node) is None
+
+    @pytest.mark.asyncio
+    async def test_execute_node_records_input_under_suffixed_id(self) -> None:
+        wf = self._loop_workflow("form1", 1)
+        node = ActivityNode(node_id="form1", node_type="form_prompt", parameters={})
+        resolved = {"name": "Loop Form"}
+        with (
+            patch.object(wf, "_resolve_node_parameters", return_value=resolved),
+            patch.object(wf, "_dispatch_node", new=AsyncMock(return_value={"response_data": {}})),
+            patch.object(wf, "_process_node_result", return_value={}),
+        ):
+            await wf._execute_node(node=node, graph=MagicMock())
+
+        assert wf.activity_input_history["form1"] == [resolved]
+        assert wf.activity_input_history["form1_iter_1"] == [resolved]
+        assert wf.get_activity_input("form1_iter_1") == resolved
+
+    @pytest.mark.asyncio
+    async def test_completed_task_records_output_under_suffixed_id(self) -> None:
+        wf = self._loop_workflow("form1", 1)
+        node = ActivityNode(node_id="form1", node_type="form_prompt", parameters={})
+        graph = MagicMock()
+        graph.get_node.return_value = node
+        output = {"outcome": "submitted", "response_data": {"note": "hi"}}
+
+        async def _done() -> dict[str, Any]:
+            return output
+
+        task = asyncio.ensure_future(_done())
+        await task
+        with (
+            patch.object(wf, "_schedule_successors", new=AsyncMock()),
+            patch.object(wf, "_cancel_skipped_pending_tasks"),
+        ):
+            await wf._process_completed_task(task, {"form1": task}, graph)
+
+        expected = {**output, "status": "completed"}
+        assert wf.activity_output_history["form1_iter_1"] == [expected]
+        assert wf.get_activity_output("form1_iter_1") == expected
+
+    def test_failure_history_records_output_under_suffixed_id(self) -> None:
+        wf = self._loop_workflow("form1", 0)
+        node = ActivityNode(node_id="form1", node_type="form_prompt", parameters={})
+        graph = MagicMock()
+        graph.get_node.return_value = node
+        entry = {"status": "failed", "error": "expired"}
+
+        wf._record_failure_history("form1", entry, graph)
+
+        assert wf.activity_output_history["form1"] == [entry]
+        assert wf.activity_output_history["form1_iter_0"] == [entry]

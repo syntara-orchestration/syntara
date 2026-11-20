@@ -136,6 +136,7 @@ export function formPromptToListRead(prompt: FormPromptRead): FormPromptListRead
     execution_id: prompt.execution_id,
     project_id: prompt.project_id,
     prompt_node_id: prompt.prompt_node_id,
+    loop_iteration_path: prompt.loop_iteration_path ?? [],
     name: prompt.name,
     status: prompt.status!,
     timeout_at: prompt.timeout_at ?? null,

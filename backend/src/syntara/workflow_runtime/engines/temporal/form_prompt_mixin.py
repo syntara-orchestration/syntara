@@ -92,6 +92,10 @@ class WorkflowFormPromptMixin:
     # Provided by OrchestratorWorkflow; declared here for mypy only
     _scrub_data: Callable[[dict[str, Any]], dict[str, Any]]
 
+    def _form_prompt_activity_id(self, node_id: str) -> str:
+        """Return the Temporal activity ID for this form prompt node (loop-index suffixed inside loops)."""
+        return form_prompt_temporal_activity_id(node_id, self.loop_body_map, self.node_control_data)
+
     async def _expire_form_prompts(self, node_id: str | None, activity_id: str) -> None:
         """Best-effort expire pending form prompts.
 
