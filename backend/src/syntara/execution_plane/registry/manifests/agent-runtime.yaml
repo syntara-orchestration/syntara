@@ -1,0 +1,90 @@
+---
+apiVersion: syntara.io/v1alpha1
+kind: Action
+metadata:
+  name: agent-runtime
+  displayName: Agent Runtime
+  description: Runs an isolated agent loop using host-provided model and MCP operations.
+spec:
+  runtime:
+    kind: custom-runner
+    entryPoint: "syntara_node_agent_runtime:AgentRuntimeStep"
+  input:
+    kind: inline
+    value:
+      type: object
+      additionalProperties: false
+      required: [contract_version, messages]
+      properties:
+        contract_version:
+          type: integer
+          const: 1
+        messages:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            additionalProperties: true
+        tools:
+          type: array
+          default: []
+          items:
+            type: object
+            required: [handle, name, input_schema]
+            additionalProperties: true
+        response_schema:
+          type: [object, 'null']
+        max_model_calls:
+          type: integer
+          default: 8
+          minimum: 1
+          maximum: 32
+  output:
+    kind: inline
+    value:
+      type: object
+      additionalProperties: false
+      required: [contract_version, content, last_turn_index, total_duration_ms]
+      properties:
+        contract_version:
+          type: integer
+          const: 1
+        content:
+          oneOf:
+            - type: string
+            - type: object
+        last_turn_index:
+          type: integer
+          minimum: 1
+        total_duration_ms:
+          type: integer
+          minimum: 0
+        response_metadata:
+          type: object
+          default: {}
+          additionalProperties: true
+        structured_output_metadata:
+          type: [object, 'null']
+          default: null
+        tools_used:
+          type: array
+          default: []
+          items:
+            type: string
+        tool_trace:
+          type: array
+          default: []
+          items:
+            type: object
+            additionalProperties: true
+        llm_token_usage_log:
+          type: array
+          default: []
+          items:
+            type: object
+            additionalProperties: true
+  error:
+    kind: inline
+    value:
+      type: object
+      additionalProperties: true
