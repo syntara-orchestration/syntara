@@ -143,7 +143,7 @@ class TestSubWorkflowNodeSchemaValidation:
         static_value: object,
         subworkflow_schema: dict[str, Any],
     ) -> None:
-        config = {
+        config: dict[str, Any] = {
             "workflow_id": VALID_UUID,
             "trigger_node_id": "child_entry",
             "input_mapping": {"target": static_value},
@@ -163,7 +163,7 @@ class TestSubWorkflowNodeSchemaValidation:
         expression: str,
         subworkflow_schema: dict[str, Any],
     ) -> None:
-        config = {
+        config: dict[str, Any] = {
             "workflow_id": VALID_UUID,
             "trigger_node_id": "child_entry",
             "input_mapping": {"target": expression},
@@ -211,7 +211,7 @@ class TestSubWorkflowNodeSchemaValidation:
         assert restored.nodes[0].parameters == node.parameters
 
     def test_input_mapping_over_limit_is_rejected_by_schema_and_model(self, subworkflow_schema: dict[str, Any]) -> None:
-        config = {
+        config: dict[str, Any] = {
             "workflow_id": VALID_UUID,
             "trigger_node_id": "child_entry",
             "input_mapping": {f"field_{index}": index for index in range(101)},
@@ -324,7 +324,7 @@ class TestSubWorkflowNodeSchemaValidation:
         subworkflow_schema: dict[str, Any],
     ) -> None:
         """JSON Schema rejects invalid trigger_node_id patterns."""
-        config = {
+        config: dict[str, Any] = {
             "workflow_id": VALID_UUID,
             "trigger_node_id": invalid_trigger_node_id,
         }
@@ -342,7 +342,7 @@ class TestSubWorkflowNodeSchemaValidation:
         """JSON Schema enforces required fields (workflow_id and trigger_node_id)."""
         other_field = "trigger_node_id" if missing_field == "workflow_id" else "workflow_id"
         other_value = "trigger_node" if other_field == "trigger_node_id" else VALID_UUID
-        config = {other_field: other_value}
+        config: dict[str, Any] = {other_field: other_value}
         with pytest.raises(jsonschema.ValidationError) as exc_info:
             _validate_params(config, subworkflow_schema)
         # Verify the error is about the missing field
