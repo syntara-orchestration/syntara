@@ -582,6 +582,29 @@ describe('flat ESLint config rule inheritance', () => {
     expect(ruleIds.every((ruleId) => config?.rules[ruleId]?.[0] === 2)).toBe(true)
   })
 
+  it('allows XMLHttpRequest only in the upload progress hook', async () => {
+    const [uploadConfig, regularConfig] = await Promise.all([
+      eslint.calculateConfigForFile('src/hooks/useFileUploadWithProgress.ts'),
+      eslint.calculateConfigForFile('src/hooks/useAuthProviders.ts'),
+    ])
+    const ruleId = '@ansible/no-unapproved-http-client'
+    const uploadRule = uploadConfig?.rules[ruleId]
+    const regularRule = regularConfig?.rules[ruleId]
+
+    expect(uploadRule?.[0]).toBe(2)
+    expect(uploadRule?.[1]).toMatchObject({
+      disallowFetch: true,
+      disallowXMLHttpRequest: false,
+      clientModules: ['axios', 'cross-fetch', 'got', 'ky', 'node-fetch', 'ofetch', 'superagent', 'undici'],
+    })
+    expect(regularRule?.[0]).toBe(2)
+    expect(regularRule?.[1]).toMatchObject({
+      disallowFetch: true,
+      disallowXMLHttpRequest: true,
+      clientModules: ['axios', 'cross-fetch', 'got', 'ky', 'node-fetch', 'ofetch', 'superagent', 'undici'],
+    })
+  })
+
   it('enforces the configured complexity and file-size thresholds', async () => {
     const longFile = Array.from({ length: 501 }, (_, index) => `export const auditLine${index} = ${index}`).join('\n')
     const longFunction = `export function auditFunction() {\n${Array.from({ length: 201 }, (_, index) => `  const auditValue${index} = ${index}`).join('\n')}\n  return auditValue200\n}`
