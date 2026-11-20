@@ -126,7 +126,7 @@ describe('Kafka consumer settings', () => {
     expect(group).toHaveAttribute('aria-invalid', 'false')
   })
 
-  it('keeps all controls disabled in version views', async () => {
+  it('shows a read-only group and disables policy controls in version views', async () => {
     vi.mocked(workflowFetchClient.GET).mockClear()
     const { container } = renderSettings({
       isReadOnly: true,
@@ -136,8 +136,8 @@ describe('Kafka consumer settings', () => {
     for (const name of ['Start position', 'New partition position', 'Offset gap policy']) {
       expect(screen.getByRole('button', { name })).toBeDisabled()
     }
-    expect(screen.getByRole('textbox', { name: GROUP })).toBeDisabled()
-    expect(screen.getByRole('textbox', { name: GROUP })).toHaveValue('saved-group')
+    expect(screen.getByRole('group', { name: GROUP })).toHaveTextContent('saved-group')
+    expect(screen.queryByRole('textbox', { name: GROUP })).not.toBeInTheDocument()
     expect(workflowFetchClient.GET).not.toHaveBeenCalled()
     expect(await axe(container)).toHaveNoViolations()
   })
@@ -162,22 +162,25 @@ describe('Kafka consumer settings', () => {
     })
     const user = userEvent.setup()
     const onSubmit = vi.fn()
-    renderSettings({ existing: true, data: { kafkaGroupId: 'published-group' }, onSubmit })
-    const group = screen.getByRole('textbox', { name: GROUP })
-    expect(group).toBeDisabled()
-    await waitFor(() => expect(group).toHaveValue('published-group'))
-    expect(group).toBeDisabled()
+    const { container } = renderSettings({ existing: true, data: { kafkaGroupId: 'published-group' }, onSubmit })
+    const group = await screen.findByRole('group', { name: GROUP })
+    expect(group).toHaveTextContent('published-group')
+    expect(screen.queryByRole('textbox', { name: GROUP })).not.toBeInTheDocument()
+    expect(group).toHaveAccessibleDescription(
+      'This consumer group is fixed after the first publish so the subscription can resume from its committed offsets.'
+    )
+    expect(await axe(container)).toHaveNoViolations()
     await user.click(screen.getByRole('button', { name: 'Save settings' }))
     expect(onSubmit).toHaveBeenCalledWith(
       expect.objectContaining({ kafkaGroupId: 'published-group' }),
       expect.anything()
     )
     await user.type(screen.getByRole('textbox', { name: 'Topic' }), '.new')
-    expect(group).toBeEnabled()
+    expect(screen.getByRole('textbox', { name: GROUP })).toBeEnabled()
     await user.clear(screen.getByRole('textbox', { name: 'Topic' }))
     await user.type(screen.getByRole('textbox', { name: 'Topic' }), 'orders')
-    expect(group).toBeDisabled()
-    expect(group).toHaveValue('published-group')
+    expect(screen.getByRole('group', { name: GROUP })).toHaveTextContent('published-group')
+    expect(screen.queryByRole('textbox', { name: GROUP })).not.toBeInTheDocument()
   })
 
   it('preserves a draft replacement group while cached publication metadata refreshes', async () => {
@@ -198,8 +201,7 @@ describe('Kafka consumer settings', () => {
     const onSubmit = vi.fn()
     const user = userEvent.setup()
     const { client } = renderSettings({ existing: true, data: { kafkaGroupId: 'replacement-draft-group' }, onSubmit })
-    const group = screen.getByRole('textbox', { name: GROUP })
-    await waitFor(() => expect(group).toHaveValue('published-group'))
+    await screen.findByRole('group', { name: GROUP })
     let finish: (() => void) | undefined
     vi.mocked(workflowFetchClient.GET).mockImplementationOnce(
       () =>
@@ -220,14 +222,14 @@ describe('Kafka consumer settings', () => {
       refreshed = client.invalidateQueries({ queryKey: ['get', '/workflows/{workflow_id}'] })
     })
     expect(await screen.findByText('Checking published consumer groups…')).toBeInTheDocument()
-    expect(group).toHaveValue('replacement-draft-group')
-    expect(group).toBeDisabled()
+    expect(screen.getByRole('textbox', { name: GROUP })).toHaveValue('replacement-draft-group')
+    expect(screen.getByRole('textbox', { name: GROUP })).toBeDisabled()
     await act(async () => {
       finish?.()
       await refreshed
     })
-    await waitFor(() => expect(group).toBeEnabled())
-    expect(group).toHaveValue('replacement-draft-group')
+    await waitFor(() => expect(screen.getByRole('textbox', { name: GROUP })).toBeEnabled())
+    expect(screen.getByRole('textbox', { name: GROUP })).toHaveValue('replacement-draft-group')
     await user.click(screen.getByRole('button', { name: 'Save settings' }))
     expect(onSubmit).toHaveBeenCalledWith(
       expect.objectContaining({ kafkaGroupId: 'replacement-draft-group' }),

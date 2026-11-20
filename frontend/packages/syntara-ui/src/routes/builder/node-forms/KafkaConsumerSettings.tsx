@@ -1,8 +1,10 @@
-import { Button, Content, ContentVariants, Stack, StackItem, TextInput, Title } from '@patternfly/react-core'
+import { Button, Content, ContentVariants, FormGroup, Stack, StackItem, TextInput, Title } from '@patternfly/react-core'
 import { KafkaOffsetGapPolicyEnum, KafkaStartPositionEnum } from '@syntara/contracts'
+import { useId } from 'react'
 import { useFormContext, useWatch } from 'react-hook-form'
 
 import { FieldHelpPopover } from '../../../components/FieldHelpPopover'
+import { FormFieldHintOrError } from '../../../components/FormFieldError'
 import { SynFormField } from '../../../components/forms/SynFormField'
 import { SynSelectField } from '../../../components/forms/SynSelectField'
 import { SynErrorState } from '../../../components/states/SynErrorState'
@@ -40,15 +42,15 @@ export function KafkaConsumerSettings({
   isReadOnly: boolean
 }>) {
   const { control } = useFormContext<TriggerFormData>()
-  const [integrationId, topic] = useWatch({ control, name: ['integrationId', 'topic'] })
+  const [integrationId, topic, groupId] = useWatch({ control, name: ['integrationId', 'topic', 'kafkaGroupId'] })
+  const groupHintId = useId()
   const publication = useKafkaPublishedSource(isReadOnly ? undefined : workflowId, triggerId)
   const isPublishedSource = Boolean(
     publication.source && publication.source.integration_id === integrationId && publication.source.topic === topic
   )
-  const isGroupLocked = isReadOnly || publication.isChecking || publication.isError || isPublishedSource
   const groupHint = isPublishedSource
-    ? 'This source’s consumer group is fixed after its first successful publication. The published group is preserved.'
-    : 'Leave blank for an auto-generated ID for a new source. The group becomes fixed after the first successful publication.'
+    ? 'This consumer group is fixed after the first publish so the subscription can resume from its committed offsets.'
+    : 'Consumer settings for this saved version are read-only.'
 
   return (
     <section aria-labelledby="kafka-consumer-settings-heading">
@@ -98,29 +100,46 @@ export function KafkaConsumerSettings({
           />
         </StackItem>
         <StackItem>
-          <SynFormField<TriggerFormData, 'kafkaGroupId'>
-            name="kafkaGroupId"
-            label="Consumer group ID"
-            fieldId="kafka-group-id"
-            hint={groupHint}
-            labelHelp={<FieldHelpPopover headerContent="Consumer group ID" helpText={groupHelp} />}
-          >
-            {({ field, fieldState, describedBy }) => (
-              <TextInput
-                id="kafka-group-id"
-                name={field.name}
-                ref={field.ref}
-                value={isPublishedSource ? (publication.source?.group_id ?? '') : (field.value ?? '')}
-                placeholder={isPublishedSource ? 'Published group' : 'Auto-generated'}
-                isDisabled={isGroupLocked}
-                aria-describedby={describedBy}
-                aria-invalid={Boolean(fieldState.error)}
-                validated={fieldState.error ? 'error' : 'default'}
-                onBlur={field.onBlur}
-                onChange={(_event, value) => field.onChange(value)}
-              />
-            )}
-          </SynFormField>
+          {isPublishedSource || isReadOnly ? (
+            <FormGroup
+              label="Consumer group ID"
+              role="group"
+              aria-label="Consumer group ID"
+              aria-labelledby={undefined}
+              fieldId="kafka-group-id"
+              aria-describedby={groupHintId}
+              labelHelp={<FieldHelpPopover headerContent="Consumer group ID" helpText={groupHelp} />}
+            >
+              <Content component={ContentVariants.p}>
+                {isPublishedSource ? publication.source?.group_id : groupId || 'Auto-generated'}
+              </Content>
+              <FormFieldHintOrError id={groupHintId} hint={groupHint} />
+            </FormGroup>
+          ) : (
+            <SynFormField<TriggerFormData, 'kafkaGroupId'>
+              name="kafkaGroupId"
+              label="Consumer group ID"
+              fieldId="kafka-group-id"
+              hint="Leave blank for an auto-generated ID for a new source. The group becomes fixed after the first successful publication."
+              labelHelp={<FieldHelpPopover headerContent="Consumer group ID" helpText={groupHelp} />}
+            >
+              {({ field, fieldState, describedBy }) => (
+                <TextInput
+                  id="kafka-group-id"
+                  name={field.name}
+                  ref={field.ref}
+                  value={field.value ?? ''}
+                  placeholder="Auto-generated"
+                  isDisabled={publication.isChecking || publication.isError}
+                  aria-describedby={describedBy}
+                  aria-invalid={Boolean(fieldState.error)}
+                  validated={fieldState.error ? 'error' : 'default'}
+                  onBlur={field.onBlur}
+                  onChange={(_event, value) => field.onChange(value)}
+                />
+              )}
+            </SynFormField>
+          )}
         </StackItem>
         {publication.isChecking && (
           <StackItem>

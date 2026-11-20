@@ -189,18 +189,31 @@ test.describe('Kafka consumer settings', () => {
       await publishWorkflowViaApi(app, id, versionNumber)
       await app.goto(toAppUrl(`/workflow-builder/${id}`))
       await openNodeForEditing(app, 'Published Kafka consumer')
-      const group = app.getByRole('textbox', { name: GROUP, exact: true })
-      await expect(group).toHaveValue('published-group')
-      await expect(group).toBeDisabled()
-      await expect(group).toHaveAccessibleDescription(/fixed after its first successful publication/)
+      const group = app.getByRole('group', { name: GROUP, exact: true })
+      await expect(group).toContainText('published-group')
+      await expect(app.getByRole('textbox', { name: GROUP, exact: true })).toHaveCount(0)
+      await expect(group).toHaveAccessibleDescription(
+        'This consumer group is fixed after the first publish so the subscription can resume from its committed offsets.'
+      )
       await group.scrollIntoViewIfNeeded()
       await app.screenshot({ path: testInfo.outputPath('kafka-published-group.png'), fullPage: true })
+      await app.emulateMedia({ colorScheme: 'dark' })
+      await app.screenshot({ path: testInfo.outputPath('kafka-published-group-dark.png'), fullPage: true })
+      await app.emulateMedia({ colorScheme: 'light' })
+      expect(
+        (
+          await new AxeBuilder({ page: app })
+            .include('section[aria-labelledby="kafka-consumer-settings-heading"]')
+            .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+            .analyze()
+        ).violations
+      ).toEqual([])
       await app.getByRole('textbox', { name: 'Topic', exact: true }).fill('replacement')
-      await expect(group).toBeEnabled()
-      await expect(group).toHaveValue('')
+      await expect(app.getByRole('textbox', { name: GROUP, exact: true })).toBeEnabled()
+      await expect(app.getByRole('textbox', { name: GROUP, exact: true })).toHaveValue('')
       await app.getByRole('textbox', { name: 'Topic', exact: true }).fill('orders')
-      await expect(group).toBeDisabled()
-      await expect(group).toHaveValue('published-group')
+      await expect(app.getByRole('textbox', { name: GROUP, exact: true })).toHaveCount(0)
+      await expect(group).toContainText('published-group')
       await app.getByRole('button', { name: 'Update', exact: true }).click()
       const saved = app.waitForResponse(
         (response) => response.request().method() === 'PATCH' && response.url().endsWith(`/workflows/${id}`)
@@ -215,8 +228,8 @@ test.describe('Kafka consumer settings', () => {
       expect(unpublish.ok()).toBe(true)
       await app.reload()
       await openNodeForEditing(app, 'Published Kafka consumer')
-      await expect(group).toBeDisabled()
-      await expect(group).toHaveValue('published-group')
+      await expect(app.getByRole('textbox', { name: GROUP, exact: true })).toHaveCount(0)
+      await expect(group).toContainText('published-group')
     } finally {
       if (workflowId) await deleteWorkflowViaApi(app, workflowId)
       await deleteIntegrationViaApi(app, connection.integrationId)
@@ -224,7 +237,9 @@ test.describe('Kafka consumer settings', () => {
     }
   })
 
-  test('keeps automatic mode through Update, republish, export and publication as a new workflow', async ({ app }) => {
+  test('keeps automatic mode through Update, republish, export and publication as a new workflow', async ({
+    app,
+  }, testInfo) => {
     const connection = await createKafkaConnection(app)
     const createdIds: string[] = []
     const nodes = [
@@ -268,7 +283,10 @@ test.describe('Kafka consumer settings', () => {
       const originalGroup = detail.kafka_subscription_sources[0]?.group_id
       expect(detail.kafka_subscription_sources[0]?.group_id_is_generated).toBe(true)
       await openNodeForEditing(app, 'Automatic consumer')
-      await expect(app.getByRole('textbox', { name: GROUP, exact: true })).toHaveValue(originalGroup ?? '')
+      const automaticGroup = app.getByRole('group', { name: GROUP, exact: true })
+      await expect(automaticGroup).toContainText(originalGroup ?? '')
+      await automaticGroup.scrollIntoViewIfNeeded()
+      await app.screenshot({ path: testInfo.outputPath('kafka-automatic-group.png'), fullPage: true })
       await app.getByRole('button', { name: 'Update', exact: true }).click()
       const saved = app.waitForResponse(
         (response) => response.request().method() === 'PATCH' && response.url().endsWith(`/workflows/${id}`)

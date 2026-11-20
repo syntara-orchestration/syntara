@@ -177,7 +177,9 @@ histories and definitions that omit the group do not hide the established ID.
 The group is disabled while this check loads or fails, with a retry on failure.
 Background refreshes preserve the raw draft value; Update reconciles against a
 fresh projection. A changed Integration or topic permits a replacement group.
-Saved version views disable all consumption controls.
+Published consumer groups appear as read-only text with an explanation of why the
+group is fixed. Saved version views also show the group as text and disable policy
+selectors.
 
 Publication from the main Publish action, Version History, and Workflows list checks the selected
 saved definition or unsaved changes against fresh source metadata. If a draft explicitly requests a different group for the same source,
