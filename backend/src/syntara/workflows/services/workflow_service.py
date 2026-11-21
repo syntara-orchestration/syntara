@@ -134,6 +134,16 @@ def _has_validation_issues(result: ValidationResult) -> bool:
     return result.error_count > 0 or result.warning_count > 0
 
 
+def _has_blocking_publish_findings(
+    definition_findings: list[ValidationFinding],
+    subworkflow_findings: list[ValidationFinding],
+) -> bool:
+    """Sub-workflow warnings are advisory; all other findings and sub-workflow errors block publish."""
+    return bool(definition_findings) or any(
+        finding.severity == ValidationSeverity.error for finding in subworkflow_findings
+    )
+
+
 class WorkflowConvertResourceMixin(ConvertResourceMixin):
     """Workflow-specific resource conversion to WorkflowRead format."""
 
@@ -1665,9 +1675,10 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
         a new version is created first via ``_create_version_record``,
         then published.
 
-        Returns a tuple of (workflow, version, warning). Warning is
-        populated when the DB commit succeeds but a non-critical post-commit
-        operation fails gracefully (e.g. scheduled trigger sync).
+        Returns a tuple of (workflow, version, warning). Warning includes
+        non-blocking Sub-workflow contract findings. It is also populated when
+        the DB commit succeeds but a non-critical post-commit operation fails
+        gracefully (e.g. scheduled trigger sync).
         """
         workflow = await self._get_workflow_for_update(workflow_id)
 
@@ -1706,12 +1717,13 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
                 ]
             )
 
+        definition_findings = result.findings
         subworkflow_findings = await validate_subworkflow_project_references(
             self.session, definition, workflow.project_id
         )
-        result = ValidationResult.from_findings([*result.findings, *subworkflow_findings])
-        if (result.error_count + result.warning_count) > 0:
-            raise WorkflowPublishValidationError(result)
+        validation_result = ValidationResult.from_findings([*definition_findings, *subworkflow_findings])
+        if _has_blocking_publish_findings(definition_findings, subworkflow_findings):
+            raise WorkflowPublishValidationError(validation_result)
 
         # Confirmation gate: block an unconfirmed publish that would remove a Subworkflow Trigger
         # still invoked by published parents. Reads the current published version (not the request),
@@ -1806,6 +1818,11 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
         if stale_tool_findings:
             stale_msg = "; ".join(f.message for f in stale_tool_findings)
             warning = "; ".join(filter(None, [warning, stale_msg]))
+
+        subworkflow_warning_messages = [
+            finding.message for finding in subworkflow_findings if finding.severity == ValidationSeverity.warning
+        ]
+        warning = "; ".join(filter(None, [warning, *subworkflow_warning_messages]))
 
         AuditEventDispatcher.dispatch(
             WorkflowVersionPublishedEvent(
