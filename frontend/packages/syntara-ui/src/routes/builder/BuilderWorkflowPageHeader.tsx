@@ -18,9 +18,11 @@ import styles from './BuilderWorkflowPageHeader.module.css'
 import { BuilderVersionViewTitleRowAddons } from './BuilderWorkflowPageHeaderParts'
 import { builderVersionViewHasTitleRowExtras } from './builderWorkflowPageHeaderTitle'
 import { EditWorkflowDetailsPopover } from './EditWorkflowDetailsPopover'
+import { useRemovedSubworkflowTriggerIds } from './hooks/usePublishTriggerRemoval'
 import { PublishWorkflowDialog } from './PublishWorkflowDialog'
 import type { BuilderPermissions } from './useBuilderPermissions'
 import type { PendingImportData } from './useWorkflowImportExport'
+import { WorkflowReferencedByBadge } from './WorkflowReferencedByBadge'
 
 type BuilderToolbarContentProps = Readonly<{
   isLiveRunActive?: boolean
@@ -211,6 +213,7 @@ function BuilderToolbarContent({
 function BuilderEditorTitleSlot({
   workflowName,
   workflowDescription,
+  workflowId,
   isNew,
   publishedVersionId,
   currentVersionId,
@@ -222,6 +225,7 @@ function BuilderEditorTitleSlot({
 }: Readonly<{
   workflowName: string
   workflowDescription: string
+  workflowId?: string
   isNew: boolean
   publishedVersionId: string | null
   currentVersionId?: string | null
@@ -278,6 +282,11 @@ function BuilderEditorTitleSlot({
           <WorkflowPublishStatusBadge publishedVersionId={publishedVersionId} currentVersionId={currentVersionId} />
         </FlexItem>
       )}
+      {!isNew && (
+        <FlexItem flex={{ default: 'flexNone' }}>
+          <WorkflowReferencedByBadge workflowId={workflowId} />
+        </FlexItem>
+      )}
       {(builderPermissions.canEdit || isBuiltin) && (
         <FlexItem flex={{ default: 'flexNone' }}>{ProjectSelector}</FlexItem>
       )}
@@ -328,7 +337,12 @@ export type BuilderWorkflowPageHeaderProps = Readonly<{
   handleToggleVersionHistory: () => void
   handleToggleDetails: () => void
   handleSaveWorkflow: () => Promise<boolean>
-  onPublish: (publishName?: string, description?: string, onSettled?: () => void) => void
+  onPublish: (
+    publishName?: string,
+    description?: string,
+    onSettled?: () => void,
+    callOptions?: { confirm?: boolean }
+  ) => void
   onUnpublish: () => void
   onDuplicate: () => void
   isViewingVersion?: boolean
@@ -396,6 +410,11 @@ export function BuilderWorkflowPageHeader({
 }: BuilderWorkflowPageHeaderProps) {
   const builderDocLink = useDocLink('builder')
   const publishDialog = useDialogState<true>()
+  const {
+    removedTriggerNodeIds,
+    isLoading: triggerDiffLoading,
+    isError: triggerDiffError,
+  } = useRemovedSubworkflowTriggerIds(workflow?.id, publishDialog.isOpen)
 
   const toolbar = (
     <BuilderToolbarContent
@@ -471,6 +490,7 @@ export function BuilderWorkflowPageHeader({
             <BuilderEditorTitleSlot
               workflowName={workflowName}
               workflowDescription={workflowDescription}
+              workflowId={workflow?.id}
               isNew={isNew}
               publishedVersionId={publishedVersionId}
               currentVersionId={currentVersionId}
@@ -494,9 +514,13 @@ export function BuilderWorkflowPageHeader({
         onClose={publishDialog.close}
         onConfirmContractChanges={onConfirmPublish}
         onCancelBreakingChanges={onCancelBreakingChanges}
-        onPublish={(publishName, description) => {
-          onPublish(publishName, description, publishDialog.close)
+        onPublish={(publishName, description, options) => {
+          onPublish(publishName, description, publishDialog.close, { confirm: options?.confirm })
         }}
+        workflowId={workflow?.id}
+        removedTriggerNodeIds={removedTriggerNodeIds}
+        triggerDiffLoading={triggerDiffLoading}
+        triggerDiffError={triggerDiffError}
       />
     </>
   )

@@ -19,6 +19,25 @@ class WorkflowListParams(BaseListParams):
     # for complex filtering operations like created_by, is_enabled, etc.
 
 
+class WorkflowUsedByListParams(BaseListParams):
+    """Query parameters for the Used-By endpoint.
+
+    Inherits the standard list params (``limit``, ``cursor``, ``sort``, ``include_total``). The
+    Used-By response always returns ``total_count`` regardless of ``include_total``. ``trigger_node_ids``
+    is a functional selector (not a generic field filter), so it is marked ``x-query-param``.
+    """
+
+    trigger_node_ids: list[str] | None = PydanticField(
+        default=None,
+        description=(
+            "When set, only parents whose published definition invokes one of these child "
+            "Subworkflow Trigger nodes are returned. Repeat the parameter for multiple triggers; "
+            "the result counts each affected parent once."
+        ),
+        json_schema_extra={"x-query-param": True},
+    )
+
+
 class WorkflowVersionListParams(BaseListParams):
     """Query parameters for workflow version list endpoint."""
 

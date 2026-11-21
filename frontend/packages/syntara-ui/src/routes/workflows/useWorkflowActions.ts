@@ -2,6 +2,7 @@ import type { WorkflowAPI } from '@syntara/contracts'
 import { useCallback } from 'react'
 
 import { executionsFetchClient, workflowClient } from '../../client'
+import { useTriggerRemovalPublishConfirm } from '../../hooks/useTriggerRemovalPublishConfirm'
 import type { useAlerts } from '../../providers/alerts'
 import { getErrorMessage } from '../../utils/apiErrors'
 
@@ -37,6 +38,7 @@ export function useWorkflowActions({
     '/workflows/{workflow_id}/versions/{version}/publish'
   )
   const { mutate: unpublishWorkflow } = workflowClient.useMutation('post', '/workflows/{workflow_id}/unpublish')
+  const { guardPublishError, triggerRemovalConfirmDialog } = useTriggerRemovalPublishConfirm()
 
   const handleRunWorkflow = useCallback(
     async (workflow: Workflow, inputData: Record<string, unknown> = {}, triggerNodeId?: string) => {
@@ -77,7 +79,7 @@ export function useWorkflowActions({
       if (!workflow?.id) return
 
       deleteWorkflow(
-        { params: { path: { workflow_id: workflow.id } } },
+        { params: { path: { workflow_id: workflow.id }, query: { confirm: true } } },
         {
           onSuccess: () => {
             showSuccess({ title: 'Workflow deleted', description: `Workflow "${workflow.name}" has been deleted.` })
@@ -101,27 +103,35 @@ export function useWorkflowActions({
   const handlePublishWorkflow = useCallback(
     (workflow: Workflow, publishName?: string, description?: string) => {
       if (!workflow?.id || !workflow.current_version) return
+      const workflowId = workflow.id
+      const version = workflow.current_version
 
-      publishWorkflow(
-        {
-          params: { path: { workflow_id: workflow.id, version: workflow.current_version } },
-          body: { name: publishName ?? null, change_description: description ?? null },
-        },
-        {
-          onSuccess: () => {
-            showSuccess({ title: 'Workflow published' })
-            onRefetch()
+      const doPublish = (confirm: boolean) => {
+        publishWorkflow(
+          {
+            params: { path: { workflow_id: workflowId, version }, query: { confirm } },
+            body: { name: publishName ?? null, change_description: description ?? null },
           },
-          onError: (error: unknown) => {
-            showError({ title: 'Failed to publish workflow', description: getErrorMessage(error) })
-          },
-          onSettled: () => {
-            onPublishSettled?.()
-          },
-        }
-      )
+          {
+            onSuccess: () => {
+              showSuccess({ title: 'Workflow published' })
+              onRefetch()
+            },
+            onError: (error: unknown) => {
+              // A removed Subworkflow Trigger with published callers needs explicit confirmation.
+              if (guardPublishError(error, () => doPublish(true))) return
+              showError({ title: 'Failed to publish workflow', description: getErrorMessage(error) })
+            },
+            onSettled: () => {
+              onPublishSettled?.()
+            },
+          }
+        )
+      }
+
+      doPublish(false)
     },
-    [publishWorkflow, showSuccess, showError, onRefetch, onPublishSettled]
+    [publishWorkflow, guardPublishError, showSuccess, showError, onRefetch, onPublishSettled]
   )
 
   const handleUnpublishWorkflow = useCallback(
@@ -154,5 +164,6 @@ export function useWorkflowActions({
     handleUnpublishWorkflow,
     isDeleting,
     isPublishing,
+    triggerRemovalConfirmDialog,
   }
 }

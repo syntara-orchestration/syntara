@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  extractPublishTriggerRemovalAffectedCount,
   getErrorCode,
   getErrorMessage,
   getErrorStatus,
@@ -9,6 +10,7 @@ import {
   isAdminConfigurationError,
   isConflictError,
   isRetryableError,
+  isPublishTriggerRemovalConfirmationError,
   isServiceUnavailableError,
   isValidationError,
   isWorkflowVersionConflictError,
@@ -446,5 +448,19 @@ describe('apiErrors', () => {
         expect(error.created_by_username).toBe('alice')
       }
     })
+  })
+})
+
+describe('publish trigger-removal confirmation error', () => {
+  it('detects the confirmation code and reads the affected count', () => {
+    const error = { cause: { code: 'WORKFLOW_PUBLISH_TRIGGER_REMOVAL_CONFIRMATION_REQUIRED', affected_count: 3 } }
+    expect(isPublishTriggerRemovalConfirmationError(error)).toBe(true)
+    expect(extractPublishTriggerRemovalAffectedCount(error)).toBe(3)
+  })
+
+  it('returns false / zero for unrelated errors', () => {
+    const error = { code: 'SOMETHING_ELSE' }
+    expect(isPublishTriggerRemovalConfirmationError(error)).toBe(false)
+    expect(extractPublishTriggerRemovalAffectedCount(error)).toBe(0)
   })
 })

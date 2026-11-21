@@ -283,6 +283,35 @@ function paginate<T>(items: T[], cursor: string | null, limit: number, includeTo
   }
 }
 
+/** A sub-workflow node in a (mock) workflow definition: references a child workflow by id. */
+type SubWorkflowNode = { type?: string; parameters?: { workflow_id?: string; trigger_node_id?: string } }
+
+function workflowSubWorkflowNodes(workflow: WorkflowWithVersion): SubWorkflowNode[] {
+  const nodes = (workflow.version?.workflow_definition as { nodes?: unknown } | undefined)?.nodes
+  return Array.isArray(nodes) ? (nodes as SubWorkflowNode[]) : []
+}
+
+/**
+ * Published workflows that use ``childId`` as a sub-workflow. When ``triggerNodeIds`` is non-empty,
+ * only parents invoking one of those child Subworkflow Triggers are returned. Mirrors the real
+ * Used-By semantics closely enough for mock mode so counts and the drill-down list render.
+ */
+function findPublishedParents(
+  childId: string,
+  triggerNodeIds: string[]
+): (WorkflowWithVersion & { project_id: string })[] {
+  return workflows.filter((workflow) => {
+    if (!workflow.published_version_id) return false
+    return workflowSubWorkflowNodes(workflow).some(
+      (node) =>
+        node.type === 'sub_workflow' &&
+        node.parameters?.workflow_id === childId &&
+        (triggerNodeIds.length === 0 ||
+          (node.parameters?.trigger_node_id != null && triggerNodeIds.includes(node.parameters.trigger_node_id)))
+    )
+  })
+}
+
 /** Redact secret fields in a credential's inputs to match real API behavior */
 function redactCredential(credential: (typeof credentials)[number]) {
   const credType = credentialTypes.find((t) => t.id === credential.credential_type_id)
@@ -1082,6 +1111,28 @@ export const handlers = [
     return HttpResponse.json({ is_valid: true, error_count: 0, warning_count: 0, findings: [] })
   }),
 
+  http.get('/api/v1/workflows/used_by_counts', ({ request }) => {
+    const url = new URL(request.url)
+    const ids = url.searchParams.getAll('workflow_ids')
+    const counts = ids.map((id) => ({ workflow_id: id, total_count: findPublishedParents(id, []).length }))
+    return HttpResponse.json({ counts })
+  }),
+  http.get('/api/v1/workflows/:workflowId/used_by', ({ request, params }) => {
+    const workflowId = String(params.workflowId)
+    const url = new URL(request.url)
+    const cursor = url.searchParams.get('cursor')
+    const parsedLimit = Number.parseInt(url.searchParams.get('limit') ?? '20', 10)
+    const limit = Number.isFinite(parsedLimit) ? Math.min(Math.max(parsedLimit, 1), 100) : 20
+    const triggerNodeIds = url.searchParams.getAll('trigger_node_ids')
+    const parents = findPublishedParents(workflowId, triggerNodeIds)
+    const page = paginate(parents, cursor, limit, false)
+    return HttpResponse.json({
+      resources: page.resources,
+      next: page.next,
+      prev: page.prev,
+      total_count: parents.length,
+    })
+  }),
   http.get('/api/v1/workflows/:workflowId', (request) => {
     const workflowId = request.params.workflowId
     const body = workflows.find((w) => w.id === workflowId)

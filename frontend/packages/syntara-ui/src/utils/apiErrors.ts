@@ -711,6 +711,18 @@ export function isWorkflowVersionConflictError(error: unknown): error is Record<
   return getErrorCode(error) === 'WORKFLOW_VERSION_CONFLICT'
 }
 
+/** True when a publish was rejected because it removes a Subworkflow Trigger used by published parents. */
+export function isPublishTriggerRemovalConfirmationError(error: unknown): boolean {
+  return getErrorCode(error) === 'WORKFLOW_PUBLISH_TRIGGER_REMOVAL_CONFIRMATION_REQUIRED'
+}
+
+/** Distinct count of affected published parents from a trigger-removal publish 409 (0 if absent). */
+export function extractPublishTriggerRemovalAffectedCount(error: unknown): number {
+  if (!error || typeof error !== 'object') return 0
+  const body = getErrorBody(error as Record<string, unknown>)
+  return typeof body.affected_count === 'number' ? body.affected_count : 0
+}
+
 function getErrorBody(error: Record<string, unknown>): Record<string, unknown> {
   if (error.cause && typeof error.cause === 'object') return error.cause as Record<string, unknown>
   return error

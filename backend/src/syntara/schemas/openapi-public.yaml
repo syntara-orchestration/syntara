@@ -25402,7 +25402,11 @@ paths:
                 retryable: true
     delete:
       summary: Delete workflow
-      description: Permanently delete a workflow and cascade-delete all its versions and executions.
+      description: |-
+        Permanently delete a workflow and cascade-delete all its versions and executions.
+
+        If the workflow is referenced by published parents, deletion requires ``confirm=true``;
+        otherwise it returns 409 with the count of referencing parents (no parent details).
       operationId: delete_workflow
       tags:
         - Workflows
@@ -25419,6 +25423,13 @@ paths:
             type: string
             format: uuid
             title: Workflow Id
+        - name: confirm
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: false
+            title: Confirm
       responses:
         '204':
           description: Workflow deleted
@@ -25934,6 +25945,309 @@ paths:
                 detail: An unexpected error occurred
                 code: INTERNAL_ERROR
                 retryable: true
+  /workflows/used_by_counts:
+    get:
+      summary: Batch Used-By totals for multiple workflows
+      description: |-
+        Return the Used-By total for each requested workflow the caller may read.
+
+        Totals count distinct published parents across all projects (matching the Used-By badge), so a workflow list can show per-row counts with one request instead of one call per row.
+      operationId: get_workflow_used_by_counts
+      tags:
+        - Workflows
+      security:
+        - bearerAuth: []
+      x-app-permission:
+        resource: workflow
+        action: read
+      parameters:
+        - name: workflow_ids
+          in: query
+          required: true
+          schema:
+            type: array
+            items:
+              type: string
+              format: uuid
+            maxItems: 100
+            title: Workflow Ids
+      responses:
+        '200':
+          description: Used-By totals for the requested workflows the caller may read
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowUsedByCountsResponse'
+        '400':
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/bad-request
+                title: Bad Request
+                detail: The request was malformed or contained invalid parameters
+                code: BAD_REQUEST
+                retryable: false
+        '401':
+          description: Unauthorized
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/unauthorized
+                title: Unauthorized
+                detail: Authentication is required to access this resource
+                code: UNAUTHORIZED
+                retryable: false
+        '403':
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/forbidden
+                title: Forbidden
+                detail: You do not have permission to access this resource
+                code: FORBIDDEN
+                retryable: false
+        '404':
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/not-found
+                title: Resource Not Found
+                detail: No resource exists with the provided identifier
+                code: NOT_FOUND
+                retryable: false
+                instance: /api/v1/workflows
+        '409':
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/conflict
+                title: Conflict
+                detail: The request conflicts with the current state of the resource
+                code: CONFLICT
+                retryable: false
+        '422':
+          description: Validation Error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/validation-error
+                title: Validation Error
+                detail: Field 'name' must be between 1 and 255 characters
+                code: VALIDATION_ERROR
+                retryable: false
+                instance: /api/v1/workflows
+        '429':
+          description: Too Many Requests
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/rate-limited
+                title: Too Many Requests
+                detail: Rate limit exceeded. Try again in 60 seconds.
+                code: RATE_LIMITED
+                retryable: true
+        '500':
+          description: Internal Server Error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/internal-error
+                title: Internal Server Error
+                detail: An unexpected error occurred
+                code: INTERNAL_ERROR
+                retryable: true
+  /workflows/{workflow_id}/used_by:
+    get:
+      summary: List published workflows that reference this workflow
+      description: |-
+        List published workflows whose published version references this workflow (Used-By).
+
+        ``total_count`` is every distinct published parent across all projects; ``resources`` is the page of parents the caller may view. Access requires read permission on this workflow.
+      operationId: list_workflow_used_by
+      tags:
+        - Workflows
+      security:
+        - bearerAuth: []
+      x-app-permission:
+        resource: workflow
+        action: read
+      parameters:
+        - name: workflow_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+            title: Workflow Id
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+            exclusiveMinimum: 0
+            maximum: 100
+            title: Limit
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+              - type: 'null'
+            title: Cursor
+        - name: sort
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+                pattern: ^-?[a-z][a-z0-9_]*$
+              - type: 'null'
+            title: Sort
+        - name: include_total
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: false
+            title: Include Total
+        - name: trigger_node_ids
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: array
+                items:
+                  type: string
+              - type: 'null'
+            x-query-param: true
+            title: Trigger Node Ids
+      responses:
+        '200':
+          description: Published parent workflows that reference this workflow
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowUsedByResponse'
+        '400':
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/bad-request
+                title: Bad Request
+                detail: The request was malformed or contained invalid parameters
+                code: BAD_REQUEST
+                retryable: false
+        '401':
+          description: Unauthorized
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/unauthorized
+                title: Unauthorized
+                detail: Authentication is required to access this resource
+                code: UNAUTHORIZED
+                retryable: false
+        '403':
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/forbidden
+                title: Forbidden
+                detail: You do not have permission to access this resource
+                code: FORBIDDEN
+                retryable: false
+        '404':
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/not-found
+                title: Resource Not Found
+                detail: No resource exists with the provided identifier
+                code: NOT_FOUND
+                retryable: false
+                instance: /api/v1/workflows
+        '409':
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/conflict
+                title: Conflict
+                detail: The request conflicts with the current state of the resource
+                code: CONFLICT
+                retryable: false
+        '422':
+          description: Validation Error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/validation-error
+                title: Validation Error
+                detail: Field 'name' must be between 1 and 255 characters
+                code: VALIDATION_ERROR
+                retryable: false
+                instance: /api/v1/workflows
+        '429':
+          description: Too Many Requests
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/rate-limited
+                title: Too Many Requests
+                detail: Rate limit exceeded. Try again in 60 seconds.
+                code: RATE_LIMITED
+                retryable: true
+        '500':
+          description: Internal Server Error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/internal-error
+                title: Internal Server Error
+                detail: An unexpected error occurred
+                code: INTERNAL_ERROR
+                retryable: true
   /workflows/{workflow_id}/versions/{version}:
     get:
       summary: Get workflow version
@@ -26191,7 +26505,11 @@ paths:
   /workflows/{workflow_id}/versions/{version}/publish:
     post:
       summary: Publish workflow version
-      description: Publish a specific workflow version.
+      description: |-
+        Publish a specific workflow version.
+
+        If publishing removes a Subworkflow Trigger that published parents invoke, it requires
+        ``confirm=true``; otherwise it returns 409 with the count of affected parents (no parent details).
       operationId: publish_workflow_version
       tags:
         - Workflows
@@ -26215,6 +26533,13 @@ paths:
             type: integer
             title: Version
           description: Version number to publish
+        - name: confirm
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: false
+            title: Confirm
       requestBody:
         required: true
         content:
@@ -35374,6 +35699,83 @@ components:
           total: 150
         - next: eyJpZCI6Im5leHQifQ
           prev: eyJpZCI6InByZXYifQ
+    WorkflowUsedByResponse:
+      type: object
+      required:
+        - resources
+        - total_count
+      title: WorkflowUsedByResponse
+      description: |-
+        Paginated Used-By response: published workflows that reference a given workflow.
+
+        ``resources`` is the page of referencing parents the requester may view; ``total_count`` is the number of distinct published parents across all projects, not filtered by visibility.
+      properties:
+        next:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Next
+          description: Cursor for next page of results
+        prev:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Prev
+          description: Cursor for previous page of results
+        total:
+          anyOf:
+            - type: integer
+              minimum: 0.0
+            - type: 'null'
+          title: Total
+          description: Total count of resources (only when include_total=true)
+        resources:
+          type: array
+          items:
+            $ref: '#/components/schemas/WorkflowRead'
+          maxItems: 100
+          title: Resources
+          description: Array of resources in current page
+        total_count:
+          type: integer
+          minimum: 0.0
+          title: Total Count
+          description: Distinct published parent workflows that reference this workflow, counted across all projects regardless of the requester's visibility.
+      examples:
+        - next: eyJpZCI6InV1aWQifQ
+          total: 150
+        - next: eyJpZCI6Im5leHQifQ
+          prev: eyJpZCI6InByZXYifQ
+    WorkflowUsedByCount:
+      type: object
+      required:
+        - workflow_id
+        - total_count
+      title: WorkflowUsedByCount
+      description: Used-By total for a single workflow, returned by the batch counts endpoint.
+      properties:
+        workflow_id:
+          type: string
+          format: uuid
+          title: Workflow Id
+        total_count:
+          type: integer
+          minimum: 0.0
+          title: Total Count
+          description: Distinct published parent workflows that reference this workflow, across all projects.
+    WorkflowUsedByCountsResponse:
+      type: object
+      title: WorkflowUsedByCountsResponse
+      description: |-
+        Batch Used-By totals for a set of workflows.
+
+        Totals are counted across all projects (matching the Used-By badge). Only workflows the caller may read are included; others are omitted so the endpoint cannot probe counts for workflows outside the caller's visibility.
+      properties:
+        counts:
+          type: array
+          items:
+            $ref: '#/components/schemas/WorkflowUsedByCount'
+          title: Counts
     WorkflowCreate:
       type: object
       title: WorkflowCreate

@@ -90,6 +90,7 @@ export function WorkflowPublishDialog({ publishDialog, isPublishing, onPublishWo
       isPublishing={isPublishing || publishReview.isPublishing}
       onClose={closeDialog}
       onPublish={reviewAndPublish}
+      workflowId={workflow?.id}
       breakingChanges={pendingReview?.review.triggers ?? []}
       contractChanges={pendingReview?.review.contract_changes ?? []}
       parentWorkflows={pendingReview?.review.parent_workflows ?? []}

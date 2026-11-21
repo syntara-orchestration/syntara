@@ -9,7 +9,7 @@ from ...client import AuthenticatedClient, Client
 from ...models.error_data import ErrorData
 from ...models.publish_version_request import PublishVersionRequest
 from ...models.publish_workflow_version_response import PublishWorkflowVersionResponse
-from ...types import Response
+from ...types import UNSET, Response, Unset
 
 
 def _get_kwargs(
@@ -17,12 +17,23 @@ def _get_kwargs(
     version: int,
     *,
     body: PublishVersionRequest,
+    confirm: bool | Unset = False,
+    additional_params: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
+
+    params: dict[str, Any] = {}
+    if isinstance(additional_params, dict):
+        params = additional_params
+
+    params["confirm"] = confirm
+
+    params = {k: v for k, v in params.items() if v is not UNSET and v is not None}
 
     _kwargs: dict[str, Any] = {
         "method": "post",
         "url": f"/workflows/{workflow_id}/versions/{version}/publish",
+        "params": params,
     }
 
     _kwargs["json"] = body.to_dict()
@@ -106,14 +117,20 @@ def sync_detailed(
     *,
     client: AuthenticatedClient,
     body: PublishVersionRequest,
+    confirm: bool | Unset = False,
+    additional_params: dict[str, Any] | None = None,
 ) -> Response[ErrorData | PublishWorkflowVersionResponse]:
     """Publish workflow version
 
      Publish a specific workflow version.
 
+    If publishing removes a Subworkflow Trigger that published parents invoke, it requires
+    ``confirm=true``; otherwise it returns 409 with the count of affected parents (no parent details).
+
     Args:
         workflow_id (UUID):
         version (int):
+        confirm (bool | Unset):  Default: False.
         body (PublishVersionRequest): Request body for publishing a workflow version.
 
     Raises:
@@ -125,9 +142,7 @@ def sync_detailed(
     """
 
     kwargs = _get_kwargs(
-        workflow_id=workflow_id,
-        version=version,
-        body=body,
+        workflow_id=workflow_id, version=version, body=body, confirm=confirm, additional_params=additional_params
     )
 
     response = client.get_httpx_client().request(
@@ -143,14 +158,19 @@ def sync(
     *,
     client: AuthenticatedClient,
     body: PublishVersionRequest,
+    confirm: bool | Unset = False,
 ) -> ErrorData | PublishWorkflowVersionResponse | None:
     """Publish workflow version
 
      Publish a specific workflow version.
 
+    If publishing removes a Subworkflow Trigger that published parents invoke, it requires
+    ``confirm=true``; otherwise it returns 409 with the count of affected parents (no parent details).
+
     Args:
         workflow_id (UUID):
         version (int):
+        confirm (bool | Unset):  Default: False.
         body (PublishVersionRequest): Request body for publishing a workflow version.
 
     Raises:
@@ -166,6 +186,7 @@ def sync(
         version=version,
         client=client,
         body=body,
+        confirm=confirm,
     ).parsed
 
 
@@ -175,14 +196,19 @@ async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
     body: PublishVersionRequest,
+    confirm: bool | Unset = False,
 ) -> Response[ErrorData | PublishWorkflowVersionResponse]:
     """Publish workflow version
 
      Publish a specific workflow version.
 
+    If publishing removes a Subworkflow Trigger that published parents invoke, it requires
+    ``confirm=true``; otherwise it returns 409 with the count of affected parents (no parent details).
+
     Args:
         workflow_id (UUID):
         version (int):
+        confirm (bool | Unset):  Default: False.
         body (PublishVersionRequest): Request body for publishing a workflow version.
 
     Raises:
@@ -197,6 +223,7 @@ async def asyncio_detailed(
         workflow_id=workflow_id,
         version=version,
         body=body,
+        confirm=confirm,
     )
 
     response = await client.get_async_httpx_client().request(**kwargs)
@@ -210,14 +237,19 @@ async def asyncio(
     *,
     client: AuthenticatedClient,
     body: PublishVersionRequest,
+    confirm: bool | Unset = False,
 ) -> ErrorData | PublishWorkflowVersionResponse | None:
     """Publish workflow version
 
      Publish a specific workflow version.
 
+    If publishing removes a Subworkflow Trigger that published parents invoke, it requires
+    ``confirm=true``; otherwise it returns 409 with the count of affected parents (no parent details).
+
     Args:
         workflow_id (UUID):
         version (int):
+        confirm (bool | Unset):  Default: False.
         body (PublishVersionRequest): Request body for publishing a workflow version.
 
     Raises:
@@ -234,5 +266,6 @@ async def asyncio(
             version=version,
             client=client,
             body=body,
+            confirm=confirm,
         )
     ).parsed

@@ -1,0 +1,319 @@
+from http import HTTPStatus
+from typing import Any
+from uuid import UUID
+
+import httpx
+
+from ... import errors
+from ...client import AuthenticatedClient, Client
+from ...models.error_data import ErrorData
+from ...models.workflow_used_by_response import WorkflowUsedByResponse
+from ...types import UNSET, Response, Unset
+
+
+def _get_kwargs(
+    workflow_id: UUID,
+    *,
+    limit: int | Unset = 20,
+    cursor: None | str | Unset = UNSET,
+    sort: None | str | Unset = UNSET,
+    include_total: bool | Unset = False,
+    trigger_node_ids: list[str] | None | Unset = UNSET,
+    additional_params: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    params: dict[str, Any] = {}
+    if isinstance(additional_params, dict):
+        params = additional_params
+
+    params["limit"] = limit
+
+    json_cursor: None | str | Unset
+    if isinstance(cursor, Unset):
+        json_cursor = UNSET
+    else:
+        json_cursor = cursor
+    params["cursor"] = json_cursor
+
+    json_sort: None | str | Unset
+    if isinstance(sort, Unset):
+        json_sort = UNSET
+    else:
+        json_sort = sort
+    params["sort"] = json_sort
+
+    params["include_total"] = include_total
+
+    json_trigger_node_ids: list[str] | None | Unset
+    if isinstance(trigger_node_ids, Unset):
+        json_trigger_node_ids = UNSET
+    elif isinstance(trigger_node_ids, list):
+        json_trigger_node_ids = trigger_node_ids
+
+    else:
+        json_trigger_node_ids = trigger_node_ids
+    params["trigger_node_ids"] = json_trigger_node_ids
+
+    params = {k: v for k, v in params.items() if v is not UNSET and v is not None}
+
+    _kwargs: dict[str, Any] = {
+        "method": "get",
+        "url": f"/workflows/{workflow_id}/used_by",
+        "params": params,
+    }
+
+    return _kwargs
+
+
+def _parse_response(
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> ErrorData | WorkflowUsedByResponse | None:
+    if response.status_code == 200:
+        response_200 = WorkflowUsedByResponse.from_dict(response.json())
+
+        return response_200
+
+    if response.status_code == 400:
+        response_400 = ErrorData.from_dict(response.json())
+
+        return response_400
+
+    if response.status_code == 401:
+        response_401 = ErrorData.from_dict(response.json())
+
+        return response_401
+
+    if response.status_code == 403:
+        response_403 = ErrorData.from_dict(response.json())
+
+        return response_403
+
+    if response.status_code == 404:
+        response_404 = ErrorData.from_dict(response.json())
+
+        return response_404
+
+    if response.status_code == 409:
+        response_409 = ErrorData.from_dict(response.json())
+
+        return response_409
+
+    if response.status_code == 422:
+        response_422 = ErrorData.from_dict(response.json())
+
+        return response_422
+
+    if response.status_code == 429:
+        response_429 = ErrorData.from_dict(response.json())
+
+        return response_429
+
+    if response.status_code == 500:
+        response_500 = ErrorData.from_dict(response.json())
+
+        return response_500
+
+    if client.raise_on_unexpected_status:
+        raise errors.UnexpectedStatus(response.status_code, response.content)
+    else:
+        return None
+
+
+def _build_response(
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> Response[ErrorData | WorkflowUsedByResponse]:
+    return Response(
+        status_code=HTTPStatus(response.status_code),
+        content=response.content,
+        headers=response.headers,
+        parsed=_parse_response(client=client, response=response),
+        request=response.request,
+        is_success=response.is_success,
+    )
+
+
+def sync_detailed(
+    workflow_id: UUID,
+    *,
+    client: AuthenticatedClient,
+    limit: int | Unset = 20,
+    cursor: None | str | Unset = UNSET,
+    sort: None | str | Unset = UNSET,
+    include_total: bool | Unset = False,
+    trigger_node_ids: list[str] | None | Unset = UNSET,
+    additional_params: dict[str, Any] | None = None,
+) -> Response[ErrorData | WorkflowUsedByResponse]:
+    """List published workflows that reference this workflow
+
+     List published workflows whose published version references this workflow (Used-By).
+
+    ``total_count`` is every distinct published parent across all projects; ``resources`` is the page of
+    parents the caller may view. Access requires read permission on this workflow.
+
+    Args:
+        workflow_id (UUID):
+        limit (int | Unset):  Default: 20.
+        cursor (None | str | Unset):
+        sort (None | str | Unset):
+        include_total (bool | Unset):  Default: False.
+        trigger_node_ids (list[str] | None | Unset):
+
+    Raises:
+        errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
+        httpx.TimeoutException: If the request takes longer than Client.timeout.
+
+    Returns:
+        Response[ErrorData | WorkflowUsedByResponse]
+    """
+
+    kwargs = _get_kwargs(
+        workflow_id=workflow_id,
+        limit=limit,
+        cursor=cursor,
+        sort=sort,
+        include_total=include_total,
+        trigger_node_ids=trigger_node_ids,
+        additional_params=additional_params,
+    )
+
+    response = client.get_httpx_client().request(
+        **kwargs,
+    )
+
+    return _build_response(client=client, response=response)
+
+
+def sync(
+    workflow_id: UUID,
+    *,
+    client: AuthenticatedClient,
+    limit: int | Unset = 20,
+    cursor: None | str | Unset = UNSET,
+    sort: None | str | Unset = UNSET,
+    include_total: bool | Unset = False,
+    trigger_node_ids: list[str] | None | Unset = UNSET,
+) -> ErrorData | WorkflowUsedByResponse | None:
+    """List published workflows that reference this workflow
+
+     List published workflows whose published version references this workflow (Used-By).
+
+    ``total_count`` is every distinct published parent across all projects; ``resources`` is the page of
+    parents the caller may view. Access requires read permission on this workflow.
+
+    Args:
+        workflow_id (UUID):
+        limit (int | Unset):  Default: 20.
+        cursor (None | str | Unset):
+        sort (None | str | Unset):
+        include_total (bool | Unset):  Default: False.
+        trigger_node_ids (list[str] | None | Unset):
+
+    Raises:
+        errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
+        httpx.TimeoutException: If the request takes longer than Client.timeout.
+
+    Returns:
+        ErrorData | WorkflowUsedByResponse
+    """
+
+    return sync_detailed(
+        workflow_id=workflow_id,
+        client=client,
+        limit=limit,
+        cursor=cursor,
+        sort=sort,
+        include_total=include_total,
+        trigger_node_ids=trigger_node_ids,
+    ).parsed
+
+
+async def asyncio_detailed(
+    workflow_id: UUID,
+    *,
+    client: AuthenticatedClient,
+    limit: int | Unset = 20,
+    cursor: None | str | Unset = UNSET,
+    sort: None | str | Unset = UNSET,
+    include_total: bool | Unset = False,
+    trigger_node_ids: list[str] | None | Unset = UNSET,
+) -> Response[ErrorData | WorkflowUsedByResponse]:
+    """List published workflows that reference this workflow
+
+     List published workflows whose published version references this workflow (Used-By).
+
+    ``total_count`` is every distinct published parent across all projects; ``resources`` is the page of
+    parents the caller may view. Access requires read permission on this workflow.
+
+    Args:
+        workflow_id (UUID):
+        limit (int | Unset):  Default: 20.
+        cursor (None | str | Unset):
+        sort (None | str | Unset):
+        include_total (bool | Unset):  Default: False.
+        trigger_node_ids (list[str] | None | Unset):
+
+    Raises:
+        errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
+        httpx.TimeoutException: If the request takes longer than Client.timeout.
+
+    Returns:
+        Response[ErrorData | WorkflowUsedByResponse]
+    """
+
+    kwargs = _get_kwargs(
+        workflow_id=workflow_id,
+        limit=limit,
+        cursor=cursor,
+        sort=sort,
+        include_total=include_total,
+        trigger_node_ids=trigger_node_ids,
+    )
+
+    response = await client.get_async_httpx_client().request(**kwargs)
+
+    return _build_response(client=client, response=response)
+
+
+async def asyncio(
+    workflow_id: UUID,
+    *,
+    client: AuthenticatedClient,
+    limit: int | Unset = 20,
+    cursor: None | str | Unset = UNSET,
+    sort: None | str | Unset = UNSET,
+    include_total: bool | Unset = False,
+    trigger_node_ids: list[str] | None | Unset = UNSET,
+) -> ErrorData | WorkflowUsedByResponse | None:
+    """List published workflows that reference this workflow
+
+     List published workflows whose published version references this workflow (Used-By).
+
+    ``total_count`` is every distinct published parent across all projects; ``resources`` is the page of
+    parents the caller may view. Access requires read permission on this workflow.
+
+    Args:
+        workflow_id (UUID):
+        limit (int | Unset):  Default: 20.
+        cursor (None | str | Unset):
+        sort (None | str | Unset):
+        include_total (bool | Unset):  Default: False.
+        trigger_node_ids (list[str] | None | Unset):
+
+    Raises:
+        errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
+        httpx.TimeoutException: If the request takes longer than Client.timeout.
+
+    Returns:
+        ErrorData | WorkflowUsedByResponse
+    """
+
+    return (
+        await asyncio_detailed(
+            workflow_id=workflow_id,
+            client=client,
+            limit=limit,
+            cursor=cursor,
+            sort=sort,
+            include_total=include_total,
+            trigger_node_ids=trigger_node_ids,
+        )
+    ).parsed

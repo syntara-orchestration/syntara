@@ -38,7 +38,9 @@ if TYPE_CHECKING:
         WorkflowNameConflictError,
         WorkflowNotFoundError,
         WorkflowNotPublishedError,
+        WorkflowPublishTriggerRemovalConfirmationError,
         WorkflowPublishValidationError,
+        WorkflowReferencedByPublishedParentsError,
         WorkflowValidationError,
         WorkflowVersionConflictError,
         WorkflowVersionNotFoundError,
@@ -343,6 +345,64 @@ def workflow_has_active_executions_handler(request: Request, exc: "WorkflowHasAc
         code="ACTIVE_EXECUTIONS_BLOCK_DELETION",
         retryable=True,
         instance=str(request.url),
+    )
+
+
+def workflow_referenced_delete_handler(
+    request: Request, exc: "WorkflowReferencedByPublishedParentsError"
+) -> JSONResponse:
+    """Handle WorkflowReferencedByPublishedParentsError with RFC 9457 format (HTTP 409).
+
+    The body exposes only the count of referencing published parents -- never their identities,
+    since the caller may lack read access to them.
+    """
+    logger.warning(
+        "Workflow deletion requires confirmation: referenced by published parents",
+        workflow_id=str(exc.workflow_id),
+        referencing_count=exc.referencing_count,
+    )
+    content = {
+        "type": PROBLEM_TYPES["resource_conflict"],
+        "title": "Workflow Deletion Requires Confirmation",
+        "detail": str(exc),
+        "code": "WORKFLOW_REFERENCED_CONFIRMATION_REQUIRED",
+        "retryable": False,
+        "instance": str(request.url),
+        "referencing_count": exc.referencing_count,
+    }
+    return JSONResponse(
+        status_code=status.HTTP_409_CONFLICT,
+        content=content,
+        media_type=_PROBLEM_JSON_MEDIA_TYPE,
+    )
+
+
+def workflow_publish_trigger_removal_handler(
+    request: Request, exc: "WorkflowPublishTriggerRemovalConfirmationError"
+) -> JSONResponse:
+    """Handle WorkflowPublishTriggerRemovalConfirmationError with RFC 9457 format (HTTP 409).
+
+    The body exposes only the distinct count of affected published parents -- never their
+    identities, since the caller may lack read access to them.
+    """
+    logger.warning(
+        "Publish requires confirmation: removes a Subworkflow Trigger invoked by published parents",
+        workflow_id=str(exc.workflow_id),
+        affected_count=exc.affected_count,
+    )
+    content = {
+        "type": PROBLEM_TYPES["resource_conflict"],
+        "title": "Publish Requires Confirmation",
+        "detail": str(exc),
+        "code": "WORKFLOW_PUBLISH_TRIGGER_REMOVAL_CONFIRMATION_REQUIRED",
+        "retryable": False,
+        "instance": str(request.url),
+        "affected_count": exc.affected_count,
+    }
+    return JSONResponse(
+        status_code=status.HTTP_409_CONFLICT,
+        content=content,
+        media_type=_PROBLEM_JSON_MEDIA_TYPE,
     )
 
 

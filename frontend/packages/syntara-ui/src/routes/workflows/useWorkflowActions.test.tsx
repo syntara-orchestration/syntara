@@ -1,6 +1,7 @@
 import type { WorkflowAPI } from '@syntara/contracts'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { renderHook, waitFor } from '@testing-library/react'
+import { render, renderHook, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import type { ReactNode } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -33,6 +34,9 @@ type MutationCallbacks = {
   onError?: (error?: unknown) => void
   onSettled?: () => void
 }
+
+// Shared, test-controllable publish behavior for the trigger-removal 409 path.
+const publishMock = vi.hoisted(() => ({ simulate409: false, confirmCalls: [] as boolean[] }))
 
 // Mock the API clients
 vi.mock('../../client', () => ({
@@ -68,8 +72,17 @@ vi.mock('../../client', () => ({
       if (typeof path === 'string' && path.includes('/publish')) {
         // Publish mutation
         return {
-          mutate: vi.fn((_params: unknown, callbacks?: MutationCallbacks) => {
-            // Simulate successful publish
+          mutate: vi.fn((params: unknown, callbacks?: MutationCallbacks) => {
+            const confirm = (params as { params?: { query?: { confirm?: boolean } } })?.params?.query?.confirm === true
+            publishMock.confirmCalls.push(confirm)
+            // Trigger-removal 409: an unconfirmed publish is rejected until confirm=true.
+            if (publishMock.simulate409 && !confirm) {
+              callbacks?.onError?.({
+                cause: { code: 'WORKFLOW_PUBLISH_TRIGGER_REMOVAL_CONFIRMATION_REQUIRED', affected_count: 2 },
+              })
+              callbacks?.onSettled?.()
+              return
+            }
             callbacks?.onSuccess?.()
             callbacks?.onSettled?.()
           }),
@@ -111,6 +124,46 @@ describe('useWorkflowActions', () => {
     vi.clearAllMocks()
     vi.mocked(executionsFetchClient.POST).mockReset()
     vi.mocked(workflowFetchClient.GET).mockReset()
+    publishMock.simulate409 = false
+    publishMock.confirmCalls = []
+  })
+
+  describe('publish trigger-removal confirmation (list page)', () => {
+    it('opens the confirm dialog on a trigger-removal 409 and republishes with confirm=true', async () => {
+      publishMock.simulate409 = true
+      const user = userEvent.setup()
+
+      function Harness() {
+        const actions = useWorkflowActions({
+          showSuccess: mockShowSuccess,
+          showError: mockShowError,
+          onNavigate: mockOnNavigate,
+          onRefetch: mockOnRefetch,
+        })
+        return (
+          <>
+            <button type="button" onClick={() => actions.handlePublishWorkflow(mockWorkflow())}>
+              do-publish
+            </button>
+            {actions.triggerRemovalConfirmDialog}
+          </>
+        )
+      }
+
+      render(<Harness />, { wrapper: createWrapper() })
+      await user.click(screen.getByRole('button', { name: 'do-publish' }))
+
+      // First publish (confirm=false) returns the 409 -> confirmation dialog, no generic error yet.
+      const confirmButton = await screen.findByRole('button', { name: 'Publish anyway' })
+      expect(mockShowError).not.toHaveBeenCalled()
+
+      await user.click(confirmButton)
+
+      await waitFor(() =>
+        expect(mockShowSuccess).toHaveBeenCalledWith(expect.objectContaining({ title: 'Workflow published' }))
+      )
+      expect(publishMock.confirmCalls).toEqual([false, true])
+    })
   })
 
   describe('onSettled callbacks', () => {
