@@ -37,6 +37,8 @@ spec:
       value: '{{revision}}'
     - name: pipeline-github-pr-number
       value: '{{pull_request_number}}'
+    - name: aap-dev-revision
+      value: 4b751971b
   pipelineRef:
     params:
       - name: name
