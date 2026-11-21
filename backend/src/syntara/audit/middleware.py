@@ -409,7 +409,7 @@ class AuditMiddleware:
             )
 
             AuditEventDispatcher.dispatch(event)
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             logger.warning(
                 "audit_middleware_failed",
                 path=path,

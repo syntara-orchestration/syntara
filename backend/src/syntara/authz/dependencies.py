@@ -45,7 +45,7 @@ def _record_authz_duration(start: float, resource_type: str, action: str) -> Non
             unit="ms",
             labels={"resource_type": resource_type, "action": action},
         )
-    except Exception:
+    except Exception:  # noqa: BLE001
         logger.debug("authz_metrics_recording_failed", exc_info=True)
 
 

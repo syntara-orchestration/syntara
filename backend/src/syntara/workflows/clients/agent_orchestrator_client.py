@@ -459,7 +459,7 @@ class AgentOrchestratorClient:
             )
             response.raise_for_status()
             logger.info("Invocation cancelled", invocation_id=invocation_id, reason=reason)
-        except Exception:
+        except Exception:  # noqa: BLE001
             logger.warning(
                 "Failed to cancel invocation (best-effort)",
                 invocation_id=invocation_id,

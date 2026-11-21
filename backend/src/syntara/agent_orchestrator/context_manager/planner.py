@@ -180,7 +180,7 @@ class ContextManagerPlanner:
                 max_input_tokens=budget.max_input_tokens,
             )
             return max_tokens
-        except Exception:
+        except Exception:  # noqa: BLE001
             max_tokens = await self.settings.get_int("context_manager.max_total_tokens")
             logger.warning(
                 "Model-aware budget resolution failed, falling back to max_total_tokens",

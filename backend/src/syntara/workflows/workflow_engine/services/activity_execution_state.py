@@ -131,7 +131,7 @@ class ActivityExecutionStateMixin:
             return ExecutionStatus.COMPLETED, None
         try:
             result_data = json.loads(completed_attrs.result.payloads[0].data)
-        except Exception:
+        except Exception:  # noqa: BLE001
             logger.warning("Failed to parse workflow result for failure detection", exc_info=True)
             return ExecutionStatus.COMPLETED, None
         if not isinstance(result_data, dict):
@@ -190,7 +190,7 @@ class ActivityExecutionStateMixin:
                 fa = result_data.get("failed_activities", {})
                 if isinstance(fa, dict):
                     return fa
-        except Exception:
+        except Exception:  # noqa: BLE001
             logger.debug("Could not parse failed_activities from workflow result", exc_info=True)
         return {}
 
@@ -214,7 +214,7 @@ class ActivityExecutionStateMixin:
                 ca = result_data.get("cancelled_activities", {})
                 if isinstance(ca, dict):
                     return ca
-        except Exception:
+        except Exception:  # noqa: BLE001
             logger.debug("Could not parse cancelled_activities from workflow result", exc_info=True)
         return {}
 
@@ -243,7 +243,7 @@ class ActivityExecutionStateMixin:
                 completed = result_data.get("completed_nodes", [])
                 if isinstance(completed, list):
                     return {node_id for node_id in completed if isinstance(node_id, str)}
-        except Exception:
+        except Exception:  # noqa: BLE001
             logger.debug("Could not parse completed_nodes from workflow result", exc_info=True)
         return set()
 

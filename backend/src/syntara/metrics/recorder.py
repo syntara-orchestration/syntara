@@ -287,7 +287,7 @@ class MetricsRecorder:
             # prometheus_client has no public API for reading a gauge value;
             # _value is a private ValueClass. The except guard handles library changes.
             return int(gauge._value.get())  # noqa: SLF001
-        except Exception:
+        except Exception:  # noqa: BLE001
             logger.debug("active_workflows_gauge_read_failed", exc_info=True)
             return 0
 
@@ -336,7 +336,7 @@ class MetricsRecorder:
         """Map a MetricType recording to its Prometheus counterpart."""
         try:
             self._dispatch_prometheus(metric_type, value, labels)
-        except Exception:
+        except Exception:  # noqa: BLE001
             logger.debug("Failed to update Prometheus metric", metric_type=metric_type, exc_info=True)
 
     def _dispatch_prometheus(  # noqa: C901, PLR0912

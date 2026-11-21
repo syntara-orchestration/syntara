@@ -168,7 +168,7 @@ class PeriodicWorker:
         if self._cleanup_callback is not None:
             try:
                 await self._cleanup_callback()
-            except Exception:
+            except Exception:  # noqa: BLE001
                 logger.warning(
                     "periodic_worker_cleanup_error",
                     worker_name=self._name,
@@ -185,7 +185,7 @@ class PeriodicWorker:
                 await self._execute_cycle()
             except asyncio.CancelledError:
                 raise
-            except Exception:
+            except Exception:  # noqa: BLE001
                 logger.warning(
                     "periodic_worker_cycle_error",
                     worker_name=self._name,

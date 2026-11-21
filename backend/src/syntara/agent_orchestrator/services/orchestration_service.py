@@ -654,7 +654,7 @@ class OrchestrationService:
                 except InvocationCancelledError:
                     cancel_event.set()
                     return
-                except Exception:
+                except Exception:  # noqa: BLE001
                     logger.debug("Cancellation check failed, will retry", invocation_id=invocation_id, exc_info=True)
                 await asyncio.sleep(interval)
 
@@ -733,7 +733,7 @@ class OrchestrationService:
                 task = asyncio.current_task()
                 if task is not None and task.cancelling():
                     raise
-            except Exception:
+            except Exception:  # noqa: BLE001
                 logger.debug("Cancellation watcher raised on teardown", invocation_id=invocation_id, exc_info=True)
 
         # No post-loop cancellation check: if cancellation lands after the last

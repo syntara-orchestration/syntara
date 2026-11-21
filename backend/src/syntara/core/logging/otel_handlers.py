@@ -74,7 +74,7 @@ def flush_otel_handler(target_logger: logging.Logger) -> None:
                 "otel.handler.flushed",
                 logger_name=target_logger.name,
             )
-        except Exception:
+        except Exception:  # noqa: BLE001
             logger.warning(
                 "otel.handler.flush_failed",
                 logger_name=target_logger.name,

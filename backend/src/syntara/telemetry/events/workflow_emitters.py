@@ -91,7 +91,7 @@ def emit_activities(
                     request_id=request_id,
                 )
             )
-        except Exception:
+        except Exception:  # noqa: BLE001
             logger.warning(
                 "Failed to emit node telemetry (fire-and-forget)",
                 activity_name=activity.activity_name,

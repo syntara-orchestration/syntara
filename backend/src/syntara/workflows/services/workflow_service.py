@@ -351,7 +351,7 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
         try:
             async with AsyncSessionLocal() as session:
                 workflow = await session.get(Workflow, workflow_id)
-        except Exception:
+        except Exception:  # noqa: BLE001
             logger.warning(
                 "Could not read workflow state before schedule deletion — skipping cleanup",
                 workflow_id=str(workflow_id),
@@ -397,7 +397,7 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
                 workflow_id=str(workflow_id),
                 should_abort=_abort_if_republished,
             )
-        except Exception:
+        except Exception:  # noqa: BLE001
             logger.warning(
                 "Best-effort scheduled trigger deletion failed — reconciliation worker will clean up orphans",
                 workflow_id=str(workflow_id),

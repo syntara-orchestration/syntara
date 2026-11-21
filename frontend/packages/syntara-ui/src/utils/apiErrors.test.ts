@@ -451,7 +451,6 @@ describe('apiErrors', () => {
   })
 })
 
-
 describe('publish trigger-removal confirmation error', () => {
   it('detects the confirmation code and reads the affected count', () => {
     const error = { cause: { code: 'WORKFLOW_PUBLISH_TRIGGER_REMOVAL_CONFIRMATION_REQUIRED', affected_count: 3 } }

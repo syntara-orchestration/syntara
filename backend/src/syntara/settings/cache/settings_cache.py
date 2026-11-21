@@ -500,7 +500,7 @@ class SettingsCache:
 
         try:
             await self._redis_client.ping()
-        except Exception:
+        except Exception:  # noqa: BLE001
             logger.warning("settings.redis_unavailable_for_pubsub", exc_info=True)
             return False
 
@@ -510,7 +510,7 @@ class SettingsCache:
 
         try:
             self._pubsub = await self._redis_client.pubsub_subscribe(REDIS_CHANNEL)
-        except Exception:
+        except Exception:  # noqa: BLE001
             logger.warning("settings.pubsub_subscribe_failed", channel=REDIS_CHANNEL, exc_info=True)
             return False
 
@@ -585,7 +585,7 @@ class SettingsCache:
         logger.info("settings.pubsub_reconnecting")
         try:
             await self._start_pubsub()
-        except Exception:
+        except Exception:  # noqa: BLE001
             logger.warning("settings.pubsub_reconnect_failed", exc_info=True)
 
     async def _pubsub_listener(self) -> None:
@@ -627,7 +627,7 @@ class SettingsCache:
 
         except asyncio.CancelledError:
             raise
-        except Exception:
+        except Exception:  # noqa: BLE001
             # Pub/Sub died — polling worker is still running as fallback.
             # Clean up stale pubsub so _maybe_reconnect_pubsub can retry.
             logger.warning("settings.pubsub_listener_error", exc_info=True)
@@ -651,7 +651,7 @@ class SettingsCache:
         """
         try:
             new_value = await self._fetch_from_db(key)
-        except Exception:
+        except Exception:  # noqa: BLE001
             logger.warning("settings.pubsub_refetch_error", key=key, exc_info=True)
             return
 
@@ -761,7 +761,7 @@ class SettingsCache:
         for key in watched_keys:
             try:
                 new_value = await self._fetch_from_db(key)
-            except Exception:
+            except Exception:  # noqa: BLE001
                 logger.warning(
                     "settings.poll_fetch_error",
                     key=key,
@@ -796,7 +796,7 @@ class SettingsCache:
                 result = cb(key, new_value)
                 if asyncio.iscoroutine(result):
                     await result
-            except Exception:
+            except Exception:  # noqa: BLE001
                 logger.warning(
                     "settings.on_change_callback_error",
                     key=key,
@@ -834,7 +834,7 @@ class SettingsCache:
             payload = json.dumps({"key": key, "mac": mac})
             await self._redis_client.pubsub_publish(REDIS_CHANNEL, payload)
             logger.debug("settings.change_published", key=key)
-        except Exception:
+        except Exception:  # noqa: BLE001
             logger.warning("settings.publish_change_error", key=key, exc_info=True)
 
 

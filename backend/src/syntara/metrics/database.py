@@ -82,7 +82,7 @@ def _after_cursor_execute(
         )
 
         _record_pool_utilization(conn, recorder)
-    except Exception:
+    except Exception:  # noqa: BLE001
         logger.debug("database_metrics_recording_failed", exc_info=True)
 
 
@@ -95,7 +95,7 @@ def _on_commit(_conn: Connection) -> None:
         recorder = get_metrics_recorder()
         recorder.record(MetricType.DATABASE_TRANSACTION_RATE, 1.0, labels={})
         recorder.increment("db_transactions")
-    except Exception:
+    except Exception:  # noqa: BLE001
         logger.debug("database_transaction_metric_failed", exc_info=True)
 
 

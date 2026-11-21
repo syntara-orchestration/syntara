@@ -44,7 +44,7 @@ class ApprovalRequestedTelemetryHandler(AuditEventHandler[ApprovalRequestedEvent
                 "Emitted approval_requested telemetry",
                 execution_id=str(event.execution_id),
             )
-        except Exception:
+        except Exception:  # noqa: BLE001
             logger.warning("Failed to emit approval_requested telemetry (non-fatal)", exc_info=True)
 
         return None

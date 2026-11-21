@@ -565,7 +565,7 @@ async def _check_database() -> str:
             timeout_seconds=DB_PROBE_TIMEOUT_SECONDS,
         )
         error_detail = f"Database probe did not complete within {DB_PROBE_TIMEOUT_SECONDS}s"
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         # Any failure at all means "not ready"; a probe has no use for the
         # distinction between one connectivity error and another.
         logger.debug("Readiness check failed: database connectivity error", error=str(e), exc_info=True)

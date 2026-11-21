@@ -160,7 +160,7 @@ async def apply_runtime_log_level() -> None:
             default=fallback_level,
         )
         level = level.upper()
-    except Exception:
+    except Exception:  # noqa: BLE001
         log.warning(
             "settings.runtime_log_level_read_error",
             extra={"fallback_level": fallback_level},

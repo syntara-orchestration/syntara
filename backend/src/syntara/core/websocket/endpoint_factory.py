@@ -400,7 +400,7 @@ def _load_module_from_file(component_name: str, py_file: Path) -> types.ModuleTy
         spec.loader.exec_module(module)
         return module
 
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logger.warning(
             "Failed to import for component",
             filename=py_file.name,
@@ -433,7 +433,7 @@ def _load_spec_file(spec_path: Path, py_file: Path) -> dict[str, Any] | None:
 
         logger.warning("Unknown spec file format, skipping", format=spec_path.suffix, filename=py_file.name)
         return None
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logger.warning("Failed to load spec from path", spec_path=str(spec_path), error=str(e), exc_info=True)
         return None
 

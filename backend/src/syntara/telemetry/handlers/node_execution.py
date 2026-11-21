@@ -53,7 +53,7 @@ class NodeExecutedTelemetryHandler(AuditEventHandler[NodeExecutedEvent]):
                 node_type=event.node_type,
                 status=event.status,
             )
-        except Exception:
+        except Exception:  # noqa: BLE001
             logger.warning("Failed to emit node_execution telemetry (non-fatal)", exc_info=True)
 
         return None

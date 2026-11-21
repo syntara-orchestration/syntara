@@ -295,7 +295,7 @@ class ExecutionStreamingService:
 
         try:
             workflow_id, workflow_name, execution_status = await self._resolve_workflow_context(execution_id)
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             logger.warning(
                 "Failed to resolve workflow context for audit",
                 execution_id=execution_id,

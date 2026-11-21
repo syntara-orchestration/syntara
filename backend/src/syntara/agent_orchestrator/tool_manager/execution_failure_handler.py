@@ -140,7 +140,7 @@ def _emit_tool_metrics(
         }
         recorder.record(MetricType.TOOL_EXECUTION_DURATION, duration_ms, unit="ms", labels=labels)
         recorder.record(MetricType.TOOL_EXECUTION_STATUS, 1.0, labels=labels)
-    except Exception:
+    except Exception:  # noqa: BLE001
         logger.warning("Failed to emit tool execution metrics", exc_info=True)
 
 
@@ -180,7 +180,7 @@ async def _persist_tool_execution_to_db(
             except Exception:
                 await session.rollback()
                 raise
-    except Exception:
+    except Exception:  # noqa: BLE001
         logger.warning("Failed to persist tool execution to DB", exc_info=True)
 
 

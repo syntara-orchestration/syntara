@@ -105,7 +105,7 @@ async def _check_sa_identity(request: Request, sa_id: str, payload: TokenPayload
     """Check SA existence, status, and token version. Returns a rejection Response or None."""
     try:
         sa_result = await _check_sa_status(sa_id)
-    except Exception:
+    except Exception:  # noqa: BLE001
         logger.debug("SA status check failed, skipping", exc_info=True)
         return None
 
@@ -181,7 +181,7 @@ async def _check_sa_credential(request: Request, sa_id: str, cred_id: str | None
 
     try:
         cred_result = await _check_cred_status(cred_id)
-    except Exception:
+    except Exception:  # noqa: BLE001
         logger.debug("Credential status check failed, skipping", exc_info=True)
         return None
 
@@ -246,7 +246,7 @@ class StaleTokenMiddleware(BaseHTTPMiddleware):
         try:
             token_service = TokenService()
             payload = token_service.decode_token(token, token_type="access")  # noqa: S106
-        except Exception:
+        except Exception:  # noqa: BLE001
             logger.debug("Token decode failed, skipping middleware checks", exc_info=True)
             return await call_next(request)
 
@@ -309,7 +309,7 @@ class StaleTokenMiddleware(BaseHTTPMiddleware):
 
             status_resolved = True
 
-        except Exception:
+        except Exception:  # noqa: BLE001
             logger.debug("User status check failed, skipping", exc_info=True)
 
         # CVE-2026-48710: use scope["path"] (raw ASGI path) instead of

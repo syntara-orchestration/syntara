@@ -282,7 +282,7 @@ class MetricsMiddleware:
             if self._request_count % self._MEMORY_TRIM_INTERVAL == 0:
                 gc.collect()
                 release_memory_to_os()
-        except Exception:
+        except Exception:  # noqa: BLE001
             logger.warning(
                 "metrics_recording_failed",
                 endpoint=path,

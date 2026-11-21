@@ -709,7 +709,7 @@ class ApprovalService(UserReferenceResolverMixin, BaseService):
                     decision_notes=request.notes,
                     temporal_activity_id=approval.temporal_activity_id,
                 )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             signal_error = "Workflow signal delivery failed"
             logger.warning(
                 "Failed to send approval signal",

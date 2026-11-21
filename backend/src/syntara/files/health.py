@@ -86,6 +86,6 @@ async def check_file_storage_health() -> FileStorageStatus:
     except TimeoutError:
         logger.debug("Health check: file storage timed out")
         return FileStorageStatus.DEGRADED
-    except Exception:
+    except Exception:  # noqa: BLE001
         logger.debug("Health check: file storage check failed", exc_info=True)
         return FileStorageStatus.ERROR

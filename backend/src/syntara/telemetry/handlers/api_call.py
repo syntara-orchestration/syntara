@@ -67,7 +67,7 @@ class APICallTelemetryHandler(AuditEventHandler[HTTPRequestEvent]):
                 status_code=event.status_code,
                 response_time_ms=event.response_time_ms,
             )
-        except Exception:
+        except Exception:  # noqa: BLE001
             logger.warning(
                 "analytics_event_failed",
                 endpoint=event.path,
@@ -107,5 +107,5 @@ class APICallTelemetryHandler(AuditEventHandler[HTTPRequestEvent]):
                 http_method=event.method,
                 interface=event.interface,
             )
-        except Exception:
+        except Exception:  # noqa: BLE001
             logger.debug("api_usage_record_failed", exc_info=True)
