@@ -14,6 +14,7 @@ export type ExecutionCopyData = {
 type UseExecutionCopyToEditorOptions = {
   executionCopy: ExecutionCopyData | undefined
   isWorkflowInitialized: boolean
+  mostRecentExecutionId: string | null
   dispatch: Dispatch<BuilderAction>
   markDirty: () => void
   showSuccess: (alert: { title: string; description?: string }) => void
@@ -22,32 +23,35 @@ type UseExecutionCopyToEditorOptions = {
 export function useExecutionCopyToEditor({
   executionCopy,
   isWorkflowInitialized,
+  mostRecentExecutionId,
   dispatch,
   markDirty,
   showSuccess,
 }: UseExecutionCopyToEditorOptions): void {
-  const hasAppliedRef = useRef(false)
-  const lastExecutionIdRef = useRef<string | undefined>(undefined)
+  const contentReplacedForExecutionRef = useRef<string | null>(null)
   const currentWorkflow = useWorkflowStore((s) => s.currentWorkflow)
 
-  useEffect(() => {
-    const executionId = executionCopy?.executionId
-    if (executionId !== lastExecutionIdRef.current) {
-      hasAppliedRef.current = false
-      lastExecutionIdRef.current = executionId
-    }
-  }, [executionCopy?.executionId])
+  const reducerSynced =
+    !!executionCopy && mostRecentExecutionId != null && mostRecentExecutionId === executionCopy.executionId
 
   useEffect(() => {
-    if (!executionCopy || hasAppliedRef.current || !currentWorkflow || !isWorkflowInitialized) return
-    hasAppliedRef.current = true
+    if (!executionCopy) {
+      contentReplacedForExecutionRef.current = null
+    }
+  }, [executionCopy])
+
+  useEffect(() => {
+    if (!executionCopy || !currentWorkflow || !isWorkflowInitialized) return
+    if (reducerSynced) return
 
     let copiedRunActivityIds: string[] | undefined
+    const contentAlreadyReplaced = contentReplacedForExecutionRef.current === executionCopy.executionId
 
-    if (!executionCopy.preserveWorkflow) {
+    if (!executionCopy.preserveWorkflow && !contentAlreadyReplaced) {
       const { workflowDef, edges, nodePositions } = parseImportedDefinition(executionCopy.workflowDefinition)
       useWorkflowStore.getState().replaceWorkflowContent(workflowDef, edges, nodePositions)
       copiedRunActivityIds = collectCopiedRunActivityIds(workflowDef)
+      contentReplacedForExecutionRef.current = executionCopy.executionId
 
       if (workflowDef.name && typeof workflowDef.name === 'string') {
         dispatch({ type: 'SET_WORKFLOW_NAME', payload: workflowDef.name })
@@ -60,8 +64,10 @@ export function useExecutionCopyToEditor({
         title: 'Run copied to editor',
         description: 'The run has been loaded into the editor with pinned runtime data.',
       })
-    } else {
+    } else if (executionCopy.preserveWorkflow) {
       // Link execution to current graph — snapshot IDs so newly added nodes get no status
+      copiedRunActivityIds = collectCopiedRunActivityIds(currentWorkflow)
+    } else {
       copiedRunActivityIds = collectCopiedRunActivityIds(currentWorkflow)
     }
 
@@ -76,5 +82,5 @@ export function useExecutionCopyToEditor({
     url.searchParams.delete('fromExecution')
     url.searchParams.delete('linkExecution')
     window.history.replaceState({}, '', url.pathname + url.search)
-  }, [executionCopy, currentWorkflow, isWorkflowInitialized, dispatch, markDirty, showSuccess])
+  }, [executionCopy, currentWorkflow, isWorkflowInitialized, reducerSynced, dispatch, markDirty, showSuccess])
 }

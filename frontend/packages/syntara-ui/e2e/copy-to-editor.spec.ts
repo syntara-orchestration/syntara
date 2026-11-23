@@ -14,6 +14,7 @@
 
 import { type Page, test, expect, toAppUrl } from './fixtures'
 import { expectCanvasStepTitleVisible } from './helpers/canvas-interaction'
+import { waitForExecutionTerminal } from './helpers/workflow-run'
 import {
   buildUniqueName,
   createBasicWorkflowViaApi,
@@ -22,9 +23,6 @@ import {
   waitForUIReady,
 } from './helpers/workflows'
 import { publishWorkflowViaApi, deleteWorkflowViaApi } from './utils/api'
-import { pollExecutionStatus } from './utils/api-executions'
-
-const TERMINAL_EXECUTION_STATUSES = ['completed', 'failed', 'cancelled']
 
 /** Run a workflow from the Workflows list page and wait for navigation to the execution detail page. */
 async function runWorkflowFromList(app: Page, workflowName: string) {
@@ -66,7 +64,7 @@ async function confirmCopyToEditorInBuilder(app: Page) {
   await waitForUIReady(app)
   await expect(app.locator('.react-flow')).toBeVisible({ timeout: 30_000 })
   await expect(async () => {
-    await expect(app.getByRole('heading', { name: 'Run details' })).toBeVisible()
+    await expect(app.getByRole('heading', { name: /run details/i })).toBeVisible()
   }).toPass({ timeout: 90_000, intervals: [2_000] })
 }
 
@@ -99,7 +97,7 @@ test.describe('Copy Run to Editor', () => {
       // Verify navigation to builder with workflow loaded
       await expect(app).toHaveURL(/\/workflow-builder\//)
       await expect(app.getByPlaceholder('Workflow name')).toHaveValue(workflowName, { timeout: 15_000 })
-      await expect(app.getByRole('heading', { name: 'Run details' })).toBeVisible({ timeout: 15_000 })
+      await expect(app.getByRole('heading', { name: /run details/i })).toBeVisible({ timeout: 15_000 })
     } finally {
       await deleteWorkflow(app, workflowName)
     }
@@ -117,7 +115,7 @@ test.describe('Copy Run to Editor', () => {
       await runWorkflowFromList(app, workflowName)
       const executionUrl = app.url()
       const executionId = executionIdFromPageUrl(app)
-      await pollExecutionStatus(app, executionId, TERMINAL_EXECUTION_STATUSES, { timeout: 120_000 })
+      await waitForExecutionTerminal(app, executionId, 120_000)
 
       await openWorkflowInBuilder(app, workflowName, id)
       await expectCanvasStepTitleVisible(app, 'Manual trigger', { timeout: 30_000 })
@@ -125,7 +123,7 @@ test.describe('Copy Run to Editor', () => {
       await waitForUIReady(app)
 
       await expect(app.getByRole('button', { name: 'Copy to editor' })).toBeVisible({ timeout: 15_000 })
-      await app.getByLabel('Run history').click()
+      await app.getByRole('button', { name: 'Run history' }).click()
       await expect(app.getByRole('heading', { name: 'Run history' })).toBeVisible()
 
       const runHistoryList = app.getByRole('list', { name: 'Run history list' })

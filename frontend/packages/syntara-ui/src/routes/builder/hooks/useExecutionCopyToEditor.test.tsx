@@ -23,6 +23,7 @@ function buildOptions(overrides: Partial<Parameters<typeof useExecutionCopyToEdi
   return {
     executionCopy: undefined as ExecutionCopyData | undefined,
     isWorkflowInitialized: true,
+    mostRecentExecutionId: null as string | null,
     dispatch: vi.fn(),
     markDirty: vi.fn(),
     showSuccess: vi.fn(),
@@ -118,11 +119,34 @@ describe('useExecutionCopyToEditor', () => {
   })
 
   it('applies only once even on re-render', () => {
-    const opts = buildOptions({ executionCopy: buildExecutionCopy() })
-    const { rerender } = renderHook(() => useExecutionCopyToEditor(opts))
-    rerender()
-    rerender()
+    const opts = buildOptions({ executionCopy: buildExecutionCopy({ executionId: 'exec-once' }) })
+    const { rerender } = renderHook((p) => useExecutionCopyToEditor(p), {
+      initialProps: opts,
+    })
+    rerender({ ...opts, mostRecentExecutionId: 'exec-once' })
+    rerender({ ...opts, mostRecentExecutionId: 'exec-once' })
     expect(opts.showSuccess).toHaveBeenCalledOnce()
+  })
+
+  it('re-dispatches run panel state when INIT cleared execution id after a replace copy', () => {
+    const dispatch = vi.fn()
+    const executionCopy = buildExecutionCopy({ executionId: 'exec-retry' })
+    const { rerender } = renderHook((p) => useExecutionCopyToEditor(p), {
+      initialProps: buildOptions({ dispatch, executionCopy, mostRecentExecutionId: null }),
+    })
+    expect(dispatch).toHaveBeenCalledWith({
+      type: 'SET_MOST_RECENT_EXECUTION',
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- vitest asymmetric matcher
+      payload: expect.objectContaining({ executionId: 'exec-retry' }),
+    })
+    dispatch.mockClear()
+    rerender(buildOptions({ dispatch, executionCopy, mostRecentExecutionId: null }))
+    expect(dispatch).toHaveBeenCalledWith({
+      type: 'SET_MOST_RECENT_EXECUTION',
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- vitest asymmetric matcher
+      payload: expect.objectContaining({ executionId: 'exec-retry' }),
+    })
+    expect(dispatch).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'SET_WORKFLOW_NAME' }) as unknown)
   })
 
   describe('preserveWorkflow mode', () => {

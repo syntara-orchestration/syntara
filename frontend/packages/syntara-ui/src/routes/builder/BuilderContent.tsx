@@ -189,6 +189,7 @@ export function BuilderContent(props: BuilderContentProps) {
   useExecutionCopyToEditor({
     executionCopy,
     isWorkflowInitialized,
+    mostRecentExecutionId,
     dispatch,
     markDirty,
     showSuccess,

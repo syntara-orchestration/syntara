@@ -54,7 +54,10 @@ export default function BuilderEdit() {
         query: { include: 'workflow_definition' },
       },
     },
-    { enabled: !!executionIdParam }
+    {
+      enabled: !!executionIdParam,
+      refetchOnMount: 'always',
+    }
   )
 
   const executionCopy = useMemo((): ExecutionCopyData | undefined => {
@@ -87,9 +90,11 @@ export default function BuilderEdit() {
     )
   }
 
+  const awaitingExecutionForCopy = !!executionIdParam && (executionQuery.isLoading || executionQuery.isFetching)
+
   // Use isLoading instead of isPending to distinguish initial load from refetch
   // isLoading = true only on first fetch, isPending = true on both initial and refetch
-  if (isLoading) {
+  if (isLoading || awaitingExecutionForCopy) {
     return (
       <SynPage>
         <SynPageTitle segments={['Loading workflow', 'Workflows']} />
