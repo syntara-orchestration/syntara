@@ -6,8 +6,8 @@ type ButtonOnClick = ComponentProps<typeof Button>['onClick']
 
 type RouterLinkProps = React.AnchorHTMLAttributes<HTMLAnchorElement>
 
-/** Bridge PF Button's `href` convention to TanStack Router's `to` prop. */
-function RouterLink({ href, children, ...rest }: RouterLinkProps) {
+/** Bridge PatternFly Button `href` to TanStack Router `to` for client-side navigation. */
+export function TanStackRouterButtonLink({ href, children, ...rest }: RouterLinkProps) {
   return (
     <TanStackLink to={href ?? '/'} {...(rest as Omit<ComponentProps<typeof TanStackLink>, 'to' | 'children'>)}>
       {children}
@@ -30,7 +30,15 @@ type SynLinkProps = {
  */
 export function SynLink({ to, children, className, onClick, ref }: Readonly<SynLinkProps>) {
   return (
-    <Button ref={ref} variant="link" isInline component={RouterLink} href={to} className={className} onClick={onClick}>
+    <Button
+      ref={ref}
+      variant="link"
+      isInline
+      component={TanStackRouterButtonLink}
+      href={to}
+      className={className}
+      onClick={onClick}
+    >
       {children}
     </Button>
   )

@@ -117,19 +117,17 @@ describe('GroupMappingTab', () => {
       render(<GroupMappingTab {...defaultProps} groupMapping={existingMapping} />, { wrapper })
 
       expect(screen.getByPlaceholderText('Filter by keyword')).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: /edit group mapping/i })).toBeInTheDocument()
+      expect(screen.getByRole('link', { name: /edit group mapping/i })).toBeInTheDocument()
       expect(screen.getByText('idp-admin')).toBeInTheDocument()
     })
 
-    it('navigates to edit page when Edit group mapping is clicked', async () => {
-      const user = userEvent.setup()
+    it('links to the edit route from Edit group mapping', () => {
       render(<GroupMappingTab {...defaultProps} groupMapping={existingMapping} />, { wrapper })
 
-      await user.click(screen.getByRole('button', { name: /edit group mapping/i }))
-
-      expect(routerTestState.navigate).toHaveBeenCalledWith({
-        to: '/system-administration/authentication/identity-providers/provider-123/group-mapping/edit',
-      })
+      expect(screen.getByRole('link', { name: /edit group mapping/i })).toHaveAttribute(
+        'href',
+        '/system-administration/authentication/identity-providers/provider-123/group-mapping/edit'
+      )
     })
   })
 
@@ -149,7 +147,7 @@ describe('GroupMappingTab', () => {
       render(<GroupMappingTab {...defaultProps} groupMapping={existingMapping} readOnly />, { wrapper })
 
       expect(screen.getByPlaceholderText('Filter by keyword')).toBeInTheDocument()
-      expect(screen.queryByRole('button', { name: /edit group mapping/i })).not.toBeInTheDocument()
+      expect(screen.queryByRole('link', { name: /edit group mapping/i })).not.toBeInTheDocument()
       expect(screen.getByText('idp-admin')).toBeInTheDocument()
     })
   })
