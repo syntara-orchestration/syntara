@@ -330,8 +330,8 @@ describe('IntegrationDetailsStep', () => {
       expect(screen.getByText(/PEM-encoded CA certificate/)).toBeInTheDocument()
       expect(screen.queryByText('Security')).not.toBeInTheDocument()
       expect(screen.queryByRole('checkbox', { name: /allow http connections/i })).not.toBeInTheDocument()
-      expect(apiEndpoint.compareDocumentPosition(certificate) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0)
-      expect(certificate.compareDocumentPosition(scope) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0)
+      expect(apiEndpoint.compareDocumentPosition(certificate) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+      expect(certificate.compareDocumentPosition(scope) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     })
 
     it('has no accessibility violations with OpenShift selected', async () => {
