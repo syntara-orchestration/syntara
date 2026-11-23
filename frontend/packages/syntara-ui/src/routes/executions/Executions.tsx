@@ -56,7 +56,11 @@ function renderExecutionsListQueryState(
   if (listError) {
     if (isServiceUnavailableError(listError)) {
       return (
-        <SynEmptyStateServiceUnavailable title="Service unavailable" description={listErrorMessage} showAdminHint={false} />
+        <SynEmptyStateServiceUnavailable
+          title="Service unavailable"
+          description={listErrorMessage}
+          showAdminHint={false}
+        />
       )
     }
     if (isForbiddenError(listError)) {
@@ -192,11 +196,8 @@ export default function Executions() {
     suppress503: true,
   })
 
-  const queryState = renderExecutionsListQueryState(
-    listError,
-    listErrorMessage,
-    executionsQuery.isPending,
-    () => detachPromise(executionsQuery.refetch())
+  const queryState = renderExecutionsListQueryState(listError, listErrorMessage, executionsQuery.isPending, () =>
+    detachPromise(executionsQuery.refetch())
   )
 
   if (queryState) {
