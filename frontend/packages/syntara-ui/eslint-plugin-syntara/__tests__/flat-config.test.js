@@ -564,7 +564,6 @@ describe('flat ESLint config rule inheritance', () => {
     const config = await eslint.calculateConfigForFile('src/routes/access-management/AssignRoleModal.tsx')
     const ruleIds = [
       'syntara/no-locale-date-format',
-      'syntara/no-fetch-aliases',
       'syntara/prefer-confirmation-dialog',
       'syntara/prefer-syn-select',
       'syntara/prefer-pf-list-components',

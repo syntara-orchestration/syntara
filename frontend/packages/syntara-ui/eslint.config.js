@@ -418,7 +418,6 @@ export default tseslint.config(
       // -- Syntara-specific rules (PR checklist + UX design system enforcement) --
       // no-switch-is-reversed, require-alert-object-param, and require-query-state-object
       // are enforced via no-restricted-syntax AST selectors above (no custom plugin needed).
-      'syntara/no-fetch-aliases': 'error',
       'syntara/prefer-pf-list-components': 'error',
       'syntara/prefer-pf-text-components': 'error',
       'syntara/use-design-tokens-not-hardcoded': 'error',

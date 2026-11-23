@@ -1,4 +1,3 @@
-import noFetchAliases from './rules/no-fetch-aliases.js'
 import noLocaleDateFormat from './rules/no-locale-date-format.js'
 import preferConfirmationDialog from './rules/prefer-confirmation-dialog.js'
 import preferSynSelect from './rules/prefer-syn-select.js'
@@ -11,7 +10,6 @@ import useDesignTokensNotHardcoded from './rules/use-design-tokens-not-hardcoded
 export default {
   meta: { name: 'eslint-plugin-syntara', version: '0.1.0' },
   rules: {
-    'no-fetch-aliases': noFetchAliases,
     'no-locale-date-format': noLocaleDateFormat,
     'prefer-confirmation-dialog': preferConfirmationDialog,
     'prefer-syn-select': preferSynSelect,

@@ -86,7 +86,6 @@ Items enforced by ESLint at **error** level are omitted -- ESLint is the source 
 - Hardcoded documentation URLs → `@ansible/no-hardcoded-doc-urls`
 - Hardcoded API prefixes → `@ansible/no-hardcoded-api-prefix`
 - Unapproved HTTP clients and direct `fetch` / `XMLHttpRequest` usage → `@ansible/no-unapproved-http-client`
-- Aliasing or passing the global `fetch` function → `syntara/no-fetch-aliases`
 - Missing explanations on ESLint disable directives warn via `@eslint-community/eslint-comments/require-description`
 - Barrel files in `src/` → `@ansible/no-barrel-files`
 - `// TODO` / `// FIXME` comments → `no-warning-comments` (warn, not error -- surfaced as a lint warning, does not block CI)
