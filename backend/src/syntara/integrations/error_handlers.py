@@ -10,6 +10,7 @@ from syntara.core.error_handlers import PROBLEM_TYPES, create_problem_details_re
 
 if TYPE_CHECKING:
     from syntara.integrations.exceptions import (
+        IntegrationClusterSyncError,
         IntegrationCredentialNotFoundError,
         IntegrationCredentialRequiredError,
         IntegrationCredentialTypeMismatchError,
@@ -207,5 +208,21 @@ def integration_error_handler(request: Request, exc: "IntegrationError") -> JSON
         detail=exc.message,
         code="INTEGRATION_ERROR",
         retryable=False,
+        instance=str(request.url),
+    )
+
+
+def integration_cluster_sync_handler(request: Request, exc: "IntegrationClusterSyncError") -> JSONResponse:
+    """Report rejection or unavailability without exposing upstream internals."""
+    problem_key = "resource_conflict" if exc.status_code == status.HTTP_409_CONFLICT else "service_unavailable"
+    if exc.status_code == status.HTTP_502_BAD_GATEWAY:
+        problem_key = "provider_error"
+    return create_problem_details_response(
+        status_code=exc.status_code,
+        problem_type=PROBLEM_TYPES[problem_key],
+        title="Integration cluster update failed",
+        detail=exc.message,
+        code=exc.code,
+        retryable=exc.status_code == status.HTTP_503_SERVICE_UNAVAILABLE,
         instance=str(request.url),
     )

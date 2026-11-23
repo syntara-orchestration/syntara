@@ -10308,7 +10308,12 @@ paths:
         - bearerAuth: []
     patch:
       summary: Update integration
-      description: Update an integration.
+      description: |-
+        Update an integration.
+
+        OpenShift updates to cluster-synchronized fields require Execution Plane acceptance
+        before persistence. A protected default cluster returns 409; unavailability returns
+        503. Both failures leave the integration unchanged.
       operationId: update_integration
       tags:
         - Integrations
@@ -10422,6 +10427,18 @@ paths:
                 detail: An unexpected error occurred
                 code: INTERNAL_ERROR
                 retryable: true
+        '502':
+          description: Execution Plane rejected the command or returned an invalid response
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+        '503':
+          description: Execution Plane unavailable; the integration update was not saved
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
         '429':
           description: Too Many Requests
           content:

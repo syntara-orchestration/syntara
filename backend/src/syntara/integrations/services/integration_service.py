@@ -6,8 +6,10 @@ from typing import NoReturn
 from uuid import UUID
 
 import structlog
+from fastapi import status
 from sqlalchemy import case, func
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlmodel import col, delete, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -23,8 +25,9 @@ from syntara.core.services.secret_service import SecretService
 from syntara.core.services.user_reference_resolution import UserReferenceResolverMixin
 from syntara.credentials.exceptions import CredentialDisabledError
 from syntara.credentials.lib.injector_resolver import InjectorResolver
-from syntara.execution_plane.cluster_sync_commands import delete_integration_cluster
-from syntara.execution_plane.integration_sync import reconcile_saved_integration
+from syntara.execution_plane.client import ExecutionPlaneRejectedError, ExecutionPlaneUnavailableError
+from syntara.execution_plane.cluster_sync_commands import delete_integration_cluster, submit_integration_cluster
+from syntara.execution_plane.integration_sync import reconcile_integration_clusters, reconcile_saved_integration
 from syntara.integrations.adapters.factory import create_health_check_adapter
 from syntara.integrations.adapters.protocol import (
     DiscoveredLLMModel,
@@ -42,6 +45,7 @@ from syntara.integrations.audit import (
     IntegrationValidateEvent,
 )
 from syntara.integrations.exceptions import (
+    IntegrationClusterSyncError,
     IntegrationCredentialRequiredError,
     IntegrationCredentialTypeMismatchError,
     IntegrationNameConflictError,
@@ -658,6 +662,60 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
         if data.name is not None and data.name != integration.name:
             await self._raise_if_name_exists(data.name)
 
+    async def _commit_integration_update(self, integration: Integration, data: IntegrationUpdate) -> None:
+        """Require EP acceptance before persistence; repair committed state on commit failure."""
+        integration_id = integration.id
+        integration_name = integration.name
+        updated_fields = list(data.model_fields_set)
+        ep_fields = {"name", "configuration", "management_credential_id", "enabled", "scope", "labels"}
+        sync_cluster = integration.integration_type == IntegrationType.OPENSHIFT and bool(
+            data.model_fields_set & ep_fields
+        )
+        integration_type = integration.integration_type.value
+        ep_accepted = False
+        try:
+            if sync_cluster:
+                await submit_integration_cluster(integration)
+                ep_accepted = True
+            await self.session.commit()
+        except Exception as exc:
+            await self.session.rollback()
+            AuditEventDispatcher.dispatch(
+                IntegrationUpdateEvent(
+                    integration_id=integration_id,
+                    integration_name=integration_name,
+                    updated_fields=updated_fields,
+                    integration_type=integration_type,
+                    error_type=type(exc).__name__,
+                )
+            )
+            if ep_accepted:
+                # Read committed state in a fresh transaction: another update may
+                # have won after rollback. The periodic worker retries failures.
+                factory = async_sessionmaker(self.session.bind, class_=AsyncSession, expire_on_commit=False)
+                await reconcile_integration_clusters(factory, integration_id)
+            if isinstance(exc, ExecutionPlaneUnavailableError):
+                raise IntegrationClusterSyncError(
+                    503,
+                    "INTEGRATION_EP_UNAVAILABLE",
+                    "Execution Plane is unavailable. The integration update was not saved.",
+                ) from exc
+            if isinstance(exc, ExecutionPlaneRejectedError):
+                if exc.status_code == status.HTTP_409_CONFLICT:
+                    message = "Execution Plane rejected the update because it conflicts with the cluster state."
+                    code = "INTEGRATION_EP_CONFLICT"
+                    if exc.code == "DEFAULT_CLUSTER_PROTECTED":
+                        message = (
+                            "The default Execution Plane cluster cannot be disabled. "
+                            "Select another default cluster first."
+                        )
+                        code = "INTEGRATION_DEFAULT_CLUSTER_PROTECTED"
+                    raise IntegrationClusterSyncError(409, code, message) from exc
+                raise IntegrationClusterSyncError(
+                    502, "INTEGRATION_EP_INVALID_RESPONSE", "Execution Plane could not accept the integration update."
+                ) from exc
+            raise
+
     async def update_integration(self, integration_id: UUID, data: IntegrationUpdate) -> IntegrationRead:
         """Apply partial updates to an integration."""
         try:
@@ -705,10 +763,7 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
             )
             await self._handle_integrity_error(e, integration_name)
 
-        ep_fields = {"name", "configuration", "management_credential_id", "enabled", "scope", "labels"}
-        await self.session.commit()
-        if data.model_fields_set & ep_fields:
-            await reconcile_saved_integration(self.session, integration)
+        await self._commit_integration_update(integration, data)
 
         result = await self._to_read_with_counts(integration)
         AuditEventDispatcher.dispatch(

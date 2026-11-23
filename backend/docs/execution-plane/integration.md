@@ -115,21 +115,22 @@ including deletion by an age threshold, is separate planned work.
 
 ## Integration configuration
 
-AO commits OpenShift integration configuration before attempting EP delivery.
-The Temporal worker process reconciles current configuration every five minutes, configured by
-`APP_EP_CLUSTER_RECONCILIATION_INTERVAL_SECONDS` (default `300`). The immediate,
-periodic, and manual paths share PostgreSQL advisory-lock coordination. Failed
-or overlapping delivery leaves AO configuration saved for a later sweep.
+OpenShift updates to cluster-synchronized fields require EP acceptance before AO
+commits. Conflicts return 409, unavailability returns 503, and invalid responses
+return 502. Failed updates roll back the patch and emit a failure audit event.
+Creation and project-assignment changes use best-effort, post-commit delivery.
+
+The Temporal worker reconciles committed configuration every five minutes via
+`APP_EP_CLUSTER_RECONCILIATION_INTERVAL_SECONDS` (default `300`). Reconciliation
+runs share an advisory lock; each delivery holds the Integration row lock through
+submission. Each integration gets one bounded attempt, with failures isolated.
+If AO commit fails after EP acceptance, reconciliation reapplies committed state.
+Timeouts can leave EP outcomes unknown; semantic conflicts require intervention.
 
 Run `automation-orchestrator-admin reconcile-clusters [--integration-id UUID]`
 for one manual pass; failures or a skipped busy pass produce a nonzero exit code.
-Each integration gets one bounded attempt. There is no outbox or polling status UI.
-
-The temporary adapter uses the existing EP source-key/revision commands. Physical
-Cluster-ID correlation and revision removal require the next EP contract update.
-Initial namespace applies when creating a missing Cluster/default target; later
-reconciliation does not rewrite independent target placement. Delete remains an
-explicit request subject to EP protections; this sweep does not delete orphans.
+Cluster registration upserts by the shared Integration/Cluster UUID. Deletion is
+explicit and subject to EP protections; reconciliation does not delete orphans.
 
 Work completion is independent of this configuration lifecycle; see
 [activity binding status progression](activity-binding-status.md).
