@@ -36,9 +36,10 @@ vi.mock('../../../utils/backendUrl', () => ({
   backendOrigin: 'https://example.com',
 }))
 
-// Mock ServiceAccountSelect to avoid async state updates from useQuery/useCanI
+// Mock ServiceAccountSelect to avoid async state updates from useQuery/useCanI.
+// Render a static control so FormGroup label `for` / `fieldId` association is wired in tests.
 vi.mock('./ServiceAccountSelect', () => ({
-  ServiceAccountSelect: () => null,
+  ServiceAccountSelect: ({ id }: { id: string }) => <input type="text" id={id} readOnly value="" />,
 }))
 
 // Mock ScheduleBuilderFields
@@ -68,6 +69,18 @@ vi.mock('../../../components/forms/ScheduleBuilderFields', () => ({
 
 async function submitTriggerForm() {
   await submitForm()
+}
+
+function expectAuthorizedServiceAccountsFieldRequired() {
+  expect(
+    screen.getByText((_content, element) => {
+      if (element?.tagName !== 'LABEL') {
+        return false
+      }
+      const text = element.textContent ?? ''
+      return text.includes('Authorized service accounts') && text.includes('*')
+    })
+  ).toBeInTheDocument()
 }
 
 describe('TriggerStepForm Component', () => {
@@ -435,16 +448,11 @@ describe('TriggerStepForm Component', () => {
     })
 
     it('marks authorized service accounts as required', () => {
-      const { container } = renderWithHeader(
+      renderWithHeader(
         <TriggerStepForm onSubmit={mockOnSubmit} initialData={{ triggerType: TriggerTypeEnum.WEBHOOK_TRIGGER }} />
       )
 
-      // PatternFly renders a required asterisk via this class on FormGroup; not reachable by accessible queries.
-      // eslint-disable-next-line testing-library/no-container, testing-library/no-node-access -- PatternFly required indicator is not accessible via accessible queries
-      const requiredIndicator = container.querySelector(
-        'label[for="webhook-authorized-service-accounts"] .pf-v6-c-form__label-required'
-      )
-      expect(requiredIndicator).toBeInTheDocument()
+      expectAuthorizedServiceAccountsFieldRequired()
     })
 
     it('allows saving a draft trigger with no authorized service accounts selected', async () => {
@@ -459,7 +467,10 @@ describe('TriggerStepForm Component', () => {
 
       await waitFor(() => {
         expect(mockOnSubmit).toHaveBeenCalledWith(
-          expect.objectContaining({ triggerType: TriggerTypeEnum.WEBHOOK_TRIGGER })
+          expect.objectContaining({
+            triggerType: TriggerTypeEnum.WEBHOOK_TRIGGER,
+            authorizedServiceAccountIds: [],
+          })
         )
       })
       expect(screen.queryByText('At least one authorized service account is required')).not.toBeInTheDocument()
@@ -569,16 +580,11 @@ describe('TriggerStepForm Component', () => {
     })
 
     it('marks authorized service accounts as required', () => {
-      const { container } = renderWithHeader(
+      renderWithHeader(
         <TriggerStepForm onSubmit={mockOnSubmit} initialData={{ triggerType: TriggerTypeEnum.EDA_TRIGGER }} />
       )
 
-      // PatternFly renders a required asterisk via this class on FormGroup; not reachable by accessible queries.
-      // eslint-disable-next-line testing-library/no-container, testing-library/no-node-access -- PatternFly required indicator is not accessible via accessible queries
-      const requiredIndicator = container.querySelector(
-        'label[for="eda-authorized-service-accounts"] .pf-v6-c-form__label-required'
-      )
-      expect(requiredIndicator).toBeInTheDocument()
+      expectAuthorizedServiceAccountsFieldRequired()
     })
 
     it('allows saving a draft trigger with no authorized service accounts selected', async () => {
@@ -592,7 +598,12 @@ describe('TriggerStepForm Component', () => {
       await submitTriggerForm()
 
       await waitFor(() => {
-        expect(mockOnSubmit).toHaveBeenCalledWith(expect.objectContaining({ triggerType: TriggerTypeEnum.EDA_TRIGGER }))
+        expect(mockOnSubmit).toHaveBeenCalledWith(
+          expect.objectContaining({
+            triggerType: TriggerTypeEnum.EDA_TRIGGER,
+            authorizedServiceAccountIds: [],
+          })
+        )
       })
       expect(screen.queryByText('At least one authorized service account is required')).not.toBeInTheDocument()
     })
