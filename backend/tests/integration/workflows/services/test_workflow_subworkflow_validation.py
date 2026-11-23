@@ -63,6 +63,24 @@ def _definition_without_subworkflow() -> dict[str, Any]:
     }
 
 
+def _definition_with_subworkflow_output_references(
+    child_workflow_id: UUID,
+    references: list[str],
+) -> dict[str, Any]:
+    """Build a parent definition whose downstream condition uses child outputs."""
+    definition = _definition_with_subworkflow(child_workflow_id)
+    definition["nodes"].append(
+        {
+            "id": "consume_output",
+            "name": "Consume child output",
+            "type": "condition",
+            "parameters": {"condition": " and ".join(f"${{{reference}}}" for reference in references)},
+        }
+    )
+    definition["edges"].append({"from": "call_child", "to": "consume_output"})
+    return definition
+
+
 async def _create_child_workflow(
     session: AsyncSession,
     user: User,
@@ -86,7 +104,9 @@ async def _create_child_workflow(
     await session.flush()
 
     if published:
-        trigger_parameters = {"input_schema": input_schema} if input_schema is not None else {}
+        trigger_parameters = {}
+        if input_schema is not None:
+            trigger_parameters["input_schema"] = input_schema
         if output_schema is not None:
             trigger_parameters["output_schema"] = output_schema
         triggers = [{"id": trigger_node_id, "type": trigger_type, "parameters": trigger_parameters}]
@@ -139,6 +159,28 @@ async def test_subworkflow_reference_in_same_project_passes_validation(
     )
 
     assert findings == []
+
+
+@pytest.mark.asyncio
+async def test_missing_child_workflow_reference_returns_error_finding(
+    test_db_session: AsyncSession,
+    test_project_id: UUID,
+) -> None:
+    missing_child_id = uuid4()
+
+    findings = await validate_subworkflow_project_references(
+        test_db_session,
+        _definition_with_subworkflow(missing_child_id),
+        test_project_id,
+    )
+
+    assert len(findings) == 1
+    finding = findings[0]
+    assert finding.severity == ValidationSeverity.error
+    assert finding.category == ValidationCategory.invalid_reference
+    assert finding.node_id == "call_child"
+    assert finding.field_path == "parameters.workflow_id"
+    assert finding.message == "The selected child workflow is no longer available."
 
 
 @pytest.mark.asyncio
@@ -333,7 +375,336 @@ async def test_same_project_reference_can_be_saved_and_published(
 
 
 @pytest.mark.asyncio
-async def test_missing_required_child_inputs_warn_on_save_and_block_publish(
+async def test_reference_to_declared_child_output_has_no_finding(
+    test_db_session: AsyncSession,
+    test_user: User,
+    test_project_id: UUID,
+) -> None:
+    child = await _create_child_workflow(
+        test_db_session,
+        test_user,
+        test_project_id,
+        output_schema={
+            "type": "object",
+            "properties": {
+                "release": {
+                    "type": "object",
+                    "properties": {"artifact_url": {"type": "string"}},
+                    "additionalProperties": False,
+                }
+            },
+        },
+    )
+
+    findings = await validate_subworkflow_project_references(
+        test_db_session,
+        _definition_with_subworkflow_output_references(
+            child.id,
+            ["call_child.outputs.release.artifact_url"],
+        ),
+        test_project_id,
+    )
+
+    assert findings == []
+
+
+@pytest.mark.asyncio
+async def test_declared_output_references_in_script_code_are_validated(
+    test_db_session: AsyncSession,
+    test_user: User,
+    test_project_id: UUID,
+) -> None:
+    child = await _create_child_workflow(
+        test_db_session,
+        test_user,
+        test_project_id,
+        output_schema={
+            "type": "object",
+            "properties": {
+                "release": {
+                    "type": "object",
+                    "properties": {"url": {"type": "string"}},
+                    "additionalProperties": False,
+                }
+            },
+        },
+    )
+    parent_definition = _definition_with_subworkflow(child.id)
+    parent_definition["nodes"].append(
+        {
+            "id": "consume_output",
+            "name": "Consume child output in script",
+            "type": "script",
+            "parameters": {
+                "language": "python",
+                "code": ('print("${call_child.outputs.release.url}")\nprint("${call_child.outputs.release.tag}")'),
+            },
+        }
+    )
+    parent_definition["edges"].append({"from": "call_child", "to": "consume_output"})
+
+    findings = await validate_subworkflow_project_references(test_db_session, parent_definition, test_project_id)
+
+    assert len(findings) == 1
+    assert findings[0].severity == ValidationSeverity.warning
+    assert findings[0].node_id == "call_child"
+    assert findings[0].field_path == "outputs.release.tag"
+
+
+@pytest.mark.asyncio
+async def test_undeclared_child_output_references_each_produce_warnings(
+    test_db_session: AsyncSession,
+    test_user: User,
+    test_project_id: UUID,
+) -> None:
+    child = await _create_child_workflow(
+        test_db_session,
+        test_user,
+        test_project_id,
+        output_schema={
+            "type": "object",
+            "properties": {
+                "still_present": {
+                    "type": "object",
+                    "properties": {"value": {"type": "string"}},
+                    "additionalProperties": False,
+                }
+            },
+        },
+    )
+
+    findings = await validate_subworkflow_project_references(
+        test_db_session,
+        _definition_with_subworkflow_output_references(
+            child.id,
+            [
+                "call_child.outputs.removed_a.value",
+                "call_child.outputs.still_present.value",
+                "call_child.outputs.removed_b",
+            ],
+        ),
+        test_project_id,
+    )
+
+    assert len(findings) == 2
+    assert all(finding.severity == ValidationSeverity.warning for finding in findings)
+    assert [finding.message for finding in findings] == [
+        "Parent references child output 'removed_a.value' which is not declared by the selected Subworkflow Trigger",
+        "Parent references child output 'removed_b' which is not declared by the selected Subworkflow Trigger",
+    ]
+    assert all(finding.node_id == "call_child" for finding in findings)
+    assert [finding.field_path for finding in findings] == [
+        "outputs.removed_a.value",
+        "outputs.removed_b",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_undeclared_child_output_warning_does_not_block_publish(
+    test_db_session: AsyncSession,
+    test_user: User,
+    test_project_id: UUID,
+) -> None:
+    child = await _create_child_workflow(
+        test_db_session,
+        test_user,
+        test_project_id,
+        output_schema={"type": "object", "properties": {}},
+    )
+    service = WorkflowService(test_db_session, test_user)
+
+    with (
+        patch(
+            "syntara.workflows.services.workflow_service.workflow_validator",
+            _valid_workflow_validator(),
+        ),
+        patch(
+            "syntara.workflows.services.workflow_service.get_system_continue_on_failure",
+            new_callable=AsyncMock,
+            return_value=False,
+        ),
+        patch("syntara.workflows.services.workflow_service.WebhookTriggerService") as webhook_service,
+    ):
+        webhook_service.return_value.sync_webhook_triggers = AsyncMock()
+        parent, version, validation_result = await service.create_workflow(
+            name=f"parent-{uuid4().hex[:8]}",
+            description=None,
+            labels={},
+            workflow_definition=_definition_with_subworkflow_output_references(
+                child.id,
+                ["call_child.outputs.removed_step.value"],
+            ),
+            project_id=test_project_id,
+        )
+
+        assert validation_result.error_count == 0
+        assert validation_result.warning_count == 1
+        assert validation_result.findings[0].message == (
+            "Parent references child output 'removed_step.value' which is not declared "
+            "by the selected Subworkflow Trigger"
+        )
+
+        published_workflow, published_version, warning = await service.publish_workflow_version(
+            workflow_id=parent.id,
+            version=version.version,
+        )
+
+    assert published_workflow.published_version_id == published_version.id
+    assert "Parent references child output 'removed_step.value' which is not declared" in warning
+
+
+@pytest.mark.asyncio
+async def test_nested_dynamic_child_output_paths_follow_declared_schema(
+    test_db_session: AsyncSession,
+    test_user: User,
+    test_project_id: UUID,
+) -> None:
+    child = await _create_child_workflow(
+        test_db_session,
+        test_user,
+        test_project_id,
+        output_schema={
+            "type": "object",
+            "properties": {
+                "labels": {
+                    "type": "object",
+                    "additionalProperties": {"type": "string"},
+                }
+            },
+        },
+    )
+
+    findings = await validate_subworkflow_project_references(
+        test_db_session,
+        _definition_with_subworkflow_output_references(
+            child.id,
+            [
+                "call_child.outputs.labels.release",
+                "call_child.outputs.labels.region",
+            ],
+        ),
+        test_project_id,
+    )
+
+    assert findings == []
+
+
+@pytest.mark.asyncio
+async def test_child_output_validation_uses_selected_trigger_schema(
+    test_db_session: AsyncSession,
+    test_user: User,
+    test_project_id: UUID,
+) -> None:
+    child = await _create_child_workflow(
+        test_db_session,
+        test_user,
+        test_project_id,
+        output_schema={"type": "object", "properties": {"selected": {"type": "string"}}},
+        additional_triggers=[
+            {
+                "id": "other_entry",
+                "type": "subworkflow_trigger",
+                "parameters": {"output_schema": {"type": "object", "properties": {"other": {"type": "string"}}}},
+            }
+        ],
+    )
+
+    findings = await validate_subworkflow_project_references(
+        test_db_session,
+        _definition_with_subworkflow_output_references(
+            child.id,
+            ["call_child.outputs.selected", "call_child.outputs.other"],
+        ),
+        test_project_id,
+    )
+
+    assert len(findings) == 1
+    assert findings[0].field_path == "outputs.other"
+
+
+@pytest.mark.asyncio
+async def test_nested_child_output_path_rejects_missing_property_in_closed_object(
+    test_db_session: AsyncSession,
+    test_user: User,
+    test_project_id: UUID,
+) -> None:
+    child = await _create_child_workflow(
+        test_db_session,
+        test_user,
+        test_project_id,
+        output_schema={
+            "type": "object",
+            "properties": {
+                "release": {
+                    "type": "object",
+                    "properties": {"url": {"type": "string"}},
+                    "additionalProperties": False,
+                }
+            },
+        },
+    )
+
+    findings = await validate_subworkflow_project_references(
+        test_db_session,
+        _definition_with_subworkflow_output_references(
+            child.id,
+            ["call_child.outputs.release.tag"],
+        ),
+        test_project_id,
+    )
+
+    assert len(findings) == 1
+    assert findings[0].field_path == "outputs.release.tag"
+
+
+@pytest.mark.asyncio
+async def test_array_child_output_paths_follow_item_schema(
+    test_db_session: AsyncSession,
+    test_user: User,
+    test_project_id: UUID,
+) -> None:
+    child = await _create_child_workflow(
+        test_db_session,
+        test_user,
+        test_project_id,
+        output_schema={
+            "type": "object",
+            "properties": {
+                "artifacts": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {"url": {"type": "string"}},
+                        "additionalProperties": False,
+                    },
+                }
+            },
+        },
+    )
+
+    findings = await validate_subworkflow_project_references(
+        test_db_session,
+        _definition_with_subworkflow_output_references(
+            child.id,
+            [
+                "call_child.outputs.artifacts.0.url",
+                "call_child.outputs.artifacts.0.tag",
+                "call_child.outputs.artifacts.url",
+            ],
+        ),
+        test_project_id,
+    )
+
+    assert len(findings) == 2
+    assert [finding.field_path for finding in findings] == [
+        "outputs.artifacts.0.tag",
+        "outputs.artifacts.url",
+    ]
+    assert all(finding.severity == ValidationSeverity.warning for finding in findings)
+
+
+@pytest.mark.asyncio
+async def test_missing_required_child_inputs_warn_on_save_and_allow_publish(
     test_db_session: AsyncSession,
     test_user: User,
     test_project_id: UUID,
@@ -360,7 +731,9 @@ async def test_missing_required_child_inputs_warn_on_save_and_block_publish(
             new_callable=AsyncMock,
             return_value=False,
         ),
+        patch("syntara.workflows.services.workflow_service.WebhookTriggerService") as webhook_service,
     ):
+        webhook_service.return_value.sync_webhook_triggers = AsyncMock()
         parent, version, validation_result = await service.create_workflow(
             name=f"parent-{uuid4().hex[:8]}",
             description=None,
@@ -377,15 +750,18 @@ async def test_missing_required_child_inputs_warn_on_save_and_block_publish(
             "parameters.input_mapping.region",
         ]
         assert [finding.message for finding in validation_result.findings] == [
-            f"Child workflow '{child.name}' requires input 'target_host', not provided in input_mapping",
-            f"Child workflow '{child.name}' requires input 'region', not provided in input_mapping",
+            "The selected child workflow requires input 'target_host', not provided in input_mapping",
+            "The selected child workflow requires input 'region', not provided in input_mapping",
         ]
 
-        with pytest.raises(WorkflowPublishValidationError) as exc_info:
-            await service.publish_workflow_version(workflow_id=parent.id, version=version.version)
+        published_workflow, published_version, warning = await service.publish_workflow_version(
+            workflow_id=parent.id,
+            version=version.version,
+        )
 
-    assert exc_info.value.validation_result.error_count == 0
-    assert exc_info.value.validation_result.warning_count == 2
+    assert published_workflow.published_version_id == published_version.id
+    assert "requires input 'target_host'" in warning
+    assert "requires input 'region'" in warning
 
 
 @pytest.mark.asyncio
@@ -459,7 +835,7 @@ async def test_parent_subworkflow_input_rejects_incompatible_upstream_declared_o
         ("published", "child_entry", "manual_trigger", "child_entry", "parameters.trigger_node_id"),
     ],
 )
-async def test_unavailable_child_invocation_is_reported_when_saved_and_blocks_publish(
+async def test_unavailable_child_invocation_severity_controls_publishability(
     test_db_session: AsyncSession,
     test_user: User,
     test_project_id: UUID,
@@ -489,7 +865,9 @@ async def test_unavailable_child_invocation_is_reported_when_saved_and_blocks_pu
             new_callable=AsyncMock,
             return_value=False,
         ),
+        patch("syntara.workflows.services.workflow_service.WebhookTriggerService") as webhook_service,
     ):
+        webhook_service.return_value.sync_webhook_triggers = AsyncMock()
         parent, _initial_version, _initial_validation = await service.create_workflow(
             name=f"parent-{uuid4().hex[:8]}",
             description=None,
@@ -506,14 +884,24 @@ async def test_unavailable_child_invocation_is_reported_when_saved_and_blocks_pu
 
         assert version is not None
         assert parent.has_validation_issues is True
-        assert validation_result.error_count == 1
+        expected_severity = ValidationSeverity.warning if child_state == "unpublished" else ValidationSeverity.error
+        assert validation_result.error_count == int(expected_severity == ValidationSeverity.error)
+        assert validation_result.warning_count == int(expected_severity == ValidationSeverity.warning)
+        assert validation_result.findings[0].severity == expected_severity
         assert validation_result.findings[0].field_path == expected_field_path
 
-        with pytest.raises(WorkflowPublishValidationError) as exc_info:
-            await service.publish_workflow_version(workflow_id=parent.id, version=version.version)
-
-    assert exc_info.value.validation_result.error_count == 1
-    assert exc_info.value.validation_result.findings[0].field_path == expected_field_path
+        if child_state == "unpublished":
+            published_workflow, published_version, warning = await service.publish_workflow_version(
+                workflow_id=parent.id,
+                version=version.version,
+            )
+            assert published_workflow.published_version_id == published_version.id
+            assert "has no published version" in warning
+        else:
+            with pytest.raises(WorkflowPublishValidationError) as exc_info:
+                await service.publish_workflow_version(workflow_id=parent.id, version=version.version)
+            assert exc_info.value.validation_result.error_count == 1
+            assert exc_info.value.validation_result.findings[0].field_path == expected_field_path
 
 
 @pytest.mark.asyncio
