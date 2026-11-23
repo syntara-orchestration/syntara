@@ -1,11 +1,12 @@
 import { Button, Divider, Dropdown, Icon, MenuToggle, type MenuToggleElement } from '@patternfly/react-core'
 import { RhUiEllipsisVerticalFillIcon, RhUiAddSquareIcon } from '@patternfly/react-icons'
-import { useCallback, type Dispatch, type Ref } from 'react'
+import { useCallback, useState, type Dispatch, type Ref } from 'react'
 
 import { DisabledWithTooltip } from '../../components/DisabledWithTooltip'
 import { useWorkflowStore } from '../../stores/useWorkflowStore'
 
 import type { BuilderAction } from './builderReducer'
+import { EmbedWorkflowDialog } from './components/EmbedWorkflowDialog'
 import { KebabMenuViewsGroup, KebabMenuActionsGroup } from './kebabMenuItems'
 import { PublishWorkflowButton } from './PublishWorkflowButton'
 import { RunWorkflowSection } from './RunWorkflowSection'
@@ -50,6 +51,8 @@ type WorkflowKebabMenuProps = Readonly<{
   handleExport: () => void
   handleVerify: (onValid?: () => void) => void
   handleDuplicate: () => void
+  hasProject: boolean
+  onEmbed?: () => void
 }>
 
 function WorkflowKebabMenu({
@@ -69,6 +72,8 @@ function WorkflowKebabMenu({
   handleExport,
   handleVerify,
   handleDuplicate,
+  hasProject,
+  onEmbed,
 }: WorkflowKebabMenuProps) {
   const renderKebabMenuToggle = useCallback(
     (toggleRef: Ref<MenuToggleElement>) => (
@@ -102,11 +107,13 @@ function WorkflowKebabMenu({
             canEdit={builderPermissions.canEdit}
             canCreate={builderPermissions.canCreate}
             canDelete={builderPermissions.canDelete}
+            hasProject={hasProject}
             tooltips={builderPermissions.tooltips}
             handleVerify={handleVerify}
             handleDuplicate={handleDuplicate}
             handleExport={handleExport}
             importFileRef={importFileRef}
+            onEmbed={onEmbed}
             onUnpublish={onUnpublish}
             dispatch={dispatch}
             closeKebab={closeKebab}
@@ -124,6 +131,7 @@ type BuilderEditorToolbarProps = Readonly<{
   workflow: { id: string } | undefined
   isPending: boolean
   isDirty: boolean
+  projectId?: string
   lastSavedAt?: string | null
   isKebabOpen: boolean
   publishedVersionId: string | null
@@ -153,6 +161,7 @@ export function BuilderEditorToolbar({
   workflow,
   isPending,
   isDirty,
+  projectId,
   lastSavedAt,
   isKebabOpen,
   publishedVersionId,
@@ -175,6 +184,8 @@ export function BuilderEditorToolbar({
   builderPermissions,
   isNodeEditorOpen,
 }: BuilderEditorToolbarProps) {
+  const [embedOpen, setEmbedOpen] = useState(false)
+  const hasProject = !!projectId
   const { importFileRef, handleImportFile, handleExport, handleVerify, isVerifying, validationErrorCount } =
     useWorkflowImportExport({
       dispatch,
@@ -214,6 +225,7 @@ export function BuilderEditorToolbar({
         handleExport={handleExport}
         handleVerify={handleVerify}
         handleDuplicate={onDuplicate}
+        hasProject={hasProject}
       />
     )
   }
@@ -307,7 +319,17 @@ export function BuilderEditorToolbar({
         handleExport={handleExport}
         handleVerify={handleVerify}
         handleDuplicate={onDuplicate}
+        hasProject={hasProject}
+        onEmbed={() => setEmbedOpen(true)}
       />
+      {embedOpen && (
+        <EmbedWorkflowDialog
+          isOpen
+          onClose={() => setEmbedOpen(false)}
+          projectId={projectId}
+          currentWorkflowId={workflow?.id}
+        />
+      )}
     </>
   )
 }
