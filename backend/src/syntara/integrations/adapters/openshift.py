@@ -10,6 +10,7 @@ import httpx
 from syntara.core.lib.tls_utils import build_integration_httpx_verify
 from syntara.integrations.adapters.factory import register_health_check_adapter
 from syntara.integrations.adapters.protocol import DiscoverResult, HealthCheckErrorType, ValidateResult
+from syntara.integrations.lib.in_cluster import is_in_cluster_kubernetes_api_url, service_account_ca_certificate
 from syntara.integrations.models.integration import IntegrationType
 
 if TYPE_CHECKING:
@@ -40,8 +41,16 @@ class OpenShiftAdapter:
             )
 
         try:
+            ca_certificate = self._config.ca_certificate
+            if ca_certificate is None and is_in_cluster_kubernetes_api_url(self._config.base_url):
+                # The in-cluster API serves a certificate signed by the cluster's own
+                # service-network CA; the CA bundle mounted in the pod is the matching
+                # trust anchor, so registering the local cluster requires no manually
+                # assembled kube-root-ca.crt bundle. A missing bundle falls back to the
+                # system trust store, exactly as before.
+                ca_certificate = service_account_ca_certificate()
             async with httpx.AsyncClient(
-                verify=build_integration_httpx_verify(ca_certificate=self._config.ca_certificate),
+                verify=build_integration_httpx_verify(ca_certificate=ca_certificate),
                 timeout=timeout_seconds,
                 follow_redirects=False,
             ) as client:

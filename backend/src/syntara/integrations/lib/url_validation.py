@@ -2,6 +2,7 @@
 
 from syntara.core.config.base import get_settings
 from syntara.core.lib.url_validation import validate_url_no_ssrf
+from syntara.integrations.lib.in_cluster import in_cluster_kubernetes_api_hosts
 
 
 def validate_integration_url_no_ssrf(url: str, *, allow_http: bool = False) -> None:
@@ -13,6 +14,16 @@ def validate_integration_url_no_ssrf(url: str, *, allow_http: bool = False) -> N
     (127.0.0.0/8, ::1, localhost) are rejected unless the hostname is allowlisted, so a
     local integration (e.g. an MCP server on localhost) is an explicit opt-in rather than
     an always-on bypass. Cloud metadata endpoints are always blocked.
+
+    The in-cluster Kubernetes API hostnames are additionally allowed when running inside
+    a cluster: the cluster Automation Orchestrator itself runs on is a supported
+    integration target, and its only address is the in-cluster API Service, a private
+    ClusterIP on every platform (managed offerings also resolve the external API hostname
+    to private load-balancer addresses from inside the cluster). The check still resolves
+    the hostname, fails closed on resolution failure, and only ever carries
+    caller-supplied credentials — never the pod's own identity — so allowing the endpoint
+    discloses nothing the credential holder did not already have. Outside a cluster the
+    names do not resolve, the auto-allow is inert, and the standard allowlist rules apply.
 
     The distinct name (vs. the workflow-oriented core ``validate_url_no_ssrf``) keeps the
     policy difference — a different allowlist setting and https-by-default — explicit at
@@ -28,7 +39,7 @@ def validate_integration_url_no_ssrf(url: str, *, allow_http: bool = False) -> N
     """
     validate_url_no_ssrf(
         url,
-        allowed_hosts=get_settings().integration_url_allowed_hosts,
+        allowed_hosts=[*get_settings().integration_url_allowed_hosts, *in_cluster_kubernetes_api_hosts()],
         allow_http=allow_http,
     )
 
