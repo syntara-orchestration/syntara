@@ -1,6 +1,6 @@
 import { act, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it, vi, beforeEach } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 
 import { executionsClient } from '../../client'
@@ -219,6 +219,47 @@ describe('ExecutionDetailsPanel', () => {
 
       expect(screen.queryByText('V1 Process data')).not.toBeInTheDocument()
       expect(screen.queryByText('V1 Send notification')).not.toBeInTheDocument()
+    })
+  })
+
+  describe('query failure', () => {
+    afterEach(() => {
+      vi.mocked(executionsClient.useQuery).mockReturnValue({
+        ...EXECUTION,
+        refetch: vi.fn(),
+      })
+    })
+
+    it('fills the panel and centers the error when the execution query fails', () => {
+      vi.mocked(executionsClient.useQuery).mockReturnValue({
+        data: undefined,
+        isLoading: false,
+        isPending: false,
+        error: new Error('Internal server error'),
+        refetch: vi.fn(),
+      } as ReturnType<typeof executionsClient.useQuery>)
+
+      renderPanel(WORKFLOW_DEF)
+
+      expect(screen.getByRole('heading', { name: 'Run details' })).toBeInTheDocument()
+      expect(screen.getByText('Error loading execution')).toBeInTheDocument()
+      expect(screen.getByTestId('execution-details-query-fallback-panel')).toBeInTheDocument()
+      expect(screen.getByTestId('execution-details-query-state-region')).toBeInTheDocument()
+    })
+
+    it('fills the panel and centers the loading state while the execution query is pending', () => {
+      vi.mocked(executionsClient.useQuery).mockReturnValue({
+        data: undefined,
+        isLoading: true,
+        isPending: true,
+        error: null,
+        refetch: vi.fn(),
+      } as ReturnType<typeof executionsClient.useQuery>)
+
+      renderPanel(WORKFLOW_DEF)
+
+      expect(screen.getByRole('heading', { name: 'Run details' })).toBeInTheDocument()
+      expect(screen.getByTestId('execution-details-query-state-region')).toBeInTheDocument()
     })
   })
 
