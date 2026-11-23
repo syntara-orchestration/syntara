@@ -141,7 +141,9 @@ async def test_monitor_updates_row_created_after_dispatch(
 ) -> None:
     await dispatch._dispatch_to_ep({"code": "echo ok"}, None, test_execution.id, None, "script-bash")
     work_id = UUID(ep_submission.call_args.args[1].command.payload["work_item_id"])
-    monitor = ActivitySyncService(Mock(), test_db_session_factory, AsyncMock())
+    temporal_client = Mock()
+    temporal_client.get_workflow_handle.return_value = Mock(query=AsyncMock(return_value=False))
+    monitor = ActivitySyncService(temporal_client, test_db_session_factory, AsyncMock())
     metadata = await monitor._initialize_monitoring(test_execution.id)
     now = datetime.now(UTC)
     metadata.pending_activity_updates[1] = {
