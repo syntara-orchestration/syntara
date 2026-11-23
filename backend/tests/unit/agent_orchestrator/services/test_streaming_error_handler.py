@@ -277,20 +277,23 @@ def test_agent_timeout_takes_precedence_over_builtin_timeout() -> None:
 
 
 def test_tool_result_serialization_failure_not_generic_llm_error() -> None:
-    """AAP-92632: tool-result serialization failures must surface distinctly.
+    """Tool-result serialization failures must surface distinctly.
 
     A LangGraph checkpoint TypeError for a non-msgpack-serializable ToolMessage
     must surface as an actionable tool-result serialization category, not fall
     through to the generic UNKNOWN_ERROR / "LLM Streaming Error" bucket.
     """
+    invocation_id = uuid4()
     exception = TypeError("Type is not msgpack serializable: ToolMessage")
-    error = classify_streaming_error(exception, uuid4())
+    error = classify_streaming_error(exception, invocation_id)
 
+    assert error.code == "TOOL_RESULT_SERIALIZATION_FAILED"
+    assert error.retryable is False
+    assert error.title == "Tool Result Serialization Failed"
+    assert error.type == f"{ERROR_TYPE_BASE_URI}/tool-result-serialization-error"
+    assert error.instance == f"/invocations/{invocation_id}"
     assert error.code != "UNKNOWN_ERROR"
-    assert error.title != "LLM Streaming Error"
-    assert error.detail != "An unexpected error occurred during LLM streaming. Please try again."
-    assert "serializ" in (error.title + error.detail).lower()
-    assert "tool" in (error.title + error.detail).lower()
+    assert "could not be serialized" in (error.detail or "")
 
 
 def test_multiple_invocations_independent() -> None:

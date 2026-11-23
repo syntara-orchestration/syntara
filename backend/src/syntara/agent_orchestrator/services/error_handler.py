@@ -66,7 +66,7 @@ def _is_network_error(error_msg: str) -> bool:
 
 def _is_tool_result_serialization_error(error_msg: str) -> bool:
     """Check if error indicates a tool result could not be checkpoint-serialized."""
-    return _contains_any(error_msg, ["msgpack serializable", "not serializable"])
+    return "msgpack serializable" in error_msg
 
 
 def _classify_by_exception_type(exception: Exception, instance: str | None) -> ErrorData | None:
