@@ -185,6 +185,7 @@ function BuilderToolbarContent({
       workflow={workflow}
       isPending={isPending}
       isDirty={isDirty}
+      projectId={projectId}
       lastSavedAt={lastSavedAt}
       isKebabOpen={isKebabOpen}
       publishedVersionId={publishedVersionId}
