@@ -1,31 +1,14 @@
 import { IntegrationTypeEnum } from '@syntara/contracts'
-import { useQuery } from '@tanstack/react-query'
 import { useMemo } from 'react'
 
-import { credentialsClient, integrationsFetchClient } from '../../../client'
-import { fetchAllPages, MAX_PAGE_SIZE } from '../../../utils/fetchAllPages'
-import { projectIdParam } from '../../../utils/queryParams'
+import { credentialsClient } from '../../../client'
 import { useAllCredentials } from '../components/useAllCredentials'
+import { useAllIntegrations } from '../components/useAllIntegrations'
 
 import type { TriggerFormData } from './triggerFormSchema'
 
 export function useKafkaSubscribeResources(projectId?: string) {
-  const integrations = useQuery({
-    queryKey: ['kafka-subscribe-integrations', projectId],
-    queryFn: () =>
-      fetchAllPages((cursor) =>
-        integrationsFetchClient.GET('/kafka_integrations', {
-          params: {
-            query: {
-              enabled: true,
-              limit: MAX_PAGE_SIZE,
-              cursor,
-              ...projectIdParam(projectId),
-            },
-          },
-        })
-      ),
-  })
+  const integrations = useAllIntegrations(IntegrationTypeEnum.KAFKA, projectId)
   const credentials = useAllCredentials({ projectId })
   const types = credentialsClient.useQuery('get', '/credential_types')
   const visibleIntegrations = useMemo(

@@ -127,7 +127,7 @@ describe('Kafka Subscribe form', () => {
         projectId="project-1"
       />
     )
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Kafka Integration' })).toBeEnabled())
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Integration' })).toBeEnabled())
     await user.clear(screen.getByRole('textbox', { name: 'Topic' }))
     await user.type(screen.getByRole('textbox', { name: 'Topic' }), 'orders.updated')
     await submitForm()
@@ -151,7 +151,7 @@ describe('Kafka Subscribe form', () => {
         projectId="project-1"
       />
     )
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Kafka Integration' })).toBeEnabled())
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Integration' })).toBeEnabled())
     await submitForm()
     expect(await screen.findByText('CEL expression must be 16,384 characters or fewer')).toBeInTheDocument()
     expect(screen.getByRole('textbox', { name: 'Filter expression (CEL)' })).toHaveValue(expression)
@@ -331,12 +331,11 @@ describe('Kafka Subscribe form', () => {
     const { container } = renderKafka()
 
     const topic = screen.getByRole('textbox', { name: 'Topic' })
-    const integrationInput = screen.getByRole('textbox', { name: 'Kafka Integration' })
+    const integrationToggle = screen.getByRole('button', { name: 'Integration' })
     expect(topic).toHaveValue('orders.created')
-    expect(integrationInput).toHaveValue('')
-    expect(integrationInput).toHaveAttribute('placeholder', 'Loading Kafka Integrations…')
-    expect(integrationInput).not.toHaveAttribute('aria-invalid', 'true')
-    expect(screen.queryByRole('textbox', { name: 'Kafka runtime credential' })).not.toBeInTheDocument()
+    expect(integrationToggle).toBeDisabled()
+    expect(integrationToggle).toHaveTextContent('Select a Kafka integration')
+    expect(screen.queryByRole('textbox', { name: 'Runtime credential' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Set up connection' })).toBeDisabled()
     expect(screen.queryByText(/Wait for Kafka .* to load/)).not.toBeInTheDocument()
     expect(
@@ -368,11 +367,11 @@ describe('Kafka Subscribe form', () => {
       finishIntegration?.()
       await Promise.resolve()
     })
-    await waitFor(() => expect(integrationInput).toHaveValue('Orders Kafka'))
+    await waitFor(() => expect(integrationToggle).toHaveTextContent('Orders Kafka'))
     expect(screen.getByRole('textbox', { name: 'Topic' })).toBe(topic)
     expect(screen.getByText('Runtime')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Change' })).toBeEnabled()
-    expect(screen.queryByRole('textbox', { name: 'Kafka runtime credential' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('textbox', { name: 'Runtime credential' })).not.toBeInTheDocument()
     expect(screen.queryByText(/Wait for Kafka .* to load/)).not.toBeInTheDocument()
     expect(
       screen.queryByText(/Select an available Kafka Integration, a compatible runtime credential/)
@@ -394,8 +393,8 @@ describe('Kafka Subscribe form', () => {
 
   it('loads visible Kafka Integrations scoped to the workflow project and separates identity from authentication', async () => {
     renderKafka()
-    expect(await screen.findByRole('button', { name: 'Kafka Integration' })).toBeInTheDocument()
-    await waitFor(() => expect(screen.getByRole('textbox', { name: 'Kafka Integration' })).toHaveValue('Orders Kafka'))
+    expect(await screen.findByRole('button', { name: 'Integration' })).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Integration' })).toHaveTextContent('Orders Kafka'))
     expect(integrationsFetchClient.GET).toHaveBeenCalledWith(
       '/kafka_integrations',
       expect.objectContaining({
@@ -412,7 +411,7 @@ describe('Kafka Subscribe form', () => {
   it('submits Kafka fields without webhook authorization or schedule settings', async () => {
     const onSubmit = vi.fn<(data: TriggerFormData) => void>()
     renderKafka(onSubmit)
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Kafka Integration' })).toBeEnabled())
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Integration' })).toBeEnabled())
     await submitForm()
     expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining(initialData))
     expect(onSubmit.mock.calls[0]?.[0].authorizedServiceAccountIds).toBeUndefined()
@@ -439,7 +438,7 @@ describe('Kafka Subscribe form', () => {
     const user = userEvent.setup()
     renderKafka(vi.fn(), null)
     expect(screen.getByText('Save the workflow before testing runtime access.')).toBeInTheDocument()
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Kafka Integration' })).toBeEnabled())
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Integration' })).toBeEnabled())
     await user.click(screen.getByRole('button', { name: 'Test runtime access' }))
     expect(mutate).not.toHaveBeenCalled()
   })
@@ -451,14 +450,14 @@ describe('Kafka Subscribe form', () => {
     })
     const user = userEvent.setup()
     renderKafka()
-    const toggle = await screen.findByRole('button', { name: 'Kafka Integration' })
+    const toggle = await screen.findByRole('button', { name: 'Integration' })
     await waitFor(() => expect(toggle).toBeEnabled())
     toggle.focus()
     await user.keyboard('{Enter}')
     await user.keyboard('{ArrowDown}{ArrowDown}{Enter}')
     expect(screen.getByRole('button', { name: 'Set up connection' })).toBeEnabled()
-    expect(screen.queryByRole('textbox', { name: 'Kafka runtime credential' })).not.toBeInTheDocument()
-    expect(screen.getByRole('textbox', { name: 'Kafka Integration' })).toHaveFocus()
+    expect(screen.queryByRole('textbox', { name: 'Runtime credential' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Integration' })).toHaveFocus()
   })
 
   it('clears the group on Integration changes while retaining consumption policies', async () => {
@@ -474,8 +473,8 @@ describe('Kafka Subscribe form', () => {
         onSubmit={onSubmit}
       />
     )
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Kafka Integration' })).toBeEnabled())
-    await user.click(screen.getByRole('button', { name: 'Kafka Integration' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Integration' })).toBeEnabled())
+    await user.click(screen.getByRole('button', { name: 'Integration' }))
     await user.click(screen.getByRole('option', { name: /Other Kafka/ }))
     expect(screen.getByRole('textbox', { name: 'Consumer group ID' })).toHaveValue('')
     expect(screen.getByRole('button', { name: 'Offset gap policy' })).toHaveTextContent('Fail')
@@ -496,7 +495,7 @@ describe('Kafka Subscribe form', () => {
     } as never)
     const user = userEvent.setup()
     renderKafka()
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Kafka Integration' })).toBeEnabled())
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Integration' })).toBeEnabled())
     await user.click(screen.getByRole('button', { name: 'Test runtime access' }))
     expect(mutate).not.toHaveBeenCalled()
   })
@@ -534,7 +533,7 @@ describe('Kafka Subscribe form', () => {
     await user.type(screen.getByRole('textbox', { name: 'Topic' }), 'orders.*')
     await submitForm()
     expect(screen.getByRole('textbox', { name: 'Topic' })).toHaveAccessibleDescription(/exact Kafka topic/)
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Kafka Integration' })).toBeEnabled())
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Integration' })).toBeEnabled())
     await user.click(screen.getByRole('button', { name: 'Test runtime access' }))
     expect(mutate).not.toHaveBeenCalled()
     expect(
@@ -551,7 +550,10 @@ describe('Kafka Subscribe form', () => {
       retryable: true,
     })
     renderKafka()
-    expect(await screen.findByRole('heading', { name: 'Unable to load Kafka Integrations' })).toBeInTheDocument()
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Integration' })).toHaveTextContent('Error loading integrations')
+    )
+    expect(screen.getByRole('button', { name: 'Retry loading integrations' })).toBeInTheDocument()
   })
 
   it('follows Integration pagination so choices beyond the first page are available', async () => {
@@ -559,16 +561,16 @@ describe('Kafka Subscribe form', () => {
       .mockResolvedValueOnce({ data: { resources: [], next: 'next-page' }, response: new Response() })
       .mockResolvedValueOnce({ data: { resources: [integration] }, response: new Response() })
     renderKafka()
-    await waitFor(() => expect(screen.getByRole('textbox', { name: 'Kafka Integration' })).toHaveValue('Orders Kafka'))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Integration' })).toHaveTextContent('Orders Kafka'))
     expect(integrationsFetchClient.GET).toHaveBeenCalledTimes(2)
   })
 
   it('presents a missing Integration without replacing its saved reference', async () => {
     vi.mocked(integrationsFetchClient.GET).mockResolvedValue({ data: { resources: [] }, response: new Response() })
     renderKafka()
-    const integration = await screen.findByRole('textbox', { name: 'Kafka Integration' })
-    await waitFor(() => expect(integration).toHaveAccessibleDescription(/Select an available Kafka Integration/))
-    expect(integration).toHaveValue('Selected Integration unavailable')
+    const integrationToggle = await screen.findByRole('button', { name: 'Integration' })
+    await waitFor(() => expect(integrationToggle).toHaveTextContent('Selected integration is unavailable'))
+    expect(screen.getByText('Select an available Kafka Integration')).toBeInTheDocument()
   })
 
   it.each(['unknown', 'error', 'available'] as const)('omits persistent Integration health for %s', async (status) => {
@@ -579,15 +581,15 @@ describe('Kafka Subscribe form', () => {
       response: new Response(),
     })
     renderKafka()
-    await waitFor(() => expect(screen.getByRole('textbox', { name: 'Kafka Integration' })).toHaveValue('Orders Kafka'))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Integration' })).toHaveTextContent('Orders Kafka'))
     expect(screen.queryByText(/Integration validation:/)).not.toBeInTheDocument()
     expect(screen.queryByText('Connection check failed')).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Change' })).toBeEnabled()
     const user = userEvent.setup()
-    await user.click(screen.getByRole('textbox', { name: 'Kafka Integration' }))
-    const options = within(screen.getByRole('listbox', { name: 'Kafka Integrations' }))
+    await user.click(screen.getByRole('button', { name: 'Integration' }))
+    const options = within(screen.getByRole('listbox', { name: 'Integration options' }))
     expect(options.getByText(status[0].toUpperCase() + status.slice(1))).toBeInTheDocument()
-    if (status === 'error') expect(options.getByText('Connection check failed')).toBeInTheDocument()
+    expect(options.queryByText('Connection check failed')).not.toBeInTheDocument()
     expect(screen.queryByText(/Integration validation:/)).not.toBeInTheDocument()
   })
 
@@ -618,10 +620,7 @@ describe('Kafka Subscribe form', () => {
     const onSubmit = vi.fn()
     renderKafka(onSubmit)
     await screen.findByText('Select an available Kafka Integration')
-    expect(screen.getByRole('textbox', { name: 'Kafka Integration' })).toHaveAttribute('aria-invalid', 'true')
-    expect(screen.getByRole('textbox', { name: 'Kafka Integration' })).toHaveAccessibleDescription(
-      /Select an available Kafka Integration/
-    )
+    expect(screen.getByRole('button', { name: 'Integration' })).toHaveTextContent('Selected integration is unavailable')
     await submitForm()
     expect(onSubmit).not.toHaveBeenCalled()
     expect(screen.getByRole('button', { name: 'Test runtime access' })).toHaveAttribute('aria-disabled', 'true')
@@ -638,7 +637,7 @@ describe('Kafka Subscribe form', () => {
     })
     const onSubmit = vi.fn()
     renderKafka(onSubmit)
-    await waitFor(() => expect(screen.getByRole('textbox', { name: 'Kafka Integration' })).toHaveValue('Orders Kafka'))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Integration' })).toHaveTextContent('Orders Kafka'))
     await submitForm()
     expect(onSubmit).not.toHaveBeenCalled()
     expect(screen.getByRole('button', { name: 'Test runtime access' })).toHaveAttribute('aria-disabled', 'true')
@@ -648,54 +647,27 @@ describe('Kafka Subscribe form', () => {
     const onSubmit = vi.fn()
     const user = userEvent.setup()
     renderKafka(onSubmit)
-    await waitFor(() => expect(screen.getByRole('textbox', { name: 'Kafka Integration' })).toHaveValue('Orders Kafka'))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Integration' })).toHaveTextContent('Orders Kafka'))
     await user.clear(screen.getByRole('textbox', { name: 'Topic' }))
     await user.click(screen.getByRole('button', { name: 'Change' }))
-    await user.clear(screen.getByRole('textbox', { name: 'Kafka runtime credential' }))
-    await user.click(screen.getByRole('button', { name: 'Clear selection' }))
+    await user.clear(screen.getByRole('textbox', { name: 'Runtime credential' }))
     await submitForm()
     expect(onSubmit).toHaveBeenCalledWith(
-      expect.objectContaining({ integrationId: '', runtimeCredentialId: '', topic: '' })
+      expect.objectContaining({ integrationId, runtimeCredentialId: '', topic: '' })
     )
     expect(screen.getByRole('button', { name: 'Test runtime access' })).toHaveAttribute('aria-disabled', 'true')
-    expect(screen.queryByRole('textbox', { name: 'Kafka runtime credential' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Set up connection' })).not.toBeInTheDocument()
-  })
-
-  it('searches Kafka Integrations without changing the saved selection', async () => {
-    const user = userEvent.setup()
-    renderKafka()
-    const input = screen.getByRole('textbox', { name: 'Kafka Integration' })
-    await waitFor(() => expect(input).toHaveValue('Orders Kafka'))
-    await user.click(input)
-    await user.type(input, 'not found')
-    expect(screen.getByRole('option', { name: 'No matching Kafka Integrations' })).toBeInTheDocument()
-    expect(screen.queryByRole('option', { name: /Orders Kafka/ })).not.toBeInTheDocument()
-  })
-
-  it('keeps the Integration menu open and restores options after clearing its filter', async () => {
-    const user = userEvent.setup()
-    renderKafka()
-    const input = screen.getByRole('textbox', { name: 'Kafka Integration' })
-    await waitFor(() => expect(input).toHaveValue('Orders Kafka'))
-    await user.click(input)
-    await user.type(input, 'not found')
-    await user.click(screen.getByRole('button', { name: 'Clear filter' }))
-
-    expect(screen.getByRole('listbox', { name: 'Kafka Integrations' })).toBeInTheDocument()
-    expect(screen.getByRole('option', { name: /Orders Kafka/ })).toBeInTheDocument()
-    expect(input).toHaveValue('')
-    expect(input).toHaveFocus()
+    expect(screen.queryByRole('textbox', { name: 'Runtime credential' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Set up connection' })).toBeEnabled()
   })
 
   it('has no accessibility violations, including the expanded Integration selector', async () => {
     const user = userEvent.setup()
     const { container } = renderKafka()
-    const toggle = screen.getByRole('button', { name: 'Kafka Integration' })
+    const toggle = screen.getByRole('button', { name: 'Integration' })
     await waitFor(() => expect(toggle).toBeEnabled())
     await user.click(toggle)
     expect(
-      within(screen.getByRole('listbox', { name: 'Kafka Integrations' })).getByRole('option', { name: /Orders Kafka/ })
+      within(screen.getByRole('listbox', { name: 'Integration options' })).getByRole('option', { name: /Orders Kafka/ })
     ).toBeInTheDocument()
     expect(await axe(container)).toHaveNoViolations()
   })
