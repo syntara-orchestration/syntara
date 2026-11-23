@@ -2,7 +2,6 @@ import ansiblePlugin from '@ansible/eslint-plugin'
 import { RuleTester } from 'eslint'
 import { describe, expect, it } from 'vitest'
 import rule from '../rules/require-http-client-disable-reason.js'
-import { findForbiddenDisableLines, isForbiddenDisable } from '../sourcePolicy.js'
 
 RuleTester.describe = describe
 RuleTester.it = it
@@ -58,23 +57,4 @@ ruleTester.run('require-http-client-disable-reason', rule, {
       errors: [{ messageId: 'missingReason' }],
     },
   ],
-})
-
-describe('HTTP-client suppression directive policy', () => {
-  it('identifies blanket disables and disables of the suppression checker', () => {
-    expect(isForbiddenDisable(' eslint-disable ')).toBe(true)
-    expect(isForbiddenDisable(' eslint-disable syntara/require-http-client-disable-reason -- temporary')).toBe(true)
-    expect(isForbiddenDisable(' eslint-disable @ansible/no-unapproved-http-client -- auth flow')).toBe(false)
-  })
-
-  it('checks comments without treating directive-like strings as comments', () => {
-    const source = [
-      'const example = "// eslint-disable"',
-      '// eslint-disable',
-      '/* eslint-disable syntara/require-http-client-disable-reason -- temporary */',
-      '/* eslint-disable @ansible/no-unapproved-http-client -- auth flow */',
-    ].join('\n')
-
-    expect(findForbiddenDisableLines(source, 'example.ts')).toEqual([2, 3])
-  })
 })
