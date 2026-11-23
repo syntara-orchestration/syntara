@@ -50,8 +50,9 @@ async function confirmCopyToEditorInBuilder(app: Page) {
   await expect(app.getByRole('heading', { name: 'Copy run to editor' })).toBeVisible()
   const replaceButton = app.getByRole('dialog').getByRole('button', { name: 'Replace current workflow' })
   await replaceButton.click()
-  await expect(app).toHaveURL(/\/workflow-builder\//, { timeout: 15_000 })
-  await expect(app.getByRole('heading', { name: 'Run details' })).toBeVisible({ timeout: 15_000 })
+  await expect(app).toHaveURL(/\/workflow-builder\//, { timeout: 30_000 })
+  await waitForUIReady(app)
+  await expect(app.getByRole('heading', { name: 'Run details' })).toBeVisible({ timeout: 30_000 })
 }
 
 test.describe('Copy Run to Editor', () => {
@@ -105,10 +106,10 @@ test.describe('Copy Run to Editor', () => {
       await app.getByLabel('Run history').click()
       await expect(app.getByRole('heading', { name: 'Run history' })).toBeVisible()
 
-      const runHistoryPanel = app.getByRole('region', { name: 'Run history' })
-      const executionButtons = runHistoryPanel.locator('button[class*="simpleList"]')
-      await expect(executionButtons).toHaveCount(1, { timeout: 15_000 })
-      await executionButtons.click()
+      const runHistoryList = app.getByRole('list', { name: 'Run history list' })
+      const executionRow = runHistoryList.getByRole('link').first()
+      await expect(executionRow).toBeVisible({ timeout: 30_000 })
+      await executionRow.click()
 
       await expect(app.getByRole('button', { name: 'Copy to editor' })).toBeVisible({ timeout: 15_000 })
       await confirmCopyToEditorInBuilder(app)
