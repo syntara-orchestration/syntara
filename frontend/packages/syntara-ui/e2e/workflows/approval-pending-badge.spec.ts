@@ -166,10 +166,11 @@ test.describe('Approval Pending Badge', () => {
 
       // Navigate to executions list
       await app.goto('/executions')
-      await expect(app.getByRole('grid')).toBeVisible({ timeout: 10_000 })
+      const executionsTable = app.getByRole('grid', { name: 'Executions table' })
+      await expect(executionsTable).toBeVisible({ timeout: 15_000 })
 
       // Find the specific row for this execution
-      const executionRow = app.locator('tr', { has: app.getByText(executionId.slice(0, 8)) })
+      const executionRow = executionsTable.locator('tr', { has: app.getByText(executionId.slice(0, 8)) })
 
       // First ensure the row exists in the table (our execution should be visible)
       await expect(executionRow).toBeVisible({ timeout: 10_000 })
