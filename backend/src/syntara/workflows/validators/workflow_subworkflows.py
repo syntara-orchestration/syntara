@@ -24,6 +24,7 @@ from .template_expressions import extract_element_expressions
 NodeTarget = tuple[str | None, UUID, str, Mapping[str, Any]]
 TargetWorkflow = tuple[str | None, UUID, UUID | None, Mapping[str, Any] | None]
 _SUBWORKFLOW_OUTPUT_PATH_PREFIX = ("outputs",)
+_MAX_SCHEMA_PATH_DEPTH = 64
 
 
 def _invalid_reference_finding(message: str, node_id: str | None, field_path: str) -> ValidationFinding:
@@ -178,25 +179,44 @@ def _referenced_child_output_paths(
     return referenced_paths
 
 
-def _allows_composed_schema_path(schema: Mapping[str, Any], path: tuple[str, ...]) -> bool | None:
+def _allows_composed_schema_path(
+    schema: Mapping[str, Any],
+    path: tuple[str, ...],
+    depth: int,
+) -> bool | None:
     """Check paths through JSON Schema composition keywords when present."""
+    constraints: list[bool] = []
     for union_key in ("anyOf", "oneOf"):
         branches = schema.get(union_key)
         if isinstance(branches, list) and branches:
-            return any(isinstance(branch, Mapping) and _schema_allows_nested_path(branch, path) for branch in branches)
+            constraints.append(
+                any(
+                    isinstance(branch, Mapping) and _schema_allows_nested_path(branch, path, depth + 1)
+                    for branch in branches
+                )
+            )
     all_of = schema.get("allOf")
     if isinstance(all_of, list) and all_of:
-        return all(isinstance(branch, Mapping) and _schema_allows_nested_path(branch, path) for branch in all_of)
-    return None
+        constraints.append(
+            all(
+                isinstance(branch, Mapping) and _schema_allows_nested_path(branch, path, depth + 1) for branch in all_of
+            )
+        )
+    return all(constraints) if constraints else None
 
 
-def _allows_object_schema_path(schema: Mapping[str, Any], segment: str, remaining: tuple[str, ...]) -> bool:
+def _allows_object_schema_path(
+    schema: Mapping[str, Any],
+    segment: str,
+    remaining: tuple[str, ...],
+    depth: int,
+) -> bool:
     """Check an object property or additional property against its schema."""
     properties = schema.get("properties")
     if isinstance(properties, Mapping) and segment in properties:
         child_schema = properties[segment]
         return not remaining or (
-            isinstance(child_schema, Mapping) and _schema_allows_nested_path(child_schema, remaining)
+            isinstance(child_schema, Mapping) and _schema_allows_nested_path(child_schema, remaining, depth + 1)
         )
 
     if schema.get("additionalProperties") is False:
@@ -205,28 +225,36 @@ def _allows_object_schema_path(schema: Mapping[str, Any], segment: str, remainin
     return (
         not remaining
         or not isinstance(additional_schema, Mapping)
-        or _schema_allows_nested_path(additional_schema, remaining)
+        or _schema_allows_nested_path(additional_schema, remaining, depth + 1)
     )
 
 
-def _allows_array_schema_path(schema: Mapping[str, Any], segment: str, remaining: tuple[str, ...]) -> bool:
+def _allows_array_schema_path(
+    schema: Mapping[str, Any],
+    segment: str,
+    remaining: tuple[str, ...],
+    depth: int,
+) -> bool:
     """Check a numeric array index and its item schema."""
     item_schema = schema.get("items")
     return (
         segment.isdecimal()
         and isinstance(item_schema, Mapping)
-        and (not remaining or _schema_allows_nested_path(item_schema, remaining))
+        and (not remaining or _schema_allows_nested_path(item_schema, remaining, depth + 1))
     )
 
 
-def _schema_allows_nested_path(schema: Mapping[str, Any], path: tuple[str, ...]) -> bool:
-    """Check nested object/array path segments against a JSON Schema fragment."""
+def _schema_allows_nested_path(schema: Mapping[str, Any], path: tuple[str, ...], depth: int = 0) -> bool:
+    """Check a nested path, treating paths beyond the depth limit as undeclared."""
     if not path or not schema:
         return True
+    if depth >= _MAX_SCHEMA_PATH_DEPTH:
+        # This produces the existing non-blocking warning instead of silently accepting an unchecked path.
+        return False
 
-    composed_result = _allows_composed_schema_path(schema, path)
-    if composed_result is not None:
-        return composed_result
+    composed_result = _allows_composed_schema_path(schema, path, depth)
+    if composed_result is False:
+        return False
 
     schema_type = schema.get("type")
     schema_types = schema_type if isinstance(schema_type, list) else [schema_type]
@@ -237,10 +265,11 @@ def _schema_allows_nested_path(schema: Mapping[str, Any], path: tuple[str, ...])
 
     segment, *remaining = path
     remaining_path = tuple(remaining)
-    if has_object_type:
-        return _allows_object_schema_path(schema, segment, remaining_path)
-    # Numeric path segments can address array items in a declared array output.
-    return _allows_array_schema_path(schema, segment, remaining_path)
+    object_path_allowed = has_object_type and _allows_object_schema_path(schema, segment, remaining_path, depth)
+    # A union type may allow the path through either its object or array branch.
+    array_path_allowed = has_array_type and _allows_array_schema_path(schema, segment, remaining_path, depth)
+    direct_schema_allows_path = object_path_allowed or array_path_allowed
+    return direct_schema_allows_path if composed_result is None else composed_result and direct_schema_allows_path
 
 
 def _is_declared_output_path(output_schema: Mapping[str, Any] | None, path: tuple[str, ...]) -> bool:

@@ -760,6 +760,48 @@ async def test_nested_dynamic_child_output_paths_follow_declared_schema(
 
 
 @pytest.mark.asyncio
+async def test_composed_child_output_schema_applies_any_of_and_all_of_constraints(
+    test_db_session: AsyncSession,
+    test_user: User,
+    test_project_id: UUID,
+) -> None:
+    child = await _create_child_workflow(
+        test_db_session,
+        test_user,
+        test_project_id,
+        output_schema={
+            "type": "object",
+            "properties": {
+                "payload": {
+                    "type": "object",
+                    "anyOf": [{"type": "object"}],
+                    "allOf": [
+                        {
+                            "type": "object",
+                            "properties": {"declared": {"type": "string"}},
+                            "additionalProperties": False,
+                        }
+                    ],
+                }
+            },
+        },
+    )
+
+    findings = await validate_subworkflow_project_references(
+        test_db_session,
+        _definition_with_subworkflow_output_references(
+            child.id,
+            ["call_child.outputs.payload.declared", "call_child.outputs.payload.undeclared"],
+        ),
+        test_project_id,
+    )
+
+    assert len(findings) == 1
+    assert findings[0].severity == ValidationSeverity.warning
+    assert findings[0].field_path == "outputs.payload.undeclared"
+
+
+@pytest.mark.asyncio
 async def test_child_output_validation_uses_selected_trigger_schema(
     test_db_session: AsyncSession,
     test_user: User,
