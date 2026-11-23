@@ -127,21 +127,26 @@ describe('EmbedWorkflowDialog', () => {
     expect(onClose).toHaveBeenCalled()
   })
 
-  it('blocks embed and warns when the source contains a sub-workflow step', async () => {
+  it('allows embed and shows an info notice when the source contains a sub-workflow step', async () => {
     const user = userEvent.setup()
+    const onClose = vi.fn()
     withWorkflows()
     resolveDefinition({
       nodes: [{ id: 'n1', type: 'sub_workflow', parameters: { workflow_id: 'x', trigger_node_id: 'y' } }],
       edges: [],
       triggers: [],
     })
-    render(<EmbedWorkflowDialog isOpen onClose={vi.fn()} projectId="project-1" currentWorkflowId="self" />)
+    render(<EmbedWorkflowDialog isOpen onClose={onClose} projectId="project-1" currentWorkflowId="self" />)
 
     await selectAlpha(user)
-    expect(await screen.findByText(/contains a sub-workflow step/i)).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Embed workflow' })).toBeDisabled()
-    await user.click(screen.getByRole('button', { name: 'Embed workflow' }))
-    expect(mocks.insertEmbeddedGraph).not.toHaveBeenCalled()
+    // informational, not a block: the copied reference keeps its link to the referenced workflow
+    expect(await screen.findByText(/keep their link to the referenced workflow/i)).toBeInTheDocument()
+    const embed = screen.getByRole('button', { name: 'Embed workflow' })
+    expect(embed).toBeEnabled()
+    await user.click(embed)
+    expect(mocks.insertEmbeddedGraph).toHaveBeenCalledTimes(1)
+    expect(mocks.showSuccess).toHaveBeenCalled()
+    expect(onClose).toHaveBeenCalled()
   })
 
   it('blocks embed and warns when the source references credentials/integrations', async () => {
@@ -209,7 +214,7 @@ describe('EmbedWorkflowDialog', () => {
       await Promise.resolve()
     })
 
-    expect(screen.queryByText(/contains a sub-workflow step/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/keep their link to the referenced workflow/i)).not.toBeInTheDocument()
     expect(screen.getByText(/connection\(s\) will be copied/i)).toBeInTheDocument()
   })
 })

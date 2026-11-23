@@ -108,7 +108,7 @@ export function EmbedWorkflowDialog({ isOpen, onClose, projectId, currentWorkflo
 
   const hasResourceRefs = (preview?.resourceReferenceNodes.length ?? 0) > 0
   const hasSubWorkflowNodes = (preview?.subWorkflowNodes.length ?? 0) > 0
-  const canEmbed = !!preview && !isFetching && !hasResourceRefs && !hasSubWorkflowNodes
+  const canEmbed = !!preview && !isFetching && !hasResourceRefs
 
   const handleEmbed = () => {
     if (!preview || !canEmbed) return
@@ -193,14 +193,15 @@ export function EmbedWorkflowDialog({ isOpen, onClose, projectId, currentWorkflo
                 {hasSubWorkflowNodes && (
                   <StackItem>
                     <Alert
-                      variant="danger"
+                      variant="info"
                       isInline
-                      title="Embedding is blocked: this workflow contains a sub-workflow step."
+                      title="Copied sub-workflow steps keep their link to the referenced workflow."
                     >
                       <Content component="p">
-                        {preview.subWorkflowNodes.length} copied step(s) reference another workflow. Copying them would
-                        re-create a live child execution and a Used-By dependency, which Embed must not do. Remove the
-                        sub-workflow step(s) from the source workflow before embedding.
+                        {preview.subWorkflowNodes.length} copied step(s) reference another workflow. The embedded copy
+                        keeps that reference: it runs the referenced workflow as a sub-workflow and will appear in that
+                        workflow&apos;s Used-By list once you publish. Only the steps shown here are copied onto your
+                        canvas — the referenced workflow itself is not copied or expanded.
                       </Content>
                     </Alert>
                   </StackItem>

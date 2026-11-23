@@ -3,9 +3,10 @@
  * single undoable operation (SDP R12).
  *
  * The caller computes the copy with copyWorkflowGraph() (so the confirmation dialog can
- * preview counts, excluded triggers and resource references first); this hook performs
- * the atomic store insertion. No runtime sub_workflow node is created, so the copied
- * steps execute as ordinary parent steps and create no child execution or Used-By entry.
+ * preview counts, excluded triggers, resource references and sub-workflow references first);
+ * this hook performs the atomic store insertion. Ordinary copied steps execute as parent
+ * steps; a copied sub_workflow step keeps its reference and runs the referenced workflow as a
+ * child (Used-By applies). No reference to the source workflow is introduced.
  */
 import { useCallback } from 'react'
 
