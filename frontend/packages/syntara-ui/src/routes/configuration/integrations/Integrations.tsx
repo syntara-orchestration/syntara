@@ -1,4 +1,4 @@
-import { Badge, Button, Switch, Tooltip, Truncate } from '@patternfly/react-core'
+import { Badge, Button, Truncate } from '@patternfly/react-core'
 import { RhUiAddIcon, RhUiCheckCircleIcon, RhUiTrashIcon } from '@patternfly/react-icons'
 import { Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table'
 import type { ThProps } from '@patternfly/react-table'
@@ -28,8 +28,10 @@ import type { FilterFieldDefinition } from '../../../types/filters'
 import { detachPromise } from '../../../utils/detachPromise'
 import { useDocLink } from '../../../utils/docs/useDocLink'
 
+import { ExecutionPlaneEnabledState } from './ExecutionPlaneEnabledState'
 import { IntegrationDialogs } from './IntegrationDialogs'
 import { IntegrationEmptyState } from './IntegrationEmptyState'
+import { IntegrationEnabledSwitch } from './IntegrationEnabledSwitch'
 import {
   INTEGRATION_TYPE_LABELS,
   getIntegrationNameFilterDefinition,
@@ -145,23 +147,16 @@ function IntegrationsTableContent({
               <DateCell dateString={integration.last_validated_at} />
             </Td>
             <Td dataLabel="State">
-              {permissions.isLoading || !permissions.canUpdate ? (
-                <Tooltip content={permissions.tooltips.enable}>
-                  <Switch
-                    id={`toggle-${integration.id}`}
-                    label={integration.enabled ? 'Enabled' : 'Disabled'}
-                    isChecked={integration.enabled ?? true}
-                    isDisabled
-                    aria-label={`Toggle ${integration.name}`}
-                  />
-                </Tooltip>
+              {isExecutionPlaneInfrastructure(integration) ? (
+                <ExecutionPlaneEnabledState enabled={integration.enabled} />
               ) : (
-                <Switch
-                  id={`toggle-${integration.id}`}
-                  label={integration.enabled ? 'Enabled' : 'Disabled'}
-                  isChecked={integration.enabled ?? true}
-                  onChange={() => handleToggleEnabled(integration)}
-                  aria-label={`Toggle ${integration.name}`}
+                <IntegrationEnabledSwitch
+                  integration={integration}
+                  switchId={`toggle-${integration.id}`}
+                  canUpdate={permissions.canUpdate}
+                  isPermissionsLoading={permissions.isLoading}
+                  updateDeniedTooltip={permissions.tooltips.enable}
+                  onToggle={() => handleToggleEnabled(integration)}
                 />
               )}
             </Td>

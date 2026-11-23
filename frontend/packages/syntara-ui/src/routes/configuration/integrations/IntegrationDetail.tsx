@@ -9,9 +9,7 @@ import {
   Skeleton,
   Stack,
   StackItem,
-  Switch,
   Tab,
-  Tooltip,
 } from '@patternfly/react-core'
 import { RhUiCheckCircleIcon, RhUiEditIcon, RhUiTrashIcon, RhUiWarningIcon } from '@patternfly/react-icons'
 import type { IntegrationsAPI } from '@syntara/contracts'
@@ -40,8 +38,10 @@ import { useUrlTab } from '../../../hooks/useUrlTab'
 import { detachPromise } from '../../../utils/detachPromise'
 import { useDocLink } from '../../../utils/docs/useDocLink'
 
+import { ExecutionPlaneEnabledState } from './ExecutionPlaneEnabledState'
 import styles from './IntegrationDetail.module.css'
 import { IntegrationDialogs } from './IntegrationDialogs'
+import { IntegrationEnabledSwitch } from './IntegrationEnabledSwitch'
 import { INTEGRATION_TYPE_LABELS, PROVIDER_HINT_LABELS } from './integrationFilters'
 import {
   getBaseUrl,
@@ -112,6 +112,11 @@ function IntegrationDetailsTab({
               errorMessage={integration.validation_error}
             />
           </SynDetail>
+          {isExecutionPlaneInfrastructure(integration) && (
+            <SynDetail label="State">
+              <ExecutionPlaneEnabledState enabled={integration.enabled} />
+            </SynDetail>
+          )}
           <SynDetail label="Last checked">
             <DateCell dateString={integration.last_validated_at} />
           </SynDetail>
@@ -172,23 +177,14 @@ function IntegrationToolbar({
 }>) {
   return (
     <>
-      {permissions.isLoading || !permissions.canUpdate ? (
-        <Tooltip content={permissions.tooltips.enable}>
-          <Switch
-            id="integration-enabled-toggle"
-            label={integration.enabled ? 'Enabled' : 'Disabled'}
-            isChecked={integration.enabled ?? true}
-            isDisabled
-            aria-label={`Toggle ${integration.name}`}
-          />
-        </Tooltip>
-      ) : (
-        <Switch
-          id="integration-enabled-toggle"
-          label={integration.enabled ? 'Enabled' : 'Disabled'}
-          isChecked={integration.enabled ?? true}
-          onChange={onToggleEnabled}
-          aria-label={`Toggle ${integration.name}`}
+      {!isExecutionPlaneInfrastructure(integration) && (
+        <IntegrationEnabledSwitch
+          integration={integration}
+          switchId="integration-enabled-toggle"
+          canUpdate={permissions.canUpdate}
+          isPermissionsLoading={permissions.isLoading}
+          updateDeniedTooltip={permissions.tooltips.enable}
+          onToggle={onToggleEnabled}
         />
       )}
       <DisabledWithTooltip isDisabled={!permissions.canUpdate} content={permissions.tooltips.update}>
