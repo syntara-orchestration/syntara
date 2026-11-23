@@ -106,7 +106,8 @@ test.describe('Copy Run to Editor', () => {
   })
 
   test('copy from run history keeps run details after workflow was already open in builder', async ({ app }) => {
-    test.slow()
+    // Konflux: poll + history list + run-details retries can exceed the default slow ceiling (180s).
+    test.setTimeout(360_000)
 
     const workflowName = buildUniqueName('e2e-copy-history')
     const { id, versionNumber } = await createBasicWorkflowViaApi(app, workflowName, 'History copy action')
