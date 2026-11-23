@@ -61,7 +61,7 @@ describe('OutputContractChangeSummary', () => {
     ).toBeInTheDocument()
     expect(screen.getByText('1 visible published parent workflow')).toBeInTheDocument()
     expect(screen.getByText(/The count includes only parent workflows visible to you/)).toBeInTheDocument()
-    expect(screen.queryByText('Child invocation: Removed output: release.tag')).not.toBeInTheDocument()
+    expect(screen.getByText('Child invocation: Removed output: release.tag')).not.toBeVisible()
     expect(screen.queryByRole('dialog', { name: 'Visible published parent workflows' })).not.toBeInTheDocument()
     expect(await axe(container)).toHaveNoViolations()
 
@@ -108,7 +108,9 @@ describe('OutputContractChangeSummary', () => {
     )
 
     expect(
-      screen.getByText('Output changes: Child trigger: Removed SubWorkflow Trigger: child_trigger.')
+      screen.getByText(
+        'Output changes: Child trigger: Removed SubWorkflow Trigger: child_trigger. Published parent workflows will use the updated child version on their next run.'
+      )
     ).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'View all 1 output changes' }))
     expect(screen.getByText('Child trigger: Removed SubWorkflow Trigger: child_trigger')).toBeInTheDocument()
@@ -117,7 +119,7 @@ describe('OutputContractChangeSummary', () => {
   it('uses visibility-scoped copy when no parent references are returned', () => {
     render(<OutputContractChangeSummary context="publish" contractChanges={contractChanges} parentWorkflows={[]} />)
 
-    expect(screen.getByText('No visible published parent workflows are listed.')).toBeInTheDocument()
+    expect(screen.getByText(/No visible published parent workflows are listed/)).toBeInTheDocument()
     expect(screen.getByText(/References outside your visibility scope may not be shown/)).toBeInTheDocument()
     expect(screen.queryByText(/0 visible published parent/)).not.toBeInTheDocument()
   })
