@@ -2,6 +2,10 @@ import { test, expect, toAppUrl } from '../fixtures'
 import { buildUniqueName, clickNode, saveWorkflow } from '../helpers/workflows'
 import { createWorkflowViaApi, deleteWorkflowViaApi, publishWorkflowViaApi } from '../utils/api'
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
 test('shows an advisory when the editor cannot execute the selected child workflow', async ({ app }) => {
   const childName = buildUniqueName('e2e-permission-child')
   const parentName = buildUniqueName('e2e-permission-parent')
@@ -40,9 +44,11 @@ test('shows an advisory when the editor cannot execute the selected child workfl
     })
     parentWorkflowId = parent.id
 
+    let deniedExecutionCheckMocked = false
     await app.route('**/authz/can_i', async (route) => {
-      const body = route.request().postDataJSON() as { action?: string; resource_type?: string }
-      if (body.action === 'run' && body.resource_type === 'execution') {
+      const body: unknown = route.request().postDataJSON()
+      if (isRecord(body) && body.action === 'run' && body.resource_type === 'execution') {
+        deniedExecutionCheckMocked = true
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
@@ -50,12 +56,19 @@ test('shows an advisory when the editor cannot execute the selected child workfl
         })
         return
       }
-      await route.continue()
+      // Keep unrelated permission checks deterministic too. If the request shape changes,
+      // this allows the UI through and the expected denied-check assertion below fails.
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ allowed: true, denied: false, denial_reason: null }),
+      })
     })
 
     await app.goto(toAppUrl(`/workflow-builder/${parent.id}`))
     await clickNode(app, 'Call child')
 
+    await expect.poll(() => deniedExecutionCheckMocked).toBe(true)
     await expect(app.getByRole('heading', { name: /You would not be able to execute this workflow/ })).toBeVisible()
     const updateButton = app.getByRole('button', { name: 'Update', exact: true })
     await expect(updateButton).toBeEnabled()
