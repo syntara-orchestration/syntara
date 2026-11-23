@@ -107,7 +107,7 @@ test.describe('Copy Run to Editor', () => {
       await expect(app.getByRole('heading', { name: 'Run history' })).toBeVisible()
 
       const runHistoryList = app.getByRole('list', { name: 'Run history list' })
-      const executionRow = runHistoryList.getByRole('link').first()
+      const executionRow = runHistoryList.getByRole('link', { name: /^Execution from / })
       await expect(executionRow).toBeVisible({ timeout: 30_000 })
       await executionRow.click()
 
