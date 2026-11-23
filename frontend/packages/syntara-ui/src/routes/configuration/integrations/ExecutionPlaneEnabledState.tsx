@@ -14,8 +14,8 @@ type ExecutionPlaneEnabledStateProps = Readonly<{
   enabled?: boolean | null
 }>
 
-export function ExecutionPlaneEnabledState({ enabled = true }: ExecutionPlaneEnabledStateProps) {
-  const label = enabled ? 'Enabled' : 'Disabled'
+export function ExecutionPlaneEnabledState({ enabled }: ExecutionPlaneEnabledStateProps) {
+  const label = (enabled ?? true) ? 'Enabled' : 'Disabled'
 
   return (
     <Tooltip content={EXECUTION_PLANE_ENABLED_TOOLTIP}>

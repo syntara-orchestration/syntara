@@ -1553,7 +1553,7 @@ describe('Integrations Component', () => {
       expect(screen.getAllByRole('switch')).toHaveLength(1)
 
       const openShiftRow = screen.getByRole('row', { name: /OpenShift Cluster/i })
-      const enabledLabel = within(openShiftRow).getByText('Enabled', { selector: '.pf-v6-c-label__text' })
+      const enabledLabel = within(openShiftRow).getByText('Enabled')
       expect(enabledLabel).toBeInTheDocument()
       expect(within(openShiftRow).queryByRole('switch')).not.toBeInTheDocument()
 
@@ -1591,7 +1591,7 @@ describe('Integrations Component', () => {
       render(<Integrations />, { wrapper })
 
       const openShiftRow = screen.getByRole('row', { name: /OpenShift Cluster/i })
-      expect(within(openShiftRow).getByText('Disabled', { selector: '.pf-v6-c-label__text' })).toBeInTheDocument()
+      expect(within(openShiftRow).getByText('Disabled')).toBeInTheDocument()
       expect(within(openShiftRow).queryByRole('switch')).not.toBeInTheDocument()
     })
 

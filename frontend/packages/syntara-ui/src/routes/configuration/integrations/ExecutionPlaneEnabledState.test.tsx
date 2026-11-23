@@ -19,6 +19,14 @@ describe('ExecutionPlaneEnabledState', () => {
     expect(screen.queryByText('Enabled')).not.toBeInTheDocument()
   })
 
+  it('null and undefined default to Enabled', () => {
+    const { rerender } = render(<ExecutionPlaneEnabledState enabled={null} />)
+    expect(screen.getByText('Enabled')).toBeInTheDocument()
+
+    rerender(<ExecutionPlaneEnabledState />)
+    expect(screen.getByText('Enabled')).toBeInTheDocument()
+  })
+
   it('shows the execution-plane tooltip on hover', async () => {
     const user = userEvent.setup()
     render(<ExecutionPlaneEnabledState enabled />)
