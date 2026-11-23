@@ -18,6 +18,8 @@ from syntara.workflows.validators.workflow_definition import (
 )
 from syntara.workflows.workflow_engine.models.workflow_definition import NodeType, SubWorkflowExecutorParameters
 
+from .template_expressions import extract_element_expressions
+
 NodeTarget = tuple[str | None, UUID, str, Mapping[str, Any]]
 TargetWorkflow = tuple[str | None, UUID, UUID | None, Mapping[str, Any] | None]
 _SUBWORKFLOW_OUTPUT_PATH_PREFIX = ("outputs",)
@@ -96,11 +98,10 @@ async def _load_target_workflows(
         workflows[target_id].published_version_id for _, target_id, _, _ in node_targets if target_id in workflows
     }
     selected_ids.discard(None)
-    if not selected_ids:
-        return {}
-
-    version_result = await session.exec(select(WorkflowVersion).where(col(WorkflowVersion.id).in_(selected_ids)))
-    versions = {version.id: version for version in version_result.all()}
+    versions: dict[UUID, WorkflowVersion] = {}
+    if selected_ids:
+        version_result = await session.exec(select(WorkflowVersion).where(col(WorkflowVersion.id).in_(selected_ids)))
+        versions = {version.id: version for version in version_result.all()}
     targets: dict[UUID, TargetWorkflow] = {}
     for _, target_id, _, _ in node_targets:
         workflow = workflows.get(target_id)
@@ -148,6 +149,110 @@ def _required_trigger_input_names(trigger: Mapping[str, Any]) -> list[str]:
     if not isinstance(required, list):
         return []
     return [name for name in required if isinstance(name, str)]
+
+
+def _referenced_child_output_paths(
+    workflow_definition: Mapping[str, Any],
+    subworkflow_node_id: str | None,
+) -> set[tuple[str, ...]]:
+    """Find declared output paths referenced through a Sub-workflow expression."""
+    if subworkflow_node_id is None:
+        return set()
+
+    triggers = workflow_definition.get("triggers")
+    nodes = workflow_definition.get("nodes")
+    elements = [*(triggers if isinstance(triggers, list) else []), *(nodes if isinstance(nodes, list) else [])]
+    referenced_paths: set[tuple[str, ...]] = set()
+    for element in elements:
+        if not isinstance(element, dict):
+            continue
+        for expression, _field_path in extract_element_expressions(element, include_script_code=True):
+            scope, *path = expression.split(".")
+            if scope != subworkflow_node_id or not path:
+                continue
+            outputs_field, *output_path = path
+            if (outputs_field,) != _SUBWORKFLOW_OUTPUT_PATH_PREFIX or not output_path:
+                continue
+            referenced_paths.add(tuple(output_path))
+    return referenced_paths
+
+
+def _allows_composed_schema_path(schema: Mapping[str, Any], path: tuple[str, ...]) -> bool | None:
+    """Check paths through JSON Schema composition keywords when present."""
+    for union_key in ("anyOf", "oneOf"):
+        branches = schema.get(union_key)
+        if isinstance(branches, list) and branches:
+            return any(isinstance(branch, Mapping) and _schema_allows_nested_path(branch, path) for branch in branches)
+    all_of = schema.get("allOf")
+    if isinstance(all_of, list) and all_of:
+        return all(isinstance(branch, Mapping) and _schema_allows_nested_path(branch, path) for branch in all_of)
+    return None
+
+
+def _allows_object_schema_path(schema: Mapping[str, Any], segment: str, remaining: tuple[str, ...]) -> bool:
+    """Check an object property or additional property against its schema."""
+    properties = schema.get("properties")
+    if isinstance(properties, Mapping) and segment in properties:
+        child_schema = properties[segment]
+        return not remaining or (
+            isinstance(child_schema, Mapping) and _schema_allows_nested_path(child_schema, remaining)
+        )
+
+    if schema.get("additionalProperties") is False:
+        return False
+    additional_schema = schema.get("additionalProperties")
+    return (
+        not remaining
+        or not isinstance(additional_schema, Mapping)
+        or _schema_allows_nested_path(additional_schema, remaining)
+    )
+
+
+def _allows_array_schema_path(schema: Mapping[str, Any], segment: str, remaining: tuple[str, ...]) -> bool:
+    """Check a numeric array index and its item schema."""
+    item_schema = schema.get("items")
+    return (
+        segment.isdecimal()
+        and isinstance(item_schema, Mapping)
+        and (not remaining or _schema_allows_nested_path(item_schema, remaining))
+    )
+
+
+def _schema_allows_nested_path(schema: Mapping[str, Any], path: tuple[str, ...]) -> bool:
+    """Check nested object/array path segments against a JSON Schema fragment."""
+    if not path or not schema:
+        return True
+
+    composed_result = _allows_composed_schema_path(schema, path)
+    if composed_result is not None:
+        return composed_result
+
+    schema_type = schema.get("type")
+    schema_types = schema_type if isinstance(schema_type, list) else [schema_type]
+    has_object_type = "object" in schema_types or schema_type is None
+    has_array_type = "array" in schema_types
+    if not has_object_type and not has_array_type:
+        return False
+
+    segment, *remaining = path
+    remaining_path = tuple(remaining)
+    if has_object_type:
+        return _allows_object_schema_path(schema, segment, remaining_path)
+    # Numeric path segments can address array items in a declared array output.
+    return _allows_array_schema_path(schema, segment, remaining_path)
+
+
+def _is_declared_output_path(output_schema: Mapping[str, Any] | None, path: tuple[str, ...]) -> bool:
+    """Check that the first path segment is public and nested segments fit its schema."""
+    if not path or not isinstance(output_schema, Mapping):
+        return False
+
+    properties = output_schema.get("properties")
+    if not isinstance(properties, Mapping) or path[0] not in properties:
+        return False
+
+    field_schema = properties[path[0]]
+    return len(path) == 1 or (isinstance(field_schema, Mapping) and _schema_allows_nested_path(field_schema, path[1:]))
 
 
 def _declared_output_type_for_expression(
@@ -215,6 +320,7 @@ def _validate_target_workflow(
     trigger_node_id: str,
     node_id: str | None,
     input_mapping: Mapping[str, Any],
+    parent_workflow_definition: Mapping[str, Any],
 ) -> list[ValidationFinding]:
     if target_workflow is None:
         return [
@@ -223,7 +329,7 @@ def _validate_target_workflow(
             )
         ]
 
-    workflow_name, target_project_id, selected_version_id, selected_definition = target_workflow
+    _workflow_name, target_project_id, selected_version_id, selected_definition = target_workflow
     if target_project_id != project_id:
         return [
             _invalid_reference_finding(
@@ -234,8 +340,12 @@ def _validate_target_workflow(
         ]
     if selected_version_id is None:
         return [
-            _invalid_reference_finding(
-                "The selected child workflow must have a published version.", node_id, "parameters.workflow_id"
+            ValidationFinding(
+                severity=ValidationSeverity.warning,
+                category=ValidationCategory.invalid_reference,
+                message="The selected child workflow has no published version",
+                node_id=node_id,
+                field_path="parameters.workflow_id",
             )
         ]
     selected_trigger = _get_selected_subworkflow_trigger(selected_definition, trigger_node_id)
@@ -248,11 +358,11 @@ def _validate_target_workflow(
             )
         ]
 
-    return [
+    findings = [
         ValidationFinding(
             severity=ValidationSeverity.warning,
             category=ValidationCategory.missing_field,
-            message=(f"Child workflow '{workflow_name}' requires input '{input_name}', not provided in input_mapping"),
+            message=f"The selected child workflow requires input '{input_name}', not provided in input_mapping",
             node_id=node_id,
             field_path=f"parameters.input_mapping.{input_name}",
         )
@@ -260,13 +370,38 @@ def _validate_target_workflow(
         if input_name not in input_mapping
     ]
 
+    trigger_parameters = selected_trigger.get("parameters")
+    output_schema = trigger_parameters.get("output_schema") if isinstance(trigger_parameters, Mapping) else None
+    referenced_paths = _referenced_child_output_paths(parent_workflow_definition, node_id)
+    stale_output_paths = sorted(path for path in referenced_paths if not _is_declared_output_path(output_schema, path))
+    findings.extend(
+        [
+            ValidationFinding(
+                severity=ValidationSeverity.warning,
+                category=ValidationCategory.invalid_reference,
+                message=(
+                    f"Parent references child output '{'.'.join(path)}' which is not declared "
+                    "by the selected Subworkflow Trigger"
+                ),
+                node_id=node_id,
+                field_path=f"outputs.{'.'.join(path)}",
+            )
+            for path in stale_output_paths
+        ]
+    )
+    return findings
+
 
 async def validate_subworkflow_project_references(
     session: AsyncSession,
     workflow_definition: dict[str, Any],
     project_id: UUID,
 ) -> list[ValidationFinding]:
-    """Validate each child workflow's latest published version, trigger, and required inputs."""
+    """Validate child targets, declared outputs, required inputs, and compatible input mappings.
+
+    Findings for missing required inputs, unpublished children, and undeclared outputs are
+    warnings. Invalid child references and incompatible mapped types are errors.
+    """
     nodes = workflow_definition.get("nodes", [])
     if not isinstance(nodes, list):
         return []
@@ -299,6 +434,7 @@ async def validate_subworkflow_project_references(
                 trigger_node_id,
                 node_id,
                 input_mapping,
+                workflow_definition,
             )
         )
         if target_workflow is None or target_workflow[1] != project_id or target_workflow[2] is None:
