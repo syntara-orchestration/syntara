@@ -266,7 +266,7 @@ vi.mock('./hooks/useForkWorkflow', () => ({
 }))
 
 const mockShowError = vi.fn()
-vi.mock('../../providers/alerts', () => ({
+vi.mock('../../providers/alerts/AlertContext', () => ({
   useAlerts: vi.fn(() => ({
     showError: mockShowError,
     showSuccess: vi.fn(),

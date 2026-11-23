@@ -5,7 +5,7 @@ import { SynForm } from '../../../components/forms/SynForm'
 import { SynTextAreaField } from '../../../components/forms/SynTextAreaField'
 import { SynTextField } from '../../../components/forms/SynTextField'
 import { useSynForm } from '../../../hooks/useSynForm'
-import { useAlerts } from '../../../providers/alerts'
+import { useAlerts } from '../../../providers/alerts/AlertContext'
 import { accessClient } from '../../access/accessClient'
 
 import { serviceAccountHelp } from './serviceAccountFieldHelp'

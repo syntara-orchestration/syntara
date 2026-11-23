@@ -13,7 +13,7 @@ import { ExecutionsAPI } from '@syntara/contracts'
 import { useState, useCallback, useRef, useEffect } from 'react'
 
 import { workflowFetchClient } from '../../../client'
-import { FlowNodeType } from '../../../constants'
+import { FlowNodeType } from '../../../constants/nodeTypes'
 import { useBlurOnOpen } from '../../../hooks/useBlurOnOpen'
 import { getErrorMessage } from '../../../utils/apiErrors'
 import { detachPromise } from '../../../utils/detachPromise'
