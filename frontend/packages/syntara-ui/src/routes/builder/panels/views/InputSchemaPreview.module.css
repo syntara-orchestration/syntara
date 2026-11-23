@@ -10,10 +10,6 @@
   color: var(--pf-t--global--color--200);
 }
 
-.previewContainer :global(.pf-v6-c-tree-view__action) {
-  align-self: flex-start;
-}
-
 .fieldLabel {
   display: flex;
   align-items: center;

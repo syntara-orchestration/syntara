@@ -52,6 +52,7 @@ export function useVersionHistoryPublishing({
     reviewOutputContract: runOutputContractReview,
   } = useOutputContractReview(workflowId)
   const [pendingPublish, setPendingPublish] = useState<PendingVersionPublish | null>(null)
+  const [reviewFailedVersion, setReviewFailedVersion] = useState<number | null>(null)
   const publishMutation = workflowClient.useMutation('post', '/workflows/{workflow_id}/versions/{version}/publish')
 
   const publishVersionNow = useCallback(
@@ -91,6 +92,7 @@ export function useVersionHistoryPublishing({
   const reviewVersionForPublish = useCallback(
     (version: number) => {
       clearOutputContractReview()
+      setReviewFailedVersion(null)
       if (!workflowId) return
 
       const workflowDefinition = versions?.find((item) => item.version === version)?.workflow_definition
@@ -105,9 +107,15 @@ export function useVersionHistoryPublishing({
       detachPromise(
         runOutputContractReview(workflowDefinition, (error) => {
           setPendingPublish((current) => (current?.version === version ? null : current))
+          setReviewFailedVersion(version)
           showError({ title: 'Failed to check output contract changes', description: getErrorMessage(error) })
         }).then((review) => {
-          if (!review) return
+          if (!review) {
+            setPendingPublish((current) => (current?.version === version ? null : current))
+            setReviewFailedVersion(version)
+            return
+          }
+          setReviewFailedVersion(null)
           setPendingPublish((current) =>
             current?.version === version && current.workflowDefinition === workflowDefinition
               ? { ...current, review }
@@ -147,13 +155,20 @@ export function useVersionHistoryPublishing({
         onSettled,
       }
       clearOutputContractReview()
+      setReviewFailedVersion(null)
       setPendingPublish(pending)
       detachPromise(
         runOutputContractReview(workflowDefinition, (error) => {
           setPendingPublish(null)
+          setReviewFailedVersion(version)
           showError({ title: 'Failed to check output contract changes', description: getErrorMessage(error) })
         }).then((review) => {
-          if (!review) return
+          if (!review) {
+            setPendingPublish(null)
+            setReviewFailedVersion(version)
+            return
+          }
+          setReviewFailedVersion(null)
           const reviewedPending = { ...pending, review }
           if (review.has_breaking_changes || review.has_contract_changes) {
             setPendingPublish(reviewedPending)
@@ -186,6 +201,7 @@ export function useVersionHistoryPublishing({
       }
       clearOutputContractReview()
       setPendingPublish(null)
+      setReviewFailedVersion(null)
       publishVersionNow(pending)
     },
     [pendingPublish, clearOutputContractReview, publishVersionNow]
@@ -194,6 +210,7 @@ export function useVersionHistoryPublishing({
   const cancelBreakingChangeWarning = useCallback(() => {
     clearOutputContractReview()
     setPendingPublish(null)
+    setReviewFailedVersion(null)
   }, [clearOutputContractReview])
 
   return {
@@ -202,6 +219,7 @@ export function useVersionHistoryPublishing({
     isPublishingVersion: publishMutation.isPending || isCheckingOutputContract,
     isCheckingOutputContract,
     reviewedPublishVersion: pendingPublish?.review ? pendingPublish.version : null,
+    reviewFailedVersion,
     breakingChanges,
     contractChanges,
     parentWorkflows,

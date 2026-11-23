@@ -48,6 +48,8 @@ export function VersionHistorySidePanel({ sidePanel, isNodeEditorOpen, editPermi
         isPublishing={sidePanel.publishDialog.isPublishing}
         isCheckingContractChanges={sidePanel.publishDialog.isCheckingContractChanges}
         isPublishDisabled={sidePanel.publishDialog.isPublishDisabled}
+        hasContractReviewError={sidePanel.publishDialog.hasContractReviewError}
+        onRetryContractReview={sidePanel.publishDialog.onRetryContractReview}
         onClose={sidePanel.publishDialog.onClose}
         onPublish={sidePanel.publishDialog.onPublish}
         breakingChanges={sidePanel.publishDialog.breakingChanges}

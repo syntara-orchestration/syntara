@@ -11,11 +11,8 @@
   min-width: 0;
 }
 
-.triggerFormContent :global(.pf-v6-l-stack),
-.triggerFormContent :global(.pf-v6-l-stack__item),
-.triggerFormContent :global(.pf-v6-c-form__group-control),
-.triggerFormContent :global(.pf-v6-c-form-control),
-.triggerFormContent :global(.pf-v6-c-code-editor) {
+/* Keep descendants shrinkable in the narrow editor panel without depending on PF class names. */
+.triggerFormContent :where(*) {
   max-width: 100%;
   min-width: 0;
 }

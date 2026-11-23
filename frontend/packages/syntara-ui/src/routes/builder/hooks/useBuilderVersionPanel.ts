@@ -58,6 +58,8 @@ function createVersionPublishDialogState({
   breakingChanges,
   contractChanges,
   parentWorkflows,
+  reviewFailedVersion,
+  reviewVersionForPublish,
   confirmPublish,
   cancelReview,
   publish,
@@ -69,6 +71,8 @@ function createVersionPublishDialogState({
   breakingChanges: WorkflowAPI.components['schemas']['TriggerBreakingChanges'][]
   contractChanges: WorkflowAPI.components['schemas']['TriggerBreakingChanges'][]
   parentWorkflows: WorkflowAPI.components['schemas']['WorkflowReferenceRead'][]
+  reviewFailedVersion: number | null
+  reviewVersionForPublish: (version: number) => void
   confirmPublish: (name?: string, description?: string, onSettled?: () => void) => void
   cancelReview: () => void
   publish: PublishVersionAction
@@ -80,6 +84,10 @@ function createVersionPublishDialogState({
     isPublishing,
     isCheckingContractChanges,
     isPublishDisabled: dialog.item == null || reviewedVersion !== dialog.item,
+    hasContractReviewError: dialog.item != null && reviewFailedVersion === dialog.item,
+    onRetryContractReview: () => {
+      if (dialog.item != null) reviewVersionForPublish(dialog.item)
+    },
     breakingChanges,
     contractChanges,
     parentWorkflows,
@@ -163,6 +171,7 @@ export function useBuilderVersionPanel(params: UseBuilderVersionPanelParams) {
     isPublishingVersion,
     isCheckingOutputContract,
     reviewedPublishVersion,
+    reviewFailedVersion,
     breakingChanges,
     publishReview,
     confirmPublishVersion,
@@ -311,6 +320,8 @@ export function useBuilderVersionPanel(params: UseBuilderVersionPanelParams) {
         isPublishing: isPublishingVersion,
         isCheckingContractChanges: isCheckingOutputContract,
         reviewedVersion: reviewedPublishVersion,
+        reviewFailedVersion,
+        reviewVersionForPublish,
         breakingChanges,
         ...publishReview,
         confirmPublish: confirmPublishVersion,

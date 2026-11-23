@@ -21,6 +21,7 @@ type PendingPublishReview = {
 type PublishReviewDialogState = Readonly<{
   isPublishDisabled: boolean
   isCheckingContractChanges: boolean
+  hasContractReviewError: boolean
   breakingChanges: WorkflowAPI.components['schemas']['TriggerBreakingChanges'][]
   contractChanges: WorkflowAPI.components['schemas']['TriggerBreakingChanges'][]
   parentWorkflows: WorkflowAPI.components['schemas']['WorkflowReferenceRead'][]
@@ -183,6 +184,7 @@ function getPublishReviewDialogState({
     isPublishing: isPublishing || isReviewPublishing,
     isPublishDisabled: !canPublish,
     isCheckingContractChanges,
+    hasContractReviewError: Boolean(hasCurrentReview && pendingReview?.review === null),
     breakingChanges: review?.triggers ?? [],
     contractChanges: review?.contract_changes ?? [],
     parentWorkflows: review?.parent_workflows ?? [],
@@ -259,6 +261,7 @@ export function WorkflowPublishDialog({ publishDialog, isPublishing, onPublishWo
     reviewOutputContract,
     showError,
   })
+  const retryContractReview = useCallback(() => setPendingReview(null), [])
   const reviewDialogState = getPublishReviewDialogState({
     isOpen: publishDialog.isOpen,
     isPublishing,
@@ -280,6 +283,8 @@ export function WorkflowPublishDialog({ publishDialog, isPublishing, onPublishWo
       isPublishing={reviewDialogState.isPublishing}
       isCheckingContractChanges={reviewDialogState.isCheckingContractChanges}
       isPublishDisabled={reviewDialogState.isPublishDisabled}
+      hasContractReviewError={reviewDialogState.hasContractReviewError}
+      onRetryContractReview={retryContractReview}
       onClose={closeDialog}
       onPublish={publishReviewedVersion}
       breakingChanges={reviewDialogState.breakingChanges}
