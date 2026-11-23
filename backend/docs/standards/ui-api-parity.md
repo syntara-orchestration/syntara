@@ -35,11 +35,11 @@ All clients apply `authMiddleware` from `client.tsx`, which handles token inject
 | Mechanism | Scope | Behavior |
 |-----------|-------|----------|
 | ESLint rule `@ansible/no-unapproved-http-client` | `frontend/packages/syntara-ui/` | Blocks direct `fetch()`, `XMLHttpRequest`, and unapproved HTTP-client imports at lint time |
-| Syntara ESLint supplements | `frontend/packages/syntara-ui/` | Blocks aliases or callbacks of global `fetch` and requires an explanation for HTTP-client rule suppressions |
+| Syntara ESLint supplements | `frontend/packages/syntara-ui/` | Blocks aliases or callbacks of global `fetch`; warns when rule-disable directives lack explanations |
 | ESLint rule override | ESLint config | Allows `XMLHttpRequest` in `useFileUploadWithProgress.ts` for upload progress while keeping other HTTP-client checks active |
 | Inline `eslint-disable-next-line` | Per-call | Document why the direct call is needed after `--` (e.g., `-- pre-auth call before token middleware`) |
 
-**Rule source:** `frontend/packages/syntara-ui/eslint.config.js` (`@ansible/no-unapproved-http-client`, `syntara/no-fetch-aliases`, `syntara/require-http-client-disable-reason`)
+**Rule source:** `frontend/packages/syntara-ui/eslint.config.js` (`@ansible/no-unapproved-http-client`, `syntara/no-fetch-aliases`, `@eslint-community/eslint-comments/require-description`)
 
 ## Contract Generation
 
@@ -138,7 +138,7 @@ The scheduled workflow auto-closes drift issues when the drift is resolved.
 
 | Rule | Enforced By | Exception |
 |------|-------------|-----------|
-| Use typed API clients only | ESLint `@ansible/no-unapproved-http-client` and `syntara/no-fetch-aliases` | `eslint-disable-next-line` with justification (enforced for the shared rule) |
+| Use typed API clients only | ESLint `@ansible/no-unapproved-http-client` and `syntara/no-fetch-aliases` | `eslint-disable-next-line` with justification (missing reasons warn for all disable directives) |
 | Regenerate contracts when spec changes | CI warning + weekly drift check | `no-contract-regen: <justification>` in PR description |
 | Breaking changes blocked in place | Pre-commit + `openapi-breaking-changes` CI job | `breaking-change-approved` label (privileged), or route to a new major version at a new path |
 | Every spec change updates `info.version` | Pre-commit + `openapi-breaking-changes` CI job | N/A — a version update is always required |

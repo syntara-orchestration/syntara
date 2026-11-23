@@ -570,7 +570,6 @@ describe('flat ESLint config rule inheritance', () => {
       'syntara/prefer-pf-list-components',
       'syntara/prefer-pf-text-components',
       'syntara/require-page-title',
-      'syntara/require-http-client-disable-reason',
       'syntara/use-design-tokens-not-hardcoded',
       '@ansible/no-barrel-files',
       '@ansible/no-hardcoded-api-prefix',
@@ -580,6 +579,7 @@ describe('flat ESLint config rule inheritance', () => {
     ]
 
     expect(ruleIds.every((ruleId) => config?.rules[ruleId]?.[0] === 2)).toBe(true)
+    expect(config?.rules['@eslint-community/eslint-comments/require-description']?.[0]).toBe(1)
   })
 
   it('allows XMLHttpRequest only in the upload progress hook', async () => {

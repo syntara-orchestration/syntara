@@ -87,7 +87,7 @@ Items enforced by ESLint at **error** level are omitted -- ESLint is the source 
 - Hardcoded API prefixes → `@ansible/no-hardcoded-api-prefix`
 - Unapproved HTTP clients and direct `fetch` / `XMLHttpRequest` usage → `@ansible/no-unapproved-http-client`
 - Aliasing or passing the global `fetch` function → `syntara/no-fetch-aliases`
-- HTTP-client rule suppressions without an explanation → `syntara/require-http-client-disable-reason`
+- Missing explanations on ESLint disable directives warn via `@eslint-community/eslint-comments/require-description`
 - Barrel files in `src/` → `@ansible/no-barrel-files`
 - `// TODO` / `// FIXME` comments → `no-warning-comments` (warn, not error -- surfaced as a lint warning, does not block CI)
 - Native `<select>` / `<FormSelect>` → `no-restricted-syntax`

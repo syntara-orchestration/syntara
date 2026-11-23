@@ -10,10 +10,6 @@ Shared checks for API paths, documentation URLs, nested component definitions, H
 
 Disallows storing or passing the global `fetch` function, which would bypass the shared HTTP-client check. Direct `fetch()` calls are reported by `@ansible/no-unapproved-http-client`.
 
-### `require-http-client-disable-reason`
-
-Requires an explanation after `--` when suppressing `@ansible/no-unapproved-http-client`.
-
 ### `prefer-confirmation-dialog`
 
 Flags raw Modal compositions that appear to be destructive confirmation dialogs. Use `<SynConfirmationDialog>` for consistent UX.

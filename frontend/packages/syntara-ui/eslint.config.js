@@ -1,4 +1,5 @@
 import ansiblePlugin from '@ansible/eslint-plugin'
+import eslintComments from '@eslint-community/eslint-plugin-eslint-comments'
 import storybook from 'eslint-plugin-storybook'
 import js from '@eslint/js'
 import { fixupPluginRules } from '@eslint/compat'
@@ -110,6 +111,17 @@ export default tseslint.config(
   },
   {
     linterOptions: { reportUnusedDisableDirectives: 'error' },
+  },
+  {
+    plugins: {
+      '@eslint-community/eslint-comments': { rules: eslintComments.rules },
+    },
+    rules: {
+      '@eslint-community/eslint-comments/require-description': [
+        'warn',
+        { ignore: ['eslint-enable', 'eslint', 'eslint-env', 'exported', 'global', 'globals'] },
+      ],
+    },
   },
   js.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked,
@@ -407,7 +419,6 @@ export default tseslint.config(
       // no-switch-is-reversed, require-alert-object-param, and require-query-state-object
       // are enforced via no-restricted-syntax AST selectors above (no custom plugin needed).
       'syntara/no-fetch-aliases': 'error',
-      'syntara/require-http-client-disable-reason': 'error',
       'syntara/prefer-pf-list-components': 'error',
       'syntara/prefer-pf-text-components': 'error',
       'syntara/use-design-tokens-not-hardcoded': 'error',
