@@ -1,5 +1,5 @@
-import { Alert, Content, ContentVariants, ExpandableSection, Stack, StackItem, TextInput } from '@patternfly/react-core'
-import { use, useState } from 'react'
+import { Stack, StackItem, TextInput } from '@patternfly/react-core'
+import { use } from 'react'
 import { useFormContext, useWatch } from 'react-hook-form'
 
 import { FormLabelWithHelp } from '../../../components/FormLabelWithHelp'
@@ -11,6 +11,7 @@ import { useIsVersionView } from '../VersionViewContext'
 import { KafkaConsumerSettings } from './KafkaConsumerSettings'
 import { KafkaCredentialConnection } from './KafkaCredentialConnection'
 import { KafkaIntegrationField } from './KafkaIntegrationField'
+import { KafkaSubscribeBehaviorAlert } from './KafkaSubscribeBehaviorAlert'
 import { KafkaSubscribeFilter } from './KafkaSubscribeFilter'
 import { kafkaSubscribeParameters } from './kafkaSubscribeMapping'
 import { KafkaSubscribePreflight } from './KafkaSubscribePreflight'
@@ -29,7 +30,6 @@ export function KafkaSubscribeFields({
 }: Readonly<{ workflowId?: string | null; projectId?: string; triggerId?: string }>) {
   const isReadOnly = useIsVersionView()
   const resources = use(KafkaSubscribeResourceContext)
-  const [deliveryExpanded, setDeliveryExpanded] = useState(false)
   const { canCreate } = useCredentialPermissions({ resourceProject: projectId })
   const { control, setValue } = useFormContext<TriggerFormData>()
   const values = useWatch({ control })
@@ -61,26 +61,7 @@ export function KafkaSubscribeFields({
   return (
     <Stack hasGutter>
       <StackItem>
-        <Alert variant="info" isInline title="Kafka Subscribe activation" component="h4">
-          <Content component={ContentVariants.p}>
-            Publishing activates this subscription. Configuration changes apply on the next publish. The runtime
-            credential authenticates to Kafka. The platform supplies the workflow execution identity automatically.
-          </Content>
-        </Alert>
-      </StackItem>
-      <StackItem>
-        <ExpandableSection
-          toggleText="Message delivery behavior"
-          isExpanded={deliveryExpanded}
-          onToggle={(_event, expanded) => setDeliveryExpanded(expanded)}
-        >
-          <Content component={ContentVariants.p}>
-            Consumer settings control initial reading positions and offset-gap recovery. Valid committed offsets, saved
-            initialization boundaries, and saved recovery decisions take precedence over policy changes. Consumer groups
-            become fixed after the first successful publication. Auto-commit is off. Commit follows durable scheduling
-            or resolution, without waiting for workflow completion.
-          </Content>
-        </ExpandableSection>
+        <KafkaSubscribeBehaviorAlert />
       </StackItem>
       <StackItem>
         <fieldset disabled={isReadOnly} className={nodeFormStyles.disabledFieldset}>

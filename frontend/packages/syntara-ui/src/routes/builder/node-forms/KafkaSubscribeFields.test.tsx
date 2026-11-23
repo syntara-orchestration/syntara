@@ -382,15 +382,14 @@ describe('Kafka Subscribe form', () => {
     )
   })
 
-  it('discloses saved-progress precedence and explains the next publish', async () => {
+  it('explains subscribe behavior in one expandable info alert', async () => {
     const user = userEvent.setup()
     renderKafka()
-    expect(screen.getByText(/Configuration changes apply on the next publish/)).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Message delivery behavior' }))
-
-    expect(
-      screen.getByText(/Consumer settings control initial reading positions and offset-gap recovery/)
-    ).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /Kafka Subscribe behavior/ })).toBeVisible()
+    expect(screen.queryByRole('button', { name: 'Message delivery behavior' })).not.toBeInTheDocument()
+    expect(screen.queryByText(/Publishing activates the subscription/)).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /info alert details/i }))
+    expect(screen.getByText(/workflow identity and message offsets are handled automatically/)).toBeInTheDocument()
   })
 
   it('loads visible Kafka Integrations scoped to the workflow project and separates identity from authentication', async () => {
@@ -405,7 +404,7 @@ describe('Kafka Subscribe form', () => {
         },
       })
     )
-    expect(screen.getByText(/platform supplies the workflow execution identity automatically/)).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /Kafka Subscribe behavior/ })).toBeInTheDocument()
     expect(screen.queryByRole('combobox', { name: /service account|execution account/i })).not.toBeInTheDocument()
     expect(screen.queryByText(/Integration validation:/)).not.toBeInTheDocument()
   })
