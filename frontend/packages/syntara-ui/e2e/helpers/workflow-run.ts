@@ -1,6 +1,7 @@
 import { type Locator } from '@playwright/test'
 
 import { type Page, expect } from '../fixtures'
+import { pollExecutionStatus, TERMINAL_STATUSES } from '../utils/api-executions'
 
 /** Locator scoped to the Compass page-header region (h1, status badges, toolbar). */
 export const pageHeader = (page: Page): Locator => page.locator('.pf-v6-c-compass__main-header')
@@ -68,4 +69,29 @@ export async function waitForExecutionPaused(page: Page, timeout = 90_000): Prom
     .waitFor({ state: 'visible', timeout: Math.max(half - reloadHeadingBudget, 5_000) })
     .then(() => true)
     .catch(() => false)
+}
+
+/** Terminal execution statuses, rendered by the header status badge (see executionStatusDisplayLabels). */
+const TERMINAL_STATUS_BADGE = /Completed|Failed|Cancelled/i
+
+/**
+ * Wait for an execution to reach a terminal state, then for the page header's
+ * status badge to reflect it.
+ *
+ * Polls the API first because the backend is the source of truth: activity rows
+ * and live status badges are driven by WebSocket patches, which can arrive late
+ * (or not at all) under CI cluster load. The reload guarantees the badge renders
+ * from a fresh fetch, so a stale activity row cannot make this wait hang.
+ *
+ * The default timeout exceeds the global 60s test timeout, so callers using it
+ * must mark the test with `test.slow()` (or run with a raised timeout).
+ */
+export async function waitForExecutionTerminal(page: Page, executionId: string, timeout = 90_000): Promise<void> {
+  await pollExecutionStatus(page, executionId, TERMINAL_STATUSES, { timeout })
+
+  await page.reload()
+  await expect(page.getByRole('heading', { level: 1 })).toBeVisible({ timeout: 10_000 })
+  await expect(page.getByTestId('execution-status-badge').getByText(TERMINAL_STATUS_BADGE)).toBeVisible({
+    timeout: 15_000,
+  })
 }
