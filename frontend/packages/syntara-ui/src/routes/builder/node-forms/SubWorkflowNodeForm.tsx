@@ -85,17 +85,21 @@ function ChildExecutionPermissionPreview({
   if (!workflowId || !projectId || isVersionView || permission.isChecking || permission.allowed) return null
   if (permission.isError) {
     return (
-      <Alert variant="warning" isInline title="Unable to verify execution permission">
-        This permission preview is unavailable. Runtime authorization will still apply when the parent runs.
-      </Alert>
+      <StackItem>
+        <Alert variant="warning" isInline title="Unable to verify execution permission">
+          This permission preview is unavailable. Runtime authorization will still apply when the parent runs.
+        </Alert>
+      </StackItem>
     )
   }
 
   return (
-    <Alert variant="info" isInline title="You would not be able to execute this workflow">
-      This advisory checks your execution permission for the selected child workflow's project. The user or service
-      account that runs the parent workflow may have different permissions; configuration and saving remain available.
-    </Alert>
+    <StackItem>
+      <Alert variant="info" isInline title="You would not be able to execute this workflow">
+        This advisory checks your execution permission for the selected child workflow's project. The user or service
+        account that runs the parent workflow may have different permissions; configuration and saving remain available.
+      </Alert>
+    </StackItem>
   )
 }
 
@@ -421,9 +425,7 @@ export function SubWorkflowNodeForm({
           isVersionView={isVersionView}
         />
       </StackItem>
-      <StackItem>
-        <ChildExecutionPermissionPreview workflowId={workflowId} projectId={projectId} isVersionView={isVersionView} />
-      </StackItem>
+      <ChildExecutionPermissionPreview workflowId={workflowId} projectId={projectId} isVersionView={isVersionView} />
       <WorkflowInputMappingSection
         canConfigure={canConfigureInputMapping}
         hasNoDeclaredInputs={hasNoDeclaredInputs}
