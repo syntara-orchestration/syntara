@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
@@ -105,8 +105,12 @@ describe('PublishWorkflowDialog', () => {
     )
 
     expect(screen.getByText('Breaking output contract changes')).toBeInTheDocument()
-    expect(screen.getByText('The child workflow’s declared output contract is changing.')).toBeInTheDocument()
-    expect(screen.queryByText('Removed output: release_tag')).not.toBeInTheDocument()
+    expect(
+      screen.getByText(
+        'Output changes: Child trigger: Removed output: release_tag. Published parent workflows will use the updated child version on their next run.'
+      )
+    ).toBeInTheDocument()
+    expect(screen.getByText('Child trigger: Removed output: release_tag')).not.toBeVisible()
     await user.click(screen.getByRole('button', { name: 'Publish anyway' }))
 
     expect(onConfirmContractChanges).toHaveBeenCalledWith(expect.stringMatching(/\w+ \d+, \d{4}/), undefined)
@@ -148,13 +152,15 @@ describe('PublishWorkflowDialog', () => {
       />
     )
 
-    expect(screen.getByText('The child workflow’s declared output contract is changing.')).toBeInTheDocument()
-    expect(screen.queryByText('Added optional output: release.notes')).not.toBeInTheDocument()
+    expect(
+      screen.getByText(
+        'Output changes: Child trigger: Added optional output: release.notes. Published parent workflows will use the updated child version on their next run.'
+      )
+    ).toBeInTheDocument()
+    expect(screen.getByText('Child trigger: Added optional output: release.notes')).not.toBeVisible()
     expect(screen.getByText('1 visible published parent workflow')).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'View visible parent workflows' }))
-    const parentDialog = screen.getByRole('dialog', { name: 'Visible published parent workflows' })
-    expect(within(parentDialog).getByText(/Deploy parent \(parent v2\).*Invoke child/)).toBeInTheDocument()
-    await user.click(within(parentDialog).getByRole('button', { name: 'Done' }))
+    expect(screen.getByText(/The count includes only parent workflows visible to you/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /view visible parent workflows/i })).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Publish with changes' }))
     expect(onConfirmContractChanges).toHaveBeenCalledWith(expect.stringMatching(/\w+ \d+, \d{4}/), undefined)
   })
