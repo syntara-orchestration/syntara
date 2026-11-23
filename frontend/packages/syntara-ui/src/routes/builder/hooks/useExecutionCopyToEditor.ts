@@ -27,7 +27,16 @@ export function useExecutionCopyToEditor({
   showSuccess,
 }: UseExecutionCopyToEditorOptions): void {
   const hasAppliedRef = useRef(false)
+  const lastExecutionIdRef = useRef<string | undefined>(undefined)
   const currentWorkflow = useWorkflowStore((s) => s.currentWorkflow)
+
+  useEffect(() => {
+    const executionId = executionCopy?.executionId
+    if (executionId !== lastExecutionIdRef.current) {
+      hasAppliedRef.current = false
+      lastExecutionIdRef.current = executionId
+    }
+  }, [executionCopy?.executionId])
 
   useEffect(() => {
     if (!executionCopy || hasAppliedRef.current || !currentWorkflow || !isWorkflowInitialized) return

@@ -134,9 +134,11 @@ test.describe('Copy Run to Editor', () => {
         await expect(executionRow).toBeVisible()
       }).toPass({ timeout: 60_000, intervals: [2_000] })
       await executionRow.click()
+      await waitForUIReady(app)
 
       await expect(app.getByRole('button', { name: 'Copy to editor' })).toBeVisible({ timeout: 15_000 })
       await confirmCopyToEditorInBuilder(app)
+      await expect(app.getByText('Run copied to editor')).toBeVisible({ timeout: 15_000 })
       await expect(app.getByPlaceholder('Workflow name')).toHaveValue(workflowName, { timeout: 30_000 })
     } finally {
       await deleteWorkflow(app, workflowName)

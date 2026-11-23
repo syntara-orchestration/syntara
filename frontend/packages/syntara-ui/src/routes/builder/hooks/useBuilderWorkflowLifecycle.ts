@@ -120,7 +120,7 @@ export function useBuilderWorkflowLifecycle(options: {
           description: workflow.description ?? workflow.name ?? DEFAULT_WORKFLOW_NAME,
         },
       })
-      setIsWorkflowInitialized(true)
+      // Graph load sets isWorkflowInitialized; metadata-only sync must not unblock execution copy.
     })
   }, [workflow, workflowId, isNew, dispatch])
 
