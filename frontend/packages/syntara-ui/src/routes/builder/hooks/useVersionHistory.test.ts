@@ -507,6 +507,7 @@ describe('useVersionHistory', () => {
       act(() => result.current.publishVersion(2, 'Release'))
 
       await waitFor(() => expect(result.current.breakingChanges).toHaveLength(1))
+      await waitFor(() => expect(result.current.reviewedPublishVersion).toBe(2))
 
       expect(result.current.breakingChanges).toHaveLength(1)
       expect(mockMutate).not.toHaveBeenCalled()
