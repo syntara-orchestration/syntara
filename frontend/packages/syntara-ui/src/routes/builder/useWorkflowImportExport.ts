@@ -1,6 +1,6 @@
 import { useCallback, useRef } from 'react'
 
-import { useAlerts } from '../../providers/alerts'
+import { useAlerts } from '../../providers/alerts/AlertContext'
 import { useWorkflowStore } from '../../stores/useWorkflowStore'
 import type { WorkflowDefinition } from '../../stores/workflowStoreTypes'
 import { getErrorMessage } from '../../utils/apiErrors'

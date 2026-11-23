@@ -4,7 +4,7 @@ import type { Meta, StoryObj } from '@storybook/tanstack-react'
 import { ExecutorTypeEnum } from '@syntara/contracts'
 import { userEvent, within } from 'storybook/test'
 
-import { FlowNodeType } from '../../constants'
+import { FlowNodeType } from '../../constants/nodeTypes'
 import { StandardStepHeader } from '../../routes/workflows/canvas/nodes/common/StandardStepHeader'
 import { STEP_TYPE_COLORS } from '../../routes/workflows/canvas/stepTypeColors'
 

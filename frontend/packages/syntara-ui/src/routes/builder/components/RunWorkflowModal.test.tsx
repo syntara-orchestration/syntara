@@ -34,7 +34,7 @@ vi.mock('./JsonEditorToolbar', () => ({
 }))
 
 const mockShowError = vi.fn()
-vi.mock('../../../providers/alerts', () => ({
+vi.mock('../../../providers/alerts/AlertContext', () => ({
   useAlerts: () => ({ showError: mockShowError, showSuccess: vi.fn() }),
 }))
 

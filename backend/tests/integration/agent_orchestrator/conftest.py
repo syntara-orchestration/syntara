@@ -59,8 +59,8 @@ async def _ao_test_client(
     Shared by both auth_client_with_mocked_llm and
     auth_client_with_tool_aware_mocked_llm.
     """
+    from syntara.workflow_runtime.engines.temporal.services.temporal_execution_service import TemporalExecutionService
     from syntara.workflows.executions_router import get_temporal_execution_service
-    from syntara.workflows.workflow_engine.services.temporal_execution_service import TemporalExecutionService
 
     token_service = TokenService()
     access_token = token_service.create_access_token(

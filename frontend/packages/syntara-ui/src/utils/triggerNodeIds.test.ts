@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { StepMenuCategory } from '../constants'
+import { StepMenuCategory } from '../constants/nodeTypes'
 
 import { buildTriggerNodeId, parseTriggerIndex, resolveFlowNodeId, toReactFlowNodeId } from './triggerNodeIds'
 describe('triggerNodeIds', () => {

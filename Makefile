@@ -58,7 +58,7 @@ typecheck: ## Type-check both codebases
 
 # --- Infrastructure services (delegated to backend which has the correct venv context) ---
 
-services-up: ## Start all infrastructure services in background
+services-up: ## Start all infrastructure services in background and wait until healthy
 	$(MAKE) -C backend services-run
 
 services-down: ## Stop all services
