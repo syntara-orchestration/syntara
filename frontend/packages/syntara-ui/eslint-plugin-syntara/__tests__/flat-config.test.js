@@ -523,7 +523,7 @@ describe('flat ESLint config rule inheritance', () => {
     expect(sourceConfig?.settings['import-x/resolver-next']).toHaveLength(1)
   })
 
-  it('keeps warning-level source rules active', async () => {
+  it('keeps warning-level comments and error-level barrel rules active', async () => {
     const commentMessages = await lintMessages(
       'src/routes/access-management/AssignRoleModal.tsx',
       '// TODO: verify this probe\nexport const value = 1'
@@ -537,7 +537,7 @@ describe('flat ESLint config rule inheritance', () => {
       true
     )
     expect(
-      barrelMessages.some((message) => message.ruleId === 'barrel-files/avoid-barrel-files' && message.severity === 1)
+      barrelMessages.some((message) => message.ruleId === 'barrel-files/avoid-barrel-files' && message.severity === 2)
     ).toBe(true)
   })
 
