@@ -41,7 +41,12 @@ export function configuredKafkaGroup(source: KafkaPublishedSource) {
   return source.group_id_is_generated ? null : source.group_id
 }
 
-export type KafkaGroupConflict = { triggerId: string; draftGroup: string; source: KafkaPublishedSource }
+export type KafkaGroupConflict = {
+  triggerId: string
+  triggerName?: string
+  draftGroup: string
+  source: KafkaPublishedSource
+}
 
 export function reconcileKafkaGroups(definition: Definition, sources: readonly KafkaPublishedSource[]) {
   const conflicts: KafkaGroupConflict[] = []
@@ -66,7 +71,8 @@ export function reconcileKafkaGroups(definition: Definition, sources: readonly K
       parameters.group_id !== '' &&
       parameters.group_id !== source.group_id
     ) {
-      conflicts.push({ triggerId: source.trigger_node_id, draftGroup: parameters.group_id, source })
+      const triggerName = typeof trigger.name === 'string' && trigger.name.trim() ? trigger.name : undefined
+      conflicts.push({ triggerId: source.trigger_node_id, triggerName, draftGroup: parameters.group_id, source })
     }
     changed = true
     return { ...trigger, parameters: { ...parameters, group_id: configuredGroup } }
