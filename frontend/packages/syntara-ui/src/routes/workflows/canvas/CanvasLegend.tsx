@@ -23,7 +23,7 @@ import { type ComponentType, type CSSProperties } from 'react'
 
 import AnsibleIcon from '../../../assets/ansible-automation-platform.svg?react'
 import { SynPanel } from '../../../components/layout/SynPanel'
-import { AAP_STEP_IDS, RegistryStepId } from '../../../constants'
+import { AAP_STEP_IDS, RegistryStepId } from '../../../constants/registryStepIds'
 
 import { APPROVAL_BRANCH_TOKENS } from './nodes/common/approvalBranchTokens'
 import { renderStepIcon } from './nodes/renderStepIcon'

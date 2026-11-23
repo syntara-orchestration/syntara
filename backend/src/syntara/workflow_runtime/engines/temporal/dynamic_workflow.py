@@ -767,10 +767,15 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
     ) -> None:
         """Mark successors on non-taken condition branches as skipped."""
         workflow.logger.info(f"Condition node {condition_node_id} routing via port: {taken_port}")
+        taken_successors = {
+            edge["to"] for edge in graph.get_outgoing_edges(condition_node_id) if edge.get("from_port") == taken_port
+        }
         for edge in graph.get_outgoing_edges(condition_node_id):
             edge_port = edge.get("from_port")
             if edge_port and edge_port != taken_port:
                 skipped_successor = edge["to"]
+                if skipped_successor in taken_successors:
+                    continue
                 if skipped_successor not in self.skipped_nodes:
                     self.skipped_nodes.add(skipped_successor)
                     workflow.logger.info(
