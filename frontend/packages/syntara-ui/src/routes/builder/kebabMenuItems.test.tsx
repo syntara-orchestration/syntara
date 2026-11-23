@@ -6,6 +6,7 @@ import { axe } from 'vitest-axe'
 import {
   KebabMenuViewsGroup,
   DuplicateMenuItem,
+  EmbedMenuItem,
   ImportMenuItem,
   UnpublishMenuItem,
   DeleteMenuItem,
@@ -313,6 +314,7 @@ describe('KebabMenuActionsGroup', () => {
     canEdit: true,
     canCreate: true,
     canDelete: true,
+    hasProject: true,
     tooltips: {
       edit: 'No edit',
       save: 'No save',
@@ -538,5 +540,102 @@ describe('KebabMenuActionsGroup', () => {
     const deleteItem = screen.getByRole('menuitem', { name: /Delete workflow/i })
     await user.hover(deleteItem)
     expect(await screen.findByText('Cannot delete')).toBeInTheDocument()
+  })
+
+  it('renders Embed published workflow and fires onEmbed when enabled', async () => {
+    const user = userEvent.setup()
+    const onEmbed = vi.fn()
+    const closeKebab = vi.fn()
+
+    render(<KebabMenuActionsGroup {...defaultProps} onEmbed={onEmbed} closeKebab={closeKebab} />)
+
+    const item = screen.getByRole('menuitem', { name: /Embed published workflow/i })
+    expect(item).not.toHaveAttribute('aria-disabled', 'true')
+
+    await user.click(item)
+    expect(onEmbed).toHaveBeenCalledTimes(1)
+    expect(closeKebab).toHaveBeenCalledTimes(1)
+  })
+
+  it('disables Embed and shows a project tooltip when no project is selected', async () => {
+    const user = userEvent.setup()
+    const onEmbed = vi.fn()
+
+    render(<KebabMenuActionsGroup {...defaultProps} hasProject={false} onEmbed={onEmbed} />)
+
+    const item = screen.getByRole('menuitem', { name: /Embed published workflow/i })
+    expect(item).toHaveAttribute('aria-disabled', 'true')
+
+    await user.click(item)
+    expect(onEmbed).not.toHaveBeenCalled()
+
+    await user.hover(item)
+    expect(await screen.findByText('Select a project to embed a workflow.')).toBeInTheDocument()
+  })
+
+  it('disables Embed and shows the edit tooltip when canEdit is false', async () => {
+    const user = userEvent.setup()
+    const onEmbed = vi.fn()
+
+    render(
+      <KebabMenuActionsGroup
+        {...defaultProps}
+        canEdit={false}
+        tooltips={{ ...defaultProps.tooltips, edit: 'Cannot edit' }}
+        onEmbed={onEmbed}
+      />
+    )
+
+    const item = screen.getByRole('menuitem', { name: /Embed published workflow/i })
+    expect(item).toHaveAttribute('aria-disabled', 'true')
+
+    await user.click(item)
+    expect(onEmbed).not.toHaveBeenCalled()
+
+    await user.hover(item)
+    expect(await screen.findByText('Cannot edit')).toBeInTheDocument()
+  })
+})
+
+describe('EmbedMenuItem', () => {
+  it('renders Embed published workflow and fires onEmbed when enabled', async () => {
+    const user = userEvent.setup()
+    const onEmbed = vi.fn()
+    const closeKebab = vi.fn()
+    render(<EmbedMenuItem canEdit hasProject editTooltip="No edit" onEmbed={onEmbed} closeKebab={closeKebab} />)
+
+    const item = screen.getByRole('menuitem', { name: /Embed published workflow/i })
+    expect(item).not.toHaveAttribute('aria-disabled', 'true')
+    await user.click(item)
+    expect(onEmbed).toHaveBeenCalledTimes(1)
+    expect(closeKebab).toHaveBeenCalledTimes(1)
+  })
+
+  it('disables and shows a project tooltip when no project is selected', async () => {
+    const user = userEvent.setup()
+    const onEmbed = vi.fn()
+    render(<EmbedMenuItem canEdit hasProject={false} editTooltip="No edit" onEmbed={onEmbed} closeKebab={vi.fn()} />)
+
+    const item = screen.getByRole('menuitem', { name: /Embed published workflow/i })
+    expect(item).toHaveAttribute('aria-disabled', 'true')
+    await user.click(item)
+    expect(onEmbed).not.toHaveBeenCalled()
+    await user.hover(item)
+    expect(await screen.findByText('Select a project to embed a workflow.')).toBeInTheDocument()
+  })
+
+  it('disables and shows the edit tooltip when canEdit is false', async () => {
+    const user = userEvent.setup()
+    const onEmbed = vi.fn()
+    render(
+      <EmbedMenuItem canEdit={false} hasProject editTooltip="Cannot edit" onEmbed={onEmbed} closeKebab={vi.fn()} />
+    )
+
+    const item = screen.getByRole('menuitem', { name: /Embed published workflow/i })
+    expect(item).toHaveAttribute('aria-disabled', 'true')
+    await user.click(item)
+    expect(onEmbed).not.toHaveBeenCalled()
+    await user.hover(item)
+    expect(await screen.findByText('Cannot edit')).toBeInTheDocument()
   })
 })

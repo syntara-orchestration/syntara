@@ -139,6 +139,40 @@ export function ImportMenuItem({ canEdit, editTooltip, importFileRef, closeKebab
   )
 }
 
+const NO_PROJECT_EMBED_TOOLTIP = 'Select a project to embed a workflow.'
+
+export type EmbedMenuItemProps = Readonly<{
+  canEdit: boolean
+  editTooltip: string
+  hasProject: boolean
+  onEmbed?: () => void
+  closeKebab: () => void
+}>
+
+export function EmbedMenuItem({ canEdit, editTooltip, hasProject, onEmbed, closeKebab }: EmbedMenuItemProps) {
+  const isDisabled = !canEdit || !hasProject
+  const tooltip = !canEdit ? editTooltip : NO_PROJECT_EMBED_TOOLTIP
+  return (
+    <DropdownItem
+      isAriaDisabled={isDisabled}
+      tooltipProps={isDisabled ? { content: tooltip } : undefined}
+      onClick={
+        isDisabled
+          ? undefined
+          : () => {
+              onEmbed?.()
+              closeKebab()
+            }
+      }
+    >
+      <Icon isInline className={toolbarStyles.menuIcon}>
+        <RhUiDuplicateIcon />
+      </Icon>
+      Embed published workflow
+    </DropdownItem>
+  )
+}
+
 export type UnpublishMenuItemProps = Readonly<{
   canEdit: boolean
   unpublishTooltip: string
@@ -204,11 +238,13 @@ export type KebabMenuActionsGroupProps = Readonly<{
   canEdit: boolean
   canCreate: boolean
   canDelete: boolean
+  hasProject: boolean
   tooltips: BuilderPermissions['tooltips']
   handleVerify: (onValid?: () => void) => void
   handleDuplicate: () => void
   handleExport: () => void
   importFileRef: React.RefObject<HTMLInputElement | null>
+  onEmbed?: () => void
   onUnpublish: () => void
   dispatch: Dispatch<BuilderAction>
   closeKebab: () => void
@@ -220,11 +256,13 @@ export function KebabMenuActionsGroup({
   canEdit,
   canCreate,
   canDelete,
+  hasProject,
   tooltips,
   handleVerify,
   handleDuplicate,
   handleExport,
   importFileRef,
+  onEmbed,
   onUnpublish,
   dispatch,
   closeKebab,
@@ -256,6 +294,13 @@ export function KebabMenuActionsGroup({
           canEdit={canEdit}
           editTooltip={tooltips.edit}
           importFileRef={importFileRef}
+          closeKebab={closeKebab}
+        />
+        <EmbedMenuItem
+          canEdit={canEdit}
+          editTooltip={tooltips.edit}
+          hasProject={hasProject}
+          onEmbed={onEmbed}
           closeKebab={closeKebab}
         />
         {showExistingWorkflowItems && publishedVersionId != null && (

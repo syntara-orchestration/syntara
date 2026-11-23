@@ -22,6 +22,13 @@ vi.mock('../../stores/useWorkflowStore', () => ({
     }),
 }))
 
+// The embed dialog fetches data on mount; the toolbar suite stubs it so these
+// tests stay isolated from TanStack Query. The dialog has its own test file.
+vi.mock('./components/EmbedWorkflowDialog', () => ({
+  EmbedWorkflowDialog: ({ isOpen }: { isOpen: boolean }) =>
+    isOpen ? <div data-testid="embed-dialog">Embed dialog</div> : null,
+}))
+
 vi.mock('./useWorkflowImportExport', () => ({
   useWorkflowImportExport: () => ({
     importFileRef: { current: null },
@@ -40,6 +47,7 @@ describe('BuilderEditorToolbar', () => {
     workflow: { id: 'wf-1' },
     isPending: false,
     isDirty: true,
+    projectId: 'project-1',
     lastSavedAt: '2026-01-15T14:30:00Z',
     isKebabOpen: false,
     publishedVersionId: null as string | null,
@@ -776,6 +784,81 @@ describe('BuilderEditorToolbar', () => {
       await user.hover(screen.getByRole('menuitem', { name: /Duplicate workflow/i }))
 
       expect(await screen.findByText('No create permission')).toBeInTheDocument()
+    })
+  })
+
+  describe('Embed published workflow action', () => {
+    it('renders Embed published workflow in the kebab Actions group', () => {
+      render(<BuilderEditorToolbar {...defaultProps} isKebabOpen />)
+
+      expect(screen.getByRole('menuitem', { name: /Embed published workflow/i })).toBeInTheDocument()
+    })
+
+    it('positions Embed published workflow after Import workflow', () => {
+      render(<BuilderEditorToolbar {...defaultProps} isKebabOpen />)
+
+      const menuItems = screen.getAllByRole('menuitem')
+      const importIndex = menuItems.findIndex((item) => item.textContent?.includes('Import workflow'))
+      const embedIndex = menuItems.findIndex((item) => item.textContent?.includes('Embed published workflow'))
+
+      expect(embedIndex).toBeGreaterThan(importIndex)
+    })
+
+    it('opens the embed dialog when clicked', async () => {
+      const user = userEvent.setup()
+      const dispatch = vi.fn()
+
+      render(<BuilderEditorToolbar {...defaultProps} isKebabOpen dispatch={dispatch} />)
+
+      expect(screen.queryByTestId('embed-dialog')).not.toBeInTheDocument()
+      await user.click(screen.getByRole('menuitem', { name: /Embed published workflow/i }))
+
+      expect(screen.getByTestId('embed-dialog')).toBeInTheDocument()
+      expect(dispatch).toHaveBeenCalledWith({ type: 'SET_KEBAB_OPEN', payload: false })
+    })
+
+    it('disables Embed when no project is selected and shows a tooltip', async () => {
+      const user = userEvent.setup()
+
+      render(<BuilderEditorToolbar {...defaultProps} projectId={undefined} isKebabOpen />)
+
+      const item = screen.getByRole('menuitem', { name: /Embed published workflow/i })
+      expect(item).toHaveAttribute('aria-disabled', 'true')
+
+      await user.hover(item)
+      expect(await screen.findByText('Select a project to embed a workflow.')).toBeInTheDocument()
+    })
+
+    it('does not open the dialog when no project is selected', async () => {
+      const user = userEvent.setup()
+
+      render(<BuilderEditorToolbar {...defaultProps} projectId={undefined} isKebabOpen />)
+
+      await user.click(screen.getByRole('menuitem', { name: /Embed published workflow/i }))
+
+      expect(screen.queryByTestId('embed-dialog')).not.toBeInTheDocument()
+    })
+
+    it('disables Embed when canEdit is false and shows the edit tooltip', async () => {
+      const user = userEvent.setup()
+
+      render(
+        <BuilderEditorToolbar
+          {...defaultProps}
+          isKebabOpen
+          builderPermissions={{
+            ...defaultProps.builderPermissions,
+            canEdit: false,
+            tooltips: { ...defaultProps.builderPermissions.tooltips, edit: 'No edit permission' },
+          }}
+        />
+      )
+
+      const item = screen.getByRole('menuitem', { name: /Embed published workflow/i })
+      expect(item).toHaveAttribute('aria-disabled', 'true')
+
+      await user.hover(item)
+      expect(await screen.findByText('No edit permission')).toBeInTheDocument()
     })
   })
 
