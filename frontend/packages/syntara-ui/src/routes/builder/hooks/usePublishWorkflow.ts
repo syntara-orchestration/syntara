@@ -164,7 +164,8 @@ export function usePublishWorkflow({
             setPendingPublish(null)
             return
           }
-          if (response.has_breaking_changes || (response.has_contract_changes && response.parent_workflows?.length)) {
+          // Parent references are visibility-filtered, so an empty list does not guarantee no consumers are affected.
+          if (response.has_breaking_changes || response.has_contract_changes) {
             return
           }
           setPendingPublish(null)

@@ -16,6 +16,12 @@ function getDefaultVersionName(): string {
   return format(new Date(), 'PPp')
 }
 
+function getPublishButtonLabel(hasBreakingChanges: boolean, requiresContractConfirmation: boolean): string {
+  if (hasBreakingChanges) return 'Publish anyway'
+  if (requiresContractConfirmation) return 'Publish with changes'
+  return 'Publish workflow'
+}
+
 type PublishWorkflowDialogProps = Readonly<{
   isOpen: boolean
   isPublishing: boolean
@@ -68,6 +74,7 @@ export function PublishWorkflowDialog({
   const hasBreakingChanges = breakingChanges.length > 0
   const reviewedContractChanges = contractChanges.length > 0 ? contractChanges : breakingChanges
   const requiresContractConfirmation = hasBreakingChanges || reviewedContractChanges.length > 0
+  const publishButtonLabel = getPublishButtonLabel(hasBreakingChanges, requiresContractConfirmation)
 
   return (
     <Modal isOpen={isOpen} onClose={handleClose} variant="small" aria-label="Publish workflow">
@@ -119,7 +126,7 @@ export function PublishWorkflowDialog({
           isLoading={isPublishing}
           isDisabled={isPublishing || isCheckingContractChanges || isPublishDisabled}
         >
-          {requiresContractConfirmation ? 'Publish anyway' : 'Publish workflow'}
+          {publishButtonLabel}
         </Button>
         <Button
           variant="link"

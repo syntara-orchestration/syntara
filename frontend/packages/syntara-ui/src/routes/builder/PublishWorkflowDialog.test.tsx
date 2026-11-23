@@ -155,7 +155,7 @@ describe('PublishWorkflowDialog', () => {
     const parentDialog = screen.getByRole('dialog', { name: 'Visible published parent workflows' })
     expect(within(parentDialog).getByText(/Deploy parent \(parent v2\).*Invoke child/)).toBeInTheDocument()
     await user.click(within(parentDialog).getByRole('button', { name: 'Done' }))
-    await user.click(screen.getByRole('button', { name: 'Publish anyway' }))
+    await user.click(screen.getByRole('button', { name: 'Publish with changes' }))
     expect(onConfirmContractChanges).toHaveBeenCalledWith(expect.stringMatching(/\w+ \d+, \d{4}/), undefined)
   })
 
