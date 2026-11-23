@@ -27,6 +27,8 @@ type PublishWorkflowDialogProps = Readonly<{
   isPublishing: boolean
   isCheckingContractChanges?: boolean
   isPublishDisabled?: boolean
+  hasContractReviewError?: boolean
+  onRetryContractReview?: () => void
   onClose: () => void
   onPublish: (publishName?: string, description?: string) => void
   breakingChanges?: WorkflowAPI.components['schemas']['TriggerBreakingChanges'][]
@@ -41,6 +43,8 @@ export function PublishWorkflowDialog({
   isPublishing,
   isCheckingContractChanges = false,
   isPublishDisabled = false,
+  hasContractReviewError = false,
+  onRetryContractReview,
   onClose,
   onPublish,
   breakingChanges = [],
@@ -104,6 +108,21 @@ export function PublishWorkflowDialog({
             Checking how this version may change the outputs used by published parent workflows.
           </Alert>
         )}
+        {hasContractReviewError && (
+          <Alert variant="warning" isInline title="Unable to verify output contract changes">
+            <Content component="p">Retry the check before publishing.</Content>
+            {onRetryContractReview && (
+              <Button
+                variant="link"
+                type="button"
+                onClick={onRetryContractReview}
+                isDisabled={isPublishing || isCheckingContractChanges}
+              >
+                Retry check
+              </Button>
+            )}
+          </Alert>
+        )}
         <Form onSubmit={handleSubmit(onSubmit)} id="publish-workflow-form">
           <SynForm form={form}>
             <SynTextField name="name" label="Version name" fieldId="publish-name" isRequired ariaLabel="Version name" />
@@ -124,7 +143,7 @@ export function PublishWorkflowDialog({
           type="submit"
           form="publish-workflow-form"
           isLoading={isPublishing}
-          isDisabled={isPublishing || isCheckingContractChanges || isPublishDisabled}
+          isDisabled={isPublishing || isCheckingContractChanges || isPublishDisabled || hasContractReviewError}
         >
           {publishButtonLabel}
         </Button>

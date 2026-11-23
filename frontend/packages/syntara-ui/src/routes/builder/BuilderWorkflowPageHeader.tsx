@@ -304,6 +304,8 @@ export type BuilderWorkflowPageHeaderProps = Readonly<{
   currentVersionId?: string | null
   isPublishing: boolean
   isCheckingContractChanges?: boolean
+  isPublishDisabled?: boolean
+  hasContractReviewError?: boolean
   breakingChanges?: WorkflowAPI.components['schemas']['TriggerBreakingChanges'][]
   contractChanges?: WorkflowAPI.components['schemas']['TriggerBreakingChanges'][]
   parentWorkflows?: WorkflowAPI.components['schemas']['WorkflowReferenceRead'][]
@@ -360,6 +362,8 @@ export function BuilderWorkflowPageHeader({
   currentVersionId,
   isPublishing,
   isCheckingContractChanges = false,
+  isPublishDisabled = false,
+  hasContractReviewError = false,
   breakingChanges,
   contractChanges,
   parentWorkflows,
@@ -497,6 +501,9 @@ export function BuilderWorkflowPageHeader({
         isOpen={publishDialog.isOpen}
         isPublishing={isPublishing}
         isCheckingContractChanges={isCheckingContractChanges}
+        isPublishDisabled={isPublishDisabled}
+        hasContractReviewError={hasContractReviewError}
+        onRetryContractReview={onReviewOutputContract}
         breakingChanges={breakingChanges}
         contractChanges={contractChanges}
         parentWorkflows={parentWorkflows}

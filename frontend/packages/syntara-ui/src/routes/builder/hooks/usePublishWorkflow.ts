@@ -78,6 +78,7 @@ export function usePublishWorkflow({
     reviewOutputContract: reviewContract,
   } = useOutputContractReview(workflowId)
   const [pendingPublish, setPendingPublish] = useState<PendingPublish | null>(null)
+  const [isPublishReviewFailed, setIsPublishReviewFailed] = useState(false)
 
   const reviewOutputContract = useCallback(
     (workflowDefinition?: unknown) => {
@@ -88,6 +89,22 @@ export function usePublishWorkflow({
       })
     },
     [workflowId, workflowName, workflowDescription, reviewContract, showError]
+  )
+
+  const reviewOutputContractForPublish = useCallback(
+    async (workflowDefinition?: unknown) => {
+      setIsPublishReviewFailed(false)
+      clearContractReview()
+      try {
+        const response = await reviewOutputContract(workflowDefinition)
+        setIsPublishReviewFailed(response === null)
+        return response
+      } catch (error) {
+        setIsPublishReviewFailed(true)
+        throw error
+      }
+    },
+    [clearContractReview, reviewOutputContract]
   )
 
   const { mutate: publishMutation, isPending: isPublishing } = workflowClient.useMutation(
@@ -153,13 +170,13 @@ export function usePublishWorkflow({
         ...(expectedVersion != null ? { expectedVersion } : {}),
       }
       if (!workflowDefinition) {
+        setIsPublishReviewFailed(false)
         publishNow(pending)
         return
       }
-      clearContractReview()
       setPendingPublish(pending)
       detachPromise(
-        reviewOutputContract(workflowDefinition).then((response) => {
+        reviewOutputContractForPublish(workflowDefinition).then((response) => {
           if (!response) {
             setPendingPublish(null)
             return
@@ -179,8 +196,7 @@ export function usePublishWorkflow({
       workflowName,
       workflowDescription,
       optionsExpectedVersion,
-      clearContractReview,
-      reviewOutputContract,
+      reviewOutputContractForPublish,
       publishNow,
     ]
   )
@@ -210,6 +226,7 @@ export function usePublishWorkflow({
 
       clearContractReview()
       setPendingPublish(null)
+      setIsPublishReviewFailed(false)
       publishNow(pending)
     },
     [
@@ -227,6 +244,7 @@ export function usePublishWorkflow({
   const cancelBreakingChangeWarning = useCallback(() => {
     clearContractReview()
     setPendingPublish(null)
+    setIsPublishReviewFailed(false)
   }, [clearContractReview])
 
   return {
@@ -236,9 +254,11 @@ export function usePublishWorkflow({
     breakingChanges,
     contractChanges,
     parentWorkflows,
+    isPublishReviewFailed,
     confirmPublish,
     cancelBreakingChangeWarning,
     reviewOutputContract,
+    reviewOutputContractForPublish,
   }
 }
 

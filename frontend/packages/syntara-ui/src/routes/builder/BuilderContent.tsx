@@ -275,9 +275,11 @@ export function BuilderContent(props: BuilderContentProps) {
     breakingChanges,
     contractChanges,
     parentWorkflows,
+    isPublishReviewFailed,
     confirmPublish,
     cancelBreakingChangeWarning,
     reviewOutputContract,
+    reviewOutputContractForPublish,
   } = usePublishWorkflow({
     workflowId,
     currentVersion,
@@ -302,8 +304,8 @@ export function BuilderContent(props: BuilderContentProps) {
     [handleSaveWorkflow, isNew, reviewOutputContract, workflow?.published_version_id]
   )
   const handleReviewOutputContractOnPublishOpen = useCallback(() => {
-    detachPromise(reviewOutputContract())
-  }, [reviewOutputContract])
+    detachPromise(reviewOutputContractForPublish())
+  }, [reviewOutputContractForPublish])
   const guardedSaveWorkflow = useGuardedSaveWorkflow({
     handleSaveWorkflow: handleSaveWithOutputContractReview,
     isNodeEditorOpen,
@@ -641,6 +643,8 @@ export function BuilderContent(props: BuilderContentProps) {
                   currentVersionId={workflow?.version?.id}
                   isPublishing={isPublishing}
                   isCheckingContractChanges={isCheckingBreakingChanges}
+                  isPublishDisabled={isPublishReviewFailed}
+                  hasContractReviewError={isPublishReviewFailed}
                   breakingChanges={breakingChanges}
                   contractChanges={contractChanges}
                   parentWorkflows={parentWorkflows}
