@@ -41,11 +41,11 @@ spec:
     - name: ep-git-url
       value: https://github.com/syntara-orchestration/syntara-execution-plane.git
     - name: ep-revision
-      value: v0.1.26
+      value: early-access
     - name: ao-operator-git-url
       value: https://github.com/automation-nexus/automation-orchestrator-operator.git
     - name: ao-operator-revision
-      value: devel
+      value: early-access
   pipelineRef:
     params:
       - name: name
