@@ -289,8 +289,8 @@ describe('BuilderFlow execution view', () => {
         triggers: [],
         workflow: {
           activities: [
-            { id: 'step-a', type: 'script', name: 'Step A', parameters: {} },
-            { id: 'step-b', type: 'script', name: 'Step B', parameters: {} },
+            { id: 'step-a', type: 'script_python', name: 'Step A', parameters: { code: 'echo a' } },
+            { id: 'step-b', type: 'script_python', name: 'Step B', parameters: { code: 'echo b' } },
           ],
         },
       },
@@ -404,15 +404,15 @@ describe('BuilderFlow execution view', () => {
           activities: [
             {
               id: 'task-replayed',
-              type: 'script',
+              type: 'script_python',
               name: 'Replayed Task',
-              task: { executor: 'script', parameters: { language: 'bash', code: 'echo hi' } },
+              parameters: { code: 'echo hi' },
             },
             {
               id: 'task-fresh',
-              type: 'script',
+              type: 'script_python',
               name: 'Fresh Task',
-              task: { executor: 'script', parameters: { language: 'bash', code: 'echo hi' } },
+              parameters: { code: 'echo hi' },
             },
           ],
         },
@@ -474,9 +474,9 @@ describe('BuilderFlow execution view', () => {
           activities: [
             {
               id: 'task-only',
-              type: 'script',
+              type: 'script_python',
               name: 'Only Task',
-              task: { executor: 'script', parameters: { language: 'bash', code: 'echo hi' } },
+              parameters: { code: 'echo hi' },
             },
           ],
         },
