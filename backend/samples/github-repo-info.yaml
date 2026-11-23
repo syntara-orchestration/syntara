@@ -58,10 +58,9 @@ nodes:
       timeout: 30
 
   - id: analyze_repo
-    type: script
+    type: script_python
     name: Analyze Repository Data
     parameters:
-      language: python
       code: |
         import json
         import os

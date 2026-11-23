@@ -14,6 +14,7 @@ from syntara.authz.models.assignments import RoleAssignment
 from syntara.authz.models.project import Project
 from syntara.core.models import User
 from syntara.core.services import BaseService
+from syntara.execution_plane.deletion import delete_execution_plane_work_items
 from syntara.projects.schemas import ProjectListResponse
 
 logger = structlog.stdlib.get_logger(__name__)
@@ -288,7 +289,7 @@ class ProjectService(BaseService):
 
         raise ProjectCredentialInUseError(project_name, credential_names, integration_names, total_count)
 
-    async def _cascade_cleanup_project_resources(self, project_id: UUID) -> None:
+    async def _cascade_cleanup_project_resources(self, project_id: UUID) -> None:  # noqa: PLR0915
         """Delete all project-scoped resources before hard-deleting the project.
 
         Uses bulk SQL for efficiency. Ordering respects FK constraints.
@@ -332,6 +333,8 @@ class ProjectService(BaseService):
             )
             if non_terminal_count:
                 raise ProjectHasActiveExecutionsError(project_id, non_terminal_count)
+
+        await delete_execution_plane_work_items(owner_field="project_id", owner_id=project_id)
 
         # --- External cleanup (best-effort, must run BEFORE DB deletes) ---
         # _cleanup_file_storage reads FileMetadata rows to get storage paths,

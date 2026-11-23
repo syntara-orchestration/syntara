@@ -11,7 +11,7 @@ import {
 
 /** Helper to create a minimal activity with a given ID for edge validation tests */
 function activity(id: string): Activity {
-  return { id, type: 'script', parameters: {} }
+  return { id, type: 'script_python', parameters: {} }
 }
 
 describe('buildWorkflowDefinition', () => {
@@ -133,7 +133,7 @@ describe('buildWorkflowDefinition', () => {
       const activities: Activity[] = [
         {
           id: 'task-1',
-          type: 'script',
+          type: 'script_python',
           name: 'My Script',
           parameters: { code: 'print("hello")' },
           settings: { timeout: 300, retry_policy: { max_retries: 3 } },
@@ -151,7 +151,7 @@ describe('buildWorkflowDefinition', () => {
 
       expect(result.nodes[0]).toMatchObject({
         id: 'task-1',
-        type: 'script',
+        type: 'script_python',
         name: 'My Script',
         parameters: { code: 'print("hello")' },
         settings: { timeout: 300, retry_policy: { max_retries: 3 } },
@@ -163,7 +163,7 @@ describe('buildWorkflowDefinition', () => {
       const activities: Activity[] = [
         {
           id: 'task-1',
-          type: 'script',
+          type: 'script_python',
           parameters: {},
           inputs: { param1: 'value1', param2: 'value2' },
         },
@@ -185,7 +185,7 @@ describe('buildWorkflowDefinition', () => {
       const activities: Activity[] = [
         {
           id: 'task-1',
-          type: 'script',
+          type: 'script_python',
           parameters: {},
         },
       ]
@@ -205,7 +205,7 @@ describe('buildWorkflowDefinition', () => {
       const activities: Activity[] = [
         {
           id: 'task-1',
-          type: 'script',
+          type: 'script_python',
           parameters: {},
         },
       ]
@@ -227,7 +227,7 @@ describe('buildWorkflowDefinition', () => {
       const activities: Activity[] = [
         {
           id: 'task-1',
-          type: 'script',
+          type: 'script_python',
           parameters: {},
           settings: { timeout: 300, continue_on_failure: true },
         },
@@ -356,7 +356,7 @@ describe('buildWorkflowDefinition', () => {
       const activities: Activity[] = [
         {
           id: 'script-1',
-          type: 'script',
+          type: 'script_python',
           parameters: {
             approver_users: [{ id: 'user-1', username: 'alice' }],
           },
@@ -663,7 +663,7 @@ describe('buildWorkflowDefinition', () => {
         },
         {
           id: 'task-1',
-          type: 'script',
+          type: 'script_python',
           name: 'Process Item',
           parameters: { code: 'print(item)' },
           inputs: { item: '$.current_item' },
@@ -790,7 +790,7 @@ describe('buildWorkflowDefinition', () => {
       const activities: Activity[] = [
         {
           id: 'script-1',
-          type: 'script',
+          type: 'script_python',
           name: 'Script',
           parameters: { code: 'if !done: pass' }, // Python code with !, not a condition expression
         },
@@ -1229,7 +1229,7 @@ describe('transformStepParameters', () => {
     })
 
     it('does not transform condition on unrelated node types', () => {
-      const result = transformStepParameters(ActivityTypeEnum.SCRIPT, {
+      const result = transformStepParameters(ActivityTypeEnum.SCRIPT_PYTHON, {
         condition: '!(${status} == "completed")',
       })
 
@@ -1279,7 +1279,7 @@ describe('transformStepParameters', () => {
     })
 
     it('does not transform approvers for non-approval nodes', () => {
-      const result = transformStepParameters(ActivityTypeEnum.SCRIPT, {
+      const result = transformStepParameters(ActivityTypeEnum.SCRIPT_PYTHON, {
         approver_users: [{ id: 'user-1', username: 'alice' }],
       })
 

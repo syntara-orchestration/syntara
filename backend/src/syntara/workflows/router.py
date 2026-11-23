@@ -192,7 +192,7 @@ def _definition_to_dict(wf_def: WorkflowDefinition | dict[str, Any]) -> dict[str
     """
     if isinstance(wf_def, dict):
         return wf_def
-    return wf_def.model_dump(exclude_defaults=True)
+    return wf_def.model_dump(mode="json", exclude_defaults=True)
 
 
 # ============================================================================

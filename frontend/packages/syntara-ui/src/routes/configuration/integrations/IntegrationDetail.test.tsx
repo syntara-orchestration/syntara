@@ -531,6 +531,60 @@ describe('IntegrationDetail', () => {
       expect(await screen.findByRole('menuitem', { name: /delete integration/i })).toBeInTheDocument()
     })
 
+    it('hides Delete for execution plane infrastructure integrations', async () => {
+      setupDefaultMocks({
+        integration: {
+          name: 'OpenShift Cluster',
+          integration_type: 'openshift',
+          configuration: {
+            integration_type: 'openshift',
+            base_url: 'https://api.openshift.example.com',
+          },
+        },
+      })
+      const user = userEvent.setup()
+      render(<IntegrationDetail />, { wrapper })
+
+      await user.click(screen.getByRole('button', { name: 'Integration actions' }))
+
+      expect(await screen.findByRole('menuitem', { name: /validate integration/i })).toBeInTheDocument()
+      expect(screen.queryByRole('menuitem', { name: /delete integration/i })).not.toBeInTheDocument()
+    })
+
+    it.each([
+      {
+        name: 'LLM Provider',
+        integration_type: 'llm_provider' as const,
+        configuration: {
+          integration_type: 'llm_provider' as const,
+          provider_hint: 'openai' as const,
+          base_url: 'https://api.openai.com/v1',
+        },
+      },
+      {
+        name: 'Ansible Automation Platform',
+        integration_type: 'ansible_automation_platform' as const,
+        configuration: {
+          integration_type: 'ansible_automation_platform' as const,
+          base_url: 'https://gateway.example.com',
+        },
+      },
+    ])('shows Delete for $name integrations', async ({ name, integration_type, configuration }) => {
+      setupDefaultMocks({
+        integration: {
+          name,
+          integration_type,
+          configuration,
+        },
+      })
+      const user = userEvent.setup()
+      render(<IntegrationDetail />, { wrapper })
+
+      await user.click(screen.getByRole('button', { name: 'Integration actions' }))
+
+      expect(await screen.findByRole('menuitem', { name: /delete integration/i })).toBeInTheDocument()
+    })
+
     it('does not show Edit in kebab menu', async () => {
       const user = userEvent.setup()
       render(<IntegrationDetail />, { wrapper })

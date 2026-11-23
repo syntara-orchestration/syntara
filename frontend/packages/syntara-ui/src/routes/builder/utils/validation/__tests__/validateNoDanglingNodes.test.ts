@@ -7,9 +7,9 @@ import { validateNoDanglingNodes } from '../rules/validateNoDanglingNodes'
 describe('validateNoDanglingNodes', () => {
   it('returns no errors for a fully connected workflow', () => {
     const activities: Activity[] = [
-      { type: 'script', id: 'A', name: 'Task A', parameters: { language: 'python', code: '' } },
-      { type: 'script', id: 'B', name: 'Task B', parameters: { language: 'python', code: '' } },
-      { type: 'script', id: 'C', name: 'Task C', parameters: { language: 'python', code: '' } },
+      { type: 'script_python', id: 'A', name: 'Task A', parameters: { code: '' } },
+      { type: 'script_python', id: 'B', name: 'Task B', parameters: { code: '' } },
+      { type: 'script_python', id: 'C', name: 'Task C', parameters: { code: '' } },
     ]
 
     const edges: EdgeConnection[] = [
@@ -23,9 +23,9 @@ describe('validateNoDanglingNodes', () => {
 
   it('detects a single dangling node', () => {
     const activities: Activity[] = [
-      { type: 'script', id: 'A', name: 'Task A', parameters: { language: 'python', code: '' } },
-      { type: 'script', id: 'B', name: 'Task B', parameters: { language: 'python', code: '' } },
-      { type: 'script', id: 'C', name: 'Task C', parameters: { language: 'python', code: '' } },
+      { type: 'script_python', id: 'A', name: 'Task A', parameters: { code: '' } },
+      { type: 'script_python', id: 'B', name: 'Task B', parameters: { code: '' } },
+      { type: 'script_python', id: 'C', name: 'Task C', parameters: { code: '' } },
     ]
 
     const edges: EdgeConnection[] = [
@@ -42,9 +42,9 @@ describe('validateNoDanglingNodes', () => {
 
   it('detects multiple dangling nodes', () => {
     const activities: Activity[] = [
-      { type: 'script', id: 'A', name: 'Task A', parameters: { language: 'python', code: '' } },
-      { type: 'script', id: 'B', name: 'Task B', parameters: { language: 'python', code: '' } },
-      { type: 'script', id: 'C', name: 'Task C', parameters: { language: 'python', code: '' } },
+      { type: 'script_python', id: 'A', name: 'Task A', parameters: { code: '' } },
+      { type: 'script_python', id: 'B', name: 'Task B', parameters: { code: '' } },
+      { type: 'script_python', id: 'C', name: 'Task C', parameters: { code: '' } },
     ]
 
     const edges: EdgeConnection[] = []
@@ -55,8 +55,8 @@ describe('validateNoDanglingNodes', () => {
 
   it('validates all activities equally (no special parallel handling)', () => {
     const activities: Activity[] = [
-      { type: 'script', id: 'A', name: 'Task A', parameters: { language: 'python', code: '' } },
-      { type: 'script', id: 'B', name: 'Task B', parameters: { language: 'python', code: '' } },
+      { type: 'script_python', id: 'A', name: 'Task A', parameters: { code: '' } },
+      { type: 'script_python', id: 'B', name: 'Task B', parameters: { code: '' } },
     ]
 
     const edges: EdgeConnection[] = []
@@ -68,10 +68,10 @@ describe('validateNoDanglingNodes', () => {
 
   it('handles complex graph with branches', () => {
     const activities: Activity[] = [
-      { type: 'script', id: 'A', name: 'Task A', parameters: { language: 'python', code: '' } },
-      { type: 'script', id: 'B', name: 'Task B', parameters: { language: 'python', code: '' } },
-      { type: 'script', id: 'C', name: 'Task C', parameters: { language: 'python', code: '' } },
-      { type: 'script', id: 'D', name: 'Task D', parameters: { language: 'python', code: '' } },
+      { type: 'script_python', id: 'A', name: 'Task A', parameters: { code: '' } },
+      { type: 'script_python', id: 'B', name: 'Task B', parameters: { code: '' } },
+      { type: 'script_python', id: 'C', name: 'Task C', parameters: { code: '' } },
+      { type: 'script_python', id: 'D', name: 'Task D', parameters: { code: '' } },
       { type: 'converge', id: 'E', name: 'Converge E', parameters: { strategy: 'all' } },
     ]
 
@@ -93,9 +93,7 @@ describe('validateNoDanglingNodes', () => {
   })
 
   it('handles single node with no edges', () => {
-    const activities: Activity[] = [
-      { type: 'script', id: 'A', name: 'Task A', parameters: { language: 'python', code: '' } },
-    ]
+    const activities: Activity[] = [{ type: 'script_python', id: 'A', name: 'Task A', parameters: { code: '' } }]
 
     const result = validateNoDanglingNodes(activities, [])
     expect(result).toHaveLength(1)

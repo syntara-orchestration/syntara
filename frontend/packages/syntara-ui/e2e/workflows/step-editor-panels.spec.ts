@@ -1,6 +1,6 @@
 import { type Page } from '../fixtures'
 import { test, expect, toAppUrl } from '../fixtures'
-import { addAgenticStep, addManualTrigger, addScriptStep } from '../helpers/v2-steps'
+import { addAgenticStep, addManualTrigger, addPythonScriptStep } from '../helpers/v2-steps'
 import {
   buildUniqueName,
   clickAddConnectedStep,
@@ -156,17 +156,17 @@ test.describe('Step editor panels', () => {
     // Build: Trigger → Gather Info → Process Data → Send Alert
     await app.goto(toAppUrl('/workflow-builder/new'))
     await addManualTrigger(app, 'Trigger')
-    await addScriptStep(
+    await addPythonScriptStep(
       app,
       'Gather Info',
       'import json; print(json.dumps({"server": "web-01", "status": "degraded", "cpu": 92, "errors": 15}))'
     )
-    await addScriptStep(
+    await addPythonScriptStep(
       app,
       'Process Data',
       'import json, sys; print(json.dumps({"alert_level": "warning", "affected_server": data["server"]}))'
     )
-    await addScriptStep(
+    await addPythonScriptStep(
       app,
       'Send Alert',
       'import json; print(json.dumps({"notification_sent": True, "channel": "#ops-alerts"}))'
@@ -328,8 +328,8 @@ test.describe('Step editor panels', () => {
     await app.goto(toAppUrl('/workflow-builder/new'))
     await selectProjectIfRequired(app)
     await addManualTrigger(app, 'Trigger')
-    await addScriptStep(app, 'Fetch Data', 'print("fetching")')
-    await addScriptStep(app, 'Analyze', 'print("analyzing")')
+    await addPythonScriptStep(app, 'Fetch Data', 'print("fetching")')
+    await addPythonScriptStep(app, 'Analyze', 'print("analyzing")')
 
     // Click the last node in the chain — its upstream is a script node
     await clickStep(app, 'Analyze')
@@ -360,8 +360,8 @@ test.describe('Step editor panels', () => {
     await app.goto(toAppUrl('/workflow-builder/new'))
     await selectProjectIfRequired(app)
     await addManualTrigger(app, 'Trigger')
-    await addScriptStep(app, 'Fetch Data', 'print("fetching")')
-    await addScriptStep(app, 'Analyze', 'print("analyzing")')
+    await addPythonScriptStep(app, 'Fetch Data', 'print("fetching")')
+    await addPythonScriptStep(app, 'Analyze', 'print("analyzing")')
 
     // Extract node IDs while edges are in the store
     await layoutCanvas(app)
@@ -521,8 +521,8 @@ test.describe('Step editor panels', () => {
     await app.goto(toAppUrl('/workflow-builder/new'))
     await selectProjectIfRequired(app)
     await addManualTrigger(app, 'Trigger')
-    await addScriptStep(app, 'Script A', 'print("hello")')
-    await addScriptStep(app, 'Script B', 'print("world")')
+    await addPythonScriptStep(app, 'Script A', 'print("hello")')
+    await addPythonScriptStep(app, 'Script B', 'print("world")')
 
     await clickStep(app, 'Script B')
     await expect(app.getByRole('heading', { name: 'Input', exact: true })).toBeVisible({ timeout: 10_000 })
@@ -564,8 +564,8 @@ test.describe('Step editor panels', () => {
     await app.goto(toAppUrl('/workflow-builder/new'))
     await selectProjectIfRequired(app)
     await addManualTrigger(app, 'Trigger')
-    await addScriptStep(app, 'Fetch', 'print("data")')
-    await addScriptStep(app, 'Analyze', 'print("result")')
+    await addPythonScriptStep(app, 'Fetch', 'print("data")')
+    await addPythonScriptStep(app, 'Analyze', 'print("result")')
     await app.getByPlaceholder('Workflow name').fill(workflowName)
     await app.getByRole('button', { name: 'Save workflow' }).click()
     await expect(app).toHaveURL(/workflow-builder\/(?!new)/, { timeout: 15_000 })
@@ -681,9 +681,9 @@ test.describe('Step editor panels', () => {
     await app.goto(toAppUrl('/workflow-builder/new'))
     await selectProjectIfRequired(app)
     await addManualTrigger(app, 'Trigger')
-    await addScriptStep(app, 'Step A', 'print("alpha")')
-    await addScriptStep(app, 'Step B', 'print("beta")')
-    await addScriptStep(app, 'Step C', 'print("gamma")')
+    await addPythonScriptStep(app, 'Step A', 'print("alpha")')
+    await addPythonScriptStep(app, 'Step B', 'print("beta")')
+    await addPythonScriptStep(app, 'Step C', 'print("gamma")')
     await app.getByPlaceholder('Workflow name').fill(workflowName)
     await app.getByRole('button', { name: 'Save workflow' }).click()
     await expect(app).toHaveURL(/workflow-builder\/(?!new)/, { timeout: 15_000 })
@@ -932,14 +932,14 @@ test.describe('Step editor panels', () => {
 
     let panel = await clickAddConnectedStep(app)
     await panel.getByRole('button', { name: 'Action', exact: true }).click()
-    await panel.getByRole('button', { name: 'Script', exact: true }).click()
+    await panel.getByRole('button', { name: 'Python Script', exact: true }).click()
     await app.getByRole('textbox', { name: 'Name', exact: true }).fill('Script A')
     await fillCodeEditor(app, { value: 'print("alpha")' })
     await app.getByRole('button', { name: 'Create' }).click()
 
     panel = await clickAddConnectedStep(app)
     await panel.getByRole('button', { name: 'Action', exact: true }).click()
-    await panel.getByRole('button', { name: 'Script', exact: true }).click()
+    await panel.getByRole('button', { name: 'Python Script', exact: true }).click()
     await app.getByRole('textbox', { name: 'Name', exact: true }).fill('Script B')
     await fillCodeEditor(app, { value: 'print("beta")' })
     await app.getByRole('button', { name: 'Create' }).click()
@@ -989,14 +989,14 @@ test.describe('Step editor panels', () => {
 
     let panel = await clickAddConnectedStep(app)
     await panel.getByRole('button', { name: 'Action', exact: true }).click()
-    await panel.getByRole('button', { name: 'Script', exact: true }).click()
+    await panel.getByRole('button', { name: 'Python Script', exact: true }).click()
     await app.getByRole('textbox', { name: 'Name', exact: true }).fill('Script A')
     await fillCodeEditor(app, { value: 'print("alpha")' })
     await app.getByRole('button', { name: 'Create' }).click()
 
     panel = await clickAddConnectedStep(app)
     await panel.getByRole('button', { name: 'Action', exact: true }).click()
-    await panel.getByRole('button', { name: 'Script', exact: true }).click()
+    await panel.getByRole('button', { name: 'Python Script', exact: true }).click()
     await app.getByRole('textbox', { name: 'Name', exact: true }).fill('Script B')
     await fillCodeEditor(app, { value: 'print("beta")' })
     await app.getByRole('button', { name: 'Create' }).click()
@@ -1042,14 +1042,14 @@ test.describe('Step editor panels', () => {
 
     let panel = await clickAddConnectedStep(app)
     await panel.getByRole('button', { name: 'Action', exact: true }).click()
-    await panel.getByRole('button', { name: 'Script', exact: true }).click()
+    await panel.getByRole('button', { name: 'Python Script', exact: true }).click()
     await app.getByRole('textbox', { name: 'Name', exact: true }).fill('Script A')
     await fillCodeEditor(app, { value: 'print("alpha")' })
     await app.getByRole('button', { name: 'Create' }).click()
 
     panel = await clickAddConnectedStep(app)
     await panel.getByRole('button', { name: 'Action', exact: true }).click()
-    await panel.getByRole('button', { name: 'Script', exact: true }).click()
+    await panel.getByRole('button', { name: 'Python Script', exact: true }).click()
     await app.getByRole('textbox', { name: 'Name', exact: true }).fill('Script B')
     await fillCodeEditor(app, { value: 'print("beta")' })
     await app.getByRole('button', { name: 'Create' }).click()
@@ -1091,14 +1091,14 @@ test.describe('Step editor panels', () => {
 
     let panel = await clickAddConnectedStep(app)
     await panel.getByRole('button', { name: 'Action', exact: true }).click()
-    await panel.getByRole('button', { name: 'Script', exact: true }).click()
+    await panel.getByRole('button', { name: 'Python Script', exact: true }).click()
     await app.getByRole('textbox', { name: 'Name', exact: true }).fill('Script A')
     await fillCodeEditor(app, { value: 'print("test")' })
     await app.getByRole('button', { name: 'Create' }).click()
 
     panel = await clickAddConnectedStep(app)
     await panel.getByRole('button', { name: 'Action', exact: true }).click()
-    await panel.getByRole('button', { name: 'Script', exact: true }).click()
+    await panel.getByRole('button', { name: 'Python Script', exact: true }).click()
     await app.getByRole('textbox', { name: 'Name', exact: true }).fill('Script B')
     await fillCodeEditor(app, { value: 'print("test2")' })
     await app.getByRole('button', { name: 'Create' }).click()
@@ -1149,14 +1149,14 @@ test.describe('Step editor panels', () => {
 
     let panel = await clickAddConnectedStep(app)
     await panel.getByRole('button', { name: 'Action', exact: true }).click()
-    await panel.getByRole('button', { name: 'Script', exact: true }).click()
+    await panel.getByRole('button', { name: 'Python Script', exact: true }).click()
     await app.getByRole('textbox', { name: 'Name', exact: true }).fill('Script A')
     await fillCodeEditor(app, { value: 'print("alpha")' })
     await app.getByRole('button', { name: 'Create' }).click()
 
     panel = await clickAddConnectedStep(app)
     await panel.getByRole('button', { name: 'Action', exact: true }).click()
-    await panel.getByRole('button', { name: 'Script', exact: true }).click()
+    await panel.getByRole('button', { name: 'Python Script', exact: true }).click()
     await app.getByRole('textbox', { name: 'Name', exact: true }).fill('Script B')
     await fillCodeEditor(app, { value: 'print("beta")' })
     await app.getByRole('button', { name: 'Create' }).click()
@@ -1202,8 +1202,8 @@ test.describe('Step editor panels', () => {
     await app.goto(toAppUrl('/workflow-builder/new'))
     await selectProjectIfRequired(app)
     await addManualTrigger(app, 'Trigger')
-    await addScriptStep(app, 'Script A', 'print("hello")')
-    await addScriptStep(app, 'Script B', 'print("world")')
+    await addPythonScriptStep(app, 'Script A', 'print("hello")')
+    await addPythonScriptStep(app, 'Script B', 'print("world")')
 
     await clickStep(app, 'Script B')
     await expect(app.getByRole('heading', { name: 'Input', exact: true })).toBeVisible({ timeout: 10_000 })
@@ -1232,7 +1232,7 @@ test.describe('Step editor panels', () => {
     await app.goto(toAppUrl('/workflow-builder/new'))
     await selectProjectIfRequired(app)
     await addManualTrigger(app, 'Trigger')
-    await addScriptStep(app, 'Script A', 'print("hello")')
+    await addPythonScriptStep(app, 'Script A', 'print("hello")')
     await addAgenticStep(app, 'Agent B', 'initial-prompt')
 
     // clickStep reopens the editor after addAgenticStep closes it

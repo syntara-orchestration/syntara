@@ -52,6 +52,7 @@ Each page area has a dedicated `use*Permissions` hook that aggregates multiple `
 | `useWorkflowPermissions`         | `routes/workflows/useWorkflowPermissions.ts`                                | toolbar create via `check_any_project` when no project selected; row update/delete/run (and duplicate create) with `workflow.project_id` when the kebab opens                                                                         |
 | `useCredentialPermissions`       | `routes/configuration/credentials/useCredentialPermissions.ts`              | create via `check_any_project` when no project selected; update/delete use `resourceProject` or system-scoped `can_i`. Detail page passes `enabled: false` until `project_id` is known. Per-row `resourceProject` in list table body. |
 | `useBuilderPermissions`          | `routes/builder/useBuilderPermissions.ts`                                   | create/update/delete/run with `resourceProject`; new workflows use `check_any_project` for create                                                                                                                                     |
+| `useExecutionTargetPermissions`  | `routes/execution-plane/useExecutionTargetPermissions.ts`                   | `execution_target:create`, `execution_target:update`, `execution_target:delete`                                                                                                                                                       |
 | `useCredentialDetailPermissions` | `routes/configuration/credentials/useCredentialDetailPermissions.ts`        | `workflow:read`                                                                                                                                                                                                                       |
 | `useSettingsPermissions`         | `routes/configuration/settings/useSettingsPermissions.ts`                   | `setting:read`, `setting:write`                                                                                                                                                                                                       |
 | `useAccessManagementPermissions` | `routes/access-management/useAccessManagementPermissions.ts`                | Hub + tabs: `can_i` (+ `check_any_project` for project/assignments/SA); Roles/Policies system-only                                                                                                                                    |
@@ -263,6 +264,19 @@ Integration permission gating uses `useIntegrationPermissions` hook checking `in
 | Delete integration          | `integration:delete` | `isAriaDisabled` + `tooltipProps` on kebab action     |
 | Enable/disable tools/models | `integration:update` | `canUpdate` prop on tab checkboxes + save button      |
 | Refresh tools/models        | `integration:update` | `isAriaDisabled` on refresh button                    |
+
+**Note**: Delete is also subject to an independent business rule (not a permission): for Execution plane infrastructure (`openshift`) integrations, the Delete kebab action is omitted on the list and detail views regardless of `integration:delete`. The other three integration types still use the permission gating above.
+
+### Execution Plane — gated
+
+Execution target permission gating uses `useExecutionTargetPermissions` checking `execution_target:read`, `execution_target:create`, `execution_target:update`, and `execution_target:delete`. List/detail read access is gated by nav/`requiredPermissions` (`execution_target:read`); viewer/user are denied the route entirely. Workflow editors without `execution_target:read` can still edit workflows, but Script affinity **Required target** is disabled with an access explanation and the targets list is not requested.
+
+| Action                           | Permission                | Implementation                                           |
+| -------------------------------- | ------------------------- | -------------------------------------------------------- |
+| Script Required target affinity  | `execution_target:read`   | Option disabled + inline warning; list query not mounted |
+| Empty-state configure CTA        | `execution_target:create` | Hidden when `canCreate` is false                         |
+| Delete execution target (list)   | `execution_target:delete` | `isAriaDisabled` + `tooltipProps` on kebab action        |
+| Delete execution target (detail) | `execution_target:delete` | `isAriaDisabled` + `tooltipProps` on header kebab action |
 
 ### Settings — minor UX gap
 

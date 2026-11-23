@@ -7,9 +7,8 @@ triggers:
     type: manual_trigger
 nodes:
   - id: existing_task
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       code: echo "Existing task"
 
   - id: converge_missing

@@ -5,6 +5,7 @@ class IntegrationType(str, Enum):
     ANSIBLE_AUTOMATION_PLATFORM = "ansible_automation_platform"
     LLM_PROVIDER = "llm_provider"
     MCP_SERVER = "mcp_server"
+    OPENSHIFT = "openshift"
 
     def __str__(self) -> str:
         return str(self.value)

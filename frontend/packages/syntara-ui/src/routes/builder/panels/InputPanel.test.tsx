@@ -73,7 +73,7 @@ vi.mock('../../../stores/useMockDataStore', () => ({
   ),
 }))
 
-const upstreamNodes = [{ id: 'upstream-1', name: 'Previous Step', type: 'script' }]
+const upstreamNodes = [{ id: 'upstream-1', name: 'Previous Step', type: 'script_python' }]
 
 const executionData = {
   'upstream-1': {
@@ -214,14 +214,14 @@ describe('InputPanel', () => {
   it('shows type-label section headers when upstream activity names are empty', () => {
     mockUseUpstreamNodes.mockReturnValue([
       { id: 'up-1', name: '', type: 'converge' },
-      { id: 'up-2', name: '   ', type: 'script' },
-      { id: 'up-3', name: 'Custom Name', type: 'script' },
+      { id: 'up-2', name: '   ', type: 'script_python' },
+      { id: 'up-3', name: 'Custom Name', type: 'script_python' },
     ])
 
     render(<InputPanel nodeId="node-1" />)
 
     expect(screen.getByRole('button', { name: 'Converge' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Script' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Python Script' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Custom Name' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Variables and context/i })).toBeInTheDocument()
   })
@@ -230,7 +230,7 @@ describe('InputPanel', () => {
     const user = userEvent.setup()
     mockUseUpstreamNodes.mockReturnValue([
       { id: 'up-1', name: '', type: 'converge' },
-      { id: 'up-2', name: '', type: 'script' },
+      { id: 'up-2', name: '', type: 'script_python' },
     ])
 
     render(<InputPanel nodeId="node-1" />)
@@ -238,7 +238,7 @@ describe('InputPanel', () => {
     await user.click(screen.getByRole('button', { name: /Set mock data/i }))
 
     expect(screen.getByRole('menuitem', { name: 'Converge' })).toBeInTheDocument()
-    expect(screen.getByRole('menuitem', { name: 'Script' })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: 'Python Script' })).toBeInTheDocument()
   })
 
   it('opens mock editor with type-label predecessor name for unnamed upstream', async () => {
@@ -275,7 +275,7 @@ describe('InputPanel', () => {
 
   it('shows schema preview via sourceNodeId fallback when no edges exist', () => {
     mockUseUpstreamNodes.mockReturnValue([])
-    mockActivities.mockReturnValue([{ id: 'source-1', name: 'Fetch Data', type: 'script' }])
+    mockActivities.mockReturnValue([{ id: 'source-1', name: 'Fetch Data', type: 'script_python' }])
 
     render(<InputPanel nodeId="" sourceNodeId="source-1" />)
 
@@ -288,11 +288,11 @@ describe('InputPanel', () => {
     // 6-node chain: trigger → A → B → C → D → E
     // All are script nodes so they have known output schemas
     const fullChain = [
-      { id: 'node-a', name: 'Step A', type: 'script' },
-      { id: 'node-b', name: 'Step B', type: 'script' },
-      { id: 'node-c', name: 'Step C', type: 'script' },
-      { id: 'node-d', name: 'Step D', type: 'script' },
-      { id: 'node-e', name: 'Step E', type: 'script' },
+      { id: 'node-a', name: 'Step A', type: 'script_python' },
+      { id: 'node-b', name: 'Step B', type: 'script_python' },
+      { id: 'node-c', name: 'Step C', type: 'script_python' },
+      { id: 'node-d', name: 'Step D', type: 'script_python' },
+      { id: 'node-e', name: 'Step E', type: 'script_python' },
       { id: 'trigger-1', name: 'Trigger', type: 'manual_trigger' },
     ]
 
@@ -341,7 +341,7 @@ describe('InputPanel', () => {
 
     it('after deleting a middle node, downstream only sees remaining connected ancestors', () => {
       // Delete node-c: node-e now only sees node-d (isolated after the break)
-      const brokenChain = [{ id: 'node-d', name: 'Step D', type: 'script' }]
+      const brokenChain = [{ id: 'node-d', name: 'Step D', type: 'script_python' }]
       mockUseUpstreamNodes.mockReturnValue(brokenChain)
 
       const brokenExecutionData = {
@@ -358,7 +358,7 @@ describe('InputPanel', () => {
     it('after deleting a middle node, the pre-break chain remains intact', () => {
       // node-b still sees node-a and trigger (unaffected by the break after node-c)
       const preBreakChain = [
-        { id: 'node-a', name: 'Step A', type: 'script' },
+        { id: 'node-a', name: 'Step A', type: 'script_python' },
         { id: 'trigger-1', name: 'Trigger', type: 'manual_trigger' },
       ]
       mockUseUpstreamNodes.mockReturnValue(preBreakChain)
@@ -379,9 +379,9 @@ describe('InputPanel', () => {
       const user = userEvent.setup()
       // Reconnect: node-b → node-d (skipping deleted node-c)
       const reconnectedChain = [
-        { id: 'node-d', name: 'Step D', type: 'script' },
-        { id: 'node-b', name: 'Step B', type: 'script' },
-        { id: 'node-a', name: 'Step A', type: 'script' },
+        { id: 'node-d', name: 'Step D', type: 'script_python' },
+        { id: 'node-b', name: 'Step B', type: 'script_python' },
+        { id: 'node-a', name: 'Step A', type: 'script_python' },
         { id: 'trigger-1', name: 'Trigger', type: 'manual_trigger' },
       ]
       mockUseUpstreamNodes.mockReturnValue(reconnectedChain)
@@ -409,7 +409,7 @@ describe('InputPanel', () => {
 
     it('schema preview reflects broken chain when no execution data exists', () => {
       // Same broken chain scenario but without execution data (design-time)
-      const brokenChain = [{ id: 'node-d', name: 'Step D', type: 'script' }]
+      const brokenChain = [{ id: 'node-d', name: 'Step D', type: 'script_python' }]
       mockUseUpstreamNodes.mockReturnValue(brokenChain)
 
       render(<InputPanel nodeId="node-e" />)
@@ -423,9 +423,9 @@ describe('InputPanel', () => {
     it('schema preview shows all ancestors after reconnection without execution data', () => {
       // Reconnected chain, design-time (no execution data)
       const reconnectedChain = [
-        { id: 'node-d', name: 'Step D', type: 'script' },
-        { id: 'node-b', name: 'Step B', type: 'script' },
-        { id: 'node-a', name: 'Step A', type: 'script' },
+        { id: 'node-d', name: 'Step D', type: 'script_python' },
+        { id: 'node-b', name: 'Step B', type: 'script_python' },
+        { id: 'node-a', name: 'Step A', type: 'script_python' },
         { id: 'trigger-1', name: 'Trigger', type: 'manual_trigger' },
       ]
       mockUseUpstreamNodes.mockReturnValue(reconnectedChain)
@@ -1216,9 +1216,9 @@ describe('InputPanel', () => {
     it('Unpin dropdown only shows predecessors that have input mocks', async () => {
       const user = userEvent.setup()
       const multipleUpstream = [
-        { id: 'upstream-1', name: 'Step 1', type: 'script' },
-        { id: 'upstream-2', name: 'Step 2', type: 'script' },
-        { id: 'upstream-3', name: 'Step 3', type: 'script' },
+        { id: 'upstream-1', name: 'Step 1', type: 'script_python' },
+        { id: 'upstream-2', name: 'Step 2', type: 'script_python' },
+        { id: 'upstream-3', name: 'Step 3', type: 'script_python' },
       ]
       mockUseUpstreamNodes.mockReturnValue(multipleUpstream)
       mockGetInputMockCount.mockReturnValue(2)
@@ -1314,8 +1314,8 @@ describe('InputPanel', () => {
     it('Multiple predecessor mock editing updates editingPredecessorId correctly', async () => {
       const user = userEvent.setup()
       const multipleUpstream = [
-        { id: 'upstream-1', name: 'Step 1', type: 'script' },
-        { id: 'upstream-2', name: 'Step 2', type: 'script' },
+        { id: 'upstream-1', name: 'Step 1', type: 'script_python' },
+        { id: 'upstream-2', name: 'Step 2', type: 'script_python' },
       ]
       mockUseUpstreamNodes.mockReturnValue(multipleUpstream)
 

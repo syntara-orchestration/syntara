@@ -12,11 +12,12 @@ if TYPE_CHECKING:
     from ..models.aap_workflow_job_template_node import AAPWorkflowJobTemplateNode
     from ..models.agentic_node import AgenticNode
     from ..models.approval_node import ApprovalNode
+    from ..models.bash_script_node import BashScriptNode
     from ..models.condition_node import ConditionNode
     from ..models.converge_node import ConvergeNode
     from ..models.http_request_node import HTTPRequestNode
     from ..models.loop_node import LoopNode
-    from ..models.script_node import ScriptNode
+    from ..models.python_script_node import PythonScriptNode
     from ..models.switch_node import SwitchNode
     from ..models.wait_node import WaitNode
     from ..models.workflow_definition_edges_item import WorkflowDefinitionEdgesItem
@@ -44,9 +45,9 @@ class WorkflowDefinition:
             triggers (list[WorkflowDefinitionTriggersItem]): Trigger nodes that define how the workflow is initiated. Must
                 contain at least one trigger. Trigger nodes must be graph entry points (no incoming edges) — enforced by
                 application-level validation.
-            nodes (list[AAPJobTemplateNode | AAPWorkflowJobTemplateNode | AgenticNode | ApprovalNode | ConditionNode |
-                ConvergeNode | HTTPRequestNode | LoopNode | ScriptNode | SwitchNode | WaitNode]): Execution and control nodes in
-                the workflow graph
+            nodes (list[AAPJobTemplateNode | AAPWorkflowJobTemplateNode | AgenticNode | ApprovalNode | BashScriptNode |
+                ConditionNode | ConvergeNode | HTTPRequestNode | LoopNode | PythonScriptNode | SwitchNode | WaitNode]):
+                Execution and control nodes in the workflow graph
             edges (list[WorkflowDefinitionEdgesItem]): List of directed edges connecting triggers and nodes in the workflow
                 graph
             description (None | str | Unset): Human-readable description of the workflow's purpose
@@ -60,11 +61,12 @@ class WorkflowDefinition:
         | AAPWorkflowJobTemplateNode
         | AgenticNode
         | ApprovalNode
+        | BashScriptNode
         | ConditionNode
         | ConvergeNode
         | HTTPRequestNode
         | LoopNode
-        | ScriptNode
+        | PythonScriptNode
         | SwitchNode
         | WaitNode
     ]
@@ -76,11 +78,12 @@ class WorkflowDefinition:
         from ..models.aap_workflow_job_template_node import AAPWorkflowJobTemplateNode
         from ..models.agentic_node import AgenticNode
         from ..models.approval_node import ApprovalNode
+        from ..models.bash_script_node import BashScriptNode
         from ..models.condition_node import ConditionNode
         from ..models.converge_node import ConvergeNode
         from ..models.http_request_node import HTTPRequestNode
         from ..models.loop_node import LoopNode
-        from ..models.script_node import ScriptNode
+        from ..models.python_script_node import PythonScriptNode
         from ..models.switch_node import SwitchNode
 
         schema_version = self.schema_version
@@ -103,7 +106,9 @@ class WorkflowDefinition:
                 nodes_item = nodes_item_data.to_dict()
             elif isinstance(nodes_item_data, AgenticNode):
                 nodes_item = nodes_item_data.to_dict()
-            elif isinstance(nodes_item_data, ScriptNode):
+            elif isinstance(nodes_item_data, PythonScriptNode):
+                nodes_item = nodes_item_data.to_dict()
+            elif isinstance(nodes_item_data, BashScriptNode):
                 nodes_item = nodes_item_data.to_dict()
             elif isinstance(nodes_item_data, ApprovalNode):
                 nodes_item = nodes_item_data.to_dict()
@@ -153,11 +158,12 @@ class WorkflowDefinition:
         from ..models.aap_workflow_job_template_node import AAPWorkflowJobTemplateNode
         from ..models.agentic_node import AgenticNode
         from ..models.approval_node import ApprovalNode
+        from ..models.bash_script_node import BashScriptNode
         from ..models.condition_node import ConditionNode
         from ..models.converge_node import ConvergeNode
         from ..models.http_request_node import HTTPRequestNode
         from ..models.loop_node import LoopNode
-        from ..models.script_node import ScriptNode
+        from ..models.python_script_node import PythonScriptNode
         from ..models.switch_node import SwitchNode
         from ..models.wait_node import WaitNode
         from ..models.workflow_definition_edges_item import WorkflowDefinitionEdgesItem
@@ -188,11 +194,12 @@ class WorkflowDefinition:
                 | AAPWorkflowJobTemplateNode
                 | AgenticNode
                 | ApprovalNode
+                | BashScriptNode
                 | ConditionNode
                 | ConvergeNode
                 | HTTPRequestNode
                 | LoopNode
-                | ScriptNode
+                | PythonScriptNode
                 | SwitchNode
                 | WaitNode
             ):
@@ -231,7 +238,7 @@ class WorkflowDefinition:
                 try:
                     if not isinstance(data, dict):
                         raise TypeError()
-                    nodes_item_type_4 = ScriptNode.from_dict(data)
+                    nodes_item_type_4 = PythonScriptNode.from_dict(data)
 
                     return nodes_item_type_4
                 except (TypeError, ValueError, AttributeError, KeyError):
@@ -239,7 +246,7 @@ class WorkflowDefinition:
                 try:
                     if not isinstance(data, dict):
                         raise TypeError()
-                    nodes_item_type_5 = ApprovalNode.from_dict(data)
+                    nodes_item_type_5 = BashScriptNode.from_dict(data)
 
                     return nodes_item_type_5
                 except (TypeError, ValueError, AttributeError, KeyError):
@@ -247,7 +254,7 @@ class WorkflowDefinition:
                 try:
                     if not isinstance(data, dict):
                         raise TypeError()
-                    nodes_item_type_6 = ConditionNode.from_dict(data)
+                    nodes_item_type_6 = ApprovalNode.from_dict(data)
 
                     return nodes_item_type_6
                 except (TypeError, ValueError, AttributeError, KeyError):
@@ -255,7 +262,7 @@ class WorkflowDefinition:
                 try:
                     if not isinstance(data, dict):
                         raise TypeError()
-                    nodes_item_type_7 = SwitchNode.from_dict(data)
+                    nodes_item_type_7 = ConditionNode.from_dict(data)
 
                     return nodes_item_type_7
                 except (TypeError, ValueError, AttributeError, KeyError):
@@ -263,7 +270,7 @@ class WorkflowDefinition:
                 try:
                     if not isinstance(data, dict):
                         raise TypeError()
-                    nodes_item_type_8 = LoopNode.from_dict(data)
+                    nodes_item_type_8 = SwitchNode.from_dict(data)
 
                     return nodes_item_type_8
                 except (TypeError, ValueError, AttributeError, KeyError):
@@ -271,16 +278,24 @@ class WorkflowDefinition:
                 try:
                     if not isinstance(data, dict):
                         raise TypeError()
-                    nodes_item_type_9 = ConvergeNode.from_dict(data)
+                    nodes_item_type_9 = LoopNode.from_dict(data)
 
                     return nodes_item_type_9
                 except (TypeError, ValueError, AttributeError, KeyError):
                     pass
+                try:
+                    if not isinstance(data, dict):
+                        raise TypeError()
+                    nodes_item_type_10 = ConvergeNode.from_dict(data)
+
+                    return nodes_item_type_10
+                except (TypeError, ValueError, AttributeError, KeyError):
+                    pass
                 if not isinstance(data, dict):
                     raise TypeError()
-                nodes_item_type_10 = WaitNode.from_dict(data)
+                nodes_item_type_11 = WaitNode.from_dict(data)
 
-                return nodes_item_type_10
+                return nodes_item_type_11
 
             nodes_item = _parse_nodes_item(nodes_item_data)
 

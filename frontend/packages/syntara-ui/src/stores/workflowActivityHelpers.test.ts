@@ -13,7 +13,7 @@ import {
 import type { Activity } from './workflowStoreTypes'
 
 // v2: all nodes are flat with a config object, no nested structures
-const task = (id: string): Activity => ({ type: ActivityTypeEnum.SCRIPT, id, name: id, parameters: {} })
+const task = (id: string): Activity => ({ type: ActivityTypeEnum.SCRIPT_PYTHON, id, name: id, parameters: {} })
 
 const condition = (id: string): Activity => ({
   type: ActivityTypeEnum.CONDITION,
@@ -233,7 +233,7 @@ describe('getValidSourceHandles', () => {
   })
 
   it('returns SOURCE for script activity type', () => {
-    const handles = getValidSourceHandles(ActivityTypeEnum.SCRIPT)
+    const handles = getValidSourceHandles(ActivityTypeEnum.SCRIPT_PYTHON)
     expect(handles).toEqual(new Set([EdgeHandleEnum.SOURCE]))
   })
 })

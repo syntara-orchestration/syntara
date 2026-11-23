@@ -56,13 +56,24 @@
       "since": "2.0.0"
     },
     {
-      "type": "script",
-      "name": "Script",
-      "description": "Execute Python or Bash scripts with structured output",
+      "type": "script_python",
+      "name": "Python Script",
+      "description": "Execute Python code in an isolated container",
       "labels": {
         "category": "executor"
       },
-      "schema_ref": "../executors/script.schema.json",
+      "schema_ref": "../executors/script_python.schema.json",
+      "deprecated": false,
+      "since": "2.0.0"
+    },
+    {
+      "type": "script_bash",
+      "name": "Bash Script",
+      "description": "Execute Bash code in an isolated container",
+      "labels": {
+        "category": "executor"
+      },
+      "schema_ref": "../executors/script_bash.schema.json",
       "deprecated": false,
       "since": "2.0.0"
     },

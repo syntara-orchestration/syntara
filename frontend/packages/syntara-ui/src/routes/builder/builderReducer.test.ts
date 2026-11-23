@@ -37,7 +37,7 @@ describe('builderReducer', () => {
         historyCardOpen: true,
         selectedNode: { id: 'node-1' } as Node<NodeType['data']>,
         stepEditorMode: 'edit',
-        stepEditorStepTypeId: 'script',
+        stepEditorStepTypeId: 'script_python',
         stepEditorStepSubtypeId: null,
       }
 
@@ -61,8 +61,8 @@ describe('builderReducer', () => {
         historyCardOpen: true,
         selectedNode: { id: 'node-1' } as Node<NodeType['data']>,
         stepEditorMode: 'edit',
-        stepEditorStepTypeId: 'script',
-        stepEditorStepSubtypeId: 'python',
+        stepEditorStepTypeId: 'script_python',
+        stepEditorStepSubtypeId: null,
       }
 
       const action: BuilderAction = { type: 'TOGGLE_DETAILS' }
@@ -74,8 +74,8 @@ describe('builderReducer', () => {
       expect(result.historyCardOpen).toBe(true)
       expect(result.selectedNode).toEqual({ id: 'node-1' })
       expect(result.stepEditorMode).toBe('edit')
-      expect(result.stepEditorStepTypeId).toBe('script')
-      expect(result.stepEditorStepSubtypeId).toBe('python')
+      expect(result.stepEditorStepTypeId).toBe('script_python')
+      expect(result.stepEditorStepSubtypeId).toBeNull()
     })
 
     it('SET_HISTORY_CARD_OPEN sets historyCardOpen', () => {
@@ -92,7 +92,7 @@ describe('builderReducer', () => {
         detailsOpen: true,
         selectedNode: { id: 'node-1' } as Node<NodeType['data']>,
         stepEditorMode: 'edit',
-        stepEditorStepTypeId: 'script',
+        stepEditorStepTypeId: 'script_python',
         stepEditorStepSubtypeId: null,
       }
 
@@ -114,8 +114,8 @@ describe('builderReducer', () => {
         detailsOpen: true,
         selectedNode: { id: 'node-1' } as Node<NodeType['data']>,
         stepEditorMode: 'edit',
-        stepEditorStepTypeId: 'script',
-        stepEditorStepSubtypeId: 'python',
+        stepEditorStepTypeId: 'script_python',
+        stepEditorStepSubtypeId: null,
       }
 
       const action: BuilderAction = { type: 'TOGGLE_HISTORY' }
@@ -148,13 +148,13 @@ describe('builderReducer', () => {
     it('OPEN_NODE_EDITOR_ADD sets editor to add mode', () => {
       const action: BuilderAction = {
         type: 'OPEN_NODE_EDITOR_ADD',
-        payload: { stepTypeId: 'script', stepSubtypeId: 'python' },
+        payload: { stepTypeId: 'script_python', stepSubtypeId: null },
       }
       const result = builderReducer(initialState, action)
 
       expect(result.stepEditorMode).toBe('add')
-      expect(result.stepEditorStepTypeId).toBe('script')
-      expect(result.stepEditorStepSubtypeId).toBe('python')
+      expect(result.stepEditorStepTypeId).toBe('script_python')
+      expect(result.stepEditorStepSubtypeId).toBeNull()
       expect(result.selectedNode).toBeNull()
       expect(result.addStepPanelOpen).toBe(false)
     })
@@ -163,8 +163,8 @@ describe('builderReducer', () => {
       const stateWithEditor: BuilderState = {
         ...initialState,
         stepEditorMode: 'edit',
-        stepEditorStepTypeId: 'script',
-        stepEditorStepSubtypeId: 'python',
+        stepEditorStepTypeId: 'script_python',
+        stepEditorStepSubtypeId: null,
         selectedNode: { id: 'node-1' } as Node<NodeType['data']>,
       }
 
@@ -178,7 +178,7 @@ describe('builderReducer', () => {
     })
 
     it('SET_SELECTED_NODE sets selectedNode', () => {
-      const node = { id: 'node-1', type: 'script' } as Node<NodeType['data']>
+      const node = { id: 'node-1', type: 'script_python' } as Node<NodeType['data']>
       const action: BuilderAction = { type: 'SET_SELECTED_NODE', payload: node }
       const result = builderReducer(initialState, action)
 
@@ -415,7 +415,7 @@ describe('builderReducer', () => {
     })
 
     it('opens editor for non-generic node clicks', () => {
-      const node = { id: 'task-1', type: 'script' } as Node<NodeType['data']>
+      const node = { id: 'task-1', type: 'script_python' } as Node<NodeType['data']>
       const action: BuilderAction = { type: 'NODE_CLICK', payload: { node, isGeneric: false } }
       const result = builderReducer(initialState, action)
 
@@ -429,7 +429,7 @@ describe('builderReducer', () => {
 
     it('opens step editor in edit mode when viewingVersion is set', () => {
       const stateViewing: BuilderState = { ...initialState, viewingVersion: 2, versionHistoryOpen: true }
-      const node = { id: 'task-1', type: 'script' } as Node<NodeType['data']>
+      const node = { id: 'task-1', type: 'script_python' } as Node<NodeType['data']>
       const action: BuilderAction = { type: 'NODE_CLICK', payload: { node, isGeneric: false } }
       const result = builderReducer(stateViewing, action)
 
@@ -446,7 +446,7 @@ describe('builderReducer', () => {
         ...initialState,
         selectedNode: { id: 'node-to-delete' } as Node<NodeType['data']>,
         stepEditorMode: 'edit',
-        stepEditorStepTypeId: 'script',
+        stepEditorStepTypeId: 'script_python',
         stepEditorStepSubtypeId: 'shell',
       }
 
@@ -465,7 +465,7 @@ describe('builderReducer', () => {
         ...initialState,
         selectedNode: node,
         stepEditorMode: 'edit',
-        stepEditorStepTypeId: 'script',
+        stepEditorStepTypeId: 'script_python',
       }
 
       const action: BuilderAction = { type: 'CLEAR_SELECTED_IF_DELETED', payload: ['node-1', 'node-2'] }
@@ -473,14 +473,14 @@ describe('builderReducer', () => {
 
       expect(result.selectedNode).toBe(node)
       expect(result.stepEditorMode).toBe('edit')
-      expect(result.stepEditorStepTypeId).toBe('script')
+      expect(result.stepEditorStepTypeId).toBe('script_python')
     })
 
     it('leaves create mode alone when no step is selected', () => {
       const addState: BuilderState = {
         ...initialState,
         stepEditorMode: 'add',
-        stepEditorStepTypeId: 'script',
+        stepEditorStepTypeId: 'script_python',
         stepEditorStepSubtypeId: 'shell',
       }
       const action: BuilderAction = { type: 'CLEAR_SELECTED_IF_DELETED', payload: ['node-1'] }

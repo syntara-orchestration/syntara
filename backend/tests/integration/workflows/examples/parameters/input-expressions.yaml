@@ -10,18 +10,16 @@ triggers:
 nodes:
   - id: source
     name: Source Activity
-    type: script
+    type: script_python
     parameters:
-      language: python
       code: |
         import json
         print(json.dumps({"count": 42, "status": "active"}))
 
   - id: consumer
     name: Consumer Activity
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       environment:
         INPUT_COUNT: ${source.stdout_json.count}
         INPUT_STATUS: ${source.stdout_json.status}

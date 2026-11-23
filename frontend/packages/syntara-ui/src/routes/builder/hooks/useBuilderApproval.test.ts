@@ -258,7 +258,7 @@ describe('useBuilderApproval', () => {
       execution_id: 'exec-1',
       approval_node_id: 'a2',
       created_at: '2026-01-01T00:00:00Z',
-      next_step_approved: { id: 'step-a', name: 'Approved Step', type: 'script' },
+      next_step_approved: { id: 'step-a', name: 'Approved Step', type: 'script_python' },
       workflow_context: { workflow_id: 'wf-1', workflow_name: 'Test', inputs: {} },
     }
 
@@ -267,7 +267,7 @@ describe('useBuilderApproval', () => {
       name: 'test',
       workflow: {
         activities: [
-          { id: 'a1', name: 'Step One', type: 'script', parameters: {} },
+          { id: 'a1', name: 'Step One', type: 'script_python', parameters: {} },
           { id: 'a2', name: 'Approval', type: 'approval', parameters: { prompt: 'Please review this change.' } },
         ],
       },
@@ -289,7 +289,7 @@ describe('useBuilderApproval', () => {
       execution_id: 'exec-1',
       approval_node_id: 'a2',
       created_at: '2026-01-01T00:00:00Z',
-      next_step_approved: { id: 'step-a', name: 'Approved Step', type: 'script' },
+      next_step_approved: { id: 'step-a', name: 'Approved Step', type: 'script_python' },
       workflow_context: { workflow_id: 'wf-1', workflow_name: 'Test', inputs: {} },
       prompt: 'Please review prod',
     }
@@ -325,7 +325,7 @@ describe('useBuilderApproval', () => {
       execution_id: 'exec-1',
       approval_node_id: 'a2',
       created_at: '2026-01-01T00:00:00Z',
-      next_step_approved: { id: 'step-a', name: 'Approved Step', type: 'script' },
+      next_step_approved: { id: 'step-a', name: 'Approved Step', type: 'script_python' },
       workflow_context: { workflow_id: 'wf-1', workflow_name: 'Test', inputs: {} },
       prompt: 'From approval record',
     }
@@ -346,7 +346,7 @@ describe('useBuilderApproval', () => {
       execution_id: 'exec-1',
       approval_node_id: 'a2',
       created_at: '2026-01-01T00:00:00Z',
-      next_step_approved: { id: 'step-a', name: 'Approved Step', type: 'script' },
+      next_step_approved: { id: 'step-a', name: 'Approved Step', type: 'script_python' },
       workflow_context: { workflow_id: 'wf-1', workflow_name: 'Test', inputs: {} },
     }
 

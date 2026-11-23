@@ -44,7 +44,7 @@ spec:
     - name: hermetic
       value: "true"
     - name: prefetch-input
-      value: '[{"type": "pip", "path": "backend"}, {"type": "rpm", "path": "backend"}, {"type": "generic", "path": "backend"}]'
+      value: '[{"type": "pip", "path": "backend", "requirements_files": ["requirements.txt", "requirements-vcs.txt"]}, {"type": "rpm", "path": "backend"}, {"type": "generic", "path": "backend"}]'
     - name: prefetch-mode
       value: permissive
   pipelineRef:

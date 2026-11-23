@@ -10,9 +10,8 @@ triggers:
 nodes:
   - id: flaky_task
     name: Flaky Task
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       code: |
         # Fail on first 2 attempts, succeed on 3rd
         ATTEMPT_FILE="/tmp/attempt_counter_$$"

@@ -10,7 +10,12 @@ import type { NodeType } from '../../workflows/canvas/nodes/NodeType'
 const FALLBACK_DOC_KEY: DocKey = 'builder'
 
 /** Registry / executor ids that intentionally have no step documentation link. */
-const STEPS_WITHOUT_DOCUMENTATION = new Set<string>([RegistryStepId.ACTION_SCRIPT, ExecutorTypeEnum.SCRIPT])
+const STEPS_WITHOUT_DOCUMENTATION = new Set<string>([
+  RegistryStepId.ACTION_SCRIPT_PYTHON,
+  RegistryStepId.ACTION_SCRIPT_BASH,
+  ExecutorTypeEnum.SCRIPT_PYTHON,
+  ExecutorTypeEnum.SCRIPT_BASH,
+])
 
 /** Registry subtype / leaf ids → step-type documentation keys (must match docsUrls.json / overlay). */
 const REGISTRY_SUBTYPE_DOC_KEYS: Readonly<Record<string, string>> = {

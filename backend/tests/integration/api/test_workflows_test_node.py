@@ -36,14 +36,14 @@ async def multi_node_workflow(test_db_session: AsyncSession, test_user: User) ->
             {
                 "id": "predecessor_node",
                 "name": "predecessor_node",
-                "type": "script",
-                "parameters": {"language": "bash", "code": "echo predecessor"},
+                "type": "script_bash",
+                "parameters": {"code": "echo predecessor"},
             },
             {
                 "id": "test_activity",
                 "name": "test_activity",
-                "type": "script",
-                "parameters": {"language": "bash", "code": "echo test"},
+                "type": "script_bash",
+                "parameters": {"code": "echo test"},
             },
         ],
         "edges": [

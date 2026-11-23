@@ -71,6 +71,25 @@ function extractFields(completedResult) {
   })
 }
 
+/** Resolve a local JSON Schema reference used by executor resultSchema definitions. */
+function resolveLocalRef(ref, fromSchemaPath, schemasRoot) {
+  const [filePath, pointer = ''] = ref.split('#')
+  const targetPath = realpathSync(resolve(dirname(fromSchemaPath), filePath))
+  const normalizedRoot = schemasRoot.endsWith('/') ? schemasRoot : `${schemasRoot}/`
+  if (!targetPath.startsWith(normalizedRoot)) {
+    throw new Error(`Schema reference escapes schemas directory: ${ref}`)
+  }
+
+  const target = JSON.parse(readFileSync(targetPath, 'utf-8'))
+  if (!pointer) return target
+
+  return pointer
+    .slice(1)
+    .split('/')
+    .map((segment) => segment.replace(/~1/g, '/').replace(/~0/g, '~'))
+    .reduce((value, segment) => value?.[segment], target)
+}
+
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
@@ -100,7 +119,10 @@ for (const nodeType of catalog.node_types) {
     continue
   }
 
-  const resultSchema = schema.resultSchema
+  const resultSchema =
+    typeof schema.resultSchema?.$ref === 'string'
+      ? resolveLocalRef(schema.resultSchema.$ref, schemaPath, realSchemasDir)
+      : schema.resultSchema
   if (!resultSchema) {
     console.warn(`  WARN: No resultSchema in "${nodeType.type}", skipping.`)
     continue
@@ -116,8 +138,10 @@ for (const nodeType of catalog.node_types) {
   }
 
   const fields = extractFields(completedResult)
-  schemas[nodeType.type] = fields
-  console.log(`  ${nodeType.type}: ${fields.length} fields`)
+  // The backend shares one result schema for both script types; stdout_json is emitted only by Python.
+  const outputFields = nodeType.type === 'script_bash' ? fields.filter((field) => field.name !== 'stdout_json') : fields
+  schemas[nodeType.type] = outputFields
+  console.log(`  ${nodeType.type}: ${outputFields.length} fields`)
 }
 
 // ---------------------------------------------------------------------------

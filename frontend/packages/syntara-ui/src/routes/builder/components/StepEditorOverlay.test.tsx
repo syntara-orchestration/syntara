@@ -30,7 +30,7 @@ describe('StepEditorOverlay', () => {
       id: 'task-1',
       type: 'task',
       position: { x: 0, y: 0 },
-      data: { id: 'task-1', type: ExecutorTypeEnum.SCRIPT, name: 'Task' },
+      data: { id: 'task-1', type: ExecutorTypeEnum.SCRIPT_PYTHON, name: 'Task' },
     } as never,
     stepTypeId: null,
     stepSubtypeId: null,
@@ -55,7 +55,15 @@ describe('StepEditorOverlay', () => {
   })
 
   it('passes mode as add when mode prop is add', () => {
-    render(<StepEditorOverlay {...baseProps} mode="add" stepTypeId="script" selectedNode={null} />)
+    render(
+      <StepEditorOverlay
+        {...baseProps}
+        mode="add"
+        stepTypeId={RegistryStepId.ACTION}
+        stepSubtypeId={RegistryStepId.ACTION_SCRIPT_PYTHON}
+        selectedNode={null}
+      />
+    )
     expect(screen.getByTestId('step-details-panel')).toHaveTextContent('add')
   })
 

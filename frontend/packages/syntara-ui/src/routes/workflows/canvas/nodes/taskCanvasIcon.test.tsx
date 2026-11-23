@@ -17,8 +17,8 @@ describe('getTaskCanvasIcon', () => {
   it('renders an icon wrapper for a script task', () => {
     const data = makeTask({
       name: 'Run',
-      type: ExecutorTypeEnum.SCRIPT,
-      parameters: { language: 'python', code: 'print(1)' },
+      type: ExecutorTypeEnum.SCRIPT_PYTHON,
+      parameters: { code: 'print(1)' },
     })
     render(<>{getTaskCanvasIcon(data)}</>)
     expect(screen.getByTestId('step-icon-wrapper')).toBeInTheDocument()
@@ -27,8 +27,8 @@ describe('getTaskCanvasIcon', () => {
   it('applies accent color on canvas variant when provided', () => {
     const data = makeTask({
       name: 'Run',
-      type: ExecutorTypeEnum.SCRIPT,
-      parameters: { language: 'python', code: 'print(1)' },
+      type: ExecutorTypeEnum.SCRIPT_PYTHON,
+      parameters: { code: 'print(1)' },
     })
     render(<>{getTaskCanvasIcon(data, 'var(--pf-t--global--color--nonstatus--purple--300)')}</>)
     expect(screen.getByTestId('step-icon-wrapper')).toBeInTheDocument()
@@ -37,8 +37,8 @@ describe('getTaskCanvasIcon', () => {
   it('uses semanticZoom variant sizing when requested', () => {
     const data = makeTask({
       name: 'Run',
-      type: ExecutorTypeEnum.SCRIPT,
-      parameters: { language: 'python', code: 'print(1)' },
+      type: ExecutorTypeEnum.SCRIPT_PYTHON,
+      parameters: { code: 'print(1)' },
     })
     render(<>{getTaskCanvasIcon(data, 'var(--pf-t--global--color--nonstatus--purple--300)', 'semanticZoom')}</>)
     expect(screen.getByTestId('step-icon-wrapper')).toHaveClass('pf-m-3xl')

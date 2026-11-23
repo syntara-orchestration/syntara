@@ -42,7 +42,7 @@ export async function waitForUIReady(page: Page) {
 /**
  * Click the "Reset layout" button to trigger an auto-layout of the canvas.
  * Uses explicit `toBeVisible()` to ride out any layout animations still settling
- * from a previous call (e.g. after addScriptStep).
+ * from a previous call (e.g. after addPythonScriptStep).
  *
  * Use this when you only need nodes repositioned after adding steps. Use
  * {@link layoutCanvas} when tests must also fit the viewport (typical in CI) before
@@ -529,7 +529,7 @@ export async function createBasicWorkflow(page: Page, workflowName: string, acti
   // Add a connected action step
   const panel = await clickAddConnectedStep(page)
   await panel.getByRole('button', { name: 'Action', exact: true }).click()
-  await panel.getByRole('button', { name: 'Script', exact: true }).click()
+  await panel.getByRole('button', { name: 'Python Script', exact: true }).click()
   await page.getByRole('textbox', { name: 'Name', exact: true }).fill(actionName)
   await fillCodeEditor(page, { value: 'print("hello")' })
   await page.getByRole('button', { name: 'Create', exact: true }).click()
@@ -610,7 +610,7 @@ export async function createWorkflowWithTrigger(page: Page, workflowName: string
 /**
  * Add a Script action step to the workflow canvas.
  */
-export async function addScriptStep(page: Page, name: string, code: string) {
+export async function addPythonScriptStep(page: Page, name: string, code: string) {
   const panel = await clickAddConnectedStep(page)
 
   const actionBtn = panel.getByRole('button', { name: 'Action', exact: true })
@@ -624,12 +624,12 @@ export async function addScriptStep(page: Page, name: string, code: string) {
 
   // Wait for panel re-render to complete before clicking Script
   await expect(async () => {
-    const scriptBtn = panel.getByRole('button', { name: 'Script', exact: true })
+    const scriptBtn = panel.getByRole('button', { name: 'Python Script', exact: true })
     await expect(scriptBtn).toBeVisible()
     await expect(scriptBtn).toBeEnabled()
   }).toPass({ timeout: 15000, intervals: [500, 1000] })
 
-  const scriptBtn = panel.getByRole('button', { name: 'Script', exact: true })
+  const scriptBtn = panel.getByRole('button', { name: 'Python Script', exact: true })
   await scriptBtn.click()
 
   await expect(actionHeading).not.toBeVisible({ timeout: 10000 })
@@ -671,7 +671,7 @@ export async function addScriptStep(page: Page, name: string, code: string) {
  * Add a Script action step WITHOUT auto-connecting it (uses "Add step" instead of "Add connected step").
  * Useful for testing manual edge creation.
  */
-export async function addScriptStepUnconnected(page: Page, name: string, code: string) {
+export async function addPythonScriptStepUnconnected(page: Page, name: string, code: string) {
   // Wait for any existing panel to close and network to settle
   const panel = addStepPanel(page)
   await expect(panel).toHaveCount(0, { timeout: 10000 })
@@ -689,7 +689,7 @@ export async function addScriptStepUnconnected(page: Page, name: string, code: s
     const actionBtn = panel.getByRole('button', { name: 'Action', exact: true })
     await expect(actionBtn).toBeVisible()
     await actionBtn.click()
-    const scriptBtn = panel.getByRole('button', { name: 'Script', exact: true })
+    const scriptBtn = panel.getByRole('button', { name: 'Python Script', exact: true })
     await expect(scriptBtn).toBeVisible()
     await scriptBtn.click()
     const nameInput = page.getByRole('textbox', { name: 'Name', exact: true })

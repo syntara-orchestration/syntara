@@ -41,9 +41,8 @@ def test_script_node_bash(syntara_api: SyntaraApiRegistry):
                 {
                     "id": "hello_script",
                     "name": "Hello Script",
-                    "type": "script",
+                    "type": "script_bash",
                     "parameters": {
-                        "language": "bash",
                         "code": 'echo "Hello from E2E test"',
                     },
                 },
@@ -74,9 +73,8 @@ def test_script_node_python(syntara_api: SyntaraApiRegistry):
                 {
                     "id": "py_script",
                     "name": "Python Script",
-                    "type": "script",
+                    "type": "script_python",
                     "parameters": {
-                        "language": "python",
                         "code": "import json; print(json.dumps({'result': 2 + 2}))",
                     },
                 },
@@ -160,14 +158,14 @@ def test_condition_true_branch(syntara_api: SyntaraApiRegistry):
                 {
                     "id": "true_branch",
                     "name": "True Branch",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": 'echo "condition was true"'},
+                    "type": "script_bash",
+                    "parameters": {"code": 'echo "condition was true"'},
                 },
                 {
                     "id": "false_branch",
                     "name": "False Branch",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": 'echo "condition was false"'},
+                    "type": "script_bash",
+                    "parameters": {"code": 'echo "condition was false"'},
                 },
             ],
             "edges": [
@@ -208,14 +206,14 @@ def test_condition_false_branch(syntara_api: SyntaraApiRegistry):
                 {
                     "id": "true_branch",
                     "name": "True Branch",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": 'echo "should not run"'},
+                    "type": "script_bash",
+                    "parameters": {"code": 'echo "should not run"'},
                 },
                 {
                     "id": "false_branch",
                     "name": "False Branch",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": 'echo "condition was false"'},
+                    "type": "script_bash",
+                    "parameters": {"code": 'echo "condition was false"'},
                 },
             ],
             "edges": [
@@ -264,8 +262,8 @@ def test_loop_for_each(syntara_api: SyntaraApiRegistry):
                 {
                     "id": "loop_body",
                     "name": "Loop Body",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": 'echo "Processing item"'},
+                    "type": "script_bash",
+                    "parameters": {"code": 'echo "Processing item"'},
                 },
             ],
             "edges": [
@@ -311,14 +309,14 @@ def test_loop_and_parallel_branch_converge(syntara_api: SyntaraApiRegistry):
                 {
                     "id": "loop_body",
                     "name": "Loop Body",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": 'echo "Processing item"'},
+                    "type": "script_bash",
+                    "parameters": {"code": 'echo "Processing item"'},
                 },
                 {
                     "id": "parallel_step",
                     "name": "Parallel Step",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": 'echo "parallel done"'},
+                    "type": "script_bash",
+                    "parameters": {"code": 'echo "parallel done"'},
                 },
                 {
                     "id": "join",
@@ -329,8 +327,8 @@ def test_loop_and_parallel_branch_converge(syntara_api: SyntaraApiRegistry):
                 {
                     "id": "final_step",
                     "name": "Final Step",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": 'echo "all done"'},
+                    "type": "script_bash",
+                    "parameters": {"code": 'echo "all done"'},
                 },
             ],
             "edges": [
@@ -383,14 +381,14 @@ def test_empty_loop_converges_with_parallel_branch(syntara_api: SyntaraApiRegist
                 {
                     "id": "loop_body",
                     "name": "Loop Body",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": 'echo "never runs"'},
+                    "type": "script_bash",
+                    "parameters": {"code": 'echo "never runs"'},
                 },
                 {
                     "id": "parallel_step",
                     "name": "Parallel Step",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": 'echo "parallel done"'},
+                    "type": "script_bash",
+                    "parameters": {"code": 'echo "parallel done"'},
                 },
                 {
                     "id": "join",
@@ -401,8 +399,8 @@ def test_empty_loop_converges_with_parallel_branch(syntara_api: SyntaraApiRegist
                 {
                     "id": "final_step",
                     "name": "Final Step",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": 'echo "all done"'},
+                    "type": "script_bash",
+                    "parameters": {"code": 'echo "all done"'},
                 },
             ],
             "edges": [
@@ -455,14 +453,14 @@ def test_loop_body_failure_blocks_converge(syntara_api: SyntaraApiRegistry):
                 {
                     "id": "failing_body",
                     "name": "Failing Body",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": "exit 1"},
+                    "type": "script_bash",
+                    "parameters": {"code": "exit 1"},
                 },
                 {
                     "id": "parallel_step",
                     "name": "Parallel Step",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": 'echo "parallel done"'},
+                    "type": "script_bash",
+                    "parameters": {"code": 'echo "parallel done"'},
                 },
                 {
                     "id": "join",
@@ -473,8 +471,8 @@ def test_loop_body_failure_blocks_converge(syntara_api: SyntaraApiRegistry):
                 {
                     "id": "final_step",
                     "name": "Final Step",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": 'echo "should not run"'},
+                    "type": "script_bash",
+                    "parameters": {"code": 'echo "should not run"'},
                 },
             ],
             "edges": [
@@ -516,14 +514,14 @@ def test_parallel_paths_with_converge(syntara_api: SyntaraApiRegistry):
                 {
                     "id": "path_a",
                     "name": "Path A",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": 'echo "Path A done"'},
+                    "type": "script_bash",
+                    "parameters": {"code": 'echo "Path A done"'},
                 },
                 {
                     "id": "path_b",
                     "name": "Path B",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": 'echo "Path B done"'},
+                    "type": "script_bash",
+                    "parameters": {"code": 'echo "Path B done"'},
                 },
                 {
                     "id": "join",
@@ -534,8 +532,8 @@ def test_parallel_paths_with_converge(syntara_api: SyntaraApiRegistry):
                 {
                     "id": "final_step",
                     "name": "Final Step",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": 'echo "All paths completed"'},
+                    "type": "script_bash",
+                    "parameters": {"code": 'echo "All paths completed"'},
                 },
             ],
             "edges": [
@@ -577,8 +575,8 @@ def test_multi_node_workflow(syntara_api: SyntaraApiRegistry):
                 {
                     "id": "setup",
                     "name": "Setup",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": 'echo "setup done"'},
+                    "type": "script_bash",
+                    "parameters": {"code": 'echo "setup done"'},
                 },
                 {
                     "id": "gate",
@@ -589,14 +587,14 @@ def test_multi_node_workflow(syntara_api: SyntaraApiRegistry):
                 {
                     "id": "task_a",
                     "name": "Task A",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": 'echo "task a"'},
+                    "type": "script_bash",
+                    "parameters": {"code": 'echo "task a"'},
                 },
                 {
                     "id": "task_b",
                     "name": "Task B",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": 'echo "task b"'},
+                    "type": "script_bash",
+                    "parameters": {"code": 'echo "task b"'},
                 },
                 {
                     "id": "join",
@@ -607,8 +605,8 @@ def test_multi_node_workflow(syntara_api: SyntaraApiRegistry):
                 {
                     "id": "finish",
                     "name": "Finish",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": 'echo "done"'},
+                    "type": "script_bash",
+                    "parameters": {"code": 'echo "done"'},
                 },
             ],
             "edges": [
@@ -661,9 +659,8 @@ def test_script_then_agentic(
                 {
                     "id": "prep",
                     "name": "Prep Data",
-                    "type": "script",
+                    "type": "script_bash",
                     "parameters": {
-                        "language": "bash",
                         "code": 'echo "jimmy"',
                     },
                 },
@@ -725,9 +722,8 @@ def test_agentic_then_script(
                 {
                     "id": "post_process",
                     "name": "Post Process",
-                    "type": "script",
+                    "type": "script_bash",
                     "parameters": {
-                        "language": "bash",
                         "code": 'echo "Agent task finished, post-processing complete"',
                     },
                 },
@@ -883,8 +879,8 @@ def _switch_workflow_definition(cases: list[dict[str, str]], default_port: str =
             {
                 "id": node_id,
                 "name": f"Action {port}",
-                "type": "script",
-                "parameters": {"language": "bash", "code": f'echo "{port} executed"'},
+                "type": "script_bash",
+                "parameters": {"code": f'echo "{port} executed"'},
             }
         )
         edges.append({"from": "sw", "to": node_id, "from_port": port})
@@ -893,8 +889,8 @@ def _switch_workflow_definition(cases: list[dict[str, str]], default_port: str =
         {
             "id": "action_default",
             "name": "Default Action",
-            "type": "script",
-            "parameters": {"language": "bash", "code": 'echo "default executed"'},
+            "type": "script_bash",
+            "parameters": {"code": 'echo "default executed"'},
         }
     )
     edges.append({"from": "sw", "to": "action_default", "from_port": default_port})
@@ -1134,8 +1130,8 @@ def test_switch_empty_cases_saves_with_validation_issues(syntara_api: SyntaraApi
                 {
                     "id": "action_default",
                     "name": "Default",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": 'echo "should not run"'},
+                    "type": "script_bash",
+                    "parameters": {"code": 'echo "should not run"'},
                 },
             ],
             "edges": [
@@ -1173,9 +1169,8 @@ def test_switch_after_script_node(syntara_api: SyntaraApiRegistry):
                 {
                     "id": "setup",
                     "name": "Setup",
-                    "type": "script",
+                    "type": "script_python",
                     "parameters": {
-                        "language": "python",
                         "code": 'import json; print(json.dumps({"priority": "high"}))',
                     },
                 },
@@ -1194,20 +1189,20 @@ def test_switch_after_script_node(syntara_api: SyntaraApiRegistry):
                 {
                     "id": "action_high",
                     "name": "High Priority",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": 'echo "high priority"'},
+                    "type": "script_bash",
+                    "parameters": {"code": 'echo "high priority"'},
                 },
                 {
                     "id": "action_low",
                     "name": "Low Priority",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": 'echo "low priority"'},
+                    "type": "script_bash",
+                    "parameters": {"code": 'echo "low priority"'},
                 },
                 {
                     "id": "action_default",
                     "name": "Default",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": 'echo "default"'},
+                    "type": "script_bash",
+                    "parameters": {"code": 'echo "default"'},
                 },
             ],
             "edges": [

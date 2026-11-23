@@ -28,7 +28,7 @@ async def test_post_workflow_valid_definition(jwt_client: AsyncClient, test_proj
         "description": "A test workflow",
         "project_id": test_project_id,
         "workflow_definition": create_minimal_workflow_definition(
-            name="test-workflow", description="A test workflow", activity_id="task1", activity_type="script"
+            name="test-workflow", description="A test workflow", activity_id="task1", activity_type="script_python"
         ),
     }
 
@@ -185,7 +185,7 @@ async def test_post_workflow_response_schema(jwt_client: AsyncClient, test_proje
             name="schema-test",
             description="Testing response schema",
             activity_id="test_activity",
-            activity_type="script",
+            activity_type="script_python",
         ),
     }
 

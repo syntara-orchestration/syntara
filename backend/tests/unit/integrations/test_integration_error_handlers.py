@@ -14,6 +14,7 @@ from syntara.integrations.error_handlers import (
     integration_error_handler,
     integration_name_conflict_handler,
     integration_not_found_handler,
+    integration_type_conflict_handler,
 )
 from syntara.integrations.exceptions import (
     IntegrationCredentialNotFoundError,
@@ -21,6 +22,7 @@ from syntara.integrations.exceptions import (
     IntegrationError,
     IntegrationNameConflictError,
     IntegrationNotFoundError,
+    IntegrationTypeConflictError,
 )
 
 _INTEGRATION_ID = "00000000-0000-0000-0000-000000000001"
@@ -92,6 +94,29 @@ class TestIntegrationCredentialRequiredHandler:
         assert data["code"] == "INTEGRATION_CREDENTIAL_REQUIRED"
         assert data["retryable"] is False
         assert "llm_provider" in data["detail"]
+
+
+class TestIntegrationTypeConflictHandler:
+    """Tests for integration_type_conflict_handler."""
+
+    def test_returns_409_with_rfc9457_format(self) -> None:
+        request = Mock(spec=Request)
+        request.url = "https://api.example.com/integrations"
+
+        exc = IntegrationTypeConflictError("openshift")
+        response = integration_type_conflict_handler(request, exc)
+
+        assert isinstance(response, JSONResponse)
+        assert response.status_code == 409
+        assert response.media_type == "application/problem+json"
+
+        data = json.loads(bytes(response.body).decode())
+        assert data["type"] == PROBLEM_TYPES["name_conflict"]
+        assert data["title"] == "Integration Type Conflict"
+        assert data["detail"] == "An integration of type 'openshift' already exists"
+        assert data["code"] == "INTEGRATION_TYPE_CONFLICT"
+        assert data["retryable"] is False
+        assert data["instance"] == "https://api.example.com/integrations"
 
 
 class TestIntegrationCredentialNotFoundHandler:

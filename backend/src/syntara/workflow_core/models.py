@@ -8,7 +8,7 @@ import json
 import re
 import uuid
 from enum import Enum, IntEnum, StrEnum
-from typing import Any, ClassVar, Literal
+from typing import Annotated, Any, ClassVar, Literal
 from urllib.parse import urlparse
 from zoneinfo import available_timezones
 
@@ -137,7 +137,8 @@ class ActivityName(StrEnum):
     APPROVAL = "execute_approval_activity"
     HTTP_REQUEST = "execute_http_request_activity"
     INTERNAL_ACTIVITY = "execute_internal_activity"
-    SCRIPT = "execute_script_activity"
+    SCRIPT_PYTHON = "execute_python_script_activity"
+    SCRIPT_BASH = "execute_bash_script_activity"
     # Internal
     CREDENTIAL_RESOLUTION = "resolve_workflow_credentials"
     INTEGRATION_RESOLUTION = "resolve_workflow_integration"
@@ -146,6 +147,7 @@ class ActivityName(StrEnum):
     CANCEL_APPROVAL = "cancel_approval_requests"
     FAIL_DETACHED_APPROVAL = "fail_detached_approval"
     CANCEL_AGENTIC = "cancel_agentic_invocation"
+    CANCEL_EXECUTION_PLANE = "cancel_execution_plane_work"
     ACTIVITY_MONITORING = "register_activity_monitoring"
     COMPLETE_WAIT = "complete_wait"
     FETCH_RUNTIME_SETTINGS = "fetch_workflow_runtime_settings"
@@ -180,7 +182,8 @@ class NodeType(str, Enum):
     APPROVAL = "approval"
     HTTP_REQUEST = "http_request"
     INTERNAL_ACTIVITY = "internal_activity"
-    SCRIPT = "script"
+    SCRIPT_PYTHON = "script_python"
+    SCRIPT_BASH = "script_bash"
 
 
 def resolve_trigger_node(
@@ -263,13 +266,6 @@ class WorkflowTerminalStatus(str, Enum):
     CANCELLED = "cancelled"
 
 
-class ScriptLanguage(str, Enum):
-    """Supported script languages for script executor."""
-
-    BASH = "bash"
-    PYTHON = "python"
-
-
 class HTTPMethod(str, Enum):
     """Supported HTTP methods for API requests."""
 
@@ -325,7 +321,7 @@ class NodeSettingsCofDisabled(NodeSettingsCof):
 
 
 class NodeSettingsNoRetry(NodeSettingsCofDisabled):
-    """Settings with disabled, continue_on_failure, and timeout (script, agentic, approval)."""
+    """Settings with disabled, continue_on_failure, and timeout (script types, agentic, approval)."""
 
     timeout: int | None = Field(default=None, ge=1)
 
@@ -337,10 +333,90 @@ class NodeSettingsFull(NodeSettingsNoRetry):
 
 
 # Executor configuration models
-class ScriptExecutorParameters(TemplateAwareBaseModel):
-    """Parameters for script executor."""
+class ExecutionTargetProfile(BaseModel):
+    """Execution Plane profile that selects a specific Execution Target."""
 
-    language: ScriptLanguage
+    type: Literal["execution_target"]
+    execution_target_id: uuid.UUID = Field(
+        description="UUID of the Execution Plane execution target selected for this workload."
+    )
+
+
+# Extension point for future Execution Plane placement profiles. Add new
+# concrete profile models to this discriminated union instead of adding
+# profile-specific fields directly to executor parameter models.
+ExecutionPlaneExecutionProfile = Annotated[
+    ExecutionTargetProfile,
+    Field(discriminator="type"),
+]
+
+
+class ExecutionPlaneMixin(BaseModel):
+    """Mixin for executor configs that accept an Execution Plane profile."""
+
+    execution_profile: ExecutionPlaneExecutionProfile | None = Field(
+        default=None,
+        description="Execution Plane placement profile for this workload.",
+    )
+
+
+class CredentialBinding(TemplateAwareBaseModel):
+    """Recipe-to-credential mapping for a workflow node."""
+
+    credential_recipe_id: str = Field(
+        min_length=1,
+        max_length=256,
+        description="Qualified credential recipe identifier requested by the workload.",
+    )
+    credential_ref: uuid.UUID = Field(
+        description="Syntara credential selected for the credential recipe.",
+    )
+
+    @field_validator("credential_recipe_id")
+    @classmethod
+    def validate_credential_recipe_id(cls, value: str) -> str:
+        """Require a qualified recipe identifier after template resolution."""
+        if TEMPLATE_PATTERN.search(value):
+            return value
+        if not re.fullmatch(r"[a-z][a-z0-9-]{0,62}(?:\.[a-z][a-z0-9-]{0,62})+", value):
+            msg = "Credential recipe ID must be a qualified lowercase identifier"
+            raise SafeValueError(msg)
+        return value
+
+
+class CredentialBindingsMixin(BaseModel):
+    """Mixin for node configs that support recipe-to-credential bindings."""
+
+    credential_bindings: list[CredentialBinding] = Field(
+        default_factory=list,
+        max_length=16,
+        description="Host-side recipe-to-credential bindings for Execution Plane dispatch.",
+    )
+
+    @field_validator("credential_bindings")
+    @classmethod
+    def validate_credential_bindings(cls, value: list[CredentialBinding]) -> list[CredentialBinding]:
+        """Reject duplicate concrete recipe identifiers before workflow storage."""
+        concrete_recipe_ids = [
+            binding.credential_recipe_id
+            for binding in value
+            if not TEMPLATE_PATTERN.search(binding.credential_recipe_id)
+        ]
+        if len(concrete_recipe_ids) != len(set(concrete_recipe_ids)):
+            msg = "Credential bindings must have unique credential recipe IDs"
+            raise SafeValueError(msg)
+        return value
+
+
+class ScriptExecutorParametersBase(
+    ExecutionPlaneMixin,
+    CredentialBindingsMixin,
+    TemplateAwareBaseModel,
+):
+    """Shared parameters for isolated Python and Bash script executors."""
+
+    model_config = ConfigDict(validate_assignment=True, extra="forbid")
+
     code: str = Field(min_length=1, description="Script code to execute")
     environment: dict[str, str] = Field(default_factory=dict, description="Environment variables")
 
@@ -359,7 +435,15 @@ class ScriptExecutorParameters(TemplateAwareBaseModel):
         return v
 
 
-class APIExecutorParameters(TemplateAwareBaseModel):
+class PythonScriptExecutorParameters(ScriptExecutorParametersBase):
+    """Parameters for Python script executor."""
+
+
+class BashScriptExecutorParameters(ScriptExecutorParametersBase):
+    """Parameters for Bash script executor."""
+
+
+class APIExecutorParameters(CredentialBindingsMixin, TemplateAwareBaseModel):
     """Parameters for API executor (http_request activity)."""
 
     method: HTTPMethod = Field(description="HTTP method")
@@ -407,7 +491,7 @@ class IntegrationConnectionConfig(BaseModel):
         return validate_uuid_or_template(v, info.field_name or "unknown")
 
 
-class AgenticExecutorParameters(TemplateAwareBaseModel, populate_by_name=True):
+class AgenticExecutorParameters(CredentialBindingsMixin, TemplateAwareBaseModel, populate_by_name=True):
     """Parameters for agentic executor."""
 
     prompt: str = Field(description="Prompt template for the agent")
@@ -532,7 +616,7 @@ class AAPVerbosity(IntEnum):
     WINRM_DEBUG = 5
 
 
-class AAPResourceReferenceMixin(BaseModel):
+class AAPResourceReferenceMixin(CredentialBindingsMixin, BaseModel):
     """Mixin for AAP executor configs with common fields and resource reference validation.
 
     Provides shared fields used by both AAP job template and workflow job template configs,
@@ -842,7 +926,7 @@ class WaitNodeParameters(BaseModel):
     duration: int = Field(ge=1, description="Wait duration in seconds")
 
 
-class ApprovalNodeParameters(BaseModel):
+class ApprovalNodeParameters(CredentialBindingsMixin, BaseModel):
     """Parameters for approval gate nodes."""
 
     credential_id: str | None = Field(default=None, description="Syntara credential UUID")
@@ -1029,7 +1113,8 @@ class WaitOutput(NodeOutput):
 
 
 NODE_OUTPUT_MODELS: dict[str, type[NodeOutput]] = {
-    NodeType.SCRIPT: ScriptOutput,
+    NodeType.SCRIPT_PYTHON: ScriptOutput,
+    NodeType.SCRIPT_BASH: ScriptOutput,
     NodeType.HTTP_REQUEST: HttpRequestOutput,
     NodeType.AAP_JOB_TEMPLATE: AAPJobTemplateOutput,
     NodeType.AAP_WORKFLOW_JOB_TEMPLATE: AAPWorkflowJobTemplateOutput,

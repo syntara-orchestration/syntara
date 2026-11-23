@@ -20,9 +20,9 @@ function createImportFile(name: string): string {
     nodes: [
       {
         id: 'node_1',
-        type: 'script',
+        type: 'script_python',
         name: 'Imported step',
-        parameters: { language: 'python', code: 'print("imported")' },
+        parameters: { code: 'print("imported")' },
       },
     ],
     edges: [{ from: 'trigger_1', to: 'node_1' }],

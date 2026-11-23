@@ -137,7 +137,7 @@ test.describe('Workflow Import/Export', () => {
     const workflowName = buildUniqueName('import-list')
     const workflowDef = {
       triggers: [{ id: 'trigger_manual', type: 'manual_trigger', name: 'Manual trigger', parameters: {} }],
-      nodes: [{ id: 'n1', type: 'script', name: 'Script', parameters: { language: 'python', code: 'print("test")' } }],
+      nodes: [{ id: 'n1', type: 'script_python', name: 'Script', parameters: { code: 'print("test")' } }],
       edges: [{ from: 'trigger_manual', to: 'n1' }],
     } as unknown as V2WorkflowDefinition
 
@@ -175,9 +175,9 @@ test.describe('Workflow Import/Export', () => {
       nodes: [
         {
           id: 'n1',
-          type: 'script',
+          type: 'script_python',
           name: 'Imported Script',
-          parameters: { language: 'python', code: 'print("imported")' },
+          parameters: { code: 'print("imported")' },
         },
       ],
       edges: [{ from: 'triggers/0', to: 'n1' }],
@@ -228,9 +228,9 @@ test.describe('Workflow Import/Export', () => {
       nodes: [
         {
           id: 'n1',
-          type: 'script',
+          type: 'script_python',
           name: 'Positioned Script',
-          parameters: { language: 'python', code: 'print("positioned")' },
+          parameters: { code: 'print("positioned")' },
           position: { x: 400, y: 300 },
         },
       ],
@@ -443,7 +443,7 @@ test.describe('Workflow Import/Export', () => {
       const definition = {
         schema_version: '1.0.0',
         triggers: [{ type: 'manual_trigger' }],
-        nodes: [{ id: 'n1', type: 'script' }],
+        nodes: [{ id: 'n1', type: 'script_python' }],
         edges: [],
       }
       const fileInput = app.locator('input[type="file"]')

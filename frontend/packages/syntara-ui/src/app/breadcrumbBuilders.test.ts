@@ -24,6 +24,10 @@ import {
   breadcrumbsUserDetailEarlyShell,
   breadcrumbsUserFormLoading,
   breadcrumbsIntegrationDetail,
+  breadcrumbsConfigureExecutionTarget,
+  breadcrumbsEditExecutionTarget,
+  breadcrumbsExecutionTargetDetail,
+  breadcrumbsExecutionTargetDetailEarlyShell,
   breadcrumbsServiceAccountDetail,
 } from './breadcrumbBuilders'
 
@@ -89,6 +93,26 @@ describe('breadcrumbBuilders', () => {
       { label: 'Access management', href: AppRoute.AccessManagement.Root },
       { label: 'Service Accounts', href: AppRoute.AccessManagement.ServiceAccounts },
       { label: 'ci-bot' },
+    ])
+  })
+
+  it('uses page hierarchy only for execution target detail', () => {
+    expect(breadcrumbsExecutionTargetDetail('Prod OpenShift West')).toEqual([
+      { label: 'Execution Plane', href: AppRoute.ExecutionPlane.Root },
+      { label: 'Prod OpenShift West' },
+    ])
+    expect(breadcrumbsExecutionTargetDetailEarlyShell()).toEqual([
+      { label: 'Execution Plane', href: AppRoute.ExecutionPlane.Root },
+      { label: 'Execution target details' },
+    ])
+    expect(breadcrumbsConfigureExecutionTarget()).toEqual([
+      { label: 'Execution Plane', href: AppRoute.ExecutionPlane.Root },
+      { label: 'Configure execution target' },
+    ])
+    expect(breadcrumbsEditExecutionTarget('Prod OpenShift West', '/execution-plane/et-1')).toEqual([
+      { label: 'Execution Plane', href: AppRoute.ExecutionPlane.Root },
+      { label: 'Prod OpenShift West', href: '/execution-plane/et-1' },
+      { label: 'Edit execution target' },
     ])
   })
 

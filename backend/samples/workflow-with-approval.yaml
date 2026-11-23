@@ -30,10 +30,9 @@ triggers:
           - change_description
 nodes:
   - id: prepare_deployment
-    type: script
+    type: script_python
     name: Prepare Deployment
     parameters:
-      language: python
       code: |
         import json
         import os
@@ -62,10 +61,9 @@ nodes:
       timeout: 3600
 
   - id: execute_deployment
-    type: script
+    type: script_python
     name: Execute Deployment
     parameters:
-      language: python
       code: |
         import json
         print(json.dumps({
@@ -74,18 +72,16 @@ nodes:
         }))
 
   - id: notify_success
-    type: script
+    type: script_bash
     name: Notify Success
     parameters:
-      language: bash
       code: |
         echo "Deployment approved and completed successfully!"
 
   - id: log_rejection
-    type: script
+    type: script_bash
     name: Log Rejection
     parameters:
-      language: bash
       code: |
         echo "Deployment rejected by approver"
         echo "No changes were deployed"

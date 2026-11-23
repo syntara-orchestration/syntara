@@ -3,7 +3,6 @@ import {
   ContentVariants,
   Flex,
   FlexItem,
-  Label,
   Split,
   SplitItem,
   Stack,
@@ -69,20 +68,13 @@ export function StepTypeOptionsList(props: StepTypeOptionsListProps) {
                   <Flex
                     alignItems={{ default: 'alignItemsCenter' }}
                     gap={{ default: 'gapSm' }}
-                    flexWrap={{ default: 'nowrap' }}
+                    flexWrap={{ default: 'wrap' }}
                   >
                     <FlexItem flex={{ default: 'flexNone' }}>
                       <Title headingLevel="h3" size="md">
                         {stepType.label}
                       </Title>
                     </FlexItem>
-                    {stepType.id === RegistryStepId.ACTION_SCRIPT && (
-                      <FlexItem>
-                        <Label isCompact color="orange" style={{ fontSize: 'var(--pf-t--global--font--size--sm)' }}>
-                          Developer Preview
-                        </Label>
-                      </FlexItem>
-                    )}
                   </Flex>
                 </SplitItem>
               </Split>

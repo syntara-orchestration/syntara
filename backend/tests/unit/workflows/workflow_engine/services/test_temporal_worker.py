@@ -69,7 +69,8 @@ class TestTemporalWorkerServiceStart:
     """Test starting the Temporal worker service."""
 
     @pytest.mark.asyncio
-    async def test_start_success(self) -> None:
+    @pytest.mark.parametrize("ep_api_url", [None, "http://execution-plane:8000"])
+    async def test_start_success(self, ep_api_url: str | None) -> None:
         """Test successfully starting the worker service."""
         service = TemporalWorkerService(
             temporal_address="test-address", namespace="test-namespace", task_queue="test-queue"
@@ -78,6 +79,10 @@ class TestTemporalWorkerServiceStart:
         # Mock Temporal client and worker
         mock_client = MagicMock()
         mock_worker = MagicMock()
+        mock_reconciler = MagicMock()
+        mock_reconciler.stop = AsyncMock()
+        mock_cancellation_reconciler = MagicMock()
+        mock_cancellation_reconciler.stop = AsyncMock()
 
         # Create a simple coroutine for worker.run to avoid AsyncMock warnings
         async def mock_run() -> None:
@@ -89,11 +94,11 @@ class TestTemporalWorkerServiceStart:
         create_task_called = False
         original_create_task = asyncio.create_task
 
-        def mock_create_task(coro: Coroutine[Any, Any, None]) -> asyncio.Task[None]:
+        def mock_create_task(coro: Coroutine[Any, Any, None], *, name: str | None = None) -> asyncio.Task[None]:
             nonlocal create_task_called
             create_task_called = True
             # Use the original create_task to avoid recursion
-            return original_create_task(coro)
+            return original_create_task(coro, name=name)
 
         with (
             patch(
@@ -103,6 +108,18 @@ class TestTemporalWorkerServiceStart:
             patch(
                 "syntara.workflow_runtime.engines.temporal.services.temporal_worker.Worker", return_value=mock_worker
             ),
+            patch(
+                "syntara.workflow_runtime.engines.temporal.services.temporal_worker.get_settings",
+                return_value=MagicMock(ep_api_url=ep_api_url),
+            ),
+            patch(
+                "syntara.workflow_runtime.engines.temporal.services.temporal_worker.get_cluster_reconciliation_worker",
+                return_value=mock_reconciler,
+            ) as get_reconciler,
+            patch(
+                "syntara.workflow_runtime.engines.temporal.services.temporal_worker.get_cancellation_reconciliation_worker",
+                return_value=mock_cancellation_reconciler,
+            ) as get_cancellation_reconciler,
             patch("asyncio.create_task", side_effect=mock_create_task),
         ):
             await service.start()
@@ -115,6 +132,27 @@ class TestTemporalWorkerServiceStart:
 
             # Verify worker task was created
             assert create_task_called
+
+            if ep_api_url:
+                get_cancellation_reconciler.assert_called_once_with()
+                mock_cancellation_reconciler.start.assert_called_once_with()
+                get_reconciler.assert_called_once_with()
+                mock_reconciler.start.assert_called_once_with()
+            else:
+                get_cancellation_reconciler.assert_not_called()
+                get_reconciler.assert_not_called()
+                mock_reconciler.start.assert_not_called()
+
+            await service.stop()
+
+            if ep_api_url:
+                mock_cancellation_reconciler.stop.assert_awaited_once_with()
+                mock_reconciler.stop.assert_awaited_once_with()
+            else:
+                mock_cancellation_reconciler.stop.assert_not_awaited()
+                mock_reconciler.stop.assert_not_awaited()
+            assert service._cluster_reconciliation_worker is None
+            assert service._cancellation_reconciliation_worker is None
 
     @pytest.mark.asyncio
     async def test_start_with_custom_config(self) -> None:

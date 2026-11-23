@@ -83,14 +83,14 @@ class TestApprovalLifecycleFlow:
         next_step_approved = ActivitySummary(
             id=approved_step_id,
             name="Deploy to Production",
-            type="script",
+            type="script_python",
         )
 
         next_step_rejected = (
             ActivitySummary(
                 id=rejected_step_id,
                 name="Rollback Changes",
-                type="script",
+                type="script_python",
             )
             if rejected_step_id
             else None
@@ -292,7 +292,7 @@ class TestApprovalLifecycleFlow:
             previous_step=PreviousStepContext(
                 id="analysis_task",
                 name="Analyze Data",
-                type="script",
+                type="script_python",
                 output={"findings": 42, "anomalies": 3, "confidence": 0.95},
             ),
         )
@@ -306,7 +306,7 @@ class TestApprovalLifecycleFlow:
             next_step_approved=ActivitySummary(
                 id="publish_results",
                 name="Publish Results",
-                type="script",
+                type="script_python",
             ),
             next_step_rejected=None,
             workflow_context=workflow_context,

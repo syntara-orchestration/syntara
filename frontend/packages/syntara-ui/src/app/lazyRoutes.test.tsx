@@ -29,6 +29,16 @@ vi.mock('../routes/feature-flags/feature-flag-demo-page', () => ({
   FeatureFlagDemo: () => <div>FeatureFlagDemo</div>,
 }))
 vi.mock('../routes/approvals/Approvals', () => ({ default: () => <div>Approvals</div> }))
+vi.mock('../routes/execution-plane/ExecutionPlane', () => ({ default: () => <div>ExecutionPlane</div> }))
+vi.mock('../routes/execution-plane/CreateExecutionTarget', () => ({
+  CreateExecutionTarget: () => <div>CreateExecutionTarget</div>,
+}))
+vi.mock('../routes/execution-plane/EditExecutionTarget', () => ({
+  EditExecutionTarget: () => <div>EditExecutionTarget</div>,
+}))
+vi.mock('../routes/execution-plane/ExecutionTargetDetail', () => ({
+  default: () => <div>ExecutionTargetDetail</div>,
+}))
 vi.mock('../routes/access-management/AccessManagement', () => ({
   AccessManagement: () => <div>AccessManagement</div>,
 }))
@@ -116,6 +126,10 @@ const lazyRouteNames = [
   'SettingsCategoryRoute',
   'FeatureFlagDemo',
   'Approvals',
+  'ExecutionPlane',
+  'CreateExecutionTarget',
+  'EditExecutionTarget',
+  'ExecutionTargetDetail',
   'AccessManagement',
   'AccessManagementCheckAccessRoute',
   'AccessManagementTokenRevocationRoute',

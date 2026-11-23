@@ -79,9 +79,8 @@ def test_wait_node_downstream_executes_after_wait(syntara_api: SyntaraApiRegistr
                 {
                     "id": "after_wait",
                     "name": "After Wait",
-                    "type": "script",
+                    "type": "script_bash",
                     "parameters": {
-                        "language": "bash",
                         "code": 'echo "Executed after wait"',
                     },
                 },

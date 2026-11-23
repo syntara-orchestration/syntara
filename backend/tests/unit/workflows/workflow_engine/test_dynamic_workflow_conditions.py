@@ -47,6 +47,7 @@ def _make_workflow(
     wf._timeout_tasks = {}
     wf._timed_out_converge_nodes = set()
     wf._detached_nodes = set()
+    wf._active_ep_nodes = set()
     wf._converge_branch_nodes = {}
     init_workflow_runtime(wf)
     wf.pre_resolved_outputs = {}
@@ -59,8 +60,8 @@ def _build_condition_graph() -> WorkflowGraph:
     backend = InMemoryGraphBackend()
     backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
     backend.add_node("cond", {"id": "cond", "type": "condition", "parameters": {"expr": "true"}})
-    backend.add_node("true_branch", {"id": "true_branch", "type": "script", "parameters": {}})
-    backend.add_node("false_branch", {"id": "false_branch", "type": "script", "parameters": {}})
+    backend.add_node("true_branch", {"id": "true_branch", "type": "script_python", "parameters": {}})
+    backend.add_node("false_branch", {"id": "false_branch", "type": "script_python", "parameters": {}})
     backend.add_edge("trigger", "cond", None)
     backend.add_edge("cond", "true_branch", {"from_port": "true"})
     backend.add_edge("cond", "false_branch", {"from_port": "false"})
@@ -72,10 +73,10 @@ def _build_condition_with_downstream_graph() -> WorkflowGraph:
     backend = InMemoryGraphBackend()
     backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
     backend.add_node("cond", {"id": "cond", "type": "condition", "parameters": {"expr": "true"}})
-    backend.add_node("true_node", {"id": "true_node", "type": "script", "parameters": {}})
-    backend.add_node("false_node", {"id": "false_node", "type": "script", "parameters": {}})
-    backend.add_node("true_downstream", {"id": "true_downstream", "type": "script", "parameters": {}})
-    backend.add_node("false_downstream", {"id": "false_downstream", "type": "script", "parameters": {}})
+    backend.add_node("true_node", {"id": "true_node", "type": "script_python", "parameters": {}})
+    backend.add_node("false_node", {"id": "false_node", "type": "script_python", "parameters": {}})
+    backend.add_node("true_downstream", {"id": "true_downstream", "type": "script_python", "parameters": {}})
+    backend.add_node("false_downstream", {"id": "false_downstream", "type": "script_python", "parameters": {}})
     backend.add_edge("trigger", "cond", None)
     backend.add_edge("cond", "true_node", {"from_port": "true"})
     backend.add_edge("cond", "false_node", {"from_port": "false"})
@@ -84,12 +85,31 @@ def _build_condition_with_downstream_graph() -> WorkflowGraph:
     return WorkflowGraph(backend)
 
 
+def _build_shared_successor_graph(node_type: str, port_a: str, port_b: str) -> WorkflowGraph:
+    """Build: trigger -> branch_node -> (port_a AND port_b both -> shared) -> shared_downstream.
+
+    Both outgoing ports of the branch node are wired to the *same* successor,
+    mirroring a workflow where a user connects both the approved and rejected
+    branches of an approval node to one target.
+    """
+    backend = InMemoryGraphBackend()
+    backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
+    backend.add_node("branch_node", {"id": "branch_node", "type": node_type, "parameters": {}})
+    backend.add_node("shared", {"id": "shared", "type": "script", "parameters": {}})
+    backend.add_node("shared_downstream", {"id": "shared_downstream", "type": "script", "parameters": {}})
+    backend.add_edge("trigger", "branch_node", None)
+    backend.add_edge("branch_node", "shared", {"from_port": port_a})
+    backend.add_edge("branch_node", "shared", {"from_port": port_b})
+    backend.add_edge("shared", "shared_downstream", None)
+    return WorkflowGraph(backend)
+
+
 def _build_linear_graph() -> WorkflowGraph:
     """Build: trigger -> node_a -> node_b (linear chain)."""
     backend = InMemoryGraphBackend()
     backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
-    backend.add_node("node_a", {"id": "node_a", "type": "script", "parameters": {}})
-    backend.add_node("node_b", {"id": "node_b", "type": "script", "parameters": {}})
+    backend.add_node("node_a", {"id": "node_a", "type": "script_python", "parameters": {}})
+    backend.add_node("node_b", {"id": "node_b", "type": "script_python", "parameters": {}})
     backend.add_edge("trigger", "node_a", None)
     backend.add_edge("node_a", "node_b", None)
     return WorkflowGraph(backend)
@@ -206,6 +226,48 @@ class TestSkipPropagation:
         wf._mark_downstream_as_skipped("node_a", graph)
 
         assert "node_b" in wf.skipped_nodes
+
+
+# ---------------------------------------------------------------------------
+# Tests: Shared successor across both branches
+# ---------------------------------------------------------------------------
+
+
+class TestSharedSuccessorAcrossBranches:
+    """A successor wired to both branch ports must run exactly once either way.
+
+    The workflow designer allows connecting both outputs of a condition,
+    approval, or switch node to the same target node. Whichever branch is
+    taken, that shared successor (and anything downstream of it) must still
+    be scheduled rather than skipped.
+    """
+
+    @pytest.mark.parametrize(
+        ("node_type", "port_a", "port_b", "taken_port"),
+        [
+            ("condition", "true", "false", "true"),
+            ("condition", "true", "false", "false"),
+            ("approval", "approved", "rejected", "approved"),
+            ("approval", "approved", "rejected", "rejected"),
+            ("switch", "case_a", "case_b", "case_a"),
+            ("switch", "case_a", "case_b", "case_b"),
+        ],
+    )
+    def test_shared_successor_not_skipped_for_either_decision(
+        self, node_type: str, port_a: str, port_b: str, taken_port: str
+    ) -> None:
+        """The shared successor and its downstream node must be scheduled, not skipped."""
+        wf = _make_workflow()
+        graph = _build_shared_successor_graph(node_type, port_a, port_b)
+        wf.resolver.set_namespace("trigger", {})
+        wf.node_control_data["branch_node"] = {"next_port": taken_port}
+        pending: dict[str, asyncio.Task[Any]] = {}
+
+        _run_schedule_successors(wf, "branch_node", graph, pending)
+
+        assert "shared" in pending
+        assert "shared" not in wf.skipped_nodes
+        assert "shared_downstream" not in wf.skipped_nodes
 
 
 # ---------------------------------------------------------------------------

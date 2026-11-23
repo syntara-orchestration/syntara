@@ -43,6 +43,8 @@ from syntara.workflows.models.webhook_trigger import WebhookTrigger
 from syntara.workflows.models.webhook_trigger_service_account import WebhookTriggerServiceAccount
 from syntara.workflows.services.workflow_service import WorkflowConvertResourceMixin, WorkflowService
 
+pytestmark = pytest.mark.usefixtures("ep_deletion_acknowledged")
+
 
 def _valid_result() -> ValidationResult:
     """Return a ValidationResult that passes all gates."""
@@ -169,9 +171,8 @@ class TestWorkflowServiceBase:
                 {
                     "id": "task1",
                     "name": "Task 1",
-                    "type": "script",
+                    "type": "script_python",
                     "parameters": {
-                        "language": "python",
                         "code": "print('hello')",
                     },
                 }

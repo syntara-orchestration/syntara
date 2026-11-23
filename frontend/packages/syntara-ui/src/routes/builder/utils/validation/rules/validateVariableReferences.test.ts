@@ -30,7 +30,7 @@ describe('validateVariableReferences', () => {
         const activities: Activity[] = [
           makeActivity({
             id: 'task-1',
-            type: 'script',
+            type: 'script_python',
             parameters: { code: `echo \${${namespace}.username}` },
           }),
         ]
@@ -46,7 +46,9 @@ describe('validateVariableReferences', () => {
     )
 
     it('errors on a bare ${input} reference when no node is named input', () => {
-      const activities: Activity[] = [makeActivity({ id: 'task-1', type: 'script', parameters: { code: '${input}' } })]
+      const activities: Activity[] = [
+        makeActivity({ id: 'task-1', type: 'script_python', parameters: { code: '${input}' } }),
+      ]
       const context: ValidationContext = { triggers: [makeTriggerWithInputs(['foo'])] }
 
       const errors = validateVariableReferences(activities, [], context)
@@ -56,8 +58,8 @@ describe('validateVariableReferences', () => {
 
     it.each(['input', 'inputs', 'variables'])('accepts ${%s.stdout} when a node is actually named %s', (namespace) => {
       const activities: Activity[] = [
-        makeActivity({ id: namespace, type: 'script', parameters: { code: 'echo hello' } }),
-        makeActivity({ id: 'task-1', type: 'script', parameters: { code: `\${${namespace}.stdout}` } }),
+        makeActivity({ id: namespace, type: 'script_python', parameters: { code: 'echo hello' } }),
+        makeActivity({ id: 'task-1', type: 'script_python', parameters: { code: `\${${namespace}.stdout}` } }),
       ]
       const edges: EdgeConnection[] = [{ id: 'e1', source: namespace, target: 'task-1' }]
 
@@ -70,7 +72,7 @@ describe('validateVariableReferences', () => {
       const activities: Activity[] = [
         makeActivity({
           id: 'task-1',
-          type: 'script',
+          type: 'script_python',
           parameters: { code: 'echo ${workflow.username}' },
         }),
       ]
@@ -85,8 +87,8 @@ describe('validateVariableReferences', () => {
 
     it('accepts ${workflow.output} when a node is actually named workflow (parity with backend node refs)', () => {
       const activities: Activity[] = [
-        makeActivity({ id: 'workflow', type: 'script', parameters: { code: 'echo hello' } }),
-        makeActivity({ id: 'task-1', type: 'script', parameters: { code: '${workflow.output}' } }),
+        makeActivity({ id: 'workflow', type: 'script_python', parameters: { code: 'echo hello' } }),
+        makeActivity({ id: 'task-1', type: 'script_python', parameters: { code: '${workflow.output}' } }),
       ]
       const edges: EdgeConnection[] = [{ id: 'e1', source: 'workflow', target: 'task-1' }]
 
@@ -96,7 +98,7 @@ describe('validateVariableReferences', () => {
     it('accepts ${workflow.username} when a trigger is actually named workflow', () => {
       const trigger = makeActivity({ id: 'workflow', type: 'manual_trigger', parameters: {} })
       const activities: Activity[] = [
-        makeActivity({ id: 'task-1', type: 'script', parameters: { code: '${workflow.username}' } }),
+        makeActivity({ id: 'task-1', type: 'script_python', parameters: { code: '${workflow.username}' } }),
       ]
       const edges: EdgeConnection[] = [{ id: 'e1', source: 'workflow', target: 'task-1' }]
       const context: ValidationContext = { triggers: [trigger] }
@@ -108,8 +110,8 @@ describe('validateVariableReferences', () => {
   describe('node references (AC2)', () => {
     it('returns no warnings when referencing an existing upstream node', () => {
       const activities: Activity[] = [
-        makeActivity({ id: 'gather', type: 'script', parameters: { code: 'echo hello' } }),
-        makeActivity({ id: 'process', type: 'script', parameters: { code: '${gather.stdout}' } }),
+        makeActivity({ id: 'gather', type: 'script_python', parameters: { code: 'echo hello' } }),
+        makeActivity({ id: 'process', type: 'script_python', parameters: { code: '${gather.stdout}' } }),
       ]
       const edges: EdgeConnection[] = [{ id: 'e1', source: 'gather', target: 'process' }]
 
@@ -119,7 +121,7 @@ describe('validateVariableReferences', () => {
 
     it('returns warning when referencing a non-existent node', () => {
       const activities: Activity[] = [
-        makeActivity({ id: 'task-1', type: 'script', parameters: { code: '${missing_node.stdout}' } }),
+        makeActivity({ id: 'task-1', type: 'script_python', parameters: { code: '${missing_node.stdout}' } }),
       ]
 
       const warnings = validateVariableReferences(activities, [])
@@ -133,8 +135,8 @@ describe('validateVariableReferences', () => {
 
     it('returns warning when referencing a node that is not upstream', () => {
       const activities: Activity[] = [
-        makeActivity({ id: 'task-a', type: 'script', parameters: { code: 'echo a' } }),
-        makeActivity({ id: 'task-b', type: 'script', parameters: { code: '${task-a.stdout}' } }),
+        makeActivity({ id: 'task-a', type: 'script_python', parameters: { code: 'echo a' } }),
+        makeActivity({ id: 'task-b', type: 'script_python', parameters: { code: '${task-a.stdout}' } }),
       ]
       const edges: EdgeConnection[] = []
 
@@ -145,9 +147,9 @@ describe('validateVariableReferences', () => {
 
     it('validates transitive upstream references', () => {
       const activities: Activity[] = [
-        makeActivity({ id: 'step-1', type: 'script', parameters: { code: 'echo 1' } }),
-        makeActivity({ id: 'step-2', type: 'script', parameters: { code: 'echo 2' } }),
-        makeActivity({ id: 'step-3', type: 'script', parameters: { code: '${step-1.output}' } }),
+        makeActivity({ id: 'step-1', type: 'script_python', parameters: { code: 'echo 1' } }),
+        makeActivity({ id: 'step-2', type: 'script_python', parameters: { code: 'echo 2' } }),
+        makeActivity({ id: 'step-3', type: 'script_python', parameters: { code: '${step-1.output}' } }),
       ]
       const edges: EdgeConnection[] = [
         { id: 'e1', source: 'step-1', target: 'step-2' },
@@ -162,7 +164,7 @@ describe('validateVariableReferences', () => {
   describe('warning format (AC3)', () => {
     it('includes affected node ID in warning', () => {
       const activities: Activity[] = [
-        makeActivity({ id: 'my-node', type: 'script', parameters: { code: '${nonexistent.out}' } }),
+        makeActivity({ id: 'my-node', type: 'script_python', parameters: { code: '${nonexistent.out}' } }),
       ]
 
       const warnings = validateVariableReferences(activities, [])
@@ -171,7 +173,7 @@ describe('validateVariableReferences', () => {
 
     it('includes the invalid reference in the message', () => {
       const activities: Activity[] = [
-        makeActivity({ id: 'task-1', type: 'script', parameters: { code: '${bad_ref.field}' } }),
+        makeActivity({ id: 'task-1', type: 'script_python', parameters: { code: '${bad_ref.field}' } }),
       ]
 
       const warnings = validateVariableReferences(activities, [])
@@ -180,7 +182,7 @@ describe('validateVariableReferences', () => {
 
     it('includes a suggestion in the warning', () => {
       const activities: Activity[] = [
-        makeActivity({ id: 'task-1', type: 'script', parameters: { code: '${nowhere.out}' } }),
+        makeActivity({ id: 'task-1', type: 'script_python', parameters: { code: '${nowhere.out}' } }),
       ]
 
       const warnings = validateVariableReferences(activities, [])
@@ -192,7 +194,7 @@ describe('validateVariableReferences', () => {
         makeActivity({
           id: 'task-1',
           name: 'Gather Data',
-          type: 'script',
+          type: 'script_python',
           parameters: { code: '${missing.out}' },
         }),
       ]
@@ -207,7 +209,7 @@ describe('validateVariableReferences', () => {
       const activities: Activity[] = [
         makeActivity({
           id: 'task-1',
-          type: 'script',
+          type: 'script_python',
           parameters: { code: '${missing.out} ${input.bad}' },
         }),
       ]
@@ -226,7 +228,7 @@ describe('validateVariableReferences', () => {
       const activities: Activity[] = [
         makeActivity({
           id: 'task-1',
-          type: 'script',
+          type: 'script_python',
           parameters: { code: '${workflow_context.some_field}' },
         }),
       ]
@@ -253,7 +255,7 @@ describe('validateVariableReferences', () => {
 
     it('rejects loop.item outside a loop body', () => {
       const activities: Activity[] = [
-        makeActivity({ id: 'task-1', type: 'script', parameters: { code: '${loop.item}' } }),
+        makeActivity({ id: 'task-1', type: 'script_python', parameters: { code: '${loop.item}' } }),
       ]
 
       const errors = validateVariableReferences(activities, [])
@@ -266,7 +268,7 @@ describe('validateVariableReferences', () => {
   describe('trigger references', () => {
     it('accepts valid trigger field', () => {
       const activities: Activity[] = [
-        makeActivity({ id: 'task-1', type: 'script', parameters: { code: '${trigger.userId}' } }),
+        makeActivity({ id: 'task-1', type: 'script_python', parameters: { code: '${trigger.userId}' } }),
       ]
       const context: ValidationContext = { triggers: [makeTriggerWithInputs(['userId'])] }
       expect(validateVariableReferences(activities, [], context)).toEqual([])
@@ -274,7 +276,7 @@ describe('validateVariableReferences', () => {
 
     it('errors on invalid trigger field', () => {
       const activities: Activity[] = [
-        makeActivity({ id: 'task-1', type: 'script', parameters: { code: '${trigger.missing}' } }),
+        makeActivity({ id: 'task-1', type: 'script_python', parameters: { code: '${trigger.missing}' } }),
       ]
       const context: ValidationContext = { triggers: [makeTriggerWithInputs(['userId'])] }
       const errors = validateVariableReferences(activities, [], context)
@@ -286,7 +288,7 @@ describe('validateVariableReferences', () => {
 
     it('errors on trigger reference when no triggers provided', () => {
       const activities: Activity[] = [
-        makeActivity({ id: 'task-1', type: 'script', parameters: { code: '${trigger.anything}' } }),
+        makeActivity({ id: 'task-1', type: 'script_python', parameters: { code: '${trigger.anything}' } }),
       ]
       const errors = validateVariableReferences(activities, [])
       expect(errors).toHaveLength(1)
@@ -298,7 +300,7 @@ describe('validateVariableReferences', () => {
       const activities: Activity[] = [
         makeActivity({
           id: 'task-1',
-          type: 'script',
+          type: 'script_python',
           parameters: { code: '${trigger.fromWebhook}' },
         }),
       ]
@@ -325,7 +327,7 @@ describe('validateVariableReferences', () => {
 
     it('handles activities with non-string parameters', () => {
       const activities: Activity[] = [
-        makeActivity({ id: 'task-1', type: 'script', parameters: { timeout: 30, retry: true } }),
+        makeActivity({ id: 'task-1', type: 'script_python', parameters: { timeout: 30, retry: true } }),
       ]
 
       const warnings = validateVariableReferences(activities, [])
@@ -353,7 +355,7 @@ describe('validateVariableReferences', () => {
       const activities: Activity[] = [
         makeActivity({
           id: 'task-1',
-          type: 'script',
+          type: 'script_python',
           parameters: { args: ['${missing_a.out}', '${missing_b.out}'] },
         }),
       ]
@@ -366,10 +368,10 @@ describe('validateVariableReferences', () => {
       const activities: Activity[] = [
         makeActivity({
           id: 'task-1',
-          type: 'script',
+          type: 'script_python',
           parameters: { code: '${gather.host} on port ${gather.port}' },
         }),
-        makeActivity({ id: 'gather', type: 'script', parameters: { code: 'echo hi' } }),
+        makeActivity({ id: 'gather', type: 'script_python', parameters: { code: 'echo hi' } }),
       ]
       const edges: EdgeConnection[] = [{ id: 'e1', source: 'gather', target: 'task-1' }]
 
@@ -381,7 +383,7 @@ describe('validateVariableReferences', () => {
       const activities: Activity[] = [
         makeActivity({
           id: 'task-1',
-          type: 'script',
+          type: 'script_python',
           parameters: { code: '${missing.a} and ${missing.b}' },
         }),
       ]
@@ -395,8 +397,8 @@ describe('validateVariableReferences', () => {
       const activities: Activity[] = [
         makeActivity({
           id: 'task-1',
-          type: 'script',
-          parameters: { code: 'echo "hello world"', language: 'bash' },
+          type: 'script_python',
+          parameters: { code: 'echo "hello world"' },
         }),
       ]
 

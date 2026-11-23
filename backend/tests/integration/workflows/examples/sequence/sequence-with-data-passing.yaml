@@ -10,18 +10,16 @@ triggers:
 nodes:
   - id: fetch_data
     name: Fetch Data
-    type: script
+    type: script_python
     parameters:
-      language: python
       code: |
         import json
         print(json.dumps({"user_id": "123", "name": "Alice", "score": 95}))
 
   - id: process_data
     name: Process Data
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       environment:
         INPUT_USER_ID: ${fetch_data.stdout_json.user_id}
         INPUT_NAME: ${fetch_data.stdout_json.name}
@@ -33,9 +31,8 @@ nodes:
 
   - id: save_result
     name: Save Result
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       code: |
         echo "Saving result complete"
 edges:

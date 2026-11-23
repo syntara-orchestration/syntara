@@ -23,14 +23,14 @@ def _create_invalid_workflow_definition() -> dict[str, Any]:
             {
                 "id": "task1",
                 "name": "Task 1",
-                "type": "script",
-                "parameters": {"language": "python", "code": "print('hello')"},
+                "type": "script_python",
+                "parameters": {"code": "print('hello')"},
             },
             {
                 "id": "orphaned_task",
                 "name": "Orphaned Task",
-                "type": "script",
-                "parameters": {"language": "python", "code": "print('orphaned')"},
+                "type": "script_python",
+                "parameters": {"code": "print('orphaned')"},
             },
         ],
         "edges": [{"from": "trigger_manual", "to": "task1"}],
@@ -384,8 +384,8 @@ async def test_publish_with_unsaved_step_includes_all_nodes(jwt_client: AsyncCli
             {
                 "id": nid,
                 "name": nid,
-                "type": "script",
-                "parameters": {"language": "python", "code": f'print("{nid}")'},
+                "type": "script_python",
+                "parameters": {"code": f'print("{nid}")'},
             }
             for nid in node_ids
         ]

@@ -7,21 +7,18 @@ triggers:
     type: manual_trigger
 nodes:
   - id: seq1
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       code: echo "Step 1"
 
   - id: seq2
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       code: echo "Step 2"
 
   - id: seq3
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       code: echo "Step 3"
 
   - id: join_sequential

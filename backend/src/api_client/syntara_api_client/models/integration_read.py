@@ -19,6 +19,7 @@ if TYPE_CHECKING:
     from ..models.integration_read_labels import IntegrationReadLabels
     from ..models.llm_provider_configuration import LLMProviderConfiguration
     from ..models.mcp_server_configuration_input import MCPServerConfigurationInput
+    from ..models.openshift_configuration import OpenShiftConfiguration
     from ..models.user_reference import UserReference
 
 
@@ -32,8 +33,8 @@ class IntegrationRead:
     Attributes:
         name (str): Human-readable name for the resource Example: Authentication Service.
         integration_type (IntegrationType): Type of external integration.
-        configuration (AAPConfiguration | LLMProviderConfiguration | MCPServerConfigurationInput): Integration-specific
-            configuration
+        configuration (AAPConfiguration | LLMProviderConfiguration | MCPServerConfigurationInput |
+            OpenShiftConfiguration): Integration-specific configuration
         id (UUID | Unset): Unique identifier for the resource Example: 550e8400-e29b-41d4-a716-446655440000.
         created_at (datetime.datetime | Unset): Timestamp when resource was created Example: 2025-10-09T12:00:00Z.
         updated_at (datetime.datetime | Unset): Timestamp when resource was last updated Example: 2025-10-09T12:30:00Z.
@@ -62,7 +63,7 @@ class IntegrationRead:
 
     name: str
     integration_type: IntegrationType
-    configuration: AAPConfiguration | LLMProviderConfiguration | MCPServerConfigurationInput
+    configuration: AAPConfiguration | LLMProviderConfiguration | MCPServerConfigurationInput | OpenShiftConfiguration
     id: UUID | Unset = UNSET
     created_at: datetime.datetime | Unset = UNSET
     updated_at: datetime.datetime | Unset = UNSET
@@ -87,6 +88,7 @@ class IntegrationRead:
     enabled_model_count: int | Unset = 0
 
     def to_dict(self) -> dict[str, Any]:
+        from ..models.aap_configuration import AAPConfiguration
         from ..models.llm_provider_configuration import LLMProviderConfiguration
         from ..models.mcp_server_configuration_input import MCPServerConfigurationInput
         from ..models.user_reference import UserReference
@@ -99,6 +101,8 @@ class IntegrationRead:
         if isinstance(self.configuration, MCPServerConfigurationInput):
             configuration = self.configuration.to_dict()
         elif isinstance(self.configuration, LLMProviderConfiguration):
+            configuration = self.configuration.to_dict()
+        elif isinstance(self.configuration, AAPConfiguration):
             configuration = self.configuration.to_dict()
         else:
             configuration = self.configuration.to_dict()
@@ -280,6 +284,7 @@ class IntegrationRead:
         from ..models.integration_read_labels import IntegrationReadLabels
         from ..models.llm_provider_configuration import LLMProviderConfiguration
         from ..models.mcp_server_configuration_input import MCPServerConfigurationInput
+        from ..models.openshift_configuration import OpenShiftConfiguration
         from ..models.user_reference import UserReference
 
         d = dict(src_dict)
@@ -289,7 +294,7 @@ class IntegrationRead:
 
         def _parse_configuration(
             data: object,
-        ) -> AAPConfiguration | LLMProviderConfiguration | MCPServerConfigurationInput:
+        ) -> AAPConfiguration | LLMProviderConfiguration | MCPServerConfigurationInput | OpenShiftConfiguration:
             try:
                 if not isinstance(data, dict):
                     raise TypeError()
@@ -306,11 +311,19 @@ class IntegrationRead:
                 return configuration_type_1
             except (TypeError, ValueError, AttributeError, KeyError):
                 pass
+            try:
+                if not isinstance(data, dict):
+                    raise TypeError()
+                configuration_type_2 = AAPConfiguration.from_dict(data)
+
+                return configuration_type_2
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
             if not isinstance(data, dict):
                 raise TypeError()
-            configuration_type_2 = AAPConfiguration.from_dict(data)
+            configuration_type_3 = OpenShiftConfiguration.from_dict(data)
 
-            return configuration_type_2
+            return configuration_type_3
 
         configuration = _parse_configuration(d.pop("configuration"))
 

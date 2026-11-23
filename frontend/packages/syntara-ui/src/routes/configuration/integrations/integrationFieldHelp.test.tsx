@@ -6,12 +6,15 @@ import { integrationHelp } from './integrationFieldHelp'
 import {
   AAP_URL_HELP,
   API_URL_HELP,
+  EXECUTION_PLANE_API_ENDPOINT_HELP,
+  EXECUTION_PLANE_CONNECTION_NAME_HELP,
   HEALTH_CHECK_CREDENTIAL_HELP,
   INTEGRATION_TYPE_HELP,
   NAME_HELP,
   PROJECTS_HELP,
   PROVIDER_TYPE_HELP,
   SCOPE_HELP,
+  SERVICE_ACCOUNT_TOKEN_HELP,
 } from './integrationFieldHelpText'
 
 describe('integrationHelp', () => {
@@ -22,12 +25,15 @@ describe('integrationHelp', () => {
         {integrationHelp.integrationType}
         {integrationHelp.name}
         {integrationHelp.serverName}
+        {integrationHelp.executionPlaneConnectionName}
         {integrationHelp.providerType}
         {integrationHelp.apiUrl}
         {integrationHelp.aapUrl}
+        {integrationHelp.executionPlaneApiEndpoint}
         {integrationHelp.scope}
         {integrationHelp.projects}
         {integrationHelp.healthCheckCredential}
+        {integrationHelp.serviceAccountToken}
       </>
     )
 
@@ -43,6 +49,10 @@ describe('integrationHelp', () => {
     expect(screen.getAllByText(NAME_HELP).length).toBeGreaterThan(0)
 
     await user.keyboard('{Escape}')
+    await user.click(screen.getByRole('button', { name: 'More info for Connection name' }))
+    expect(screen.getByText(EXECUTION_PLANE_CONNECTION_NAME_HELP)).toBeInTheDocument()
+
+    await user.keyboard('{Escape}')
     await user.click(screen.getByRole('button', { name: 'More info for Provider type' }))
     expect(screen.getByText(PROVIDER_TYPE_HELP)).toBeInTheDocument()
 
@@ -55,6 +65,10 @@ describe('integrationHelp', () => {
     expect(screen.getByText(AAP_URL_HELP)).toBeInTheDocument()
 
     await user.keyboard('{Escape}')
+    await user.click(screen.getByRole('button', { name: 'More info for API endpoint' }))
+    expect(screen.getByText(EXECUTION_PLANE_API_ENDPOINT_HELP)).toBeInTheDocument()
+
+    await user.keyboard('{Escape}')
     await user.click(screen.getByRole('button', { name: 'More info for Scope' }))
     expect(screen.getByText(SCOPE_HELP)).toBeInTheDocument()
 
@@ -65,5 +79,9 @@ describe('integrationHelp', () => {
     await user.keyboard('{Escape}')
     await user.click(screen.getByRole('button', { name: 'More info for Health check credential' }))
     expect(screen.getByText(HEALTH_CHECK_CREDENTIAL_HELP)).toBeInTheDocument()
+
+    await user.keyboard('{Escape}')
+    await user.click(screen.getByRole('button', { name: 'More info for Service account token' }))
+    expect(screen.getByText(SERVICE_ACCOUNT_TOKEN_HELP)).toBeInTheDocument()
   })
 })

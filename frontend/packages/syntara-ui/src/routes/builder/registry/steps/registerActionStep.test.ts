@@ -1,4 +1,4 @@
-import { ExecutorTypeEnum } from '@syntara/contracts'
+import { ExecutorTypeEnum, type Activity } from '@syntara/contracts'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { RegistryStepId } from '../../../../constants/registryStepIds'
@@ -13,10 +13,17 @@ vi.mock('../../../../stores/useWorkflowStore', () => ({
       addActivity: vi.fn(),
     })),
   },
-  createScriptActivity: vi.fn((id: string, name: string) => ({
-    id,
-    name,
-    type: 'script' as const,
+  createPythonScriptActivity: vi.fn((opts: Record<string, unknown>) => ({
+    id: opts.id,
+    name: opts.name,
+    type: 'script_python' as const,
+    parameters: { code: opts.code },
+  })),
+  createBashScriptActivity: vi.fn((opts: Record<string, unknown>) => ({
+    id: opts.id,
+    name: opts.name,
+    type: 'script_bash' as const,
+    parameters: { code: opts.code },
   })),
   createApiActivity: vi.fn((opts: Record<string, unknown>) => ({
     id: opts.id,
@@ -56,16 +63,21 @@ describe('registerActionStep', () => {
     expect(registration?.keywords).toEqual(expect.arrayContaining(['script', 'api', 'http', 'python', 'rest']))
   })
 
-  it('includes two subtypes: script and REST API', () => {
+  it('includes Python Script, Bash Script, and REST API subtypes', () => {
     registerActionStep()
 
     const registration = StepRegistry.get(RegistryStepId.ACTION)
-    expect(registration?.subtypes).toHaveLength(2)
+    expect(registration?.subtypes).toHaveLength(3)
 
-    const scriptSubtype = registration?.subtypes?.find((s) => s.id === RegistryStepId.ACTION_SCRIPT)
-    expect(scriptSubtype).toBeDefined()
-    expect(scriptSubtype?.label).toBe('Script')
-    expect(scriptSubtype?.initialData).toEqual({ executor: ExecutorTypeEnum.SCRIPT })
+    const pythonSubtype = registration?.subtypes?.find((s) => s.id === RegistryStepId.ACTION_SCRIPT_PYTHON)
+    expect(pythonSubtype).toBeDefined()
+    expect(pythonSubtype?.label).toBe('Python Script')
+    expect(pythonSubtype?.initialData).toEqual({ executor: ExecutorTypeEnum.SCRIPT_PYTHON })
+
+    const bashSubtype = registration?.subtypes?.find((s) => s.id === RegistryStepId.ACTION_SCRIPT_BASH)
+    expect(bashSubtype).toBeDefined()
+    expect(bashSubtype?.label).toBe('Bash Script')
+    expect(bashSubtype?.initialData).toEqual({ executor: ExecutorTypeEnum.SCRIPT_BASH })
 
     const apiSubtype = registration?.subtypes?.find((s) => s.id === RegistryStepId.ACTION_API)
     expect(apiSubtype).toBeDefined()
@@ -74,7 +86,7 @@ describe('registerActionStep', () => {
   })
 
   it('onSubmit creates a script activity and calls onSuccess', () => {
-    const mockAddActivity = vi.fn()
+    const mockAddActivity = vi.fn<(activity: Activity) => void>()
     vi.mocked(useWorkflowStore.getState).mockReturnValue({
       addActivity: mockAddActivity,
     } as never)
@@ -87,8 +99,7 @@ describe('registerActionStep', () => {
     registration?.onSubmit(
       {
         name: 'My Script',
-        executor: ExecutorTypeEnum.SCRIPT,
-        language: 'python',
+        executor: ExecutorTypeEnum.SCRIPT_PYTHON,
         code: 'print("hello")',
         credential_id: undefined,
       },
@@ -97,12 +108,19 @@ describe('registerActionStep', () => {
     )
 
     expect(mockAddActivity).toHaveBeenCalled()
+    expect(mockAddActivity).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: ExecutorTypeEnum.SCRIPT_PYTHON,
+        parameters: { code: 'print("hello")' },
+      })
+    )
+    expect(mockAddActivity.mock.calls[0]?.[0].parameters).not.toHaveProperty('language')
     expect(onSuccess).toHaveBeenCalledWith(expect.any(String))
     expect(onError).not.toHaveBeenCalled()
   })
 
   it('onSubmit creates an API activity and calls onSuccess', () => {
-    const mockAddActivity = vi.fn()
+    const mockAddActivity = vi.fn<(activity: Activity) => void>()
     vi.mocked(useWorkflowStore.getState).mockReturnValue({
       addActivity: mockAddActivity,
     } as never)
@@ -132,8 +150,8 @@ describe('registerActionStep', () => {
     expect(onError).not.toHaveBeenCalled()
   })
 
-  it('creates activity even when script is missing required fields', () => {
-    const mockAddActivity = vi.fn()
+  it('onSubmit creates a Bash activity and calls onSuccess', () => {
+    const mockAddActivity = vi.fn<(activity: Activity) => void>()
     vi.mocked(useWorkflowStore.getState).mockReturnValue({
       addActivity: mockAddActivity,
     } as never)
@@ -145,16 +163,21 @@ describe('registerActionStep', () => {
 
     registration?.onSubmit(
       {
-        name: 'Bad Script',
-        executor: ExecutorTypeEnum.SCRIPT,
-        language: undefined,
-        code: undefined,
+        name: 'Bash Script',
+        executor: ExecutorTypeEnum.SCRIPT_BASH,
+        code: 'echo hello',
       },
       onSuccess,
       onError
     )
 
     expect(mockAddActivity).toHaveBeenCalled()
+    expect(mockAddActivity).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: ExecutorTypeEnum.SCRIPT_BASH,
+        parameters: { code: 'echo hello' },
+      })
+    )
     expect(onSuccess).toHaveBeenCalledWith(expect.any(String))
     expect(onError).not.toHaveBeenCalled()
   })
@@ -198,11 +221,7 @@ describe('registerActionStep', () => {
     const onSuccess = vi.fn()
     const onError = vi.fn()
 
-    registration?.onSubmit(
-      { name: 'Crash', executor: ExecutorTypeEnum.SCRIPT, language: 'python', code: 'x' },
-      onSuccess,
-      onError
-    )
+    registration?.onSubmit({ name: 'Crash', executor: ExecutorTypeEnum.SCRIPT_PYTHON, code: 'x' }, onSuccess, onError)
 
     expect(onError).toHaveBeenCalledWith('Store error')
     expect(onSuccess).not.toHaveBeenCalled()
@@ -220,11 +239,7 @@ describe('registerActionStep', () => {
     const onSuccess = vi.fn()
     const onError = vi.fn()
 
-    registration?.onSubmit(
-      { name: 'Crash', executor: ExecutorTypeEnum.SCRIPT, language: 'python', code: 'x' },
-      onSuccess,
-      onError
-    )
+    registration?.onSubmit({ name: 'Crash', executor: ExecutorTypeEnum.SCRIPT_PYTHON, code: 'x' }, onSuccess, onError)
 
     expect(onError).toHaveBeenCalledWith('Failed to add action')
     expect(onSuccess).not.toHaveBeenCalled()

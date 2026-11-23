@@ -4,6 +4,7 @@ import {
   ContentVariants,
   ExpandableSection,
   Form,
+  FormGroup,
   HelperText,
   HelperTextItem,
   MenuToggle,
@@ -14,15 +15,17 @@ import {
   Title,
 } from '@patternfly/react-core'
 import { IntegrationTypeEnum } from '@syntara/contracts'
-import { type ReactNode, type Ref, useCallback, useState } from 'react'
+import { type ReactElement, type ReactNode, type Ref, useCallback, useState } from 'react'
 import { useWatch, type UseFormSetValue } from 'react-hook-form'
 
 import { SynFormField } from '../../../../components/forms/SynFormField'
 import { SynTextField } from '../../../../components/forms/SynTextField'
 import { SynSelect } from '../../../../components/SynSelect'
 import { integrationHelp } from '../integrationFieldHelp'
+import { EXECUTION_PLANE_SINGLETON_HELP } from '../integrationFieldHelpText'
 import { PROVIDERS_HIDING_BASE_URL, PROVIDERS_REQUIRING_BASE_URL } from '../integrationFilters'
 
+import { ExecutionPlaneScopeField } from './ExecutionPlaneScopeField'
 import { INTEGRATION_TYPE_OPTIONS, PROVIDER_HINT_OPTIONS, type IntegrationFormData } from './integrationFormSchema'
 import { ScopeFields } from './ScopeFields'
 import styles from './WizardSteps.module.css'
@@ -107,12 +110,17 @@ function IntegrationTypeSelect({
   onOpenChange,
   onSelect,
   renderToggle,
+  isOpenShiftDisabled,
+  openShiftDisabledDescription,
 }: Readonly<{
   value: string
   isOpen: boolean
   onOpenChange: (open: boolean) => void
   onSelect: (value: string) => void
   renderToggle: (toggleRef: Ref<MenuToggleElement>) => ReactNode
+  isOpenShiftDisabled: boolean
+  /** Shown only when the option is disabled because an EP integration already exists. */
+  openShiftDisabledDescription?: string
 }>) {
   return (
     <SynSelect
@@ -127,11 +135,19 @@ function IntegrationTypeSelect({
       shouldFocusToggleOnSelect
     >
       <SelectList>
-        {INTEGRATION_TYPE_OPTIONS.map((opt) => (
-          <SelectOption key={opt.value} value={opt.value}>
-            {opt.label}
-          </SelectOption>
-        ))}
+        {INTEGRATION_TYPE_OPTIONS.map((opt) => {
+          const isDisabled = opt.value === IntegrationTypeEnum.OPENSHIFT && isOpenShiftDisabled
+          return (
+            <SelectOption
+              key={opt.value}
+              value={opt.value}
+              isDisabled={isDisabled}
+              description={isDisabled ? openShiftDisabledDescription : undefined}
+            >
+              {opt.label}
+            </SelectOption>
+          )
+        })}
       </SelectList>
     </SynSelect>
   )
@@ -139,9 +155,12 @@ function IntegrationTypeSelect({
 
 function SecurityFields() {
   const [isExpanded, setIsExpanded] = useState(false)
+  const integrationType = useWatch<IntegrationFormData, 'integration_type'>({ name: 'integration_type' })
   const skipTlsVerify = useWatch<IntegrationFormData, 'configuration.insecure_skip_tls_verify'>({
     name: 'configuration.insecure_skip_tls_verify',
   })
+  // Execution plane infrastructure always requires HTTPS + TLS verification.
+  const showHttpTlsOptions = integrationType !== IntegrationTypeEnum.OPENSHIFT
 
   return (
     <ExpandableSection
@@ -151,49 +170,53 @@ function SecurityFields() {
       isIndented
     >
       <div className={styles.securityFields}>
-        <SynFormField<IntegrationFormData, 'configuration.allow_http'>
-          name="configuration.allow_http"
-          label="Allow HTTP connections"
-          fieldId="allow-http"
-          hideFormGroupLabel
-          hideFooter
-        >
-          {({ field }) => (
-            <Checkbox
-              id="allow-http"
+        {showHttpTlsOptions && (
+          <>
+            <SynFormField<IntegrationFormData, 'configuration.allow_http'>
+              name="configuration.allow_http"
               label="Allow HTTP connections"
-              description="Permits unencrypted HTTP URLs for this integration"
-              isChecked={field.value}
-              onChange={(_event, checked) => field.onChange(checked)}
-            />
-          )}
-        </SynFormField>
-        <SynFormField<IntegrationFormData, 'configuration.insecure_skip_tls_verify'>
-          name="configuration.insecure_skip_tls_verify"
-          label="Disable TLS certificate verification"
-          fieldId="insecure-skip-tls-verify"
-          hideFormGroupLabel
-          hideFooter
-        >
-          {({ field }) => (
-            <Checkbox
-              id="insecure-skip-tls-verify"
+              fieldId="allow-http"
+              hideFormGroupLabel
+              hideFooter
+            >
+              {({ field }) => (
+                <Checkbox
+                  id="allow-http"
+                  label="Allow HTTP connections"
+                  description="Permits unencrypted HTTP URLs for this integration"
+                  isChecked={field.value}
+                  onChange={(_event, checked) => field.onChange(checked)}
+                />
+              )}
+            </SynFormField>
+            <SynFormField<IntegrationFormData, 'configuration.insecure_skip_tls_verify'>
+              name="configuration.insecure_skip_tls_verify"
               label="Disable TLS certificate verification"
-              description="Skips validation of the server's TLS certificate on connections"
-              isChecked={field.value}
-              onChange={(_event, checked) => field.onChange(checked)}
-              body={
-                skipTlsVerify ? (
-                  <HelperText>
-                    <HelperTextItem variant="warning">
-                      The server's TLS certificate will not be verified. Only enable in trusted networks.
-                    </HelperTextItem>
-                  </HelperText>
-                ) : undefined
-              }
-            />
-          )}
-        </SynFormField>
+              fieldId="insecure-skip-tls-verify"
+              hideFormGroupLabel
+              hideFooter
+            >
+              {({ field }) => (
+                <Checkbox
+                  id="insecure-skip-tls-verify"
+                  label="Disable TLS certificate verification"
+                  description="Skips validation of the server's TLS certificate on connections"
+                  isChecked={field.value}
+                  onChange={(_event, checked) => field.onChange(checked)}
+                  body={
+                    skipTlsVerify ? (
+                      <HelperText>
+                        <HelperTextItem variant="warning">
+                          The server's TLS certificate will not be verified. Only enable in trusted networks.
+                        </HelperTextItem>
+                      </HelperText>
+                    ) : undefined
+                  }
+                />
+              )}
+            </SynFormField>
+          </>
+        )}
         {!skipTlsVerify && (
           <SynFormField<IntegrationFormData, 'configuration.ca_certificate'>
             name="configuration.ca_certificate"
@@ -224,9 +247,77 @@ function SecurityFields() {
 type IntegrationDetailsStepProps = Readonly<{
   setValue: UseFormSetValue<IntegrationFormData>
   onTypeChange: (newType: string) => void
+  /** True when an Execution plane infrastructure integration already exists. */
+  openShiftExists: boolean
+  /** True while the singleton lookup is pending/failed, or when one already exists. */
+  isOpenShiftUnavailable: boolean
 }>
 
-export function IntegrationDetailsStep({ setValue, onTypeChange }: IntegrationDetailsStepProps) {
+function getTypeConfig(
+  integrationType: string,
+  providerHint: string | undefined
+): {
+  nameLabel: string
+  namePlaceholder: string
+  nameLabelHelp: ReactElement
+  showProviderHint: boolean
+  hideBaseUrl: boolean
+  requireBaseUrl: boolean
+  baseUrlLabel: string
+  baseUrlPlaceholder: string
+  baseUrlLabelHelp: ReactElement
+} {
+  const isLLM = integrationType === IntegrationTypeEnum.LLM_PROVIDER
+  const isAAP = integrationType === IntegrationTypeEnum.ANSIBLE_AUTOMATION_PLATFORM
+  const isOpenShift = integrationType === IntegrationTypeEnum.OPENSHIFT
+
+  if (isLLM) {
+    return {
+      nameLabel: 'Name',
+      namePlaceholder: 'Enter provider name',
+      nameLabelHelp: integrationHelp.name,
+      showProviderHint: true,
+      hideBaseUrl: typeof providerHint === 'string' && PROVIDERS_HIDING_BASE_URL.has(providerHint),
+      requireBaseUrl: typeof providerHint === 'string' && PROVIDERS_REQUIRING_BASE_URL.has(providerHint),
+      baseUrlLabel: 'API URL',
+      baseUrlPlaceholder: 'https://api.example.com/v1',
+      baseUrlLabelHelp: integrationHelp.apiUrl,
+    }
+  }
+
+  if (isOpenShift) {
+    return {
+      nameLabel: 'Connection name',
+      namePlaceholder: 'ocp-us-east-prod',
+      nameLabelHelp: integrationHelp.executionPlaneConnectionName,
+      showProviderHint: false,
+      hideBaseUrl: false,
+      requireBaseUrl: true,
+      baseUrlLabel: 'API endpoint',
+      baseUrlPlaceholder: 'https://api.your-cluster.example.com:6443',
+      baseUrlLabelHelp: integrationHelp.executionPlaneApiEndpoint,
+    }
+  }
+
+  return {
+    nameLabel: 'Server name / ID',
+    namePlaceholder: 'Enter server name / ID',
+    nameLabelHelp: integrationHelp.serverName,
+    showProviderHint: false,
+    hideBaseUrl: false,
+    requireBaseUrl: true,
+    baseUrlLabel: 'API URL',
+    baseUrlPlaceholder: isAAP ? 'e.g. https://aap.example.com' : 'https://mcp-server.example.com/mcp',
+    baseUrlLabelHelp: isAAP ? integrationHelp.aapUrl : integrationHelp.apiUrl,
+  }
+}
+
+export function IntegrationDetailsStep({
+  setValue,
+  onTypeChange,
+  openShiftExists,
+  isOpenShiftUnavailable,
+}: IntegrationDetailsStepProps) {
   const scope = useWatch<IntegrationFormData, 'scope'>({ name: 'scope' })
   const integrationType = useWatch<IntegrationFormData, 'integration_type'>({ name: 'integration_type' })
   const providerHint = useWatch<IntegrationFormData, 'configuration.provider_hint'>({
@@ -235,25 +326,8 @@ export function IntegrationDetailsStep({ setValue, onTypeChange }: IntegrationDe
   const [isTypeOpen, setIsTypeOpen] = useState(false)
   const [isProviderOpen, setIsProviderOpen] = useState(false)
 
-  const isLLM = integrationType === IntegrationTypeEnum.LLM_PROVIDER
-  const isAAP = integrationType === IntegrationTypeEnum.ANSIBLE_AUTOMATION_PLATFORM
-  const typeConfig = isLLM
-    ? {
-        nameLabel: 'Name',
-        namePlaceholder: 'Enter provider name',
-        showProviderHint: true,
-        hideBaseUrl: typeof providerHint === 'string' && PROVIDERS_HIDING_BASE_URL.has(providerHint),
-        requireBaseUrl: typeof providerHint === 'string' && PROVIDERS_REQUIRING_BASE_URL.has(providerHint),
-        baseUrlPlaceholder: 'https://api.example.com/v1',
-      }
-    : {
-        nameLabel: 'Server name / ID',
-        namePlaceholder: 'Enter server name / ID',
-        showProviderHint: false,
-        hideBaseUrl: false,
-        requireBaseUrl: true,
-        baseUrlPlaceholder: isAAP ? 'e.g. https://aap.example.com' : 'https://mcp-server.example.com/mcp',
-      }
+  const isOpenShift = integrationType === IntegrationTypeEnum.OPENSHIFT
+  const typeConfig = getTypeConfig(integrationType, providerHint)
 
   const renderTypeToggle = useCallback(
     (toggleRef: Ref<MenuToggleElement>) => (
@@ -300,9 +374,12 @@ export function IntegrationDetailsStep({ setValue, onTypeChange }: IntegrationDe
               value={field.value}
               isOpen={isTypeOpen}
               onOpenChange={setIsTypeOpen}
+              isOpenShiftDisabled={isOpenShiftUnavailable}
+              openShiftDisabledDescription={openShiftExists ? EXECUTION_PLANE_SINGLETON_HELP : undefined}
               onSelect={(value) => {
                 const validType = INTEGRATION_TYPE_OPTIONS.find((opt) => opt.value === value)
                 if (!validType) return
+                if (validType.value === IntegrationTypeEnum.OPENSHIFT && isOpenShiftUnavailable) return
                 onTypeChange(validType.value)
                 setIsTypeOpen(false)
               }}
@@ -310,20 +387,27 @@ export function IntegrationDetailsStep({ setValue, onTypeChange }: IntegrationDe
             />
           )}
         </SynFormField>
+        {isOpenShift && (
+          <FormGroup label="Infrastructure type" fieldId="infrastructure-type">
+            <Content id="infrastructure-type">OpenShift</Content>
+          </FormGroup>
+        )}
         <SynTextField<IntegrationFormData, 'name'>
           name="name"
           label={typeConfig.nameLabel}
           fieldId="name"
           placeholder={typeConfig.namePlaceholder}
           isRequired
-          labelHelp={isLLM ? integrationHelp.name : integrationHelp.serverName}
+          labelHelp={typeConfig.nameLabelHelp}
         />
-        <SynTextField<IntegrationFormData, 'description'>
-          name="description"
-          label="Description"
-          fieldId="description"
-          placeholder="Enter description"
-        />
+        {!isOpenShift && (
+          <SynTextField<IntegrationFormData, 'description'>
+            name="description"
+            label="Description"
+            fieldId="description"
+            placeholder="Enter description"
+          />
+        )}
         {typeConfig.showProviderHint && (
           <SynFormField<IntegrationFormData, 'configuration.provider_hint'>
             name="configuration.provider_hint"
@@ -355,25 +439,29 @@ export function IntegrationDetailsStep({ setValue, onTypeChange }: IntegrationDe
         {!typeConfig.hideBaseUrl && (
           <SynTextField<IntegrationFormData, 'configuration.base_url'>
             name="configuration.base_url"
-            label="API URL"
+            label={typeConfig.baseUrlLabel}
             fieldId="base-url"
             placeholder={typeConfig.baseUrlPlaceholder}
             isRequired={typeConfig.requireBaseUrl}
-            labelHelp={isAAP ? integrationHelp.aapUrl : integrationHelp.apiUrl}
+            labelHelp={typeConfig.baseUrlLabelHelp}
           />
         )}
 
         <SecurityFields />
 
-        <ScopeFields<IntegrationFormData>
-          scope={scope}
-          scopeName="scope"
-          projectIdsName="project_ids"
-          idPrefix="integration"
-          onScopeChange={(newScope) => {
-            if (newScope === 'global') setValue('project_ids', [])
-          }}
-        />
+        {isOpenShift ? (
+          <ExecutionPlaneScopeField fieldId="integration-scope" />
+        ) : (
+          <ScopeFields<IntegrationFormData>
+            scope={scope}
+            scopeName="scope"
+            projectIdsName="project_ids"
+            idPrefix="integration"
+            onScopeChange={(newScope) => {
+              if (newScope === 'global') setValue('project_ids', [])
+            }}
+          />
+        )}
       </Form>
     </>
   )

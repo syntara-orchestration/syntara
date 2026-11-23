@@ -111,7 +111,7 @@ class ActivitySummary(SQLModel):
 
     id: str = Field(..., description="Activity ID from workflow definition")
     name: str = Field(..., description="Human-readable activity name")
-    type: str = Field(..., description="Activity type (script, approval, agentic, etc.)")
+    type: str = Field(..., description="Activity type (script_python, script_bash, approval, agentic, etc.)")
 
 
 class PreviousStepContext(SQLModel):

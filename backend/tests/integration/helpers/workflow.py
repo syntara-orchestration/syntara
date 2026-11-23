@@ -109,7 +109,7 @@ class ActivitiesFactory:
                 activity_name=name,
                 temporal_activity_id=f"temporal-{uuid4()}",
                 status=status,
-                node_type="script",
+                node_type="script_python",
                 started_at=now - timedelta(seconds=duration_seconds),
                 completed_at=now if is_terminal else None,
                 input_data={},

@@ -117,6 +117,47 @@ describe('useEditTestConnection', () => {
     })
   })
 
+  it('sends matching openshift integration_type values for Execution plane infrastructure', () => {
+    const openshiftIntegration: IntegrationRead = {
+      ...BASE_INTEGRATION,
+      name: 'EP Cluster',
+      integration_type: 'openshift',
+      configuration: {
+        integration_type: 'openshift',
+        base_url: 'https://ep-control-plane:6443',
+        allow_http: false,
+        insecure_skip_tls_verify: false,
+        ca_certificate: '-----BEGIN CERTIFICATE-----\n...',
+      },
+    }
+    const getValues = vi.fn(() =>
+      makeFormValues({
+        integration_type: 'openshift',
+        base_url: 'https://ep-control-plane:6443',
+        ca_certificate: '-----BEGIN CERTIFICATE-----\n...',
+      })
+    )
+    const { result } = renderHook(() => useEditTestConnection(openshiftIntegration, getValues))
+
+    act(() => {
+      result.current.handleTestConnection()
+    })
+
+    expect(mockMutate).toHaveBeenCalledOnce()
+    const [request] = mockMutate.mock.calls[0] as [{ body: Record<string, unknown> }]
+    expect(request.body).toEqual({
+      integration_type: 'openshift',
+      configuration: {
+        integration_type: 'openshift',
+        base_url: 'https://ep-control-plane:6443',
+        allow_http: false,
+        insecure_skip_tls_verify: false,
+        ca_certificate: '-----BEGIN CERTIFICATE-----\n...',
+      },
+      credential_id: 'cred-1',
+    })
+  })
+
   it('shows success alert with tool count for MCP server', () => {
     const getValues = vi.fn(() => makeFormValues())
     const { result } = renderHook(() => useEditTestConnection(BASE_INTEGRATION, getValues))

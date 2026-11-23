@@ -27,6 +27,35 @@ function validateUrl(
   return undefined
 }
 
+type EditSchemaData = {
+  base_url?: string
+  allow_http: boolean
+  insecure_skip_tls_verify: boolean
+}
+
+function refineOpenShiftFields(data: EditSchemaData, ctx: z.RefinementCtx) {
+  if (data.allow_http) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'OpenShift requires HTTPS',
+      path: ['allow_http'],
+    })
+  }
+  if (data.insecure_skip_tls_verify) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'OpenShift requires TLS verification',
+      path: ['insecure_skip_tls_verify'],
+    })
+  }
+  const err = validateUrl(data.base_url, {
+    required: true,
+    allowHttp: data.allow_http,
+    fieldLabel: 'API endpoint',
+  })
+  if (err) ctx.addIssue({ code: z.ZodIssueCode.custom, message: err, path: ['base_url'] })
+}
+
 export function buildEditSchema(requiresBaseUrl: boolean) {
   return z
     .object({
@@ -64,6 +93,9 @@ export function buildEditSchema(requiresBaseUrl: boolean) {
           fieldLabel: 'API URL',
         })
         if (err) ctx.addIssue({ code: z.ZodIssueCode.custom, message: err, path: ['base_url'] })
+      }
+      if (data.integration_type === IntegrationTypeEnum.OPENSHIFT) {
+        refineOpenShiftFields(data, ctx)
       }
       if (data.integration_type === IntegrationTypeEnum.LLM_PROVIDER) {
         const err = validateUrl(data.base_url, {
@@ -105,6 +137,15 @@ export function buildConfiguration(integrationType: string, values: EditIntegrat
       provider_hint: providerHint as IntegrationsAPI.components['schemas']['LLMProviderConfiguration']['provider_hint'],
       base_url: values.base_url || undefined,
       ...securityFields(values),
+    }
+  }
+  if (integrationType === IntegrationTypeEnum.OPENSHIFT) {
+    return {
+      integration_type: IntegrationTypeEnum.OPENSHIFT,
+      base_url: values.base_url ?? '',
+      allow_http: false,
+      insecure_skip_tls_verify: false,
+      ca_certificate: values.ca_certificate,
     }
   }
   return { integration_type: 'mcp_server' as const, base_url: values.base_url ?? '', ...securityFields(values) }

@@ -345,6 +345,37 @@ describe('Integrations Component', () => {
       expect(typeCells.length).toBe(3)
     })
 
+    it('renders OpenShift validation status without an Execution Plane column', () => {
+      vi.mocked(integrationsClient.useQuery).mockReturnValueOnce({
+        data: {
+          resources: [
+            {
+              ...mockIntegrations[0],
+              name: 'OpenShift Cluster',
+              integration_type: 'openshift',
+              validation_status: IntegrationStatusEnum.VALIDATING,
+              configuration: {
+                integration_type: 'openshift',
+                base_url: 'https://api.openshift.example.com',
+              },
+            },
+          ],
+        },
+        isPending: false,
+        isError: false,
+        error: null,
+        refetch: vi.fn(),
+      })
+
+      render(<Integrations />, { wrapper })
+
+      expect(screen.queryByRole('columnheader', { name: 'Execution Plane' })).not.toBeInTheDocument()
+      const dataRow = screen.getAllByRole('row')[1]
+      const dataCells = within(dataRow).getAllByRole('cell')
+      expect(dataCells[1]).toHaveTextContent('Validating')
+      expect(dataCells[2]).toHaveTextContent('Execution plane infrastructure')
+    })
+
     it('renders tool count column', () => {
       render(<Integrations />, { wrapper })
 
@@ -441,6 +472,87 @@ describe('Integrations Component', () => {
           name: 'I understand this integration and the resources shown above will be permanently deleted.',
         })
       ).toBeInTheDocument()
+    })
+
+    it('hides Delete for execution plane infrastructure integrations', async () => {
+      const user = userEvent.setup()
+      vi.mocked(integrationsClient.useQuery).mockReturnValue({
+        data: {
+          resources: [
+            {
+              ...mockIntegrations[0],
+              id: 'openshift-1',
+              name: 'OpenShift Cluster',
+              integration_type: 'openshift',
+              configuration: {
+                integration_type: 'openshift',
+                base_url: 'https://api.openshift.example.com',
+              },
+            },
+          ],
+        },
+        isPending: false,
+        isError: false,
+        error: null,
+        refetch: vi.fn(),
+      })
+
+      render(<Integrations />, { wrapper })
+
+      await user.click(screen.getByRole('button', { name: /Actions for OpenShift Cluster/i }))
+
+      expect(await screen.findByRole('menuitem', { name: /validate integration/i })).toBeInTheDocument()
+      expect(screen.queryByRole('menuitem', { name: /delete integration/i })).not.toBeInTheDocument()
+    })
+
+    it.each([
+      {
+        name: 'MCP Server',
+        integration_type: 'mcp_server',
+        configuration: { integration_type: 'mcp_server', base_url: 'https://mcp.example.com' },
+      },
+      {
+        name: 'LLM Provider',
+        integration_type: 'llm_provider',
+        configuration: {
+          integration_type: 'llm_provider',
+          provider_hint: 'openai',
+          base_url: 'https://api.openai.com/v1',
+        },
+      },
+      {
+        name: 'Ansible Automation Platform',
+        integration_type: 'ansible_automation_platform',
+        configuration: {
+          integration_type: 'ansible_automation_platform',
+          base_url: 'https://gateway.example.com',
+        },
+      },
+    ] as const)('shows Delete for $name integrations', async ({ name, integration_type, configuration }) => {
+      const user = userEvent.setup()
+      vi.mocked(integrationsClient.useQuery).mockReturnValue({
+        data: {
+          resources: [
+            {
+              ...mockIntegrations[0],
+              id: `${integration_type}-1`,
+              name,
+              integration_type,
+              configuration,
+            },
+          ],
+        },
+        isPending: false,
+        isError: false,
+        error: null,
+        refetch: vi.fn(),
+      })
+
+      render(<Integrations />, { wrapper })
+
+      await user.click(screen.getByRole('button', { name: new RegExp(`Actions for ${name}`, 'i') }))
+
+      expect(await screen.findByRole('menuitem', { name: /delete integration/i })).toBeInTheDocument()
     })
   })
 

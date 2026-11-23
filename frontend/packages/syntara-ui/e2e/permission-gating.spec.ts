@@ -21,6 +21,11 @@
 import { loginAsUser } from './authorization/fixtures'
 import { type Page, test, expect, toAppUrl, appBaseUrl } from './fixtures'
 import { clickMainNavEntry, expectDockedNavGroupChildLinks, mainNavGroup, mainNavigation } from './helpers/docked-nav'
+import {
+  createExecutionTargetViaApi,
+  deleteExecutionTargetViaApi,
+  isExecutionPlaneListReachable,
+} from './helpers/execution-plane'
 import { openRowKebab } from './helpers/patternfly'
 import { buildUniqueName } from './helpers/workflows'
 import {
@@ -135,9 +140,9 @@ async function createPublishedWorkflowForProjectAdmin(
           nodes: [
             {
               id: 'node_1',
-              type: 'script',
+              type: 'script_python',
               name: 'E2E admin step',
-              parameters: { language: 'python', code: 'print("e2e")' },
+              parameters: { code: 'print("e2e")' },
             },
           ],
           edges: [{ from: 'trigger_1', to: 'node_1' }],
@@ -960,6 +965,139 @@ test.describe('Permission gating — Credential actions', () => {
     } finally {
       await deleteCredentialViaApi(app, credential.id)
     }
+  })
+})
+
+// ── Action gating — Execution targets ────────────────────────────────────
+//
+// Backend role conventions: execution_target:read = admin+auditor;
+// execution_target:create / update / delete = admin only. Viewer/user
+// cannot load the list at all — they are gated by the route/nav read check,
+// not a disabled create button.
+
+test.describe('Permission gating — Execution target actions', () => {
+  test('auditor: Configure execution target button is disabled with tooltip', async ({ app, auditorApp }) => {
+    // Compose CI does not start execution-plane-api; the list error state has no create CTA.
+    test.skip(
+      !(await isExecutionPlaneListReachable(app)),
+      'Execution Plane API is not available in this environment (compose CI does not start execution-plane-api)'
+    )
+
+    // Toolbar Configure CTA only renders when the list has rows. Create a fixture so
+    // an empty live EP still exercises aria-disabled + tooltip (not empty-state gating).
+    const name = buildUniqueName('e2e-et-perm-configure')
+    const created = await createExecutionTargetViaApi(app, { name })
+
+    try {
+      await auditorApp.goto(toAppUrl('/execution-plane'))
+      await expect(auditorApp.getByRole('heading', { level: 1, name: 'Execution Plane' })).toBeVisible()
+
+      const configureButton = auditorApp.getByRole('button', { name: 'Configure execution target' })
+      await expect(configureButton).toBeVisible({ timeout: 15_000 })
+      await expect(configureButton).toHaveAttribute('aria-disabled', 'true')
+      await configureButton.hover()
+      await expect(auditorApp.getByRole('tooltip').filter({ hasText: 'execution_target:create' })).toBeVisible()
+    } finally {
+      await deleteExecutionTargetViaApi(app, created.id)
+    }
+  })
+
+  test('auditor: Edit and Delete execution target kebabs are aria-disabled', async ({ app, auditorApp }) => {
+    test.skip(
+      !(await isExecutionPlaneListReachable(app)),
+      'Execution Plane API is not available in this environment (compose CI does not start execution-plane-api)'
+    )
+
+    const name = buildUniqueName('e2e-et-perm-kebab')
+    const created = await createExecutionTargetViaApi(app, { name })
+
+    try {
+      await auditorApp.goto(toAppUrl('/execution-plane'))
+      await expect(auditorApp.getByRole('heading', { level: 1, name: 'Execution Plane' })).toBeVisible()
+
+      await auditorApp.getByPlaceholder('Filter by name').fill(name)
+      await auditorApp.getByRole('button', { name: 'Apply filter' }).click()
+
+      const row = auditorApp.getByRole('row', { name: new RegExp(name) })
+      await expect(row).toBeVisible({ timeout: 15_000 })
+      await openRowKebab(row, /Edit execution target/i)
+      await expect(auditorApp.getByRole('menuitem', { name: /Edit execution target/i })).toHaveAttribute(
+        'aria-disabled',
+        'true'
+      )
+      await expect(auditorApp.getByRole('menuitem', { name: /Delete execution target/i })).toHaveAttribute(
+        'aria-disabled',
+        'true'
+      )
+    } finally {
+      await deleteExecutionTargetViaApi(app, created.id)
+    }
+  })
+
+  test('auditor: enable/disable toggle is aria-disabled with tooltip', async ({ app, auditorApp }) => {
+    test.skip(
+      !(await isExecutionPlaneListReachable(app)),
+      'Execution Plane API is not available in this environment (compose CI does not start execution-plane-api)'
+    )
+
+    const name = buildUniqueName('e2e-et-perm-toggle')
+    const created = await createExecutionTargetViaApi(app, { name })
+
+    try {
+      await auditorApp.goto(toAppUrl('/execution-plane'))
+      await expect(auditorApp.getByRole('heading', { level: 1, name: 'Execution Plane' })).toBeVisible()
+
+      await auditorApp.getByPlaceholder('Filter by name').fill(name)
+      await auditorApp.getByRole('button', { name: 'Apply filter' }).click()
+
+      const row = auditorApp.getByRole('row', { name: new RegExp(name) })
+      await expect(row).toBeVisible({ timeout: 15_000 })
+
+      const toggle = row.getByRole('switch', { name: `Toggle ${name}` })
+      // Permission gating uses aria-disabled (not native disabled) so tooltips still receive hover.
+      // Playwright's toBeDisabled() treats aria-disabled as disabled, so assert the attribute only.
+      // PF Switch hides the input behind a styled span — force hover like credential enable toggles.
+      await expect(toggle).toHaveAttribute('aria-disabled', 'true')
+      await toggle.hover({ force: true })
+      await expect(auditorApp.getByRole('tooltip').filter({ hasText: 'execution_target:update' })).toBeVisible()
+    } finally {
+      await deleteExecutionTargetViaApi(app, created.id)
+    }
+  })
+
+  test('viewer: direct URL to Execution Plane list shows access denied', async ({ viewerApp }) => {
+    await viewerApp.goto(toAppUrl('/execution-plane'))
+    await expect(viewerApp.getByRole('heading', { name: 'Access denied', level: 2 })).toBeVisible()
+  })
+
+  test('user: direct URL to Execution Plane list shows access denied', async ({ userApp }) => {
+    await userApp.goto(toAppUrl('/execution-plane'))
+    await expect(userApp.getByRole('heading', { name: 'Access denied', level: 2 })).toBeVisible()
+  })
+
+  test('viewer: direct URL to Configure execution target shows access denied', async ({ viewerApp }) => {
+    await viewerApp.goto(toAppUrl('/execution-plane/create'))
+    await expect(viewerApp.getByRole('heading', { name: 'Access denied', level: 2 })).toBeVisible()
+  })
+
+  test('user: direct URL to Configure execution target shows access denied', async ({ userApp }) => {
+    await userApp.goto(toAppUrl('/execution-plane/create'))
+    await expect(userApp.getByRole('heading', { name: 'Access denied', level: 2 })).toBeVisible()
+  })
+
+  test('auditor: direct URL to Configure execution target shows access denied', async ({ auditorApp }) => {
+    await auditorApp.goto(toAppUrl('/execution-plane/create'))
+    await expect(auditorApp.getByRole('heading', { name: 'Access denied', level: 2 })).toBeVisible()
+  })
+
+  test('viewer: direct URL to Edit execution target shows access denied', async ({ viewerApp }) => {
+    await viewerApp.goto(toAppUrl('/execution-plane/a1000000-0000-4000-8000-000000000002/edit'))
+    await expect(viewerApp.getByRole('heading', { name: 'Access denied', level: 2 })).toBeVisible()
+  })
+
+  test('auditor: direct URL to Edit execution target shows access denied', async ({ auditorApp }) => {
+    await auditorApp.goto(toAppUrl('/execution-plane/a1000000-0000-4000-8000-000000000002/edit'))
+    await expect(auditorApp.getByRole('heading', { name: 'Access denied', level: 2 })).toBeVisible()
   })
 })
 

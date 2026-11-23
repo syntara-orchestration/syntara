@@ -48,6 +48,9 @@ INVOCATION_WS_PATH = "/ws/agent_orchestrator/v1/invocations"
 _PATCH_AUTHN = "syntara.core.websocket.endpoint_factory._authenticate_websocket"
 
 
+pytestmark = pytest.mark.usefixtures("ep_deletion_acknowledged")
+
+
 @pytest.fixture(autouse=True)
 def _reset_connection_managers() -> Generator[None, None, None]:
     """Reset connection managers between tests for isolation."""

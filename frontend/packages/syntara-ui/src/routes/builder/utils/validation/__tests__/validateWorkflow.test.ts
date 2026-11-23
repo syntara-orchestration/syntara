@@ -25,9 +25,7 @@ describe('validateWorkflow', () => {
     })
 
     it('returns valid result for simple workflow', () => {
-      const activities: Activity[] = [
-        { type: 'script', id: 'task-1', name: 'Task 1', parameters: { language: 'python', code: '' } },
-      ]
+      const activities: Activity[] = [{ type: 'script_python', id: 'task-1', name: 'Task 1', parameters: { code: '' } }]
       const edges: EdgeConnection[] = [
         {
           id: 'trigger-1-task-1',
@@ -46,7 +44,7 @@ describe('validateWorkflow', () => {
     it('returns valid result for condition node with then branch connected', () => {
       const activities: Activity[] = [
         makeCondition({ id: 'C1', name: 'Condition 1', condition: 'x > 10' }),
-        { type: 'script', id: 'T1', name: 'Task 1', parameters: { language: 'python', code: '' } },
+        { type: 'script_python', id: 'T1', name: 'Task 1', parameters: { code: '' } },
       ]
       const edges: EdgeConnection[] = [
         { id: 'C1-T1', source: 'C1', target: 'T1', sourceHandle: 'true', targetHandle: 'target' },
@@ -60,7 +58,7 @@ describe('validateWorkflow', () => {
   describe('invalid workflows', () => {
     it('detects dangling nodes', () => {
       const activities: Activity[] = [
-        { type: 'script', id: 'task-1', name: 'Disconnected Task', parameters: { language: 'python', code: '' } },
+        { type: 'script_python', id: 'task-1', name: 'Disconnected Task', parameters: { code: '' } },
       ]
       const edges: EdgeConnection[] = []
 
@@ -73,7 +71,7 @@ describe('validateWorkflow', () => {
     it('detects condition node missing then branch', () => {
       const activities: Activity[] = [
         makeCondition({ id: 'C1', name: 'Condition 1', condition: 'x > 10' }),
-        { type: 'script', id: 'T1', name: 'Task 1', parameters: { language: 'python', code: '' } },
+        { type: 'script_python', id: 'T1', name: 'Task 1', parameters: { code: '' } },
       ]
       const edges: EdgeConnection[] = [
         { id: 'trigger-1-C1', source: 'trigger-1', target: 'C1', sourceHandle: 'source', targetHandle: 'target' },
@@ -144,9 +142,7 @@ describe('validateWorkflow', () => {
 
   describe('warnings', () => {
     it('includes warnings in result when rules produce them', () => {
-      const activities: Activity[] = [
-        { type: 'script', id: 'task-1', name: 'Task 1', parameters: { language: 'python', code: '' } },
-      ]
+      const activities: Activity[] = [{ type: 'script_python', id: 'task-1', name: 'Task 1', parameters: { code: '' } }]
       const edges: EdgeConnection[] = []
 
       const result = validateWorkflow(activities, edges)

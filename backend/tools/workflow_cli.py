@@ -45,10 +45,13 @@ from syntara.core.logging import configure_structlog
 from syntara.workflow_runtime.engines.models import WorkflowResultResponse
 from syntara.workflow_runtime.engines.temporal.activities.condition import condition
 from syntara.workflow_runtime.engines.temporal.activities.converge import converge
+from syntara.workflow_runtime.engines.temporal.activities.ep.ep_dispatch_activity import (
+    execute_bash_script_activity,
+    execute_python_script_activity,
+)
 from syntara.workflow_runtime.engines.temporal.activities.http_request_activity import execute_http_request_activity
 from syntara.workflow_runtime.engines.temporal.activities.loop import loop
 from syntara.workflow_runtime.engines.temporal.activities.manual_trigger import manual_trigger
-from syntara.workflow_runtime.engines.temporal.activities.script_activity import execute_script_activity
 from syntara.workflow_runtime.engines.temporal.dynamic_workflow import OrchestratorWorkflow
 
 # Configure logging
@@ -123,7 +126,8 @@ async def run_workflow(
             manual_trigger,
             execute_http_request_activity,
             converge,
-            execute_script_activity,
+            execute_python_script_activity,
+            execute_bash_script_activity,
             condition,
             loop,
         ],

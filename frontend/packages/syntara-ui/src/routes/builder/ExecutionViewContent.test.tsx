@@ -43,9 +43,9 @@ describe('ExecutionViewContent', () => {
     const workflow = {
       id: 'workflow-1',
       triggers: [{ id: 'trigger_manual', type: 'manual_trigger' }],
-      nodes: [{ id: 'task-1', type: 'script', name: 'Task', parameters: {} }],
+      nodes: [{ id: 'task-1', type: 'script_python', name: 'Task', parameters: {} }],
       edges: [{ from: 'trigger_manual', to: 'task-1' }],
-      workflow: { activities: [{ id: 'task-1', type: 'script', name: 'Task', parameters: {} }] },
+      workflow: { activities: [{ id: 'task-1', type: 'script_python', name: 'Task', parameters: {} }] },
     } as never
 
     render(<ExecutionViewContent workflow={workflow} executionId="exec-1" executionStatus={null} />)
@@ -75,9 +75,9 @@ describe('ExecutionViewContent', () => {
     const workflow = {
       id: 'workflow-positions',
       triggers: [{ id: 'trigger_manual', type: 'manual_trigger', position: { x: 50, y: 75 } }],
-      nodes: [{ id: 'task-1', type: 'script', name: 'Task', parameters: {}, position: { x: 100, y: 200 } }],
+      nodes: [{ id: 'task-1', type: 'script_python', name: 'Task', parameters: {}, position: { x: 100, y: 200 } }],
       edges: [{ from: 'trigger_manual', to: 'task-1' }],
-      workflow: { activities: [{ id: 'task-1', type: 'script', name: 'Task', parameters: {} }] },
+      workflow: { activities: [{ id: 'task-1', type: 'script_python', name: 'Task', parameters: {} }] },
     } as never
 
     render(<ExecutionViewContent workflow={workflow} executionId="exec-1" executionStatus={null} />)
@@ -98,9 +98,9 @@ describe('ExecutionViewContent', () => {
       nodes: [
         {
           id: 'task-1',
-          type: 'script',
+          type: 'script_python',
           name: 'Task',
-          parameters: { language: 'bash', code: 'echo' },
+          parameters: { code: 'echo' },
         },
       ],
       edges: [{ from: 'trigger_manual', to: 'task-1' }],
@@ -108,9 +108,9 @@ describe('ExecutionViewContent', () => {
         activities: [
           {
             id: 'task-1',
-            type: 'script',
+            type: 'script_python',
             name: 'Task',
-            parameters: { language: 'bash', code: 'echo' },
+            parameters: { code: 'echo' },
           },
         ],
       },

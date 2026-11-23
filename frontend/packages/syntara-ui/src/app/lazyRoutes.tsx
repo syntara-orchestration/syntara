@@ -23,6 +23,18 @@ export const FeatureFlagDemo = lazy(() =>
   import('../routes/feature-flags/feature-flag-demo-page').then((m) => ({ default: m.FeatureFlagDemo }))
 )
 export const Approvals = lazy(() => import('../routes/approvals/Approvals'))
+export const ExecutionPlane = lazy(() => import('../routes/execution-plane/ExecutionPlane'))
+export const CreateExecutionTarget = lazy(() =>
+  import('../routes/execution-plane/CreateExecutionTarget').then((m) => ({
+    default: m.CreateExecutionTarget,
+  }))
+)
+export const EditExecutionTarget = lazy(() =>
+  import('../routes/execution-plane/EditExecutionTarget').then((m) => ({
+    default: m.EditExecutionTarget,
+  }))
+)
+export const ExecutionTargetDetail = lazy(() => import('../routes/execution-plane/ExecutionTargetDetail'))
 export const AccessManagement = lazy(() =>
   import('../routes/access-management/AccessManagement').then((m) => ({ default: m.AccessManagement }))
 )

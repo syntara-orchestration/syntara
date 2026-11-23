@@ -974,6 +974,18 @@ wheels = [
 ]
 
 [[package]]
+name = "execution-plane-client"
+version = "0.1.26"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pydantic" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/82/74/a2c3de134b195f41a8d6e52983d510e570d574dbe740465a49215ead1352/execution_plane_client-0.1.26.tar.gz", hash = "sha256:2fe19dc65cd5e8a8fb95160b33738a612ac6808baccbd247742e03407244b3b0", size = 21562, upload-time = "2026-11-21T15:06:50.968Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/48/1c/0f459c2a5188719d53fd2cc9a056fbc3a431fa4294ea49be098b4a771b9e/execution_plane_client-0.1.26-py3-none-any.whl", hash = "sha256:457637d0dd97d54c6b30fbfb95dc6f011aea8ef760d1b89c4e4f1ebba8a183b8", size = 34062, upload-time = "2026-11-21T15:06:49.863Z" },
+]
+
+[[package]]
 name = "fastapi"
 version = "0.162.0"
 source = { registry = "https://pypi.org/simple" }
@@ -4335,6 +4347,7 @@ dependencies = [
     { name = "boto3" },
     { name = "cachetools" },
     { name = "cryptography" },
+    { name = "execution-plane-client" },
     { name = "fastapi" },
     { name = "filelock" },
     { name = "httpx" },
@@ -4442,6 +4455,7 @@ requires-dist = [
     { name = "boto3-stubs", extras = ["s3"], marker = "extra == 'dev'", specifier = ">=1.35.0" },
     { name = "cachetools", specifier = ">=5.0" },
     { name = "cryptography", specifier = ">=48.0.1" },
+    { name = "execution-plane-client", specifier = ">=0.1.26,<0.2.0" },
     { name = "fastapi", specifier = ">=0.135.0" },
     { name = "fastmcp", marker = "extra == 'dev'", specifier = ">=3.2.0,<4.0.0" },
     { name = "filelock", specifier = ">=4.2.1" },
@@ -4533,7 +4547,7 @@ dev = [
 
 [[package]]
 name = "syntara-api-client"
-version = "1.5.1"
+version = "1.6.0"
 source = { editable = "src/api_client" }
 dependencies = [
     { name = "attrs" },

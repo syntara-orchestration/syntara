@@ -18,27 +18,24 @@ triggers:
 nodes:
   - id: outer_check
     name: Outer Check
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       code: |
         echo "Outer check passed"
 
   - id: inner_check
     name: Inner Check
-    type: script
+    type: script_bash
     condition: ${trigger.outer_value} > 0
     parameters:
-      language: bash
       code: |
         echo "Inner check passed"
 
   - id: final_action
     name: Final Action
-    type: script
+    type: script_bash
     condition: ${trigger.inner_value} > 0
     parameters:
-      language: bash
       code: |
         echo "Both conditions met"
 edges:

@@ -9,9 +9,8 @@ triggers:
 
 nodes:
   - id: failing_script
-    type: script
+    type: script_python
     parameters:
-      language: python
       code: |
         raise Exception("Intentional error for testing")
     retry_policy:

@@ -16,12 +16,12 @@ describe('getTaskSemanticLabels', () => {
   it('uses activity name and executor metadata label for script', () => {
     const data = makeTask({
       name: 'Run script',
-      type: ExecutorTypeEnum.SCRIPT,
-      parameters: { language: 'python', code: 'x' },
+      type: ExecutorTypeEnum.SCRIPT_PYTHON,
+      parameters: { code: 'x' },
     })
     expect(getTaskSemanticLabels(data)).toEqual({
       title: 'Run script',
-      typeLabel: 'Script',
+      typeLabel: 'Python Script',
     })
   })
 
@@ -38,8 +38,8 @@ describe('getTaskSemanticLabels', () => {
   it('falls back when name is whitespace-only', () => {
     const data = makeTask({
       name: '  \t',
-      type: ExecutorTypeEnum.SCRIPT,
-      parameters: { language: 'python', code: 'x' },
+      type: ExecutorTypeEnum.SCRIPT_PYTHON,
+      parameters: { code: 'x' },
     })
     expect(getTaskSemanticLabels(data).title).toBe('Untitled task')
   })

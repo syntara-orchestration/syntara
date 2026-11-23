@@ -139,6 +139,14 @@ class TestRolePolicyMapping:  # noqa: D101
         names = builtin_role_policy_names("auditor")
         assert not any("credential:use" in n for n in names)
 
+    def test_execution_plane_callback_role_has_only_callback_policies(self) -> None:
+        names = builtin_role_policy_names("execution-plane-callback")
+        assert names == [
+            "execution-plane-callback:complete:any",
+            "execution-plane-callback:resolve-credential-cluster:any",
+            "execution-plane-callback:resolve-credential-workload:any",
+        ]
+
     def test_user_does_not_have_credential_use(self) -> None:
         names = builtin_role_policy_names("user")
         assert not any("credential:use" in n for n in names)
@@ -240,6 +248,7 @@ class TestRegistryIntegrity:  # noqa: D101
     def test_all_builtin_policies_have_test_coverage(self) -> None:
         from tests.e2e.authz.policies.conftest import (
             E2E_COVERAGE_EXEMPT,
+            EXECUTION_PLANE_SCOPED_CASES,
             OWN_SCOPED_CASES,
             PROJECT_SCOPED_CASES,
             SELF_SCOPED_CASES,
@@ -247,7 +256,12 @@ class TestRegistryIntegrity:  # noqa: D101
         )
 
         e2e_covered = {
-            c.policy for c in PROJECT_SCOPED_CASES + SYSTEM_SCOPED_REPRESENTATIVE + SELF_SCOPED_CASES + OWN_SCOPED_CASES
+            c.policy
+            for c in PROJECT_SCOPED_CASES
+            + SYSTEM_SCOPED_REPRESENTATIVE
+            + EXECUTION_PLANE_SCOPED_CASES
+            + SELF_SCOPED_CASES
+            + OWN_SCOPED_CASES
         }
         accounted_for = e2e_covered | E2E_COVERAGE_EXEMPT
         all_builtin = {p.name for p in BUILTIN_POLICIES}
@@ -256,10 +270,11 @@ class TestRegistryIntegrity:  # noqa: D101
         assert not missing, (
             f"{len(missing)} built-in policies have no test coverage. "
             f"Add a PolicyTestCase to the appropriate list in "
-            f"tests/e2e/authorization/policies/conftest.py:\n"
+            f"tests/e2e/authz/policies/conftest.py:\n"
             f"  - project-scoped → PROJECT_SCOPED_CASES\n"
             f"  - system-scoped  → SYSTEM_SCOPED_REPRESENTATIVE\n"
             f"  - self-scoped    → SELF_SCOPED_CASES\n"
+            f"  - execution-plane → EXECUTION_PLANE_SCOPED_CASES\n"
             f"Or, if unit-test coverage is sufficient, add to E2E_COVERAGE_EXEMPT.\n"
             f"\nMissing policies:\n  " + "\n  ".join(missing)
         )
@@ -268,7 +283,7 @@ class TestRegistryIntegrity:  # noqa: D101
         assert not stale, (
             f"{len(stale)} policies are listed in e2e test cases or "
             f"E2E_COVERAGE_EXEMPT but no longer exist in BUILTIN_POLICIES. "
-            f"Remove them from tests/e2e/authorization/policies/conftest.py:\n  " + "\n  ".join(stale)
+            f"Remove them from tests/e2e/authz/policies/conftest.py:\n  " + "\n  ".join(stale)
         )
 
     def test_own_scope_policies_have_project_constraint(self) -> None:

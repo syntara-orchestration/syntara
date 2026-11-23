@@ -14,9 +14,8 @@ nodes:
     # Missing 'condition' field - should raise ValueError
   - id: then_task
 
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       code: echo "Then branch"
 edges:
   - from: invalid_condition

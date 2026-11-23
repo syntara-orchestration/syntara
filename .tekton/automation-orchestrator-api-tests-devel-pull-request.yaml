@@ -1,4 +1,17 @@
 ---
+# Thin stub: the ao-api-tests bundle pipeline with an Execution Plane.
+#
+# feat/ANSTRAT-1803 dispatches every script-node activity to the standalone
+# Execution Plane, so the e2e environment must deploy one: ep-revision pins
+# the EP source for deploy-ao (aap-konflux-pipelines#4719), and
+# ao-operator-revision pins the operator branch that honors
+# ENABLE_EXECUTION_PLANE in {cr-name}-admin-settings (the prebuilt operator
+# bundle ignores it — automation-orchestrator-operator#1573). When both land
+# on their mainlines, these pins drop and the stub converges to devel's.
+#
+# The pipeline bundle must carry the EP params + prepare-execution-plane task
+# (aap-konflux-pipelines#4746); until it merges and republishes, the digest
+# below points at the last pre-EP build and the EP pins are inert.
 apiVersion: tekton.dev/v1
 kind: PipelineRun
 metadata:
@@ -13,6 +26,7 @@ metadata:
       event == "pull_request" &&
       (target_branch == "devel" || target_branch.startsWith("feature/") || target_branch.startsWith("feat/")) &&
       (files.all.exists(x, x.startsWith("backend/")) ||
+      files.all.exists(x, x.startsWith("tools/")) ||
       ".tekton/automation-orchestrator-api-tests-devel-pull-request.yaml".pathChanged())
   creationTimestamp: null
   labels:
@@ -37,12 +51,24 @@ spec:
       value: '{{revision}}'
     - name: pipeline-github-pr-number
       value: '{{pull_request_number}}'
+    - name: ao-revision
+      value: '{{revision}}'
+    - name: ao-pr-number
+      value: '{{pull_request_number}}'
+    - name: ep-git-url
+      value: https://github.com/syntara-orchestration/syntara-execution-plane.git
+    - name: ep-revision
+      value: v0.1.26
+    - name: ao-operator-git-url
+      value: https://github.com/automation-nexus/automation-orchestrator-operator.git
+    - name: ao-operator-revision
+      value: feat/ANSTRAT-1803
   pipelineRef:
     params:
       - name: name
         value: ao-api-tests
       - name: bundle
-        value: quay.io/aap-ci/tekton-catalog/pipeline/test/ao-api-tests:0.1
+        value: quay.io/aap-ci/tekton-catalog/pipeline/test/ao-api-tests:0.1@sha256:bd91cdfb38e27153d679c6385e6c84e8a7a8379fa474196e2453fbcee9f6c479
       - name: kind
         value: pipeline
       - name: secret
@@ -51,7 +77,7 @@ spec:
 
   taskRunTemplate:
     serviceAccountName: konflux-integration-runner
-    
+
   workspaces:
     - name: workspace
       volumeClaimTemplate:
@@ -60,4 +86,4 @@ spec:
             - ReadWriteOnce
           resources:
             requests:
-              storage: 1Gi
+              storage: 1G

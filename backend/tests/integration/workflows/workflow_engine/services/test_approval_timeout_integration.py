@@ -12,6 +12,7 @@ activity to batch-expire pending approval requests via the Approvals API.
 import asyncio
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
+from uuid import uuid4
 
 import pytest
 import yaml
@@ -28,6 +29,7 @@ from syntara.workflow_runtime.engines.temporal.activities.runtime_settings_activ
 from syntara.workflow_runtime.engines.temporal.dynamic_workflow import OrchestratorWorkflow
 
 _expire_calls: list[tuple[str, str | None]] = []
+_TEST_WORKFLOW_METADATA = {"workflow_context": {"workflow": {"project_id": str(uuid4())}}}
 
 
 @activity.defn(name=ActivityName.APPROVAL)
@@ -118,9 +120,8 @@ nodes:
     strategy: any
     n_required: 1
 - id: post_converge
-  type: script
+  type: script_python
   parameters:
-    language: python
     code: "print('done')"
 edges:
 - from: trigger_manual
@@ -156,9 +157,8 @@ nodes:
     decision_window: {decision_window}
     fallback_decision: reject
 - id: next_step
-  type: script
+  type: script_python
   parameters:
-    language: python
     code: "print('approved')"
 edges:
 - from: trigger_manual
@@ -171,10 +171,11 @@ edges:
     return result
 
 
-@activity.defn(name=ActivityName.SCRIPT)
+@activity.defn(name=ActivityName.SCRIPT_PYTHON)
 async def _test_script_activity(
     resolved_parameters: dict[str, Any],
     outputs: dict[str, str] | None = None,
+    project_id: str | None = None,
     **kwargs: object,
 ) -> dict[str, Any]:
     return {"output": {"status": "completed"}}
@@ -201,14 +202,12 @@ nodes:
   settings:
     continue_on_failure: true
 - id: approved_step
-  type: script
+  type: script_python
   parameters:
-    language: python
     code: "print('approved')"
 - id: rejected_step
-  type: script
+  type: script_python
   parameters:
-    language: python
     code: "print('rejected')"
 edges:
 - from: trigger_manual
@@ -261,6 +260,7 @@ class TestApprovalTimeoutIntegration:
                 workflow_def=workflow_def,
                 workflow_name="approval-timeout-test",
                 trigger_node_id="trigger_manual",
+                workflow_metadata=_TEST_WORKFLOW_METADATA,
             )
 
             handle = execution_service.temporal_client.get_workflow_handle(
@@ -312,6 +312,7 @@ class TestApprovalTimeoutIntegration:
                 workflow_def=workflow_def,
                 workflow_name=f"approval-cof-{fallback_decision}-test",
                 trigger_node_id="trigger_manual",
+                workflow_metadata=_TEST_WORKFLOW_METADATA,
             )
 
             handle = execution_service.temporal_client.get_workflow_handle(
@@ -389,6 +390,7 @@ class TestApprovalTimeoutIntegration:
                     workflow_def=workflow_def,
                     workflow_name="multi-approval-completion-test",
                     trigger_node_id="trigger_manual",
+                    workflow_metadata=_TEST_WORKFLOW_METADATA,
                 )
 
                 handle = execution_service.temporal_client.get_workflow_handle(

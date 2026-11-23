@@ -273,14 +273,27 @@ def _extract_credential_node_names(workflow_definition: dict[str, Any], credenti
     return [
         node.get("name") or node.get("id", "Unknown")
         for node in workflow_definition.get("nodes", [])
-        if _get_node_credential_id(node) == credential_id
+        if credential_id in _get_node_credential_ids(node)
     ]
 
 
-def _get_node_credential_id(node: dict[str, Any]) -> str | None:
+def _get_node_credential_ids(node: dict[str, Any]) -> set[str]:
+    """Return every credential ID referenced by a workflow node."""
+    credential_ids: set[str] = set()
     parameters: dict[str, Any] = node.get("parameters", {})
-    result: str | None = parameters.get("credential_id")
-    return result
+    if credential_id := parameters.get("credential_id"):
+        credential_ids.add(str(credential_id))
+    for binding in parameters.get("credential_bindings") or []:
+        if isinstance(binding, dict) and binding.get("credential_ref") is not None:
+            credential_ids.add(str(binding["credential_ref"]))
+    return credential_ids
+
+
+def _credential_jsonpath(credential_id: UUID) -> Any:  # noqa: ANN401
+    """Build a JSON path matching legacy IDs and modern binding references."""
+    return literal_column(
+        f'\'$.** ? (@.credential_id == "{credential_id}" || @.credential_ref == "{credential_id}")\'::jsonpath'
+    )
 
 
 class CredentialService(UserReferenceResolverMixin, BaseService):
@@ -844,7 +857,7 @@ class CredentialService(UserReferenceResolverMixin, BaseService):
                     (
                         func.jsonb_path_exists(
                             WorkflowVersion.workflow_definition,
-                            literal_column(f"'$.**.credential_id ? (@ == \"{cid}\")'::jsonpath"),
+                            _credential_jsonpath(cid),
                         ),
                         1,
                     ),
@@ -925,7 +938,7 @@ class CredentialService(UserReferenceResolverMixin, BaseService):
         jsonpath_conditions = [
             func.jsonb_path_exists(
                 WorkflowVersion.workflow_definition,
-                literal_column(f"'$.**.credential_id ? (@ == \"{cid}\")'::jsonpath"),
+                _credential_jsonpath(cid),
             )
             for cid in credential_ids
         ]

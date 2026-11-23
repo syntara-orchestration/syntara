@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://automation.example.com/schemas/workflows/v2/executors/script_python",
+  "title": "Python Script Node",
+  "description": "Execute Python code in the isolated Python script container.",
+  "parameterSchema": {
+    "type": "object",
+    "required": ["code"],
+    "properties": {
+      "execution_profile": {
+        "anyOf": [
+          {
+            "oneOf": [
+              {
+                "title": "ExecutionTargetProfile",
+                "type": "object",
+                "required": ["type", "execution_target_id"],
+                "properties": {
+                  "type": {"const": "execution_target"},
+                  "execution_target_id": {"type": "string", "format": "uuid", "description": "UUID of the EP target to select via its reserved identity label; the target must be eligible for scheduling."}
+                },
+                "additionalProperties": false
+              }
+            ],
+            "discriminator": {"propertyName": "type"}
+          },
+          {"type": "null"}
+        ],
+        "description": "Execution Plane placement profile for this workload.",
+        "default": null
+      },
+      "code": {
+        "type": "string",
+        "description": "Python source code to execute.",
+        "minLength": 1
+      },
+      "environment": {
+        "type": "object",
+        "description": "Environment variables passed to the Python process.",
+        "additionalProperties": {"type": "string"}
+      },
+      "credential_bindings": {
+        "$ref": "../common-definitions.schema.json#/$defs/credential_bindings"
+      }
+    },
+    "additionalProperties": false
+  },
+  "settingSchema": {
+    "$ref": "../common-definitions.schema.json#/$defs/nodeSettingsNoRetry"
+  },
+  "resultSchema": {
+    "$ref": "script_result.schema.json#/resultSchema"
+  }
+}

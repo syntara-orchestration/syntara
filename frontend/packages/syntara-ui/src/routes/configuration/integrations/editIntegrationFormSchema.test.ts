@@ -212,6 +212,51 @@ describe('buildEditSchema', () => {
     })
   })
 
+  describe('OpenShift (Execution plane infrastructure)', () => {
+    const validOpenShift = {
+      name: 'EP Control Plane',
+      description: '',
+      integration_type: 'openshift',
+      base_url: 'https://api.cluster.example.com:6443',
+      scope: 'global' as const,
+      management_credential_id: null,
+      ...securityDefaults,
+    }
+
+    it('accepts valid OpenShift data', () => {
+      const result = schema.safeParse(validOpenShift)
+      expect(result.success).toBe(true)
+    })
+
+    it.each([
+      ['empty base_url', '', 'API endpoint is required'],
+      ['HTTP URL (HTTPS only)', 'http://api.cluster.example.com:6443', 'Must be an HTTPS URL'],
+      ['invalid URL', 'not-a-url', 'Must be a valid URL'],
+    ])('rejects %s', (_label, url, expectedMessage) => {
+      const result = schema.safeParse({ ...validOpenShift, base_url: url })
+      expect(result.success).toBe(false)
+      if (!result.success) {
+        expect(result.error.issues.some((i) => i.message === expectedMessage)).toBe(true)
+      }
+    })
+
+    it('rejects allow_http=true', () => {
+      const result = schema.safeParse({ ...validOpenShift, allow_http: true })
+      expect(result.success).toBe(false)
+      if (!result.success) {
+        expect(result.error.issues.some((i) => i.message === 'OpenShift requires HTTPS')).toBe(true)
+      }
+    })
+
+    it('rejects insecure_skip_tls_verify=true', () => {
+      const result = schema.safeParse({ ...validOpenShift, insecure_skip_tls_verify: true })
+      expect(result.success).toBe(false)
+      if (!result.success) {
+        expect(result.error.issues.some((i) => i.message === 'OpenShift requires TLS verification')).toBe(true)
+      }
+    })
+  })
+
   describe('shared fields', () => {
     it('rejects empty name', () => {
       const result = schema.safeParse({ ...validMcp, name: '' })
@@ -328,6 +373,54 @@ describe('buildConfiguration', () => {
       expect(config).toEqual({
         integration_type: 'mcp_server',
         base_url: 'https://example.com',
+        ...expectedSecurityDefaults,
+      })
+    })
+  })
+
+  describe('OpenShift (Execution plane infrastructure)', () => {
+    it('returns openshift configuration with matching integration_type', () => {
+      const openshiftValues = {
+        ...baseValues,
+        integration_type: 'openshift',
+        base_url: 'https://ep-control-plane:6443',
+        ca_certificate: '-----BEGIN CERTIFICATE-----\n...',
+      }
+      const config = buildConfiguration('openshift', openshiftValues)
+      expect(config).toEqual({
+        integration_type: 'openshift',
+        base_url: 'https://ep-control-plane:6443',
+        allow_http: false,
+        insecure_skip_tls_verify: false,
+        ca_certificate: '-----BEGIN CERTIFICATE-----\n...',
+      })
+    })
+
+    it('forces allow_http and insecure_skip_tls_verify to false', () => {
+      const openshiftValues = {
+        ...baseValues,
+        integration_type: 'openshift',
+        base_url: 'https://ep-control-plane:6443',
+        allow_http: true,
+        insecure_skip_tls_verify: true,
+      }
+      const config = buildConfiguration('openshift', openshiftValues)
+      expect(config).toMatchObject({
+        allow_http: false,
+        insecure_skip_tls_verify: false,
+      })
+    })
+
+    it('falls back to empty string when base_url is undefined', () => {
+      const withoutUrl = {
+        ...baseValues,
+        integration_type: 'openshift',
+        base_url: undefined,
+      } as unknown as typeof baseValues
+      const config = buildConfiguration('openshift', withoutUrl)
+      expect(config).toEqual({
+        integration_type: 'openshift',
+        base_url: '',
         ...expectedSecurityDefaults,
       })
     })

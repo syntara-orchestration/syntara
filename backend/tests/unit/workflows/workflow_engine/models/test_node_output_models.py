@@ -432,7 +432,8 @@ class TestNodeOutputModelsRegistry:
 
     def test_registry_maps_all_expected_node_types(self) -> None:
         expected_types = {
-            NodeType.SCRIPT,
+            NodeType.SCRIPT_PYTHON,
+            NodeType.SCRIPT_BASH,
             NodeType.HTTP_REQUEST,
             NodeType.AAP_JOB_TEMPLATE,
             NodeType.AAP_WORKFLOW_JOB_TEMPLATE,

@@ -171,9 +171,9 @@ describe('StepDetailsPanel', () => {
         activities: [
           {
             id: 'new-1',
-            type: 'task',
+            type: 'script_python',
             name: 'New Task',
-            task: { executor: 'script', parameters: {} },
+            parameters: {},
             metadata: { __isGeneric: true, __customMessage: 'test message' },
           },
         ],
@@ -226,9 +226,9 @@ describe('StepDetailsPanel', () => {
         activities: [
           {
             id: 'replacement-1',
-            type: 'task',
+            type: 'script_python',
             name: 'Replacement Task',
-            task: { executor: 'script', parameters: {} },
+            parameters: {},
             metadata: { __isGeneric: true },
           },
         ],
@@ -386,7 +386,7 @@ describe('StepDetailsPanel', () => {
       id: 'task-1',
       type: 'task',
       position: { x: 0, y: 0 },
-      data: { id: 'task-1', type: 'task', name: 'Task', task: { executor: 'script', parameters: {} } },
+      data: { id: 'task-1', type: 'script_python', name: 'Task', parameters: {} },
     }
 
     render(<StepDetailsPanel mode="edit" node={taskNode} onClose={mockOnClose} />)
@@ -421,7 +421,7 @@ describe('StepDetailsPanel', () => {
       id: 'task-1',
       type: 'task',
       position: { x: 0, y: 0 },
-      data: { id: 'task-1', type: 'task', name: 'Task', task: { executor: 'script', parameters: {} } },
+      data: { id: 'task-1', type: 'script_python', name: 'Task', parameters: {} },
     }
 
     render(<StepDetailsPanel mode="edit" node={taskNode} onClose={mockOnClose} />)
@@ -752,7 +752,7 @@ describe('StepDetailsPanel', () => {
       id: 'task-1',
       type: 'task',
       position: { x: 0, y: 0 },
-      data: { id: 'task-1', type: 'task', name: 'Task', task: { executor: 'script', parameters: {} } },
+      data: { id: 'task-1', type: 'script_python', name: 'Task', parameters: {} },
     }
 
     render(
@@ -774,7 +774,7 @@ describe('StepDetailsPanel', () => {
       id,
       type: 'task',
       position: { x: 0, y: 0 },
-      data: { id, type: 'script', name: id, parameters: { language: 'python', code: '' } },
+      data: { id, type: 'script_python', name: id, parameters: { code: '' } },
     })
 
     const { rerender } = render(

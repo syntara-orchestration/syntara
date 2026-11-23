@@ -125,7 +125,11 @@ function getTaskFormId(taskData: TaskActivity): string {
   }
 
   // Script or HTTP request
-  if (executor === ExecutorTypeEnum.SCRIPT || executor === ExecutorTypeEnum.HTTP_REQUEST) {
+  if (
+    executor === ExecutorTypeEnum.SCRIPT_PYTHON ||
+    executor === ExecutorTypeEnum.SCRIPT_BASH ||
+    executor === ExecutorTypeEnum.HTTP_REQUEST
+  ) {
     return 'action-step-form'
   }
 

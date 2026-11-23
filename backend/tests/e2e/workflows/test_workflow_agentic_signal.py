@@ -92,9 +92,8 @@ class TestWorkflowAgenticSignal:
                             {
                                 "id": "echo_result",
                                 "name": "Echo AI Result",
-                                "type": "script",
+                                "type": "script_bash",
                                 "parameters": {
-                                    "language": "bash",
                                     "code": 'echo "${name_via_ai.result.default_job_template}"',
                                 },
                             },

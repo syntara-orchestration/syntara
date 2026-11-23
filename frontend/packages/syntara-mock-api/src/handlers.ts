@@ -14,6 +14,13 @@ import {
   WorkflowVersionStatusEnum,
 } from '@syntara/contracts'
 import { credentials, credentialTypes, credentialWorkflows } from './resources/credentials'
+import {
+  executionTargets,
+  MOCK_ACTIVE_WORKLOAD_COUNTS,
+  MOCK_DELETE_CONFLICT_LABEL,
+  MOCK_HEALTH_FAILURE_LABEL,
+  MOCK_UPDATE_CONFLICT_LABEL,
+} from './resources/executionTargets'
 import { integrations } from './resources/integrations'
 import { models } from './resources/models'
 import { workflows } from './resources/workflows'
@@ -211,6 +218,16 @@ function getUsernameFromRequest(request: Request): string {
   }
 
   return 'admin'
+}
+
+/** Matches can_i: admin/demo (and other default-allow personas) may write; auditor is read-only. */
+function canWriteExecutionTarget(username: string): boolean {
+  return username === 'admin' || username === 'demo'
+}
+
+/** Matches can_i: admin/demo/auditor may read. */
+function canReadExecutionTarget(username: string): boolean {
+  return username === 'admin' || username === 'demo' || username === 'auditor'
 }
 
 const randomCharacters = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
@@ -437,6 +454,663 @@ export const handlers = [
   }),
 
   // ── Integrations ──────────────────────────────────────────────────────────
+
+  http.get('/api/execution_plane/v1/execution_targets', ({ request }) => {
+    const username = getUsernameFromRequest(request)
+    // Align with can_i: admin/demo/auditor may read (viewer/user/project personas denied).
+    if (!canReadExecutionTarget(username)) {
+      return HttpResponse.json(
+        {
+          type: 'https://api.example.com/errors/forbidden',
+          title: 'Forbidden',
+          detail: 'Insufficient permissions for execution_target:read',
+          code: 'FORBIDDEN',
+          retryable: false,
+        },
+        { status: 403 }
+      )
+    }
+
+    const url = new URL(request.url)
+    const id = url.searchParams.get('id')
+    const clusterId = url.searchParams.get('cluster_id')
+    const nameContains = url.searchParams.get('name[contains]')
+    const statusEq = url.searchParams.get('status')
+    const statusIn = url.searchParams.get('status[in]')
+    const enabledParam = url.searchParams.get('enabled')
+    const lastRanAtGte = url.searchParams.get('last_ran_at[gte]')
+    const lastRanAtLte = url.searchParams.get('last_ran_at[lte]')
+    const sort = url.searchParams.get('sort')
+    const cursor = url.searchParams.get('cursor')
+    const parsedLimit = Number.parseInt(url.searchParams.get('limit') ?? '20', 10)
+    const limit = Number.isFinite(parsedLimit) ? Math.min(Math.max(parsedLimit, 1), 100) : 20
+    const includeTotal = url.searchParams.get('include_total') === 'true'
+
+    let filtered = [...executionTargets]
+    if (id) {
+      filtered = filtered.filter((target) => target.id === id)
+    }
+    if (clusterId) {
+      filtered = filtered.filter((target) => target.cluster_id === clusterId)
+    }
+    if (nameContains) {
+      const lower = nameContains.toLowerCase()
+      filtered = filtered.filter((target) => target.name.toLowerCase().includes(lower))
+    }
+    if (statusIn) {
+      const allowed = new Set(
+        statusIn
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean)
+      )
+      filtered = filtered.filter((target) => allowed.has(target.status))
+    } else if (statusEq) {
+      filtered = filtered.filter((target) => target.status === statusEq)
+    }
+    if (enabledParam !== null) {
+      const enabled = enabledParam === 'true'
+      filtered = filtered.filter((target) => target.enabled === enabled)
+    }
+    if (lastRanAtGte) {
+      const gteMs = Date.parse(lastRanAtGte)
+      if (!Number.isNaN(gteMs)) {
+        filtered = filtered.filter((target) => {
+          if (!target.last_ran_at) return false
+          return Date.parse(target.last_ran_at) >= gteMs
+        })
+      }
+    }
+    if (lastRanAtLte) {
+      const lteMs = Date.parse(lastRanAtLte)
+      if (!Number.isNaN(lteMs)) {
+        filtered = filtered.filter((target) => {
+          if (!target.last_ran_at) return false
+          return Date.parse(target.last_ran_at) <= lteMs
+        })
+      }
+    }
+
+    if (sort) {
+      const isDesc = sort.startsWith('-')
+      const field = isDesc ? sort.slice(1) : sort
+      // Fields the UI exposes as sortable; unknown values are ignored
+      filtered.sort((a, b) => {
+        let aVal: string
+        let bVal: string
+        switch (field) {
+          case 'name':
+            aVal = a.name
+            bVal = b.name
+            break
+          case 'cluster_id':
+            aVal = a.cluster_id
+            bVal = b.cluster_id
+            break
+          case 'status':
+            aVal = a.status
+            bVal = b.status
+            break
+          case 'enabled':
+            aVal = a.enabled ? '1' : '0'
+            bVal = b.enabled ? '1' : '0'
+            break
+          default:
+            return 0
+        }
+        const cmp = aVal.localeCompare(bVal)
+        return isDesc ? -cmp : cmp
+      })
+    }
+
+    return HttpResponse.json(paginate(filtered, cursor, limit, includeTotal))
+  }),
+
+  http.get('/api/execution_plane/v1/execution_targets/:target_id', ({ request, params }) => {
+    const username = getUsernameFromRequest(request)
+    if (!canReadExecutionTarget(username)) {
+      return HttpResponse.json(
+        {
+          type: 'https://api.example.com/errors/forbidden',
+          title: 'Forbidden',
+          detail: 'Insufficient permissions for execution_target:read',
+          code: 'FORBIDDEN',
+          retryable: false,
+        },
+        { status: 403 }
+      )
+    }
+
+    const target = executionTargets.find((item) => item.id === params.target_id)
+    if (!target) {
+      return HttpResponse.json(
+        {
+          type: 'https://api.example.com/errors/not-found',
+          title: 'Not Found',
+          detail: `Execution target ${params.target_id as string} not found`,
+          code: 'NOT_FOUND',
+          retryable: false,
+        },
+        { status: 404 }
+      )
+    }
+    return HttpResponse.json(target)
+  }),
+
+  http.get('/api/execution_plane/v1/execution_targets/:target_id/usage', ({ request, params }) => {
+    const username = getUsernameFromRequest(request)
+    if (!canReadExecutionTarget(username)) {
+      return HttpResponse.json(
+        {
+          type: 'https://api.example.com/errors/forbidden',
+          title: 'Forbidden',
+          detail: 'Insufficient permissions for execution_target:read',
+          code: 'FORBIDDEN',
+          retryable: false,
+        },
+        { status: 403 }
+      )
+    }
+
+    const targetId = params.target_id as string
+    const target = executionTargets.find((item) => item.id === targetId)
+    if (!target) {
+      return HttpResponse.json(
+        {
+          type: 'https://api.example.com/errors/not-found',
+          title: 'Not Found',
+          detail: `Execution target ${targetId} not found`,
+          code: 'NOT_FOUND',
+          retryable: false,
+        },
+        { status: 404 }
+      )
+    }
+
+    return HttpResponse.json({
+      target_id: targetId,
+      active_workload_count: MOCK_ACTIVE_WORKLOAD_COUNTS[targetId] ?? 0,
+    })
+  }),
+
+  /**
+   * On-demand target health / test-connection probe.
+   * Targets labeled `mock_health_failure` return healthy: false with a reason.
+   */
+  http.get('/api/execution_plane/v1/execution_targets/:target_id/health', ({ request, params }) => {
+    const username = getUsernameFromRequest(request)
+    if (!canReadExecutionTarget(username)) {
+      return HttpResponse.json(
+        {
+          type: 'https://api.example.com/errors/forbidden',
+          title: 'Forbidden',
+          detail: 'Insufficient permissions for execution_target:read',
+          code: 'FORBIDDEN',
+          retryable: false,
+        },
+        { status: 403 }
+      )
+    }
+
+    const targetId = params.target_id as string
+    const target = executionTargets.find((item) => item.id === targetId)
+    if (!target) {
+      return HttpResponse.json(
+        {
+          type: 'https://api.example.com/errors/not-found',
+          title: 'Not Found',
+          detail: `Execution target ${targetId} not found`,
+          code: 'NOT_FOUND',
+          retryable: false,
+        },
+        { status: 404 }
+      )
+    }
+
+    if (target.labels?.[MOCK_HEALTH_FAILURE_LABEL]) {
+      return HttpResponse.json({
+        healthy: false,
+        message: `Unable to reach execution target "${target.name}": connection refused`,
+        skipped: false,
+      })
+    }
+
+    return HttpResponse.json({
+      healthy: true,
+      message: null,
+      skipped: false,
+    })
+  }),
+
+  http.post('/api/execution_plane/v1/execution_targets', async ({ request }) => {
+    const username = getUsernameFromRequest(request)
+    // Align with can_i (admin/demo allowed); otherwise create form is reachable then POST 403s.
+    if (!canWriteExecutionTarget(username)) {
+      return HttpResponse.json(
+        {
+          type: 'https://api.example.com/errors/forbidden',
+          title: 'Forbidden',
+          detail: 'Insufficient permissions for execution_target:create',
+          code: 'FORBIDDEN',
+          retryable: false,
+        },
+        { status: 403 }
+      )
+    }
+
+    const body = (await request.json()) as {
+      name?: string
+      placement?: {
+        type?: 'kubernetes'
+        namespace?: string
+        node_selectors?: string[]
+        tolerations?: string[]
+      }
+      labels?: Record<string, string>
+      is_default?: boolean
+    }
+
+    const name = body.name?.trim() ?? ''
+    const namespace = body.placement?.namespace?.trim() ?? ''
+
+    if (!name || !namespace) {
+      return HttpResponse.json(
+        {
+          type: 'https://api.example.com/errors/validation-error',
+          title: 'Validation Error',
+          detail: 'name and placement.namespace are required',
+          code: 'VALIDATION_ERROR',
+          retryable: false,
+        },
+        { status: 422 }
+      )
+    }
+
+    if (executionTargets.some((target) => target.name.toLowerCase() === name.toLowerCase())) {
+      return HttpResponse.json(
+        {
+          type: 'https://api.example.com/errors/conflict',
+          title: 'Conflict',
+          detail: `An execution target named "${name}" already exists`,
+          code: 'CONFLICT',
+          retryable: false,
+        },
+        { status: 409 }
+      )
+    }
+
+    const openshiftIntegrations = integrations.filter((item) => item.integration_type === IntegrationTypeEnum.OPENSHIFT)
+    if (openshiftIntegrations.length !== 1) {
+      return HttpResponse.json(
+        {
+          type: 'https://api.example.com/errors/conflict',
+          title: 'Conflict',
+          detail: 'Expected exactly one installed Execution Plane cluster',
+          code: 'CONFLICT',
+          retryable: false,
+        },
+        { status: 409 }
+      )
+    }
+
+    // length === 1 was asserted above
+    const openshiftIntegration = openshiftIntegrations[0]!
+    const id = uuidv4()
+    const created = {
+      id,
+      cluster_id: openshiftIntegration.id,
+      name,
+      backend_type: 'kubernetes',
+      endpoint:
+        openshiftIntegration.configuration && 'base_url' in openshiftIntegration.configuration
+          ? String(openshiftIntegration.configuration.base_url)
+          : 'https://api.openshift.example.com:6443',
+      placement: {
+        type: 'kubernetes' as const,
+        namespace,
+        node_selectors: body.placement?.node_selectors ?? [],
+        tolerations: body.placement?.tolerations ?? [],
+      },
+      status: 'registering',
+      enabled: true,
+      is_default: body.is_default ?? false,
+      status_message: null,
+      labels: {
+        ...(body.labels ?? {}),
+        integration_id: openshiftIntegration.id,
+      },
+      created_at: mockDate.now,
+      last_ran_at: null,
+    }
+
+    if (created.is_default) {
+      for (const item of executionTargets) {
+        item.is_default = false
+      }
+    }
+
+    executionTargets.unshift(created)
+
+    return HttpResponse.json(created, {
+      status: 201,
+      headers: {
+        Location: `/api/execution_plane/v1/execution_targets/${id}`,
+      },
+    })
+  }),
+
+  /**
+   * PATCH execution target — partial update (minProperties: 1).
+   * 422 with FastAPI-style `detail[].loc` for field mapping; 409 for name clashes,
+   * clearing the default flag, or the mock concurrent-edit label.
+   */
+  http.patch('/api/execution_plane/v1/execution_targets/:target_id', async ({ request, params }) => {
+    const username = getUsernameFromRequest(request)
+    if (!canWriteExecutionTarget(username)) {
+      return HttpResponse.json(
+        {
+          type: 'https://api.example.com/errors/forbidden',
+          title: 'Forbidden',
+          detail: 'Insufficient permissions for execution_target:update',
+          code: 'FORBIDDEN',
+          retryable: false,
+        },
+        { status: 403 }
+      )
+    }
+
+    const targetId = params.target_id as string
+    const target = executionTargets.find((item) => item.id === targetId)
+    if (!target) {
+      return HttpResponse.json(
+        {
+          type: 'https://api.example.com/errors/not-found',
+          title: 'Not Found',
+          detail: `Execution target ${targetId} not found`,
+          code: 'NOT_FOUND',
+          retryable: false,
+        },
+        { status: 404 }
+      )
+    }
+
+    if (target.labels?.[MOCK_UPDATE_CONFLICT_LABEL]) {
+      return HttpResponse.json(
+        {
+          type: 'https://api.example.com/errors/conflict',
+          title: 'Conflict',
+          detail: 'Execution target was modified by another user. Reload and try again.',
+          code: 'CONFLICT',
+          retryable: false,
+        },
+        { status: 409 }
+      )
+    }
+
+    const body = (await request.json()) as {
+      name?: string | null
+      placement?: {
+        type?: 'kubernetes'
+        namespace?: string | null
+        node_selectors?: string[]
+        tolerations?: string[]
+      } | null
+      labels?: Record<string, string> | null
+      is_default?: boolean | null
+      enabled?: boolean | null
+    }
+
+    const providedKeys = Object.keys(body).filter((key) => body[key as keyof typeof body] !== undefined)
+    if (providedKeys.length === 0) {
+      return HttpResponse.json(
+        {
+          detail: [
+            {
+              loc: ['body'],
+              msg: 'At least one field is required',
+              type: 'value_error',
+            },
+          ],
+        },
+        { status: 422 }
+      )
+    }
+
+    if ('name' in body) {
+      if (body.name === null || typeof body.name !== 'string' || body.name.trim().length === 0) {
+        return HttpResponse.json(
+          {
+            detail: [
+              {
+                loc: ['body', 'name'],
+                msg: 'Name cannot be empty',
+                type: 'value_error',
+              },
+            ],
+          },
+          { status: 422 }
+        )
+      }
+      if (body.name.trim().length > 255) {
+        return HttpResponse.json(
+          {
+            detail: [
+              {
+                loc: ['body', 'name'],
+                msg: 'Name must be 255 characters or fewer',
+                type: 'value_error',
+              },
+            ],
+          },
+          { status: 422 }
+        )
+      }
+    }
+
+    if ('placement' in body) {
+      if (body.placement === null || typeof body.placement !== 'object') {
+        return HttpResponse.json(
+          {
+            detail: [
+              {
+                loc: ['body', 'placement'],
+                msg: 'Placement cannot be cleared',
+                type: 'value_error',
+              },
+            ],
+          },
+          { status: 422 }
+        )
+      }
+      const namespace = body.placement.namespace?.trim() ?? ''
+      if (!namespace) {
+        return HttpResponse.json(
+          {
+            detail: [
+              {
+                loc: ['body', 'placement', 'namespace'],
+                msg: 'Namespace is required',
+                type: 'value_error',
+              },
+            ],
+          },
+          { status: 422 }
+        )
+      }
+    }
+
+    if ('labels' in body && (body.labels === null || typeof body.labels !== 'object')) {
+      return HttpResponse.json(
+        {
+          detail: [
+            {
+              loc: ['body', 'labels'],
+              msg: 'Labels cannot be cleared',
+              type: 'value_error',
+            },
+          ],
+        },
+        { status: 422 }
+      )
+    }
+
+    if ('is_default' in body && body.is_default === null) {
+      return HttpResponse.json(
+        {
+          detail: [
+            {
+              loc: ['body', 'is_default'],
+              msg: 'is_default cannot be null',
+              type: 'value_error',
+            },
+          ],
+        },
+        { status: 422 }
+      )
+    }
+
+    if ('enabled' in body && body.enabled === null) {
+      return HttpResponse.json(
+        {
+          detail: [
+            {
+              loc: ['body', 'enabled'],
+              msg: 'enabled cannot be null',
+              type: 'value_error',
+            },
+          ],
+        },
+        { status: 422 }
+      )
+    }
+
+    const nextName = typeof body.name === 'string' ? body.name.trim() : undefined
+    if (
+      nextName &&
+      executionTargets.some((item) => item.id !== targetId && item.name.toLowerCase() === nextName.toLowerCase())
+    ) {
+      return HttpResponse.json(
+        {
+          type: 'https://api.example.com/errors/conflict',
+          title: 'Conflict',
+          detail: `An execution target named "${nextName}" already exists`,
+          code: 'CONFLICT',
+          retryable: false,
+        },
+        { status: 409 }
+      )
+    }
+
+    if (body.is_default === false && target.is_default) {
+      return HttpResponse.json(
+        {
+          type: 'https://api.example.com/errors/conflict',
+          title: 'Conflict',
+          detail: 'Cannot clear the default flag; promote another target first',
+          code: 'CONFLICT',
+          retryable: false,
+        },
+        { status: 409 }
+      )
+    }
+
+    if (nextName !== undefined) {
+      target.name = nextName
+    }
+
+    if (body.placement) {
+      const namespace = body.placement.namespace?.trim() ?? ''
+      target.placement = {
+        type: 'kubernetes',
+        namespace,
+        node_selectors: body.placement.node_selectors ?? [],
+        tolerations: body.placement.tolerations ?? [],
+      }
+    }
+
+    if (body.labels) {
+      target.labels = { ...body.labels }
+    }
+
+    if (typeof body.enabled === 'boolean') {
+      target.enabled = body.enabled
+    }
+
+    if (body.is_default === true) {
+      for (const item of executionTargets) {
+        item.is_default = item.id === targetId
+      }
+    }
+
+    return HttpResponse.json(target)
+  }),
+
+  /**
+   * DELETE execution target — 202 Accepted (draining continues independently).
+   * 409 when the target is the current default or marked with the mock in-use label.
+   * Mock removes the row on success for deterministic list/pagination tests; the UI
+   * must still treat 202 as success without requiring immediate absence from the list.
+   */
+  http.delete('/api/execution_plane/v1/execution_targets/:target_id', ({ request, params }) => {
+    const username = getUsernameFromRequest(request)
+    if (!canWriteExecutionTarget(username)) {
+      return HttpResponse.json(
+        {
+          type: 'https://api.example.com/errors/forbidden',
+          title: 'Forbidden',
+          detail: 'Insufficient permissions for execution_target:delete',
+          code: 'FORBIDDEN',
+          retryable: false,
+        },
+        { status: 403 }
+      )
+    }
+
+    const targetId = params.target_id as string
+    const index = executionTargets.findIndex((item) => item.id === targetId)
+    if (index === -1) {
+      return HttpResponse.json(
+        {
+          type: 'https://api.example.com/errors/not-found',
+          title: 'Not Found',
+          detail: `Execution target ${targetId} not found`,
+          code: 'NOT_FOUND',
+          retryable: false,
+        },
+        { status: 404 }
+      )
+    }
+
+    const target = executionTargets[index]
+    if (target?.is_default) {
+      return HttpResponse.json(
+        {
+          type: 'https://api.example.com/errors/conflict',
+          title: 'Conflict',
+          detail: 'Cannot delete the default execution target; promote another target first',
+          code: 'CONFLICT',
+          retryable: false,
+        },
+        { status: 409 }
+      )
+    }
+
+    if (target?.labels?.[MOCK_DELETE_CONFLICT_LABEL]) {
+      return HttpResponse.json(
+        {
+          type: 'https://api.example.com/errors/conflict',
+          title: 'Conflict',
+          detail: 'Execution target is in use and cannot be deleted',
+          code: 'CONFLICT',
+          retryable: false,
+        },
+        { status: 409 }
+      )
+    }
+
+    executionTargets.splice(index, 1)
+    return HttpResponse.json({ id: targetId, accepted: true as const }, { status: 202 })
+  }),
 
   http.get('/api/v1/integrations', ({ request }) => {
     const url = new URL(request.url)
@@ -1793,7 +2467,7 @@ export const handlers = [
           timeout_at: null,
           approver_users: [],
           approver_groups: [],
-          next_step_approved: { id: 'script_1', name: 'Approved action', type: 'script' },
+          next_step_approved: { id: 'script_1', name: 'Approved action', type: 'script_python' },
           next_step_rejected: null,
           workflow_context: {
             workflow_id: body.workflow_id,

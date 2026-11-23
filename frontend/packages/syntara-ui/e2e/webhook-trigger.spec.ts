@@ -44,7 +44,7 @@ test.describe('Webhook Trigger', () => {
       // Add a connected script action
       const panel = await clickAddConnectedStep(app)
       await panel.getByRole('button', { name: 'Action', exact: true }).click()
-      await panel.getByRole('button', { name: 'Script', exact: true }).click()
+      await panel.getByRole('button', { name: 'Python Script', exact: true }).click()
       await app.getByRole('textbox', { name: 'Name', exact: true }).fill('Process payload')
       await fillCodeEditor(app, { value: 'print("processing webhook")' })
       await app.getByRole('button', { name: 'Create' }).click()
@@ -169,7 +169,7 @@ test.describe('Webhook Trigger', () => {
       // Add a connected script action so workflow can be saved
       const panel = await clickAddConnectedStep(app)
       await panel.getByRole('button', { name: 'Action', exact: true }).click()
-      await panel.getByRole('button', { name: 'Script', exact: true }).click()
+      await panel.getByRole('button', { name: 'Python Script', exact: true }).click()
       await app.getByRole('textbox', { name: 'Name', exact: true }).fill('Action')
       await fillCodeEditor(app, { value: 'print("ok")' })
       await app.getByRole('button', { name: 'Create' }).click()
@@ -210,7 +210,7 @@ test.describe('Webhook Trigger', () => {
       // Add a connected action so workflow can be saved
       const panel = await clickAddConnectedStep(app)
       await panel.getByRole('button', { name: 'Action', exact: true }).click()
-      await panel.getByRole('button', { name: 'Script', exact: true }).click()
+      await panel.getByRole('button', { name: 'Python Script', exact: true }).click()
       await app.getByRole('textbox', { name: 'Name', exact: true }).fill('Handle event')
       await fillCodeEditor(app, { value: 'print("event")' })
       await app.getByRole('button', { name: 'Create' }).click()

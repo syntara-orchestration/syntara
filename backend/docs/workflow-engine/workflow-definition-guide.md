@@ -72,10 +72,9 @@ nodes:
         - 504
 
   - id: process_user_data
-    type: script
+    type: script_python
     name: Process User Data
     config:
-      language: python
       code: |
         import json
         import os
@@ -141,10 +140,9 @@ triggers:
 
 nodes:
   - id: check_service_health
-    type: script
+    type: script_bash
     name: Check Service Health
     config:
-      language: bash
       code: |
         #!/bin/bash
 
@@ -467,10 +465,9 @@ nodes:
 ```yaml
 nodes:
   - id: prepare_data
-    type: script
+    type: script_python
     name: Prepare Data
     config:
-      language: python
       code: |
         import json
         print(json.dumps({"ready": True, "items": 42}))
@@ -482,10 +479,9 @@ nodes:
       timeout: 3600
 
   - id: finalize
-    type: script
+    type: script_bash
     name: Finalize
     config:
-      language: bash
       code: echo "Approved and finalized"
 
 edges:
@@ -505,10 +501,9 @@ edges:
 ```yaml
 nodes:
   - id: process_item
-    type: script
+    type: script_bash
     name: Process Item
     config:
-      language: bash
       code: |
         #!/bin/bash
         ITEM="${INPUT_ITEM}"

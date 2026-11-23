@@ -9,6 +9,9 @@
       "credential_id": {
         "$ref": "../common-definitions.schema.json#/$defs/credential_id"
       },
+      "credential_bindings": {
+        "$ref": "../common-definitions.schema.json#/$defs/credential_bindings"
+      },
       "approver_users": {
         "type": "array",
         "items": {

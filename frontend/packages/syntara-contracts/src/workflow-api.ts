@@ -1011,7 +1011,8 @@ export interface components {
         | components['schemas']['AAPWorkflowJobTemplateNode']
         | components['schemas']['HTTPRequestNode']
         | components['schemas']['AgenticNode']
-        | components['schemas']['ScriptNode']
+        | components['schemas']['PythonScriptNode']
+        | components['schemas']['BashScriptNode']
         | components['schemas']['ApprovalNode']
         | components['schemas']['ConditionNode']
         | components['schemas']['SwitchNode']
@@ -1184,10 +1185,10 @@ export interface components {
       [key: string]: unknown
     }
     /**
-     * ScriptNode
-     * @description Script executor node.
+     * PythonScriptNode
+     * @description Python script executor node.
      */
-    ScriptNode: {
+    PythonScriptNode: {
       /**
        * Id
        * @description Unique identifier for the node within the workflow
@@ -1216,8 +1217,47 @@ export interface components {
        * @description discriminator enum property added by openapi-typescript
        * @enum {string}
        */
-      type: 'script'
-      parameters: components['schemas']['ScriptExecutorParameters']
+      type: 'script_python'
+      parameters: components['schemas']['PythonScriptExecutorParameters']
+      settings?: components['schemas']['NodeSettingsNoRetry'] | null
+    } & {
+      [key: string]: unknown
+    }
+    /**
+     * BashScriptNode
+     * @description Bash script executor node.
+     */
+    BashScriptNode: {
+      /**
+       * Id
+       * @description Unique identifier for the node within the workflow
+       */
+      id: string
+      /**
+       * Name
+       * @description Human-readable name for the node
+       */
+      name?: string | null
+      /**
+       * Description
+       * @description Human-readable description of the node purpose
+       */
+      description?: string | null
+      /**
+       * Outputs
+       * @description Output extraction mapping
+       */
+      outputs?: {
+        [key: string]: string
+      } | null
+      /** @description Optional UI position hint */
+      position?: components['schemas']['NodePosition'] | null
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: 'script_bash'
+      parameters: components['schemas']['BashScriptExecutorParameters']
       settings?: components['schemas']['NodeSettingsNoRetry'] | null
     } & {
       [key: string]: unknown
@@ -1471,6 +1511,11 @@ export interface components {
        */
       credential_id?: string | null
       /**
+       * Credential Bindings
+       * @description Host-side recipe-to-credential bindings for Execution Plane dispatch.
+       */
+      credential_bindings?: components['schemas']['CredentialBinding'][]
+      /**
        * Integration Id
        * @description UUID of the Ansible Automation Platform Gateway integration for connection URL resolution.
        */
@@ -1594,6 +1639,11 @@ export interface components {
        */
       credential_id?: string | null
       /**
+       * Credential Bindings
+       * @description Host-side recipe-to-credential bindings for Execution Plane dispatch.
+       */
+      credential_bindings?: components['schemas']['CredentialBinding'][]
+      /**
        * Integration Id
        * @description UUID of the Ansible Automation Platform Gateway integration for connection URL resolution.
        */
@@ -1693,6 +1743,11 @@ export interface components {
        * @description Syntara credential UUID for authentication or Secret URL.
        */
       credential_id?: string | null
+      /**
+       * Credential Bindings
+       * @description Host-side recipe-to-credential bindings for Execution Plane dispatch.
+       */
+      credential_bindings?: components['schemas']['CredentialBinding'][]
     }
     /**
      * AgenticExecutorParameters
@@ -1716,6 +1771,11 @@ export interface components {
        * @description Syntara credential UUID for LLM provider authentication
        */
       credential_id?: string | null
+      /**
+       * Credential Bindings
+       * @description Host-side recipe-to-credential bindings for Execution Plane dispatch.
+       */
+      credential_bindings?: components['schemas']['CredentialBinding'][]
       /**
        * File Ids
        * @description File IDs for agent context
@@ -1771,11 +1831,49 @@ export interface components {
       credential_id: string
     }
     /**
-     * ScriptExecutorParameters
-     * @description Parameters for script executor.
+     * CredentialBinding
+     * @description Recipe-to-credential mapping for a workflow node.
      */
-    ScriptExecutorParameters: {
-      language: components['schemas']['ScriptLanguage']
+    CredentialBinding: {
+      /**
+       * Credential Recipe Id
+       * @description Qualified credential recipe identifier requested by the workload.
+       */
+      credential_recipe_id: string
+      /**
+       * Credential Ref
+       * Format: uuid
+       * @description Syntara credential selected for the credential recipe.
+       */
+      credential_ref: string
+    }
+    /**
+     * ExecutionTargetProfile
+     * @description Execution Plane profile that selects a specific Execution Target.
+     */
+    ExecutionTargetProfile: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: 'execution_target'
+      /**
+       * Execution Target Id
+       * Format: uuid
+       * @description UUID of the Execution Plane execution target selected for this workload.
+       */
+      execution_target_id: string
+    }
+    /**
+     * PythonScriptExecutorParameters
+     * @description Parameters for Python script executor.
+     */
+    PythonScriptExecutorParameters: {
+      /**
+       * Execution Profile
+       * @description Execution Plane placement profile for this workload.
+       */
+      execution_profile?: components['schemas']['ExecutionTargetProfile'] | null
       /**
        * Code
        * @description Script code to execute
@@ -1788,6 +1886,39 @@ export interface components {
       environment?: {
         [key: string]: string
       }
+      /**
+       * Credential Bindings
+       * @description Host-side recipe-to-credential bindings for Execution Plane dispatch.
+       */
+      credential_bindings?: components['schemas']['CredentialBinding'][]
+    }
+    /**
+     * BashScriptExecutorParameters
+     * @description Parameters for Bash script executor.
+     */
+    BashScriptExecutorParameters: {
+      /**
+       * Execution Profile
+       * @description Execution Plane placement profile for this workload.
+       */
+      execution_profile?: components['schemas']['ExecutionTargetProfile'] | null
+      /**
+       * Code
+       * @description Script code to execute
+       */
+      code: string
+      /**
+       * Environment
+       * @description Environment variables
+       */
+      environment?: {
+        [key: string]: string
+      }
+      /**
+       * Credential Bindings
+       * @description Host-side recipe-to-credential bindings for Execution Plane dispatch.
+       */
+      credential_bindings?: components['schemas']['CredentialBinding'][]
     }
     /**
      * ApprovalNodeParameters
@@ -1799,6 +1930,11 @@ export interface components {
        * @description Syntara credential UUID
        */
       credential_id?: string | null
+      /**
+       * Credential Bindings
+       * @description Host-side recipe-to-credential bindings for Execution Plane dispatch.
+       */
+      credential_bindings?: components['schemas']['CredentialBinding'][]
       /**
        * Approver Users
        * @description Usernames who can approve
@@ -1979,7 +2115,7 @@ export interface components {
     }
     /**
      * NodeSettingsNoRetry
-     * @description Settings with disabled, continue_on_failure, and timeout (script, agentic, approval).
+     * @description Settings with disabled, continue_on_failure, and timeout (script types, agentic, approval).
      */
     NodeSettingsNoRetry: {
       /** Continue On Failure */
@@ -2041,12 +2177,6 @@ export interface components {
      * @enum {string}
      */
     HTTPMethod: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'HEAD' | 'OPTIONS' | 'CONNECT' | 'TRACE'
-    /**
-     * ScriptLanguage
-     * @description Supported script languages for script executor.
-     * @enum {string}
-     */
-    ScriptLanguage: 'bash' | 'python'
     /**
      * ConvergeStrategy
      * @description Convergence strategies for converge nodes.

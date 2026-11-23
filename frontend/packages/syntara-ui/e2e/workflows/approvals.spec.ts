@@ -46,9 +46,9 @@ async function createPendingApproval(
       { id: 'approval_1', type: 'approval', name: approvalName, parameters: {} },
       {
         id: 'script_1',
-        type: 'script',
+        type: 'script_python',
         name: `${approvalName} - approved action`,
-        parameters: { language: 'python', code: 'print("approved")' },
+        parameters: { code: 'print("approved")' },
       },
     ],
     edges: [
@@ -104,9 +104,9 @@ async function createPendingApprovalLight(
       { id: 'approval_1', type: 'approval', name: approvalName, parameters: {} },
       {
         id: 'script_1',
-        type: 'script',
+        type: 'script_python',
         name: `${approvalName} - approved action`,
-        parameters: { language: 'python', code: 'print("approved")' },
+        parameters: { code: 'print("approved")' },
       },
     ],
     edges: [

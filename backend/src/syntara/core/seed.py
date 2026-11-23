@@ -192,6 +192,7 @@ def _register_all() -> None:
     from syntara.audit.seed import seed_audit_metadata  # noqa: PLC0415
     from syntara.authz.seed import seed_groups_project_admin  # noqa: PLC0415
     from syntara.credentials.lib.preseed import preseed_credential_types  # noqa: PLC0415
+    from syntara.execution_plane.registry.seeder import seed_execution_plane_plugins  # noqa: PLC0415
     from syntara.settings.seeder import seed_settings_with_session  # noqa: PLC0415
     from syntara.workflows.seed_builtin import seed_builtin_workflows  # noqa: PLC0415
 
@@ -207,6 +208,13 @@ def _register_all() -> None:
             name="credentials",
             func=preseed_credential_types,
             description="Create/update managed credential types",
+        )
+    )
+    _register(
+        SeederRegistration(
+            name="execution_plane_plugins",
+            func=seed_execution_plane_plugins,
+            description="Seed Action manifests and workload images for script step types",
         )
     )
     _register(
