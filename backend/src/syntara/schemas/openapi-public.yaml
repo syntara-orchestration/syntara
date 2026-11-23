@@ -25523,7 +25523,7 @@ paths:
   /workflows/{workflow_id}/invocation_schema:
     get:
       summary: Get workflow invocation schema
-      description: Get the latest published Subworkflow Trigger schemas for a workflow.
+      description: Returns the invocation contract from the workflow's latest published version. The response includes each Subworkflow Trigger's input schema and declared public output schema; it does not expose draft schemas or internal child step outputs. Requires read access to the workflow. If the workflow has no published version, the endpoint returns 404. A published workflow without a Subworkflow Trigger returns 200 with `is_eligible` set to false and an empty `triggers` list.
       operationId: get_workflow_invocation_schema
       tags:
         - Workflows
@@ -25542,11 +25542,56 @@ paths:
             title: Workflow Id
       responses:
         '200':
-          description: Published Subworkflow Trigger schemas
+          description: Invocation metadata and Subworkflow Trigger schemas from the latest published version
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/WorkflowInvocationSchemaRead'
+              examples:
+                eligibleWorkflow:
+                  summary: Published workflow with a declared public output contract
+                  value:
+                    workflow_id: 6c7085a1-5f73-47f1-8f63-728a40b055f6
+                    published_version_id: 7a0594be-a081-4756-98cf-480f0a2a51a7
+                    published_version: 4
+                    published_version_name: Incident intake
+                    published_version_created_at: '2026-11-21T14:20:00Z'
+                    is_eligible: true
+                    triggers:
+                      - trigger_node_id: incident_intake
+                        name: Incident intake
+                        input_schema:
+                          type: object
+                          properties:
+                            incident_id:
+                              type: string
+                          required:
+                            - incident_id
+                        output_schema:
+                          type: object
+                          properties:
+                            incident:
+                              type: object
+                              properties:
+                                id:
+                                  type: string
+                                status:
+                                  type: string
+                              required:
+                                - id
+                                - status
+                          required:
+                            - incident
+                ineligibleWorkflow:
+                  summary: Published workflow without a Subworkflow Trigger
+                  value:
+                    workflow_id: 6c7085a1-5f73-47f1-8f63-728a40b055f6
+                    published_version_id: 7a0594be-a081-4756-98cf-480f0a2a51a7
+                    published_version: 4
+                    published_version_name: Manual workflow
+                    published_version_created_at: '2026-11-21T14:20:00Z'
+                    is_eligible: false
+                    triggers: []
         '400':
           description: Bad Request
           content:
@@ -34914,33 +34959,36 @@ components:
     WorkflowInvocationTriggerSchema:
       type: object
       title: WorkflowInvocationTriggerSchema
-      description: One dedicated Subworkflow Trigger available for Reference mode.
+      description: Invocation contract declared by one Subworkflow Trigger.
       required:
         - trigger_node_id
       properties:
         trigger_node_id:
           type: string
           title: Trigger Node Id
+          description: ID of the Subworkflow Trigger that declares these schemas.
         name:
           anyOf:
             - type: string
             - type: 'null'
           title: Name
+          description: Optional display name of the Subworkflow Trigger.
         input_schema:
           type: object
           additionalProperties: true
           title: Input Schema
+          description: JSON Schema describing the inputs accepted by this trigger.
         output_schema:
           anyOf:
             - type: object
               additionalProperties: true
             - type: 'null'
           title: Output Schema
-          description: JSON Schema defining the outputs exposed to parent workflows. Provides encapsulation—parent sees only declared fields, not internal child step structure.
+          description: JSON Schema for the public outputs exposed to parent workflows by this trigger. Parent workflows consume these declared fields; internal child step outputs are not exposed. A null value means this trigger has no declared output schema.
     WorkflowInvocationSchemaRead:
       type: object
       title: WorkflowInvocationSchemaRead
-      description: Published invocation schemas for a child workflow.
+      description: Invocation schemas from the latest published version of a workflow.
       required:
         - workflow_id
         - published_version_id
@@ -34952,32 +35000,39 @@ components:
           type: string
           format: uuid
           title: Workflow Id
+          description: ID of the workflow whose invocation contract is returned.
         published_version_id:
           type: string
           format: uuid
           title: Published Version Id
+          description: ID of the latest published workflow version used for this response.
         published_version:
           type: integer
           title: Published Version
+          description: Version number of the latest published workflow version.
         published_version_name:
           anyOf:
             - type: string
             - type: 'null'
           title: Published Version Name
+          description: Optional name of the published version.
         published_version_created_at:
           anyOf:
             - type: string
               format: date-time
             - type: 'null'
           title: Published Version Created At
+          description: Creation time of the published version, in UTC.
         is_eligible:
           type: boolean
           title: Is Eligible
+          description: Whether the published workflow has at least one Subworkflow Trigger available for invocation.
         triggers:
           type: array
           items:
             $ref: '#/components/schemas/WorkflowInvocationTriggerSchema'
           title: Triggers
+          description: Subworkflow Trigger schemas from the published version; empty when the workflow is not eligible.
     PublishWorkflowVersionResponse:
       type: object
       title: PublishWorkflowVersionResponse

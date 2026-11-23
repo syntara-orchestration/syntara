@@ -101,7 +101,7 @@ export interface paths {
     }
     /**
      * Get workflow invocation schema
-     * @description Get the latest published Subworkflow Trigger schemas for a workflow.
+     * @description Returns the invocation contract from the workflow's latest published version. The response includes each Subworkflow Trigger's input schema and declared public output schema; it does not expose draft schemas or internal child step outputs. Requires read access to the workflow. If the workflow has no published version, the endpoint returns 404. A published workflow without a Subworkflow Trigger returns 200 with `is_eligible` set to false and an empty `triggers` list.
      */
     get: operations['get_workflow_invocation_schema']
     put?: never
@@ -483,20 +483,29 @@ export interface components {
     }
     /**
      * WorkflowInvocationTriggerSchema
-     * @description One dedicated Subworkflow Trigger available for Reference mode.
+     * @description Invocation contract declared by one Subworkflow Trigger.
      */
     WorkflowInvocationTriggerSchema: {
-      /** Trigger Node Id */
+      /**
+       * Trigger Node Id
+       * @description ID of the Subworkflow Trigger that declares these schemas.
+       */
       trigger_node_id: string
-      /** Name */
+      /**
+       * Name
+       * @description Optional display name of the Subworkflow Trigger.
+       */
       name?: string | null
-      /** Input Schema */
+      /**
+       * Input Schema
+       * @description JSON Schema describing the inputs accepted by this trigger.
+       */
       input_schema?: {
         [key: string]: unknown
       }
       /**
        * Output Schema
-       * @description JSON Schema defining the outputs exposed to parent workflows. Provides encapsulation—parent sees only declared fields, not internal child step structure.
+       * @description JSON Schema for the public outputs exposed to parent workflows by this trigger. Parent workflows consume these declared fields; internal child step outputs are not exposed. A null value means this trigger has no declared output schema.
        */
       output_schema?: {
         [key: string]: unknown
@@ -504,28 +513,45 @@ export interface components {
     }
     /**
      * WorkflowInvocationSchemaRead
-     * @description Published invocation schemas for a child workflow.
+     * @description Invocation schemas from the latest published version of a workflow.
      */
     WorkflowInvocationSchemaRead: {
       /**
        * Workflow Id
        * Format: uuid
+       * @description ID of the workflow whose invocation contract is returned.
        */
       workflow_id: string
       /**
        * Published Version Id
        * Format: uuid
+       * @description ID of the latest published workflow version used for this response.
        */
       published_version_id: string
-      /** Published Version */
+      /**
+       * Published Version
+       * @description Version number of the latest published workflow version.
+       */
       published_version: number
-      /** Published Version Name */
+      /**
+       * Published Version Name
+       * @description Optional name of the published version.
+       */
       published_version_name?: string | null
-      /** Published Version Created At */
+      /**
+       * Published Version Created At
+       * @description Creation time of the published version, in UTC.
+       */
       published_version_created_at?: string | null
-      /** Is Eligible */
+      /**
+       * Is Eligible
+       * @description Whether the published workflow has at least one Subworkflow Trigger available for invocation.
+       */
       is_eligible: boolean
-      /** Triggers */
+      /**
+       * Triggers
+       * @description Subworkflow Trigger schemas from the published version; empty when the workflow is not eligible.
+       */
       triggers: components['schemas']['WorkflowInvocationTriggerSchema'][]
     }
     /**
@@ -2971,7 +2997,7 @@ export interface operations {
     }
     requestBody?: never
     responses: {
-      /** @description Published Subworkflow Trigger schemas */
+      /** @description Invocation metadata and Subworkflow Trigger schemas from the latest published version */
       200: {
         headers: {
           [name: string]: unknown

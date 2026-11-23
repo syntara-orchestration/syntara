@@ -319,7 +319,12 @@ paths:
   /workflows/{workflow_id}/invocation_schema:
     get:
       summary: Get workflow invocation schema
-      description: Get the latest published Subworkflow Trigger schemas for a workflow.
+      description: >-
+        Returns the invocation contract from the workflow's latest published version. The response includes each
+        Subworkflow Trigger's input schema and declared public output schema; it does not expose draft schemas or
+        internal child step outputs. Requires read access to the workflow. If the workflow has no published version,
+        the endpoint returns 404. A published workflow without a Subworkflow Trigger returns 200 with `is_eligible`
+        set to false and an empty `triggers` list.
       operationId: get_workflow_invocation_schema
       tags:
         - Workflows
@@ -338,11 +343,56 @@ paths:
             title: Workflow Id
       responses:
         '200':
-          description: Published Subworkflow Trigger schemas
+          description: Invocation metadata and Subworkflow Trigger schemas from the latest published version
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/WorkflowInvocationSchemaRead'
+              examples:
+                eligibleWorkflow:
+                  summary: Published workflow with a declared public output contract
+                  value:
+                    workflow_id: 6c7085a1-5f73-47f1-8f63-728a40b055f6
+                    published_version_id: 7a0594be-a081-4756-98cf-480f0a2a51a7
+                    published_version: 4
+                    published_version_name: Incident intake
+                    published_version_created_at: '2026-11-21T14:20:00Z'
+                    is_eligible: true
+                    triggers:
+                      - trigger_node_id: incident_intake
+                        name: Incident intake
+                        input_schema:
+                          type: object
+                          properties:
+                            incident_id:
+                              type: string
+                          required:
+                            - incident_id
+                        output_schema:
+                          type: object
+                          properties:
+                            incident:
+                              type: object
+                              properties:
+                                id:
+                                  type: string
+                                status:
+                                  type: string
+                              required:
+                                - id
+                                - status
+                          required:
+                            - incident
+                ineligibleWorkflow:
+                  summary: Published workflow without a Subworkflow Trigger
+                  value:
+                    workflow_id: 6c7085a1-5f73-47f1-8f63-728a40b055f6
+                    published_version_id: 7a0594be-a081-4756-98cf-480f0a2a51a7
+                    published_version: 4
+                    published_version_name: Manual workflow
+                    published_version_created_at: '2026-11-21T14:20:00Z'
+                    is_eligible: false
+                    triggers: []
         '400':
           $ref: '../../base/shared-resources.openapi.yaml#/components/responses/BadRequestError'
         '401':

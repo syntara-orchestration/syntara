@@ -357,16 +357,87 @@ async def get_workflow(
 @router.get(
     "/{workflow_id}/invocation_schema",
     summary="Get workflow invocation schema",
+    description=(
+        "Returns the invocation contract from the workflow's latest published version. The response includes "
+        "each Subworkflow Trigger's input schema and declared public output schema; it does not expose draft "
+        "schemas or internal child step outputs. Requires read access to the workflow. If the workflow has no "
+        "published version, the endpoint returns 404. A published workflow without a Subworkflow Trigger returns "
+        "200 with `is_eligible` set to false and an empty `triggers` list."
+    ),
     dependencies=[Depends(_wf_perm_read)],
     operation_id="get_workflow_invocation_schema",
-    response_description="Published Subworkflow Trigger schemas",
+    response_description="Invocation metadata and Subworkflow Trigger schemas from the latest published version",
     response_model=WorkflowInvocationSchemaRead,
+    openapi_extra={
+        "responses": {
+            "200": {
+                "content": {
+                    "application/json": {
+                        "examples": {
+                            "eligibleWorkflow": {
+                                "summary": "Published workflow with a declared public output contract",
+                                "value": {
+                                    "workflow_id": "6c7085a1-5f73-47f1-8f63-728a40b055f6",
+                                    "published_version_id": "7a0594be-a081-4756-98cf-480f0a2a51a7",
+                                    "published_version": 4,
+                                    "published_version_name": "Incident intake",
+                                    "published_version_created_at": "2026-11-21T14:20:00Z",
+                                    "is_eligible": True,
+                                    "triggers": [
+                                        {
+                                            "trigger_node_id": "incident_intake",
+                                            "name": "Incident intake",
+                                            "input_schema": {
+                                                "type": "object",
+                                                "properties": {"incident_id": {"type": "string"}},
+                                                "required": ["incident_id"],
+                                            },
+                                            "output_schema": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "incident": {
+                                                        "type": "object",
+                                                        "properties": {
+                                                            "id": {"type": "string"},
+                                                            "status": {"type": "string"},
+                                                        },
+                                                        "required": ["id", "status"],
+                                                    }
+                                                },
+                                                "required": ["incident"],
+                                            },
+                                        }
+                                    ],
+                                },
+                            },
+                            "ineligibleWorkflow": {
+                                "summary": "Published workflow without a Subworkflow Trigger",
+                                "value": {
+                                    "workflow_id": "6c7085a1-5f73-47f1-8f63-728a40b055f6",
+                                    "published_version_id": "7a0594be-a081-4756-98cf-480f0a2a51a7",
+                                    "published_version": 4,
+                                    "published_version_name": "Manual workflow",
+                                    "published_version_created_at": "2026-11-21T14:20:00Z",
+                                    "is_eligible": False,
+                                    "triggers": [],
+                                },
+                            },
+                        }
+                    }
+                }
+            }
+        }
+    },
 )
 async def get_workflow_invocation_schema(
     workflow_id: UUID,
     service: Annotated[WorkflowService, Depends(get_workflow_service)],
 ) -> WorkflowInvocationSchemaRead:
-    """Get the latest published Subworkflow Trigger schemas for a workflow."""
+    """Get the invocation contract from a workflow's latest published version.
+
+    Only Subworkflow Trigger schemas are returned. The endpoint returns 404 when the workflow has no published
+    version; a published workflow with no Subworkflow Trigger is returned as ineligible with an empty trigger list.
+    """
     workflow = await service.get_workflow_by_id(workflow_id)
     if workflow.published_version_id is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workflow has no published version")
