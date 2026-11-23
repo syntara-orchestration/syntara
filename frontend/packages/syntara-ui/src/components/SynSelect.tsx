@@ -1,4 +1,5 @@
 import { Select, type SelectProps } from '@patternfly/react-core'
+import type { Ref } from 'react'
 
 import { useCloseSelectOnOuterScroll } from '../hooks/useCloseSelectOnOuterScroll'
 
@@ -6,7 +7,10 @@ import { LONG_SELECT_MAX_MENU_HEIGHT, longSelectMenuPopperProps } from './longSe
 import longSelectMenuStyles from './longSelectMenu.module.css'
 
 /** PatternFly `Select` props, plus Syntara menu defaults applied by {@link SynSelect}. */
-export type SynSelectProps = SelectProps
+export type SynSelectProps = SelectProps & {
+  /** Menu element, so keyboard handling can move focus onto an option. */
+  menuRef?: Ref<HTMLDivElement>
+}
 
 /**
  * PatternFly `Select` with Syntara menu defaults. Prefer this over importing `Select`
@@ -26,6 +30,7 @@ export function SynSelect({
   maxMenuHeight = LONG_SELECT_MAX_MENU_HEIGHT,
   popperProps,
   className,
+  menuRef,
   ...props
 }: Readonly<SynSelectProps>) {
   const outerScrollRef = useCloseSelectOnOuterScroll(Boolean(isOpen), () => onOpenChange?.(false))
@@ -35,6 +40,7 @@ export function SynSelect({
     <div ref={outerScrollRef}>
       <Select
         {...props}
+        ref={menuRef}
         isOpen={isOpen}
         onOpenChange={onOpenChange}
         isScrollable={isScrollable}

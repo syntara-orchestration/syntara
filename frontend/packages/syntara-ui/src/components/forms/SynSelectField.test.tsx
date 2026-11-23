@@ -44,6 +44,29 @@ describe('SynSelectField', () => {
     expect(screen.getByLabelText('Project')).toHaveTextContent('Select an option')
   })
 
+  it('moves from the current option with the arrow keys and commits that option', async () => {
+    const user = userEvent.setup()
+    const choices = [
+      { value: 'proj-1', label: 'Project One' },
+      { value: 'proj-2', label: 'Project Two' },
+      { value: 'proj-3', label: 'Project Three' },
+    ]
+    renderWithForm<FormData>({ schema, defaultValues: { projectId: 'proj-1' } }, ({ control }) => (
+      <SynSelectField name="projectId" control={control} label="Project" options={choices} />
+    ))
+    const toggle = screen.getByRole('button', { name: 'Project' })
+    toggle.focus()
+    await user.keyboard(' ')
+    await user.keyboard('{ArrowDown}{Enter}')
+    expect(toggle).toHaveTextContent('Project Two')
+    expect(toggle).toHaveFocus()
+
+    toggle.focus()
+    await user.keyboard(' ')
+    await user.keyboard('{ArrowUp}{Enter}')
+    expect(toggle).toHaveTextContent('Project One')
+  })
+
   it('selects an option and updates the toggle label', async () => {
     const user = userEvent.setup()
     renderWithForm<FormData>({ schema, defaultValues: { projectId: '' } }, ({ control }) => (

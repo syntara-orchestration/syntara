@@ -91,7 +91,7 @@ describe('Kafka consumer settings', () => {
     const list = screen.getByRole('listbox', { name: 'Offset gap policy options' })
     expect(within(list).queryByRole('option', { name: 'Inherit' })).not.toBeInTheDocument()
     expect(await axe(container)).toHaveNoViolations()
-    await user.keyboard('{ArrowDown}{Enter}')
+    await user.keyboard('{ArrowUp}{Enter}')
     expect(toggle).toHaveFocus()
     await user.type(screen.getByRole('textbox', { name: GROUP }), 'orders-consumer')
     await user.click(screen.getByRole('button', { name: 'Save settings' }))
@@ -99,6 +99,32 @@ describe('Kafka consumer settings', () => {
       expect.objectContaining({
         kafkaStart: { position: 'earliest', offset_gap_policy: 'fail' },
         kafkaGroupId: 'orders-consumer',
+      }),
+      expect.anything()
+    )
+  })
+
+  it('commits the next policy with Space, ArrowDown, and Enter', async () => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn()
+    renderSettings({ onSubmit })
+
+    const chooseNext = async (name: string, expected: string) => {
+      const toggle = screen.getByRole('button', { name })
+      toggle.focus()
+      await user.keyboard(' ')
+      await user.keyboard('{ArrowDown}{Enter}')
+      expect(toggle).toHaveTextContent(expected)
+      expect(toggle).toHaveFocus()
+    }
+
+    await chooseNext('Start position', 'Earliest')
+    await chooseNext('New partition position', 'Latest')
+    await chooseNext('Offset gap policy', 'Latest')
+    await user.click(screen.getByRole('button', { name: 'Save settings' }))
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kafkaStart: { position: 'earliest', added_partition_position: 'latest', offset_gap_policy: 'latest' },
       }),
       expect.anything()
     )
