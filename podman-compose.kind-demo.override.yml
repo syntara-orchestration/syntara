@@ -1,5 +1,5 @@
 ---
-# Cold-start Execution Plane demo override (AAP-93615).
+# Cold-start Execution Plane demo override.
 #
 # Layers the kind-cluster network onto the base full-stack compose WITHOUT changing
 # the default dev stack. The base podman-compose.yml must stay runnable for people

@@ -152,8 +152,8 @@ string path. EP now builds an SSL context with the CA and client certificate
 loaded together. The Role's narrow permission set was checked: port-forward
 access succeeds, while Pod logs and exec remain denied.
 
-A separate [HTTP executor smoke run](https://github.com/syntara-orchestration/syntara-execution-plane/blob/migration/ANSTRAT-1803/docs/kind-demo-runbook.md#http-executor-smoke-test)
-submitted the SDK HTTP executor image directly to EP and verified a successful
+A separate HTTP executor smoke run in the EP Kind demo runbook submitted the
+SDK HTTP executor image directly to EP and verified a successful
 HTTP response over the Job/gRPC path and completed cleanup. It used the current
 first-release WorkItem contract and did not run AO's native `http_request`
 activity or the AO-to-EP callback path.
@@ -165,9 +165,8 @@ inotify watchers, and the current OpenShift login was unauthorized. Therefore
 actual allowed-versus-blocked network traffic remains unverified and must be
 tested on an enforcing CNI, preferably the target OpenShift environment. The
 callback outage/restart, cancellation, startup failure, ambiguous Execute,
-database-role isolation, and migration-upgrade scenarios in the EP
-[Kind demo runbook](https://github.com/syntara-orchestration/syntara-execution-plane/blob/migration/ANSTRAT-1803/docs/kind-demo-runbook.md)
-also remain release checks.
+database-role isolation, and migration-upgrade scenarios in the EP Kind demo
+runbook also remain release checks.
 
 The merged monorepo Kind/Konflux harnesses that run Alembic from AO, write EP
 tables directly, or connect EP to Temporal are not retained as validation for

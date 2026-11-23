@@ -4,7 +4,8 @@ Updated 6 October 2026 for EP PR #1 and AO PR #728. These decisions describe
 the first isolated release. This file is a mirror; the EP repository copy is
 canonical and should be updated first.
 
-Canonical source: [EP `docs/service-isolation-revisit-decisions.md`](https://github.com/syntara-orchestration/syntara-execution-plane/blob/migration/ANSTRAT-1803/docs/service-isolation-revisit-decisions.md).
+Canonical source: `docs/service-isolation-revisit-decisions.md` in the
+Execution Plane repository.
 
 ## Confirmed first-release choices
 
@@ -48,7 +49,8 @@ versioned SDK protocol carries inputs, progress, errors, results, and returned
 stdout/stderr fields. No workload input Secret, Pod-log result retrieval,
 `exec`, or stdin/stdout control path is part of this contract. Management
 credentials and service TLS Secrets are separate from user credential
-injection. Do not define a credential mount convention before ANSTRAT-2422.
+injection. Do not define a credential mount convention before the planned
+workload-credential design review.
 
 The initial transport is an authenticated Kubernetes API port-forward carrying
 the gRPC stream to a loopback client. It is a bootstrap choice, not a claim

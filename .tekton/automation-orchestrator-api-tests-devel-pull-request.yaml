@@ -1,7 +1,7 @@
 ---
 # Thin stub: the ao-api-tests bundle pipeline with an Execution Plane.
 #
-# feat/ANSTRAT-1803 dispatches every script-node activity to the standalone
+# The execution-plane integration dispatches every script-node activity to the standalone
 # Execution Plane, so the e2e environment must deploy one: ep-revision pins
 # the EP source for deploy-ao (aap-konflux-pipelines#4719), and
 # ao-operator-revision pins the operator branch that honors
@@ -62,7 +62,7 @@ spec:
     - name: ao-operator-git-url
       value: https://github.com/automation-nexus/automation-orchestrator-operator.git
     - name: ao-operator-revision
-      value: feat/ANSTRAT-1803
+      value: devel
   pipelineRef:
     params:
       - name: name

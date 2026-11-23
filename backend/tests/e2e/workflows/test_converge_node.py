@@ -228,7 +228,7 @@ def test_converge_timeout_continue_on_failure(syntara_api: SyntaraApiRegistry):
     assert result.status == ExecutionStatus.COMPLETED_WITH_ERRORS
     # Detached in-flight branches are not cancelled: an Execution Plane work
     # item that was already dispatched runs to completion and is recorded as
-    # completed, while one still queued is cancelled (AAP-90400 race).
+    # completed, while one still queued is cancelled because of dispatch racing.
     assert activities["fast_branch"].status in ("completed", "cancelled")
     assert activities["slow_branch"].status in ("completed", "cancelled")  # detached when timeout fired
     # If the detached branch finishes while the workflow is still draining its
@@ -388,7 +388,7 @@ def test_converge_timeout_fail_and_skip_downstream(syntara_api: SyntaraApiRegist
 
     # Detached in-flight branches are not cancelled: an Execution Plane work
     # item that was already dispatched runs to completion and is recorded as
-    # completed, while one still queued is cancelled (AAP-90400 race).
+    # completed, while one still queued is cancelled because of dispatch racing.
     assert activities["fast_branch"].status in ("completed", "cancelled")
     assert activities["slow_branch"].status in ("completed", "cancelled")  # detached when timeout fired
     assert activities["intermediate"].status in (
