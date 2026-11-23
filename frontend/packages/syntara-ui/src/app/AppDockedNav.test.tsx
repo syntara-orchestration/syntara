@@ -211,7 +211,7 @@ describe('AppDockedNav', () => {
     expect(profileLink).toHaveAttribute('href', '/my-profile')
     await user.click(profileLink)
 
-    expect(mockNavigate).toHaveBeenCalledWith({ to: '/my-profile' })
+    expect(mockRequestNavigation).toHaveBeenCalledWith('/my-profile')
   })
 
   it.each(['Meta', 'Control'] as const)(

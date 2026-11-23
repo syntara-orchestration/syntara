@@ -6,7 +6,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { axe } from 'vitest-axe'
 
 import { identityProvidersClient, usersClient } from '../../../client'
-import { AlertProvider } from '../../../providers/alerts'
+import { AlertProvider } from '../../../providers/alerts/AlertProvider'
 
 import { useDetachIdentity } from './useDetachIdentity'
 import { UserIdentitiesPanel } from './UserIdentitiesPanel'

@@ -25,7 +25,7 @@ import {
 } from '@patternfly/react-core'
 import type { MenuToggleElement } from '@patternfly/react-core'
 import { RhUiProfileFillIcon, RhUiQuestionMarkCircleIcon } from '@patternfly/react-icons'
-import { Link, useNavigate, useRouterState } from '@tanstack/react-router'
+import { Link, useRouterState } from '@tanstack/react-router'
 import { useMemo, useRef, useState } from 'react'
 
 import { authClient } from '../client'
@@ -179,10 +179,12 @@ function NavExpandableItem({
   /* v8 ignore stop */
 }
 
-function UserMenuDropdown({ showTooltip }: Readonly<{ showTooltip: boolean }>) {
+function UserMenuDropdown({
+  showTooltip,
+  requestNavigation,
+}: Readonly<{ showTooltip: boolean; requestNavigation: (path: string) => void }>) {
   const [isOpen, setIsOpen] = useState(false)
   const userMenuRef = useRef<MenuToggleElement>(null)
-  const navigate = useNavigate()
   const logout = useAuthStore((s) => s.logout)
   const { showAlert } = useAlerts()
   const { data: currentUser } = authClient.useQuery('get', '/auth/me')
@@ -210,7 +212,7 @@ function UserMenuDropdown({ showTooltip }: Readonly<{ showTooltip: boolean }>) {
 
     event?.preventDefault()
     setIsOpen(false)
-    detachPromise(navigate({ to: AppRoute.MyProfile.Root }))
+    requestNavigation(AppRoute.MyProfile.Root)
   }
 
   /* v8 ignore start -- phantom branches from compiled JSX props */
@@ -397,7 +399,7 @@ export function AppDockedNav() {
                   </Button>
                 </ToolbarItem>
                 <ToolbarItem>
-                  <UserMenuDropdown showTooltip={showTooltips} />
+                  <UserMenuDropdown showTooltip={showTooltips} requestNavigation={requestNavigation} />
                 </ToolbarItem>
               </ToolbarGroup>
             </ToolbarContent>

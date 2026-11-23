@@ -43,6 +43,7 @@ import { useRevokeUserTokens } from '../useRevokeUserTokens'
 import { useUserPermissions } from '../useUserPermissions'
 
 import type { UserIdentity } from './identityUtils'
+import styles from './UserDetail.module.css'
 import { UserDetailConfirmationDialogs, UserDetailToolbar } from './UserDetailActions'
 import { renderUserDetailEarlyShell } from './userDetailEarlyShell'
 import { computeGroupCount, computeRoleAssignmentCount } from './userDetailUtils'
@@ -157,16 +158,16 @@ function UserDetailsTab({
                 [...uniqueProviders.entries()]
                   .sort(([, a], [, b]) => a.localeCompare(b))
                   .map(([id, name]) => (
-                    <Label key={id} isCompact>
-                      <SynLink
-                        to={AppRoute.SystemAdministration.Authentication.IdentityProviderDetail.replace(
-                          ':providerId',
-                          id
-                        ).replace('/:tab?', '')}
-                      >
-                        {name}
-                      </SynLink>
-                    </Label>
+                    <SynLink
+                      key={id}
+                      className={styles.identityProviderLink}
+                      to={AppRoute.SystemAdministration.Authentication.IdentityProviderDetail.replace(
+                        ':providerId',
+                        id
+                      ).replace('/:tab?', '')}
+                    >
+                      {name}
+                    </SynLink>
                   ))}
             </LabelGroup>
           )}
