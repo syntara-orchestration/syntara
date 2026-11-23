@@ -20,10 +20,6 @@
  *  REPORTED via `resourceReferenceNodes`. This module does NOT silently strip or
  *  preserve them as authorized — the caller surfaces them and the embed is gated
  *  pending the authorization-at-use decision (documented OPEN for Sagar/security).
- *
- * NOTE (verify on-computer): this is a DRAFT written without a compiler/test run in the
- * authoring environment. Confirm import paths, the `Activity` shape, and the v2 node
- * `position` field against @syntara/contracts before relying on it.
  */
 
 import type { Activity } from '../../../../stores/workflowStoreTypes'
