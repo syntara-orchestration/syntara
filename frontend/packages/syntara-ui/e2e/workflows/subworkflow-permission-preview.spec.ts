@@ -69,7 +69,9 @@ test('shows an advisory when the editor cannot execute the selected child workfl
     await clickNode(app, 'Call child')
 
     await expect.poll(() => deniedExecutionCheckMocked).toBe(true)
-    await expect(app.getByRole('heading', { name: /You would not be able to execute this workflow/ })).toBeVisible()
+    await expect(
+      app.getByRole('heading', { name: /You may not be able to run executions in this project/ })
+    ).toBeVisible()
     const updateButton = app.getByRole('button', { name: 'Update', exact: true })
     await expect(updateButton).toBeEnabled()
     await app.getByRole('textbox', { name: 'Name', exact: true }).fill('Call child permission preview')

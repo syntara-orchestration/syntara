@@ -423,6 +423,10 @@ describe('SubWorkflowNodeForm', () => {
     renderForm({ initialData: { workflow_id: 'workflow-1', trigger_node_id: 'sub-trigger-1' } })
 
     expect(await screen.findByText('You do not have permission to read this child workflow.')).toBeInTheDocument()
+    expect(mocks.useCanI).toHaveBeenLastCalledWith('run', 'execution', {
+      resourceProject: 'project-1',
+      enabled: false,
+    })
   })
 
   it('shows a non-blocking preview when the editor cannot execute the selected child workflow', async () => {
@@ -433,7 +437,7 @@ describe('SubWorkflowNodeForm', () => {
       onSubmit,
     })
 
-    expect(await screen.findByText('You would not be able to execute this workflow')).toBeInTheDocument()
+    expect(await screen.findByText('You may not be able to run executions in this project')).toBeInTheDocument()
     expect(mocks.useCanI).toHaveBeenCalledWith('run', 'execution', {
       resourceProject: 'project-1',
       enabled: true,
@@ -450,7 +454,7 @@ describe('SubWorkflowNodeForm', () => {
 
     await screen.findByRole('textbox', { name: 'host' })
 
-    expect(screen.queryByText('You would not be able to execute this workflow')).not.toBeInTheDocument()
+    expect(screen.queryByText('You may not be able to run executions in this project')).not.toBeInTheDocument()
     expect(screen.queryByText('Unable to verify execution permission')).not.toBeInTheDocument()
   })
 
@@ -458,15 +462,19 @@ describe('SubWorkflowNodeForm', () => {
     mocks.useCanI.mockReturnValue({ allowed: false, isChecking: true, isError: false })
     renderForm({ initialData: { workflow_id: 'workflow-1', trigger_node_id: 'sub-trigger-1' } })
 
-    expect(screen.queryByText('You would not be able to execute this workflow')).not.toBeInTheDocument()
+    expect(screen.queryByText('You may not be able to run executions in this project')).not.toBeInTheDocument()
   })
 
-  it('does not treat a failed permission check as a confirmed denial', () => {
-    mocks.useCanI.mockReturnValue({ allowed: false, isChecking: false, isError: true })
+  it('does not treat a failed permission check as a denial and allows retrying', async () => {
+    const user = userEvent.setup()
+    const refetch = vi.fn().mockResolvedValue(undefined)
+    mocks.useCanI.mockReturnValue({ allowed: false, isChecking: false, isError: true, refetch })
     renderForm({ initialData: { workflow_id: 'workflow-1', trigger_node_id: 'sub-trigger-1' } })
 
     expect(screen.getByText('Unable to verify execution permission')).toBeInTheDocument()
-    expect(screen.queryByText('You would not be able to execute this workflow')).not.toBeInTheDocument()
+    expect(screen.queryByText('You may not be able to run executions in this project')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Retry' }))
+    expect(refetch).toHaveBeenCalledOnce()
   })
 
   it('shows a warning when the selected workflow is no longer eligible', async () => {
@@ -477,6 +485,10 @@ describe('SubWorkflowNodeForm', () => {
     renderForm({ initialData: { workflow_id: 'workflow-1' } })
 
     expect(await screen.findByText('This workflow has no eligible Sub-workflow Trigger.')).toBeInTheDocument()
+    expect(mocks.useCanI).toHaveBeenLastCalledWith('run', 'execution', {
+      resourceProject: 'project-1',
+      enabled: false,
+    })
   })
 
   it('has no accessibility violations after selecting an eligible child', async () => {
