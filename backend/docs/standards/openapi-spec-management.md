@@ -123,7 +123,8 @@ CI accepts the override when the PR has the `breaking-change-approved` label. Au
 1. Use the label named exactly `breaking-change-approved`.
 2. When an authorized team member adds it, the workflow verifies the membership and records that verification in a follow-up comment. Unauthorized changes are reverted when possible, and the check reports whether the final label state is authorized.
 3. The caller needs the `ANSIBLE_ORG_MEMBERS_READ_ONLY_APP_CLIENT_ID` Actions variable and `ANSIBLE_ORG_MEMBERS_READ_ONLY_APP_PRIVATE_KEY` Actions secret. Ask an organization administrator to confirm that the Syntara repository can access them before relying on the workflow.
-4. After an authorized member applies the label to a failed PR, the OpenAPI Breaking Changes workflow re-runs on `labeled` / `unlabeled`. Re-run **(Backend) Check OpenAPI Breaking Changes** if that required check still shows the pre-label failure.
+4. Make the `approval-label-authorization` check a required status check, or include it in the `(Backend) Required Checks` aggregate. This prevents a PR from merging while the authorization workflow is still checking or reverting a label.
+5. After an authorized member applies the label to a failed PR, the OpenAPI Breaking Changes workflow re-runs on `labeled` / `unlabeled`. Re-run **(Backend) Check OpenAPI Breaking Changes** if that required check still shows the pre-label failure.
 
 GitHub has no native per-label permission; the shared authorization workflow enforces who may change this label. The contributor handbook for this process is in the [backend contributor guide](../../backend-contributing.md#breaking-change-override-process).
 

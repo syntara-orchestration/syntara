@@ -280,9 +280,10 @@ def check_approval_label(pr_labels_json: str) -> bool:
     is used instead of a comma-joined string so that a label name that itself
     contains a comma cannot be split into two and forge the approval label. The
     match is case-sensitive to stay consistent with the exact label comparison
-    in ``approval-label-authorization.yml`` and the label filter in
-    ``openapi-breaking-changes.yml``; a case-variant must not be accepted as
-    this exact approval label.
+    in the shared ``ansible/actions`` approval-label-authorization workflow
+    (called from this repo's ``approval-label-authorization.yml``) and the label
+    filter in ``openapi-breaking-changes.yml``; a case-variant must not be
+    accepted as this exact approval label.
 
     Args:
         pr_labels_json: JSON-encoded array of PR label names
