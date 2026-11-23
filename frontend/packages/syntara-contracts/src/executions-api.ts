@@ -117,7 +117,7 @@ export interface paths {
     }
     /**
      * List child executions
-     * @description Retrieve child (sub-workflow) executions spawned by a parent execution.
+     * @description Returns child workflow execution records spawned by this parent execution. Use this endpoint to inspect nested run status and correlate each child with the parent Sub-workflow node that started it. The optional `node_id` filter selects one parent node; a `for_each` node can have multiple child executions, one per iteration. Results use standard execution pagination and are limited to child executions in projects visible to the caller. Read permission on the parent execution is required.
      */
     get: operations['list_child_executions']
     put?: never
@@ -2324,7 +2324,7 @@ export interface operations {
     }
     requestBody?: never
     responses: {
-      /** @description Successful Response */
+      /** @description Paginated child workflow execution records */
       200: {
         headers: {
           [name: string]: unknown

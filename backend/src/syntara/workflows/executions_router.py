@@ -353,8 +353,57 @@ async def list_execution_activities(
     "/{execution_id}/children",
     operation_id="list_child_executions",
     summary="List child executions",
-    description="Retrieve child (sub-workflow) executions spawned by a parent execution.",
+    description=(
+        "Returns child workflow execution records spawned by this parent execution. Use this endpoint to inspect "
+        "nested run status and correlate each child with the parent Sub-workflow node that started it. The optional "
+        "`node_id` filter selects one parent node; a `for_each` node can have multiple child executions, one per "
+        "iteration. Results use standard execution pagination and are limited to child executions in projects "
+        "visible to the caller. Read permission on the parent execution is required."
+    ),
     dependencies=[Depends(_exec_perm_read)],
+    response_description="Paginated child workflow execution records",
+    openapi_extra={
+        "responses": {
+            "200": {
+                "content": {
+                    "application/json": {
+                        "examples": {
+                            "childExecution": {
+                                "summary": "Failed child execution with include_total=true",
+                                "value": {
+                                    "total": 1,
+                                    "resources": [
+                                        {
+                                            "id": "d0fd8be6-bb54-42d9-a6d3-8bd168f97108",
+                                            "workflow_id": "6c7085a1-5f73-47f1-8f63-728a40b055f6",
+                                            "workflow_version_id": "7a0594be-a081-4756-98cf-480f0a2a51a7",
+                                            "workflow_name": "Incident enrichment",
+                                            "workflow_version": 4,
+                                            "project_id": "a868a8b1-65ae-4c41-ad5b-a2dd452de1e2",
+                                            "temporal_workflow_id": (
+                                                "child-execution-d0fd8be6-bb54-42d9-a6d3-8bd168f97108"
+                                            ),
+                                            "status": "failed",
+                                            "created_at": "2026-11-23T10:15:00Z",
+                                            "completed_at": "2026-11-23T10:15:08Z",
+                                            "updated_at": "2026-11-23T10:15:08Z",
+                                            "input_data": {"incident_id": "INC-4821"},
+                                            "error_details": (
+                                                "Sub-workflow output contract failed: required public output "
+                                                "'status' was not produced."
+                                            ),
+                                            "trigger_node_id": "child_entry",
+                                            "trigger_type": "subworkflow_trigger",
+                                        }
+                                    ],
+                                },
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
 )
 async def list_child_executions(
     execution_id: UUID,
