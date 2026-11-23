@@ -130,6 +130,8 @@ describe('HTTP-client suppression directive policy', () => {
 
     for (const path of sourceFiles) {
       const code = await readFile(path, 'utf8')
+      if (!code.includes('eslint-disable')) continue
+
       const { ast } = tseslint.parser.parseForESLint(code, {
         ecmaVersion: 'latest',
         filePath: path,
