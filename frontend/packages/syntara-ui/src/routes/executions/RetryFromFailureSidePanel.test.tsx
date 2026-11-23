@@ -36,8 +36,8 @@ function renderPanel(props?: Partial<React.ComponentProps<typeof RetryFromFailur
       ['step-2', 'Second Step'],
     ]),
     activityTypeMap: new Map([
-      ['step-1', 'script'],
-      ['step-2', 'script'],
+      ['step-1', 'script_python'],
+      ['step-2', 'script_python'],
     ]),
     onClose: vi.fn(),
     ...props,
@@ -73,7 +73,7 @@ describe('RetryFromFailureSidePanel', () => {
     expect(screen.getByText('3 steps will be retried')).toBeInTheDocument()
     expect(screen.getByText('Includes affected steps and any downstream merge step')).toBeInTheDocument()
     expect(screen.getByText('Second Step')).toBeInTheDocument()
-    expect(screen.getByText('Script')).toBeInTheDocument()
+    expect(screen.getByText('Python Script')).toBeInTheDocument()
     expect(screen.getByText('1 completed result retained')).toBeInTheDocument()
     expect(
       screen.getByText(/This retry uses the same workflow version as this run, preserving the definition that ran/)
@@ -471,8 +471,8 @@ describe('RetryFromFailureSidePanel', () => {
         ['call-api', 'Call external API'],
       ]),
       activityTypeMap: new Map([
-        ['fetch-inventory', 'script'],
-        ['call-api', 'script'],
+        ['fetch-inventory', 'script_python'],
+        ['call-api', 'script_python'],
       ]),
       workflowEdges: [
         { source: 'fetch-inventory', target: 'process-inventory' },
