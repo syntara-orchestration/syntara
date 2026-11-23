@@ -1039,10 +1039,9 @@ describe('useExecutionStore', () => {
     it('accepts terminal status from snapshot after patch left activity in-flight', () => {
       useExecutionStore.getState().reset()
 
-      useExecutionStore.getState().applyPatch(
-        [{ op: 'replace', path: '/activities/script_step/status', value: 'running' }],
-        'patch-running'
-      )
+      useExecutionStore
+        .getState()
+        .applyPatch([{ op: 'replace', path: '/activities/script_step/status', value: 'running' }], 'patch-running')
 
       const execution = createMockExecution({
         activities: [
