@@ -519,6 +519,32 @@ describe('IntegrationForm', () => {
       })
       expect(screen.getByRole('button', { name: 'MCP Server' })).toBeInTheDocument()
     })
+
+    it('requires a CA certificate before leaving integration details', async () => {
+      const user = userEvent.setup()
+      render(<IntegrationForm />, { wrapper })
+
+      await user.click(screen.getByRole('button', { name: 'MCP Server' }))
+      await user.click(screen.getByRole('option', { name: /Execution plane infrastructure/i }))
+
+      const certificate = screen.getByRole('textbox', { name: /ca certificate/i })
+      expect(certificate).toBeRequired()
+      expect(screen.queryByText('Security')).not.toBeInTheDocument()
+
+      await user.type(screen.getByRole('textbox', { name: /connection name/i }), 'ocp-prod')
+      await user.click(screen.getByRole('textbox', { name: /api endpoint/i }))
+      await user.paste('https://api.cluster.example.com:6443')
+      await user.click(screen.getByRole('button', { name: 'Next' }))
+
+      expect(await screen.findByText('CA certificate is required')).toBeInTheDocument()
+      expect(screen.queryByRole('heading', { name: 'Authentication' })).not.toBeInTheDocument()
+
+      await user.click(certificate)
+      await user.paste('-----BEGIN CERTIFICATE-----\nMIIB')
+      await user.click(screen.getByRole('button', { name: 'Next' }))
+
+      expect(await screen.findByRole('heading', { name: 'Authentication' })).toBeInTheDocument()
+    })
   })
 
   describe('Test connection (discover)', () => {

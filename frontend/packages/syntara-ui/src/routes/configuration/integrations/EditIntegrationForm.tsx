@@ -37,6 +37,7 @@ import { detachPromise } from '../../../utils/detachPromise'
 import { useDocLink } from '../../../utils/docs/useDocLink'
 import { CredentialSelector } from '../../builder/components/CredentialSelector'
 
+import { CaCertificateField } from './CaCertificateField'
 import styles from './EditIntegrationForm.module.css'
 import type { EditIntegrationFormValues, IntegrationRead } from './editIntegrationFormSchema'
 import { buildConfiguration, buildEditSchema, editIntegrationSchema } from './editIntegrationFormSchema'
@@ -200,7 +201,15 @@ function EditIntegrationFormFields({
         />
       )}
 
-      <EditSecurityFields />
+      {isOpenShift ? (
+        <CaCertificateField<EditIntegrationFormValues, 'ca_certificate'>
+          name="ca_certificate"
+          fieldId="edit-ca-certificate"
+          isRequired
+        />
+      ) : (
+        <EditSecurityFields />
+      )}
 
       {isOpenShift ? (
         <ExecutionPlaneScopeField fieldId="edit-integration-scope" />

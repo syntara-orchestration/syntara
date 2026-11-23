@@ -352,6 +352,9 @@ export function IntegrationForm() {
       if (errors.configuration && 'base_url' in errors.configuration && errors.configuration.base_url) {
         messages.push(errors.configuration.base_url.message ?? 'Base URL is invalid')
       }
+      if (errors.configuration && 'ca_certificate' in errors.configuration && errors.configuration.ca_certificate) {
+        messages.push(errors.configuration.ca_certificate.message ?? 'CA certificate is required')
+      }
       if (messages.length > 0) {
         showAlert({
           title: 'Unable to save integration',
