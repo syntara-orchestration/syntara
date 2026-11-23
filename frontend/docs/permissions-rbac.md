@@ -255,17 +255,17 @@ Backend defines `policy:create`, `policy:update`, `policy:delete`. The UI curren
 
 Integration permission gating uses `useIntegrationPermissions` hook checking `integration:create`, `integration:update`, `integration:delete`.
 
-| Action                      | Permission           | Implementation                                        |
-| --------------------------- | -------------------- | ----------------------------------------------------- |
-| Configure (create)          | `integration:create` | `DisabledWithTooltip` on list page + route guard      |
-| Edit integration            | `integration:update` | `DisabledWithTooltip` on detail toolbar + route guard |
-| Enable/disable integration  | `integration:update` | `Tooltip` on disabled `Switch`                        |
-| Validate integration        | `integration:update` | `isAriaDisabled` + `tooltipProps` on kebab action     |
-| Delete integration          | `integration:delete` | `isAriaDisabled` + `tooltipProps` on kebab action     |
-| Enable/disable tools/models | `integration:update` | `canUpdate` prop on tab checkboxes + save button      |
-| Refresh tools/models        | `integration:update` | `isAriaDisabled` on refresh button                    |
+| Action                      | Permission           | Implementation                                            |
+| --------------------------- | -------------------- | --------------------------------------------------------- |
+| Configure (create)          | `integration:create` | `DisabledWithTooltip` on list page + route guard          |
+| Edit integration            | `integration:update` | `DisabledWithTooltip` on detail toolbar + route guard     |
+| Enable/disable integration  | `integration:update` | `Tooltip` on disabled `Switch` (non–execution-plane only) |
+| Validate integration        | `integration:update` | `isAriaDisabled` + `tooltipProps` on kebab action         |
+| Delete integration          | `integration:delete` | `isAriaDisabled` + `tooltipProps` on kebab action         |
+| Enable/disable tools/models | `integration:update` | `canUpdate` prop on tab checkboxes + save button          |
+| Refresh tools/models        | `integration:update` | `isAriaDisabled` on refresh button                        |
 
-**Note**: Delete is also subject to an independent business rule (not a permission): for Execution plane infrastructure (`openshift`) integrations, the Delete kebab action is omitted on the list and detail views regardless of `integration:delete`. The other three integration types still use the permission gating above.
+**Note**: Execution plane infrastructure (`openshift`) integrations have independent business rules (not permissions): the Delete kebab action is omitted on list and detail views regardless of `integration:delete`, and enable/disable is not offered — the list State column and detail State field show a static Enabled/Disabled label with an explanatory tooltip instead of a `Switch`. The other three integration types still use the permission gating above.
 
 ### Execution Plane — gated
 

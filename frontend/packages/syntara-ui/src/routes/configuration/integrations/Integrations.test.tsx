@@ -1524,6 +1524,77 @@ describe('Integrations Component', () => {
       }
     })
 
+    it('shows a static Enabled label instead of a switch for OpenShift integrations', async () => {
+      vi.mocked(integrationsClient.useQuery).mockReturnValue({
+        data: {
+          resources: [
+            {
+              ...mockIntegrations[0],
+              id: 'openshift-1',
+              name: 'OpenShift Cluster',
+              integration_type: 'openshift',
+              configuration: {
+                integration_type: 'openshift',
+                base_url: 'https://api.openshift.example.com',
+              },
+            },
+            mockIntegrations[1],
+          ],
+        },
+        isPending: false,
+        isError: false,
+        error: null,
+        refetch: vi.fn(),
+      })
+
+      const user = userEvent.setup()
+      render(<Integrations />, { wrapper })
+
+      expect(screen.getAllByRole('switch')).toHaveLength(1)
+
+      const openShiftRow = screen.getByRole('row', { name: /OpenShift Cluster/i })
+      const enabledLabel = within(openShiftRow).getByText('Enabled', { selector: '.pf-v6-c-label__text' })
+      expect(enabledLabel).toBeInTheDocument()
+      expect(within(openShiftRow).queryByRole('switch')).not.toBeInTheDocument()
+
+      await user.hover(enabledLabel)
+      expect(
+        await screen.findByText(
+          /Execution plane infrastructure must stay enabled so execution targets can use the cluster/
+        )
+      ).toBeInTheDocument()
+    })
+
+    it('shows Disabled label for a disabled OpenShift integration', () => {
+      vi.mocked(integrationsClient.useQuery).mockReturnValue({
+        data: {
+          resources: [
+            {
+              ...mockIntegrations[0],
+              id: 'openshift-1',
+              name: 'OpenShift Cluster',
+              integration_type: 'openshift',
+              enabled: false,
+              configuration: {
+                integration_type: 'openshift',
+                base_url: 'https://api.openshift.example.com',
+              },
+            },
+          ],
+        },
+        isPending: false,
+        isError: false,
+        error: null,
+        refetch: vi.fn(),
+      })
+
+      render(<Integrations />, { wrapper })
+
+      const openShiftRow = screen.getByRole('row', { name: /OpenShift Cluster/i })
+      expect(within(openShiftRow).getByText('Disabled', { selector: '.pf-v6-c-label__text' })).toBeInTheDocument()
+      expect(within(openShiftRow).queryByRole('switch')).not.toBeInTheDocument()
+    })
+
     it('opens disable confirmation dialog when toggling an enabled integration off', async () => {
       const user = userEvent.setup()
       render(<Integrations />, { wrapper })

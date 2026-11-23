@@ -10,6 +10,7 @@ import { getErrorMessage } from '../../../utils/apiErrors'
 import { detachPromise } from '../../../utils/detachPromise'
 
 import { OPENSHIFT_INTEGRATION_EXISTS_QUERY_KEY } from './form/useOpenShiftIntegrationExists'
+import { isExecutionPlaneInfrastructure } from './integrationUtils'
 
 type IntegrationRead = IntegrationsAPI.components['schemas']['IntegrationRead']
 
@@ -94,6 +95,8 @@ export function useIntegrationActions(refetch: () => Promise<unknown>) {
 
   function handleToggleEnabled(integration: IntegrationRead) {
     if (!integration.id) return
+    // MVP: Execution plane infrastructure cannot be disabled in the UI.
+    if (isExecutionPlaneInfrastructure(integration)) return
 
     if (integration.enabled) {
       disableDialog.open(integration)
