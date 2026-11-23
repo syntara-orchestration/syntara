@@ -1,6 +1,8 @@
 import { IntegrationTypeEnum, LLMProviderHintEnum } from '@syntara/contracts'
 import { describe, expect, it } from 'vitest'
 
+import { CA_CERTIFICATE_REQUIRED_MESSAGE } from '../caCertificate'
+
 import { integrationFormSchema, getStep1Fields, getDefaultConfiguration } from './integrationFormSchema'
 
 const securityDefaults = {
@@ -43,6 +45,7 @@ const validOpenShiftBase = {
     integration_type: 'openshift' as const,
     base_url: 'https://api.example.com:6443',
     ...securityDefaults,
+    ca_certificate: '-----BEGIN CERTIFICATE-----\n...',
   },
   scope: 'global' as const,
 }
@@ -311,11 +314,32 @@ describe('integrationFormSchema', () => {
           integration_type: 'openshift' as const,
           base_url: 'http://api.example.com:6443',
           ...securityDefaults,
+          ca_certificate: '-----BEGIN CERTIFICATE-----\n...',
         },
       })
       expect(result.success).toBe(false)
       if (!result.success) {
         expect(result.error.issues.some((i) => i.message === 'Must be an HTTPS URL')).toBe(true)
+      }
+    })
+
+    it.each([
+      ['null', null],
+      ['empty', ''],
+      ['whitespace', '   '],
+    ])('rejects a %s CA certificate', (_label, caCertificate) => {
+      const result = integrationFormSchema.safeParse({
+        ...validOpenShiftBase,
+        name: 'Cluster',
+        configuration: {
+          ...validOpenShiftBase.configuration,
+          ca_certificate: caCertificate,
+        },
+      })
+      expect(result.success).toBe(false)
+      if (!result.success) {
+        expect(result.error.issues.some((i) => i.message === CA_CERTIFICATE_REQUIRED_MESSAGE)).toBe(true)
+        expect(result.error.issues.some((i) => i.path.join('.') === 'configuration.ca_certificate')).toBe(true)
       }
     })
   })
@@ -437,10 +461,11 @@ describe('integrationFormSchema', () => {
       expect(fields).toContain('configuration.base_url')
     })
 
-    it('returns name and base_url for OpenShift', () => {
+    it('returns name, base_url, and CA certificate for OpenShift', () => {
       const fields = getStep1Fields(IntegrationTypeEnum.OPENSHIFT)
       expect(fields).toContain('name')
       expect(fields).toContain('configuration.base_url')
+      expect(fields).toContain('configuration.ca_certificate')
     })
 
     it('references valid schema paths that are required for MCP', () => {

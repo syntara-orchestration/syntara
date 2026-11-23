@@ -318,6 +318,22 @@ describe('IntegrationDetailsStep', () => {
       expect(screen.queryByRole('textbox', { name: /^api url$/i })).not.toBeInTheDocument()
     })
 
+    it('shows a required CA certificate outside Security section', () => {
+      render(<TestWrapper defaultType={IntegrationTypeEnum.OPENSHIFT} />)
+
+      const certificate = screen.getByRole('textbox', { name: /ca certificate/i })
+      const apiEndpoint = screen.getByRole('textbox', { name: /api endpoint/i })
+      const scope = screen.getByText('Global')
+
+      expect(certificate).toBeRequired()
+      expect(certificate).toHaveAttribute('aria-required', 'true')
+      expect(screen.getByText(/PEM-encoded CA certificate/)).toBeInTheDocument()
+      expect(screen.queryByText('Security')).not.toBeInTheDocument()
+      expect(screen.queryByRole('checkbox', { name: /allow http connections/i })).not.toBeInTheDocument()
+      expect(apiEndpoint.compareDocumentPosition(certificate) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+      expect(certificate.compareDocumentPosition(scope) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    })
+
     it('has no accessibility violations with OpenShift selected', async () => {
       const { container } = render(<TestWrapper defaultType={IntegrationTypeEnum.OPENSHIFT} />)
 
@@ -551,15 +567,16 @@ describe('IntegrationDetailsStep', () => {
       expect(screen.getByRole('checkbox', { name: /disable tls certificate verification/i })).toBeInTheDocument()
     })
 
-    it('hides HTTP and TLS checkboxes for Execution plane infrastructure but keeps CA certificate', async () => {
+    it('keeps an optional CA certificate inside Security for other integration types', async () => {
       const user = userEvent.setup()
-      render(<TestWrapper defaultType={IntegrationTypeEnum.OPENSHIFT} />)
+      render(<TestWrapper />)
+
+      expect(screen.queryByRole('textbox', { name: /ca certificate/i })).not.toBeInTheDocument()
 
       await user.click(screen.getByText('Security'))
 
-      expect(screen.queryByRole('checkbox', { name: /allow http connections/i })).not.toBeInTheDocument()
-      expect(screen.queryByRole('checkbox', { name: /disable tls certificate verification/i })).not.toBeInTheDocument()
-      expect(screen.getByRole('textbox', { name: /ca certificate/i })).toBeInTheDocument()
+      const certificate = screen.getByRole('textbox', { name: /ca certificate/i })
+      expect(certificate).not.toBeRequired()
       expect(screen.getByText(/PEM-encoded CA certificate/)).toBeInTheDocument()
     })
 

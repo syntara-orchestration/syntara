@@ -28,6 +28,7 @@ import { useAlerts } from '../../../../providers/alerts/AlertContext'
 import { getErrorMessage } from '../../../../utils/apiErrors'
 import { detachPromise } from '../../../../utils/detachPromise'
 import { useDocLink } from '../../../../utils/docs/useDocLink'
+import { CA_CERTIFICATE_REQUIRED_MESSAGE } from '../caCertificate'
 import { CREDENTIAL_REQUIRED_TYPES } from '../integrationFilters'
 
 import { CredentialStep } from './CredentialStep'
@@ -351,6 +352,9 @@ export function IntegrationForm() {
       if (errors.name) messages.push(errors.name.message ?? 'Name is invalid')
       if (errors.configuration && 'base_url' in errors.configuration && errors.configuration.base_url) {
         messages.push(errors.configuration.base_url.message ?? 'Base URL is invalid')
+      }
+      if (errors.configuration && 'ca_certificate' in errors.configuration && errors.configuration.ca_certificate) {
+        messages.push(errors.configuration.ca_certificate.message ?? CA_CERTIFICATE_REQUIRED_MESSAGE)
       }
       if (messages.length > 0) {
         showAlert({

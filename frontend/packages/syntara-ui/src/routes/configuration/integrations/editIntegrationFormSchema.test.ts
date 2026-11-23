@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
+import { CA_CERTIFICATE_REQUIRED_MESSAGE } from './caCertificate'
 import { buildEditSchema, buildConfiguration } from './editIntegrationFormSchema'
 
 const schema = buildEditSchema(true)
@@ -221,6 +222,7 @@ describe('buildEditSchema', () => {
       scope: 'global' as const,
       management_credential_id: null,
       ...securityDefaults,
+      ca_certificate: '-----BEGIN CERTIFICATE-----\n...',
     }
 
     it('accepts valid OpenShift data', () => {
@@ -253,6 +255,18 @@ describe('buildEditSchema', () => {
       expect(result.success).toBe(false)
       if (!result.success) {
         expect(result.error.issues.some((i) => i.message === 'OpenShift requires TLS verification')).toBe(true)
+      }
+    })
+
+    it.each([
+      ['null', null],
+      ['empty', ''],
+      ['whitespace', '   '],
+    ])('rejects a %s CA certificate', (_label, caCertificate) => {
+      const result = schema.safeParse({ ...validOpenShift, ca_certificate: caCertificate })
+      expect(result.success).toBe(false)
+      if (!result.success) {
+        expect(result.error.issues.some((i) => i.message === CA_CERTIFICATE_REQUIRED_MESSAGE)).toBe(true)
       }
     })
   })
