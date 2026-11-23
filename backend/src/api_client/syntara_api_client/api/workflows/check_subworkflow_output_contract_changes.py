@@ -108,15 +108,14 @@ def sync_detailed(
     """Check for Sub-workflow output contract changes before publishing
 
      Check a candidate workflow definition for Sub-workflow output contract changes.
-
-    Compares the submitted candidate definition against the currently published version
-    to detect breaking changes such as:
-    - Removed outputs
-    - Type changes
-    - New required outputs
-
-    This endpoint does not publish the candidate definition. It should be called before
-    publishing to warn users about breaking changes that may affect parent workflows.
+    Compares the submitted candidate definition against the currently published version and reports
+    changes grouped by Subworkflow Trigger. The response includes all contract changes, a separate
+    breaking-change subset, and visible published parent workflow steps that reference affected
+    triggers.
+    Removing an output or trigger, changing an output type or constraint, and adding a required output
+    can be breaking. Adding an optional output, making an output optional, or changing its source
+    mapping is nonbreaking.
+    The endpoint does not save or publish the candidate definition.
 
     Args:
         workflow_id (UUID):
@@ -155,15 +154,14 @@ def sync(
     """Check for Sub-workflow output contract changes before publishing
 
      Check a candidate workflow definition for Sub-workflow output contract changes.
-
-    Compares the submitted candidate definition against the currently published version
-    to detect breaking changes such as:
-    - Removed outputs
-    - Type changes
-    - New required outputs
-
-    This endpoint does not publish the candidate definition. It should be called before
-    publishing to warn users about breaking changes that may affect parent workflows.
+    Compares the submitted candidate definition against the currently published version and reports
+    changes grouped by Subworkflow Trigger. The response includes all contract changes, a separate
+    breaking-change subset, and visible published parent workflow steps that reference affected
+    triggers.
+    Removing an output or trigger, changing an output type or constraint, and adding a required output
+    can be breaking. Adding an optional output, making an output optional, or changing its source
+    mapping is nonbreaking.
+    The endpoint does not save or publish the candidate definition.
 
     Args:
         workflow_id (UUID):
@@ -197,15 +195,14 @@ async def asyncio_detailed(
     """Check for Sub-workflow output contract changes before publishing
 
      Check a candidate workflow definition for Sub-workflow output contract changes.
-
-    Compares the submitted candidate definition against the currently published version
-    to detect breaking changes such as:
-    - Removed outputs
-    - Type changes
-    - New required outputs
-
-    This endpoint does not publish the candidate definition. It should be called before
-    publishing to warn users about breaking changes that may affect parent workflows.
+    Compares the submitted candidate definition against the currently published version and reports
+    changes grouped by Subworkflow Trigger. The response includes all contract changes, a separate
+    breaking-change subset, and visible published parent workflow steps that reference affected
+    triggers.
+    Removing an output or trigger, changing an output type or constraint, and adding a required output
+    can be breaking. Adding an optional output, making an output optional, or changing its source
+    mapping is nonbreaking.
+    The endpoint does not save or publish the candidate definition.
 
     Args:
         workflow_id (UUID):
@@ -242,15 +239,14 @@ async def asyncio(
     """Check for Sub-workflow output contract changes before publishing
 
      Check a candidate workflow definition for Sub-workflow output contract changes.
-
-    Compares the submitted candidate definition against the currently published version
-    to detect breaking changes such as:
-    - Removed outputs
-    - Type changes
-    - New required outputs
-
-    This endpoint does not publish the candidate definition. It should be called before
-    publishing to warn users about breaking changes that may affect parent workflows.
+    Compares the submitted candidate definition against the currently published version and reports
+    changes grouped by Subworkflow Trigger. The response includes all contract changes, a separate
+    breaking-change subset, and visible published parent workflow steps that reference affected
+    triggers.
+    Removing an output or trigger, changing an output type or constraint, and adding a required output
+    can be breaking. Adding an optional output, making an output optional, or changing its source
+    mapping is nonbreaking.
+    The endpoint does not save or publish the candidate definition.
 
     Args:
         workflow_id (UUID):

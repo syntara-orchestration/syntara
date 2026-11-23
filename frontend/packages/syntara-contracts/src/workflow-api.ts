@@ -208,15 +208,9 @@ export interface paths {
     /**
      * Check for Sub-workflow output contract changes before publishing
      * @description Check a candidate workflow definition for Sub-workflow output contract changes.
-     *
-     *     Compares the submitted candidate definition against the currently published version
-     *     to detect breaking changes such as:
-     *     - Removed outputs
-     *     - Type changes
-     *     - New required outputs
-     *
-     *     This endpoint does not publish the candidate definition. It should be called before
-     *     publishing to warn users about breaking changes that may affect parent workflows.
+     *     Compares the submitted candidate definition against the currently published version and reports changes grouped by Subworkflow Trigger. The response includes all contract changes, a separate breaking-change subset, and visible published parent workflow steps that reference affected triggers.
+     *     Removing an output or trigger, changing an output type or constraint, and adding a required output can be breaking. Adding an optional output, making an output optional, or changing its source mapping is nonbreaking.
+     *     The endpoint does not save or publish the candidate definition.
      */
     post: operations['check_subworkflow_output_contract_changes']
     delete?: never
@@ -724,25 +718,41 @@ export interface components {
      * @description A single breaking change detected in an output schema.
      *
      *     Attributes:
-     *         change_type: Type of breaking change (removed_output, type_change, new_required_output)
-     *         field_path: Dotted path to the affected field
-     *         old_type: Previous field type (for type changes)
-     *         new_type: New field type (for type changes and new required outputs)
+     *         change_type: Category of output contract change.
+     *         field_path: Dotted path to the affected public output field.
+     *         old_type: Previous JSON Schema type, when applicable.
+     *         new_type: Candidate JSON Schema type, when applicable.
      *         description: Human-readable description
      */
     BreakingChange: {
-      /** Change Type */
+      /**
+       * Change Type
+       * @description Change category, such as removed_output, type_change, new_required_output, added_output, required_output, optional_output, constraint_change, mapping_changed, or removed_trigger.
+       */
       change_type: string
-      /** Field Path */
+      /**
+       * Field Path
+       * @description Dotted path to the affected public output field, or the trigger ID when a trigger is removed.
+       */
       field_path: string
-      /** Old Type */
+      /**
+       * Old Type
+       * @description Previous JSON Schema type, when applicable.
+       */
       old_type?: string | null
-      /** New Type */
+      /**
+       * New Type
+       * @description Candidate JSON Schema type, when applicable.
+       */
       new_type?: string | null
-      /** Description */
+      /**
+       * Description
+       * @description Human-readable explanation of the contract change.
+       */
       description: string
       /**
        * Is Breaking
+       * @description Whether this change can break consumers of the published output contract.
        * @default true
        */
       is_breaking?: boolean
@@ -757,30 +767,52 @@ export interface components {
      *         changes: List of breaking changes detected for this trigger
      */
     TriggerBreakingChanges: {
-      /** Trigger Id */
+      /**
+       * Trigger Id
+       * @description ID of the Subworkflow Trigger whose output contract changed.
+       */
       trigger_id: string
-      /** Trigger Name */
+      /**
+       * Trigger Name
+       * @description Optional display name of the Subworkflow Trigger.
+       */
       trigger_name?: string | null
-      /** Changes */
+      /**
+       * Changes
+       * @description Output contract changes detected for this trigger.
+       */
       changes: components['schemas']['BreakingChange'][]
     }
     /**
      * BreakingChangesResponse
-     * @description Response containing the output contract diff and current parent references.
+     * @description Response containing output contract changes and visible parent references.
      */
     BreakingChangesResponse: {
-      /** Has Breaking Changes */
+      /**
+       * Has Breaking Changes
+       * @description Whether any detected output contract change is breaking.
+       */
       has_breaking_changes: boolean
-      /** Triggers */
+      /**
+       * Triggers
+       * @description Per-trigger groups containing breaking changes only; empty when none are breaking.
+       */
       triggers: components['schemas']['TriggerBreakingChanges'][]
       /**
        * Has Contract Changes
+       * @description Whether any output schema or source mapping changed, including nonbreaking changes.
        * @default false
        */
       has_contract_changes?: boolean
-      /** Contract Changes */
+      /**
+       * Contract Changes
+       * @description All detected per-trigger changes, including nonbreaking changes.
+       */
       contract_changes?: components['schemas']['TriggerBreakingChanges'][]
-      /** Parent Workflows */
+      /**
+       * Parent Workflows
+       * @description Visible, currently published parent workflow steps referencing triggers whose output contracts changed.
+       */
       parent_workflows?: components['schemas']['WorkflowReferenceRead'][]
     }
     /**
@@ -791,15 +823,28 @@ export interface components {
       /**
        * Workflow Id
        * Format: uuid
+       * @description ID of the published parent workflow that references the child.
        */
       workflow_id: string
-      /** Workflow Name */
+      /**
+       * Workflow Name
+       * @description Name of the published parent workflow.
+       */
       workflow_name: string
-      /** Workflow Version */
+      /**
+       * Workflow Version
+       * @description Published version number of the parent workflow.
+       */
       workflow_version: number
-      /** Step Id */
+      /**
+       * Step Id
+       * @description ID of the Sub-workflow node in the parent workflow.
+       */
       step_id: string
-      /** Step Name */
+      /**
+       * Step Name
+       * @description Optional display name of the referencing node.
+       */
       step_name?: string | null
     }
     /**
@@ -3203,13 +3248,14 @@ export interface operations {
       }
       cookie?: never
     }
+    /** @description Candidate workflow definition to compare with the currently published output contracts. The candidate is not saved or published. */
     requestBody: {
       content: {
         'application/json': components['schemas']['WorkflowValidateRequest']
       }
     }
     responses: {
-      /** @description Sub-workflow output contract changes detection result */
+      /** @description All detected output contract changes and the breaking subset */
       200: {
         headers: {
           [name: string]: unknown

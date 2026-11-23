@@ -24,9 +24,9 @@ class TriggerBreakingChanges:
         changes: List of breaking changes detected for this trigger
 
         Attributes:
-            trigger_id (str):
-            changes (list[BreakingChange]):
-            trigger_name (None | str | Unset):
+            trigger_id (str): ID of the Subworkflow Trigger whose output contract changed.
+            changes (list[BreakingChange]): Output contract changes detected for this trigger.
+            trigger_name (None | str | Unset): Optional display name of the Subworkflow Trigger.
     """
 
     trigger_id: str

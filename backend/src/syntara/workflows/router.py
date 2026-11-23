@@ -66,6 +66,133 @@ def _has_validation_issues(result: ValidationResult) -> bool:
     return result.error_count > 0 or result.warning_count > 0
 
 
+_SUBWORKFLOW_CONTRACT_CHANGE_EXAMPLES = {
+    "noChanges": {
+        "summary": "The candidate preserves the published output contract",
+        "value": {
+            "has_breaking_changes": False,
+            "triggers": [],
+            "has_contract_changes": False,
+            "contract_changes": [],
+            "parent_workflows": [],
+        },
+    },
+    "breakingOutputRemoval": {
+        "summary": "A required public output was removed",
+        "value": {
+            "has_breaking_changes": True,
+            "triggers": [
+                {
+                    "trigger_id": "incident_intake",
+                    "trigger_name": "Incident intake",
+                    "changes": [
+                        {
+                            "change_type": "removed_output",
+                            "field_path": "incident.status",
+                            "old_type": "string",
+                            "description": "Removed public output: incident.status",
+                            "is_breaking": True,
+                        }
+                    ],
+                }
+            ],
+            "has_contract_changes": True,
+            "contract_changes": [
+                {
+                    "trigger_id": "incident_intake",
+                    "trigger_name": "Incident intake",
+                    "changes": [
+                        {
+                            "change_type": "removed_output",
+                            "field_path": "incident.status",
+                            "old_type": "string",
+                            "description": "Removed public output: incident.status",
+                            "is_breaking": True,
+                        }
+                    ],
+                }
+            ],
+            "parent_workflows": [
+                {
+                    "workflow_id": "484e8e3b-93bc-4dc8-bcab-f73f55589ab0",
+                    "workflow_name": "Incident escalation",
+                    "workflow_version": 12,
+                    "step_id": "run_incident_review",
+                    "step_name": "Run incident review",
+                }
+            ],
+        },
+    },
+    "nonBreakingOutputAddition": {
+        "summary": "An optional public output was added",
+        "value": {
+            "has_breaking_changes": False,
+            "triggers": [],
+            "has_contract_changes": True,
+            "contract_changes": [
+                {
+                    "trigger_id": "incident_intake",
+                    "trigger_name": "Incident intake",
+                    "changes": [
+                        {
+                            "change_type": "added_output",
+                            "field_path": "incident.priority",
+                            "new_type": "string",
+                            "description": "Added optional output: incident.priority",
+                            "is_breaking": False,
+                        }
+                    ],
+                }
+            ],
+            "parent_workflows": [
+                {
+                    "workflow_id": "484e8e3b-93bc-4dc8-bcab-f73f55589ab0",
+                    "workflow_name": "Incident escalation",
+                    "workflow_version": 12,
+                    "step_id": "run_incident_review",
+                    "step_name": "Run incident review",
+                }
+            ],
+        },
+    },
+}
+
+_SUBWORKFLOW_CONTRACT_CHANGE_REQUEST_EXAMPLES = {
+    "candidateOutputContract": {
+        "summary": "Candidate definition declaring a public output",
+        "value": {
+            "workflow_definition": {
+                "schema_version": "2.0.0",
+                "name": "Incident intake",
+                "triggers": [
+                    {
+                        "id": "incident_intake",
+                        "type": "subworkflow_trigger",
+                        "name": "Incident intake",
+                        "parameters": {
+                            "output_schema": {
+                                "type": "object",
+                                "properties": {"status": {"type": "string"}},
+                                "required": ["status"],
+                            },
+                            "output_mapping": {"status": "${collect_status.stdout}"},
+                        },
+                    }
+                ],
+                "nodes": [
+                    {
+                        "id": "collect_status",
+                        "type": "script",
+                        "parameters": {"language": "bash", "code": "echo ready"},
+                    }
+                ],
+                "edges": [{"from": "incident_intake", "to": "collect_status"}],
+            }
+        },
+    }
+}
+
+
 class _ValidationRoute(APIRoute):
     """Converts RequestValidationError into RFC 9457 problem details on 422."""
 
@@ -601,10 +728,42 @@ async def get_workflow_version(
 @router.post(
     "/{workflow_id}/check_subworkflow_output_contract_changes",
     summary="Check for Sub-workflow output contract changes before publishing",
+    description=(
+        "Check a candidate workflow definition for Sub-workflow output contract changes.\n\n"
+        "Compares the submitted candidate definition against the currently published version and reports changes "
+        "grouped by Subworkflow Trigger. The response includes all contract changes, a separate breaking-change "
+        "subset, and visible published parent workflow steps that reference affected triggers.\n\n"
+        "Removing an output or trigger, changing an output type or constraint, and adding a required output can be "
+        "breaking. Adding an optional output, making an output optional, or changing its source mapping is "
+        "nonbreaking.\n\n"
+        "The endpoint does not save or publish the candidate definition."
+    ),
     response_model=BreakingChangesResponse,
     dependencies=[Depends(_wf_perm_read)],
     operation_id="check_subworkflow_output_contract_changes",
-    response_description="Sub-workflow output contract changes detection result",
+    response_description="All detected output contract changes and the breaking subset",
+    openapi_extra={
+        "requestBody": {
+            "description": (
+                "Candidate workflow definition to compare with the currently published output contracts. "
+                "The candidate is not saved or published."
+            ),
+            "content": {
+                "application/json": {
+                    "examples": _SUBWORKFLOW_CONTRACT_CHANGE_REQUEST_EXAMPLES,
+                }
+            },
+        },
+        "responses": {
+            "200": {
+                "content": {
+                    "application/json": {
+                        "examples": _SUBWORKFLOW_CONTRACT_CHANGE_EXAMPLES,
+                    }
+                }
+            }
+        },
+    },
 )
 async def check_subworkflow_output_contract_changes(
     workflow_id: UUID,
@@ -614,14 +773,13 @@ async def check_subworkflow_output_contract_changes(
 ) -> BreakingChangesResponse:
     """Check a candidate workflow definition for Sub-workflow output contract changes.
 
-    Compares the submitted candidate definition against the currently published version
-    to detect breaking changes such as:
-    - Removed outputs
-    - Type changes
-    - New required outputs
-
-    This endpoint does not publish the candidate definition. It should be called before
-    publishing to warn users about breaking changes that may affect parent workflows.
+    Compares the submitted candidate definition against the currently published version and
+    reports changes grouped by Subworkflow Trigger. The response includes all contract changes,
+    a separate breaking-change subset, and visible published parent workflow steps that reference
+    affected triggers. Removing an output or trigger, changing an output type or constraint, and
+    adding a required output can be breaking. Adding an optional output, making an output optional,
+    or changing its source mapping is nonbreaking. The endpoint does not save or publish the candidate
+    definition.
     """
     workflow = await service.get_workflow_by_id(workflow_id)
 

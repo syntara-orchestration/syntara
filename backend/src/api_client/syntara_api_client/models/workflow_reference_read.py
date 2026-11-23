@@ -16,11 +16,11 @@ class WorkflowReferenceRead:
     """A currently published parent workflow step that references this child.
 
     Attributes:
-        workflow_id (UUID):
-        workflow_name (str):
-        workflow_version (int):
-        step_id (str):
-        step_name (None | str | Unset):
+        workflow_id (UUID): ID of the published parent workflow that references the child.
+        workflow_name (str): Name of the published parent workflow.
+        workflow_version (int): Published version number of the parent workflow.
+        step_id (str): ID of the Sub-workflow node in the parent workflow.
+        step_name (None | str | Unset): Optional display name of the referencing node.
     """
 
     workflow_id: UUID

@@ -11,7 +11,7 @@ T = TypeVar("T", bound="WorkflowInvocationTriggerSchemaInputSchema")
 
 @_attrs_define
 class WorkflowInvocationTriggerSchemaInputSchema:
-    """ """
+    """JSON Schema describing the inputs accepted by this trigger."""
 
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 

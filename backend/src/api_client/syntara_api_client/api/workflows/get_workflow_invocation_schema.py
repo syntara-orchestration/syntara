@@ -96,7 +96,11 @@ def sync_detailed(
 ) -> Response[ErrorData | WorkflowInvocationSchemaRead]:
     """Get workflow invocation schema
 
-     Get the latest published Subworkflow Trigger schemas for a workflow.
+     Returns the invocation contract from the workflow's latest published version. The response includes
+    each Subworkflow Trigger's input schema and declared public output schema; it does not expose draft
+    schemas or internal child step outputs. Requires read access to the workflow. If the workflow has no
+    published version, the endpoint returns 404. A published workflow without a Subworkflow Trigger
+    returns 200 with `is_eligible` set to false and an empty `triggers` list.
 
     Args:
         workflow_id (UUID):
@@ -127,7 +131,11 @@ def sync(
 ) -> ErrorData | WorkflowInvocationSchemaRead | None:
     """Get workflow invocation schema
 
-     Get the latest published Subworkflow Trigger schemas for a workflow.
+     Returns the invocation contract from the workflow's latest published version. The response includes
+    each Subworkflow Trigger's input schema and declared public output schema; it does not expose draft
+    schemas or internal child step outputs. Requires read access to the workflow. If the workflow has no
+    published version, the endpoint returns 404. A published workflow without a Subworkflow Trigger
+    returns 200 with `is_eligible` set to false and an empty `triggers` list.
 
     Args:
         workflow_id (UUID):
@@ -153,7 +161,11 @@ async def asyncio_detailed(
 ) -> Response[ErrorData | WorkflowInvocationSchemaRead]:
     """Get workflow invocation schema
 
-     Get the latest published Subworkflow Trigger schemas for a workflow.
+     Returns the invocation contract from the workflow's latest published version. The response includes
+    each Subworkflow Trigger's input schema and declared public output schema; it does not expose draft
+    schemas or internal child step outputs. Requires read access to the workflow. If the workflow has no
+    published version, the endpoint returns 404. A published workflow without a Subworkflow Trigger
+    returns 200 with `is_eligible` set to false and an empty `triggers` list.
 
     Args:
         workflow_id (UUID):
@@ -182,7 +194,11 @@ async def asyncio(
 ) -> ErrorData | WorkflowInvocationSchemaRead | None:
     """Get workflow invocation schema
 
-     Get the latest published Subworkflow Trigger schemas for a workflow.
+     Returns the invocation contract from the workflow's latest published version. The response includes
+    each Subworkflow Trigger's input schema and declared public output schema; it does not expose draft
+    schemas or internal child step outputs. Requires read access to the workflow. If the workflow has no
+    published version, the endpoint returns 404. A published workflow without a Subworkflow Trigger
+    returns 200 with `is_eligible` set to false and an empty `triggers` list.
 
     Args:
         workflow_id (UUID):

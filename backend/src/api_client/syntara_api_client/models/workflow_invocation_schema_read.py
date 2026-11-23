@@ -20,16 +20,18 @@ T = TypeVar("T", bound="WorkflowInvocationSchemaRead")
 
 @_attrs_define
 class WorkflowInvocationSchemaRead:
-    """Published invocation schemas for a child workflow.
+    """Invocation schemas from the latest published version of a workflow.
 
     Attributes:
-        workflow_id (UUID):
-        published_version_id (UUID):
-        published_version (int):
-        is_eligible (bool):
-        triggers (list[WorkflowInvocationTriggerSchema]):
-        published_version_name (None | str | Unset):
-        published_version_created_at (datetime.datetime | None | Unset):
+        workflow_id (UUID): ID of the workflow whose invocation contract is returned.
+        published_version_id (UUID): ID of the latest published workflow version used for this response.
+        published_version (int): Version number of the latest published workflow version.
+        is_eligible (bool): Whether the published workflow has at least one Subworkflow Trigger available for
+            invocation.
+        triggers (list[WorkflowInvocationTriggerSchema]): Subworkflow Trigger schemas from the published version; empty
+            when the workflow is not eligible.
+        published_version_name (None | str | Unset): Optional name of the published version.
+        published_version_created_at (datetime.datetime | None | Unset): Creation time of the published version, in UTC.
     """
 
     workflow_id: UUID

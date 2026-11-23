@@ -20,15 +20,16 @@ T = TypeVar("T", bound="WorkflowInvocationTriggerSchema")
 
 @_attrs_define
 class WorkflowInvocationTriggerSchema:
-    """One dedicated Subworkflow Trigger available for Reference mode.
+    """Invocation contract declared by one Subworkflow Trigger.
 
     Attributes:
-        trigger_node_id (str):
-        name (None | str | Unset):
-        input_schema (WorkflowInvocationTriggerSchemaInputSchema | Unset):
-        output_schema (None | Unset | WorkflowInvocationTriggerSchemaOutputSchemaType0): JSON Schema defining the
-            outputs exposed to parent workflows. Provides encapsulation—parent sees only declared fields, not internal child
-            step structure.
+        trigger_node_id (str): ID of the Subworkflow Trigger that declares these schemas.
+        name (None | str | Unset): Optional display name of the Subworkflow Trigger.
+        input_schema (WorkflowInvocationTriggerSchemaInputSchema | Unset): JSON Schema describing the inputs accepted by
+            this trigger.
+        output_schema (None | Unset | WorkflowInvocationTriggerSchemaOutputSchemaType0): JSON Schema for the public
+            outputs exposed to parent workflows by this trigger. Parent workflows consume these declared fields; internal
+            child step outputs are not exposed. A null value means this trigger has no declared output schema.
     """
 
     trigger_node_id: str
