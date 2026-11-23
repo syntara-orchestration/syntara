@@ -20,9 +20,8 @@ import {
   ensureProject,
   getAuthToken,
   pollExecutionStatus,
+  TERMINAL_STATUSES,
 } from '../utils/api'
-
-const TERMINAL_STATUSES = ['completed', 'failed', 'cancelled']
 
 /** Podman Compose E2E and merge queue runs need more headroom for Temporal to finish under load. */
 const TERMINAL_POLL_TIMEOUT_MS = process.env.CI ? 180_000 : 90_000
