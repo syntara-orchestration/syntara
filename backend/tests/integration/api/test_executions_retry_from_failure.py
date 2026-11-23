@@ -134,7 +134,7 @@ async def _add_failed_activity(session: AsyncSession, execution: Execution, node
         ActivityExecution(
             execution_id=execution.id,
             activity_name=node_id,
-            node_type=NodeType.SCRIPT,
+            node_type=NodeType.SCRIPT_PYTHON,
             temporal_activity_id=f"temporal-activity-{uuid.uuid4()}",
             status=ActivityStatus.FAILED,
             error_details="boom",
@@ -148,7 +148,7 @@ async def _add_completed_activity(
     execution: Execution,
     node_id: str,
     output: dict[str, Any] | None = None,
-    node_type: NodeType = NodeType.SCRIPT,
+    node_type: NodeType = NodeType.SCRIPT_PYTHON,
 ) -> None:
     """Record a completed activity with stored output for a node."""
     session.add(
