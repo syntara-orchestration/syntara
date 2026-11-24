@@ -22,7 +22,7 @@ test.describe('Allow Everyone In — Setting Configuration', () => {
 
     await app.goto(toAppUrl(`/system-administration/authentication/identity-providers/${AAP_OIDC_IDP.id}`))
     await expect(app.getByRole('heading', { level: 1, name: 'AAP' })).toBeVisible()
-    await app.getByRole('button', { name: /Edit provider/i }).click()
+    await app.getByRole('link', { name: /Edit provider/i }).click()
 
     await expect(app.getByRole('heading', { level: 1, name: 'Edit OIDC provider' })).toBeVisible()
     const allowAllToggle = app.getByRole('switch', { name: /Allow all authenticated/ })

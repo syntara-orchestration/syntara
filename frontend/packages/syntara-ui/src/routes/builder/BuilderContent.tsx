@@ -300,6 +300,8 @@ export function BuilderContent(props: BuilderContentProps) {
     handleMostRecentResize,
     handleMostRecentNodeSelect,
     handleCloseMostRecentRunPanel,
+    isPanelExpanded: isMostRecentRunPanelExpanded,
+    panelExpandControl: mostRecentPanelExpandControl,
   } = useBuilderLiveRunPanel({
     mostRecentExecutionId,
     mostRecentRunPanelOpen,
@@ -676,36 +678,38 @@ export function BuilderContent(props: BuilderContentProps) {
                     style={{ pointerEvents: isStepEditorOpen && !versionPanel.isViewingVersion ? 'none' : 'auto' }}
                   >
                     <SynPanelStack>
-                      <SynPanelStackItem isFilled>
-                        <SynPanel hasNoPadding isFullHeight className={styles.canvasPanel}>
-                          <VersionInfoCard
-                            title={versionPanel.viewedVersionName}
-                            date={versionPanel.viewedVersionDate}
-                            description={versionPanel.viewedVersionDescription}
-                            publishedAt={versionPanel.viewedVersionPublishedAt}
-                            unpublishedAt={versionPanel.viewedVersionUnpublishedAt}
-                          />
-                          <BuilderFlow
-                            workflowId={workflowId}
-                            readOnly={versionPanel.isViewingVersion}
-                            canEdit={builderPermissions.canEdit}
-                            panelOpen={isAddStepPanelOpen || !!selectedNode}
-                            activeEdgeButtonNodeId={isAddStepPanelOpen ? sourceNodeId : null}
-                            activeEdgeButtonHandle={isAddStepPanelOpen ? sourceHandle : null}
-                            activeEdgeId={isAddStepPanelOpen ? edgeIdToReplace : null}
-                            executionStatus={canvasExecutionStatus}
-                            copiedRunActivityIds={copiedRunActivityIds}
-                            disableDeleteKey={isStepEditorOpen}
-                            disableSpacePanning={isStepEditorOpen || confirmDialogOpen}
-                            onNodeClick={wrappedHandleNodeClick}
-                            onAddNodeFromEdge={handleAddNodeFromEdge}
-                            onNodesDeleted={handleNodesDeleted}
-                            newNodeDesiredPosition={state.newNodeDesiredPosition}
-                            onClearDesiredPosition={handleClearDesiredPosition}
-                            validationErrors={state.validationErrors}
-                          />
-                        </SynPanel>
-                      </SynPanelStackItem>
+                      {!(showMostRecentRunPanelInEditor && isMostRecentRunPanelExpanded) && (
+                        <SynPanelStackItem isFilled>
+                          <SynPanel hasNoPadding isFullHeight className={styles.canvasPanel}>
+                            <VersionInfoCard
+                              title={versionPanel.viewedVersionName}
+                              date={versionPanel.viewedVersionDate}
+                              description={versionPanel.viewedVersionDescription}
+                              publishedAt={versionPanel.viewedVersionPublishedAt}
+                              unpublishedAt={versionPanel.viewedVersionUnpublishedAt}
+                            />
+                            <BuilderFlow
+                              workflowId={workflowId}
+                              readOnly={versionPanel.isViewingVersion}
+                              canEdit={builderPermissions.canEdit}
+                              panelOpen={isAddStepPanelOpen || !!selectedNode}
+                              activeEdgeButtonNodeId={isAddStepPanelOpen ? sourceNodeId : null}
+                              activeEdgeButtonHandle={isAddStepPanelOpen ? sourceHandle : null}
+                              activeEdgeId={isAddStepPanelOpen ? edgeIdToReplace : null}
+                              executionStatus={canvasExecutionStatus}
+                              copiedRunActivityIds={copiedRunActivityIds}
+                              disableDeleteKey={isStepEditorOpen}
+                              disableSpacePanning={isStepEditorOpen || confirmDialogOpen}
+                              onNodeClick={wrappedHandleNodeClick}
+                              onAddNodeFromEdge={handleAddNodeFromEdge}
+                              onNodesDeleted={handleNodesDeleted}
+                              newNodeDesiredPosition={state.newNodeDesiredPosition}
+                              onClearDesiredPosition={handleClearDesiredPosition}
+                              validationErrors={state.validationErrors}
+                            />
+                          </SynPanel>
+                        </SynPanelStackItem>
+                      )}
                       {showMostRecentRunPanelInEditor && mostRecentExecutionId && (
                         <ExecutionDetailsPanelWrapper
                           executionId={mostRecentExecutionId}
@@ -717,6 +721,8 @@ export function BuilderContent(props: BuilderContentProps) {
                           onResize={handleMostRecentResize}
                           isTerminalStatus={isTerminalStatus}
                           onClosePanel={handleCloseMostRecentRunPanel}
+                          isPanelExpanded={isMostRecentRunPanelExpanded}
+                          panelExpandControl={mostRecentPanelExpandControl}
                         />
                       )}
                     </SynPanelStack>
