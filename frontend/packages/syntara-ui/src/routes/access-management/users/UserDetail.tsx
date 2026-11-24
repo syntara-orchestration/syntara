@@ -422,8 +422,7 @@ export function UserDetail({ isMyProfile }: Readonly<UserDetailProps> = {}) {
 
   const navigateBack = () =>
     detachPromise(navigate({ to: isMyProfile ? AppRoute.Workflows.Root : AppRoute.AccessManagement.Users }))
-  const navigateEdit = () =>
-    detachPromise(navigate({ to: AppRoute.AccessManagement.EditUser.replace(':userId', userId ?? '') }))
+  const editUserPath = AppRoute.AccessManagement.EditUser.replace(':userId', userId ?? '')
 
   const handleDelete = useDeleteAction({
     deleteFn: deleteUser,
@@ -493,7 +492,7 @@ export function UserDetail({ isMyProfile }: Readonly<UserDetailProps> = {}) {
             <UserDetailToolbar
               permissions={userPermissions}
               showKebabMenu={!userData.is_builtin}
-              onEdit={navigateEdit}
+              editTo={editUserPath}
               onRevoke={() => revokeDialog.open(userData)}
               onDelete={() => deleteDialog.open(userData)}
             />
