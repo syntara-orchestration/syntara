@@ -209,12 +209,14 @@ describe('useBuilderWorkflowLifecycle', () => {
         type: 'SET_WORKFLOW_NAME',
         payload: 'Named',
       })
+    })
+    await waitFor(() => {
       expect(dispatch).toHaveBeenCalledWith({
         type: 'SET_WORKFLOW_DESCRIPTION',
         payload: 'Desc',
       })
-      expect(dispatch).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'INIT_WORKFLOW' }) as BuilderAction)
     })
+    expect(dispatch).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'INIT_WORKFLOW' }) as BuilderAction)
   })
 
   it('dispatches SET_WORKFLOW_NAME when default name conflicts with list', async () => {
