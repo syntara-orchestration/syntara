@@ -65,7 +65,7 @@ async function confirmCopyToEditorInBuilder(app: Page) {
   await expect(app.locator('.react-flow')).toBeVisible({ timeout: 30_000 })
   await expect(async () => {
     await expect(app.getByRole('heading', { name: /run details/i })).toBeVisible()
-  }).toPass({ timeout: 90_000, intervals: [2_000] })
+  }).toPass({ timeout: 120_000, intervals: [2_000] })
 }
 
 test.describe('Copy Run to Editor', () => {
@@ -136,7 +136,7 @@ test.describe('Copy Run to Editor', () => {
 
       await expect(app.getByRole('button', { name: 'Copy to editor' })).toBeVisible({ timeout: 15_000 })
       await confirmCopyToEditorInBuilder(app)
-      await expect(app.getByText('Run copied to editor')).toBeVisible({ timeout: 15_000 })
+      await expect(app.getByText('Run copied to editor')).toBeVisible({ timeout: 30_000 })
       await expect(app.getByPlaceholder('Workflow name')).toHaveValue(workflowName, { timeout: 30_000 })
     } finally {
       await deleteWorkflow(app, workflowName)

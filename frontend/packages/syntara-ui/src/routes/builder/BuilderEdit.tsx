@@ -90,11 +90,15 @@ export default function BuilderEdit() {
     )
   }
 
-  const awaitingExecutionForCopy = !!executionIdParam && (executionQuery.isLoading || executionQuery.isFetching)
+  // Wait only for the first execution payload (include=workflow_definition). Do not gate on
+  // isFetching after data exists — refetch/Ws invalidation would unmount BuilderContent and
+  // wipe reducer state (run panel) mid copy-to-editor.
+  const awaitingInitialExecutionPayload =
+    !!executionIdParam && !executionCopy && !executionQuery.data && executionQuery.isLoading
 
   // Use isLoading instead of isPending to distinguish initial load from refetch
   // isLoading = true only on first fetch, isPending = true on both initial and refetch
-  if (isLoading || awaitingExecutionForCopy) {
+  if (isLoading || awaitingInitialExecutionPayload) {
     return (
       <SynPage>
         <SynPageTitle segments={['Loading workflow', 'Workflows']} />
