@@ -194,7 +194,7 @@ This is the handbook for the AO REST API Versioning and Deprecation Policy as en
    - engineering and BU leadership (Senior Director or above) have approved
    - a member of `syntara-leads` applies the `breaking-change-approved` label
    - `info.version` is incremented by a **minor** version (never major — a new major version is a new spec at a new path)
-4. **Label restriction.** GitHub has no native per-label permission. The Breaking Change Label Guard workflow (`.github/workflows/breaking-change-label-guard.yml`) verifies the actor who added the label is in `syntara-leads`. If not, it fails the check, removes the label, and comments on the PR. Provision `SYNTARA_LEADS_READ_TOKEN` (org Members: read); without it the guard fails closed.
+4. **Label restriction.** GitHub has no native per-label permission. The Breaking Change Label Guard workflow (`.github/workflows/breaking-change-label-guard.yml`) verifies the actor who added the label is in `syntara-leads`. If not, it fails the check, removes the label, and comments on the PR.
 
 ### Submitting a Pull Request
 

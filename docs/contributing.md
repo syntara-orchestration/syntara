@@ -105,7 +105,7 @@ Backend (when `backend/` changes; aggregated by `(Backend) Required Checks`):
 | `(Backend) Integration Tests` | Integration tests (needs services) |
 | `(Backend) Test Podman Compose E2E` | Compose-based backend E2E |
 | `(Backend) Shared Checks Gate` | Waits on shared jobs such as `Pre-commit` |
-| Backend Snyk SAST / SCA jobs | Vulnerability scanning (needs `SNYK_TOKEN`) |
+| Backend Snyk SAST / SCA jobs | Vulnerability scanning |
 
 Frontend (when `frontend/` or `backend/` changes — backend so the UI is
 checked when the API changes; aggregated by `(Frontend) Required Checks`):
@@ -155,10 +155,10 @@ filters. Konflux pipeline secrets are handled **inside** the pipeline.
 **GitHub Actions** jobs that read org/repo secrets can still behave differently
 on fork PRs.
 
-| Area | Secrets involved | What to expect on forks |
+| Area | What to expect on forks |
 | --- | --- | --- |
-| Snyk SAST / SCA | `SNYK_TOKEN` (org) | May skip, fail, or lack token access vs in-org PRs |
-| Podman Compose E2E | `RH_REGISTRY_USER` / `RH_REGISTRY_TOKEN` (and related repo secrets such as Currents / OpenRouter where used) | Not fully verified from forks yet — registry login and compose steps are the main suspects if these jobs fail only on fork PRs |
+| Snyk SAST / SCA | May skip, fail, or lack token access vs in-org PRs |
+| Podman Compose E2E | Not fully verified from forks yet — registry login and compose steps are the main suspects if these jobs fail only on fork PRs |
 | Maintainer comment commands | N/A | `/build-pr-image` (and similar) only run for org owners/members — see the [backend contributor guide](backend-contributing.md#ci-commands-for-maintainers) |
 
 If you see **other** unexpected failures on a fork PR that look like missing
