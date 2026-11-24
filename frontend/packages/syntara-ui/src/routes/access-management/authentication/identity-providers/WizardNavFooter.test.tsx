@@ -49,7 +49,9 @@ describe('WizardNavFooter', () => {
       render(<WizardNavFooter submitLabel="Save" onSubmit={vi.fn()} onCancel={vi.fn()} />)
 
       expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument()
-      expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument()
+      const cancel = screen.getByRole('button', { name: 'Cancel' })
+      expect(cancel).toBeInTheDocument()
+      expect(cancel).toHaveClass('pf-m-link')
     })
 
     it('validates step 1 fields before advancing', async () => {
