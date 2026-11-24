@@ -109,6 +109,7 @@ async def test_monitor_and_dispatch_share_identity_in_either_order(
                 work_id=work_id,
                 status=CompletionStatus.COMPLETED,
                 result=result,
+                runtime_context=None,
             )
             assert delivered is monitor_first
     if not monitor_first:
@@ -121,6 +122,7 @@ async def test_monitor_and_dispatch_share_identity_in_either_order(
             work_id=work_id,
             status=CompletionStatus.COMPLETED,
             result=result,
+            runtime_context=None,
         )
         rows = (
             await reader.exec(select(ActivityExecution).where(ActivityExecution.execution_id == test_execution.id))
@@ -200,6 +202,7 @@ async def test_dispatch_moves_credential_bindings_out_of_inputs(
         "execution_id": str(test_execution.id),
         "project_id": str(test_execution.project_id),
         "workflow_id": str(test_execution.workflow_id),
+        "temporal_activity_id": _NODE_ID,
     }
     assert second_message.command.payload == first_message.command.payload
 
@@ -223,3 +226,72 @@ async def test_dispatch_rejects_unresolved_credential_binding_templates(
         await dispatch._dispatch_to_ep(input_config, None, test_execution.id, None, "script-bash")
 
     ep_submission.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_loop_body_completion_correlates_canvas_activity(
+    test_execution: Execution,
+    test_db_session_factory: async_sessionmaker[AsyncSession],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Loop-body work can complete the canvas activity despite its unique Temporal ID."""
+    monitor = ActivitySyncService(Mock(), test_db_session_factory, AsyncMock())
+    await monitor._create_all_activities_upfront(test_execution.id, _DEFINITIONS)
+    loop_activity_id = f"{_NODE_ID}_iter_0"
+    info = Mock(
+        workflow_id=test_execution.temporal_workflow_id,
+        workflow_run_id="test-run",
+        activity_id=loop_activity_id,
+    )
+    with (
+        patch.object(activity, "info", return_value=info),
+        patch.object(dispatch, "AsyncSessionLocal", test_db_session_factory),
+        patch.object(
+            dispatch,
+            "get_execution_plane_plugin",
+            AsyncMock(
+                return_value=SimpleNamespace(
+                    name="script-bash",
+                    node_type=NodeType.SCRIPT_BASH,
+                    image_reference="quay.io/example/script-bash:test",
+                    step_identity="syntara.script-bash.script-bash",
+                    manifest=_PLUGIN_MANIFEST,
+                )
+            ),
+        ),
+        patch.object(dispatch, "ExecutionPlaneHttpClient"),
+        patch.object(dispatch, "_submit_and_read_work", return_value={"status": "pending"}),
+    ):
+        assert await dispatch._dispatch_to_ep({"code": "echo ok"}, None, test_execution.id, None, "script-bash") is None
+
+    work_id = uuid5(test_execution.id, loop_activity_id)
+    runtime_context: dict[str, object] = {
+        "execution_id": str(test_execution.id),
+        "temporal_activity_id": loop_activity_id,
+    }
+    temporal = AsyncMock()
+    result = {"output": {"return_code": 0, "stdout": "ok", "stderr": ""}}
+    async with test_db_session_factory() as reader:
+        delivered = await CompletionCommandHandler()._complete_activity(
+            context=AOCommandContext(reader, temporal),
+            work_id=work_id,
+            status=CompletionStatus.COMPLETED,
+            result=result,
+            runtime_context=runtime_context,
+        )
+    assert delivered
+    temporal.complete_async_activity.assert_awaited_once_with(
+        temporal_workflow_id=test_execution.temporal_workflow_id,
+        activity_id=loop_activity_id,
+        result=result,
+    )
+
+    runtime_context["temporal_activity_id"] = f"{_NODE_ID}_iter_1"
+    async with test_db_session_factory() as reader:
+        assert not await CompletionCommandHandler()._complete_activity(
+            context=AOCommandContext(reader, temporal),
+            work_id=work_id,
+            status=CompletionStatus.COMPLETED,
+            result=result,
+            runtime_context=runtime_context,
+        )
