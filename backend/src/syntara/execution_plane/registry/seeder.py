@@ -1,7 +1,8 @@
-"""Seed the Python and Bash Action manifests and their devel workload images."""
+"""Seed Python and Bash Actions with configured workload images."""
 
 from __future__ import annotations
 
+import os
 from datetime import UTC, datetime
 from importlib.resources import files
 from typing import TYPE_CHECKING, Any
@@ -25,6 +26,7 @@ _PLUGIN_SEEDS = (
         NodeType.SCRIPT_PYTHON,
         "syntara.script-python.script-python",
         "script-python.yaml",
+        "RELATED_IMAGE_SCRIPT_PYTHON",
         "quay.io/aap/ansible-automation-platform/ao-python-rhel9:devel",
     ),
     (
@@ -32,6 +34,7 @@ _PLUGIN_SEEDS = (
         NodeType.SCRIPT_BASH,
         "syntara.script-bash.script-bash",
         "script-bash.yaml",
+        "RELATED_IMAGE_SCRIPT_BASH",
         "quay.io/aap/ansible-automation-platform/ao-bash-rhel9:devel",
     ),
 )
@@ -52,7 +55,7 @@ def _load_manifest(filename: str, expected_name: str) -> dict[str, Any]:
 
 
 async def seed_execution_plane_plugins(session: AsyncSession) -> None:
-    """Idempotently seed the two script Actions and their devel image refs."""
+    """Seed script Actions, allowing the operator to override their image refs."""
     now = datetime.now(UTC)
     rows = [
         {
@@ -61,12 +64,12 @@ async def seed_execution_plane_plugins(session: AsyncSession) -> None:
             "node_type": node_type,
             "step_identity": step_identity,
             "manifest": _load_manifest(filename, name),
-            "image_reference": image_reference,
+            "image_reference": os.environ.get(image_env_var) or image_reference,
             "created_at": now,
             "updated_at": now,
             "labels": {},
         }
-        for name, node_type, step_identity, filename, image_reference in _PLUGIN_SEEDS
+        for name, node_type, step_identity, filename, image_env_var, image_reference in _PLUGIN_SEEDS
     ]
     statement = insert(ExecutionPlanePlugin).values(rows)
     statement = statement.on_conflict_do_update(
