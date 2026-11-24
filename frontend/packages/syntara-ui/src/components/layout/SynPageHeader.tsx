@@ -41,7 +41,10 @@ export type SynPageHeaderProps = Readonly<{
   toolbar?: ReactNode
   /** Optional content before the default title (e.g. provider icon). Ignored when `titleSlot` is set. */
   titleLeading?: ReactNode
-  /** Optional content after the default title (badges, status, metadata). Ignored when `titleSlot` is set. */
+  /**
+   * Optional content after the default title (badges, status, metadata), before the doc link.
+   * Ignored when `titleSlot` is set.
+   */
   titleAddons?: ReactNode
   /** Optional project selector after the title row. Ignored when `titleSlot` is set. */
   projectSelector?: ReactNode
@@ -101,12 +104,12 @@ function renderTitleRegion(props: SynPageHeaderProps): ReactNode {
           {title}
         </Title>
       </FlexItem>
+      {isRenderableSlot(titleAddons) ? titleAddons : null}
       {docLink !== undefined && (
         <FlexItem>
           <DocLinkButton href={docLink} />
         </FlexItem>
       )}
-      {isRenderableSlot(titleAddons) ? titleAddons : null}
       {isRenderableSlot(projectSelector) && <FlexItem>{projectSelector}</FlexItem>}
     </Flex>
   )
