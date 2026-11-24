@@ -108,6 +108,7 @@ import { submitForm } from '../../../test/submit-form'
 import { useAllCredentials } from '../components/useAllCredentials'
 
 import { AAPJobTemplateForm as AAPStepForm } from './AAPJobTemplateForm'
+import { AAP_CREDENTIAL_REQUIRED_HINT } from './shared/stepFieldHelpText'
 import { renderWithHeader } from './test-utils/renderWithHeader'
 
 // Mock useAAPBrowser hook to provide test data without real API calls
@@ -141,15 +142,18 @@ const defaultTemplateDetail: AAPJobTemplateDetail = {
 }
 
 // Base mock data shared across all tests (static data that doesn't change)
+const baseMockJobTemplates = [
+  { id: 10, name: 'Deploy App', description: 'Deploy the application', organization_name: 'Default' },
+  { id: 11, name: 'Backup DB', description: 'Backup the database', organization_name: 'Default' },
+]
+
 const baseMockAAPBrowserData = {
   organizations: [
     { id: 1, name: 'Default' },
     { id: 2, name: 'Engineering' },
   ],
-  jobTemplates: [
-    { id: 10, name: 'Deploy App', description: 'Deploy the application', organization_name: 'Default' },
-    { id: 11, name: 'Backup DB', description: 'Backup the database', organization_name: 'Default' },
-  ],
+  jobTemplates: baseMockJobTemplates,
+  templates: baseMockJobTemplates,
   inventories: [{ id: 1, name: 'Demo Inventory', description: 'Demo hosts', organization_name: 'Default' }],
   executionEnvironments: [
     { id: 1, name: 'Default EE', description: 'Default execution environment' },
@@ -179,6 +183,7 @@ const baseMockAAPBrowserData = {
   templateDetail: undefined,
   error: null,
   retryAll: mockRetryAll,
+  isActive: true,
   searchOrganizations: vi.fn(),
   searchJobTemplates: vi.fn(),
   searchInventories: vi.fn(),
@@ -248,6 +253,18 @@ describe('AAPStepForm', () => {
 
     const templateInput = screen.getByPlaceholderText(/Select a job template/i)
     expect(templateInput).toBeInTheDocument()
+  })
+
+  it('disables resource pickers until a credential is selected', () => {
+    mockUseAAPBrowser.mockReturnValue({ ...createMockAAPBrowser(defaultTemplateDetail), isActive: false })
+
+    renderWithHeader(
+      <AAPStepForm onSubmit={mockOnSubmit} onCancel={vi.fn()} initialData={{ integration_id: 'int-123' }} />
+    )
+
+    expect(screen.getByPlaceholderText(/Select an organization/i)).toBeDisabled()
+    expect(screen.getByPlaceholderText(/Select a job template/i)).toBeDisabled()
+    expect(screen.getByText(AAP_CREDENTIAL_REQUIRED_HINT)).toBeInTheDocument()
   })
 
   it('submits form even without organization selected (permissive schema)', async () => {

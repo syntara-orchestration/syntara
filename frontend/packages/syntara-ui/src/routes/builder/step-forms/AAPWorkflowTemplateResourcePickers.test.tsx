@@ -5,9 +5,11 @@ import { describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 
 import type { useAAPBrowser } from '../../../hooks/useAAPBrowser'
+import { VersionViewProvider } from '../VersionViewProvider'
 
 import { AAPWorkflowTemplateResourcePickers } from './AAPWorkflowTemplateResourcePickers'
 import type { AAPWorkflowTemplateFormData } from './aapWorkflowTemplateSchema'
+import { AAP_CREDENTIAL_REQUIRED_HINT } from './shared/stepFieldHelpText'
 
 // Mock dependencies
 vi.mock('../../../utils/apiErrors', () => ({
@@ -26,18 +28,21 @@ vi.mock('./AAPTypeaheadSelect', () => ({
     placeholder,
     selected,
     ariaLabel,
+    isDisabled,
   }: {
     options: Array<{ value: string; label: string }>
     onChange: (v: string) => void
     placeholder: string
     selected: string
     ariaLabel: string
+    isDisabled?: boolean
   }) => (
     <div data-testid={`typeahead-${ariaLabel.toLowerCase().replace(/\s+/g, '-')}`}>
       <input
         aria-label={ariaLabel}
         value={selected}
         placeholder={placeholder}
+        disabled={isDisabled}
         onChange={(e) => onChange(e.target.value)}
       />
       {options.map((opt) => (
@@ -82,6 +87,10 @@ function createMockBrowser(overrides?: Partial<ReturnType<typeof useAAPBrowser>>
       { id: 1, name: 'Workflow Template 1', description: 'Workflow description 1' },
       { id: 2, name: 'Workflow Template 2', description: null },
     ],
+    templates: [
+      { id: 1, name: 'Workflow Template 1', description: 'Workflow description 1' },
+      { id: 2, name: 'Workflow Template 2', description: null },
+    ],
     selectOrganization: vi.fn(),
     selectTemplate: vi.fn(),
     searchOrganizations: vi.fn(),
@@ -91,6 +100,7 @@ function createMockBrowser(overrides?: Partial<ReturnType<typeof useAAPBrowser>>
     error: null,
     retryAll: vi.fn(),
     workflowTemplateDetail: undefined,
+    isActive: true,
     ...overrides,
   } as unknown as ReturnType<typeof useAAPBrowser>
 }
@@ -243,5 +253,181 @@ describe('AAPWorkflowTemplateResourcePickers', () => {
     )
 
     expect(await axe(container)).toHaveNoViolations()
+  })
+
+  describe('credential gating', () => {
+    it('disables organization and workflow template pickers until a credential is selected', () => {
+      const browser = createMockBrowser({ isActive: false })
+
+      render(
+        <TestWrapper>
+          <AAPWorkflowTemplateResourcePickers browser={browser} />
+        </TestWrapper>
+      )
+
+      expect(screen.getByLabelText('Organization')).toBeDisabled()
+      expect(screen.getByLabelText('Workflow template')).toBeDisabled()
+    })
+
+    it('shows a credential hint while browsing is inactive', () => {
+      const browser = createMockBrowser({ isActive: false })
+
+      render(
+        <TestWrapper>
+          <AAPWorkflowTemplateResourcePickers browser={browser} />
+        </TestWrapper>
+      )
+
+      expect(screen.getByText(AAP_CREDENTIAL_REQUIRED_HINT)).toBeInTheDocument()
+    })
+
+    it('does not show the credential hint once browsing is active', () => {
+      const browser = createMockBrowser({ isActive: true })
+
+      render(
+        <TestWrapper>
+          <AAPWorkflowTemplateResourcePickers browser={browser} />
+        </TestWrapper>
+      )
+
+      expect(screen.queryByText(AAP_CREDENTIAL_REQUIRED_HINT)).not.toBeInTheDocument()
+    })
+
+    it('keeps saved selections visible while pickers are disabled', () => {
+      const browser = createMockBrowser({ isActive: false })
+
+      render(
+        <TestWrapper
+          defaultValues={{
+            organization_name: 'Org 1',
+            workflow_job_template_name: 'Workflow Template 1',
+            workflow_job_template_id: 1,
+          }}
+        >
+          <AAPWorkflowTemplateResourcePickers browser={browser} />
+        </TestWrapper>
+      )
+
+      expect(screen.getByLabelText('Organization')).toHaveValue('Org 1')
+      expect(screen.getByLabelText('Workflow template')).toHaveValue('Workflow Template 1')
+      expect(screen.getByLabelText('Organization')).toBeDisabled()
+      expect(screen.getByLabelText('Workflow template')).toBeDisabled()
+    })
+
+    it('enables pickers once a credential is selected', () => {
+      const browser = createMockBrowser({ isActive: true })
+
+      render(
+        <TestWrapper>
+          <AAPWorkflowTemplateResourcePickers browser={browser} />
+        </TestWrapper>
+      )
+
+      expect(screen.getByLabelText('Organization')).toBeEnabled()
+      expect(screen.getByLabelText('Workflow template')).toBeEnabled()
+    })
+
+    it('has no accessibility violations while pickers are disabled', async () => {
+      const browser = createMockBrowser({ isActive: false })
+      const { container } = render(
+        <TestWrapper>
+          <AAPWorkflowTemplateResourcePickers browser={browser} />
+        </TestWrapper>
+      )
+
+      expect(await axe(container)).toHaveNoViolations()
+    })
+  })
+
+  describe('selection reconciliation', () => {
+    const savedSelection = {
+      organization_name: 'Org 1',
+      workflow_job_template_name: 'Workflow Template 1',
+      workflow_job_template_id: 1,
+    }
+
+    it('clears a stale organization and resets the browser selection scope', () => {
+      const selectOrganization = vi.fn()
+      const selectTemplate = vi.fn()
+      const freshLists = createMockBrowser({ selectOrganization, selectTemplate })
+      const staleLists = createMockBrowser({ organizations: [], selectOrganization, selectTemplate })
+
+      const view = render(
+        <TestWrapper defaultValues={savedSelection}>
+          <AAPWorkflowTemplateResourcePickers browser={freshLists} />
+        </TestWrapper>
+      )
+      expect(screen.getByLabelText('Organization')).toHaveValue('Org 1')
+
+      // Lists reload under a credential that no longer offers the saved organization
+      view.rerender(
+        <TestWrapper defaultValues={savedSelection}>
+          <AAPWorkflowTemplateResourcePickers browser={staleLists} />
+        </TestWrapper>
+      )
+
+      expect(screen.getByLabelText('Organization')).toHaveValue('')
+      expect(screen.getByLabelText('Workflow template')).toHaveValue('')
+      expect(selectOrganization).toHaveBeenCalledWith('')
+    })
+
+    it('clears a stale template and resets the browser template selection', () => {
+      const selectOrganization = vi.fn()
+      const selectTemplate = vi.fn()
+      const freshLists = createMockBrowser({ selectOrganization, selectTemplate })
+      const staleLists = createMockBrowser({
+        templates: [{ id: 2, name: 'Workflow Template 2', description: null }],
+        selectOrganization,
+        selectTemplate,
+      })
+
+      const view = render(
+        <TestWrapper defaultValues={savedSelection}>
+          <AAPWorkflowTemplateResourcePickers browser={freshLists} />
+        </TestWrapper>
+      )
+      expect(screen.getByLabelText('Workflow template')).toHaveValue('Workflow Template 1')
+
+      // Lists reload under a credential that no longer offers the saved template
+      view.rerender(
+        <TestWrapper defaultValues={savedSelection}>
+          <AAPWorkflowTemplateResourcePickers browser={staleLists} />
+        </TestWrapper>
+      )
+
+      expect(screen.getByLabelText('Organization')).toHaveValue('Org 1')
+      expect(screen.getByLabelText('Workflow template')).toHaveValue('')
+      expect(selectTemplate).toHaveBeenCalledWith(undefined)
+      expect(selectOrganization).not.toHaveBeenCalledWith('')
+    })
+
+    it('keeps saved selections in the read-only version view', () => {
+      const selectOrganization = vi.fn()
+      const selectTemplate = vi.fn()
+      const freshLists = createMockBrowser({ selectOrganization, selectTemplate })
+      const staleLists = createMockBrowser({ organizations: [], selectOrganization, selectTemplate })
+
+      const view = render(
+        <VersionViewProvider value={true}>
+          <TestWrapper defaultValues={savedSelection}>
+            <AAPWorkflowTemplateResourcePickers browser={freshLists} />
+          </TestWrapper>
+        </VersionViewProvider>
+      )
+      expect(screen.getByLabelText('Organization')).toHaveValue('Org 1')
+
+      view.rerender(
+        <VersionViewProvider value={true}>
+          <TestWrapper defaultValues={savedSelection}>
+            <AAPWorkflowTemplateResourcePickers browser={staleLists} />
+          </TestWrapper>
+        </VersionViewProvider>
+      )
+
+      expect(screen.getByLabelText('Organization')).toHaveValue('Org 1')
+      expect(screen.getByLabelText('Workflow template')).toHaveValue('Workflow Template 1')
+      expect(selectOrganization).not.toHaveBeenCalled()
+      expect(selectTemplate).not.toHaveBeenCalled()
+    })
   })
 })

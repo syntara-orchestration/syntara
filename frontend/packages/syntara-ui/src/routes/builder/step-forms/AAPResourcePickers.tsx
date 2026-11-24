@@ -1,21 +1,26 @@
 import { Button, FormHelperText, HelperText, HelperTextItem, StackItem } from '@patternfly/react-core'
-import { useFormContext } from 'react-hook-form'
+import { useCallback, useEffect } from 'react'
+import { useFormContext, useWatch } from 'react-hook-form'
 
 import { SynFormField } from '../../../components/forms/SynFormField'
 import type { useAAPBrowser } from '../../../hooks/useAAPBrowser'
 import { isValidAAPTemplateURL } from '../../../utils/urlValidation'
+import { useIsVersionView } from '../VersionViewContext'
 
 import type { AAPJobTemplateFormData } from './aapJobTemplateSchema'
+import { getAAPSelectionStaleness } from './aapSelectionStaleness'
 import { AAPTypeaheadSelect } from './AAPTypeaheadSelect'
 import { AAPErrorAlert } from './shared/AAPErrorAlert'
 import { stepHelp } from './shared/stepFieldHelp'
+import { AAP_CREDENTIAL_REQUIRED_HINT } from './shared/stepFieldHelpText'
 
 type AAPResourcePickersProps = {
   readonly browser: ReturnType<typeof useAAPBrowser>
 }
 
 export function AAPResourcePickers({ browser }: AAPResourcePickersProps) {
-  const { setValue, reset, getValues } = useFormContext<AAPJobTemplateFormData>()
+  const { setValue, reset, getValues, control } = useFormContext<AAPJobTemplateFormData>()
+  const isVersionView = useIsVersionView()
 
   const {
     organizations,
@@ -26,6 +31,7 @@ export function AAPResourcePickers({ browser }: AAPResourcePickersProps) {
     searchJobTemplates,
     loadingOrgs,
     loadingTemplates,
+    isActive,
     error: browserError,
     retryAll,
   } = browser
@@ -42,7 +48,7 @@ export function AAPResourcePickers({ browser }: AAPResourcePickersProps) {
    * Called when organization or template changes to reset user-provided values.
    * Uses reset() to batch updates and avoid unnecessary re-renders.
    */
-  const clearPromptOverrides = () => {
+  const clearPromptOverrides = useCallback(() => {
     const clearedOverrides = {
       inventory_name: '',
       inventory_id: undefined,
@@ -64,7 +70,47 @@ export function AAPResourcePickers({ browser }: AAPResourcePickersProps) {
       labels: [],
     }
     reset({ ...getValues(), ...clearedOverrides }, { keepDirty: false })
-  }
+  }, [reset, getValues])
+
+  const organizationName = useWatch({ control, name: 'organization_name' })
+  const templateName = useWatch({ control, name: 'job_template_name' })
+
+  // Drop selections the currently loaded lists no longer offer (for example
+  // after a credential switch); selections that remain visible are retained
+  const staleness = getAAPSelectionStaleness(browser, {
+    selectedOrganization: organizationName || undefined,
+    selectedTemplateName: templateName || undefined,
+  })
+
+  /**
+   * Clear a stale organization selection. Also resets the browser's internal
+   * scope so the template list stops filtering by the cleared organization
+   * and the template detail query stops tracking the cleared template id
+   * under the new credential.
+   */
+  const clearStaleOrganization = useCallback(() => {
+    setValue('organization_name', '')
+    setValue('job_template_name', '')
+    setValue('job_template_id', undefined)
+    selectOrganization('')
+    clearPromptOverrides()
+  }, [setValue, selectOrganization, clearPromptOverrides])
+
+  /** Clear a stale template selection and the browser's tracked template id. */
+  const clearStaleTemplate = useCallback(() => {
+    setValue('job_template_name', '')
+    setValue('job_template_id', undefined)
+    selectJobTemplate(undefined)
+    clearPromptOverrides()
+  }, [setValue, selectJobTemplate, clearPromptOverrides])
+
+  useEffect(() => {
+    // The read-only version view displays the saved selections exactly as
+    // stored — never reconcile them against the live resource lists.
+    if (isVersionView) return
+    if (staleness.organization) clearStaleOrganization()
+    else if (staleness.template) clearStaleTemplate()
+  }, [staleness.organization, staleness.template, isVersionView, clearStaleOrganization, clearStaleTemplate])
 
   return (
     <>
@@ -75,7 +121,7 @@ export function AAPResourcePickers({ browser }: AAPResourcePickersProps) {
           labelHelp={stepHelp.aapOrganization}
           isRequired
           fieldId="aap-organization"
-          hint="AAP organization to browse resources from"
+          hint={isActive ? 'AAP organization to browse resources from' : AAP_CREDENTIAL_REQUIRED_HINT}
         >
           {({ field, fieldState }) => (
             <AAPTypeaheadSelect
@@ -93,6 +139,7 @@ export function AAPResourcePickers({ browser }: AAPResourcePickersProps) {
               onSearchChange={searchOrganizations}
               placeholder="Select an organization"
               isLoading={loadingOrgs}
+              isDisabled={!isActive}
               hasError={!!fieldState.error}
             />
           )}
@@ -124,6 +171,7 @@ export function AAPResourcePickers({ browser }: AAPResourcePickersProps) {
               onSearchChange={searchJobTemplates}
               placeholder="Select a job template"
               isLoading={loadingTemplates}
+              isDisabled={!isActive}
               hasError={!!fieldState.error}
             />
           )}

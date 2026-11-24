@@ -330,16 +330,19 @@ function useAAPBrowserResults(
  * Hook to browse AAP resources (organizations, job/workflow templates, inventories,
  * execution environments, credentials, instance groups) via the Syntara backend proxy.
  *
- * @param credentialId - Optional Orchestrator AAP credential ID for authentication.
- *   If omitted, the backend uses the selected integration's management credential.
+ * @param credentialId - Orchestrator AAP credential ID used for authentication.
+ *   Browsing is active only while a credential is selected; clearing it stops
+ *   all resource queries.
  * @param initialState - Initial organization and template selection
  * @param templateType - 'job' for job templates (default) or 'workflow' for workflow templates
- * @param integrationId - Optional AAP Gateway integration ID. If omitted and only
- *   one AAP integration is visible, the backend uses that integration. Required
- *   when more than one AAP integration is configured.
+ * @param integrationId - Optional AAP Gateway integration ID. It resolves the
+ *   connection URL but does not activate browsing on its own — a credential is
+ *   still required. If omitted and only one AAP integration is visible, the
+ *   backend uses that integration. Required when more than one AAP integration
+ *   is configured.
  *
- * Fetching starts when `credentialId` or `integrationId` is provided. When an
- * organization is selected, the hook re-fetches resources filtered by that org.
+ * Fetching starts only when `credentialId` is provided. When an organization is
+ * selected, the hook re-fetches resources filtered by that org.
  */
 export function useAAPBrowser(
   credentialId: string | undefined,
@@ -352,7 +355,10 @@ export function useAAPBrowser(
     selectedOrg: initialState?.organization ?? '',
     selectedTemplateId: initialState?.templateId ?? initialState?.jobTemplateId,
   }))
-  const isActive = credentialId !== undefined || integrationId !== undefined
+  // Browsing requires an explicitly selected credential. An integration alone
+  // only resolves the connection — it must not expose resources, since the
+  // backend would fall back to the integration's management credential.
+  const isActive = credentialId !== undefined
 
   const queries = useAAPQueries({ state, isActive, credentialId, templateType, integrationId })
   const actions = useAAPActions(setState)
@@ -388,5 +394,7 @@ export function useAAPBrowser(
     selectedOrg: state.selectedOrg,
     ...actions,
     retryAll,
+    /** True while a credential is selected and resource queries are running. */
+    isActive,
   }
 }
