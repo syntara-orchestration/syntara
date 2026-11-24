@@ -2146,6 +2146,7 @@ components:
       type: object
       required:
         - prompt
+        - credential_id
       title: AgenticExecutorParameters
       description: Parameters for agentic executor.
     IntegrationConnectionConfig:
