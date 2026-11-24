@@ -359,6 +359,36 @@ describe('AppDockedNav', () => {
     }
   )
 
+  it.each(['Meta', 'Control'] as const)(
+    'preserves modified-click behavior for collapsed dock child links with %s',
+    async (modifier) => {
+      const user = userEvent.setup()
+      mockUseDockState.mockReturnValue(
+        createMockDockState({
+          isDockExpanded: false,
+          isNavGroupExpanded: () => true,
+        })
+      )
+      renderDockedNav()
+
+      const integrationsLink = screen.getByRole('link', { name: 'Integrations' })
+      expect(integrationsLink).toHaveAttribute('href', '/configuration/integrations')
+      let clickEvent: MouseEvent | undefined
+      const observeClick = (event: MouseEvent) => {
+        clickEvent = event
+      }
+      document.addEventListener('click', observeClick, { capture: true, once: true })
+
+      await user.keyboard(`{${modifier}>}`)
+      await user.pointer({ keys: '[MouseLeft]', target: integrationsLink })
+      await user.keyboard(`{/${modifier}}`)
+      document.removeEventListener('click', observeClick, { capture: true })
+
+      expect(clickEvent?.defaultPrevented).toBe(false)
+      expect(mockRequestNavigation).not.toHaveBeenCalled()
+    }
+  )
+
   it('shows System Administration child links when the group is expanded', () => {
     mockUseDockState.mockReturnValue(
       createMockDockState({

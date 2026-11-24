@@ -8,6 +8,8 @@ Custom ESLint rules for the Syntara UI project to enforce project-specific patte
 
 Flags `onClick`, CTA, and back callbacks that only navigate. Use `SynLink` for page navigation. The rule catches direct `navigate(...)` calls, calls in local handlers, and `detachPromise(navigate(...))`. Callbacks that do other work before navigating remain allowed. Menu actions that close a menu or open a dialog also remain allowed. Route-only `DropdownItem` and `MenuItem` callbacks need a link destination.
 
+Component action props such as `onNavigate` and `onCancel` are not treated as route-only CTA or back props. They remain valid even when their current handler navigates, as shown by the rule fixtures.
+
 ```tsx
 // Invalid: Cmd-click and open-in-new-tab do not work.
 <Button onClick={() => navigate({ to: '/users/new' })}>Create user</Button>

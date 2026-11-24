@@ -4,6 +4,7 @@ import type { WorkflowAPI } from '@syntara/contracts'
 import { useNavigate } from '@tanstack/react-router'
 import { useCallback, useMemo, useState } from 'react'
 
+import { AppRoute } from '../../app/AppRoute'
 import { DisabledWithTooltip } from '../../components/DisabledWithTooltip'
 import { SynPage, SynPageBody } from '../../components/layout/SynPage'
 import { SynPageHeader } from '../../components/layout/SynPageHeader'
@@ -109,7 +110,7 @@ function WorkflowsPageToolbar({
       {showWorkflowActions && (
         <DisabledWithTooltip isDisabled={!canCreate} content={createTooltip}>
           {canCreate ? (
-            <SynLink to="/workflow-builder/new" variant="primary" icon={<RhUiAddIcon />}>
+            <SynLink to={AppRoute.WorkflowBuilder.New} variant="primary" icon={<RhUiAddIcon />}>
               Create workflow
             </SynLink>
           ) : (
@@ -285,7 +286,7 @@ export default function Workflows() {
               onFilterChange={handleFilterChange}
               onClearAllFilters={handleClearAllFilters}
               createWorkflowTo={
-                permissions.canCreate && !selectedProject?.is_builtin ? '/workflow-builder/new' : undefined
+                permissions.canCreate && !selectedProject?.is_builtin ? AppRoute.WorkflowBuilder.New : undefined
               }
               footer={getFooterProps(workflowsQuery.data)}
               getSortParams={getSortParams}
