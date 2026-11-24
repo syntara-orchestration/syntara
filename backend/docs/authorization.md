@@ -530,6 +530,103 @@ uv run tools/authz_cli.py --username alice --password secret can-i read workflow
 uv run tools/authz_cli.py --username alice --password secret what-can-i
 ```
 
+## Sub-workflow (Reference Mode) Authorization
+
+When a parent workflow invokes a child workflow through a Sub-workflow step
+(Reference Mode), authorization is enforced at **runtime, inside the Temporal
+setup activity**, *before* the child execution is created. This is separate from
+the synchronous HTTP authorization on the REST API described above.
+
+### Two distinct authorization surfaces
+
+| Surface | When it applies | How a failure appears |
+|---------|-----------------|-----------------------|
+| **Synchronous HTTP (REST API)** | Design time — reading a published child's invocation schema via `GET /{workflow_id}/invocation_schema` | HTTP **403** with an RFC 9457 `ErrorData` body (`application/problem+json`). The requirement is published in the OpenAPI as `x-app-permission: {resource: workflow, action: read}`, and the 403 shape/example is injected app-level (see `core/error_handlers.py`). |
+| **Asynchronous runtime (Temporal)** | Run time — invoking the child during a parent execution | A non-retryable `SubWorkflowAuthorizationError` surfaced in the **parent execution result**. This is **not** an HTTP 403. |
+
+> An asynchronous runtime authorization failure is never an HTTP 403. The child
+> invocation runs inside a Temporal activity, so a denial is reported as a
+> non-retryable workflow-step failure in the parent's execution result, not as an
+> HTTP status code. Do not conflate the two.
+
+### Design-time: invocation-schema access (`workflow:read`)
+
+`GET /{workflow_id}/invocation_schema` returns a published child's Subworkflow
+Trigger input/output schemas for the builder. It requires **`workflow:read`** on
+the workflow's project (enforced by `PermissionChecker`; published in the
+OpenAPI as `x-app-permission: {resource: workflow, action: read}`). A caller
+without it receives the standard **403** `ErrorData` response.
+
+### Runtime: child invocation (`execution:run`)
+
+Before a child `Execution` is created, the setup activity
+(`sub_workflow_setup_activity.py`) runs two independent gates, in order, and
+**both must pass**:
+
+1. **Project isolation — V1 same-project restriction.** `_assert_child_in_parent_project`
+   rejects a cross-project invocation with a non-retryable
+   `SubWorkflowProjectScopeError`. In V1 a parent may invoke only children **in
+   its own project**. (This is project isolation, *not* the RBAC permission
+   check.)
+2. **Execute permission.** `authorize_child_invocation` requires **`execution:run`**,
+   project-scoped to the **child's** project (resolved from the authoritative
+   workflow record, never from caller-supplied input). **Execute permission on the
+   parent does not grant execute permission on the child** — the child is
+   authorized independently.
+
+Only after both gates — and trigger/input eligibility validation — pass is the
+child execution created and started. If either gate fails, the child is **never
+created**.
+
+**Effective identity.** Authorization evaluates the **propagated initiating
+identity** (the user who started the parent run). For **scheduled** parents the
+propagated identity is the **workflow author** (AAP-95035); authorizing the
+author is a V1 decision pending Product/Security review (AAP-91266).
+
+### Runtime error classifications (all non-retryable)
+
+| Error type | Cause | Sanitized message |
+|------------|-------|-------------------|
+| `SubWorkflowAuthorizationError` | Caller lacks `execution:run` on the child, or the principal is missing/disabled | `Not authorized to run child workflow.` (policy deny) · `Sub-workflow invocation principal is missing or disabled; refusing to create child execution.` (missing/disabled) |
+| `SubWorkflowProjectScopeError` | Cross-project invocation (V1) | project-scope violation (no child identifiers leaked) |
+| `TriggerNotFoundError` | Configured trigger does not exist in the child | `Trigger node '<id>' not found in child workflow definition` |
+| `InvalidTriggerType` | Configured trigger exists but is not a Subworkflow Trigger | `Trigger '<id>' has type '<type>', ... requires a subworkflow_trigger node.` |
+
+Authorization (`SubWorkflowAuthorizationError`) and eligibility
+(`TriggerNotFoundError`, `InvalidTriggerType`) are **distinct, independently
+identifiable classifications** — they are never collapsed into a generic error.
+Authorization messages are **sanitized**: they never expose the child workflow's
+name, id, or project (those are emitted only to structured server logs).
+
+### Propagation into the parent execution result
+
+A runtime authorization failure aborts the setup activity with a non-retryable
+`ApplicationError`. The classification survives the Temporal boundary
+(`ActivityError` → `cause` `ApplicationError`, `type` preserved), so the
+Sub-workflow step fails in the parent run with the sanitized message, is **not
+retried**, and the child is **never created**. Existing step failure handling
+applies — for example, `continue_on_failure` on the Sub-workflow step is
+honored.
+
+Representative runtime error contract for a denied invocation (the actual
+implemented contract the setup activity raises):
+
+```text
+ApplicationError
+  message:       "Not authorized to run child workflow."
+  type:          "SubWorkflowAuthorizationError"
+  non_retryable: true
+```
+
+This surfaces in the parent execution result as a failed Sub-workflow step
+carrying the same sanitized message; no child execution is recorded.
+
+> **Scope note.** Structured authorization-denial *audit events* (emission,
+> schema, and query APIs) are tracked separately under AAP-95044 / AAP-91238 and
+> are not documented here. End-user guidance (how to grant permissions,
+> screenshots, troubleshooting) lives in the customer documentation under
+> AAP-91240.
+
 ## Local Development Setup
 
 Authorization is evaluated in-process, so local development does not require a separate policy sidecar:
