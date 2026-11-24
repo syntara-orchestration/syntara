@@ -20,8 +20,13 @@ from syntara.authz.dependencies import PermissionChecker, VisibilityFilter
 from syntara.authz.engine import VisibilityResult
 from syntara.core.database.session import get_db
 from syntara.core.models import User
+from syntara.core.models.error import ErrorData
 from syntara.core.syntara_router import NO_PERMISSION, SyntaraRouter
-from syntara.workflows.error_handlers import build_validation_problem_response
+from syntara.workflows.error_handlers import (
+    WorkflowPublishTriggerRemovalConfirmationProblem,
+    WorkflowReferencedConfirmationProblem,
+    build_validation_problem_response,
+)
 from syntara.workflows.exceptions import WorkflowDefinitionInvalidError
 from syntara.workflows.executions_router import get_temporal_execution_service
 from syntara.workflows.models import (
@@ -450,6 +455,17 @@ async def update_workflow(
     dependencies=[Depends(_wf_perm_delete)],
     operation_id="delete_workflow",
     response_description="Workflow deleted",
+    responses={
+        status.HTTP_409_CONFLICT: {
+            "model": WorkflowReferencedConfirmationProblem | ErrorData,
+            "description": (
+                "Conflict. When the workflow is referenced by published parents the body is a "
+                "WorkflowReferencedConfirmationProblem (carrying referencing_count); resend with "
+                "confirm=true to delete. Other conflicts (for example active executions blocking "
+                "deletion) use the generic problem shape."
+            ),
+        }
+    },
 )
 async def delete_workflow(
     workflow_id: UUID,
@@ -698,6 +714,17 @@ async def check_subworkflow_output_contract_changes(
     dependencies=[Depends(_wf_perm_update)],
     operation_id="publish_workflow_version",
     response_description="Published workflow version",
+    responses={
+        status.HTTP_409_CONFLICT: {
+            "model": WorkflowPublishTriggerRemovalConfirmationProblem | ErrorData,
+            "description": (
+                "Conflict. When publishing removes a Subworkflow Trigger invoked by published "
+                "parents the body is a WorkflowPublishTriggerRemovalConfirmationProblem (carrying "
+                "affected_count); resend with confirm=true. Other conflicts (version conflict, "
+                "publish validation) use the generic problem shape."
+            ),
+        }
+    },
 )
 async def publish_workflow_version(
     workflow_id: UUID,

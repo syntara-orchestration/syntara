@@ -155,7 +155,6 @@ function BuilderToolbarContent({
   }
 
   if (isLiveRunActive && onBackToEditor) {
-    const isCancellable = isExecutionCancellable(executionStatus)
     return (
       <>
         {hasApprovalPending && onReviewApproval && (
@@ -168,7 +167,7 @@ function BuilderToolbarContent({
             Review approval
           </Button>
         )}
-        {isCancellable && executionId && projectId && (
+        {isExecutionCancellable(executionStatus) && executionId && projectId && (
           <CancelExecutionButton executionId={executionId} projectId={projectId} />
         )}
         <Button variant="primary" onClick={onBackToEditor}>

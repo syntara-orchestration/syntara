@@ -34,13 +34,14 @@ _PUB_CODE = "WORKFLOW_PUBLISH_TRIGGER_REMOVAL_CONFIRMATION_REQUIRED"
 
 
 def _published_schema(schema_name: str) -> dict[str, Any]:
-    """Load a specialized problem schema from the YAML, inlining the ErrorData allOf ``$ref``."""
+    """Load a specialized problem schema from the YAML.
+
+    The published schema is a self-contained flat object: the Pydantic model subclasses
+    ``ErrorData`` and Pydantic inlines the inherited fields, so the schema carries them directly
+    (no ``allOf``/``$ref``) and can be validated with ``jsonschema`` as-is.
+    """
     subspec = yaml.safe_load(_SUBSPEC.read_text())
-    shared = yaml.safe_load(_SHARED.read_text())
-    error_data = shared["components"]["schemas"]["ErrorData"]
-    schema = dict(subspec["components"]["schemas"][schema_name])
-    schema["allOf"] = [error_data if "$ref" in part else part for part in schema["allOf"]]
-    return schema
+    return dict(subspec["components"]["schemas"][schema_name])
 
 
 def _base_body(code: str) -> dict[str, Any]:
@@ -138,24 +139,16 @@ class TestModelOpenAPIConsistency:
 
     def test_referenced_constraints_match(self) -> None:
         subspec = yaml.safe_load(_SUBSPEC.read_text())
-        ext = next(
-            p
-            for p in subspec["components"]["schemas"]["WorkflowReferencedConfirmationProblem"]["allOf"]
-            if "$ref" not in p
-        )
-        assert ext["properties"]["code"]["enum"] == [_REF_CODE]
-        assert "referencing_count" in ext["required"]
-        assert ext["properties"]["referencing_count"]["minimum"] == 1
+        schema = subspec["components"]["schemas"]["WorkflowReferencedConfirmationProblem"]
+        assert schema["properties"]["code"]["const"] == _REF_CODE
+        assert "referencing_count" in schema["required"]
+        assert schema["properties"]["referencing_count"]["minimum"] == 1
         assert WorkflowReferencedConfirmationProblem.model_fields["referencing_count"].is_required()
 
     def test_publish_constraints_match(self) -> None:
         subspec = yaml.safe_load(_SUBSPEC.read_text())
-        ext = next(
-            p
-            for p in subspec["components"]["schemas"]["WorkflowPublishTriggerRemovalConfirmationProblem"]["allOf"]
-            if "$ref" not in p
-        )
-        assert ext["properties"]["code"]["enum"] == [_PUB_CODE]
-        assert "affected_count" in ext["required"]
-        assert ext["properties"]["affected_count"]["minimum"] == 1
+        schema = subspec["components"]["schemas"]["WorkflowPublishTriggerRemovalConfirmationProblem"]
+        assert schema["properties"]["code"]["const"] == _PUB_CODE
+        assert "affected_count" in schema["required"]
+        assert schema["properties"]["affected_count"]["minimum"] == 1
         assert WorkflowPublishTriggerRemovalConfirmationProblem.model_fields["affected_count"].is_required()

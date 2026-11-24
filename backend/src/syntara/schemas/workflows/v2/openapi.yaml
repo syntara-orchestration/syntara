@@ -331,6 +331,7 @@ paths:
                 anyOf:
                   - $ref: '#/components/schemas/WorkflowReferencedConfirmationProblem'
                   - $ref: '../../base/shared-resources.openapi.yaml#/components/schemas/ErrorData'
+                title: Response 409 Delete Workflow
         '422':
           $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ValidationError'
         "429":
@@ -816,6 +817,7 @@ paths:
                 anyOf:
                   - $ref: '#/components/schemas/WorkflowPublishTriggerRemovalConfirmationProblem'
                   - $ref: '../../base/shared-resources.openapi.yaml#/components/schemas/ErrorData'
+                title: Response 409 Publish Workflow Version
         '422':
           $ref: '../../base/shared-resources.openapi.yaml#/components/responses/ValidationError'
         "429":
@@ -1428,86 +1430,178 @@ components:
         - next: eyJpZCI6Im5leHQifQ
           prev: eyJpZCI6InByZXYifQ
     WorkflowReferencedConfirmationProblem:
+      description: |-
+        Typed RFC 9457 problem body for the delete-confirmation 409.
+
+        Extends the base problem with the count of referencing published parents; their identities are
+        never disclosed, since the caller may lack read access to them. Mirrors
+        ``WorkflowReferencedConfirmationProblem`` in the OpenAPI spec so generated clients type the field.
+      examples:
+        - code: RATE_LIMIT_EXCEEDED
+          detail: OpenRouter API rate limit exceeded. Please try again in a few moments.
+          instance: /invocations/550e8400-e29b-41d4-a716-446655440000
+          retryable: true
+          title: LLM Rate Limit Exceeded
+          type: https://api.example.com/errors/llm-error
+        - code: STREAM_TIMEOUT
+          detail: LLM streaming timed out after 30 seconds
+          instance: /invocations/550e8400-e29b-41d4-a716-446655440000
+          retryable: true
+          title: Streaming Timeout
+          type: https://api.example.com/errors/timeout-error
+      properties:
+        code:
+          const: WORKFLOW_REFERENCED_CONFIRMATION_REQUIRED
+          description: Machine-readable error code; fixed for this problem type.
+          title: Code
+          type: string
+        detail:
+          description: Human-readable explanation specific to this occurrence
+          examples:
+            - 'OpenRouter API returned error: rate limit exceeded. Please try again in a few moments.'
+          maxLength: 2000
+          minLength: 1
+          title: Detail
+          type: string
+        instance:
+          anyOf:
+            - maxLength: 2048
+              type: string
+            - type: 'null'
+          description: Optional URI reference identifying the specific occurrence
+          examples:
+            - /invocations/550e8400-e29b-41d4-a716-446655440000
+          title: Instance
+        referencing_count:
+          description: Distinct published parents that reference this workflow and would be affected by deletion.
+          minimum: 1.0
+          title: Referencing Count
+          type: integer
+        retryable:
+          description: Whether this error can be retried by creating a new invocation
+          examples:
+            - true
+          title: Retryable
+          type: boolean
+        title:
+          description: Short, human-readable summary of the problem
+          examples:
+            - LLM Service Unavailable
+          maxLength: 200
+          minLength: 1
+          title: Title
+          type: string
+        type:
+          description: URI reference identifying the problem type
+          examples:
+            - https://api.example.com/errors/llm-error
+          maxLength: 500
+          minLength: 1
+          title: Type
+          type: string
+      required:
+        - type
+        - title
+        - detail
+        - code
+        - retryable
+        - referencing_count
       title: WorkflowReferencedConfirmationProblem
-      description: >-
-        RFC 9457 problem body returned (HTTP 409) when deleting a workflow that is referenced by
-        published parents without ``confirm=true``. Extends ``ErrorData`` with the count of
-        referencing parents; their identities are never disclosed, since the caller may lack read
-        access to them.
-      allOf:
-        - $ref: '../../base/shared-resources.openapi.yaml#/components/schemas/ErrorData'
-        - type: object
-          required:
-            - code
-            - referencing_count
-          properties:
-            code:
-              type: string
-              enum:
-                - WORKFLOW_REFERENCED_CONFIRMATION_REQUIRED
-              title: Code
-              description: Machine-readable error code; fixed for this problem type.
-            referencing_count:
-              type: integer
-              minimum: 1
-              title: Referencing Count
-              description: Distinct published parent workflows that reference this workflow and would be affected by the deletion.
-      examples:
-        - type: https://api.example.com/errors/conflict
-          title: Workflow Deletion Requires Confirmation
-          detail: This workflow is referenced by 2 published parent workflows.
-          code: WORKFLOW_REFERENCED_CONFIRMATION_REQUIRED
-          retryable: false
-          referencing_count: 2
-
+      type: object
     WorkflowPublishTriggerRemovalConfirmationProblem:
-      title: WorkflowPublishTriggerRemovalConfirmationProblem
-      description: >-
-        RFC 9457 problem body returned (HTTP 409) when publishing a version that removes a
-        Subworkflow Trigger invoked by published parents without ``confirm=true``. Extends
-        ``ErrorData`` with the count of affected parents; their identities are never disclosed.
-      allOf:
-        - $ref: '../../base/shared-resources.openapi.yaml#/components/schemas/ErrorData'
-        - type: object
-          required:
-            - code
-            - affected_count
-          properties:
-            code:
-              type: string
-              enum:
-                - WORKFLOW_PUBLISH_TRIGGER_REMOVAL_CONFIRMATION_REQUIRED
-              title: Code
-              description: Machine-readable error code; fixed for this problem type.
-            affected_count:
-              type: integer
-              minimum: 1
-              title: Affected Count
-              description: Distinct published parent workflows that invoke a Subworkflow Trigger removed by this publish.
-      examples:
-        - type: https://api.example.com/errors/conflict
-          title: Publish Requires Confirmation
-          detail: Publishing removes a Subworkflow Trigger invoked by 1 published parent workflow.
-          code: WORKFLOW_PUBLISH_TRIGGER_REMOVAL_CONFIRMATION_REQUIRED
-          retryable: false
-          affected_count: 1
+      description: |-
+        Typed RFC 9457 problem body for the publish trigger-removal 409.
 
+        Extends the base problem with the count of affected published parents (identities are never
+        disclosed). Mirrors ``WorkflowPublishTriggerRemovalConfirmationProblem`` in the OpenAPI spec.
+      examples:
+        - code: RATE_LIMIT_EXCEEDED
+          detail: OpenRouter API rate limit exceeded. Please try again in a few moments.
+          instance: /invocations/550e8400-e29b-41d4-a716-446655440000
+          retryable: true
+          title: LLM Rate Limit Exceeded
+          type: https://api.example.com/errors/llm-error
+        - code: STREAM_TIMEOUT
+          detail: LLM streaming timed out after 30 seconds
+          instance: /invocations/550e8400-e29b-41d4-a716-446655440000
+          retryable: true
+          title: Streaming Timeout
+          type: https://api.example.com/errors/timeout-error
+      properties:
+        affected_count:
+          description: Distinct published parents that invoke a Subworkflow Trigger removed by this publish.
+          minimum: 1.0
+          title: Affected Count
+          type: integer
+        code:
+          const: WORKFLOW_PUBLISH_TRIGGER_REMOVAL_CONFIRMATION_REQUIRED
+          description: Machine-readable error code; fixed for this problem type.
+          title: Code
+          type: string
+        detail:
+          description: Human-readable explanation specific to this occurrence
+          examples:
+            - 'OpenRouter API returned error: rate limit exceeded. Please try again in a few moments.'
+          maxLength: 2000
+          minLength: 1
+          title: Detail
+          type: string
+        instance:
+          anyOf:
+            - maxLength: 2048
+              type: string
+            - type: 'null'
+          description: Optional URI reference identifying the specific occurrence
+          examples:
+            - /invocations/550e8400-e29b-41d4-a716-446655440000
+          title: Instance
+        retryable:
+          description: Whether this error can be retried by creating a new invocation
+          examples:
+            - true
+          title: Retryable
+          type: boolean
+        title:
+          description: Short, human-readable summary of the problem
+          examples:
+            - LLM Service Unavailable
+          maxLength: 200
+          minLength: 1
+          title: Title
+          type: string
+        type:
+          description: URI reference identifying the problem type
+          examples:
+            - https://api.example.com/errors/llm-error
+          maxLength: 500
+          minLength: 1
+          title: Type
+          type: string
+      required:
+        - type
+        - title
+        - detail
+        - code
+        - retryable
+        - affected_count
+      title: WorkflowPublishTriggerRemovalConfirmationProblem
+      type: object
     WorkflowUsedByResponse:
       type: object
       required:
         - resources
         - referencing_parent_count
       title: WorkflowUsedByResponse
-      description: >-
+      description: |-
         Used-By response: the published parents that reference a given workflow.
 
-
-        ``resources`` is the RBAC-filtered page of referencing parents the requester may view,
-        paged by ``next``/``prev``. ``referencing_parent_count`` is a domain value -- not a
-        pagination total -- giving the number of distinct published parents across all projects,
-        counted regardless of the requester's visibility, so the Used-By badge reflects true impact
-        even when some parents sit in projects the caller cannot see. The page envelope's
-        ``total``/``include_total`` are deliberately omitted here.
+        ``resources`` is the RBAC-filtered page of referencing parents the requester may view, paged by
+        ``next``/``prev``. ``referencing_parent_count`` is a domain value -- not a pagination total --
+        giving the number of distinct published parents across all projects, counted regardless of the
+        requester's visibility, so the Used-By badge reflects true impact even when some parents sit in
+        projects the caller cannot see. The page envelope's ``total``/``include_total`` are deliberately
+        omitted here: the visible page is already bounded by ``limit`` and the meaningful count is the
+        cross-project domain value above.
       properties:
         resources:
           type: array
@@ -1530,21 +1624,19 @@ components:
           description: Cursor for the previous page of referencing parents.
         referencing_parent_count:
           type: integer
-          minimum: 0
+          minimum: 0.0
           title: Referencing Parent Count
           description: Distinct published parent workflows that reference this workflow, counted across all projects regardless of the requester's visibility. A domain value, not a pagination total.
       examples:
-        - resources: []
-          next: null
-          prev: null
-          referencing_parent_count: 3
+        - referencing_parent_count: 3
+          resources: []
     WorkflowUsedByCount:
       type: object
       required:
         - workflow_id
         - referencing_parent_count
       title: WorkflowUsedByCount
-      description: Used-By total for a single workflow, returned by the batch counts endpoint.
+      description: Used-By count for a single workflow, returned by the batch counts endpoint.
       properties:
         workflow_id:
           type: string
@@ -1552,7 +1644,7 @@ components:
           title: Workflow Id
         referencing_parent_count:
           type: integer
-          minimum: 0
+          minimum: 0.0
           title: Referencing Parent Count
           description: Distinct published parent workflows that reference this workflow, across all projects, regardless of the requester's visibility.
     WorkflowUsedByCountsResponse:

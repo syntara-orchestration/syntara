@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any, TypeVar, cast
+from typing import Any, Literal, TypeVar, cast
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
-from ..models.workflow_referenced_confirmation_problem_code import WorkflowReferencedConfirmationProblemCode
 from ..types import UNSET, Unset
 
 T = TypeVar("T", bound="WorkflowReferencedConfirmationProblem")
@@ -14,42 +13,45 @@ T = TypeVar("T", bound="WorkflowReferencedConfirmationProblem")
 
 @_attrs_define
 class WorkflowReferencedConfirmationProblem:
-    """RFC 9457 problem body returned (HTTP 409) when deleting a workflow that is referenced by published parents without
-    ``confirm=true``. Extends ``ErrorData`` with the count of referencing parents; their identities are never disclosed,
-    since the caller may lack read access to them.
+    """Typed RFC 9457 problem body for the delete-confirmation 409.
+
+    Extends the base problem with the count of referencing published parents; their identities are
+    never disclosed, since the caller may lack read access to them. Mirrors
+    ``WorkflowReferencedConfirmationProblem`` in the OpenAPI spec so generated clients type the field.
 
         Attributes:
-            type_ (str): URI reference identifying the problem type
-            title (str): Short, human-readable summary of the problem
+            code (Literal['WORKFLOW_REFERENCED_CONFIRMATION_REQUIRED']): Machine-readable error code; fixed for this problem
+                type.
             detail (str): Human-readable explanation specific to this occurrence
-            code (WorkflowReferencedConfirmationProblemCode): Machine-readable error code; fixed for this problem type.
+            referencing_count (int): Distinct published parents that reference this workflow and would be affected by
+                deletion.
             retryable (bool): Whether this error can be retried by creating a new invocation
-            referencing_count (int): Distinct published parent workflows that reference this workflow and would be affected
-                by the deletion.
+            title (str): Short, human-readable summary of the problem
+            type_ (str): URI reference identifying the problem type
             instance (None | str | Unset): Optional URI reference identifying the specific occurrence
     """
 
-    type_: str
-    title: str
+    code: Literal["WORKFLOW_REFERENCED_CONFIRMATION_REQUIRED"]
     detail: str
-    code: WorkflowReferencedConfirmationProblemCode
-    retryable: bool
     referencing_count: int
+    retryable: bool
+    title: str
+    type_: str
     instance: None | str | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        type_ = self.type_
-
-        title = self.title
+        code = self.code
 
         detail = self.detail
 
-        code = self.code.value
+        referencing_count = self.referencing_count
 
         retryable = self.retryable
 
-        referencing_count = self.referencing_count
+        title = self.title
+
+        type_ = self.type_
 
         instance: None | str | Unset
         if isinstance(self.instance, Unset):
@@ -61,12 +63,12 @@ class WorkflowReferencedConfirmationProblem:
         field_dict.update(self.additional_properties)
         field_dict.update(
             {
-                "type": type_,
-                "title": title,
-                "detail": detail,
                 "code": code,
-                "retryable": retryable,
+                "detail": detail,
                 "referencing_count": referencing_count,
+                "retryable": retryable,
+                "title": title,
+                "type": type_,
             }
         )
         if instance is not UNSET:
@@ -77,17 +79,19 @@ class WorkflowReferencedConfirmationProblem:
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         d = dict(src_dict)
-        type_ = d.pop("type")
-
-        title = d.pop("title")
+        code = cast(Literal["WORKFLOW_REFERENCED_CONFIRMATION_REQUIRED"], d.pop("code"))
+        if code != "WORKFLOW_REFERENCED_CONFIRMATION_REQUIRED":
+            raise ValueError(f"code must match const 'WORKFLOW_REFERENCED_CONFIRMATION_REQUIRED', got '{code}'")
 
         detail = d.pop("detail")
 
-        code = WorkflowReferencedConfirmationProblemCode(d.pop("code"))
+        referencing_count = d.pop("referencing_count")
 
         retryable = d.pop("retryable")
 
-        referencing_count = d.pop("referencing_count")
+        title = d.pop("title")
+
+        type_ = d.pop("type")
 
         def _parse_instance(data: object) -> None | str | Unset:
             if data is None:
@@ -99,12 +103,12 @@ class WorkflowReferencedConfirmationProblem:
         instance = _parse_instance(d.pop("instance", UNSET))
 
         workflow_referenced_confirmation_problem = cls(
-            type_=type_,
-            title=title,
-            detail=detail,
             code=code,
-            retryable=retryable,
+            detail=detail,
             referencing_count=referencing_count,
+            retryable=retryable,
+            title=title,
+            type_=type_,
             instance=instance,
         )
 

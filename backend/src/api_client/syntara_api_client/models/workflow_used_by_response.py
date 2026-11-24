@@ -19,11 +19,13 @@ T = TypeVar("T", bound="WorkflowUsedByResponse")
 class WorkflowUsedByResponse:
     """Used-By response: the published parents that reference a given workflow.
 
-    ``resources`` is the RBAC-filtered page of referencing parents the requester may view, paged by ``next``/``prev``.
-    ``referencing_parent_count`` is a domain value -- not a pagination total -- giving the number of distinct published
-    parents across all projects, counted regardless of the requester's visibility, so the Used-By badge reflects true
-    impact even when some parents sit in projects the caller cannot see. The page envelope's ``total``/``include_total``
-    are deliberately omitted here.
+    ``resources`` is the RBAC-filtered page of referencing parents the requester may view, paged by
+    ``next``/``prev``. ``referencing_parent_count`` is a domain value -- not a pagination total --
+    giving the number of distinct published parents across all projects, counted regardless of the
+    requester's visibility, so the Used-By badge reflects true impact even when some parents sit in
+    projects the caller cannot see. The page envelope's ``total``/``include_total`` are deliberately
+    omitted here: the visible page is already bounded by ``limit`` and the meaningful count is the
+    cross-project domain value above.
 
         Attributes:
             resources (list[WorkflowRead]): Page of referencing published parents the caller may view.

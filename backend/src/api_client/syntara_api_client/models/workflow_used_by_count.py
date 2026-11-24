@@ -12,7 +12,7 @@ T = TypeVar("T", bound="WorkflowUsedByCount")
 
 @_attrs_define
 class WorkflowUsedByCount:
-    """Used-By total for a single workflow, returned by the batch counts endpoint.
+    """Used-By count for a single workflow, returned by the batch counts endpoint.
 
     Attributes:
         workflow_id (UUID):

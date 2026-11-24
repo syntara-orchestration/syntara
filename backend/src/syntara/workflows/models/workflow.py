@@ -300,8 +300,8 @@ class WorkflowUsedByResponse(SQLModel):
     """
 
     resources: list[WorkflowRead] = Field(
-        default_factory=list,
         description="Page of referencing published parents the caller may view.",
+        max_length=FieldLimits.MAX_ITEMS_PER_PAGE,
     )
     next: str | None = Field(default=None, description="Cursor for the next page of referencing parents.")
     prev: str | None = Field(default=None, description="Cursor for the previous page of referencing parents.")
@@ -311,6 +311,14 @@ class WorkflowUsedByResponse(SQLModel):
             "Distinct published parent workflows that reference this workflow, counted across all "
             "projects regardless of the requester's visibility. A domain value, not a pagination total."
         ),
+    )
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(  # type: ignore[assignment]
+        json_schema_extra={
+            "examples": [
+                {"resources": [], "next": None, "prev": None, "referencing_parent_count": 3},
+            ]
+        },
     )
 
 

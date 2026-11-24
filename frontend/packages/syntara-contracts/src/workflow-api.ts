@@ -912,64 +912,151 @@ export interface components {
     }
     /**
      * WorkflowReferencedConfirmationProblem
-     * @description RFC 9457 problem body returned (HTTP 409) when deleting a workflow that is referenced by published parents without ``confirm=true``. Extends ``ErrorData`` with the count of referencing parents; their identities are never disclosed, since the caller may lack read access to them.
+     * @description Typed RFC 9457 problem body for the delete-confirmation 409.
+     *
+     *     Extends the base problem with the count of referencing published parents; their identities are
+     *     never disclosed, since the caller may lack read access to them. Mirrors
+     *     ``WorkflowReferencedConfirmationProblem`` in the OpenAPI spec so generated clients type the field.
      * @example {
-     *       "type": "https://api.example.com/errors/conflict",
-     *       "title": "Workflow Deletion Requires Confirmation",
-     *       "detail": "This workflow is referenced by 2 published parent workflows.",
-     *       "code": "WORKFLOW_REFERENCED_CONFIRMATION_REQUIRED",
-     *       "retryable": false,
-     *       "referencing_count": 2
+     *       "code": "RATE_LIMIT_EXCEEDED",
+     *       "detail": "OpenRouter API rate limit exceeded. Please try again in a few moments.",
+     *       "instance": "/invocations/550e8400-e29b-41d4-a716-446655440000",
+     *       "retryable": true,
+     *       "title": "LLM Rate Limit Exceeded",
+     *       "type": "https://api.example.com/errors/llm-error"
+     *     }
+     * @example {
+     *       "code": "STREAM_TIMEOUT",
+     *       "detail": "LLM streaming timed out after 30 seconds",
+     *       "instance": "/invocations/550e8400-e29b-41d4-a716-446655440000",
+     *       "retryable": true,
+     *       "title": "Streaming Timeout",
+     *       "type": "https://api.example.com/errors/timeout-error"
      *     }
      */
-    WorkflowReferencedConfirmationProblem: components['schemas']['ErrorData'] & {
+    WorkflowReferencedConfirmationProblem: {
       /**
        * Code
        * @description Machine-readable error code; fixed for this problem type.
-       * @enum {string}
+       * @constant
        */
       code: 'WORKFLOW_REFERENCED_CONFIRMATION_REQUIRED'
       /**
+       * Detail
+       * @description Human-readable explanation specific to this occurrence
+       * @example OpenRouter API returned error: rate limit exceeded. Please try again in a few moments.
+       */
+      detail: string
+      /**
+       * Instance
+       * @description Optional URI reference identifying the specific occurrence
+       * @example /invocations/550e8400-e29b-41d4-a716-446655440000
+       */
+      instance?: string | null
+      /**
        * Referencing Count
-       * @description Distinct published parent workflows that reference this workflow and would be affected by the deletion.
+       * @description Distinct published parents that reference this workflow and would be affected by deletion.
        */
       referencing_count: number
+      /**
+       * Retryable
+       * @description Whether this error can be retried by creating a new invocation
+       * @example true
+       */
+      retryable: boolean
+      /**
+       * Title
+       * @description Short, human-readable summary of the problem
+       * @example LLM Service Unavailable
+       */
+      title: string
+      /**
+       * Type
+       * @description URI reference identifying the problem type
+       * @example https://api.example.com/errors/llm-error
+       */
+      type: string
     }
     /**
      * WorkflowPublishTriggerRemovalConfirmationProblem
-     * @description RFC 9457 problem body returned (HTTP 409) when publishing a version that removes a Subworkflow Trigger invoked by published parents without ``confirm=true``. Extends ``ErrorData`` with the count of affected parents; their identities are never disclosed.
+     * @description Typed RFC 9457 problem body for the publish trigger-removal 409.
+     *
+     *     Extends the base problem with the count of affected published parents (identities are never
+     *     disclosed). Mirrors ``WorkflowPublishTriggerRemovalConfirmationProblem`` in the OpenAPI spec.
      * @example {
-     *       "type": "https://api.example.com/errors/conflict",
-     *       "title": "Publish Requires Confirmation",
-     *       "detail": "Publishing removes a Subworkflow Trigger invoked by 1 published parent workflow.",
-     *       "code": "WORKFLOW_PUBLISH_TRIGGER_REMOVAL_CONFIRMATION_REQUIRED",
-     *       "retryable": false,
-     *       "affected_count": 1
+     *       "code": "RATE_LIMIT_EXCEEDED",
+     *       "detail": "OpenRouter API rate limit exceeded. Please try again in a few moments.",
+     *       "instance": "/invocations/550e8400-e29b-41d4-a716-446655440000",
+     *       "retryable": true,
+     *       "title": "LLM Rate Limit Exceeded",
+     *       "type": "https://api.example.com/errors/llm-error"
+     *     }
+     * @example {
+     *       "code": "STREAM_TIMEOUT",
+     *       "detail": "LLM streaming timed out after 30 seconds",
+     *       "instance": "/invocations/550e8400-e29b-41d4-a716-446655440000",
+     *       "retryable": true,
+     *       "title": "Streaming Timeout",
+     *       "type": "https://api.example.com/errors/timeout-error"
      *     }
      */
-    WorkflowPublishTriggerRemovalConfirmationProblem: components['schemas']['ErrorData'] & {
+    WorkflowPublishTriggerRemovalConfirmationProblem: {
+      /**
+       * Affected Count
+       * @description Distinct published parents that invoke a Subworkflow Trigger removed by this publish.
+       */
+      affected_count: number
       /**
        * Code
        * @description Machine-readable error code; fixed for this problem type.
-       * @enum {string}
+       * @constant
        */
       code: 'WORKFLOW_PUBLISH_TRIGGER_REMOVAL_CONFIRMATION_REQUIRED'
       /**
-       * Affected Count
-       * @description Distinct published parent workflows that invoke a Subworkflow Trigger removed by this publish.
+       * Detail
+       * @description Human-readable explanation specific to this occurrence
+       * @example OpenRouter API returned error: rate limit exceeded. Please try again in a few moments.
        */
-      affected_count: number
+      detail: string
+      /**
+       * Instance
+       * @description Optional URI reference identifying the specific occurrence
+       * @example /invocations/550e8400-e29b-41d4-a716-446655440000
+       */
+      instance?: string | null
+      /**
+       * Retryable
+       * @description Whether this error can be retried by creating a new invocation
+       * @example true
+       */
+      retryable: boolean
+      /**
+       * Title
+       * @description Short, human-readable summary of the problem
+       * @example LLM Service Unavailable
+       */
+      title: string
+      /**
+       * Type
+       * @description URI reference identifying the problem type
+       * @example https://api.example.com/errors/llm-error
+       */
+      type: string
     }
     /**
      * WorkflowUsedByResponse
      * @description Used-By response: the published parents that reference a given workflow.
      *
-     *     ``resources`` is the RBAC-filtered page of referencing parents the requester may view, paged by ``next``/``prev``. ``referencing_parent_count`` is a domain value -- not a pagination total -- giving the number of distinct published parents across all projects, counted regardless of the requester's visibility, so the Used-By badge reflects true impact even when some parents sit in projects the caller cannot see. The page envelope's ``total``/``include_total`` are deliberately omitted here.
+     *     ``resources`` is the RBAC-filtered page of referencing parents the requester may view, paged by
+     *     ``next``/``prev``. ``referencing_parent_count`` is a domain value -- not a pagination total --
+     *     giving the number of distinct published parents across all projects, counted regardless of the
+     *     requester's visibility, so the Used-By badge reflects true impact even when some parents sit in
+     *     projects the caller cannot see. The page envelope's ``total``/``include_total`` are deliberately
+     *     omitted here: the visible page is already bounded by ``limit`` and the meaningful count is the
+     *     cross-project domain value above.
      * @example {
-     *       "resources": [],
-     *       "next": null,
-     *       "prev": null,
-     *       "referencing_parent_count": 3
+     *       "referencing_parent_count": 3,
+     *       "resources": []
      *     }
      */
     WorkflowUsedByResponse: {
@@ -996,7 +1083,7 @@ export interface components {
     }
     /**
      * WorkflowUsedByCount
-     * @description Used-By total for a single workflow, returned by the batch counts endpoint.
+     * @description Used-By count for a single workflow, returned by the batch counts endpoint.
      */
     WorkflowUsedByCount: {
       /**
