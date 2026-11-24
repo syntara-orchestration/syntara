@@ -9,7 +9,13 @@
 
 import AxeBuilder from '@axe-core/playwright'
 
-import { cleanupPersona, createPersona, loginAsUser, PERSONA_ACTIONS, type Persona } from '../authorization/fixtures'
+import {
+  cleanupProjectPersona,
+  createProjectPersona,
+  loginAsUser,
+  loginAsUserApi,
+  type ProjectPersona,
+} from '../authorization/fixtures'
 import { test, expect, toAppUrl, type Page } from '../fixtures'
 import { WCAG_TAGS } from '../fixtures/accessibility'
 import { layoutCanvas } from '../helpers/canvas-interaction'
@@ -37,7 +43,7 @@ const executionIds = new Set<string>()
 let failedRun: WorkflowRun | null = null
 let completedRun: WorkflowRun | null = null
 let multipleFailureRun: WorkflowRun | null = null
-let noEditPersona: Persona | null = null
+let noEditPersona: ProjectPersona | null = null
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -65,9 +71,33 @@ function requireRun(run: WorkflowRun | null, label: string): WorkflowRun {
   return run
 }
 
-function requirePersona(persona: Persona | null): Persona {
+function requirePersona(persona: ProjectPersona | null): ProjectPersona {
   if (!persona) throw new Error('No-edit persona was not created in beforeAll')
   return persona
+}
+
+async function canPerformProjectAction(
+  app: Page,
+  token: string,
+  check: { resourceType: string; action: string; projectId: string }
+): Promise<boolean> {
+  const response = await apiRequest(app, 'post', '/authz/can_i', {
+    token,
+    data: {
+      resource_type: check.resourceType,
+      action: check.action,
+      resource_project: check.projectId,
+    },
+  })
+  if (!response.ok()) {
+    const body = await response.text().catch(() => '(unreadable)')
+    throw new Error(`POST /authz/can_i returned ${response.status()}: ${body}`)
+  }
+  const body: unknown = await response.json()
+  if (!isRecord(body) || typeof body['allowed'] !== 'boolean') {
+    throw new Error('POST /authz/can_i did not return a boolean allowed value')
+  }
+  return body['allowed']
 }
 
 function nodeParameters(definition: unknown, nodeId: string): Record<string, unknown> {
@@ -291,7 +321,46 @@ test.describe('Retry from failure — real backend', () => {
         expectedStatus: 'failed',
       })
 
-      noEditPersona = await createPersona(page, buildUniqueName('e2e-retry-no-edit'), PERSONA_ACTIONS.executionOperator)
+      noEditPersona = await createProjectPersona(page, project.id, buildUniqueName('e2e-retry-no-edit'), [
+        'workflow:read:project',
+        'execution:run:project',
+        'execution:read:project',
+        'project:read:project',
+      ])
+
+      const operatorToken = await loginAsUserApi(page, noEditPersona.username, noEditPersona.password)
+      expect(
+        await canPerformProjectAction(page, operatorToken, {
+          resourceType: 'workflow',
+          action: 'read',
+          projectId: project.id,
+        }),
+        'the test operator must be able to read the workflow'
+      ).toBe(true)
+      expect(
+        await canPerformProjectAction(page, operatorToken, {
+          resourceType: 'execution',
+          action: 'read',
+          projectId: project.id,
+        }),
+        'the test operator must be able to read the execution'
+      ).toBe(true)
+      expect(
+        await canPerformProjectAction(page, operatorToken, {
+          resourceType: 'execution',
+          action: 'run',
+          projectId: project.id,
+        }),
+        'the test operator must be able to retry executions'
+      ).toBe(true)
+      expect(
+        await canPerformProjectAction(page, operatorToken, {
+          resourceType: 'workflow',
+          action: 'update',
+          projectId: project.id,
+        }),
+        'the test operator must not be able to update workflows'
+      ).toBe(false)
     } finally {
       await page.close()
     }
@@ -307,7 +376,7 @@ test.describe('Retry from failure — real backend', () => {
       for (const workflowId of workflowIds) {
         await deleteWorkflowViaApi(page, workflowId)
       }
-      if (noEditPersona) await cleanupPersona(page, noEditPersona)
+      if (noEditPersona) await cleanupProjectPersona(page, noEditPersona)
     } finally {
       await page.close()
     }
