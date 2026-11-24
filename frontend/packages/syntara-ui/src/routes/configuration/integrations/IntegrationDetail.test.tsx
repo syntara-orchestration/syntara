@@ -490,19 +490,19 @@ describe('IntegrationDetail', () => {
       expect(screen.getByText('Disabled')).toBeInTheDocument()
     })
 
-    it('shows Edit integration as a primary button in toolbar', () => {
+    it('shows Edit integration as a primary link in toolbar', () => {
       render(<IntegrationDetail />, { wrapper })
 
-      expect(screen.getByRole('button', { name: 'Edit integration' })).toBeInTheDocument()
+      expect(screen.getByRole('link', { name: 'Edit integration' })).toBeInTheDocument()
     })
 
-    it('navigates to edit page when Edit integration is clicked', async () => {
-      const user = userEvent.setup()
+    it('links to the edit route from Edit integration', () => {
       render(<IntegrationDetail />, { wrapper })
 
-      await user.click(screen.getByRole('button', { name: 'Edit integration' }))
-
-      expect(mockNavigate).toHaveBeenCalledWith({ to: '/configuration/integrations/int-1/edit' })
+      expect(screen.getByRole('link', { name: 'Edit integration' })).toHaveAttribute(
+        'href',
+        '/configuration/integrations/int-1/edit'
+      )
     })
 
     it('shows kebab menu', () => {
@@ -1236,12 +1236,12 @@ describe('IntegrationDetail', () => {
   })
 
   describe('Permission gating', () => {
-    it('disables Edit button when canUpdate is false', () => {
+    it('disables Edit link when canUpdate is false', () => {
       mockPermissions.canUpdate = false
       render(<IntegrationDetail />, { wrapper })
 
-      const editButton = screen.getByRole('button', { name: 'Edit integration' })
-      expect(editButton).toHaveAttribute('aria-disabled', 'true')
+      const editLink = screen.getByRole('link', { name: 'Edit integration' })
+      expect(editLink).toHaveAttribute('aria-disabled', 'true')
     })
 
     it('disables toggle switch with correct label when canUpdate is false', () => {
