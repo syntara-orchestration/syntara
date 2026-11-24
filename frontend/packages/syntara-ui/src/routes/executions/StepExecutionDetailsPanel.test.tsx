@@ -139,10 +139,10 @@ describe('StepExecutionDetailsPanel', () => {
     expect(screen.getByText('No parameters data')).toBeInTheDocument()
   })
 
-  // AAP-89482: a pre-resolved (mock data) predecessor was never actually run by the
+  // A pre-resolved (mock data) predecessor was never actually run by the
   // backend, so there is no ActivityExecution record and the activities REST query
   // returns nothing for it. The mock output supplied via "Set mock data" is carried
-  // on the skipped node's ActivityState (nodeState.outputData) and must still be
+  // on the skipped step's ActivityState (stepState.outputData) and must still be
   // shown in the Output pane instead of an empty state.
   it('shows the supplied mock output for a pre-resolved (skipped) node when no activity record exists', () => {
     mockUseQuery.mockReturnValue({
@@ -153,9 +153,9 @@ describe('StepExecutionDetailsPanel', () => {
     })
 
     render(
-      <NodeExecutionDetailsPanel
+      <StepExecutionDetailsPanel
         {...defaultProps}
-        nodeState={{
+        stepState={{
           activityId: 'first_action',
           status: 'skipped',
           startedAt: null,
