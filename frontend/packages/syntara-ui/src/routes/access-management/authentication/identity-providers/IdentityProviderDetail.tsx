@@ -43,6 +43,7 @@ import { SynPanel } from '../../../../components/layout/SynPanel'
 import { SynListPanel, SynListPanelTabs, SynListPanelView } from '../../../../components/panels/list/SynListPanel'
 import { ProviderIcon } from '../../../../components/ProviderIcon'
 import { useQueryState } from '../../../../components/states/useQueryState'
+import { SynDetailEditLink } from '../../../../components/SynDetailEditLink'
 import type { KebabAction } from '../../../../components/SynKebabMenu'
 import { SynKebabMenu } from '../../../../components/SynKebabMenu'
 import { SynPageTitle } from '../../../../components/SynPageTitle'
@@ -260,13 +261,13 @@ function IdentityProviderDetailToolbar({
   isEnabled,
   kebabActions,
   onToggle,
-  onEdit,
+  editTo,
 }: Readonly<{
   permissions: ReturnType<typeof useIdentityProviderPermissions>
   isEnabled: boolean
   kebabActions: KebabAction[]
   onToggle: () => void
-  onEdit: () => void
+  editTo: string
 }>) {
   return (
     <>
@@ -280,14 +281,9 @@ function IdentityProviderDetailToolbar({
         />
       </DisabledWithTooltip>
       <DisabledWithTooltip isDisabled={!permissions.canUpdate} content={permissions.tooltips.update}>
-        <Button
-          variant="primary"
-          icon={<RhUiEditIcon />}
-          isAriaDisabled={!permissions.canUpdate}
-          onClick={permissions.canUpdate ? onEdit : undefined}
-        >
+        <SynDetailEditLink to={editTo} isAriaDisabled={!permissions.canUpdate}>
           Edit provider
-        </Button>
+        </SynDetailEditLink>
       </DisabledWithTooltip>
       <SynKebabMenu actions={kebabActions} aria-label="Identity provider actions" />
     </>
@@ -356,12 +352,10 @@ export function IdentityProviderDetail() {
   )
 
   const navigateBack = () => detachPromise(navigate({ to: AppRoute.SystemAdministration.Authentication.Root }))
-  const navigateEdit = () =>
-    detachPromise(
-      navigate({
-        to: AppRoute.SystemAdministration.Authentication.EditIdentityProvider.replace(':providerId', providerId ?? ''),
-      })
-    )
+  const editProviderPath = AppRoute.SystemAdministration.Authentication.EditIdentityProvider.replace(
+    ':providerId',
+    providerId ?? ''
+  )
 
   const providerData = providerQuery.data
   const config = providerData?.configuration
@@ -498,7 +492,7 @@ export function IdentityProviderDetail() {
             isEnabled={providerData.enabled ?? false}
             kebabActions={kebabActions}
             onToggle={() => handleToggle(providerData)}
-            onEdit={navigateEdit}
+            editTo={editProviderPath}
           />
         }
       />
