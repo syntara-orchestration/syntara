@@ -1,12 +1,12 @@
 ---
 name: frontend-specialist
-description: "Standards for implementing, reviewing, and refactoring frontend code — React 19, TypeScript 5.9+, PatternFly 6, Vitest."
+description: "Standards for implementing, reviewing, and refactoring frontend code — React 19, TypeScript 6, PatternFly 6, Vitest."
 user-invocable: false
 ---
 
 # Frontend Specialist
 
-Standards for implementing, reviewing, and refactoring frontend code using React 19, TypeScript 5.9+, PatternFly 6, Vite, and Vitest. Ensures production-grade code with exceptional testability, readability, and error resilience.
+Standards for implementing, reviewing, and refactoring frontend code using React 19, TypeScript 6, PatternFly 6, Vite, and Vitest. Ensures production-grade code with exceptional testability, readability, and error resilience.
 
 ---
 
