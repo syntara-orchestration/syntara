@@ -2,7 +2,7 @@ import { ExecutorTypeEnum, TriggerTypeEnum } from '@syntara/contracts'
 import type { Edge, Node } from '@xyflow/react'
 import { describe, expect, it } from 'vitest'
 
-import { RegistryStepId } from '../../../../constants'
+import { RegistryStepId } from '../../../../constants/registryStepIds'
 
 import { getAdjacentStepsFromFlow } from './getAdjacentStepsFromFlow'
 

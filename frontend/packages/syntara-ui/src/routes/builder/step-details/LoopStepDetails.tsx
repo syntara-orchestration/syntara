@@ -1,7 +1,7 @@
 import type { LoopActivity } from '@syntara/contracts'
 import type { ReactNode } from 'react'
 
-import { useAlerts } from '../../../providers/alerts'
+import { useAlerts } from '../../../providers/alerts/AlertContext'
 import { useWorkflowStoreActions } from '../../../stores/useWorkflowStore'
 import type { LoopFormData } from '../step-forms/LoopStepForm'
 import { LoopStepForm } from '../step-forms/LoopStepForm'

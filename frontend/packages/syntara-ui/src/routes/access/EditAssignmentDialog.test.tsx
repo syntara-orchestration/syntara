@@ -5,7 +5,7 @@ import type { ReactNode } from 'react'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { axe } from 'vitest-axe'
 
-import { AlertProvider } from '../../providers/alerts'
+import { AlertProvider } from '../../providers/alerts/AlertProvider'
 
 import { accessClient } from './accessClient'
 import { ROLE_HELP, SCOPE_HELP } from './accessControlFieldHelpText'

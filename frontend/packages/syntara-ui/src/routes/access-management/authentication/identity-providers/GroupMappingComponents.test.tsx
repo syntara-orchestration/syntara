@@ -433,21 +433,21 @@ describe('ReadOnlyView', () => {
   const readOnlyDefaults = {
     entries: mockEntries,
     mappedGroups: mockMappedGroups,
-    onEditMapping: vi.fn(),
+    editMappingTo: '/system-administration/authentication/identity-providers/p-1/group-mapping/edit',
   }
 
-  it('renders Edit group mapping button and keyword filter toolbar', () => {
+  it('renders Edit group mapping link and keyword filter toolbar', () => {
     render(<ReadOnlyView {...readOnlyDefaults} />)
 
-    expect(screen.getByRole('button', { name: /edit group mapping/i })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /edit group mapping/i })).toBeInTheDocument()
     expect(screen.getByPlaceholderText('Filter by keyword')).toBeInTheDocument()
   })
 
-  it('hides Edit group mapping when onEditMapping is omitted', () => {
+  it('hides Edit group mapping when editMappingTo is omitted', () => {
     render(<ReadOnlyView entries={mockEntries} mappedGroups={mockMappedGroups} />)
 
     expect(screen.getByPlaceholderText('Filter by keyword')).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /edit group mapping/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /edit group mapping/i })).not.toBeInTheDocument()
   })
 
   it('renders entries as plain text in table cells', () => {

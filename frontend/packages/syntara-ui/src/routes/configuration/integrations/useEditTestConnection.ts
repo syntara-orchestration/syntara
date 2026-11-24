@@ -2,7 +2,7 @@ import { IntegrationTypeEnum } from '@syntara/contracts'
 import { useCallback } from 'react'
 
 import { integrationsClient } from '../../../client'
-import { useAlerts } from '../../../providers/alerts'
+import { useAlerts } from '../../../providers/alerts/AlertContext'
 import { getErrorMessage } from '../../../utils/apiErrors'
 
 import type { DiscoverResult, EditIntegrationFormValues, IntegrationRead } from './editIntegrationFormSchema'
