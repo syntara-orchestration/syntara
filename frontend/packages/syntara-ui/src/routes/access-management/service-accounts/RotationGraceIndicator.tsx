@@ -19,7 +19,13 @@ export function RotationGraceIndicator({
   return (
     <div className={styles.container}>
       <Tooltip content={tooltipContent}>
-        <SynLabel tabIndex={0} variant="outline" status="info" icon={<RhUiInformationIcon />}>
+        <SynLabel
+          tabIndex={0}
+          className={styles.statusLabel}
+          variant="outline"
+          status="info"
+          icon={<RhUiInformationIcon />}
+        >
           Rotating — {gracePeriod.remainingLabel} left
         </SynLabel>
       </Tooltip>

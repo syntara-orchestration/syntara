@@ -7,7 +7,7 @@ registered. Registration does not enforce permissions on workflow writes.
 from collections.abc import Mapping
 from typing import Any
 
-from syntara.workflows.workflow_engine.models.workflow_definition import NodeType
+from syntara.workflow_core.models import NodeType
 
 NODE_RESOURCE_TYPE = "step_type"
 NODE_KIND_LABEL = "kind"

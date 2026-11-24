@@ -1,7 +1,7 @@
 import type { Activity } from '@syntara/contracts'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { FlowNodeType } from '../../../../../constants'
+import { FlowNodeType } from '../../../../../constants/nodeTypes'
 import { makeCondition } from '../../../../../test/test-helpers'
 import type { EdgeConnection } from '../../../types/edge'
 import { validateWorkflow } from '../validateWorkflow'

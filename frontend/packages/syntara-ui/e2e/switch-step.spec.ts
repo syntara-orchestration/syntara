@@ -474,8 +474,8 @@ test.describe('Switch Step — UI-15', () => {
         await app.getByRole('button', { name: 'Save workflow' }).click()
         await expect(app).toHaveURL(/workflow-builder\/(?!new\b).+/)
 
-        // Click the step to open the editor
-        await app.locator('[role="group"][aria-roledescription="node"]').filter({ hasText: 'Panel Switch' }).click()
+        // Open the step editor via the canvas Edit control
+        await openSwitchStepForEditing(app, 'Panel Switch')
 
         // Three-panel layout must be visible
         await expect(app.getByRole('tab', { name: 'Parameters' })).toBeVisible()

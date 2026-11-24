@@ -52,6 +52,62 @@ async function findLlmCredentialForProject(
   return match ? { name: credName, id: match.id } : null
 }
 
+const LLM_CREDENTIAL_CREATE_MAX_ATTEMPTS = 4
+const LLM_CREDENTIAL_RETRYABLE_STATUSES = new Set([409, 429, 500, 502, 503, 504])
+
+async function getLlmProviderCredentialTypeId(page: Page): Promise<string> {
+  const typesResp = await apiRequest(page, 'get', '/credential_types')
+  if (!typesResp.ok()) throw new Error('Could not list credential types')
+  const types = (await typesResp.json()) as { resources?: Array<{ id: string; name: string }> }
+  const llmType = types.resources?.find((t) => t.name === 'LLM Provider')
+  if (!llmType) throw new Error('LLM Provider credential type not found')
+  return llmType.id
+}
+
+/**
+ * Create an LLM Provider credential via the API with MQ-friendly retries.
+ * Use a unique `name` when tests run in parallel (e.g. integration-models).
+ */
+export async function createLlmProviderCredential(
+  page: Page,
+  options: { name: string; projectId: string; apiKey?: string }
+): Promise<{ name: string; id: string }> {
+  const { name: credName, projectId, apiKey = 'sk-e2e-test-key' } = options
+  const llmTypeId = await getLlmProviderCredentialTypeId(page)
+
+  for (let attempt = 1; attempt <= LLM_CREDENTIAL_CREATE_MAX_ATTEMPTS; attempt++) {
+    const createResp = await apiRequest(page, 'post', '/credentials', {
+      data: {
+        name: credName,
+        credential_type_id: llmTypeId,
+        project_id: projectId,
+        inputs: { api_key: apiKey },
+      },
+    })
+
+    if (createResp.ok()) {
+      const cred = (await createResp.json()) as { id: string }
+      return { name: credName, id: cred.id }
+    }
+
+    const status = createResp.status()
+    if (status === 409) {
+      const raced = await findLlmCredentialForProject(page, credName, projectId)
+      if (raced) return raced
+    }
+
+    if (LLM_CREDENTIAL_RETRYABLE_STATUSES.has(status) && attempt < LLM_CREDENTIAL_CREATE_MAX_ATTEMPTS) {
+      await page.waitForTimeout(250 * attempt)
+      continue
+    }
+
+    const text = await createResp.text()
+    throw new Error(`Could not create LLM credential: ${status} ${text}`)
+  }
+
+  throw new Error('Could not create LLM credential: retries exhausted')
+}
+
 export async function ensureLlmCredential(page: Page): Promise<{ name: string; id: string }> {
   const targetProjectId = await getBuilderProjectId(page)
   const credName = 'e2e-llm-provider'
@@ -68,34 +124,11 @@ export async function ensureLlmCredential(page: Page): Promise<{ name: string; i
     }
   }
 
-  // Find LLM Provider credential type
-  const typesResp = await apiRequest(page, 'get', '/credential_types')
-  if (!typesResp.ok()) throw new Error('Could not list credential types')
-  const types = (await typesResp.json()) as { resources?: Array<{ id: string; name: string }> }
-  const llmType = types.resources?.find((t) => t.name === 'LLM Provider')
-  if (!llmType) throw new Error('LLM Provider credential type not found')
-
-  // Create the credential
-  const createResp = await apiRequest(page, 'post', '/credentials', {
-    data: {
-      name: credName,
-      credential_type_id: llmType.id,
-      project_id: targetProjectId,
-      inputs: { api_key: 'sk-ant-e2e-test-key' },
-    },
+  return createLlmProviderCredential(page, {
+    name: credName,
+    projectId: targetProjectId,
+    apiKey: 'sk-ant-e2e-test-key',
   })
-  if (createResp.ok()) {
-    const cred = (await createResp.json()) as { id: string }
-    return { name: credName, id: cred.id }
-  }
-
-  // Parallel Playwright workers can race on the shared credential name.
-  if (createResp.status() === 409) {
-    const raced = await findLlmCredentialForProject(page, credName, targetProjectId)
-    if (raced) return raced
-  }
-
-  throw new Error(`Could not create LLM credential: ${createResp.status()}`)
 }
 
 /**

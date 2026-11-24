@@ -13,10 +13,10 @@ import {
   Tab,
   Tooltip,
 } from '@patternfly/react-core'
-import { RhUiCheckCircleIcon, RhUiEditIcon, RhUiTrashIcon, RhUiWarningIcon } from '@patternfly/react-icons'
+import { RhUiCheckCircleIcon, RhUiTrashIcon, RhUiWarningIcon } from '@patternfly/react-icons'
 import type { IntegrationsAPI } from '@syntara/contracts'
 import { IntegrationTypeEnum } from '@syntara/contracts'
-import { useNavigate, useParams } from '@tanstack/react-router'
+import { useParams } from '@tanstack/react-router'
 
 import { AppRoute } from '../../../app/AppRoute'
 import { breadcrumbsIntegrationDetail, breadcrumbsIntegrationDetailEarlyShell } from '../../../app/breadcrumbBuilders'
@@ -30,11 +30,12 @@ import { SynPageHeader } from '../../../components/layout/SynPageHeader'
 import { SynPanel } from '../../../components/layout/SynPanel'
 import { SynErrorState } from '../../../components/states/SynErrorState'
 import { useQueryState } from '../../../components/states/useQueryState'
+import { SynDetailEditLink } from '../../../components/SynDetailEditLink'
 import type { KebabAction } from '../../../components/SynKebabMenu'
 import { SynKebabMenu } from '../../../components/SynKebabMenu'
 import { SynLink } from '../../../components/SynLink'
 import { SynPageTitle } from '../../../components/SynPageTitle'
-import { DateCell } from '../../../components/table/DateCell.tsx'
+import { DateCell } from '../../../components/table/DateCell'
 import { SynUrlTabs } from '../../../components/tabs/SynUrlTabs'
 import { useUrlTab } from '../../../hooks/useUrlTab'
 import { detachPromise } from '../../../utils/detachPromise'
@@ -160,13 +161,13 @@ function IntegrationToolbar({
   integration,
   kebabActions,
   onToggleEnabled,
-  onEdit,
+  editTo,
   permissions,
 }: Readonly<{
   integration: IntegrationRead
   kebabActions: KebabAction[]
   onToggleEnabled: () => void
-  onEdit: () => void
+  editTo: string
   permissions: IntegrationPermissions
 }>) {
   return (
@@ -191,14 +192,9 @@ function IntegrationToolbar({
         />
       )}
       <DisabledWithTooltip isDisabled={!permissions.canUpdate} content={permissions.tooltips.update}>
-        <Button
-          variant="primary"
-          icon={<RhUiEditIcon />}
-          isAriaDisabled={!permissions.canUpdate}
-          onClick={permissions.canUpdate ? onEdit : undefined}
-        >
+        <SynDetailEditLink to={editTo} isAriaDisabled={!permissions.canUpdate}>
           Edit integration
-        </Button>
+        </SynDetailEditLink>
       </DisabledWithTooltip>
       <SynKebabMenu actions={kebabActions} aria-label="Integration actions" />
     </>
@@ -278,6 +274,18 @@ function getFooterState({
   return { isDirty: toolsDirty, isSaving: isToolsSaving, onSave: handleToolsSave, saveLabel: 'Save tools' }
 }
 
+function shouldShowResourcesFooter(
+  isLLM: boolean,
+  tools: ReturnType<typeof useAllIntegrationTools>['tools'],
+  modelsState: ReturnType<typeof useIntegrationModelsState>
+): boolean {
+  if (isLLM) {
+    if (modelsState.isLoading || modelsState.error) return false
+    return modelsState.models.length > 0
+  }
+  return tools.length > 0
+}
+
 function hasResourcesTab(integration: IntegrationsAPI.components['schemas']['IntegrationRead']): boolean {
   return isLLMProvider(integration) || integration.integration_type === IntegrationTypeEnum.MCP_SERVER
 }
@@ -286,7 +294,6 @@ type IntegrationDetailTab = 'details' | 'resources' | 'edit'
 
 export function IntegrationDetail() {
   const { integrationId }: { integrationId: string } = useParams({ strict: false })
-  const navigate = useNavigate()
   const integrationBasePath = AppRoute.Configuration.Integrations.Detail.replace(':integrationId', integrationId)
   const editPath = AppRoute.Configuration.Integrations.Edit.replace(':integrationId', integrationId)
   const [activeTab] = useUrlTab<IntegrationDetailTab>(integrationBasePath)
@@ -384,7 +391,8 @@ export function IntegrationDetail() {
   if (!integration?.id) return null
 
   const integrationCrumbs = breadcrumbsIntegrationDetail(integration.name)
-  const footer = activeTab === 'resources' ? <ResourcesFooter {...footerState} /> : undefined
+  const showResourcesFooter = shouldShowResourcesFooter(isLLM, tools, modelsState)
+  const footer = activeTab === 'resources' && showResourcesFooter ? <ResourcesFooter {...footerState} /> : undefined
 
   return (
     <SynPage>
@@ -398,7 +406,7 @@ export function IntegrationDetail() {
             integration={integration}
             kebabActions={kebabActions}
             onToggleEnabled={() => handleToggleEnabled(integration)}
-            onEdit={() => detachPromise(navigate({ to: editPath }))}
+            editTo={editPath}
             permissions={permissions}
           />
         }

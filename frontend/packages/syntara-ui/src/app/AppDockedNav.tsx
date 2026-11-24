@@ -24,19 +24,13 @@ import {
   Tooltip,
 } from '@patternfly/react-core'
 import type { MenuToggleElement } from '@patternfly/react-core'
-import {
-  RhUiDarkModeIcon,
-  RhUiLightModeIcon,
-  RhUiProfileFillIcon,
-  RhUiQuestionMarkCircleIcon,
-} from '@patternfly/react-icons'
-// eslint-disable-next-line @typescript-eslint/no-restricted-imports -- MastheadLogo needs a plain anchor; SynLink adds PF Button styling
+import { RhUiProfileFillIcon, RhUiQuestionMarkCircleIcon } from '@patternfly/react-icons'
 import { Link, useNavigate, useRouterState } from '@tanstack/react-router'
 import { useMemo, useRef, useState } from 'react'
 
 import { authClient } from '../client'
-import { useAlerts } from '../providers/alerts'
-import { useBrand } from '../providers/brand'
+import { useAlerts } from '../providers/alerts/AlertContext'
+import { useBrand } from '../providers/brand/useBrand'
 import { useColorScheme } from '../providers/theme/useColorScheme'
 import { useAuthStore } from '../stores/useAuthStore'
 import { getErrorMessage } from '../utils/apiErrors'
@@ -45,6 +39,7 @@ import { useDocLink } from '../utils/docs/useDocLink'
 
 import { AppRoute } from './AppRoute'
 import type { TNavigationItem } from './navigationItems'
+import { ThemeMenu } from './ThemeMenu'
 import { useDockState } from './useDockState'
 import { useFilteredNavigationItems } from './useFilteredNavigationItems'
 import { useUnsavedChanges } from './useUnsavedChanges'
@@ -227,8 +222,8 @@ function UserMenuDropdown({ showTooltip }: Readonly<{ showTooltip: boolean }>) {
           </DropdownItem>
         </DropdownList>
       </Dropdown>
-      {showTooltip && (
-        <Tooltip aria="none" aria-live="off" triggerRef={userMenuRef} content={username} position="right" />
+      {showTooltip && !isOpen && (
+        <Tooltip aria="none" aria-live="off" triggerRef={userMenuRef} content="Account" position="right" />
       )}
     </>
   )
@@ -238,25 +233,20 @@ function UserMenuDropdown({ showTooltip }: Readonly<{ showTooltip: boolean }>) {
 export function AppDockedNav() {
   const location = useRouterState({ select: (s) => s.location.pathname })
   const { requestNavigation } = useUnsavedChanges()
-  const { colorScheme, toggleColorScheme } = useColorScheme()
+  const { colorScheme } = useColorScheme()
   const brand = useBrand()
   const docsHomeUrl = useDocLink('home')
   const { isDockExpanded, isMobile, dockedToggleRef, onToggleDock, isNavGroupExpanded, onExpandNavGroup, onNavSelect } =
     useDockState()
 
   const filteredItems = useFilteredNavigationItems()
-  const visibleItems = useMemo(
-    () => filteredItems.filter((item) => !item.hidden && !item.path.startsWith('/support')),
-    [filteredItems]
-  )
+  const visibleItems = useMemo(() => filteredItems.filter((item) => !item.hidden), [filteredItems])
   const activeTopLevel = '/' + location.split('/')[1]
 
-  const colorSchemeRef = useRef<HTMLButtonElement>(null)
   const helpRef = useRef<HTMLButtonElement>(null)
   const navItemRefs = useMemo(() => createNavItemRefs(visibleItems), [visibleItems])
   const expandableRefs = useMemo(() => createExpandableRefs(visibleItems), [visibleItems])
 
-  const colorSchemeToggleLabel = colorScheme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'
   const showTooltips = !isDockExpanded
 
   /* v8 ignore start -- phantom branches from compiled JSX props, ternaries, and map callbacks */
@@ -360,16 +350,7 @@ export function AppDockedNav() {
                 gap={{ default: 'gapNone', md: 'gapMd' }}
               >
                 <ToolbarItem>
-                  <Button
-                    variant="plain"
-                    isDocked
-                    icon={colorScheme === 'dark' ? <RhUiDarkModeIcon /> : <RhUiLightModeIcon />}
-                    aria-label={colorSchemeToggleLabel}
-                    ref={colorSchemeRef}
-                    onClick={toggleColorScheme}
-                  >
-                    {colorScheme === 'dark' ? 'Light mode' : 'Dark mode'}
-                  </Button>
+                  <ThemeMenu showTooltip={showTooltips} />
                 </ToolbarItem>
                 <ToolbarItem>
                   <Button
@@ -391,16 +372,7 @@ export function AppDockedNav() {
           </Toolbar>
         </MastheadContent>
         {showTooltips && (
-          <>
-            <Tooltip
-              aria="none"
-              aria-live="off"
-              triggerRef={colorSchemeRef}
-              content={colorSchemeToggleLabel}
-              position="right"
-            />
-            <Tooltip aria="none" aria-live="off" triggerRef={helpRef} content="Documentation" position="right" />
-          </>
+          <Tooltip aria="none" aria-live="off" triggerRef={helpRef} content="Documentation" position="right" />
         )}
       </Masthead>
     </CompassDockMain>

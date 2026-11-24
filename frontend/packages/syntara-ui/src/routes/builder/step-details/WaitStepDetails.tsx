@@ -1,7 +1,7 @@
 import type { WaitActivity } from '@syntara/contracts'
 import type { ReactNode } from 'react'
 
-import { useAlerts } from '../../../providers/alerts'
+import { useAlerts } from '../../../providers/alerts/AlertContext'
 import { useWorkflowStoreActions } from '../../../stores/useWorkflowStore'
 import { useMaxWaitDuration } from '../step-forms/useMaxWaitDuration'
 import { WaitStepForm, type WaitFormData } from '../step-forms/WaitStepForm'

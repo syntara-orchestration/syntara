@@ -8,10 +8,10 @@ import { axe } from 'vitest-axe'
 
 import { integrationsClient } from '../../../client'
 import { useFilterState } from '../../../hooks/useFilterState'
-import { AlertProvider } from '../../../providers/alerts'
+import { AlertProvider } from '../../../providers/alerts/AlertProvider'
 import { assertUrlParam } from '../../../test/filter-test-helpers'
 import { routerTestState } from '../../../test/setup'
-import { formatDateTime } from '../../../utils/dateUtils.ts'
+import { formatDateTime } from '../../../utils/dateUtils'
 
 import Integrations from './Integrations'
 

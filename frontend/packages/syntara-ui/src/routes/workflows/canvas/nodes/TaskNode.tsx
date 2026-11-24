@@ -4,7 +4,7 @@ import { type Node, type NodeProps } from '@xyflow/react'
 import { SynDetailList } from '../../../../components/details/SynDetailList'
 import { SynStep } from '../../../../components/steps/SynStep'
 import { SynStepBody } from '../../../../components/steps/SynStepBody'
-import { FlowNodeType } from '../../../../constants'
+import { FlowNodeType } from '../../../../constants/nodeTypes'
 import type { ActivityStatus } from '../../execution/types'
 import { getStepTypeColor } from '../stepTypeColors'
 
@@ -93,6 +93,7 @@ export function TaskStepComponent(props: NodeProps<TaskNode>) {
       topBarColor={iconColor}
       semanticZoomSummary={getTaskSemanticLabels(props.data)}
       semanticZoomIcon={getTaskCanvasIcon(props.data, iconColor, 'semanticZoom')}
+      semanticZoomPreviewIcon={getTaskCanvasIcon(props.data, iconColor, 'header')}
       semanticZoomMenuActions={menuActions}
     >
       <TaskActivityDetails
@@ -120,7 +121,7 @@ export function TaskActivityDetails(
 
   const executorMeta = executorMetadata[actualExecutor] ?? executorMetadata[props.data.type ?? '']
   const { id: iconId } = getTaskIconDescriptor(props.data)
-  const iconNode = renderStepIcon(executorMeta?.icon, iconId, 'canvas', props.iconColor)
+  const iconNode = renderStepIcon(executorMeta?.icon, iconId, 'header', props.iconColor)
   const taskExecutorLabel = executorMeta?.label ?? 'Task'
   const taskExecutor = actualExecutor || (props.data.type ?? '')
   const config = props.data.parameters ?? {}

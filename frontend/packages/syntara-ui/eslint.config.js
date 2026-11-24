@@ -28,30 +28,50 @@ const require = createRequire(import.meta.url)
 // eslint-plugin-react's "detect" calls context.getFilename(), removed in ESLint 10.
 // Read the installed React version instead of hardcoding.
 const reactVersion = require('react/package.json').version
+const importXResolver = importPlugin.createNodeResolver({
+  extensions: ['.mjs', '.cjs', '.js', '.jsx', '.ts', '.tsx', '.json', '.node'],
+})
 
 /** Glob patterns for unit and integration test files. */
 const TEST_FILES = ['**/*.test.{ts,tsx}', '**/*.spec.{ts,tsx}']
 /** Glob pattern for end-to-end test files. */
 const E2E_FILES = ['e2e/**']
 /** Import restrictions shared by TypeScript source files. */
+const SHARED_RESTRICTED_IMPORT_PATTERNS = [
+  {
+    regex: '(?:\\.{1,2}/)*(?:hooks/)?routing/(?:useNavigate|useParams|useSearch|useLocation|navigate|Link)$',
+    message: 'Deprecated bridge hook. Use @tanstack/react-router primitives directly.',
+  },
+  {
+    group: ['@syntara/contracts/src', '@syntara/contracts/src/**'],
+    message:
+      "Import from '@syntara/contracts' (the public entry point), not from internal source paths. Internal paths are not part of the published API and can break silently when the package restructures.",
+  },
+]
+const TANSTACK_LINK_RESTRICTION = {
+  group: ['@tanstack/react-router'],
+  importNames: ['Link'],
+  message:
+    'Use SynLink from components/SynLink instead of TanStack Link directly. SynLink provides consistent PatternFly styling.',
+}
 const SHARED_RESTRICTED_IMPORT_OPTIONS = {
-  patterns: [
-    {
-      regex: '(?:\\.{1,2}/)*(?:hooks/)?routing/(?:useNavigate|useParams|useSearch|useLocation|navigate|Link)$',
-      message: 'Deprecated bridge hook. Use @tanstack/react-router primitives directly.',
-    },
-    {
-      group: ['@tanstack/react-router'],
-      importNames: ['Link'],
-      message:
-        'Use SynLink from components/SynLink instead of TanStack Link directly. SynLink provides consistent PatternFly styling.',
-    },
-    {
-      group: ['@syntara/contracts/src', '@syntara/contracts/src/**'],
-      message:
-        "Import from '@syntara/contracts' (the public entry point), not from internal source paths. Internal paths are not part of the published API and can break silently when the package restructures.",
-    },
-  ],
+  patterns: [...SHARED_RESTRICTED_IMPORT_PATTERNS, TANSTACK_LINK_RESTRICTION],
+}
+const LINK_ALLOWED_RESTRICTED_IMPORT_OPTIONS = {
+  patterns: SHARED_RESTRICTED_IMPORT_PATTERNS,
+}
+
+const MATH_RANDOM_RESTRICTION = {
+  selector: 'CallExpression[callee.type="MemberExpression"][callee.object.name="Math"][callee.property.name="random"]',
+  message:
+    'Do not use Math.random() — it is not cryptographically secure. Use crypto.getRandomValues(), crypto.randomUUID(), node:crypto.randomInt/randomBytes, or the uuid package. If the value is strictly non-security (e.g. visual jitter), add an eslint-disable-next-line with a short justification.',
+}
+
+const CRYPTO_RANDOM_UUID_RESTRICTION = {
+  object: 'crypto',
+  property: 'randomUUID',
+  message:
+    'crypto.randomUUID is unavailable over HTTP (non-secure contexts). Use generateUUID() from src/utils/generateUUID.ts or React useId() for component keys.',
 }
 
 export default tseslint.config(
@@ -67,22 +87,27 @@ export default tseslint.config(
       'eslint-plugin-syntara/**',
     ],
   },
+  {
+    languageOptions: {
+      parserOptions: {
+        tsconfigRootDir: __dirname,
+      },
+    },
+  },
+  {
+    linterOptions: { reportUnusedDisableDirectives: 'error' },
+  },
   js.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked,
   ...pluginQuery.configs['flat/recommended'],
   // Align with Sonar typescript:S2245 / CWE-338: Math.random is not suitable for secrets, tokens, or crypto.
-  // Use globalThis.crypto.getRandomValues(), crypto.randomUUID(), node:crypto.randomInt/randomBytes, or the uuid package.
+  // Reuse the selector in narrower E2E blocks below because flat config replaces array-valued rules.
   {
     files: ['**/*.{js,jsx,ts,tsx}'],
     rules: {
       'no-restricted-syntax': [
         'error',
-        {
-          selector:
-            'CallExpression[callee.type="MemberExpression"][callee.object.name="Math"][callee.property.name="random"]',
-          message:
-            'Do not use Math.random() — it is not cryptographically secure. Use crypto.getRandomValues(), crypto.randomUUID(), node:crypto.randomInt/randomBytes, or the uuid package. If the value is strictly non-security (e.g. visual jitter), add an eslint-disable-next-line with a short justification.',
-        },
+        MATH_RANDOM_RESTRICTION,
         {
           selector: 'JSXOpeningElement[name.name="Switch"] JSXAttribute[name.name="isReversed"]',
           message:
@@ -145,18 +170,10 @@ export default tseslint.config(
       // axios restriction merged into the icon no-restricted-imports block below
       // to avoid flat-config rule shadowing (the last matching block wins for a given rule).
       // Raw HTTP calls are handled by syntara/no-raw-http-calls (fetch, XMLHttpRequest) below
-      'no-restricted-properties': [
-        'error',
-        {
-          object: 'crypto',
-          property: 'randomUUID',
-          message:
-            'crypto.randomUUID is unavailable over HTTP (non-secure contexts). Use generateUUID() from src/utils/generateUUID.ts or React useId() for component keys.',
-        },
-      ],
+      'no-restricted-properties': ['error', CRYPTO_RANDOM_UUID_RESTRICTION],
     },
   },
-  // Icon migration: flag non-RhUi icons at warn level (existing legacy imports being phased out incrementally).
+  // Require RhUi icons in production TypeScript files when equivalents exist.
   // Bridge hook deprecation uses @typescript-eslint/no-restricted-imports (a separate
   // rule name) to avoid flat-config shadowing — two blocks setting the same rule on the same files
   // would cause the last one to win and silently drop the other.
@@ -165,46 +182,52 @@ export default tseslint.config(
     ignores: [...TEST_FILES, ...E2E_FILES],
     rules: {
       'no-restricted-imports': [
-        'warn',
+        'error',
         {
           patterns: [
             {
               group: ['@patternfly/react-icons'],
-              importNamePattern: '^(?!RhUi)',
-              message:
-                'Use RhUi* icons from @patternfly/react-icons (e.g. RhUiAddIcon, RhUiTrashIcon, RhUiEditIcon). Non-RhUi icons are being phased out.',
+              // Provider identity and empty-state icon choices follow product UX guidance.
+              importNamePattern: '^(?!(?:RhUi|AnsibleTowerIcon$|GlobeIcon$|PlusCircleIcon$|SearchIcon$))',
+              message: 'Use RhUi* icons from @patternfly/react-icons, except approved provider and empty-state icons.',
             },
           ],
         },
       ],
     },
   },
-  // Deprecate bridge hooks in favor of direct @tanstack/react-router imports.
-  // useSearchParams is exempt — it is a supported utility, not a deprecated bridge.
+  // Reject banned imports and direct TanStack Link usage. Bridge hooks are deprecated in favor of direct
+  // @tanstack/react-router imports. useSearchParams is exempt — it is a supported utility, not a deprecated bridge.
   {
     files: ['**/*.{ts,tsx}'],
     ignores: ['**/hooks/routing/*.{ts,tsx}', '**/hooks/routing/*.test.{ts,tsx}'],
     rules: {
       '@typescript-eslint/no-restricted-imports': [
-        'warn',
+        'error',
         {
           ...SHARED_RESTRICTED_IMPORT_OPTIONS,
         },
       ],
     },
   },
-  // SynLink.tsx wraps TanStack Link for general use. SynPageBreadcrumbs,
-  // HistoryListItemLink, and masthead logo links import Link directly because
-  // SynLink renders a PF6 Button (wrong for breadcrumb items, list-row overlays,
-  // and MastheadLogo's component prop which expects an anchor wrapper).
+  // SynLink.tsx wraps TanStack Link for general use. These components use raw Link where
+  // SynLink's PF6 Button styling is wrong for breadcrumbs, row overlays, or MastheadLogo anchors.
+  // Keep the bridge-hook and internal-contract restrictions active in these files.
   {
     files: [
       '**/components/SynLink.tsx',
       '**/components/layout/SynPageBreadcrumbs.tsx',
       '**/routes/builder/HistoryListItemLink.tsx',
+      '**/app/AppDockedNav.tsx',
+      '**/app/AppMobileMasthead.tsx',
     ],
     rules: {
-      '@typescript-eslint/no-restricted-imports': 'off',
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
+        {
+          ...LINK_ALLOWED_RESTRICTED_IMPORT_OPTIONS,
+        },
+      ],
     },
   },
   {
@@ -214,11 +237,14 @@ export default tseslint.config(
       globals: globals.browser,
       parserOptions: {
         project: ['./tsconfig.app.json', './tsconfig.node.json', './tsconfig.e2e.json', './tsconfig.storybook.json'],
-        tsconfigRootDir: __dirname,
       },
     },
     settings: {
       react: { version: reactVersion },
+      // `no-cycle` needs a resolver configured for TS files and this extension list
+      // to traverse their exports. Without both, TS cycles pass silently.
+      'import-x/extensions': ['.mjs', '.cjs', '.js', '.jsx', '.ts', '.tsx', '.json', '.node'],
+      'import-x/resolver-next': [importXResolver],
     },
     plugins: {
       // eslint-plugin-react / jsx-a11y still declare ESLint ^9 peers and use removed
@@ -315,8 +341,8 @@ export default tseslint.config(
       'import-x/no-duplicates': 'error',
       'import-x/no-cycle': ['error', { maxDepth: 2 }],
       'import-x/no-self-import': 'error',
-      // Do not include file extensions in imports — TypeScript resolves them automatically.
-      'import-x/extensions': ['warn', 'never'],
+      // TypeScript resolves source extensions automatically; JSON imports need `.json`.
+      'import-x/extensions': ['error', 'never', { json: 'always' }],
       '@typescript-eslint/consistent-type-definitions': ['error', 'type'],
       // -- syntara custom rules (PR checklist + UX design system enforcement) --
       // no-switch-is-reversed, require-alert-object-param, and require-query-state-object
@@ -356,7 +382,7 @@ export default tseslint.config(
       'reactYouMightNotNeedAnEffect/no-chain-state-updates': 'warn',
       'reactYouMightNotNeedAnEffect/no-event-handler': 'warn',
       'reactYouMightNotNeedAnEffect/no-adjust-state-on-prop-change': 'warn',
-      'reactYouMightNotNeedAnEffect/no-reset-all-state-on-prop-change': 'warn',
+      'reactYouMightNotNeedAnEffect/no-reset-all-state-on-prop-change': 'error',
       'reactYouMightNotNeedAnEffect/no-pass-live-state-to-parent': 'warn',
       'reactYouMightNotNeedAnEffect/no-pass-data-to-parent': 'warn',
       'reactYouMightNotNeedAnEffect/no-initialize-state': 'warn',
@@ -367,6 +393,15 @@ export default tseslint.config(
     files: ['**/test/createTestRouter.tsx'],
     rules: {
       'react-refresh/only-export-components': 'off',
+    },
+  },
+  {
+    // `useWorkflowStore` preserves selector exports for existing consumers while
+    // `workflowStoreSelectors` imports the store to implement those selectors.
+    // The cycle is safe because the store binding is only read when a hook runs.
+    files: ['src/stores/useWorkflowStore.ts', 'src/stores/workflowStoreSelectors.ts'],
+    rules: {
+      'import-x/no-cycle': 'off',
     },
   },
   {
@@ -397,11 +432,10 @@ export default tseslint.config(
     // tree-shaking, circular deps) actually apply. Test-only helper directories (e.g. e2e/) are
     // out of scope, since code there never ships to users and grouped re-exports can be a
     // reasonable convenience. See https://tkdodo.eu/blog/please-stop-using-barrel-files
-    // `warn` (not `error`) so existing barrel files are not a hard build break; new ones in src/
-    // are blocked by the Zero New Warnings Policy in review.
+    // Barrel files in production code fail lint so new ones cannot be added.
     files: ['src/**/*.{ts,tsx}'],
     rules: {
-      'barrel-files/avoid-barrel-files': 'warn',
+      'barrel-files/avoid-barrel-files': 'error',
     },
   },
   {
@@ -481,7 +515,7 @@ export default tseslint.config(
       'testing-library/no-debugging-utils': 'error',
       // Prefer userEvent over fireEvent for realistic user interaction simulation
       'testing-library/prefer-user-event': 'error',
-      'testing-library/no-container': 'warn',
+      'testing-library/no-container': 'error',
       'testing-library/no-node-access': 'error',
     },
   },
@@ -558,6 +592,7 @@ export default tseslint.config(
       ],
       'no-restricted-syntax': [
         'error',
+        MATH_RANDOM_RESTRICTION,
         {
           selector: "CallExpression[callee.property.name='waitForLoadState'][arguments.0.value='networkidle']",
           message:
@@ -574,6 +609,7 @@ export default tseslint.config(
       // don't use React hooks, formState, or JSX aria-label patterns from above.
       'no-restricted-syntax': [
         'error',
+        MATH_RANDOM_RESTRICTION,
         {
           selector: 'CallExpression[callee.property.name="dispatchEvent"]',
           message:
@@ -617,6 +653,7 @@ export default tseslint.config(
       // so false positives on non-Playwright code are rare in E2E specs.
       'no-restricted-properties': [
         'error',
+        CRYPTO_RANDOM_UUID_RESTRICTION,
         {
           property: 'first',
           message:
@@ -675,7 +712,6 @@ export default tseslint.config(
       '**/routes/**/ExecutionDetail.tsx',
       '**/routes/**/Integrations.tsx',
       '**/routes/**/IntegrationTools.tsx',
-      '**/routes/**/Glossary.tsx',
       '**/routes/**/Settings.tsx',
       '**/routes/**/Approvals.tsx',
       '**/routes/**/Authentication.tsx',

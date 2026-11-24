@@ -13,9 +13,9 @@ from temporalio.service import RPCError
 from syntara.audit.dispatcher import AuditEventDispatcher
 from syntara.core.constants import FieldLimits
 from syntara.core.error_handlers import PROBLEM_TYPES, create_problem_details_response
+from syntara.workflow_core.models import NodeType
 from syntara.workflows.audit.webhook_auth import WebhookAuthFailureEvent
 from syntara.workflows.models.node_permission import NodeKindWriteDeniedProblemDetail
-from syntara.workflows.workflow_engine.models.workflow_definition import NodeType
 
 if TYPE_CHECKING:
     from syntara.workflows.exceptions import (
