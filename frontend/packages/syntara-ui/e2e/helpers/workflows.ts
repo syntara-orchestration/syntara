@@ -57,6 +57,15 @@ export async function triggerLayout(page: Page) {
 
 export { clickNode, clickStep, layoutCanvas } from './canvas-interaction'
 
+/** Confirms the builder canvas "Delete step?" dialog after choosing Delete from a step kebab menu. */
+export async function confirmWorkflowStepDeleteDialog(page: Page) {
+  const deleteDialog = page.getByRole('dialog')
+  await expect(deleteDialog).toBeVisible()
+  await expect(deleteDialog.getByRole('heading', { name: /Delete step\?/ })).toBeVisible()
+  await deleteDialog.getByRole('button', { name: 'Delete', exact: true }).click()
+  await expect(deleteDialog).not.toBeVisible()
+}
+
 export async function closeStepEditorPanel(page: Page) {
   // The step editor cancel button has different aria-labels depending on mode:
   //   edit mode  → "Cancel without saving"

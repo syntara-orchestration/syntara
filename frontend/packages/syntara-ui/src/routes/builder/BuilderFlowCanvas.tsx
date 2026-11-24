@@ -17,7 +17,7 @@ import {
   useStore,
   useUpdateNodeInternals,
 } from '@xyflow/react'
-import { useCallback, useLayoutEffect, useRef } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef } from 'react'
 
 import { SynConfirmationDialog } from '../../components/dialogs/SynConfirmationDialog'
 import { FlowNodeType } from '../../constants/nodeTypes'
@@ -157,6 +157,17 @@ export function BuilderFlowCanvas({
     closeDeleteDialog()
   }
   const isMultiDelete = (pendingDeletion?.nodeCount ?? 0) > 1
+  const pendingDeletionRef = useRef<PendingNodeDeletion | null>(null)
+
+  useEffect(() => {
+    pendingDeletionRef.current = pendingDeletion
+  }, [pendingDeletion])
+
+  useEffect(() => {
+    return () => {
+      pendingDeletionRef.current?.resolve(false)
+    }
+  }, [])
 
   return (
     <div

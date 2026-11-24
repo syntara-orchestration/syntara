@@ -1,4 +1,4 @@
-/** AAP-97771: deleting a workflow step must require confirmation and preserve configuration on cancel. */
+/** Step deletion must require confirmation and preserve configuration when the dialog is cancelled. */
 import { ActivityTypeEnum, type Activity, type WorkflowWithVersion } from '@syntara/contracts'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen, waitFor, within } from '@testing-library/react'
@@ -91,6 +91,35 @@ async function renderBuilder(props: BuilderContentProps) {
     expect(screen.getByPlaceholderText('Workflow name')).toBeInTheDocument()
   })
   return view
+}
+
+function stubReactFlowLayoutForCanvas() {
+  vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(300)
+  vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(120)
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 300, 120))
+  vi.stubGlobal(
+    'DOMMatrixReadOnly',
+    class {
+      readonly m22 = 1
+    }
+  )
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      readonly callback: ResizeObserverCallback
+      constructor(callback: ResizeObserverCallback) {
+        this.callback = callback
+      }
+      observe(target: Element) {
+        setTimeout(
+          () => this.callback([{ target, contentRect: new DOMRect(0, 0, 300, 120) } as ResizeObserverEntry], this),
+          0
+        )
+      }
+      unobserve = vi.fn()
+      disconnect = vi.fn()
+    }
+  )
 }
 
 describe('BuilderContent - Delete Workflow', () => {
@@ -343,66 +372,69 @@ describe('BuilderContent - Delete Workflow', () => {
     })
   })
 
-  it('preserves a configured workflow step when its delete confirmation is cancelled', async () => {
-    vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(300)
-    vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(120)
-    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 300, 120))
-    vi.stubGlobal(
-      'DOMMatrixReadOnly',
-      class {
-        readonly m22 = 1
-      }
-    )
-    vi.stubGlobal(
-      'ResizeObserver',
-      class {
-        readonly callback: ResizeObserverCallback
-        constructor(callback: ResizeObserverCallback) {
-          this.callback = callback
-        }
-        observe(target: Element) {
-          setTimeout(
-            () => this.callback([{ target, contentRect: new DOMRect(0, 0, 300, 120) } as ResizeObserverEntry], this),
-            0
-          )
-        }
-        unobserve = vi.fn()
-        disconnect = vi.fn()
-      }
-    )
-    const user = userEvent.setup()
-    const activity = {
+  describe('workflow step delete confirmation', () => {
+    const configuredScriptActivity = {
       id: 'script-1',
       name: 'Configured script',
       type: ActivityTypeEnum.SCRIPT,
       parameters: { language: 'python', code: 'print("keep this configuration")' },
     } satisfies Activity
-    const version = mockWorkflow.version
-    if (!version) throw new Error('Expected a versioned test workflow')
-    const workflow: WorkflowWithVersion = {
-      ...mockWorkflow,
-      version: {
-        ...version,
-        workflow_definition: {
-          ...version.workflow_definition,
-          nodes: [activity],
+
+    function workflowWithActivity(activity: Activity): WorkflowWithVersion {
+      const version = mockWorkflow.version
+      if (!version) throw new Error('Expected a versioned test workflow')
+      return {
+        ...mockWorkflow,
+        version: {
+          ...version,
+          workflow_definition: {
+            ...version.workflow_definition,
+            nodes: [activity],
+          },
         },
-      },
+      }
     }
 
-    await renderBuilder({ workflow, isNew: false, workflowId: 'workflow-1' })
-    const stepMenu = await screen.findByRole('button', { name: 'Step actions menu' })
-    expect(useWorkflowStore.getState().currentWorkflow?.workflow.activities).toEqual([activity])
+    it('preserves a configured workflow step when its delete confirmation is cancelled', async () => {
+      stubReactFlowLayoutForCanvas()
+      const user = userEvent.setup()
+      const activity = configuredScriptActivity
 
-    await user.click(stepMenu)
-    await user.click(await screen.findByRole('menuitem', { name: 'Delete' }))
+      await renderBuilder({ workflow: workflowWithActivity(activity), isNew: false, workflowId: 'workflow-1' })
+      const stepMenu = await screen.findByRole('button', { name: 'Step actions menu' })
+      expect(useWorkflowStore.getState().currentWorkflow?.workflow.activities).toEqual([activity])
 
-    expect.soft(useWorkflowStore.getState().currentWorkflow?.workflow.activities).toEqual([activity])
-    const confirmationDialog = await screen.findByRole('dialog')
-    await user.click(within(confirmationDialog).getByRole('button', { name: 'Cancel' }))
+      await user.click(stepMenu)
+      await user.click(await screen.findByRole('menuitem', { name: 'Delete' }))
 
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-    expect(screen.getByText(activity.name)).toBeInTheDocument()
-    expect(useWorkflowStore.getState().currentWorkflow?.workflow.activities).toEqual([activity])
+      expect.soft(useWorkflowStore.getState().currentWorkflow?.workflow.activities).toEqual([activity])
+      const confirmationDialog = await screen.findByRole('dialog')
+      expect(within(confirmationDialog).getByRole('heading', { name: /Delete step\?/ })).toBeInTheDocument()
+      await user.click(within(confirmationDialog).getByRole('button', { name: 'Cancel' }))
+
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+      expect(screen.getByText(activity.name)).toBeInTheDocument()
+      expect(useWorkflowStore.getState().currentWorkflow?.workflow.activities).toEqual([activity])
+    })
+
+    it('removes the workflow step when delete confirmation is accepted', async () => {
+      stubReactFlowLayoutForCanvas()
+      const user = userEvent.setup()
+      const activity = configuredScriptActivity
+
+      await renderBuilder({ workflow: workflowWithActivity(activity), isNew: false, workflowId: 'workflow-1' })
+      await user.click(await screen.findByRole('button', { name: 'Step actions menu' }))
+      await user.click(await screen.findByRole('menuitem', { name: 'Delete' }))
+
+      const confirmationDialog = await screen.findByRole('dialog')
+      expect(within(confirmationDialog).getByRole('heading', { name: /Delete step\?/ })).toBeInTheDocument()
+      await user.click(within(confirmationDialog).getByRole('button', { name: 'Delete' }))
+
+      await waitFor(() => {
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+      })
+      expect(screen.queryByText(activity.name)).not.toBeInTheDocument()
+      expect(useWorkflowStore.getState().currentWorkflow?.workflow.activities).toEqual([])
+    })
   })
 })
