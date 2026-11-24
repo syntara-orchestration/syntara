@@ -6,6 +6,10 @@ on:
     - cron: '*/15 * * * *'
   workflow_dispatch:
 
+concurrency:
+  group: merge-queue-health-poll
+  cancel-in-progress: false
+
 jobs:
   queue-health-check:
     runs-on: ubuntu-24.04

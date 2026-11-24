@@ -9,4 +9,8 @@ describe('hasNewDequeueSince', () => {
   it('does not replay dequeues already covered by the previous run', () => {
     expect(hasNewDequeueSince([{ dequeuedAt: '2026-08-27T12:10:00Z' }], new Date('2026-08-27T12:15:00Z'))).toBe(false)
   })
+
+  it('keeps dequeues with the same timestamp to account for timestamp precision', () => {
+    expect(hasNewDequeueSince([{ dequeuedAt: '2026-08-27T12:10:00Z' }], new Date('2026-08-27T12:10:00Z'))).toBe(true)
+  })
 })
