@@ -179,6 +179,7 @@ class SubWorkflowSetupActivity:
                 depth exceeded, or project mismatch.
 
         """
+        invocation_started_at = datetime.now(UTC)
         if current_depth >= _MAX_SUB_WORKFLOW_DEPTH:
             msg = (
                 f"Sub-workflow nesting depth {current_depth} exceeds maximum "
@@ -229,6 +230,7 @@ class SubWorkflowSetupActivity:
             created_by_user_id=created_by_user_id,
             created_by_uuid=created_by_uuid,
             current_depth=current_depth,
+            invocation_started_at=invocation_started_at,
         )
 
     async def _prepare_child_execution(
@@ -244,6 +246,7 @@ class SubWorkflowSetupActivity:
         created_by_user_id: str,
         created_by_uuid: UUID,
         current_depth: int,
+        invocation_started_at: datetime,
     ) -> dict[str, Any]:
         from syntara.workflows.exceptions import WorkflowNotPublishedError  # noqa: PLC0415
         from syntara.workflows.models.execution import Execution, ExecutionStatus  # noqa: PLC0415
@@ -366,6 +369,8 @@ class SubWorkflowSetupActivity:
                     "parent_execution_id": parent_execution_id,
                     "parent_node_id": parent_node_id,
                     "sub_workflow_depth": current_depth + 1,
+                    "workflow_name": child_wf_name,
+                    "subworkflow_invocation_started_at": invocation_started_at.isoformat(),
                 },
             )
             session.add(execution)

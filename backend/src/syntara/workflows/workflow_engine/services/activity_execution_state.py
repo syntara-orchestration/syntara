@@ -14,12 +14,15 @@ from temporalio.api.enums.v1 import EventType
 from temporalio.api.history.v1 import HistoryEvent
 
 from syntara.core.exceptions import SafeValueError
+from syntara.telemetry.client import get_telemetry_registry
 from syntara.telemetry.events.workflow_emitters import _map_execution_status_to_telemetry
 from syntara.telemetry.events.workflow_error import TimedOutComponent
 from syntara.workflows.audit.execution_completed import WorkflowCompletedEvent
 from syntara.workflows.audit.execution_error import WorkflowExecutionErrorEvent
+from syntara.workflows.audit.sub_workflow_invocation import SubWorkflowInvocationCompletedEvent
 from syntara.workflows.models.activity_execution import TERMINAL_ACTIVITY_STATUSES, ActivityExecution, ActivityStatus
 from syntara.workflows.models.execution import Execution, ExecutionStatus
+from syntara.workflows.models.workflow import Workflow
 from syntara.workflows.utils.datetime import ensure_timezone_aware
 from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName, NodeType
 from syntara.workflows.workflow_engine.services.activity_sync_types import ExecutionMonitorMetadata
@@ -79,6 +82,89 @@ def _resolve_finalized_completed_at(
     if candidate > now:
         return now
     return candidate
+
+
+def _execution_metadata_datetime(execution_metadata: dict[str, Any], key: str) -> datetime | None:
+    """Parse an ISO timestamp stored in execution_metadata."""
+    value = execution_metadata.get(key)
+    if not isinstance(value, str):
+        return None
+    try:
+        return ensure_timezone_aware(datetime.fromisoformat(value))
+    except ValueError:
+        return None
+
+
+def _duration_ms(started_at: datetime | None, completed_at: datetime) -> int | None:
+    """Return a non-negative elapsed duration when both endpoints are available."""
+    if started_at is None or completed_at < started_at:
+        return None
+    return int((completed_at - started_at).total_seconds() * 1000)
+
+
+async def _build_subworkflow_invocation_event(
+    session: AsyncSession,
+    execution: Execution,
+    status: ExecutionStatus,
+    completed_at: datetime,
+    request_id: UUID | None,
+) -> SubWorkflowInvocationCompletedEvent | None:
+    """Build invocation telemetry from the terminal child execution record."""
+    execution_metadata = execution.execution_metadata
+    if not get_telemetry_registry().is_initialized() or not isinstance(execution_metadata, dict):
+        return None
+
+    raw_parent_execution_id = execution_metadata.get("parent_execution_id")
+    parent_node_id = execution_metadata.get("parent_node_id")
+    if not isinstance(raw_parent_execution_id, str) or not isinstance(parent_node_id, str):
+        return None
+    try:
+        parent_execution_id = UUID(raw_parent_execution_id)
+    except ValueError:
+        logger.warning("Skipping sub-workflow telemetry with invalid parent execution ID", execution_id=execution.id)
+        return None
+
+    parent_execution = await session.get(Execution, parent_execution_id)
+    if parent_execution is None:
+        logger.warning(
+            "Skipping sub-workflow telemetry because its parent execution is missing",
+            execution_id=execution.id,
+            parent_execution_id=parent_execution_id,
+        )
+        return None
+    parent_workflow = await session.get(Workflow, parent_execution.workflow_id)
+    if parent_workflow is None:
+        logger.warning(
+            "Skipping sub-workflow telemetry because its parent workflow is missing",
+            execution_id=execution.id,
+            parent_workflow_id=parent_execution.workflow_id,
+        )
+        return None
+
+    child_workflow_name = execution_metadata.get("workflow_name")
+    if not isinstance(child_workflow_name, str):
+        child_workflow_name = "unknown"
+
+    return SubWorkflowInvocationCompletedEvent(
+        parent_execution_id=parent_execution_id,
+        parent_workflow_id=parent_execution.workflow_id,
+        parent_workflow_name=parent_workflow.name,
+        parent_node_id=parent_node_id,
+        child_execution_id=execution.id,
+        child_workflow_id=execution.workflow_id,
+        child_workflow_name=child_workflow_name,
+        status=_map_execution_status_to_telemetry(status),
+        invocation_duration_ms=_duration_ms(
+            _execution_metadata_datetime(execution_metadata, "subworkflow_invocation_started_at"),
+            completed_at,
+        ),
+        child_execution_duration_ms=_duration_ms(
+            _execution_metadata_datetime(execution_metadata, "workflow_started_at"),
+            completed_at,
+        ),
+        occurred_at=completed_at,
+        request_id=request_id,
+    )
 
 
 class ActivityExecutionStateMixin:
@@ -341,6 +427,33 @@ class ActivityExecutionStateMixin:
                 latest[node_id] = aware
         return latest
 
+    async def _dispatch_subworkflow_invocation_telemetry(
+        self,
+        session: AsyncSession,
+        execution: Execution,
+        status: ExecutionStatus,
+        completed_at: datetime,
+        request_id: UUID | None,
+    ) -> None:
+        """Build and dispatch child-invocation telemetry without affecting completion."""
+        try:
+            invocation_event = await _build_subworkflow_invocation_event(
+                session,
+                execution,
+                status,
+                completed_at,
+                request_id,
+            )
+        except Exception:  # noqa: BLE001
+            logger.warning(
+                "Failed to build sub-workflow invocation telemetry (non-fatal)",
+                execution_id=execution.id,
+                exc_info=True,
+            )
+            return
+        if invocation_event is not None:
+            self._dispatch_audit_event(invocation_event)
+
     async def _update_execution_status_from_event(
         self,
         metadata: ExecutionMonitorMetadata,
@@ -428,6 +541,14 @@ class ActivityExecutionStateMixin:
                 )
 
                 await session.commit()
+
+                await self._dispatch_subworkflow_invocation_telemetry(
+                    session,
+                    execution,
+                    status,
+                    completed_at,
+                    metadata.request_id,
+                )
 
                 logger.info(
                     "Updated execution to status at time",

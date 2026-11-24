@@ -12,6 +12,7 @@ lives in the DB-backed integration suite.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from typing import Any, Self
 from unittest.mock import MagicMock
 from uuid import UUID, uuid4
@@ -230,6 +231,7 @@ def _prepare_kwargs(child_execution_id: UUID, child_workflow_id: UUID) -> dict[s
         "created_by_user_id": str(uuid4()),
         "created_by_uuid": uuid4(),
         "current_depth": 0,
+        "invocation_started_at": datetime(2026, 1, 1, tzinfo=UTC),
     }
 
 

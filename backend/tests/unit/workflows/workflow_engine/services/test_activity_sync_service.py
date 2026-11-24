@@ -1357,6 +1357,8 @@ class TestExecutionStatusUpdates:
         from syntara.workflows.models.execution import ExecutionStatus
 
         execution = self._create_mock_execution(self.execution_id, status="PENDING")
+        parent_execution_id = uuid4()
+        execution.execution_metadata = {"parent_execution_id": str(parent_execution_id)}
 
         # Mock session
         mock_result = Mock()
@@ -1381,6 +1383,7 @@ class TestExecutionStatusUpdates:
         # Verify status changed to RUNNING
         assert execution.status == ExecutionStatus.RUNNING
         assert execution.last_processed_event_id == 5
+        assert execution.execution_metadata["workflow_started_at"] == event.event_time.isoformat()
         mock_session.commit.assert_awaited_once()
 
     @pytest.mark.asyncio

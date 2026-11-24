@@ -523,6 +523,7 @@ class TestSubWorkflowLifecycle:
         assert str(child.created_by) != str(_CHILD_CREATED_BY)
         # Lineage metadata points back at the parent execution.
         assert child.execution_metadata["parent_execution_id"] == _PARENT_EXECUTION_ID
+        assert child.execution_metadata["subworkflow_invocation_started_at"]
 
     async def test_trigger_in_completed_activities(self, temporal_env: object) -> None:
         """The manual trigger node appears in completed_activities."""
