@@ -3,6 +3,17 @@
   "project": ["src/**/*.{ts,tsx}"],
   "treatConfigHintsAsErrors": false,
   "ignoreDependencies": ["babel-plugin-react-compiler", "eslint", "prettier", "nyc", "tsx", "pngjs", "@types/pngjs"],
-  "ignoreBinaries": ["concurrently", "vitest", "playwright", "tsc", "knip", "eslint", "nyc", "vite", "storybook"],
+  "ignoreBinaries": [
+    "concurrently",
+    "vitest",
+    "playwright",
+    "tsc",
+    "knip",
+    "eslint",
+    "nyc",
+    "vite",
+    "storybook",
+    "stryker"
+  ],
   "exclude": ["unlisted", "types"]
 }
