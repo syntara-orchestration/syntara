@@ -82,7 +82,12 @@ export function HeaderMetadata({
             <Nav
               variant="horizontal-subnav"
               aria-label="Run details views"
-              onSelect={(_event, selected) => onViewModeChange(String(selected.itemId) as ViewMode)}
+              onSelect={(_event, selected) => {
+                const id = String(selected.itemId)
+                if (id === 'overview' || id === 'details') {
+                  onViewModeChange(id)
+                }
+              }}
             >
               <NavList>
                 <NavItem

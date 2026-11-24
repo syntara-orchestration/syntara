@@ -7,25 +7,19 @@ import {
   DataListItemCells,
   DataListItemRow,
 } from '@patternfly/react-core'
-import { ActivityTypeEnum } from '@syntara/contracts'
 import { useCallback, useMemo, type KeyboardEvent, type MouseEvent } from 'react'
 
 import { ExecutionTimeRange } from '../../components/table/ExecutionTimestamp'
-import { capitalize } from '../../utils/capitalize'
 import type { ActivityState, ActivityStatus } from '../workflows/execution/types'
 
 import styles from './CompactActivityList.module.css'
 import type { ActivityOrderItem } from './ExecutionActivityTable'
 import { ActivityStatusLabel } from './ExecutionStatus'
-import { activityStatusDisplayLabels } from './executionStatusConstants'
+import { getActivityStatusDisplayLabel } from './executionStatusConstants'
 import { ACTIVITY_STATUS } from './utils/executionState/executionHelpers'
 
 function activityListItemAriaLabel(displayName: string, status: ActivityStatus, nodeType?: string): string {
-  if (nodeType === ActivityTypeEnum.WAIT && status === 'waiting') {
-    return `${displayName}, Running`
-  }
-  const statusLabel = activityStatusDisplayLabels[status] ?? capitalize(status)
-  return `${displayName}, ${statusLabel}`
+  return `${displayName}, ${getActivityStatusDisplayLabel(status, nodeType)}`
 }
 
 export type CompactActivityListProps = {

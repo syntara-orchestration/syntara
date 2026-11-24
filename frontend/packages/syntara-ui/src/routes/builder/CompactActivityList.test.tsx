@@ -47,6 +47,26 @@ describe('CompactActivityList', () => {
     expect(within(list).getByRole('listitem', { name: 'task-2, Failed' })).toBeInTheDocument()
   })
 
+  it('uses approval waiting label in row accessible name', () => {
+    const approvalOrder: ActivityOrderItem[] = [{ id: 'appr-1', name: 'Approve change', type: 'approval' }]
+    const approvalStates = new Map([state('appr-1', { status: 'waiting' })])
+
+    render(<CompactActivityList activityStates={approvalStates} activityOrder={approvalOrder} onRowClick={vi.fn()} />)
+
+    const list = screen.getByRole('list', { name: 'Activity list' })
+    expect(within(list).getByRole('listitem', { name: 'Approve change, Waiting for approval' })).toBeInTheDocument()
+  })
+
+  it('uses Running label in row accessible name for waiting wait nodes', () => {
+    const waitOrder: ActivityOrderItem[] = [{ id: 'wait-1', name: 'Pause', type: 'wait' }]
+    const waitStates = new Map([state('wait-1', { status: 'waiting' })])
+
+    render(<CompactActivityList activityStates={waitStates} activityOrder={waitOrder} onRowClick={vi.fn()} />)
+
+    const list = screen.getByRole('list', { name: 'Activity list' })
+    expect(within(list).getByRole('listitem', { name: 'Pause, Running' })).toBeInTheDocument()
+  })
+
   it('shows time range when activity has start and end times', () => {
     render(<CompactActivityList activityStates={states} activityOrder={order} />)
 

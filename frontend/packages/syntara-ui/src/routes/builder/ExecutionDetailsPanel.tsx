@@ -128,10 +128,10 @@ function ThreePanelLayout({
 
         <StackItem isFilled className={styles.contentFlex}>
           <Flex
+            className={styles.detailsBodyRow}
             flexWrap={{ default: 'nowrap' }}
             alignItems={{ default: 'alignItemsStretch' }}
             gap={{ default: 'gapNone' }}
-            style={{ height: '100%' }}
           >
             <FlexItem className={styles.activityList}>
               <Stack className={styles.activityListColumn}>
