@@ -6,6 +6,7 @@ from typing import Any
 
 import pytest
 
+from syntara.workflow_core.models import NodeType
 from syntara.workflows.node_kinds import (
     NODE_KIND_DISPLAY_LABELS,
     NODE_KINDS,
@@ -13,7 +14,6 @@ from syntara.workflows.node_kinds import (
     node_labels,
     validate_node_kind_statements,
 )
-from syntara.workflows.workflow_engine.models.workflow_definition import NodeType
 
 _SYSTEM_ONLY_NODE_TYPES = frozenset({NodeType.INTERNAL_ACTIVITY.value})
 _GRANTABLE_NODE_TYPES = sorted(NODE_KINDS)

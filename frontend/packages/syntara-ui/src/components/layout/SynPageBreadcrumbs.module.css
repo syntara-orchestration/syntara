@@ -32,9 +32,21 @@
   max-width: 100%;
 }
 
+/*
+ * PatternFly Truncate defaults to min-width 6ch on the root and __start span.
+ * Short labels (e.g. "Users") then leave empty space before the next chevron.
+ * Variables on .truncatedLabel inherit into __start/__end; keep max-width for ellipsis.
+ */
 .truncatedLabel {
+  --pf-v6-c-truncate--MinWidth: 0;
+  --pf-v6-c-truncate__start--MinWidth: 0;
   min-width: 0;
   max-width: 100%;
+}
+
+.truncatedLabel :global(.pf-v6-c-truncate__start),
+.truncatedLabel :global(.pf-v6-c-truncate__end) {
+  min-width: 0;
 }
 
 .segmentLink {

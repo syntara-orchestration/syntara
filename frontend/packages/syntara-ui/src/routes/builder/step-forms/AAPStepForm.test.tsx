@@ -569,7 +569,7 @@ describe('AAPStepForm', () => {
       expect(screen.getByPlaceholderText('{"key": "value"} or drag expression')).toBeInTheDocument()
     })
 
-    it('enables the toggle and shows extra_vars when loading saved extra_vars expressions', () => {
+    it('does not enable the toggle for extra_vars expressions and still shows the saved value', () => {
       const savedExtraVars = '{"app_version": "${inputs.version}"}'
       renderWithHeader(
         <AAPStepForm
@@ -584,11 +584,11 @@ describe('AAPStepForm', () => {
         />
       )
 
-      expect(screen.getByRole('switch', { name: 'Use input variables' })).toBeChecked()
-      expect(screen.getByPlaceholderText('{"key": "value"} or drag expression')).toHaveValue(savedExtraVars)
+      expect(screen.getByRole('switch', { name: 'Use input variables' })).not.toBeChecked()
+      expect(screen.getByRole('textbox', { name: 'Extra Variables' })).toHaveValue(savedExtraVars)
     })
 
-    it('enables the toggle when loading saved extra_vars with pretty-printed expressions', () => {
+    it('does not enable the toggle for pretty-printed extra_vars expressions', () => {
       const savedExtraVars = JSON.stringify({ app_version: '${inputs.version}' }, null, 2)
       renderWithHeader(
         <AAPStepForm
@@ -600,8 +600,8 @@ describe('AAPStepForm', () => {
         />
       )
 
-      expect(screen.getByRole('switch', { name: 'Use input variables' })).toBeChecked()
-      expect(screen.getByPlaceholderText('{"key": "value"} or drag expression')).toBeVisible()
+      expect(screen.getByRole('switch', { name: 'Use input variables' })).not.toBeChecked()
+      expect(screen.getByRole('textbox', { name: 'Extra Variables' })).toBeVisible()
     })
 
     it('enables the toggle from tags expressions', () => {

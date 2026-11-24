@@ -102,6 +102,15 @@ describe('StepTypeOptionsList', () => {
     })
   })
 
+  it('uses bordered panels so card edges stay visible without glass or high contrast', () => {
+    const onSelect = vi.fn()
+    render(<StepTypeOptionsList stepTypes={mockStepTypes} onSelect={onSelect} />)
+
+    const actionCard = screen.getByRole('button', { name: 'Action Step' })
+    expect(actionCard.className).toMatch(/pf-m-bordered/)
+    expect(actionCard.style.getPropertyValue('--step-type-accent')).not.toBe('')
+  })
+
   it('renders empty when stepTypes array is empty', () => {
     const onSelect = vi.fn()
     const { container } = render(<StepTypeOptionsList stepTypes={[]} onSelect={onSelect} />)

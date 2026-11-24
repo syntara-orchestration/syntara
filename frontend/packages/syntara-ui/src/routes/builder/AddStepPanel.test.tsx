@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { RegistryStepId } from '../../constants'
+import { RegistryStepId } from '../../constants/registryStepIds'
 
 import { AddStepPanel, AddStepPanelHeader } from './AddStepPanel'
 

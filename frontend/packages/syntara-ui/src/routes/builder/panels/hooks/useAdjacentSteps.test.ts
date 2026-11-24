@@ -2,7 +2,7 @@ import { renderHook } from '@testing-library/react'
 import type { Edge, Node } from '@xyflow/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { RegistryStepId } from '../../../../constants'
+import { RegistryStepId } from '../../../../constants/registryStepIds'
 
 import { useAdjacentSteps } from './useAdjacentSteps'
 
