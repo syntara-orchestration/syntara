@@ -3861,7 +3861,7 @@ export const handlers = [
   // ── Access Management: Projects ─────────────────────────────────────────
 
   // ==========================================================================
-  // Node kinds (ANSTRAT-2533 P6) — step-type permissions for the add-step panel
+  // Node kinds — step-type permissions for the add-step panel
   // ==========================================================================
 
   http.get('/api/v1/node_kinds', ({ request }) => {

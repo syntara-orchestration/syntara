@@ -10,8 +10,8 @@
  * - /workflow-builder/new?projectId=<id> pre-fills the modal with that project
  * - After Continue the toolbar shows "Project: <name>" as text (no project
  *   selector) and saving persists the workflow
- * - Editing an existing workflow shows its project as text, never as an
- *   editable selector (project_id is immutable — AAP-79246)
+ * - Editing an existing workflow shows its project as text because project_id
+ *   is immutable
  *
  * Note: Toast notifications are intentionally NOT asserted here — they are
  * tested in unit tests and are too ephemeral for reliable E2E assertions.
@@ -152,8 +152,8 @@ test.describe('New workflow — project selection modal', () => {
   })
 
   /**
-   * AAP-79246: project_id is immutable after creation — editing an existing
-   * workflow shows the project as text, not an editable selector.
+   * project_id is immutable after creation, so the editor shows the project
+   * as text.
    */
   test('editing an existing workflow shows its project as text, not a selector', async ({ app }) => {
     const workflowName = buildUniqueName('e2e-proj-immutable')

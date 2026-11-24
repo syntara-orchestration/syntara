@@ -1,4 +1,4 @@
-"""Integration tests for the step-type permissions endpoint (ANSTRAT-2533 P6).
+"""Integration tests for the step-type permissions endpoint.
 
 Exercises the full round trip — real policy resolution and real Rego
 evaluation — for ``GET /api/v1/node_kinds?project_id=<uuid>``.

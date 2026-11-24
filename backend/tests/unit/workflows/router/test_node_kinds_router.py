@@ -1,4 +1,4 @@
-"""Unit tests for the step-type permissions router (ANSTRAT-2533 P6).
+"""Unit tests for the step-type permissions router.
 
 The endpoint function is exercised directly; the policy evaluation and the
 project lookup are replaced with doubles.

@@ -1,4 +1,4 @@
-"""Project-scoped step-type permissions for the add-step panel (ANSTRAT-2533 P6).
+"""Project-scoped step-type permissions for the add-step panel.
 
 One system-scoped endpoint:
 
@@ -18,9 +18,9 @@ The prefix is top-level rather than ``/workflows/node_kinds`` on purpose:
 routers are auto-discovered in filesystem order, so a static path nested under
 the workflows router could be shadowed by ``/workflows/{workflow_id}``.
 
-The ANSTRAT-1750 prototype's kill-switch write route (``PUT
-/{kind}/enabled``) is deliberately not ported: restricting step types is done
-with deny policies, not by disabling kinds platform-wide.
+Administrators restrict step types with deny policies. This router only reads
+permissions, so it omits the prototype's platform-wide ``PUT /{kind}/enabled``
+route.
 """
 
 from typing import Annotated
