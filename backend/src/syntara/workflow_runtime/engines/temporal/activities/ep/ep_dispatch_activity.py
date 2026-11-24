@@ -112,7 +112,7 @@ def _validate_input_schema(inputs: dict[str, Any], schema: dict[str, Any]) -> No
         raise ApplicationError(message, type="ConfigError", non_retryable=True) from None
 
 
-async def _work_runtime_context(execution_id: uuid.UUID) -> dict[str, object]:
+async def _work_runtime_context(execution_id: uuid.UUID, temporal_activity_id: str) -> dict[str, object]:
     """Build plugin-visible context from the persisted Execution and its owner IDs.
 
     Values are UUID strings for Execution.id, Project.id, and Workflow.id,
@@ -131,6 +131,7 @@ async def _work_runtime_context(execution_id: uuid.UUID) -> dict[str, object]:
         "execution_id": str(execution_id),
         "project_id": str(row[0]),
         "workflow_id": str(row[1]),
+        "temporal_activity_id": temporal_activity_id,
     }
 
 
@@ -204,7 +205,7 @@ async def _dispatch_to_ep(  # noqa: C901, PLR0912, PLR0915 - service handoff and
     try:
         message = WorkExecute(
             work_item_id=work_item_id,
-            runtime_context=await _work_runtime_context(execution_id),
+            runtime_context=await _work_runtime_context(execution_id, info.activity_id),
             invocation=WorkloadInvocation.model_validate(
                 _build_invocation(input_config, step_identity, credential_recipe_ids)
             ),

@@ -12,6 +12,7 @@ from syntara.workflow_runtime.engines.temporal.activities.ep import ep_dispatch_
 @pytest.mark.parametrize("execution_exists", [True, False])
 async def test_runtime_context_uses_persisted_execution_context(monkeypatch, *, execution_exists: bool) -> None:
     execution_id, project_id, workflow_id = uuid4(), uuid4(), uuid4()
+    temporal_activity_id = "script_iter_0"
     session = AsyncMock()
     rows = MagicMock()
     rows.first.return_value = (project_id, workflow_id) if execution_exists else None
@@ -25,13 +26,14 @@ async def test_runtime_context_uses_persisted_execution_context(monkeypatch, *, 
         from temporalio.exceptions import ApplicationError
 
         with pytest.raises(ApplicationError, match="Execution does not exist"):
-            await dispatch._work_runtime_context(execution_id)
+            await dispatch._work_runtime_context(execution_id, temporal_activity_id)
         return
-    runtime_context = await dispatch._work_runtime_context(execution_id)
+    runtime_context = await dispatch._work_runtime_context(execution_id, temporal_activity_id)
 
     expected = {"execution_id": str(execution_id)}
     if execution_exists:
         expected.update(project_id=str(project_id), workflow_id=str(workflow_id))
+        expected["temporal_activity_id"] = temporal_activity_id
     assert runtime_context == expected
     assert session.exec.await_args is not None
     query = session.exec.await_args.args[0].compile()
