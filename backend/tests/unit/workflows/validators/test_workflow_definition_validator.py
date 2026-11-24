@@ -485,7 +485,7 @@ class TestCollectFindings:
         assert "unreachable" in orphan.message
 
     def test_aap_job_template_use_input_variables_accepted(self, validator: WorkflowValidator) -> None:
-        """AAP-92977: Verify must accept the same node shape that Save accepts.
+        """Verify must accept the same node shape that Save accepts.
 
         The Workflow Builder writes a UI-only ``use_input_variables`` marker
         into an AAP Job Template node's parameters whenever the "Use input
