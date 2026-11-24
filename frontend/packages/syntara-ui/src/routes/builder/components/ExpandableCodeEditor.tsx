@@ -1,14 +1,20 @@
 import { CodeEditor, CodeEditorControl, Language } from '@patternfly/react-code-editor'
 import { Button, Content, Modal, ModalBody, ModalFooter, ModalHeader } from '@patternfly/react-core'
 import { RhUiExternalLinkIcon } from '@patternfly/react-icons'
+import type * as monacoEditorCore from 'monaco-editor-core'
 import type { KeyboardEvent, Ref } from 'react'
 import { useCallback, useImperativeHandle, useState } from 'react'
 
+import { loadShikiService } from '../../../components/details/shiki-service-loader'
+import { getShikiTheme } from '../../../components/details/shiki-theme'
 import { useBlurOnOpen } from '../../../hooks/useBlurOnOpen'
 import { useDropTarget } from '../../../hooks/useDropTarget'
 import { useMonacoBlur } from '../../../hooks/useMonacoBlur'
 import { useColorScheme } from '../../../providers/theme/useColorScheme'
+import { detachPromise } from '../../../utils/detachPromise'
 import { DROP_TARGET_OUTLINE } from '../panels/utils/dragTypes'
+
+type Monaco = typeof monacoEditorCore
 
 /** Supported code languages for syntax highlighting */
 export type CodeLanguage = 'python' | 'bash' | 'json' | 'plaintext'
@@ -105,9 +111,26 @@ export function ExpandableCodeEditor({
   const effectiveTheme = isDarkTheme ?? colorScheme === 'dark'
 
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [hasShikiMonacoSetup, setHasShikiMonacoSetup] = useState(false)
   useBlurOnOpen(isModalOpen)
   const monacoLanguage = languageMap[language]
   const { getValue, focus, handleEditorDidMount, setValue, editorRef } = useMonacoBlur(code, onBlur)
+  const shikiTheme = getShikiTheme(effectiveTheme)
+  const patternFlyTheme = effectiveTheme ? 'pf-v6-theme-dark' : 'pf-v6-theme-light'
+  const jsonBracketColorizationOptions = language === 'json' ? { bracketPairColorization: { enabled: true } } : {}
+  const editorProps = {
+    theme: language === 'plaintext' || !hasShikiMonacoSetup ? patternFlyTheme : shikiTheme,
+    beforeMount: (monaco: Monaco) => {
+      if (language === 'plaintext') return
+
+      detachPromise(
+        loadShikiService()
+          .then(({ setupMonacoShiki }) => setupMonacoShiki(monaco, shikiTheme))
+          .then(() => setHasShikiMonacoSetup(true)),
+        { onReject: () => monaco.editor.setTheme(patternFlyTheme) }
+      )
+    },
+  }
 
   const handleDroppedText = useCallback(
     (text: string) => {
@@ -182,6 +205,7 @@ export function ExpandableCodeEditor({
           isReadOnly={isReadOnly}
           isLineNumbersVisible={isLineNumbersVisible}
           isDarkTheme={effectiveTheme}
+          editorProps={editorProps}
           customControls={
             <>
               {additionalControls}
@@ -189,7 +213,7 @@ export function ExpandableCodeEditor({
             </>
           }
           aria-label={ariaLabel}
-          options={{ ariaLabel }}
+          options={{ ariaLabel, ...jsonBracketColorizationOptions }}
         />
       </div>
 
@@ -217,8 +241,9 @@ export function ExpandableCodeEditor({
               isReadOnly={isReadOnly}
               isLineNumbersVisible={isLineNumbersVisible}
               isDarkTheme={effectiveTheme}
+              editorProps={editorProps}
               aria-label={`${ariaLabel} expanded`}
-              options={{ ariaLabel: `${ariaLabel} expanded` }}
+              options={{ ariaLabel: `${ariaLabel} expanded`, ...jsonBracketColorizationOptions }}
             />
           </div>
         </ModalBody>

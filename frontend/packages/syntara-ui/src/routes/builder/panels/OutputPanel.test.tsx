@@ -16,6 +16,10 @@ function renderWithProviders(ui: ReactNode) {
   return render(<ColorSchemeProvider>{ui}</ColorSchemeProvider>)
 }
 
+async function expectCodeBlockToContain(content: string): Promise<void> {
+  await waitFor(() => expect(screen.getByRole('code')).toHaveTextContent(content))
+}
+
 /**
  * Coverage Summary:
  * - 95.32% line coverage (line 115 is an unreachable TypeScript exhaustiveness check)
@@ -122,11 +126,11 @@ describe('OutputPanel', () => {
     expect(screen.getByRole('button', { name: 'JSON' })).toBeInTheDocument()
   })
 
-  it('defaults to JSON view when output data exists', () => {
+  it('defaults to JSON view when output data exists', async () => {
     renderWithProviders(<OutputPanel outputData={sampleOutput} nodeId={testNodeId} />)
 
     expect(screen.getByRole('button', { name: 'JSON' })).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getByText(/"result": "success"/)).toBeInTheDocument()
+    await expectCodeBlockToContain('"result": "success"')
   })
 
   it('does not show empty state when output data exists', () => {
@@ -164,7 +168,7 @@ describe('OutputPanel', () => {
     await user.click(screen.getByRole('button', { name: 'Schema' }))
     await user.click(screen.getByRole('button', { name: 'JSON' }))
 
-    expect(screen.getByText(/"result": "success"/)).toBeInTheDocument()
+    await expectCodeBlockToContain('"result": "success"')
   })
 
   it('has no accessibility violations', async () => {
@@ -254,14 +258,14 @@ describe('OutputPanel', () => {
       expect(screen.getByRole('button', { name: /unpin data/i })).toBeInTheDocument()
     })
 
-    it('shows mock output data in JSON view when pinned', () => {
+    it('shows mock output data in JSON view when pinned', async () => {
       const mockOutput = { mock: 'data', value: 42 }
       mockGetOutputMock.mockReturnValue(mockOutput)
 
       renderWithProviders(<OutputPanel nodeId={testNodeId} />)
 
-      expect(screen.getByText(/"mock": "data"/)).toBeInTheDocument()
-      expect(screen.getByText(/"value": 42/)).toBeInTheDocument()
+      await expectCodeBlockToContain('"mock": "data"')
+      await expectCodeBlockToContain('"value": 42')
     })
 
     it('calls unpinOutputMock when "Unpin data" is clicked', async () => {
@@ -276,15 +280,15 @@ describe('OutputPanel', () => {
       expect(mockUnpinOutputMock).toHaveBeenCalledWith(testNodeId)
     })
 
-    it('shows pinned mock data instead of last-run output data when mock is pinned', () => {
+    it('shows pinned mock data instead of last-run output data when mock is pinned', async () => {
       const mockOutput = { mock: 'data' }
       mockGetOutputMock.mockReturnValue(mockOutput)
 
       renderWithProviders(<OutputPanel outputData={sampleOutput} nodeId={testNodeId} />)
 
       // Pinned mock data should be authoritative, not the last real execution output
-      expect(screen.getByText(/"mock": "data"/)).toBeInTheDocument()
-      expect(screen.queryByText(/"result": "success"/)).not.toBeInTheDocument()
+      await expectCodeBlockToContain('"mock": "data"')
+      expect(screen.getByRole('code')).not.toHaveTextContent('"result": "success"')
     })
 
     it('pre-populates editor with existing mock data when setting mock again', async () => {
@@ -509,7 +513,7 @@ describe('OutputPanel', () => {
 
       // Back to JSON
       await user.click(screen.getByRole('button', { name: 'JSON' }))
-      expect(screen.getByText(/"result": "success"/)).toBeInTheDocument()
+      await expectCodeBlockToContain('"result": "success"')
     })
 
     // Note: Line 115 (the exhaustive default case) cannot be covered without breaking TypeScript's
@@ -562,7 +566,7 @@ describe('OutputPanel', () => {
       renderWithProviders(<OutputPanel nodeId={testNodeId} />)
 
       // Should show first mock
-      expect(screen.getByText(/"version": 1/)).toBeInTheDocument()
+      await expectCodeBlockToContain('"version": 1')
 
       // Open editor
       await user.click(screen.getByRole('button', { name: /set mock data/i }))
@@ -605,7 +609,7 @@ describe('OutputPanel', () => {
       expect(editorAfterReopen).toHaveDisplayValue(/^\{/)
     })
 
-    it('Mock data displays instead of empty state when no real output', () => {
+    it('Mock data displays instead of empty state when no real output', async () => {
       const mockOutput = { mock: 'data', count: 42 }
       mockGetOutputMock.mockReturnValue(mockOutput)
 
@@ -615,8 +619,8 @@ describe('OutputPanel', () => {
       expect(screen.queryByText('No output data')).not.toBeInTheDocument()
 
       // Should show mock data in JSON view
-      expect(screen.getByText(/"mock": "data"/)).toBeInTheDocument()
-      expect(screen.getByText(/"count": 42/)).toBeInTheDocument()
+      await expectCodeBlockToContain('"mock": "data"')
+      await expectCodeBlockToContain('"count": 42')
     })
   })
 })

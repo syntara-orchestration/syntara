@@ -34,7 +34,14 @@ export function OutputJsonView({ data }: Readonly<OutputJsonViewProps>) {
         />
       </StackItem>
       <StackItem isFilled>
-        <SynCodeBlock enableCopy enableExpand expandTitle="Output JSON" noMaxHeight copyContent={fullJson}>
+        <SynCodeBlock
+          language="json"
+          enableCopy
+          enableExpand
+          expandTitle="Output JSON"
+          noMaxHeight
+          copyContent={fullJson}
+        >
           {filteredContent ?? fullJson}
         </SynCodeBlock>
       </StackItem>

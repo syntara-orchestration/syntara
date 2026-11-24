@@ -225,7 +225,7 @@ export function ApprovalReviewView({ approval, activityNameMap, onClose }: Appro
 
         <StackItem isFilled style={{ minHeight: 0, overflow: 'auto' }}>
           <Title headingLevel="h3">Approval context</Title>
-          <SynCodeBlock jsonObject={approval} enableCopy />
+          <SynCodeBlock jsonObject={approval} language="json" enableCopy />
         </StackItem>
 
         <StackItem style={{ flexShrink: 0 }}>

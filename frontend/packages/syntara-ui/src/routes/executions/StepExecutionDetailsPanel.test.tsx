@@ -1,11 +1,47 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { act, render, screen } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ReactNode } from 'react'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { axe } from 'vitest-axe'
 
+import type { ShikiTokenLines } from '../../components/details/shiki-service'
+
 import { StepExecutionDetailsPanel } from './StepExecutionDetailsPanel'
+
+const {
+  mockHighlightCode,
+  mockHighlightCodeSync,
+  mockIsShikiReady,
+  mockPreloadShiki,
+  mockLoadShikiService,
+  mockService,
+} = vi.hoisted(() => {
+  const mockHighlightCode = vi.fn<(source: string, language: string) => Promise<ShikiTokenLines>>()
+  const mockHighlightCodeSync = vi.fn<(source: string, language: string) => ShikiTokenLines>()
+  const mockIsShikiReady = vi.fn<() => boolean>()
+  const mockPreloadShiki = vi.fn<() => Promise<void>>()
+  const mockService = {
+    highlightCode: mockHighlightCode,
+    highlightCodeSync: mockHighlightCodeSync,
+    isShikiReady: mockIsShikiReady,
+    preloadShiki: mockPreloadShiki,
+  }
+
+  return {
+    mockHighlightCode,
+    mockHighlightCodeSync,
+    mockIsShikiReady,
+    mockPreloadShiki,
+    mockLoadShikiService: vi.fn<() => Promise<typeof mockService>>(),
+    mockService,
+  }
+})
+
+vi.mock('../../components/details/shiki-service-loader', () => ({
+  getLoadedShikiService: () => mockService,
+  loadShikiService: mockLoadShikiService,
+}))
 
 const mockActivityData = {
   resources: [
@@ -37,6 +73,10 @@ const wrapper = ({ children }: { children: ReactNode }) => (
   <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
 )
 
+function expectCodeToContain(text: string) {
+  expect(screen.getAllByRole('code').some((code) => code.textContent?.includes(text))).toBe(true)
+}
+
 const defaultProps = {
   stepId: 'run_aap_vm',
   stepName: 'Run AAP VM',
@@ -52,6 +92,15 @@ const defaultProps = {
 describe('StepExecutionDetailsPanel', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockPreloadShiki.mockResolvedValue(undefined)
+    mockHighlightCode.mockImplementation((source) =>
+      Promise.resolve(source.split('\n').map((line) => [{ content: line, style: {} }]))
+    )
+    mockHighlightCodeSync.mockImplementation((source) =>
+      source.split('\n').map((line) => [{ content: line, style: {} }])
+    )
+    mockIsShikiReady.mockReturnValue(true)
+    mockLoadShikiService.mockResolvedValue(mockService)
     mockUseQuery.mockReturnValue({ data: mockActivityData, isLoading: false, error: null, refetch: vi.fn() })
   })
 
@@ -74,18 +123,18 @@ describe('StepExecutionDetailsPanel', () => {
     expect(screen.getByText('Output')).toBeInTheDocument()
   })
 
-  it('shows input data in the input pane by default (JSON view)', () => {
+  it('shows input data in the input pane by default (JSON view)', async () => {
     render(<StepExecutionDetailsPanel {...defaultProps} />, { wrapper })
 
-    expect(screen.getByText(/"host"/)).toBeInTheDocument()
-    expect(screen.getByText(/"10.0.0.1"/)).toBeInTheDocument()
+    await waitFor(() => expectCodeToContain('"host"'))
+    expectCodeToContain('"10.0.0.1"')
   })
 
-  it('shows output data in the output pane by default (JSON view)', () => {
+  it('shows output data in the output pane by default (JSON view)', async () => {
     render(<StepExecutionDetailsPanel {...defaultProps} />, { wrapper })
 
-    expect(screen.getByText(/"stdout"/)).toBeInTheDocument()
-    expect(screen.getByText(/"VM provisioned successfully"/)).toBeInTheDocument()
+    await waitFor(() => expectCodeToContain('"stdout"'))
+    expectCodeToContain('"VM provisioned successfully"')
   })
 
   it('renders schema view when switching to Schema', async () => {
@@ -113,6 +162,15 @@ describe('StepExecutionDetailsPanel', () => {
     render(<StepExecutionDetailsPanel {...defaultProps} />, { wrapper })
 
     expect(screen.getByRole('progressbar')).toBeInTheDocument()
+  })
+
+  it('preloads syntax highlighting while activity data is loading', async () => {
+    mockIsShikiReady.mockReturnValue(false)
+    mockUseQuery.mockReturnValue({ data: null, isLoading: true, error: null, refetch: vi.fn() })
+    render(<StepExecutionDetailsPanel {...defaultProps} />, { wrapper })
+
+    await waitFor(() => expect(mockPreloadShiki).toHaveBeenCalledOnce())
+    expect(mockHighlightCode).not.toHaveBeenCalled()
   })
 
   it('shows empty state when output data is null', () => {
@@ -222,18 +280,39 @@ describe('StepExecutionDetailsPanel', () => {
     Element.prototype.scrollIntoView = scrollIntoView
 
     render(<StepExecutionDetailsPanel {...defaultProps} />, { wrapper })
+    expect(mockHighlightCodeSync).toHaveBeenCalledTimes(2)
 
     const searchInputs = screen.getAllByPlaceholderText('Search')
     await user.type(searchInputs[0], 'host')
 
     // Verify that mark elements are rendered (highlighted search results)
-    const marks = screen.getAllByRole('mark')
-    expect(marks.length).toBeGreaterThan(0)
+    await waitFor(() => expect(screen.getAllByRole('mark').length).toBeGreaterThan(0))
+    expect(mockHighlightCodeSync).toHaveBeenCalledTimes(2)
+  })
+
+  it('does not tokenize input or output after switching to schema and table views', async () => {
+    const user = userEvent.setup()
+    render(<StepExecutionDetailsPanel {...defaultProps} />, { wrapper })
+    expect(mockHighlightCodeSync).toHaveBeenCalledTimes(2)
+    mockHighlightCodeSync.mockClear()
+
+    const schemaButtons = screen.getAllByRole('button', { name: 'Schema' })
+    await user.click(schemaButtons[0])
+    await user.click(schemaButtons[1])
+
+    const tableButtons = screen.getAllByRole('button', { name: 'Table' })
+    await user.click(tableButtons[0])
+    await user.click(tableButtons[1])
+
+    expect(mockHighlightCodeSync).not.toHaveBeenCalled()
   })
 
   it('scrolls to first search match when typing in search', async () => {
     const user = userEvent.setup()
-    const scrollIntoView = vi.fn()
+    const scrollTargets: Element[] = []
+    const scrollIntoView = vi.fn(function (this: Element) {
+      scrollTargets.push(this)
+    })
     Element.prototype.scrollIntoView = scrollIntoView
 
     render(<StepExecutionDetailsPanel {...defaultProps} />, { wrapper })
@@ -241,8 +320,8 @@ describe('StepExecutionDetailsPanel', () => {
     const searchInputs = screen.getAllByPlaceholderText('Search')
     await user.type(searchInputs[0], 'host')
 
-    // In happy-dom scrollIntoView might not be called, so just verify search value changed
     expect(searchInputs[0]).toHaveValue('host')
+    await waitFor(() => expect(scrollTargets).toContain(screen.getByRole('mark')))
   })
 
   it('clears search term when clear button is clicked', async () => {
@@ -318,7 +397,7 @@ describe('StepExecutionDetailsPanel', () => {
     render(<StepExecutionDetailsPanel {...defaultProps} />, { wrapper })
 
     // Start in JSON view
-    expect(screen.getByText(/"host"/)).toBeInTheDocument()
+    await waitFor(() => expectCodeToContain('"host"'))
 
     // Switch to Schema view
     const schemaButtons = screen.getAllByRole('button', { name: 'Schema' })

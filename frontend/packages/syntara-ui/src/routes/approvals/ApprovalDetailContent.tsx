@@ -402,7 +402,14 @@ export function ApprovalDetailContent({
             />
           </StackItem>
           <StackItem className={styles.codeBlockContainer}>
-            <SynCodeBlock jsonObject={approval} enableCopy enableExpand expandTitle="Approval context" fillHeight />
+            <SynCodeBlock
+              jsonObject={approval}
+              language="json"
+              enableCopy
+              enableExpand
+              expandTitle="Approval context"
+              fillHeight
+            />
           </StackItem>
         </Stack>
       </StackItem>
