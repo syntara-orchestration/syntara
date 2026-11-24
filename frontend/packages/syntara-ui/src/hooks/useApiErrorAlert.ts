@@ -12,6 +12,8 @@ import {
 export type UseApiErrorAlertOptions = {
   /** Override the alert title (defaults to parsed title or "Error") */
   title?: string
+  /** Override the parsed backend message with user-facing copy */
+  message?: string
   /** Additional context prefixed to the parsed error message */
   context?: string
   /** If true, do not show an alert for 503 errors (useful when rendering a 503 EmptyState) */
@@ -19,9 +21,9 @@ export type UseApiErrorAlertOptions = {
 }
 
 /**
- * Shows a deduped alert for an API error (including parsed 4xx/5xx response bodies).
+ * Shows a deduped alert for an API error, using parsed 4xx/5xx response messages by default.
  *
- * Intended for query error paths where the UI should always surface the backend message.
+ * Pass a message override when the UI should show application-specific copy instead.
  *
  * 403 Forbidden errors are silently suppressed: they indicate "access denied",
  * which is handled by page-level empty/denied states — a redundant toast adds
@@ -32,6 +34,7 @@ export function useApiErrorAlert(error: unknown, options: UseApiErrorAlertOption
   const lastKeyRef = useRef<string | null>(null)
 
   const title = options.title
+  const messageOverride = options.message
   const context = options.context
   const suppress503 = options.suppress503
 
@@ -41,7 +44,7 @@ export function useApiErrorAlert(error: unknown, options: UseApiErrorAlertOption
       return
     }
 
-    const message = getErrorMessage(error)
+    const message = messageOverride ?? getErrorMessage(error)
     const status = getErrorStatus(error)
     const errorTitle = title ?? getErrorTitle(error)
     const fullMessage = context ? `${context}: ${message}` : message
@@ -62,5 +65,5 @@ export function useApiErrorAlert(error: unknown, options: UseApiErrorAlertOption
     }
 
     showError({ title: errorTitle, description: fullMessage })
-  }, [error, title, context, suppress503, showError, showWarning])
+  }, [error, title, messageOverride, context, suppress503, showError, showWarning])
 }
