@@ -212,6 +212,16 @@ async def get_integration(
     summary="Update integration",
     dependencies=[Depends(_perm_update)],
     operation_id="update_integration",
+    responses={
+        502: {
+            "description": "Execution Plane rejected the command or returned an invalid response",
+            "content": {"application/problem+json": {"schema": {"$ref": "#/components/schemas/ErrorData"}}},
+        },
+        503: {
+            "description": "Execution Plane unavailable; the integration update was not saved",
+            "content": {"application/problem+json": {"schema": {"$ref": "#/components/schemas/ErrorData"}}},
+        },
+    },
 )
 @audit(EventCategory.USER_ACTION, event_action="integration_update", capture_args={"integration_id"})
 async def update_integration(
@@ -219,7 +229,12 @@ async def update_integration(
     data: IntegrationUpdate,
     service: Annotated[IntegrationService, Depends(get_integration_service)],
 ) -> IntegrationRead:
-    """Update an integration."""
+    """Update an integration.
+
+    OpenShift updates to cluster-synchronized fields require Execution Plane acceptance
+    before persistence. A protected default cluster returns 409; unavailability returns
+    503. Both failures leave the integration unchanged.
+    """
     return await service.update_integration(integration_id, data)
 
 

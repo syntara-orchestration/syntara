@@ -52,6 +52,10 @@ export interface paths {
     /**
      * Update integration
      * @description Update an integration.
+     *
+     *     OpenShift updates to cluster-synchronized fields require Execution Plane acceptance
+     *     before persistence. A protected default cluster returns 409; unavailability returns
+     *     503. Both failures leave the integration unchanged.
      */
     patch: operations['update_integration']
     trace?: never
@@ -1760,6 +1764,24 @@ export interface operations {
       422: components['responses']['ValidationError']
       429: components['responses']['RateLimitError']
       500: components['responses']['InternalServerError']
+      /** @description Execution Plane rejected the command or returned an invalid response */
+      502: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/problem+json': components['schemas']['ErrorData']
+        }
+      }
+      /** @description Execution Plane unavailable; the integration update was not saved */
+      503: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/problem+json': components['schemas']['ErrorData']
+        }
+      }
     }
   }
   discover_integration_connection: {

@@ -124,3 +124,47 @@ async def test_bulk_command_selector_wire_contract(monkeypatch, command, field):
     wire_selector = messages[0]["command"]["payload"]["selector"]
     assert {key: value for key, value in wire_selector.items() if value is not None} == selector
     assert f"work.{command}_bulk" in client_module.EP_SCOPES.split()
+
+
+@pytest.mark.asyncio
+async def test_default_cluster_conflict_preserves_code_and_message(monkeypatch):
+    monkeypatch.setattr(client_module, "create_ep_service_token", lambda: "test-token")
+    client = object.__new__(ExecutionPlaneHttpClient)
+    client._client = httpx.AsyncClient(
+        base_url="https://ep.example",
+        transport=httpx.MockTransport(
+            lambda _: httpx.Response(
+                409, json={"detail": {"code": "DEFAULT_CLUSTER_PROTECTED", "message": "Default cluster is protected"}}
+            )
+        ),
+    )
+    async with client:
+        with pytest.raises(ExecutionPlaneRejectedError) as error:
+            await client.submit_command(cancellation())
+    assert error.value.status_code == 409
+    assert error.value.code == "DEFAULT_CLUSTER_PROTECTED"
+    assert error.value.detail == "Default cluster is protected"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("resource_kind", [None, "work_item"])
+async def test_cluster_submission_rejects_missing_or_wrong_resource(resource_kind):
+    from unittest.mock import AsyncMock
+
+    from execution_plane_client.commands.clusters import ClusterRegister
+    from execution_plane_client.commands.results import TransportReceipt
+    from execution_plane_client.protocol import ResourceReference
+
+    from syntara.execution_plane.cluster_sync_commands import _submit
+
+    cluster_id = uuid4()
+    command = ClusterRegister(
+        resource_id=cluster_id, name="cluster", endpoint="https://cluster.example.com", credential_ref=uuid4()
+    )
+    client = AsyncMock()
+    client.submit_command.return_value = TransportReceipt(
+        message_id=uuid4(),
+        resource=ResourceReference(kind=resource_kind, resource_id=cluster_id) if resource_kind else None,
+    )
+    with pytest.raises(ExecutionPlaneRejectedError, match="Invalid cluster command receipt"):
+        await _submit(client, command, cluster_id)

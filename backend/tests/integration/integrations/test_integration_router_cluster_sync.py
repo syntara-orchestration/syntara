@@ -1,6 +1,7 @@
-"""Integration writes persist desired state even when EP delivery fails."""
+"""Integration updates require EP acceptance before saving desired state."""
 
 from typing import Never
+from unittest.mock import MagicMock
 from uuid import UUID
 
 import pytest
@@ -9,9 +10,12 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from syntara.audit.dispatcher import AuditEventDispatcher
+from syntara.core.models import User
 from syntara.execution_plane import cluster_sync_commands
 from syntara.execution_plane.client import ExecutionPlaneRejectedError, ExecutionPlaneUnavailableError
 from syntara.execution_plane.integration_sync import reconcile_integration_clusters
+from syntara.integrations.audit import IntegrationUpdateEvent
 
 BASE_URL = "/api/v1/integrations"
 
@@ -66,15 +70,17 @@ async def test_create_update_delete_and_recreate_submit_ep_commands(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("conflict", [False, True])
-async def test_ep_failure_preserves_ao_update_and_later_reconciliation_applies_it(
+@pytest.mark.parametrize("failure", ["conflict", "default", "unavailable", "timeout", "invalid", "unauthorized"])
+async def test_ep_failure_rolls_back_entire_update_and_audits_failure(
     auth_client: AsyncClient,
+    test_user: User,
+    test_db_session: AsyncSession,
     http_bearer_token_credential_id: UUID,
     monkeypatch: pytest.MonkeyPatch,
     test_db_session_factory: async_sessionmaker[AsyncSession],
     ep_cluster_commands: list[MessageEnvelope],
     *,
-    conflict: bool,
+    failure: str,
 ) -> None:
     created = await auth_client.post(
         BASE_URL,
@@ -92,19 +98,42 @@ async def test_ep_failure_preserves_ao_update_and_later_reconciliation_applies_i
     integration_id = created.json()["id"]
 
     def fail_client() -> Never:
-        if conflict:
-            raise ExecutionPlaneRejectedError(status_code=409, detail="Cluster conflict")
-        raise ExecutionPlaneUnavailableError
+        if failure == "unavailable":
+            raise ExecutionPlaneUnavailableError
+        if failure == "timeout":
+            raise TimeoutError
+        raise ExecutionPlaneRejectedError(
+            status_code={"conflict": 409, "default": 409, "unauthorized": 403}.get(failure),
+            code="DEFAULT_CLUSTER_PROTECTED" if failure == "default" else None,
+        )
 
+    audit = MagicMock()
+    monkeypatch.setattr(AuditEventDispatcher, "dispatch", audit)
     with monkeypatch.context() as unavailable:
         unavailable.setattr(cluster_sync_commands, "ExecutionPlaneHttpClient", fail_client)
-        response = await auth_client.patch(f"{BASE_URL}/{integration_id}", json={"enabled": False})
-    assert response.status_code == 200, response.text
+        response = await auth_client.patch(
+            f"{BASE_URL}/{integration_id}", json={"enabled": False, "name": "rejected-name", "labels": {"new": "label"}}
+        )
+    expected_status = (
+        503 if failure in {"unavailable", "timeout"} else 409 if failure in {"conflict", "default"} else 502
+    )
+    assert response.status_code == expected_status, response.text
+    if failure == "default":
+        assert "cannot be disabled" in response.text
+    events = [call.args[0] for call in audit.call_args_list if isinstance(call.args[0], IntegrationUpdateEvent)]
+    assert len(events) == 1
+    assert events[0].error_type == (
+        "ExecutionPlaneUnavailableError" if failure in {"unavailable", "timeout"} else "ExecutionPlaneRejectedError"
+    )
+    # The test client reuses this ORM user across requests; rollback expires it.
+    await test_db_session.refresh(test_user)
     current = await auth_client.get(f"{BASE_URL}/{integration_id}")
     assert current.status_code == 200
-    assert current.json()["enabled"] is False
+    assert current.json()["enabled"] is True
+    assert current.json()["name"] == "cluster-before-failure"
+    assert not current.json()["labels"]
     assert len(ep_cluster_commands) == 1
     result = await reconcile_integration_clusters(test_db_session_factory, UUID(integration_id))
     assert result == {"synced": 1, "failed": 0, "skipped": 0}
     assert ep_cluster_commands[-1].command.command_type == "cluster.register"
-    assert ep_cluster_commands[-1].command.payload["enabled"] is False
+    assert ep_cluster_commands[-1].command.payload["enabled"] is True

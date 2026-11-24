@@ -7,12 +7,14 @@ filter: register is an idempotent upsert on that id.
 
 from __future__ import annotations
 
+import asyncio
 from typing import TYPE_CHECKING
 
 from execution_plane_client.commands.clusters import ClusterDelete, ClusterRegister
 from fastapi import HTTPException, status
 from sqlmodel import select
 
+from syntara.core.config.base import get_settings
 from syntara.core.exceptions import SafeValueError
 from syntara.execution_plane.client import (
     EP_AUDIENCE,
@@ -44,29 +46,45 @@ async def _submit(
         raise ExecutionPlaneRejectedError(message)
 
 
+def build_integration_cluster_command(integration: Integration) -> ClusterRegister:
+    """Build the desired cluster from either candidate or committed AO state."""
+    configuration = integration.configuration
+    if not isinstance(configuration, OpenShiftConfiguration) or integration.management_credential_id is None:
+        message = "OpenShift cluster synchronization requires configuration and a management credential"
+        raise SafeValueError(message)
+    return ClusterRegister.model_validate(
+        {
+            "resource_id": integration.id,
+            "name": integration.name,
+            "endpoint": configuration.base_url,
+            "credential_ref": integration.management_credential_id,
+            "ca_certificate": configuration.ca_certificate,
+            "labels": integration.labels or {},
+            "enabled": integration.enabled,
+        }
+    )
+
+
+async def submit_integration_cluster(integration: Integration) -> None:
+    """Submit candidate state without swallowing rejections or committing AO."""
+    command = build_integration_cluster_command(integration)
+    try:
+        async with asyncio.timeout(get_settings().ep_request_timeout_seconds):
+            async with ExecutionPlaneHttpClient() as client:
+                await _submit(client, command, integration.id)
+    except TimeoutError as exc:
+        raise ExecutionPlaneUnavailableError from exc
+
+
 async def apply_integration_cluster(session_factory: async_sessionmaker[AsyncSession], integration_id: UUID) -> bool:
-    """Upsert the EP Cluster whose physical id is this Integration's id."""
+    """Keep committed state locked through delivery so updates cannot overtake it."""
     async with session_factory() as session:
-        integration = (await session.exec(select(Integration).where(Integration.id == integration_id))).one_or_none()
+        integration = (
+            await session.exec(select(Integration).where(Integration.id == integration_id).with_for_update())
+        ).one_or_none()
         if integration is None or integration.integration_type != IntegrationType.OPENSHIFT:
             return False
-        configuration = integration.configuration
-        if not isinstance(configuration, OpenShiftConfiguration) or integration.management_credential_id is None:
-            message = "OpenShift cluster synchronization requires configuration and a management credential"
-            raise SafeValueError(message)
-        command = ClusterRegister.model_validate(
-            {
-                "resource_id": integration.id,
-                "name": integration.name,
-                "endpoint": configuration.base_url,
-                "credential_ref": integration.management_credential_id,
-                "ca_certificate": configuration.ca_certificate,
-                "labels": integration.labels or {},
-                "enabled": integration.enabled,
-            }
-        )
-    async with ExecutionPlaneHttpClient() as client:
-        await _submit(client, command, integration_id)
+        await submit_integration_cluster(integration)
     return True
 
 
