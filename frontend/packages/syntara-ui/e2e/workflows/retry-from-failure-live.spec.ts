@@ -23,9 +23,10 @@ import { buildUniqueName, fillCodeEditor } from '../helpers/workflows'
 import { isSkipWebServerForPlaywrightTests } from '../playwrightWebServerEnv'
 import {
   apiRequest,
+  createProjectViaApi,
   createWorkflowViaApi,
+  deleteProjectViaApi,
   deleteWorkflowViaApi,
-  ensureProject,
   getAuthToken,
   pollExecutionStatus,
 } from '../utils/api'
@@ -40,6 +41,7 @@ type WorkflowRun = {
 
 const workflowIds = new Set<string>()
 const executionIds = new Set<string>()
+let testProjectId: string | null = null
 let failedRun: WorkflowRun | null = null
 let completedRun: WorkflowRun | null = null
 let multipleFailureRun: WorkflowRun | null = null
@@ -115,6 +117,7 @@ async function createRun(
   app: Page,
   options: {
     name: string
+    projectId: string
     nodes: Array<{ id: string; type: string; name: string; parameters: Record<string, unknown> }>
     edges: Array<{ from: string; to: string }>
     expectedStatus: 'failed' | 'completed'
@@ -123,6 +126,7 @@ async function createRun(
   const { id: workflowId } = await createWorkflowViaApi({
     app,
     name: options.name,
+    projectId: options.projectId,
     triggers: [{ id: 'trigger_manual', type: 'manual_trigger', name: 'Manual trigger', parameters: {} }],
     nodes: options.nodes,
     edges: options.edges,
@@ -251,11 +255,12 @@ test.describe('Retry from failure — real backend', () => {
   test.beforeAll(async ({ browser }) => {
     const page = await browser.newPage()
     try {
-      const project = await ensureProject(page)
-      if (!project) throw new Error('Could not ensure project for retry-from-failure tests')
+      const project = await createProjectViaApi(page, buildUniqueName('e2e-retry-from-failure-project'))
+      testProjectId = project.id
 
       failedRun = await createRun(page, {
         name: buildUniqueName('e2e-retry-failure'),
+        projectId: project.id,
         nodes: [
           {
             id: 'step1',
@@ -286,6 +291,7 @@ test.describe('Retry from failure — real backend', () => {
 
       completedRun = await createRun(page, {
         name: buildUniqueName('e2e-retry-completed'),
+        projectId: project.id,
         nodes: [
           {
             id: 'completed_step',
@@ -300,6 +306,7 @@ test.describe('Retry from failure — real backend', () => {
 
       multipleFailureRun = await createRun(page, {
         name: buildUniqueName('e2e-retry-parallel-failures'),
+        projectId: project.id,
         nodes: [
           {
             id: 'branch_a',
@@ -377,6 +384,7 @@ test.describe('Retry from failure — real backend', () => {
         await deleteWorkflowViaApi(page, workflowId)
       }
       if (noEditPersona) await cleanupProjectPersona(page, noEditPersona)
+      if (testProjectId) await deleteProjectViaApi(page, testProjectId)
     } finally {
       await page.close()
     }
