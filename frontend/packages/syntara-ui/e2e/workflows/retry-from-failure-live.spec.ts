@@ -229,21 +229,21 @@ test.describe('Retry from failure — real backend', () => {
         nodes: [
           {
             id: 'step1',
-            type: 'script',
+            type: 'script_bash',
             name: 'First Step',
-            parameters: { language: 'bash', code: 'echo first-step' },
+            parameters: { code: 'echo first-step' },
           },
           {
             id: 'step2',
-            type: 'script',
+            type: 'script_bash',
             name: 'Second Step',
-            parameters: { language: 'bash', code: 'exit 1' },
+            parameters: { code: 'exit 1' },
           },
           {
             id: 'step3',
-            type: 'script',
+            type: 'script_bash',
             name: 'Third Step',
-            parameters: { language: 'bash', code: 'echo downstream-step' },
+            parameters: { code: 'echo downstream-step' },
           },
         ],
         edges: [
@@ -259,9 +259,9 @@ test.describe('Retry from failure — real backend', () => {
         nodes: [
           {
             id: 'completed_step',
-            type: 'script',
+            type: 'script_bash',
             name: 'Completed Step',
-            parameters: { language: 'bash', code: 'echo completed' },
+            parameters: { code: 'echo completed' },
           },
         ],
         edges: [{ from: 'trigger_manual', to: 'completed_step' }],
@@ -273,15 +273,15 @@ test.describe('Retry from failure — real backend', () => {
         nodes: [
           {
             id: 'branch_a',
-            type: 'script',
+            type: 'script_bash',
             name: 'Branch A',
-            parameters: { language: 'bash', code: 'exit 1' },
+            parameters: { code: 'exit 1' },
           },
           {
             id: 'branch_b',
-            type: 'script',
+            type: 'script_bash',
             name: 'Branch B',
-            parameters: { language: 'bash', code: 'exit 1' },
+            parameters: { code: 'exit 1' },
           },
         ],
         edges: [
