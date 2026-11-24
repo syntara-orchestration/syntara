@@ -17,8 +17,10 @@ const maxBatches = process.env.SYNTARA_MUTATION_MAX_BATCHES
   ? Number(process.env.SYNTARA_MUTATION_MAX_BATCHES)
   : Number.POSITIVE_INFINITY
 
-if (!/^[A-Za-z0-9._-]+$/.test(runId)) {
-  throw new Error('SYNTARA_MUTATION_RUN_ID may contain only letters, numbers, dots, underscores, and dashes')
+if (!/^[A-Za-z0-9._-]+$/.test(runId) || runId === '.' || runId === '..') {
+  throw new Error(
+    'SYNTARA_MUTATION_RUN_ID must be a path-safe name using letters, numbers, dots, underscores, or dashes'
+  )
 }
 if (!Number.isInteger(batchSize) || batchSize < 1) {
   throw new Error('SYNTARA_MUTATION_BATCH_SIZE must be a positive integer')

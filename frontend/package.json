@@ -36,6 +36,7 @@
     "storybook:build": "npm run storybook:build --prefix packages/syntara-ui",
     "gen": "npm run gen:local --prefix packages/syntara-contracts",
     "mutate": "npm run mutate --prefix packages/syntara-ui",
+    "mutation:audit": "node scripts/run-mutation-audit.mjs",
     "podman:build": "concurrently npm:podman:build:* -c auto",
     "podman:build:ui": "podman build -f packages/syntara-ui/Containerfile -t syntara-ui:latest -t localhost/syntara-ui:latest .",
     "podman:build:mock-api": "podman build -f packages/syntara-mock-api/Containerfile -t syntara-mock-api:latest -t localhost/syntara-mock-api:latest .",
