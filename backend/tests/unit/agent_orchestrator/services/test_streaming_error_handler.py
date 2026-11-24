@@ -83,8 +83,15 @@ pytestmark = pytest.mark.unit
             "TOOL_SELECTION_UNAVAILABLE",
             False,
         ),
+        # LangGraph checkpoint msgpack failures (not generic serialization errors)
+        (
+            TypeError("Type is not msgpack serializable: ToolMessage"),
+            "TOOL_RESULT_SERIALIZATION_FAILED",
+            False,
+        ),
         # Unknown errors
         (ValueError("Invalid input format"), "UNKNOWN_ERROR", False),
+        (Exception("Object is not serializable to JSON"), "UNKNOWN_ERROR", False),
         (Exception("Something went wrong"), "UNKNOWN_ERROR", False),
         (Exception(""), "UNKNOWN_ERROR", False),
         # A 4xx status is not a server error
@@ -115,7 +122,9 @@ pytestmark = pytest.mark.unit
         "tool_discovery_zero_provision",
         "tool_discovery_zero_match",
         "tool_selection_unavailable",
+        "tool_result_msgpack_serialization",
         "unknown_value_error",
+        "unknown_non_msgpack_serializable",
         "unknown_generic",
         "unknown_empty",
         "unknown_4xx",
