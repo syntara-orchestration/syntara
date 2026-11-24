@@ -39,7 +39,8 @@ export function useAllProjects(options?: UseAllProjectsOptions) {
 }
 
 /** Non-builtin projects only. Use for "pick a project to create a resource in" dropdowns. */
-export function useSelectableProjects() {
+export function useSelectableProjects(options?: UseAllProjectsOptions) {
+  const enabled = options?.enabled ?? true
   const {
     data: projects = [],
     isPending,
@@ -48,6 +49,7 @@ export function useSelectableProjects() {
   } = useQuery({
     queryKey: ['all-projects', { is_builtin: false }],
     queryFn: fetchSelectableProjects,
+    enabled,
   })
-  return { projects, isLoading: isPending, error, refetch }
+  return { projects, isLoading: enabled && isPending, error, refetch }
 }

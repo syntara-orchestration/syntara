@@ -102,6 +102,14 @@ describe('useAllProjects', () => {
     expect(result.current.projects).toEqual([])
   })
 
+  it('does not fetch or report loading when disabled', () => {
+    const { result } = renderHook(() => useSelectableProjects({ enabled: false }), { wrapper })
+
+    expect(accessFetchClient.GET).not.toHaveBeenCalled()
+    expect(result.current.isLoading).toBe(false)
+    expect(result.current.projects).toEqual([])
+  })
+
   it('passes correct query parameters without is_builtin filter', async () => {
     vi.mocked(accessFetchClient.GET).mockResolvedValue({
       data: { resources: [] },

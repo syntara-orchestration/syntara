@@ -41,6 +41,7 @@ type BuilderDialogsProps = Readonly<{
   workflowName: string
   workflowId: string | null
   confirmDialogOpen: boolean
+  forceRunConfirmation?: boolean
   deleteDialogOpen: boolean
   dispatch: Dispatch<BuilderAction>
   handleRunWorkflow: (inputData?: Record<string, unknown>, triggerNodeId?: string) => void
@@ -73,6 +74,7 @@ type BuilderDialogsProps = Readonly<{
 
 type UseRunConfirmStateParams = {
   confirmDialogOpen: boolean
+  forceRunConfirmation: boolean
   showInputDialog: boolean
   dispatch: Dispatch<BuilderAction>
   handleRunWorkflow: (inputData?: Record<string, unknown>, triggerNodeId?: string) => void
@@ -81,6 +83,7 @@ type UseRunConfirmStateParams = {
 
 function useRunConfirmState({
   confirmDialogOpen,
+  forceRunConfirmation,
   showInputDialog,
   dispatch,
   handleRunWorkflow,
@@ -99,7 +102,7 @@ function useRunConfirmState({
     setPrevOpen(false)
   }
 
-  const skipConfirm = confirmDialogOpen && getRunConfirmDismissed()
+  const skipConfirm = confirmDialogOpen && !forceRunConfirmation && getRunConfirmDismissed()
 
   // Auto-run when confirmation is skipped and no input dialog is needed
   const autoRanRef = useRef(false)
@@ -121,6 +124,7 @@ function useRunConfirmState({
     setDoNotShowAgain,
     closeAll: () => {
       dispatch({ type: 'SET_CONFIRM_DIALOG', payload: false })
+      dispatch({ type: 'SET_FORCE_RUN_CONFIRMATION', payload: false })
       setConfirmedRun(false)
       setDoNotShowAgain(false)
     },
@@ -128,9 +132,11 @@ function useRunConfirmState({
       if (doNotShowAgain) setRunConfirmDismissed()
       if (showInputDialog) {
         setConfirmedRun(true)
+        dispatch({ type: 'SET_FORCE_RUN_CONFIRMATION', payload: false })
       } else {
         handleRunWorkflow(undefined, triggerNodeId)
         dispatch({ type: 'SET_CONFIRM_DIALOG', payload: false })
+        dispatch({ type: 'SET_FORCE_RUN_CONFIRMATION', payload: false })
       }
     },
   }
@@ -140,6 +146,7 @@ export function BuilderDialogs({
   workflowName,
   workflowId,
   confirmDialogOpen,
+  forceRunConfirmation = false,
   deleteDialogOpen,
   dispatch,
   handleRunWorkflow,
@@ -171,7 +178,14 @@ export function BuilderDialogs({
   const showInputDialog =
     hasNonEmptyInputSchema(triggerInputSchema) || activitiesReferenceTrigger(activities ?? [], triggerNodeIds)
   const { showConfirmStep, showInputStep, doNotShowAgain, setDoNotShowAgain, closeAll, handleConfirmRun } =
-    useRunConfirmState({ confirmDialogOpen, showInputDialog, dispatch, handleRunWorkflow, triggerNodeId })
+    useRunConfirmState({
+      confirmDialogOpen,
+      forceRunConfirmation,
+      showInputDialog,
+      dispatch,
+      handleRunWorkflow,
+      triggerNodeId,
+    })
   return (
     <>
       <SynConfirmationDialog
