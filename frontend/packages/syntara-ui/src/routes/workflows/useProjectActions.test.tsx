@@ -132,10 +132,9 @@ describe('useProjectActions', () => {
     })
   })
 
-  // AAP-93574: deleting the project currently shown on the Workflows page should not
-  // leave the page pointed at the now-deleted project (which then errors with
-  // "project <id> not found"). The user should be moved away from the stale selection.
-  describe('deleting the currently selected project (AAP-93574)', () => {
+  // Deleting the project currently shown on the Workflows page should not leave the page
+  // pointed at the now-deleted project (which then errors with "project <id> not found").
+  describe('deleting the currently selected project', () => {
     beforeEach(() => {
       useProjectStore.setState({ selectedProjectId: 'proj-1', selectedProjectName: 'Test Project' })
     })
