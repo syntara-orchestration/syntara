@@ -67,6 +67,7 @@ async def test_can_i_reports_exact_effective_statement(
 ) -> None:
     db = test_db_session
     project = Project(name="payments", labels={})
+    projects = [project]
     db.add(project)
     await db.commit()
     await _assign_policy(db, test_user, "allow-all-step-types", [_statement("allow")])
@@ -83,30 +84,32 @@ async def test_can_i_reports_exact_effective_statement(
         await db.flush()
         db.add(RoleAssignment(principal_id=test_user.id, role_name=role.name, project_id=other.id))
         await db.commit()
+        projects.append(other)
     await _assign_policy(
         db, test_user, "z-second-deny", [_statement("deny", kind="script")], project.id if project_scoped else None
     )
 
-    for context in (project.name, str(project.id)):
-        response = await auth_client.post(
-            "/api/v1/authz/can_i",
-            json={
-                "action": "write",
-                "resource_type": "step_type",
-                "resource_labels": {"kind": "script"},
-                "resource_project": context,
-            },
-        )
-        assert response.status_code == 200, response.text
-        assert response.json() == {
-            "allowed": False,
-            "denied": True,
-            "matched_policy": "",
-            "denial_reason": "policy_deny",
-            "denied_by": "a-mixed-policy",
-            "denied_scope": "project" if project_scoped else "any",
-            "denied_project": "payments" if project_scoped else "",
-        }
+    for target in projects:
+        for context in (target.name, str(target.id)):
+            response = await auth_client.post(
+                "/api/v1/authz/can_i",
+                json={
+                    "action": "write",
+                    "resource_type": "step_type",
+                    "resource_labels": {"kind": "script"},
+                    "resource_project": context,
+                },
+            )
+            assert response.status_code == 200, response.text
+            assert response.json() == {
+                "allowed": False,
+                "denied": True,
+                "matched_policy": "",
+                "denial_reason": "policy_deny",
+                "denied_by": "a-mixed-policy",
+                "denied_scope": "project" if project_scoped else "any",
+                "denied_project": target.name if project_scoped else "",
+            }
     for kind, context in (("http_request", "payments"), ("script", "unassigned-project")):
         response = await auth_client.post(
             "/api/v1/authz/can_i",
