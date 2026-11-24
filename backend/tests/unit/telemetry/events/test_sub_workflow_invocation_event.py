@@ -46,4 +46,15 @@ def test_event_schema_accepts_future_embed_mode() -> None:
     event = _event(SubWorkflowInvocationMode.EMBED)
 
     assert event.invocation_mode == SubWorkflowInvocationMode.EMBED
-    assert "embed" in SubWorkflowInvocationEvent.model_json_schema()["$defs"]["SubWorkflowInvocationMode"]["enum"]
+    schema = SubWorkflowInvocationEvent.model_json_schema()
+    assert "embed" in schema["$defs"]["SubWorkflowInvocationMode"]["enum"]
+    assert {
+        "parent_execution_id",
+        "parent_workflow_id",
+        "child_execution_id",
+        "child_workflow_id",
+        "invocation_mode",
+        "status",
+        "installation_anon_id",
+        "occurred_at",
+    } <= set(schema["required"])

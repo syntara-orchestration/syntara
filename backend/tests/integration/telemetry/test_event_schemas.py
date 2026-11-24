@@ -143,7 +143,7 @@ class TestSubWorkflowInvocationTelemetryEventSchema:
             "status",
             "installation_anon_id",
             "occurred_at",
-        } <= schema["required"]
+        } <= set(schema["required"])
 
     def test_event_serializes_for_segment_and_supports_future_embed_mode(self) -> None:
         event = SubWorkflowInvocationEvent(
