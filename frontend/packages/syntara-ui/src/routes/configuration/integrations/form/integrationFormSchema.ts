@@ -1,6 +1,7 @@
 import { IntegrationTypeEnum, LLMProviderHintEnum } from '@syntara/contracts'
 import { z } from 'zod'
 
+import { addRequiredCaCertificateIssue } from '../caCertificate'
 import { PROVIDERS_REQUIRING_BASE_URL } from '../integrationFilters'
 
 const securityFields = {
@@ -119,6 +120,7 @@ const openshiftSchema = z.object({
           path: ['base_url'],
         })
       }
+      addRequiredCaCertificateIssue(data.ca_certificate, ctx)
     }),
 })
 
@@ -159,7 +161,7 @@ export function getStep1Fields(integrationType: string, scope?: string): string[
     case IntegrationTypeEnum.LLM_PROVIDER:
       return [...shared, 'configuration.provider_hint', 'configuration.base_url']
     case IntegrationTypeEnum.OPENSHIFT:
-      return [...shared, 'configuration.base_url']
+      return [...shared, 'configuration.base_url', 'configuration.ca_certificate']
     default:
       return shared
   }

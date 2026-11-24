@@ -823,15 +823,26 @@ describe('EditIntegrationForm', () => {
       expect(screen.queryByRole('textbox', { name: /^description$/i })).not.toBeInTheDocument()
     })
 
-    it('hides HTTP and TLS checkboxes but keeps CA certificate under Security', async () => {
+    it('shows a required CA certificate outside Security', async () => {
       const user = userEvent.setup()
+      const { patchMutate } = setupMutationMocks()
       render(<EditIntegrationForm />, { wrapper })
 
-      await user.click(screen.getByText('Security'))
+      const certificate = screen.getByRole('textbox', { name: /ca certificate/i })
+      const apiEndpoint = screen.getByRole('textbox', { name: /api endpoint/i })
 
+      expect(certificate).toBeRequired()
+      expect(certificate).toHaveValue('-----BEGIN CERTIFICATE-----\n...')
+      expect(screen.getByText(/PEM-encoded CA certificate/)).toBeInTheDocument()
+      expect(screen.queryByText('Security')).not.toBeInTheDocument()
       expect(screen.queryByRole('checkbox', { name: /allow http connections/i })).not.toBeInTheDocument()
-      expect(screen.queryByRole('checkbox', { name: /disable tls certificate verification/i })).not.toBeInTheDocument()
-      expect(screen.getByRole('textbox', { name: /ca certificate/i })).toBeInTheDocument()
+      expect(apiEndpoint.compareDocumentPosition(certificate) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+
+      await user.clear(certificate)
+      await user.click(screen.getByRole('button', { name: 'Save integration' }))
+
+      expect(await screen.findByText('CA certificate is required')).toBeInTheDocument()
+      expect(patchMutate).not.toHaveBeenCalled()
     })
 
     it('shows Authentication section with service account token credential', () => {

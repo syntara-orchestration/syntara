@@ -2,6 +2,8 @@ import type { IntegrationsAPI } from '@syntara/contracts'
 import { IntegrationTypeEnum } from '@syntara/contracts'
 import { z } from 'zod'
 
+import { addRequiredCaCertificateIssue } from './caCertificate'
+
 function isLoopback(hostname: string): boolean {
   return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1' || hostname === '[::1]'
 }
@@ -31,6 +33,7 @@ type EditSchemaData = {
   base_url?: string
   allow_http: boolean
   insecure_skip_tls_verify: boolean
+  ca_certificate?: string | null
 }
 
 function refineOpenShiftFields(data: EditSchemaData, ctx: z.RefinementCtx) {
@@ -54,6 +57,7 @@ function refineOpenShiftFields(data: EditSchemaData, ctx: z.RefinementCtx) {
     fieldLabel: 'API endpoint',
   })
   if (err) ctx.addIssue({ code: z.ZodIssueCode.custom, message: err, path: ['base_url'] })
+  addRequiredCaCertificateIssue(data.ca_certificate, ctx)
 }
 
 export function buildEditSchema(requiresBaseUrl: boolean) {

@@ -174,6 +174,25 @@ describe('useIntegrationActions', () => {
 
       expect(mockMutate).toHaveBeenCalledWith(expect.objectContaining({ body: { enabled: true } }), expect.any(Object))
     })
+
+    it('does nothing for execution plane infrastructure integrations', () => {
+      const openShiftIntegration: IntegrationRead = {
+        ...mockIntegration,
+        id: 'openshift-1',
+        name: 'OpenShift Cluster',
+        integration_type: 'openshift',
+        configuration: {
+          integration_type: 'openshift',
+          base_url: 'https://api.openshift.example.com',
+        },
+      }
+      const { result } = renderHook(() => useIntegrationActions(mockRefetch), { wrapper })
+
+      act(() => result.current.handleToggleEnabled(openShiftIntegration))
+
+      expect(result.current.disableDialog.isOpen).toBe(false)
+      expect(mockMutate).not.toHaveBeenCalled()
+    })
   })
 
   describe('handleDisable', () => {

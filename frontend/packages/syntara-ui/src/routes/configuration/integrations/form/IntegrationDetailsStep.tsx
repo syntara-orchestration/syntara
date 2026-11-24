@@ -11,7 +11,6 @@ import {
   type MenuToggleElement,
   SelectList,
   SelectOption,
-  TextArea,
   Title,
 } from '@patternfly/react-core'
 import { IntegrationTypeEnum } from '@syntara/contracts'
@@ -21,6 +20,7 @@ import { useWatch, type UseFormSetValue } from 'react-hook-form'
 import { SynFormField } from '../../../../components/forms/SynFormField'
 import { SynTextField } from '../../../../components/forms/SynTextField'
 import { SynSelect } from '../../../../components/SynSelect'
+import { CaCertificateField } from '../CaCertificateField'
 import { integrationHelp } from '../integrationFieldHelp'
 import { EXECUTION_PLANE_SINGLETON_HELP } from '../integrationFieldHelpText'
 import { PROVIDERS_HIDING_BASE_URL, PROVIDERS_REQUIRING_BASE_URL } from '../integrationFilters'
@@ -155,12 +155,9 @@ function IntegrationTypeSelect({
 
 function SecurityFields() {
   const [isExpanded, setIsExpanded] = useState(false)
-  const integrationType = useWatch<IntegrationFormData, 'integration_type'>({ name: 'integration_type' })
   const skipTlsVerify = useWatch<IntegrationFormData, 'configuration.insecure_skip_tls_verify'>({
     name: 'configuration.insecure_skip_tls_verify',
   })
-  // Execution plane infrastructure always requires HTTPS + TLS verification.
-  const showHttpTlsOptions = integrationType !== IntegrationTypeEnum.OPENSHIFT
 
   return (
     <ExpandableSection
@@ -170,74 +167,54 @@ function SecurityFields() {
       isIndented
     >
       <div className={styles.securityFields}>
-        {showHttpTlsOptions && (
-          <>
-            <SynFormField<IntegrationFormData, 'configuration.allow_http'>
-              name="configuration.allow_http"
+        <SynFormField<IntegrationFormData, 'configuration.allow_http'>
+          name="configuration.allow_http"
+          label="Allow HTTP connections"
+          fieldId="allow-http"
+          hideFormGroupLabel
+          hideFooter
+        >
+          {({ field }) => (
+            <Checkbox
+              id="allow-http"
               label="Allow HTTP connections"
-              fieldId="allow-http"
-              hideFormGroupLabel
-              hideFooter
-            >
-              {({ field }) => (
-                <Checkbox
-                  id="allow-http"
-                  label="Allow HTTP connections"
-                  description="Permits unencrypted HTTP URLs for this integration"
-                  isChecked={field.value}
-                  onChange={(_event, checked) => field.onChange(checked)}
-                />
-              )}
-            </SynFormField>
-            <SynFormField<IntegrationFormData, 'configuration.insecure_skip_tls_verify'>
-              name="configuration.insecure_skip_tls_verify"
+              description="Permits unencrypted HTTP URLs for this integration"
+              isChecked={field.value}
+              onChange={(_event, checked) => field.onChange(checked)}
+            />
+          )}
+        </SynFormField>
+        <SynFormField<IntegrationFormData, 'configuration.insecure_skip_tls_verify'>
+          name="configuration.insecure_skip_tls_verify"
+          label="Disable TLS certificate verification"
+          fieldId="insecure-skip-tls-verify"
+          hideFormGroupLabel
+          hideFooter
+        >
+          {({ field }) => (
+            <Checkbox
+              id="insecure-skip-tls-verify"
               label="Disable TLS certificate verification"
-              fieldId="insecure-skip-tls-verify"
-              hideFormGroupLabel
-              hideFooter
-            >
-              {({ field }) => (
-                <Checkbox
-                  id="insecure-skip-tls-verify"
-                  label="Disable TLS certificate verification"
-                  description="Skips validation of the server's TLS certificate on connections"
-                  isChecked={field.value}
-                  onChange={(_event, checked) => field.onChange(checked)}
-                  body={
-                    skipTlsVerify ? (
-                      <HelperText>
-                        <HelperTextItem variant="warning">
-                          The server's TLS certificate will not be verified. Only enable in trusted networks.
-                        </HelperTextItem>
-                      </HelperText>
-                    ) : undefined
-                  }
-                />
-              )}
-            </SynFormField>
-          </>
-        )}
+              description="Skips validation of the server's TLS certificate on connections"
+              isChecked={field.value}
+              onChange={(_event, checked) => field.onChange(checked)}
+              body={
+                skipTlsVerify ? (
+                  <HelperText>
+                    <HelperTextItem variant="warning">
+                      The server's TLS certificate will not be verified. Only enable in trusted networks.
+                    </HelperTextItem>
+                  </HelperText>
+                ) : undefined
+              }
+            />
+          )}
+        </SynFormField>
         {!skipTlsVerify && (
-          <SynFormField<IntegrationFormData, 'configuration.ca_certificate'>
+          <CaCertificateField<IntegrationFormData, 'configuration.ca_certificate'>
             name="configuration.ca_certificate"
-            label="CA certificate"
             fieldId="ca-certificate"
-            hint="PEM-encoded CA certificate to trust for this integration's TLS connections."
-          >
-            {({ field }) => (
-              <TextArea
-                id="ca-certificate"
-                placeholder={'-----BEGIN CERTIFICATE-----\n\n-----END CERTIFICATE-----'}
-                aria-label="CA certificate"
-                resizeOrientation="vertical"
-                rows={4}
-                value={field.value ?? ''}
-                onChange={(_event, value) => field.onChange(value || null)}
-                onBlur={field.onBlur}
-                name={field.name}
-              />
-            )}
-          </SynFormField>
+          />
         )}
       </div>
     </ExpandableSection>
@@ -447,7 +424,15 @@ export function IntegrationDetailsStep({
           />
         )}
 
-        <SecurityFields />
+        {isOpenShift ? (
+          <CaCertificateField<IntegrationFormData, 'configuration.ca_certificate'>
+            name="configuration.ca_certificate"
+            fieldId="ca-certificate"
+            isRequired
+          />
+        ) : (
+          <SecurityFields />
+        )}
 
         {isOpenShift ? (
           <ExecutionPlaneScopeField fieldId="integration-scope" />
