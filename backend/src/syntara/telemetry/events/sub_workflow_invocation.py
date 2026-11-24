@@ -44,7 +44,7 @@ class SubWorkflowInvocationEvent(BaseTelemetryEvent):
     invocation_duration_ms: int | None = Field(
         default=None,
         ge=0,
-        description="Parent Sub-workflow node start to completion duration in milliseconds",
+        description="Sub-workflow setup activity start to child terminal completion duration in milliseconds",
     )
     child_execution_duration_ms: int | None = Field(
         default=None,
@@ -55,4 +55,4 @@ class SubWorkflowInvocationEvent(BaseTelemetryEvent):
         min_length=1,
         description="Anonymized installation identifier used for aggregation",
     )
-    occurred_at: datetime = Field(description="Time the parent Sub-workflow node completed")
+    occurred_at: datetime = Field(description="Time the child workflow execution reached a terminal state")
