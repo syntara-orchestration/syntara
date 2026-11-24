@@ -39,9 +39,7 @@ export function useExecutionCopyToEditor({
   }, [executionCopy])
 
   const reducerSynced =
-    !!executionCopy &&
-    mostRecentExecutionId != null &&
-    mostRecentExecutionId === executionCopy.executionId
+    !!executionCopy && mostRecentExecutionId != null && mostRecentExecutionId === executionCopy.executionId
 
   useEffect(() => {
     if (executionCopy || mostRecentExecutionId) return
@@ -93,15 +91,7 @@ export function useExecutionCopyToEditor({
       })
     }, 0)
     return () => window.clearTimeout(timer)
-  }, [
-    executionCopy,
-    currentWorkflow,
-    isWorkflowInitialized,
-    mostRecentExecutionId,
-    dispatch,
-    markDirty,
-    showSuccess,
-  ])
+  }, [executionCopy, currentWorkflow, isWorkflowInitialized, mostRecentExecutionId, dispatch, markDirty, showSuccess])
 
   useEffect(() => {
     if (!reducerSynced) return
