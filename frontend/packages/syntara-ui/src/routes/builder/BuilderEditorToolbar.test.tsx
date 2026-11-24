@@ -501,7 +501,7 @@ describe('BuilderEditorToolbar', () => {
       })
     })
 
-    it('disables run dropdown when canRun is false', () => {
+    it('marks the run dropdown aria-disabled when canRun is false', () => {
       render(
         <BuilderEditorToolbar
           {...multiTriggerProps}
@@ -509,7 +509,7 @@ describe('BuilderEditorToolbar', () => {
         />
       )
 
-      expect(screen.getByRole('button', { name: /Run workflow/i })).toBeDisabled()
+      expect(screen.getByRole('button', { name: /Run workflow/i })).toHaveAttribute('aria-disabled', 'true')
     })
 
     it('uses fallback name for triggers without a name', async () => {

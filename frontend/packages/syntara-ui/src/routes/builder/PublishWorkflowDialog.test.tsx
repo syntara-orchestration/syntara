@@ -86,10 +86,14 @@ describe('PublishWorkflowDialog', () => {
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled()
   })
 
-  it('disables publish metadata when the selected version has a blocked type', () => {
-    render(
+  it('keeps the publish explanation keyboard reachable when permission is revoked', async () => {
+    const user = userEvent.setup()
+    const onPublish = vi.fn()
+    const { rerender } = render(<PublishWorkflowDialog {...defaultProps} onPublish={onPublish} />)
+    rerender(
       <PublishWorkflowDialog
         {...defaultProps}
+        onPublish={onPublish}
         canPublish={false}
         editTooltip="Blocked step types: Script."
         blockedStepTypes={['Script']}
@@ -98,8 +102,17 @@ describe('PublishWorkflowDialog', () => {
 
     expect(screen.getByLabelText('Version name')).toBeDisabled()
     expect(screen.getByLabelText('Description')).toBeDisabled()
-    expect(screen.getByRole('button', { name: 'Publish workflow' })).toBeDisabled()
     expect(screen.getByText('Blocked step types: Script.')).toBeInTheDocument()
+    const publish = screen.getByRole('button', { name: 'Publish workflow' })
+    screen.getByRole('button', { name: 'Cancel' }).focus()
+    await user.tab({ shift: true })
+
+    expect(publish).toHaveFocus()
+    expect(publish).toHaveAttribute('aria-disabled', 'true')
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Blocked step types: Script.')
+    await user.keyboard('{Enter} ')
+    await user.click(publish)
+    expect(onPublish).not.toHaveBeenCalled()
   })
 
   it('offers a retry when publish permission checks fail', async () => {

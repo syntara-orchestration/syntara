@@ -13,6 +13,7 @@
 import { type Page, test, expect, toAppUrl } from '../fixtures'
 import { createWorkflowViaApi, updateWorkflowViaApi, deleteWorkflowViaApi } from '../helpers/workflow-versions'
 import { buildUniqueName } from '../helpers/workflows'
+import { publishWorkflowViaApi } from '../utils/api'
 
 async function openVersionHistory(app: Page) {
   await app.getByRole('button', { name: 'Workflow actions' }).click()
@@ -77,12 +78,13 @@ test.describe('Version History Panel @pr-check', () => {
     }
   })
 
-  test('UI-9: restore version creates new draft', async ({ app }) => {
+  test('UI-9: restore creates a new draft even when history filters out the viewed version', async ({ app }) => {
     test.setTimeout(120_000)
     const name = buildUniqueName('e2e-vh-restore')
     const workflow = await createWorkflowViaApi(app, name)
 
     try {
+      await publishWorkflowViaApi(app, workflow.id, 1)
       await updateWorkflowViaApi(app, workflow.id, 'version 2')
 
       await app.goto(toAppUrl(`/workflow-builder/${workflow.id}`))
@@ -97,14 +99,75 @@ test.describe('Version History Panel @pr-check', () => {
       await clickVersionRow(app, 1)
 
       await expect(app.getByText(/Viewing/i)).toBeVisible({ timeout: 10_000 })
+      await app.getByRole('button', { name: /Filter by state/i }).click()
+      await app.getByRole('checkbox', { name: 'Previously published' }).check()
+      await app.keyboard.press('Escape')
+      await expect(app.getByRole('button', { name: 'Actions for version 1', exact: true })).toHaveCount(0)
 
       await app.getByRole('button', { name: /Restore version/i }).click()
 
       const dialog = app.getByRole('dialog')
-      await expect(dialog).toBeVisible()
-      await dialog.getByRole('button', { name: /Restore/i }).click()
+      const confirm = dialog.getByRole('button', { name: 'Restore version' })
+      await expect(confirm).toBeEnabled()
+      const restoreResponse = app.waitForResponse(
+        (response) =>
+          response.request().method() === 'POST' &&
+          response.url().endsWith(`/workflows/${workflow.id}/versions/1/restore`)
+      )
+      await confirm.click()
+      expect((await restoreResponse).ok()).toBe(true)
 
       await expect(app.getByText(/Viewing/i)).not.toBeVisible({ timeout: 10_000 })
+    } finally {
+      await deleteWorkflowViaApi(app, workflow.id)
+    }
+  })
+
+  test('keeps the dirty draft available when saving becomes unauthorized', async ({ app }) => {
+    const name = buildUniqueName('e2e-vh-save-permission')
+    const workflow = await createWorkflowViaApi(app, name)
+
+    try {
+      await updateWorkflowViaApi(app, workflow.id, 'version 2')
+      await app.goto(toAppUrl(`/workflow-builder/${workflow.id}`))
+      const workflowName = app.getByRole('textbox', { name: 'Workflow name' })
+      const unsavedName = `${name}-draft`
+      await workflowName.fill(unsavedName)
+
+      await app.route('**/api/v1/authz/can_i', async (route) => {
+        const body = route.request().postDataJSON() as { resource_type?: string; resource_labels?: { kind?: string } }
+        if (body.resource_type === 'step_type' && body.resource_labels?.kind === 'script') {
+          await route.fulfill({ json: { allowed: false } })
+        } else {
+          await route.continue()
+        }
+      })
+
+      await openVersionHistory(app)
+      const versionActions = app.getByRole('button', { name: 'Actions for version 1', exact: true })
+      await versionActions.click()
+      await expect(workflowName).toBeDisabled()
+      await expect(workflowName).toHaveValue(unsavedName)
+      await versionActions.click()
+
+      await clickVersionRow(app, 1)
+
+      const prompt = app.getByRole('dialog', { name: 'Save changes before viewing this version?' })
+      const save = prompt.getByRole('button', { name: 'Save workflow' })
+      const view = prompt.getByRole('button', { name: 'View version without saving' })
+      await expect(save).toHaveAttribute('aria-disabled', 'true')
+      await view.focus()
+      await app.keyboard.press('Shift+Tab')
+      await expect(save).toBeFocused()
+      await expect(app.getByRole('tooltip')).toContainText('Script steps')
+      await app.keyboard.press('Enter')
+      await expect(prompt).toBeVisible()
+
+      await prompt.getByRole('button', { name: 'Cancel' }).click()
+      await expect(workflowName).toHaveValue(unsavedName)
+      await clickVersionRow(app, 1)
+      await view.click()
+      await expect(app.getByRole('button', { name: 'Back to editor' })).toBeVisible()
     } finally {
       await deleteWorkflowViaApi(app, workflow.id)
     }

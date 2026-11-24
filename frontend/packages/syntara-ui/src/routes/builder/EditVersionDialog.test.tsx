@@ -70,12 +70,26 @@ describe('EditVersionDialog', () => {
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled()
   })
 
-  it('disables version metadata fields when the selected version contains a blocked type', () => {
-    render(<EditVersionDialog {...defaultProps} canEdit={false} editTooltip="Blocked step type: Script" />)
+  it('keeps the save explanation keyboard reachable when permission is revoked', async () => {
+    const user = userEvent.setup()
+    const onSave = vi.fn()
+    const { rerender } = render(<EditVersionDialog {...defaultProps} onSave={onSave} />)
+    rerender(
+      <EditVersionDialog {...defaultProps} onSave={onSave} canEdit={false} editTooltip="Blocked step type: Script" />
+    )
 
     expect(screen.getByRole('textbox', { name: 'Version name' })).toBeDisabled()
     expect(screen.getByRole('textbox', { name: 'Description' })).toBeDisabled()
-    expect(screen.getByRole('button', { name: 'Save version' })).toBeDisabled()
+    const save = screen.getByRole('button', { name: 'Save version' })
+    screen.getByRole('button', { name: 'Cancel' }).focus()
+    await user.tab({ shift: true })
+
+    expect(save).toHaveFocus()
+    expect(save).toHaveAttribute('aria-disabled', 'true')
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Blocked step type: Script')
+    await user.keyboard('{Enter} ')
+    await user.click(save)
+    expect(onSave).not.toHaveBeenCalled()
   })
 
   it('offers a retry when selected version permission checks fail', async () => {

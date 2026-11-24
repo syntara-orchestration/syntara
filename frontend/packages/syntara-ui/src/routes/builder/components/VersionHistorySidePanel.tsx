@@ -100,12 +100,7 @@ export function VersionHistorySidePanel({
         onRetryPermissionCheck={sidePanel.publishDialog.onRetryPermissionCheck}
       />
 
-      <SaveBeforeViewDialog
-        isOpen={sidePanel.saveBeforeViewDialog.isOpen}
-        onSave={sidePanel.saveBeforeViewDialog.onSave}
-        onViewWithoutSaving={sidePanel.saveBeforeViewDialog.onViewWithoutSaving}
-        onCancel={sidePanel.saveBeforeViewDialog.onCancel}
-      />
+      <SaveBeforeViewDialog {...sidePanel.saveBeforeViewDialog} />
 
       <EditVersionDialog
         isOpen={sidePanel.editDialog.isOpen}

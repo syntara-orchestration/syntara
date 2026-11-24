@@ -65,6 +65,7 @@ export function BuilderContent(props: BuilderContentProps) {
     onVersionUpdated: authoring.onVersionUpdated,
     canEdit: builderPermissions.canEdit,
     canCreate: builderPermissions.canCreate,
+    saveTooltip: builderPermissions.tooltips.save,
   })
   const dialogProps = useBuilderDialogProps({
     workflowName,

@@ -58,6 +58,28 @@ describe('SaveBeforeViewDialog', () => {
     expect(onViewWithoutSaving).toHaveBeenCalledTimes(1)
   })
 
+  it('explains why saving is blocked and leaves both navigation actions available', async () => {
+    const user = userEvent.setup()
+    const onSave = vi.fn().mockResolvedValue(true)
+    render(
+      <SaveBeforeViewDialog {...defaultProps} onSave={onSave} canSave={false} saveTooltip="Wait steps are blocked." />
+    )
+
+    const save = screen.getByRole('button', { name: 'Save workflow' })
+    const view = screen.getByRole('button', { name: 'View version without saving' })
+    view.focus()
+    await user.tab({ shift: true })
+
+    expect(save).toHaveFocus()
+    expect(save).toHaveAttribute('aria-disabled', 'true')
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Wait steps are blocked.')
+    await user.keyboard('{Enter} ')
+    await user.click(save)
+    expect(onSave).not.toHaveBeenCalled()
+    expect(view).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeEnabled()
+  })
+
   it('calls onCancel when Cancel is clicked', async () => {
     const user = userEvent.setup()
     const onCancel = vi.fn()

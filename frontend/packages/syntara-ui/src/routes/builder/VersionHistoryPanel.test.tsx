@@ -154,7 +154,7 @@ describe('VersionHistoryPanel', () => {
     await user.click(kebabButtons[0])
     await user.click(screen.getByText('Restore version'))
 
-    expect(defaultProps.onRestoreVersion).toHaveBeenCalledWith(3, '2026-05-19T21:59:00.000Z')
+    expect(defaultProps.onRestoreVersion).toHaveBeenCalledWith(defaultProps.versions[0])
   })
 
   it('calls onExportVersion via kebab menu', async () => {
@@ -517,7 +517,7 @@ describe('VersionHistoryPanel', () => {
     await user.click(kebabButtons[2])
     await user.click(screen.getByText('Restore version'))
 
-    expect(defaultProps.onRestoreVersion).toHaveBeenCalledWith(1, '2026-05-12T21:59:00.000Z')
+    expect(defaultProps.onRestoreVersion).toHaveBeenCalledWith(defaultProps.versions[2])
   })
 
   it('calls onExportVersion for non-first version via kebab', async () => {

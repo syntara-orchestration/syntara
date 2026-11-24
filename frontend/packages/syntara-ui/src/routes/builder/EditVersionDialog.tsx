@@ -109,7 +109,8 @@ export function EditVersionDialog({
             type="submit"
             form="edit-version-form"
             isLoading={isSaving}
-            isDisabled={isSaving || !canEdit}
+            isDisabled={isSaving}
+            isAriaDisabled={!canEdit}
           >
             Save version
           </Button>

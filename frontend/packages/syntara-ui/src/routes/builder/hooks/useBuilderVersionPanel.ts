@@ -16,7 +16,6 @@ import { useVersionViewNavigation } from './useVersionViewNavigation'
 type WorkflowWithVersion = WorkflowAPI.components['schemas']['WorkflowReadWithVersion']
 type WorkflowVersion = WorkflowAPI.components['schemas']['WorkflowVersionRead']
 type ResourceDialog<T> = { isOpen: boolean; item: T | null; open: (item: T) => void; close: () => void }
-type RestoreDialogItem = { version: number; dateTime: string }
 type VersionDefinitionPermissions = ReturnType<typeof useVersionDefinitionPermissions>
 
 function getRestoreTooltip(permissions: VersionDefinitionPermissions) {
@@ -58,7 +57,7 @@ function buildPublishDialogProps(options: {
 function buildRestoreDialogProps(options: {
   canConfirm: boolean
   restorePermissions: VersionDefinitionPermissions
-  restoreDialog: ResourceDialog<RestoreDialogItem>
+  restoreDialog: ReturnType<typeof useBuilderVersionHistory>['restoreDialog']
   restoreDialogTitle: string
   restoreMutationIsPending: boolean
   handleConfirmRestore: () => void
@@ -94,18 +93,22 @@ function editDialogTooltip(canEdit: boolean, canEditSelected: boolean, permissio
 
 function buildEditDialogProps(options: {
   canEdit: boolean
-  canEditSelected: boolean
   editPermissions: VersionDefinitionPermissions
   editVersionDialog: ResourceDialog<WorkflowVersion>
   isSaving: boolean
-  onSave: (name: string | null, description: string | null) => void
+  updateVersionMetadata: ReturnType<typeof useBuilderVersionHistory>['updateVersionMetadata']
 }) {
-  const { canEdit, canEditSelected, editPermissions, editVersionDialog, isSaving, onSave } = options
+  const { canEdit, editPermissions, editVersionDialog, isSaving, updateVersionMetadata } = options
+  const canEditSelected = canEdit && editPermissions.canAuthor
   return {
     isOpen: editVersionDialog.isOpen,
     isSaving,
     onClose: editVersionDialog.close,
-    onSave,
+    onSave: (name: string | null, description: string | null) => {
+      if (!canEditSelected || !editVersionDialog.item) return
+      updateVersionMetadata(editVersionDialog.item.version, name, description)
+      editVersionDialog.close()
+    },
     canEdit: canEditSelected,
     editTooltip: editDialogTooltip(canEdit, canEditSelected, editPermissions.permissionMessage),
     permissionCheckError: editPermissions.isError,
@@ -134,6 +137,7 @@ type UseBuilderVersionPanelParams = {
   onVersionUpdated?: (version: number) => void
   canEdit: boolean
   canCreate: boolean
+  saveTooltip: string
 }
 
 export function useBuilderVersionPanel(params: UseBuilderVersionPanelParams) {
@@ -156,6 +160,7 @@ export function useBuilderVersionPanel(params: UseBuilderVersionPanelParams) {
     onVersionUpdated,
     canEdit,
     canCreate,
+    saveTooltip,
   } = params
   const { isDirty } = useWorkflowStore()
   const { showSuccess, showError } = useAlerts()
@@ -213,7 +218,6 @@ export function useBuilderVersionPanel(params: UseBuilderVersionPanelParams) {
 
   const versionPublishDialog = useDialogState<number>()
   const editVersionDialog = useDialogState<WorkflowVersion>()
-  const restoreTargetVersion = filteredVersions.find((version) => version.version === restoreDialog.item?.version)
   const publishTargetVersion = filteredVersions.find((version) => version.version === versionPublishDialog.item)
   const {
     selected: selectedVersionPermissions,
@@ -228,27 +232,18 @@ export function useBuilderVersionPanel(params: UseBuilderVersionPanelParams) {
     retryViewedVersion: () => refetchViewedVersion(),
     editVersion: editVersionDialog.item ?? undefined,
     isEditDialogOpen: editVersionDialog.isOpen,
-    restoreDefinition: restoreTargetVersion?.workflow_definition,
+    restoreDefinition: restoreDialog.item?.definition,
     isRestoreDialogOpen: restoreDialog.isOpen,
     publishDefinition: publishTargetVersion?.workflow_definition,
     isPublishDialogOpen: versionPublishDialog.isOpen,
   })
 
-  const canEditSelectedVersion = canEdit && editPermissions.canAuthor
-  const canConfirmRestore = canEdit && restorePermissions.canAuthor
-  const canPublishSelectedVersion = canEdit && publishPermissions.canAuthor
   const canRestoreSelectedVersion =
     canEdit &&
     isViewingVersion &&
-    viewedVersionDate != null &&
     viewingVersion !== null &&
+    viewedVersionDate != null &&
     selectedVersionPermissions.canAuthor
-
-  const handleEditVersionSave = (publishName: string | null, changeDescription: string | null) => {
-    if (!canEditSelectedVersion || !editVersionDialog.item) return
-    updateVersionMetadata(editVersionDialog.item.version, publishName, changeDescription)
-    editVersionDialog.close()
-  }
 
   const handleViewRunHistory = (versionNumber: number) => {
     if (isViewingVersion) {
@@ -262,6 +257,7 @@ export function useBuilderVersionPanel(params: UseBuilderVersionPanelParams) {
   const versionNavigation = useVersionViewNavigation({
     isDirty,
     isViewingVersion,
+    canSave: canEdit,
     dispatch,
     handleSaveWorkflow,
     searchParams,
@@ -270,9 +266,13 @@ export function useBuilderVersionPanel(params: UseBuilderVersionPanelParams) {
 
   const openRestoreDialogForCurrentVersion = isViewingVersion
     ? () => {
-        if (canRestoreSelectedVersion && viewingVersion !== null && viewedVersionDate != null) {
-          restoreDialog.open({ version: viewingVersion, dateTime: viewedVersionDate })
-        }
+        if (!canRestoreSelectedVersion || viewingVersion === null || !viewedVersionDate || !viewedVersionDefinition)
+          return
+        restoreDialog.open({
+          version: viewingVersion,
+          dateTime: viewedVersionDate,
+          definition: viewedVersionDefinition,
+        })
       }
     : undefined
 
@@ -286,8 +286,8 @@ export function useBuilderVersionPanel(params: UseBuilderVersionPanelParams) {
     paginationFooterProps,
     onClose: () => dispatch({ type: 'SET_VERSION_HISTORY_OPEN', payload: false }),
     onSelectVersion: versionNavigation.onSelectVersion,
-    onRestoreVersion: (version: number, createdAt: string) => {
-      if (canEdit) restoreDialog.open({ version, dateTime: createdAt })
+    onRestoreVersion: ({ version, created_at, workflow_definition }: WorkflowVersion) => {
+      if (canEdit) restoreDialog.open({ version, dateTime: created_at, definition: workflow_definition })
     },
     onExportVersion: exportVersion,
     onOpenInNewWindow: openInNewWindow,
@@ -304,14 +304,14 @@ export function useBuilderVersionPanel(params: UseBuilderVersionPanelParams) {
     },
     publishDialog: buildPublishDialogProps({
       canEdit,
-      canPublish: canPublishSelectedVersion,
+      canPublish: canEdit && publishPermissions.canAuthor,
       publishPermissions,
       versionPublishDialog,
       publishVersion,
     }),
-    saveBeforeViewDialog: versionNavigation.saveBeforeViewDialog,
+    saveBeforeViewDialog: { ...versionNavigation.saveBeforeViewDialog, canSave: canEdit, saveTooltip },
     restoreDialog: buildRestoreDialogProps({
-      canConfirm: canConfirmRestore,
+      canConfirm: canEdit && restorePermissions.canAuthor,
       restorePermissions,
       restoreDialog,
       restoreDialogTitle,
@@ -320,11 +320,10 @@ export function useBuilderVersionPanel(params: UseBuilderVersionPanelParams) {
     }),
     editDialog: buildEditDialogProps({
       canEdit,
-      canEditSelected: canEditSelectedVersion,
       editPermissions,
       editVersionDialog,
       isSaving: updateMetadataMutation.isPending,
-      onSave: handleEditVersionSave,
+      updateVersionMetadata,
     }),
   }
 

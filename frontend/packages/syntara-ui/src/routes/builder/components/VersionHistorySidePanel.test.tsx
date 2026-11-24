@@ -67,6 +67,8 @@ function createSidePanelState(overrides: Partial<VersionSidePanelState> = {}): V
     },
     saveBeforeViewDialog: {
       isOpen: false,
+      canSave: true,
+      saveTooltip: '',
       onSave: vi.fn().mockResolvedValue(true),
       onViewWithoutSaving: vi.fn(),
       onCancel: vi.fn(),
@@ -160,6 +162,8 @@ describe('VersionHistorySidePanel', () => {
     const sidePanel = createSidePanelState({
       saveBeforeViewDialog: {
         isOpen: true,
+        canSave: true,
+        saveTooltip: '',
         onSave: vi.fn().mockResolvedValue(true),
         onViewWithoutSaving: vi.fn(),
         onCancel: vi.fn(),

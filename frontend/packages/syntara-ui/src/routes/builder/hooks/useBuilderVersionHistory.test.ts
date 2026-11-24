@@ -9,6 +9,7 @@ import { useBuilderVersionHistory } from './useBuilderVersionHistory'
 const mockLoadWorkflowWithEdges = vi.fn()
 const mockRestoreMutate = vi.fn()
 const mockRefetch = vi.fn().mockResolvedValue({})
+const restoreTarget = { dateTime: '2026-05-19T14:30:00.000Z', definition: { nodes: [], triggers: [] } }
 
 const mockVersions = [
   { version: 2, status: 'draft', workflow_definition: { name: 'v2' } },
@@ -297,7 +298,7 @@ describe('useBuilderVersionHistory', () => {
       })
 
       act(() => {
-        result.current.restoreDialog.open({ version: 1, dateTime: '2026-05-19T14:30:00.000Z' })
+        result.current.restoreDialog.open({ ...restoreTarget, version: 1 })
       })
 
       act(() => {
@@ -314,7 +315,7 @@ describe('useBuilderVersionHistory', () => {
       })
 
       act(() => {
-        result.current.restoreDialog.open({ version: 2, dateTime: '2026-05-19T14:30:00.000Z' })
+        result.current.restoreDialog.open({ ...restoreTarget, version: 2 })
       })
 
       act(() => {
@@ -341,7 +342,7 @@ describe('useBuilderVersionHistory', () => {
       })
 
       act(() => {
-        result.current.restoreDialog.open({ version: 2, dateTime: '2026-05-19T14:30:00.000Z' })
+        result.current.restoreDialog.open({ ...restoreTarget, version: 2 })
       })
 
       act(() => {
@@ -367,7 +368,7 @@ describe('useBuilderVersionHistory', () => {
       })
 
       act(() => {
-        result.current.restoreDialog.open({ version: 2, dateTime: '2026-05-19T14:30:00.000Z' })
+        result.current.restoreDialog.open({ ...restoreTarget, version: 2 })
       })
 
       const callCountBefore = mockLoadWorkflowWithEdges.mock.calls.length
@@ -390,7 +391,7 @@ describe('useBuilderVersionHistory', () => {
       })
 
       act(() => {
-        result.current.restoreDialog.open({ version: 2, dateTime: '2026-05-19T14:30:00.000Z' })
+        result.current.restoreDialog.open({ ...restoreTarget, version: 2 })
       })
 
       act(() => {
@@ -418,7 +419,7 @@ describe('useBuilderVersionHistory', () => {
         wrapper: makeWrapper(queryClient),
       })
 
-      act(() => result.current.restoreDialog.open({ version: 1, dateTime: '2026-05-19T14:30:00.000Z' }))
+      act(() => result.current.restoreDialog.open({ ...restoreTarget, version: 1 }))
       act(() => result.current.handleConfirmRestore())
 
       expect(params.showError).toHaveBeenCalledWith({
@@ -528,7 +529,7 @@ describe('useBuilderVersionHistory', () => {
       })
 
       act(() => {
-        result.current.restoreDialog.open({ version: 1, dateTime: '2026-05-19T14:30:00.000Z' })
+        result.current.restoreDialog.open({ ...restoreTarget, version: 1 })
       })
 
       expect(result.current.restoreDialogTitle).toContain('Restore version from')

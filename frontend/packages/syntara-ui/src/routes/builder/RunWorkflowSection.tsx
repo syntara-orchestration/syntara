@@ -13,30 +13,35 @@ import { useCallback, useState, type Dispatch, type Ref } from 'react'
 import { DisabledWithTooltip } from '../../components/DisabledWithTooltip'
 
 import type { BuilderAction } from './builderReducer'
+import styles from './RunWorkflowSection.module.css'
 import type { BuilderPermissions } from './useBuilderPermissions'
 
 type RunMenuToggleProps = Readonly<{
   toggleRef: Ref<MenuToggleElement>
   isExpanded: boolean
   isDisabled: boolean
+  tooltipContent: string
   onClick: (() => void) | undefined
 }>
 
-function RunMenuToggle({ toggleRef, isExpanded, isDisabled, onClick }: RunMenuToggleProps) {
+function RunMenuToggle({ toggleRef, isExpanded, isDisabled, tooltipContent, onClick }: RunMenuToggleProps) {
   return (
-    <MenuToggle
-      ref={toggleRef}
-      variant="plain"
-      onClick={onClick}
-      isExpanded={isExpanded}
-      isDisabled={isDisabled}
-      aria-label="Run workflow"
-    >
-      <Icon isInline>
-        <RhUiPlayIcon />
-      </Icon>{' '}
-      Run
-    </MenuToggle>
+    <DisabledWithTooltip isDisabled={isDisabled} content={tooltipContent} position="bottom">
+      <MenuToggle
+        ref={toggleRef}
+        variant="plain"
+        className={styles.toggle}
+        onClick={onClick}
+        isExpanded={isExpanded}
+        aria-disabled={isDisabled}
+        aria-label="Run workflow"
+      >
+        <Icon isInline>
+          <RhUiPlayIcon />
+        </Icon>{' '}
+        Run
+      </MenuToggle>
+    </DisabledWithTooltip>
   )
 }
 
@@ -54,7 +59,7 @@ const SAVE_FIRST_TOOLTIP = 'Save workflow before running'
 const NODE_EDITOR_TOOLTIP = 'Finish editing the current step before running'
 
 export function RunWorkflowSection({
-  triggers,
+  triggers = [],
   isSaved,
   validationErrorCount,
   dispatch,
@@ -62,9 +67,9 @@ export function RunWorkflowSection({
   isStepEditorOpen,
 }: RunWorkflowSectionProps) {
   const [isRunDropdownOpen, setIsRunDropdownOpen] = useState(false)
-  const firstTrigger = triggers?.[0]
+  const firstTrigger = triggers[0]
   const hasTriggers = firstTrigger !== undefined
-  const hasMultipleTriggers = (triggers?.length ?? 0) > 1
+  const hasMultipleTriggers = triggers.length > 1
   const readOnly = !builderPermissions.canEdit
   const hasValidationErrors = !readOnly && validationErrorCount > 0
   const openRunDialog = (triggerId: string) => {
@@ -88,43 +93,43 @@ export function RunWorkflowSection({
     runTooltipContent = `Resolve validation issue${suffix} before running — ${validationErrorCount} found`
   }
 
+  const isRunMenuOpen = !isRunDisabled && isRunDropdownOpen
   const renderRunToggle = useCallback(
     (toggleRef: Ref<MenuToggleElement>) => (
       <RunMenuToggle
         toggleRef={toggleRef}
-        isExpanded={isRunDropdownOpen}
+        isExpanded={isRunMenuOpen}
         isDisabled={isRunDisabled}
+        tooltipContent={runTooltipContent}
         onClick={!isRunDisabled ? () => setIsRunDropdownOpen((prev) => !prev) : undefined}
       />
     ),
-    [isRunDropdownOpen, isRunDisabled]
+    [isRunMenuOpen, isRunDisabled, runTooltipContent]
   )
 
   if (hasMultipleTriggers) {
     return (
-      <DisabledWithTooltip isDisabled={isRunDisabled} content={runTooltipContent} position="bottom">
-        <Dropdown
-          isOpen={isRunDropdownOpen}
-          onOpenChange={setIsRunDropdownOpen}
-          toggle={renderRunToggle}
-          popperProps={{ position: 'left' }}
-        >
-          <DropdownList>
-            {triggers?.map((trigger, index) => (
-              <DropdownItem
-                key={trigger.id}
-                onClick={() => {
-                  if (isRunDisabled) return
-                  openRunDialog(trigger.id)
-                  setIsRunDropdownOpen(false)
-                }}
-              >
-                {trigger.name ?? `Trigger ${index + 1}`}
-              </DropdownItem>
-            ))}
-          </DropdownList>
-        </Dropdown>
-      </DisabledWithTooltip>
+      <Dropdown
+        isOpen={isRunMenuOpen}
+        onOpenChange={setIsRunDropdownOpen}
+        toggle={renderRunToggle}
+        popperProps={{ position: 'left' }}
+      >
+        <DropdownList>
+          {triggers.map((trigger, index) => (
+            <DropdownItem
+              key={trigger.id}
+              onClick={() => {
+                if (isRunDisabled) return
+                openRunDialog(trigger.id)
+                setIsRunDropdownOpen(false)
+              }}
+            >
+              {trigger.name ?? `Trigger ${index + 1}`}
+            </DropdownItem>
+          ))}
+        </DropdownList>
+      </Dropdown>
     )
   }
 

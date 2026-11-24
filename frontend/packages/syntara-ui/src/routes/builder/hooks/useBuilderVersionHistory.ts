@@ -19,7 +19,7 @@ import { useVersionHistory } from './useVersionHistory'
 type WorkflowWithVersion = WorkflowAPI.components['schemas']['WorkflowReadWithVersion']
 type V2Edge = { from: string; to: string; from_port?: string; to_port?: string }
 
-type RestoreDialogItem = { version: number; dateTime: string }
+type RestoreDialogItem = { version: number; dateTime: string; definition: Record<string, unknown> }
 
 type UseBuilderVersionHistoryParams = {
   workflowId: string | null

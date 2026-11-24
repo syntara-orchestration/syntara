@@ -135,7 +135,8 @@ export function PublishWorkflowDialog({
             type="submit"
             form="publish-workflow-form"
             isLoading={isPublishing}
-            isDisabled={isPublishing || !canPublish}
+            isDisabled={isPublishing}
+            isAriaDisabled={!canPublish}
           >
             Publish workflow
           </Button>

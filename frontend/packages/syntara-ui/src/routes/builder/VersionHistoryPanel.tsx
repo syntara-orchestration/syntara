@@ -42,7 +42,7 @@ type VersionHistoryPanelProps = Readonly<{
   versions: WorkflowVersion[]
   onClose: () => void
   onSelectVersion: (version: number) => void
-  onRestoreVersion: (version: number, createdAt: string) => void
+  onRestoreVersion: (version: WorkflowVersion) => void
   onExportVersion: (version: number) => void
   onOpenInNewWindow: (version: number) => void
   onPublishVersion: (version: number) => void
@@ -140,7 +140,7 @@ export function VersionHistoryPanel(props: VersionHistoryPanelProps) {
                   key={version.id}
                   version={version}
                   onSelect={() => onSelectVersion(version.version)}
-                  onRestore={() => onRestoreVersion(version.version, version.created_at)}
+                  onRestore={() => onRestoreVersion(version)}
                   onExport={() => onExportVersion(version.version)}
                   onOpenInNewWindow={() => onOpenInNewWindow(version.version)}
                   onPublish={() => onPublishVersion(version.version)}

@@ -35,7 +35,6 @@ export function useBuilderVersionPermissions(options: {
   })
   const restore = useVersionDefinitionPermissions(options.restoreDefinition, options.projectId, {
     enabled: options.isRestoreDialogOpen,
-    isContextLoading: options.isRestoreDialogOpen && !options.restoreDefinition,
   })
   const publish = useVersionDefinitionPermissions(options.publishDefinition, options.projectId, {
     enabled: options.isPublishDialogOpen,

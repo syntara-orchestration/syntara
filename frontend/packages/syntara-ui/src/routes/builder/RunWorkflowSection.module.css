@@ -1,0 +1,4 @@
+.toggle[aria-disabled='true'] {
+  color: var(--pf-t--global--text--color--disabled);
+  background-color: transparent;
+}
