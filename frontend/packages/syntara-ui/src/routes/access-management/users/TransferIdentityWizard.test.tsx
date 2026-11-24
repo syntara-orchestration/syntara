@@ -37,23 +37,11 @@ vi.mock('../../access/accessClient', () => ({
 
 vi.mock('@tanstack/react-router', async () => {
   const actual = await vi.importActual('@tanstack/react-router')
-  const React = await import('react')
   // Import global setup's router mock
-  const { routerTestState } = await import('../../../test/setup')
+  const { MockLink, routerTestState } = await import('../../../test/setup')
   return {
     ...actual,
-    Link: ({
-      to,
-      children,
-      className,
-      style,
-      ...rest
-    }: {
-      to: string
-      children: React.ReactNode
-      className?: string
-      style?: React.CSSProperties
-    }) => React.createElement('a', { href: String(to), className, style, ...rest }, children),
+    Link: MockLink,
     useParams: vi.fn(() => ({ userId: 'target-user' })),
     useNavigate: () => routerTestState.navigate,
     useRouterState: (opts?: { select?: (s: { location: { pathname: string; searchStr: string } }) => unknown }) => {
@@ -68,14 +56,6 @@ vi.mock('@tanstack/react-router', async () => {
     useMatch: vi.fn(() => ({ params: {} })),
   }
 })
-
-vi.mock('../../../hooks/routing/Link', () => ({
-  Link: ({ href, children, ...rest }: { href: string; children: React.ReactNode; [key: string]: unknown }) => (
-    <a href={href} {...rest}>
-      {children}
-    </a>
-  ),
-}))
 
 vi.mock('../../../utils/generateUUID', () => ({
   isValidUUID: () => true,

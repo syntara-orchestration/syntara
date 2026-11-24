@@ -27,7 +27,7 @@ import { useMutationErrorHandler } from '../../../hooks/useMutationErrorHandler'
 import { detachPromise } from '../../../utils/detachPromise'
 import { useDocLink } from '../../../utils/docs/useDocLink'
 import { accessClient } from '../../access/accessClient'
-import { getProjectDetailPath } from '../accessManagementPaths'
+import { getProjectDetailDestination } from '../accessManagementPaths'
 import { DetailPageShell } from '../DetailPageShell'
 import { RoleAssignmentsPanel } from '../RoleAssignmentsPanel'
 import { RolePrincipalType } from '../RoleAssignmentTypes'
@@ -44,7 +44,7 @@ function DetailsTab({ serviceAccount }: Readonly<{ serviceAccount: ServiceAccoun
       <SynDetail label="Name">{serviceAccount.name}</SynDetail>
       <SynDetail label="Owning project">
         {serviceAccount.project_name ? (
-          <SynLink to={getProjectDetailPath(serviceAccount.project_id)}>{serviceAccount.project_name}</SynLink>
+          <SynLink to={getProjectDetailDestination(serviceAccount.project_id)}>{serviceAccount.project_name}</SynLink>
         ) : (
           serviceAccount.project_id
         )}

@@ -2,12 +2,22 @@ import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { axe } from 'vitest-axe'
 
+import { getUserDetailDestination } from '../routes/access-management/accessManagementPaths'
+
 import { SynLink } from './SynLink'
 
 describe('SynLink', () => {
   it('renders as an anchor tag with the correct href', () => {
     render(<SynLink to="/some/path">Go somewhere</SynLink>)
     expect(screen.getByRole('link', { name: 'Go somewhere' })).toHaveAttribute('href', '/some/path')
+  })
+
+  it('resolves params from a typed route destination', () => {
+    render(<SynLink to={getUserDetailDestination('u-123')}>User detail</SynLink>)
+    expect(screen.getByRole('link', { name: 'User detail' })).toHaveAttribute(
+      'href',
+      '/system-administration/access-management/users/u-123'
+    )
   })
 
   it('applies PatternFly link button classes', () => {

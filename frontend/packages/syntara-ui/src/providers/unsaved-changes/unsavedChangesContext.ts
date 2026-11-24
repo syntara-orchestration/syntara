@@ -1,5 +1,7 @@
 import { createContext } from 'react'
 
+import type { NavigationTarget } from '../../app/typed-route-destinations'
+
 export type DirtyCheckOptions = {
   check: () => boolean
   exitWithoutSaving?: () => void
@@ -11,10 +13,10 @@ export type DirtyCheckOptions = {
 
 export type UnsavedChangesContextType = {
   /**
-   * Request navigation to a path. If there are unsaved changes,
+   * Request navigation to a path or typed destination. If there are unsaved changes,
    * shows a confirmation modal. Otherwise, navigates immediately.
    */
-  requestNavigation: (targetPath: string) => void
+  requestNavigation: (target: NavigationTarget) => void
   /**
    * Register the save handler from BuilderContent
    */

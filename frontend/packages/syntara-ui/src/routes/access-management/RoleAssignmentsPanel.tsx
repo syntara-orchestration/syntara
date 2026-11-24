@@ -27,7 +27,7 @@ import { detachPromise } from '../../utils/detachPromise'
 import { roleAssignmentsQueryKey } from '../access/useAlreadyAssignedRoles'
 import { useAssignmentPermissions } from '../access/useAssignmentPermissions'
 
-import { getProjectDetailPath } from './accessManagementPaths'
+import { getProjectDetailDestination } from './accessManagementPaths'
 import { AssignRoleModal } from './AssignRoleModal'
 import type { RoleAssignmentColumnKey, ColumnDefinition } from './roleAssignmentColumns'
 import {
@@ -168,7 +168,7 @@ function RoleAssignmentsTableBody({
               {isVisible('project') && (
                 <Td dataLabel="Project">
                   {row.scopeType === 'project' && row.projectId ? (
-                    <LinkCell href={getProjectDetailPath(row.projectId)}>
+                    <LinkCell href={getProjectDetailDestination(row.projectId)}>
                       <Truncate content={row.scope} />
                     </LinkCell>
                   ) : (
