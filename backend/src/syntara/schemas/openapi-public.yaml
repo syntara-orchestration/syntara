@@ -6736,6 +6736,7 @@ paths:
                   - user
                   - group
                   - service_account
+                  - service
               - type: 'null'
             title: Principal Type
         - name: role_name
@@ -28927,6 +28928,7 @@ components:
                 - user
                 - group
                 - service_account
+                - service
             - type: 'null'
           title: Principal Type
         role_name:

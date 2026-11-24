@@ -111,6 +111,13 @@ test.describe('Access Management — Create button labels', () => {
       await app.getByRole('tab', { name: tab }).click()
       await expect(app).toHaveURL(new RegExp(`${ACCESS_URL}/${urlPath}`))
 
+      if (label === 'Add assignment') {
+        const assignmentsReady = app
+          .getByRole('grid', { name: 'Role assignments' })
+          .or(app.getByRole('heading', { name: 'No assignments yet' }))
+        await expect(assignmentsReady).toBeVisible({ timeout: 20_000 })
+      }
+
       const actionButton = app.getByRole('button', { name: label })
 
       if (requiresSeedData) {

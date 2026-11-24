@@ -55,7 +55,7 @@ class RoleAssignmentRead(SQLModel):
     principal_id: UUID | None = None
     group_id: UUID | None = None
     principal_name: str
-    principal_type: Literal["user", "group", "service_account"] | None = None
+    principal_type: Literal["user", "group", "service_account", "service"] | None = None
     role_name: str
     role_description: str | None = None
     role_policies: list[str] = []
@@ -85,7 +85,7 @@ class RoleAssignmentListParams(BaseListParams):
     principal_id: UUID | None = Field(default=None, description="Filter by principal ID (user or service account)")
     group_id: UUID | None = Field(default=None, description="Filter by group ID")
     principal_name: str | None = Field(default=None, description="Filter by principal name")
-    principal_type: Literal["user", "group", "service_account"] | None = Field(
+    principal_type: Literal["user", "group", "service_account", "service"] | None = Field(
         default=None, description="Filter by principal type"
     )
     role_name: str | None = Field(default=None, description="Filter by role name")

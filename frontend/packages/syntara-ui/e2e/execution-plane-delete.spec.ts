@@ -130,7 +130,7 @@ test.describe('Execution Plane — delete execution target', { tag: '@pr-check' 
 
       const row = app.getByRole('row', { name: new RegExp(name) })
       await expect(row).toBeVisible({ timeout: 15_000 })
-      await expect(row.getByText('Default')).toBeVisible()
+      await expect(row.getByText('Default', { exact: true })).toBeVisible()
       await openRowKebab(row, /Delete execution target/i)
       await app.getByRole('menuitem', { name: /Delete execution target/i }).click()
 
