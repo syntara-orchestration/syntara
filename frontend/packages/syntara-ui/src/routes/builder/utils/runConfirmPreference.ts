@@ -7,3 +7,11 @@ export function getRunConfirmDismissed(): boolean {
     return false
   }
 }
+
+export function setRunConfirmDismissed(): void {
+  try {
+    localStorage.setItem(RUN_CONFIRM_DISMISSED_KEY, 'true')
+  } catch {
+    // ignore – storage unavailable
+  }
+}

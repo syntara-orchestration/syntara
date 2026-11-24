@@ -384,7 +384,7 @@ export default tseslint.config(
       'reactYouMightNotNeedAnEffect/no-adjust-state-on-prop-change': 'warn',
       'reactYouMightNotNeedAnEffect/no-reset-all-state-on-prop-change': 'error',
       'reactYouMightNotNeedAnEffect/no-pass-live-state-to-parent': 'warn',
-      'reactYouMightNotNeedAnEffect/no-pass-data-to-parent': 'warn',
+      'reactYouMightNotNeedAnEffect/no-pass-data-to-parent': 'error',
       'reactYouMightNotNeedAnEffect/no-initialize-state': 'warn',
     },
   },

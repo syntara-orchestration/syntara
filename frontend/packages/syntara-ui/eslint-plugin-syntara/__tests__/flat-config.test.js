@@ -33,6 +33,19 @@ const eslintProbe = new ESLint({
     },
   ],
 })
+const reactEffectRuleProbeEslint = new ESLint({
+  cwd: process.cwd(),
+  overrideConfig: [
+    {
+      files: ['**/*.{ts,tsx}'],
+      languageOptions: { parserOptions: { project: false } },
+      rules: {
+        ...projectBackedRuleOverrides,
+        'reactYouMightNotNeedAnEffect/no-pass-data-to-parent': 'error',
+      },
+    },
+  ],
+})
 const mockApiEslint = new ESLint({
   cwd: resolve(process.cwd(), '../syntara-mock-api'),
   overrideConfig: [
@@ -307,7 +320,7 @@ const reactEffectRuleProbes = [
     'query data passed to parent',
     "import { useEffect } from 'react'; import { useQuery } from '@tanstack/react-query'; export function Probe({ onDataFetched }: { onDataFetched: (data: number) => void }) { const { data } = useQuery({ queryKey: ['probe'], queryFn: async () => 1 }); useEffect(() => { onDataFetched(data) }, [data, onDataFetched]); return null }",
     'reactYouMightNotNeedAnEffect/no-pass-data-to-parent',
-    1,
+    2,
   ],
   [
     'state initialized in effect',
@@ -474,6 +487,19 @@ describe('flat ESLint config rule inheritance', () => {
     },
     30_000
   )
+
+  it('reports data passed to a parent from an effect as an error', async () => {
+    const [result] = await reactEffectRuleProbeEslint.lintText(
+      "import { useEffect } from 'react'; import { useQuery } from '@tanstack/react-query'; export function Probe({ onDataFetched }: { onDataFetched: (data: number) => void }) { const { data } = useQuery({ queryKey: ['probe'], queryFn: async () => 1 }); useEffect(() => { onDataFetched(data) }, [data, onDataFetched]); return null }",
+      { filePath: 'src/routes/access-management/AssignRoleModal.tsx' }
+    )
+
+    expect(
+      result.messages.some(
+        (message) => message.ruleId === 'reactYouMightNotNeedAnEffect/no-pass-data-to-parent' && message.severity === 2
+      )
+    ).toBe(true)
+  })
 
   it.each(testProfileRuleProbes)(
     'enforces the test-only rule: %s',

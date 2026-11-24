@@ -1,10 +1,18 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { use } from 'react'
+import { createPortal } from 'react-dom'
 import { describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 
 import type { AdjacentSteps } from './panels/hooks/useAdjacentSteps'
+import { StepFormHeaderPortalContext } from './step-forms/shared/StepFormHeaderPortalContext'
 import { StepEditorLayout } from './StepEditorLayout'
+
+function HeaderPortalContent() {
+  const target = use(StepFormHeaderPortalContext)
+  return target ? createPortal(<span>Portaled Header Content</span>, target) : null
+}
 
 vi.mock('./panels/InputPanel', () => ({
   InputPanel: ({
@@ -401,6 +409,12 @@ describe('StepEditorLayout', () => {
     )
 
     expect(screen.getByText('Custom Header')).toBeInTheDocument()
+  })
+
+  it('provides a portal target for form-owned header content', () => {
+    render(<StepEditorLayout parametersContent={<HeaderPortalContent />} showInputPanel={false} />)
+
+    expect(screen.getByText('Portaled Header Content')).toBeInTheDocument()
   })
 
   it('renders header actions when provided', () => {

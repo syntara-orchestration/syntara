@@ -9,11 +9,9 @@ import {
   TextArea,
 } from '@patternfly/react-core'
 import { RhUiErrorIcon } from '@patternfly/react-icons'
-import type { IntegrationsAPI, ToolManagerAPI } from '@syntara/contracts'
 import type { ReactNode } from 'react'
 import { use, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { Control, UseFormSetValue } from 'react-hook-form'
-import { Controller, useFormContext, useFormState, useWatch } from 'react-hook-form'
+import { Controller, useFormContext, useFormState } from 'react-hook-form'
 
 import { AppRoute } from '../../../app/AppRoute'
 import { SynForm } from '../../../components/forms/SynForm'
@@ -31,6 +29,14 @@ import { AIAgentFileContext } from './aiAgentFileContext'
 import { AIAgentFileUploadSection } from './AIAgentFileUploadSection'
 import { aiAgentFormSchema, type AIAgentFormData } from './aiAgentFormSchema'
 import { LLMSection, NO_PROJECT_MESSAGE, ToolsLoadError } from './AIAgentFormSections'
+import {
+  cleanStaleToolSelections,
+  formatStaleToolsWarning,
+  getToolSelection,
+  getVisibleToolSelection,
+  groupToolsByIntegration,
+  useToolSelection,
+} from './aiAgentToolSelection'
 import { ConnectionsSection } from './ConnectionsSection'
 import { ActivityNameField } from './shared/ActivityNameField'
 import { stepHelp } from './shared/stepFieldHelp'
@@ -44,9 +50,6 @@ import { useAllEnabledMcpIntegrations } from './useAllEnabledMcpIntegrations'
 import { useAllTools } from './useAllTools'
 import { useFilesMetadata } from './useFilesMetadata'
 import type { MarkPersistedFn } from './useFileUploadState'
-
-type IntegrationRead = IntegrationsAPI.components['schemas']['IntegrationRead']
-type ToolWithParameters = ToolManagerAPI.components['schemas']['ToolWithParameters']
 
 export type { AIAgentFormData }
 
@@ -85,72 +88,9 @@ function FieldError({ message }: Readonly<{ message: string | undefined }>) {
   )
 }
 
-function groupToolsByIntegration(tools: ToolWithParameters[], integrations: IntegrationRead[]): IntegrationWithTools[] {
-  const integrationMap = new Map(
-    integrations.filter((i): i is IntegrationRead & { id: string } => Boolean(i.id)).map((i) => [i.id, i.name])
-  )
-
-  const grouped = new Map<string, { name: string; tools: { id: string; name: string; description: string | null }[] }>()
-  for (const tool of tools) {
-    const integrationId = tool.integration_id
-    if (!integrationId) continue
-    if (!integrationMap.has(integrationId)) continue
-    if (tool.enabled === false) continue
-    if (!tool.id) continue
-    if (!grouped.has(integrationId)) {
-      grouped.set(integrationId, {
-        name: integrationMap.get(integrationId) ?? integrationId,
-        tools: [],
-      })
-    }
-    grouped.get(integrationId)?.tools.push({
-      id: tool.id,
-      name: tool.namespaced_name,
-      description: null,
-    })
-  }
-
-  return Array.from(grouped.entries()).map(([id, { name, tools: discovered_tools }]) => ({
-    id,
-    name,
-    discovered_tools,
-  }))
-}
-
-function useToolSelection(control: Control<AIAgentFormData>, setValue: UseFormSetValue<AIAgentFormData>) {
-  const toolSelectionStrategy = useWatch({ control, name: 'tool_selection_strategy' }) ?? 'NONE'
-  const rawToolSelections = useWatch({ control, name: 'tool_selections' })
-
-  const toolSelection = useMemo<ToolSelection>(() => {
-    const toolSelections = rawToolSelections ?? []
-    if (toolSelectionStrategy === 'ALL') return { strategy: 'ALL' }
-    if (toolSelectionStrategy === 'SELECTED' && toolSelections.length > 0)
-      return { strategy: 'SELECTED', toolIds: toolSelections }
-    return { strategy: 'NONE' }
-  }, [toolSelectionStrategy, rawToolSelections])
-
-  const handleToolSelectionChange = useCallback(
-    (selection: ToolSelection) => {
-      if (selection.strategy === 'ALL') {
-        setValue('tool_selection_strategy', 'ALL')
-        setValue('tool_selections', [])
-      } else if (selection.strategy === 'SELECTED') {
-        setValue('tool_selection_strategy', 'SELECTED')
-        setValue('tool_selections', selection.toolIds)
-      } else {
-        setValue('tool_selection_strategy', 'NONE')
-        setValue('tool_selections', [])
-        setValue('integration_connections', [])
-      }
-    },
-    [setValue]
-  )
-
-  return { toolSelection, handleToolSelectionChange }
-}
-
 type AIAgentFormFieldsProps = Readonly<{
   onHeaderContentChange?: (content: ReactNode | null) => void
+  initialToolSelection: ToolSelection
   projectId?: string
   integrations: IntegrationWithTools[]
   isLoadingIntegrations: boolean
@@ -162,6 +102,7 @@ type AIAgentFormFieldsProps = Readonly<{
 
 function AIAgentFormFields({
   onHeaderContentChange,
+  initialToolSelection,
   projectId,
   integrations,
   isLoadingIntegrations,
@@ -179,7 +120,16 @@ function AIAgentFormFields({
   if (!fileContext) throw new Error('AIAgentFormFields must be used within AIAgentFileContext.Provider')
   const { isFilesError } = fileContext
 
-  const [staleToolsWarning, setStaleToolsWarning] = useState('')
+  const { selection: visibleToolSelection, staleToolInfo } = useMemo(
+    () => getVisibleToolSelection(toolSelection, integrations, isLoadingIntegrations, isToolsError),
+    [toolSelection, integrations, isLoadingIntegrations, isToolsError]
+  )
+  const { staleToolInfo: initialStaleToolInfo } = useMemo(
+    () => getVisibleToolSelection(initialToolSelection, integrations, isLoadingIntegrations, isToolsError),
+    [initialToolSelection, integrations, isLoadingIntegrations, isToolsError]
+  )
+
+  const staleToolsWarning = formatStaleToolsWarning((staleToolInfo ?? initialStaleToolInfo)?.removedCount)
 
   const nameField = useMemo(
     () => <ActivityNameField control={control} fieldId="agent-name" placeholder="Enter agent name" ariaLabel="Name" />,
@@ -219,23 +169,11 @@ function AIAgentFormFields({
       <StackItem>
         <FormGroup label="Tools" labelHelp={stepHelp.aiTools} fieldId="agent-tools">
           <ToolsMultiSelect
-            value={toolSelection}
+            value={visibleToolSelection}
             onChange={handleToolSelectionChange}
             integrations={integrations}
             isLoading={isLoadingIntegrations}
-            isError={isToolsError}
             hasNoIntegrations={hasNoIntegrations}
-            onStaleDetected={({ validToolIds, removedCount }) => {
-              if (validToolIds.length === 0) {
-                handleToolSelectionChange({ strategy: 'NONE' })
-              } else {
-                handleToolSelectionChange({ strategy: 'SELECTED', toolIds: validToolIds })
-              }
-              const plural = removedCount > 1
-              setStaleToolsWarning(
-                `${String(removedCount)} previously selected tool${plural ? 's are' : ' is'} no longer available and ${plural ? 'have' : 'has'} been removed.`
-              )
-            }}
           />
           {staleToolsWarning && <Alert variant="warning" isInline isPlain title={staleToolsWarning} />}
           {hasNoIntegrations && (
@@ -433,6 +371,8 @@ export function AIAgentStepForm(props: Readonly<AIAgentStepFormProps>) {
   const { onSubmit: onSubmitProp } = props
   const handleSubmit = useCallback(
     async (data: AIAgentFormData) => {
+      const cleanedData = cleanStaleToolSelections(data, integrations, isLoadingIntegrations, isAnyToolsError)
+
       const trimmed = data.responseSchema?.trim()
       const parsedResponseSchema = trimmed ? (JSON.parse(trimmed) as Record<string, unknown>) : undefined
 
@@ -442,7 +382,7 @@ export function AIAgentStepForm(props: Readonly<AIAgentStepFormProps>) {
         .map((f) => f.id)
 
       try {
-        const result = onSubmitProp({ ...data, fileIds, parsedResponseSchema })
+        const result = onSubmitProp({ ...cleanedData, fileIds, parsedResponseSchema })
         const outcome = result instanceof Promise ? await result : result
         if (outcome === false) {
           return false
@@ -453,7 +393,7 @@ export function AIAgentStepForm(props: Readonly<AIAgentStepFormProps>) {
         return false
       }
     },
-    [completedFiles, onSubmitProp, markPersisted]
+    [completedFiles, integrations, isAnyToolsError, isLoadingIntegrations, onSubmitProp, markPersisted]
   )
 
   const form = useSynForm({
@@ -496,6 +436,10 @@ export function AIAgentStepForm(props: Readonly<AIAgentStepFormProps>) {
         <StepFormContainer formId="ai-agent-step-form" onSubmit={onFormSubmit}>
           <AIAgentFormFields
             onHeaderContentChange={props.onHeaderContentChange}
+            initialToolSelection={getToolSelection(
+              defaultValues.tool_selection_strategy,
+              defaultValues.tool_selections
+            )}
             projectId={props.projectId}
             integrations={integrations}
             isLoadingIntegrations={isLoadingIntegrations}
