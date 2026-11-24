@@ -98,6 +98,24 @@ describe('useCanI', () => {
     expect(result.current.allowed).toBe(false)
   })
 
+  it('exposes refetch so a failed permission check can be retried', async () => {
+    vi.mocked(accessFetchClient.POST)
+      .mockRejectedValueOnce(new Error('network error'))
+      .mockResolvedValueOnce({ data: { allowed: true } })
+
+    const { result } = renderHook(() => useCanI('run', 'execution', { resourceProject: 'project-1' }), {
+      wrapper: createWrapper(),
+    })
+
+    await waitFor(() => expect(result.current.isError).toBe(true))
+    const refetch = result.current.refetch
+    expect(refetch).toBeDefined()
+    await refetch?.()
+
+    await waitFor(() => expect(result.current.allowed).toBe(true))
+    expect(accessFetchClient.POST).toHaveBeenCalledTimes(2)
+  })
+
   it('passes resourceId when provided', async () => {
     vi.mocked(accessFetchClient.POST).mockResolvedValue({
       data: { allowed: true },
