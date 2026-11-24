@@ -118,9 +118,11 @@ describe('useExecutionCopyToEditor', () => {
   })
 
   it('cleans the URL query params after reducer syncs', async () => {
-    vi.mocked(window.history.replaceState).mockRestore()
-    window.history.replaceState({}, '', '/workflow-builder/wf-1?fromExecution=exec-123')
-    const replaceStateSpy = vi.spyOn(window.history, 'replaceState').mockImplementation(() => {})
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: new URL('https://localhost/workflow-builder/wf-1?fromExecution=exec-123'),
+    })
+    const replaceStateSpy = vi.spyOn(window.history, 'replaceState')
     const opts = buildOptions({
       executionCopy: buildExecutionCopy({ executionId: 'exec-123' }),
       mostRecentExecutionId: 'exec-123',
