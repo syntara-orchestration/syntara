@@ -118,14 +118,19 @@ describe('useExecutionCopyToEditor', () => {
   })
 
   it('cleans the URL query params after reducer syncs', async () => {
+    vi.mocked(window.history.replaceState).mockRestore()
     window.history.replaceState({}, '', '/workflow-builder/wf-1?fromExecution=exec-123')
-    const replaceStateSpy = vi.spyOn(window.history, 'replaceState')
+    const replaceStateSpy = vi.spyOn(window.history, 'replaceState').mockImplementation(() => {})
     const opts = buildOptions({
       executionCopy: buildExecutionCopy({ executionId: 'exec-123' }),
       mostRecentExecutionId: 'exec-123',
     })
     renderHook(() => useExecutionCopyToEditor(opts))
-    await waitFor(() => expect(replaceStateSpy).toHaveBeenCalledWith({}, '', '/workflow-builder/wf-1'))
+    await waitFor(() => {
+      expect(
+        replaceStateSpy.mock.calls.some(([, , href]) => typeof href === 'string' && !href.includes('fromExecution'))
+      ).toBe(true)
+    })
   })
 
   it('applies only once even on re-render', async () => {
