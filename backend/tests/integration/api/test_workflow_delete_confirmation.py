@@ -173,6 +173,7 @@ async def test_delete_blocked_by_active_executions_is_generic_409(
             project_id=project_id,
             temporal_workflow_id=f"tmp-{uuid4().hex}",
             status=ExecutionStatus.RUNNING,
+            created_by=test_user.id,
         )
     )
     await test_db_session.commit()
