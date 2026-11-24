@@ -1,5 +1,6 @@
 import { ActivityTypeEnum, type Activity } from '@syntara/contracts'
 
+import { canonicalToolSelectionStrategy } from '../../../stores/workflowFactories'
 import { parseExpression } from '../../../utils/expressions/parser'
 import { serializeExpression } from '../../../utils/expressions/serializer'
 import { parseTriggerIndex } from '../../../utils/triggerNodeIds'
@@ -191,8 +192,26 @@ function transformConditionForBackend(condition: string | undefined): string | u
 }
 
 /**
+ * Canonicalize an agentic node's tool selection for the backend.
+ *
+ * `SELECTED` with a missing or empty `tool_selections` list means "no tools" and
+ * is rewritten to the canonical `NONE` form, deleting the `tool_selections` key.
+ * Definitions the builder sends to `/workflows/validate`, save, and publish are
+ * all built through this transform, so a workflow whose stored version predates
+ * the backend's save-time canonicalization still verifies and publishes without
+ * a reload — `/workflows/validate` reports the definition as sent and would
+ * otherwise reject the shape the schema forbids.
+ */
+function transformAgenticToolSelection(parameters: Record<string, unknown>): Record<string, unknown> {
+  const strategy = canonicalToolSelectionStrategy(parameters.tool_selection_strategy, parameters.tool_selections)
+  if (strategy === parameters.tool_selection_strategy) return parameters
+  const rest = Object.fromEntries(Object.entries(parameters).filter(([key]) => key !== 'tool_selections'))
+  return { ...rest, tool_selection_strategy: strategy }
+}
+
+/**
  * Apply all backend-facing transforms to a single node's parameters.
- * Consolidates condition, switch, approval, and converge transforms
+ * Consolidates condition, switch, approval, converge, and agentic transforms
  * so both `buildWorkflowDefinition` and version-duplication share one path.
  */
 export function transformStepParameters(type: string, parameters: Record<string, unknown>): Record<string, unknown> {
@@ -217,6 +236,10 @@ export function transformStepParameters(type: string, parameters: Record<string,
 
   if (type === ActivityTypeEnum.CONVERGE && 'branches' in result) {
     result = Object.fromEntries(Object.entries(result).filter(([key]) => key !== 'branches'))
+  }
+
+  if (type === ActivityTypeEnum.AGENTIC) {
+    result = transformAgenticToolSelection(result)
   }
 
   return result

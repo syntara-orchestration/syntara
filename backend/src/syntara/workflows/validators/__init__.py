@@ -5,7 +5,11 @@ This module provides validation for workflow definitions and metadata.
 
 from syntara.settings.cache.settings_cache import get_runtime_settings
 
-from .workflow_definition import WorkflowValidator, collect_scheduled_trigger_config_findings
+from .workflow_definition import (
+    WorkflowValidator,
+    canonicalize_empty_tool_selections,
+    collect_scheduled_trigger_config_findings,
+)
 from .workflow_integrations import validate_workflow_references
 
 # Convenience singleton instance for easy usage
@@ -20,6 +24,7 @@ async def get_system_continue_on_failure() -> bool:
 
 __all__ = [
     "WorkflowValidator",
+    "canonicalize_empty_tool_selections",
     "collect_scheduled_trigger_config_findings",
     "get_system_continue_on_failure",
     "validate_workflow_references",

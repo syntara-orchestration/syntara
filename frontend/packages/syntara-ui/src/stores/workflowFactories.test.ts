@@ -470,6 +470,29 @@ describe('workflowFactories', () => {
         expect(activity.parameters.tool_selections).toBeUndefined()
       })
 
+      it('rewrites SELECTED strategy with empty tool selections to NONE', () => {
+        const activity = createAgenticActivity({
+          id: 'agent-1',
+          name: 'Task Agent',
+          toolSelectionStrategy: 'SELECTED',
+          toolSelections: [],
+        })
+
+        expect(activity.parameters.tool_selection_strategy).toBe('NONE')
+        expect(activity.parameters).not.toHaveProperty('tool_selections')
+      })
+
+      it('rewrites SELECTED strategy with missing tool selections to NONE', () => {
+        const activity = createAgenticActivity({
+          id: 'agent-1',
+          name: 'Task Agent',
+          toolSelectionStrategy: 'SELECTED',
+        })
+
+        expect(activity.parameters.tool_selection_strategy).toBe('NONE')
+        expect(activity.parameters).not.toHaveProperty('tool_selections')
+      })
+
       it('creates an agentic activity with prompt', () => {
         const activity = createAgenticActivity({
           id: 'agent-1',
