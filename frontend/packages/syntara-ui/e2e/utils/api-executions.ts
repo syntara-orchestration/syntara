@@ -1,9 +1,16 @@
 /**
  * Execution & approval polling helpers for E2E tests.
  */
-import { expect, type Page } from '../fixtures'
+import { expect, test, type Page } from '../fixtures'
 
 import { apiRequest, getAuthToken } from './api-core'
+
+/**
+ * Every execution status at which the execution will not change again on its own.
+ * Single source of truth for terminal-state waits — keep new specs importing this
+ * instead of defining a local copy, which tends to omit `completed_with_errors`.
+ */
+export const TERMINAL_STATUSES: readonly string[] = ['completed', 'completed_with_errors', 'failed', 'cancelled']
 
 /**
  * Poll an execution's status via the API until it matches one of the expected values.
@@ -13,15 +20,34 @@ import { apiRequest, getAuthToken } from './api-core'
 export async function pollExecutionStatus(
   app: Page,
   executionId: string,
-  expectedStatuses: string[],
+  expectedStatuses: readonly string[],
   options?: { token?: string; timeout?: number }
 ): Promise<void> {
   const token = options?.token ?? (await getAuthToken(app)) ?? undefined
-  await expect(async () => {
-    const resp = await apiRequest(app, 'get', `/executions/${executionId}`, { token })
-    const exec = (await resp.json()) as { status: string }
-    expect(expectedStatuses).toContain(exec.status)
-  }).toPass({ timeout: options?.timeout ?? 90_000, intervals: [1_000] })
+  let lastStatus: string | undefined
+  try {
+    await expect(async () => {
+      const resp = await apiRequest(app, 'get', `/executions/${executionId}`, { token })
+      const exec = (await resp.json()) as { status: string }
+      lastStatus = exec.status
+      // Include the observed status in the failure message: on timeout this is the
+      // only signal that tells "stuck pending" apart from "worker never picked it up".
+      expect(expectedStatuses, `execution ${executionId} status was "${exec.status}"`).toContain(exec.status)
+    }).toPass({ timeout: options?.timeout ?? 90_000, intervals: [1_000] })
+  } catch (error) {
+    // Attach the last observed status so CI failures carry evidence instead of a bare timeout.
+    if (lastStatus !== undefined) {
+      try {
+        await test.info().attach(`execution-${executionId}-last-status.json`, {
+          body: JSON.stringify({ executionId, lastStatus, expectedStatuses }),
+          contentType: 'application/json',
+        })
+      } catch {
+        // Outside a test context (e.g. a setup script) — diagnostics are optional.
+      }
+    }
+    throw error
+  }
 }
 
 /**

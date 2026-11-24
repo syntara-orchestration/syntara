@@ -198,7 +198,7 @@ test.describe('User Detail — Group Membership', () => {
     await expect(app).toHaveURL(/\/system-administration\/access-management\/users\/[^/]+$/, { timeout: 30_000 })
     // User detail loaded — do not wait on `role="tab"` "Details": PF horizontal overflow can move
     // every sub-tab (including Details) behind overflow/scroll so no tab is a visible `tab`.
-    await expect(app.getByRole('button', { name: 'Edit user' })).toBeVisible({ timeout: 30_000 })
+    await expect(app.getByRole('link', { name: 'Edit user' })).toBeVisible({ timeout: 30_000 })
 
     // Open the Groups panel via URL (matches useUrlTab); avoids relying on any sub-tab click.
     const userPath = new URL(app.url()).pathname

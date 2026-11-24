@@ -12,10 +12,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from syntara.workflows.utils.namespace_resolver import NamespaceResolver
-from syntara.workflows.workflow_engine.dynamic_workflow import OrchestratorWorkflow
-from syntara.workflows.workflow_engine.graph import WorkflowGraph
-from syntara.workflows.workflow_engine.graph_backend import InMemoryGraphBackend
+from syntara.workflow_core.graph import WorkflowGraph
+from syntara.workflow_core.graph_backend import InMemoryGraphBackend
+from syntara.workflow_core.utils.namespace_resolver import NamespaceResolver
+from syntara.workflow_runtime.engines.temporal.dynamic_workflow import OrchestratorWorkflow
 from tests.unit.workflows.workflow_engine.conftest import init_workflow_runtime
 
 type _Task = asyncio.Task[None]
@@ -29,8 +29,8 @@ type _Task = asyncio.Task[None]
 def _mock_temporal_workflow() -> Generator[MagicMock]:
     """Suppress 'Not in workflow event loop' errors from Temporal SDK calls."""
     with (
-        patch("syntara.workflows.workflow_engine.dynamic_workflow.workflow") as mock_wf,
-        patch("syntara.workflows.workflow_engine.converge_mixin.workflow", mock_wf),
+        patch("syntara.workflow_runtime.engines.temporal.dynamic_workflow.workflow") as mock_wf,
+        patch("syntara.workflow_runtime.engines.temporal.converge_mixin.workflow", mock_wf),
     ):
         mock_wf.logger = MagicMock()
         mock_wf.info.return_value = MagicMock(workflow_id="test-wf-id")
@@ -278,7 +278,7 @@ class TestConvergeTimeoutCreationOrder:
         wf = _make_workflow()
         wf._converge_branch_nodes = {"shared_node": set(converge_ids)}
 
-        with patch("syntara.workflows.workflow_engine.converge_mixin.asyncio.create_task") as mock_create:
+        with patch("syntara.workflow_runtime.engines.temporal.converge_mixin.asyncio.create_task") as mock_create:
             mock_create.return_value = MagicMock(spec=asyncio.Task)
             wf._handle_converge_timeout("shared_node", graph, {})
 
@@ -294,7 +294,7 @@ class TestConvergeTimeoutCreationOrder:
         existing_task: MagicMock = MagicMock(spec=asyncio.Task)
         wf._timeout_tasks["conv_alpha"] = existing_task
 
-        with patch("syntara.workflows.workflow_engine.converge_mixin.asyncio.create_task") as mock_create:
+        with patch("syntara.workflow_runtime.engines.temporal.converge_mixin.asyncio.create_task") as mock_create:
             mock_create.return_value = MagicMock(spec=asyncio.Task)
             wf._handle_converge_timeout("shared_node", graph, {})
 
@@ -308,7 +308,7 @@ class TestConvergeTimeoutCreationOrder:
         wf._converge_branch_nodes = {"shared_node": {"conv_alpha", "conv_beta"}}
         wf.failed_nodes["conv_alpha"] = "upstream failure"
 
-        with patch("syntara.workflows.workflow_engine.converge_mixin.asyncio.create_task") as mock_create:
+        with patch("syntara.workflow_runtime.engines.temporal.converge_mixin.asyncio.create_task") as mock_create:
             mock_create.return_value = MagicMock(spec=asyncio.Task)
             wf._handle_converge_timeout("shared_node", graph, {})
 

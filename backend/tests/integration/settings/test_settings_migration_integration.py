@@ -106,7 +106,7 @@ async def test_loop_activity_routes_on_condition_not_max_iterations(
     so that it can raise ApplicationError before the activity is called. The activity itself
     now only cares about condition_result.
     """
-    from syntara.workflows.workflow_engine.activities.loop import loop
+    from syntara.workflow_runtime.engines.temporal.activities.loop import loop
 
     await _set_int_setting(
         test_db_session,

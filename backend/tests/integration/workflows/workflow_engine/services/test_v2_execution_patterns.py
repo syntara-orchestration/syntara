@@ -19,15 +19,17 @@ import pytest
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
 
-from syntara.workflows.workflow_engine.activities.condition import condition
-from syntara.workflows.workflow_engine.activities.converge import converge
-from syntara.workflows.workflow_engine.activities.loop import loop
-from syntara.workflows.workflow_engine.activities.manual_trigger import manual_trigger
-from syntara.workflows.workflow_engine.activities.runtime_settings_activity import fetch_workflow_runtime_settings
-from syntara.workflows.workflow_engine.activities.script_activity import execute_script_activity
-from syntara.workflows.workflow_engine.activities.switch import switch
-from syntara.workflows.workflow_engine.dynamic_workflow import OrchestratorWorkflow
-from syntara.workflows.workflow_engine.services.temporal_execution_service import TemporalExecutionService
+from syntara.workflow_runtime.engines.temporal.activities.condition import condition
+from syntara.workflow_runtime.engines.temporal.activities.converge import converge
+from syntara.workflow_runtime.engines.temporal.activities.loop import loop
+from syntara.workflow_runtime.engines.temporal.activities.manual_trigger import manual_trigger
+from syntara.workflow_runtime.engines.temporal.activities.runtime_settings_activity import (
+    fetch_workflow_runtime_settings,
+)
+from syntara.workflow_runtime.engines.temporal.activities.script_activity import execute_script_activity
+from syntara.workflow_runtime.engines.temporal.activities.switch import switch
+from syntara.workflow_runtime.engines.temporal.dynamic_workflow import OrchestratorWorkflow
+from syntara.workflow_runtime.engines.temporal.services.temporal_execution_service import TemporalExecutionService
 
 _V2_ACTIVITIES: Sequence[Callable[..., Any]] = [
     execute_script_activity,

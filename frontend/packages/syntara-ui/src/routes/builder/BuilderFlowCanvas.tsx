@@ -18,7 +18,7 @@ import {
 } from '@xyflow/react'
 import { useLayoutEffect, useRef } from 'react'
 
-import { FlowNodeType } from '../../constants'
+import { FlowNodeType } from '../../constants/nodeTypes'
 import { CanvasControls } from '../workflows/canvas/CanvasControls'
 import { type NodeType } from '../workflows/canvas/nodes/NodeType'
 import { SEMANTIC_ZOOM_MAX_SCALE } from '../workflows/canvas/semanticZoom'

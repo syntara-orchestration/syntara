@@ -5,7 +5,7 @@ import type { ReactNode } from 'react'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 
 import { executionsFetchClient, workflowClient, workflowFetchClient } from '../../client'
-import { AlertProvider } from '../../providers/alerts'
+import { AlertProvider } from '../../providers/alerts/AlertProvider'
 import { ColorSchemeProvider } from '../../providers/theme/ColorSchemeProvider'
 import { assertUrlParam, assertUrlParamIsNull } from '../../test/filter-test-helpers'
 import { expectPageTitle } from '../../test/pageTitle'
@@ -2006,7 +2006,11 @@ describe('Workflows Component', () => {
 
       await waitFor(() => {
         expect(screen.getByText('Failed to duplicate workflow')).toBeInTheDocument()
-        expect(screen.getByText('Workflow has no definition to duplicate')).toBeInTheDocument()
+        expect(
+          screen.getByText(
+            'This workflow cannot be duplicated because it has no saved content. Try saving the workflow first.'
+          )
+        ).toBeInTheDocument()
       })
     })
 
@@ -2037,7 +2041,11 @@ describe('Workflows Component', () => {
 
       await waitFor(() => {
         expect(screen.getByText('Failed to duplicate workflow')).toBeInTheDocument()
-        expect(screen.getByText('Workflow must have a project ID')).toBeInTheDocument()
+        expect(
+          screen.getByText(
+            'This workflow cannot be duplicated because it is not associated with a project. Open it from within a project.'
+          )
+        ).toBeInTheDocument()
       })
     })
 
