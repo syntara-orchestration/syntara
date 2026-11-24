@@ -27,7 +27,7 @@ Checks for breaking changes in OpenAPI spec using `oasdiff`. Automatically resol
 The gate enforces these rules:
 1. **Every meaningful spec change must update `info.version`.** Comparison is canonical (semantic), so serialization-only diffs (whitespace, key order, quote style) do not require a version change. A meaningful change that leaves `info.version` unchanged is blocked (`version_bump_required`).
 2. **The version increment must match the change type**: increment the `minor` version for additive changes (new endpoint, field, or enum value), the `patch` version for spec-only edits (description, example, annotation). An incorrect version increment is blocked (`incorrect_version_increment`).
-3. **Breaking changes are blocked in place** — full stop (`breaking_blocked`). The only override is the privileged `breaking-change-approved` label (restricted to the `syntara-leads` team via the Breaking Change Label Guard workflow). A new major version is a new spec at a new path and does not register as a breaking change here. An approved breaking change must still increment `info.version` by a `minor` version.
+3. **Breaking changes are blocked in place** — full stop (`breaking_blocked`). The only override is the privileged `breaking-change-approved` label. The shared approval-label authorization workflow restricts changes to active members of `ansible/ansible-staff-eng-leads`. A new major version is a new spec at a new path and does not register as a breaking change here. An approved breaking change must still increment `info.version` by a `minor` version.
 
 ```bash
 # Compare current branch against devel
@@ -267,7 +267,7 @@ The `openapi-breaking-changes` job:
 3. On failure, prints `breaking-results.json` (spec path, versions, `version_bumped`, breaking changes) to the job log
 4. Runs `check-contract-regeneration.py` to verify contracts are regenerated and posts results via `post-contract-regeneration-comment.py`
 
-The **Breaking Change Label Guard** workflow (`.github/workflows/breaking-change-label-guard.yml`) fires when `breaking-change-approved` is added. Unauthorized actors have the label removed, the check fails, and a PR comment explains why.
+The `.github/workflows/approval-label-authorization.yml` caller runs the shared authorization workflow on pull request and approval-label events. It verifies active membership in `ansible/ansible-staff-eng-leads`; unauthorized changes are reverted when possible, and the check reports the outcome.
 
 ## Security Features
 
