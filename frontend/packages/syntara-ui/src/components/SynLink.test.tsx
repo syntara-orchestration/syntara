@@ -16,6 +16,19 @@ describe('SynLink', () => {
     expect(link).toHaveClass('pf-v6-c-button', 'pf-m-link', 'pf-m-inline')
   })
 
+  it('renders the primary variant as a link with primary button styling', () => {
+    render(
+      <SynLink to="/workflow-builder/new" variant="primary">
+        Create workflow
+      </SynLink>
+    )
+
+    const link = screen.getByRole('link', { name: 'Create workflow' })
+    expect(link).toHaveAttribute('href', '/workflow-builder/new')
+    expect(link).toHaveClass('pf-v6-c-button', 'pf-m-primary')
+    expect(link).not.toHaveClass('pf-m-inline')
+  })
+
   it('merges custom className with PatternFly classes', () => {
     render(
       <SynLink to="/path" className="my-class">

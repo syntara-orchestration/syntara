@@ -22,6 +22,7 @@ import { SynPage, SynPageBody } from '../../../components/layout/SynPage'
 import { SynPageHeader } from '../../../components/layout/SynPageHeader'
 import { SynListPanel, SynListPanelTabs } from '../../../components/panels/list/SynListPanel'
 import { useQueryState } from '../../../components/states/useQueryState'
+import { SynLink } from '../../../components/SynLink'
 import { SynPageTitle } from '../../../components/SynPageTitle'
 import { DateCell } from '../../../components/table/DateCell'
 import { useDeleteAction } from '../../../hooks/useDeleteAction'
@@ -42,6 +43,7 @@ import { useRevokeUserTokens } from '../useRevokeUserTokens'
 import { useUserPermissions } from '../useUserPermissions'
 
 import type { UserIdentity } from './identityUtils'
+import styles from './UserDetail.module.css'
 import { UserDetailConfirmationDialogs, UserDetailToolbar } from './UserDetailActions'
 import { renderUserDetailEarlyShell } from './userDetailEarlyShell'
 import { computeGroupCount, computeRoleAssignmentCount } from './userDetailUtils'
@@ -107,7 +109,6 @@ function UserDetailsTab({
   user: User
   identities: Pick<UserIdentity, 'provider_name' | 'identity_provider_id'>[]
 }) {
-  const navigate = useNavigate()
   const { first_name, last_name } = user
 
   const isLocal = user.auth_type === AUTH_TYPE_LOCAL
@@ -157,22 +158,16 @@ function UserDetailsTab({
                 [...uniqueProviders.entries()]
                   .sort(([, a], [, b]) => a.localeCompare(b))
                   .map(([id, name]) => (
-                    <Label
+                    <SynLink
                       key={id}
-                      isCompact
-                      onClick={() =>
-                        detachPromise(
-                          navigate({
-                            to: AppRoute.SystemAdministration.Authentication.IdentityProviderDetail.replace(
-                              ':providerId',
-                              id
-                            ).replace('/:tab?', ''),
-                          })
-                        )
-                      }
+                      className={styles.identityProviderLink}
+                      to={AppRoute.SystemAdministration.Authentication.IdentityProviderDetail.replace(
+                        ':providerId',
+                        id
+                      ).replace('/:tab?', '')}
                     >
                       {name}
-                    </Label>
+                    </SynLink>
                   ))}
             </LabelGroup>
           )}
@@ -463,7 +458,7 @@ export function UserDetail({ isMyProfile }: Readonly<UserDetailProps> = {}) {
     isMeQueryPending: meQuery.isPending,
     hasUserQueryError: !!userQuery.error,
     queryState,
-    navigateBack,
+    backTo: isMyProfile ? AppRoute.Workflows.Root : AppRoute.AccessManagement.Users,
     refetchUser,
   })
   if (earlyShell) return earlyShell

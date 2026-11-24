@@ -17,15 +17,14 @@ import {
   TitleSizes,
 } from '@patternfly/react-core'
 import { RhUiCloseIcon } from '@patternfly/react-icons'
-import { useNavigate } from '@tanstack/react-router'
 import { useEffect } from 'react'
 
 import { AppRoute } from '../../app/AppRoute'
 import { SynCodeBlock } from '../../components/details/SynCodeBlock'
 import { SynPanel } from '../../components/layout/SynPanel'
+import { SynLink } from '../../components/SynLink'
 import { DateCell } from '../../components/table/DateCell'
 import { capitalize } from '../../utils/capitalize'
-import { detachPromise } from '../../utils/detachPromise'
 
 import { buildPolicyDefinitionJson } from './policyUtils'
 import { PolicyTypeLabel } from './ScopeLabel'
@@ -42,17 +41,10 @@ function ProjectScopeLink({
   projectId,
   projectName,
 }: Readonly<{ projectId: string; projectName: string | null | undefined }>) {
-  const navigate = useNavigate()
   return (
-    <Button
-      variant="link"
-      isInline
-      onClick={() =>
-        detachPromise(navigate({ to: AppRoute.AccessManagement.ProjectDetail.replace(':projectId', projectId) }))
-      }
-    >
+    <SynLink to={AppRoute.AccessManagement.ProjectDetail.replace(':projectId', projectId)} variant="link">
       Project: {projectName ?? projectId}
-    </Button>
+    </SynLink>
   )
 }
 

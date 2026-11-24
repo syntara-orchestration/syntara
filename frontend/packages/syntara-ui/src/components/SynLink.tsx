@@ -3,6 +3,8 @@ import { Link as TanStackLink } from '@tanstack/react-router'
 import type { ComponentProps, ReactNode, Ref } from 'react'
 
 type ButtonOnClick = ComponentProps<typeof Button>['onClick']
+type ButtonIcon = ComponentProps<typeof Button>['icon']
+type ButtonVariant = ComponentProps<typeof Button>['variant']
 
 type RouterLinkProps = React.AnchorHTMLAttributes<HTMLAnchorElement>
 
@@ -19,21 +21,24 @@ type SynLinkProps = {
   /** Route path to navigate to on click. */
   to: string
   children: ReactNode
+  variant?: ButtonVariant
+  icon?: ButtonIcon
   className?: string
   onClick?: ButtonOnClick
   ref?: Ref<HTMLAnchorElement>
 }
 
 /**
- * Application-level link that renders a PatternFly inline link button
- * wired to TanStack Router for client-side navigation.
+ * Application-level route link styled with PatternFly. It defaults to an inline
+ * link and supports button variants for prominent navigation actions.
  */
-export function SynLink({ to, children, className, onClick, ref }: Readonly<SynLinkProps>) {
+export function SynLink({ to, children, variant = 'link', icon, className, onClick, ref }: Readonly<SynLinkProps>) {
   return (
     <Button
       ref={ref}
-      variant="link"
-      isInline
+      variant={variant}
+      isInline={variant === 'link'}
+      icon={icon}
       component={TanStackRouterButtonLink}
       href={to}
       className={className}

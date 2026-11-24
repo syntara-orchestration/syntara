@@ -65,7 +65,7 @@ test.describe('User Detail — Local User Controls and Group Assignment (UI-27)'
 
     await app.goto(toAppUrl(`${ACCESS_URL}/${NON_BUILTIN_USER_ID}/identities`))
 
-    await expect(app.getByRole('button', { name: 'Transfer identity' })).toBeVisible({ timeout: 15_000 })
+    await expect(app.getByRole('link', { name: 'Transfer identity' })).toBeVisible({ timeout: 15_000 })
     // ConnectAction returns <span>—</span> when !isSelf — the button is never mounted.
     // not.toBeAttached() asserts DOM non-presence, stronger than not.toBeVisible().
     await expect(app.getByRole('button', { name: 'Connect' })).not.toBeAttached()

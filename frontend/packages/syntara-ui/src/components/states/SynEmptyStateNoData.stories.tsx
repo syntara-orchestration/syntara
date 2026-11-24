@@ -1,11 +1,23 @@
 import { Button } from '@patternfly/react-core'
 import type { Meta, StoryObj } from '@storybook/tanstack-react'
+import type { ReactNode } from 'react'
 import { fn } from 'storybook/test'
 
 import { pageDecorator } from './storyDecorators'
 import { SynEmptyStateNoData } from './SynEmptyStateNoData'
 
-const meta: Meta<typeof SynEmptyStateNoData> = {
+type SynEmptyStateNoDataStoryArgs = {
+  title?: string
+  description?: string
+  buttonText?: string
+  imageSrc?: string
+  imageAlt?: string
+  linkTo?: never
+  addData?: () => void
+  secondaryActions?: ReactNode
+}
+
+const meta: Meta<SynEmptyStateNoDataStoryArgs> = {
   component: SynEmptyStateNoData,
   decorators: [pageDecorator],
   tags: ['autodocs'],

@@ -131,7 +131,7 @@ describe('Authentication', () => {
     render(<Authentication />, { wrapper })
 
     expect(screen.getByText('No identity providers configured yet')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Add OIDC provider/ })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /Add OIDC provider/ })).toBeInTheDocument()
   })
 
   it('keeps create actions in the empty-state footer, not the page header', () => {
@@ -139,7 +139,7 @@ describe('Authentication', () => {
     render(<Authentication />, { wrapper })
 
     expect(screen.queryByRole('toolbar')).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Add OIDC provider/ })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /Add OIDC provider/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Add Ansible Automation Platform/ })).toBeInTheDocument()
   })
 
@@ -147,11 +147,11 @@ describe('Authentication', () => {
     setupProviders()
     render(<Authentication />, { wrapper })
 
-    expect(screen.getByRole('button', { name: /Add OIDC provider/ })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /Add OIDC provider/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Add Ansible Automation Platform/ })).toBeInTheDocument()
 
     const filterBar = screen.getByRole('search', { name: /Filters/i })
-    expect(within(filterBar).queryByRole('button', { name: /Add OIDC provider/ })).not.toBeInTheDocument()
+    expect(within(filterBar).queryByRole('link', { name: /Add OIDC provider/ })).not.toBeInTheDocument()
     expect(within(filterBar).queryByRole('button', { name: /Add Ansible Automation Platform/ })).not.toBeInTheDocument()
   })
 
@@ -176,7 +176,7 @@ describe('Authentication', () => {
     render(<Authentication />, { wrapper })
 
     expect(screen.queryByRole('button', { name: /Add Ansible Automation Platform/ })).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Add OIDC provider/ })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /Add OIDC provider/ })).toBeInTheDocument()
   })
 
   it('has no accessibility violations', async () => {

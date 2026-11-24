@@ -5,6 +5,8 @@ import { axe } from 'vitest-axe'
 
 import { WizardNavFooter } from './WizardNavFooter'
 
+const CANCEL_TO = '/system-administration/authentication'
+
 const mockGoToNextStep = vi.fn().mockResolvedValue(undefined)
 const mockGoToPrevStep = vi.fn()
 const mockGoToStepById = vi.fn()
@@ -24,6 +26,10 @@ vi.mock('@patternfly/react-core', async () => {
     useWizardContext: () => mockContext,
   }
 })
+
+vi.mock('../../../../components/SynLink', () => ({
+  SynLink: ({ to, children }: { to: string; children: string }) => <a href={to}>{children}</a>,
+}))
 
 describe('WizardNavFooter', () => {
   beforeEach(() => {
@@ -46,10 +52,10 @@ describe('WizardNavFooter', () => {
     })
 
     it('does not render submit button but shows cancel', () => {
-      render(<WizardNavFooter submitLabel="Save" onSubmit={vi.fn()} onCancel={vi.fn()} />)
+      render(<WizardNavFooter submitLabel="Save" onSubmit={vi.fn()} cancelTo={CANCEL_TO} />)
 
       expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument()
-      expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument()
+      expect(screen.getByRole('link', { name: 'Cancel' })).toHaveAttribute('href', CANCEL_TO)
     })
 
     it('validates step 1 fields before advancing', async () => {
@@ -107,15 +113,15 @@ describe('WizardNavFooter', () => {
     })
 
     it('renders Cancel when provided', () => {
-      render(<WizardNavFooter submitLabel="Save" onSubmit={vi.fn()} onCancel={vi.fn()} />)
+      render(<WizardNavFooter submitLabel="Save" onSubmit={vi.fn()} cancelTo={CANCEL_TO} />)
 
-      expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument()
+      expect(screen.getByRole('link', { name: 'Cancel' })).toHaveAttribute('href', CANCEL_TO)
     })
 
     it('does not render Cancel when not provided', () => {
       render(<WizardNavFooter submitLabel="Save" onSubmit={vi.fn()} />)
 
-      expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('link', { name: 'Cancel' })).not.toBeInTheDocument()
     })
 
     it('calls onSubmit when save is clicked', async () => {
@@ -167,16 +173,16 @@ describe('WizardNavFooter', () => {
       expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument()
     })
 
-    it('renders Cancel when onCancel is provided', () => {
-      render(<WizardNavFooter trigger={vi.fn()} onCancel={vi.fn()} />)
+    it('renders Cancel as a link when a destination is provided', () => {
+      render(<WizardNavFooter trigger={vi.fn()} cancelTo={CANCEL_TO} />)
 
-      expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument()
+      expect(screen.getByRole('link', { name: 'Cancel' })).toHaveAttribute('href', CANCEL_TO)
     })
 
-    it('does not render Cancel when onCancel is not provided', () => {
+    it('does not render Cancel when a destination is not provided', () => {
       render(<WizardNavFooter trigger={vi.fn()} />)
 
-      expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('link', { name: 'Cancel' })).not.toBeInTheDocument()
     })
 
     it('advances without step 1 validation when clicking Next', async () => {
@@ -221,16 +227,16 @@ describe('WizardNavFooter', () => {
       expect(screen.getByRole('button', { name: 'Back' })).toBeInTheDocument()
     })
 
-    it('renders Cancel button when onCancel is provided', () => {
-      render(<WizardNavFooter submitLabel="Save" onSubmit={vi.fn()} onCancel={vi.fn()} />)
+    it('renders Cancel link when a destination is provided', () => {
+      render(<WizardNavFooter submitLabel="Save" onSubmit={vi.fn()} cancelTo={CANCEL_TO} />)
 
-      expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument()
+      expect(screen.getByRole('link', { name: 'Cancel' })).toHaveAttribute('href', CANCEL_TO)
     })
 
-    it('does not render Cancel button when onCancel is not provided', () => {
+    it('does not render Cancel link when a destination is not provided', () => {
       render(<WizardNavFooter submitLabel="Save" onSubmit={vi.fn()} />)
 
-      expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('link', { name: 'Cancel' })).not.toBeInTheDocument()
     })
 
     it('does not render Next button', () => {
@@ -249,14 +255,10 @@ describe('WizardNavFooter', () => {
       expect(onSubmit).toHaveBeenCalledWith(mockGoToStepById)
     })
 
-    it('calls onCancel when cancel is clicked', async () => {
-      const onCancel = vi.fn()
-      const user = userEvent.setup()
-      render(<WizardNavFooter submitLabel="Save" onSubmit={vi.fn()} onCancel={onCancel} />)
+    it('links Cancel to the supplied destination', () => {
+      render(<WizardNavFooter submitLabel="Save" onSubmit={vi.fn()} cancelTo={CANCEL_TO} />)
 
-      await user.click(screen.getByRole('button', { name: 'Cancel' }))
-
-      expect(onCancel).toHaveBeenCalled()
+      expect(screen.getByRole('link', { name: 'Cancel' })).toHaveAttribute('href', CANCEL_TO)
     })
 
     it('disables submit button while saving', () => {
@@ -292,27 +294,25 @@ describe('WizardNavFooter', () => {
 
   describe('re-render stability', () => {
     it('preserves first step layout on re-render with same props', () => {
-      const onCancel = vi.fn()
-      const { rerender } = render(<WizardNavFooter onCancel={onCancel} />)
+      const { rerender } = render(<WizardNavFooter cancelTo={CANCEL_TO} />)
 
-      rerender(<WizardNavFooter onCancel={onCancel} />)
+      rerender(<WizardNavFooter cancelTo={CANCEL_TO} />)
 
       expect(screen.getByRole('button', { name: 'Next' })).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument()
+      expect(screen.getByRole('link', { name: 'Cancel' })).toHaveAttribute('href', CANCEL_TO)
       expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument()
     })
 
     it('preserves last step layout on re-render with same props', () => {
       mockContext.activeStep = { index: 2 }
       const onSubmit = vi.fn()
-      const onCancel = vi.fn()
-      const { rerender } = render(<WizardNavFooter submitLabel="Save" onSubmit={onSubmit} onCancel={onCancel} />)
+      const { rerender } = render(<WizardNavFooter submitLabel="Save" onSubmit={onSubmit} cancelTo={CANCEL_TO} />)
 
-      rerender(<WizardNavFooter submitLabel="Save" onSubmit={onSubmit} onCancel={onCancel} />)
+      rerender(<WizardNavFooter submitLabel="Save" onSubmit={onSubmit} cancelTo={CANCEL_TO} />)
 
       expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument()
       expect(screen.getByRole('button', { name: 'Back' })).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument()
+      expect(screen.getByRole('link', { name: 'Cancel' })).toHaveAttribute('href', CANCEL_TO)
     })
 
     it('updates layout when wizard step changes from first to last', () => {
@@ -328,26 +328,24 @@ describe('WizardNavFooter', () => {
       expect(screen.queryByRole('button', { name: 'Next' })).not.toBeInTheDocument()
     })
 
-    it('updates layout when onCancel is added', () => {
+    it('updates layout when a cancel destination is added', () => {
       const { rerender } = render(<WizardNavFooter />)
 
-      expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('link', { name: 'Cancel' })).not.toBeInTheDocument()
 
-      const onCancel = vi.fn()
-      rerender(<WizardNavFooter onCancel={onCancel} />)
+      rerender(<WizardNavFooter cancelTo={CANCEL_TO} />)
 
-      expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument()
+      expect(screen.getByRole('link', { name: 'Cancel' })).toHaveAttribute('href', CANCEL_TO)
     })
 
-    it('updates layout when onCancel is removed', () => {
-      const onCancel = vi.fn()
-      const { rerender } = render(<WizardNavFooter onCancel={onCancel} />)
+    it('updates layout when a cancel destination is removed', () => {
+      const { rerender } = render(<WizardNavFooter cancelTo={CANCEL_TO} />)
 
-      expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument()
+      expect(screen.getByRole('link', { name: 'Cancel' })).toHaveAttribute('href', CANCEL_TO)
 
       rerender(<WizardNavFooter />)
 
-      expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('link', { name: 'Cancel' })).not.toBeInTheDocument()
     })
 
     it('updates saving state on re-render', () => {
@@ -372,7 +370,9 @@ describe('WizardNavFooter', () => {
 
   it('has no accessibility violations on last step', async () => {
     mockContext.activeStep = { index: 2 }
-    const { container } = render(<WizardNavFooter submitLabel="Save provider" onSubmit={vi.fn()} onCancel={vi.fn()} />)
+    const { container } = render(
+      <WizardNavFooter submitLabel="Save provider" onSubmit={vi.fn()} cancelTo={CANCEL_TO} />
+    )
 
     const results = await axe(container)
     expect(results).toHaveNoViolations()

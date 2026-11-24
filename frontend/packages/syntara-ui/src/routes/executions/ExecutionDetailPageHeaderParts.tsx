@@ -3,6 +3,7 @@ import type { ExecutionsAPI } from '@syntara/contracts'
 
 import { ApprovalPendingBadge } from '../../components/labels/ApprovalPendingBadge'
 import { SynLabel } from '../../components/labels/SynLabel'
+import { SynLink } from '../../components/SynLink'
 import { ExecutionTimestamp } from '../../components/table/ExecutionTimestamp'
 import { StatusLabel } from '../builder/ExecutionStatus'
 import { RunHistoryToggleButton } from '../builder/RunHistoryToggleButton'
@@ -48,7 +49,7 @@ export type ExecutionDetailHeaderToolbarProps = Readonly<{
   onReviewClick: () => void
   historyCardOpen: boolean
   onToggleHistory: () => void
-  onBackToEditor: () => void
+  editorTo?: string
   onCopyToEditor: () => void
   isCancellable: boolean
   executionId: string
@@ -62,7 +63,7 @@ export function ExecutionDetailHeaderToolbar({
   onReviewClick,
   historyCardOpen,
   onToggleHistory,
-  onBackToEditor,
+  editorTo,
   onCopyToEditor,
   isCancellable,
   executionId,
@@ -93,9 +94,11 @@ export function ExecutionDetailHeaderToolbar({
       <Button variant="secondary" onClick={onCopyToEditor}>
         Copy to editor
       </Button>
-      <Button variant={showApprovalActionStrip ? 'secondary' : 'primary'} onClick={onBackToEditor}>
-        Back to editor
-      </Button>
+      {editorTo && (
+        <SynLink to={editorTo} variant={showApprovalActionStrip ? 'secondary' : 'primary'}>
+          Back to editor
+        </SynLink>
+      )}
       <RunHistoryToggleButton onClick={onToggleHistory} isActive={historyCardOpen} />
     </>
   )

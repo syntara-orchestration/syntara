@@ -3,7 +3,6 @@ import { RhUiAddIcon, RhUiCheckCircleIcon, RhUiTrashIcon } from '@patternfly/rea
 import { Tbody, Td, Th, Thead, Tr } from '@patternfly/react-table'
 import type { ThProps } from '@patternfly/react-table'
 import type { IntegrationsAPI } from '@syntara/contracts'
-import { useNavigate } from '@tanstack/react-router'
 import { useMemo } from 'react'
 
 import { AppRoute } from '../../../app/AppRoute'
@@ -20,6 +19,7 @@ import {
 } from '../../../components/panels/list/SynListPanel'
 import type { KebabAction } from '../../../components/SynKebabMenu'
 import { SynKebabMenu } from '../../../components/SynKebabMenu'
+import { SynLink } from '../../../components/SynLink'
 import { SynPageTitle } from '../../../components/SynPageTitle'
 import { DateCell } from '../../../components/table/DateCell'
 import { LinkCell } from '../../../components/table/LinkCell'
@@ -172,7 +172,6 @@ function IntegrationsTableContent({
 }
 
 export default function Integrations() {
-  const navigate = useNavigate()
   const docLink = useDocLink('integrations')
   const permissions = useIntegrationPermissions()
 
@@ -237,20 +236,15 @@ export default function Integrations() {
         toolbar={
           !isEmpty || hasActiveFilters ? (
             <DisabledWithTooltip isDisabled={!permissions.canCreate} content={permissions.tooltips.create}>
-              <Button
-                variant="primary"
-                icon={<RhUiAddIcon />}
-                isAriaDisabled={!permissions.canCreate}
-                onClick={
-                  permissions.canCreate
-                    ? () => {
-                        detachPromise(navigate({ to: AppRoute.Configuration.Integrations.Configure }))
-                      }
-                    : undefined
-                }
-              >
-                Configure integration
-              </Button>
+              {permissions.canCreate ? (
+                <SynLink to={AppRoute.Configuration.Integrations.Configure} variant="primary" icon={<RhUiAddIcon />}>
+                  Configure integration
+                </SynLink>
+              ) : (
+                <Button variant="primary" icon={<RhUiAddIcon />} isAriaDisabled>
+                  Configure integration
+                </Button>
+              )}
             </DisabledWithTooltip>
           ) : undefined
         }

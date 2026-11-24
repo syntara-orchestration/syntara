@@ -33,7 +33,7 @@ test.describe('AAP-76532: Scoping & Isolation', () => {
       await loginAsUser(creatorPage, creator)
       await creatorPage.goto(toAppUrl('/workflows'))
       await expect(creatorPage.getByRole('heading', { level: 1, name: /Workflows/i })).toBeVisible({ timeout: 15_000 })
-      await expect(creatorPage.getByRole('button', { name: /Create workflow/i })).toBeVisible()
+      await expect(creatorPage.getByRole('link', { name: /Create workflow/i })).toBeVisible()
     } finally {
       await creatorCtx.close()
     }
@@ -63,7 +63,7 @@ test.describe('AAP-76532: Scoping & Isolation', () => {
       await loginAsUser(writerPage, writer)
       await writerPage.goto(toAppUrl('/workflows'))
       await expect(writerPage.getByRole('heading', { level: 1, name: /Workflows/i })).toBeVisible({ timeout: 15_000 })
-      await expect(writerPage.getByRole('button', { name: /Create workflow/i })).toBeVisible()
+      await expect(writerPage.getByRole('link', { name: /Create workflow/i })).toBeVisible()
     } finally {
       await writerCtx.close()
     }

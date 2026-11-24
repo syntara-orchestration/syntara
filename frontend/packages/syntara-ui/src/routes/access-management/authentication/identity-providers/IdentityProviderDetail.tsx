@@ -46,6 +46,7 @@ import { useQueryState } from '../../../../components/states/useQueryState'
 import { SynDetailEditLink } from '../../../../components/SynDetailEditLink'
 import type { KebabAction } from '../../../../components/SynKebabMenu'
 import { SynKebabMenu } from '../../../../components/SynKebabMenu'
+import { SynLink } from '../../../../components/SynLink'
 import { SynPageTitle } from '../../../../components/SynPageTitle'
 import { DateCell } from '../../../../components/table/DateCell'
 import { useDeleteAction } from '../../../../hooks/useDeleteAction'
@@ -442,9 +443,13 @@ export function IdentityProviderDetail() {
           </EmptyStateBody>
           <EmptyStateFooter>
             <EmptyStateActions>
-              <Button variant="primary" icon={<RhUiArrowLeftIcon />} onClick={navigateBack}>
+              <SynLink
+                to={AppRoute.SystemAdministration.Authentication.Root}
+                variant="primary"
+                icon={<RhUiArrowLeftIcon />}
+              >
                 Back to identity providers
-              </Button>
+              </SynLink>
               <Button variant="link" icon={<RhUiSyncIcon />} onClick={() => detachPromise(refetchProvider())}>
                 Retry
               </Button>

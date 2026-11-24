@@ -6,15 +6,15 @@ test('workflows page toolbar shows Import workflow before Create workflow', asyn
   await app.goto(toAppUrl('/workflows'))
   await expect(app.getByRole('heading', { level: 1, name: 'Workflows' })).toBeVisible()
 
-  const createButton = app.getByRole('button', { name: 'Create workflow' })
+  const createLink = app.getByRole('link', { name: 'Create workflow' })
   const importButton = app.getByRole('button', { name: 'Import workflow' })
 
-  await expect(createButton).toBeVisible()
+  await expect(createLink).toBeVisible()
   await expect(importButton).toBeVisible()
 
   // Import (secondary) appears to the left of Create (primary) per PF convention
   const importBox = await importButton.boundingBox()
-  const createBox = await createButton.boundingBox()
+  const createBox = await createLink.boundingBox()
   expect(importBox?.x).toBeLessThan(createBox?.x ?? Infinity)
 })
 

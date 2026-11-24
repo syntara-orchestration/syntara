@@ -25,7 +25,7 @@ import {
 } from '@patternfly/react-core'
 import type { MenuToggleElement } from '@patternfly/react-core'
 import { RhUiProfileFillIcon, RhUiQuestionMarkCircleIcon } from '@patternfly/react-icons'
-import { Link, useNavigate, useRouterState } from '@tanstack/react-router'
+import { Link, useRouterState } from '@tanstack/react-router'
 import { useMemo, useRef, useState } from 'react'
 
 import { authClient } from '../client'
@@ -56,6 +56,28 @@ function findFirstEnabledPath(item: TNavigationItem): string {
 }
 
 /** Items with multiple children render as expandable groups instead of direct links. */
+type RouterNavLinkProps = React.AnchorHTMLAttributes<HTMLAnchorElement>
+
+/** Adapts PatternFly's `href` prop to TanStack Router's `to` prop. */
+function RouterNavLink({ href, children, ...rest }: RouterNavLinkProps) {
+  return (
+    <Link to={href ?? '/'} {...(rest as Omit<React.ComponentProps<typeof Link>, 'to' | 'children'>)}>
+      {children}
+    </Link>
+  )
+}
+
+/** Returns true when a click uses a modifier key or a non-primary mouse button. */
+function isModifiedClick(event: React.SyntheticEvent | undefined): boolean {
+  if (!event || typeof globalThis.MouseEvent === 'undefined') return false
+
+  const mouseEvent = event.nativeEvent
+  return (
+    mouseEvent instanceof globalThis.MouseEvent &&
+    (mouseEvent.button !== 0 || mouseEvent.metaKey || mouseEvent.ctrlKey || mouseEvent.shiftKey || mouseEvent.altKey)
+  )
+}
+
 function hasDropdownChildren(item: TNavigationItem): boolean {
   return (item.children?.length ?? 0) > 1
 }
@@ -80,9 +102,15 @@ function createExpandableRefs(items: TNavigationItem[]) {
 
 function navigateToNavItem(
   itemId: string | number,
+  to: string | undefined,
   visibleItems: TNavigationItem[],
   requestNavigation: (path: string) => void
 ) {
+  if (to) {
+    requestNavigation(to)
+    return
+  }
+
   const item = visibleItems.find((navItem) => navItem.path === itemId)
   if (item) requestNavigation(findFirstEnabledPath(item))
 }
@@ -103,7 +131,6 @@ function NavExpandableItem({
   buttonRef,
   location,
   onExpand,
-  requestNavigation,
 }: Readonly<{
   item: TNavigationItem
   isActive: boolean
@@ -112,7 +139,6 @@ function NavExpandableItem({
   buttonRef?: React.RefObject<HTMLButtonElement | null>
   location: string
   onExpand: (event: React.MouseEvent<HTMLButtonElement>, isExpanded: boolean) => void
-  requestNavigation: (path: string) => void
 }>) {
   const enabledChildren = item.children ?? []
   const groupId = getNavGroupId(item.path)
@@ -137,14 +163,13 @@ function NavExpandableItem({
       {enabledChildren.map((child) => (
         <NavItem
           key={child.path}
-          preventDefault
           id={`nav-${child.path.replaceAll('/', '-')}`}
           groupId={groupId}
           itemId={child.path}
-          href={child.path}
+          to={child.path}
+          component={RouterNavLink}
           isActive={location.startsWith(child.path)}
           icon={child.icon}
-          onClick={() => requestNavigation(child.path)}
         >
           {child.label}
         </NavItem>
@@ -154,10 +179,12 @@ function NavExpandableItem({
   /* v8 ignore stop */
 }
 
-function UserMenuDropdown({ showTooltip }: Readonly<{ showTooltip: boolean }>) {
+function UserMenuDropdown({
+  showTooltip,
+  requestNavigation,
+}: Readonly<{ showTooltip: boolean; requestNavigation: (path: string) => void }>) {
   const [isOpen, setIsOpen] = useState(false)
   const userMenuRef = useRef<MenuToggleElement>(null)
-  const navigate = useNavigate()
   const logout = useAuthStore((s) => s.logout)
   const { showAlert } = useAlerts()
   const { data: currentUser } = authClient.useQuery('get', '/auth/me')
@@ -175,6 +202,17 @@ function UserMenuDropdown({ showTooltip }: Readonly<{ showTooltip: boolean }>) {
         })
       },
     })
+  }
+
+  const handleProfileClick = (event: React.MouseEvent | undefined) => {
+    if (isModifiedClick(event)) {
+      event?.stopPropagation()
+      return
+    }
+
+    event?.preventDefault()
+    setIsOpen(false)
+    requestNavigation(AppRoute.MyProfile.Root)
   }
 
   /* v8 ignore start -- phantom branches from compiled JSX props */
@@ -208,13 +246,7 @@ function UserMenuDropdown({ showTooltip }: Readonly<{ showTooltip: boolean }>) {
         popperProps={{ placement: 'right-start', preventOverflow: true, enableFlip: false }}
       >
         <DropdownList>
-          <DropdownItem
-            key="profile"
-            onClick={() => {
-              detachPromise(navigate({ to: AppRoute.MyProfile.Root }))
-              setIsOpen(false)
-            }}
-          >
+          <DropdownItem key="profile" to={AppRoute.MyProfile.Root} onClick={handleProfileClick}>
             My Profile
           </DropdownItem>
           <DropdownItem key="logout" onClick={handleLogoutClick}>
@@ -283,8 +315,11 @@ export function AppDockedNav() {
             <ToolbarContent>
               <ToolbarItem>
                 <Nav
-                  onSelect={(_event, selectedItem) => {
-                    navigateToNavItem(selectedItem.itemId, visibleItems, requestNavigation)
+                  onSelect={(event, selectedItem) => {
+                    if (isModifiedClick(event)) return
+
+                    event.preventDefault()
+                    navigateToNavItem(selectedItem.itemId, selectedItem.to, visibleItems, requestNavigation)
                     onNavSelect()
                   }}
                   variant="docked"
@@ -309,7 +344,6 @@ export function AppDockedNav() {
                             buttonRef={expandableRefs[item.path]}
                             location={location}
                             onExpand={(event, expanded) => onExpandNavGroup(event, getNavGroupId(item.path), expanded)}
-                            requestNavigation={requestNavigation}
                           />,
                         ]
                       }
@@ -317,10 +351,10 @@ export function AppDockedNav() {
                         separator,
                         <NavItem
                           key={item.path}
-                          preventDefault
                           id={`nav-${item.path.replaceAll('/', '-')}`}
                           itemId={item.path}
-                          href={findFirstEnabledPath(item)}
+                          to={findFirstEnabledPath(item)}
+                          component={RouterNavLink}
                           isActive={isActive}
                           icon={item.icon}
                           aria-label={item.label}
@@ -365,7 +399,7 @@ export function AppDockedNav() {
                   </Button>
                 </ToolbarItem>
                 <ToolbarItem>
-                  <UserMenuDropdown showTooltip={showTooltips} />
+                  <UserMenuDropdown showTooltip={showTooltips} requestNavigation={requestNavigation} />
                 </ToolbarItem>
               </ToolbarGroup>
             </ToolbarContent>

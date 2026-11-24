@@ -9,6 +9,7 @@ import {
 import { useCallback } from 'react'
 import { type UseFormTrigger } from 'react-hook-form'
 
+import { SynLink } from '../../../../components/SynLink'
 import { detachPromise } from '../../../../utils/detachPromise'
 
 import { type IdentityProviderFormData } from './identityProviderFormSchema'
@@ -31,10 +32,10 @@ type WizardNavFooterProps = Readonly<{
   submitLabel?: string
   isSaving?: boolean
   onSubmit?: (goToStepById: (id: string) => void) => void
-  onCancel?: () => void
+  cancelTo?: string
 }>
 
-export function WizardNavFooter({ trigger, submitLabel, isSaving, onSubmit, onCancel }: WizardNavFooterProps) {
+export function WizardNavFooter({ trigger, submitLabel, isSaving, onSubmit, cancelTo }: WizardNavFooterProps) {
   const { goToNextStep, goToPrevStep, goToStepById, activeStep, steps } = useWizardContext()
   const isFirst = activeStep.index === 1
   const isLast = activeStep.index === steps.length
@@ -71,12 +72,10 @@ export function WizardNavFooter({ trigger, submitLabel, isSaving, onSubmit, onCa
             )}
           </ActionListItem>
         </ActionListGroup>
-        {onCancel && (
+        {cancelTo && (
           <ActionListGroup>
             <ActionListItem>
-              <Button variant="link" onClick={onCancel}>
-                Cancel
-              </Button>
+              <SynLink to={cancelTo}>Cancel</SynLink>
             </ActionListItem>
           </ActionListGroup>
         )}

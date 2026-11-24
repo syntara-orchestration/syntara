@@ -1,21 +1,23 @@
 import { Button, EmptyState, EmptyStateActions, EmptyStateBody, EmptyStateFooter } from '@patternfly/react-core'
 import { RhUiArrowLeftIcon, RhUiSearchIcon, RhUiSyncIcon } from '@patternfly/react-icons'
 
+import { SynLink } from '../../../components/SynLink'
+
 type UserNotFoundStateProps = {
-  onBack: () => void
+  backTo: string
   onRetry: () => void
   backLabel?: string
 }
 
-export function UserNotFoundState({ onBack, onRetry, backLabel = 'Back to users' }: Readonly<UserNotFoundStateProps>) {
+export function UserNotFoundState({ backTo, onRetry, backLabel = 'Back to users' }: Readonly<UserNotFoundStateProps>) {
   return (
     <EmptyState headingLevel="h2" titleText="User not found" icon={RhUiSearchIcon} isFullHeight>
       <EmptyStateBody>The user you are looking for does not exist or may have been deleted.</EmptyStateBody>
       <EmptyStateFooter>
         <EmptyStateActions>
-          <Button variant="primary" icon={<RhUiArrowLeftIcon />} onClick={onBack}>
+          <SynLink to={backTo} variant="primary" icon={<RhUiArrowLeftIcon />}>
             {backLabel}
-          </Button>
+          </SynLink>
           <Button variant="link" icon={<RhUiSyncIcon />} onClick={onRetry}>
             Retry
           </Button>
