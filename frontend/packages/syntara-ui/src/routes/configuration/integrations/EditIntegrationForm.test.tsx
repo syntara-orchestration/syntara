@@ -488,13 +488,10 @@ describe('EditIntegrationForm', () => {
   })
 
   describe('Cancel', () => {
-    it('navigates to detail page when Cancel is clicked', async () => {
-      const user = userEvent.setup()
+    it('links cancel to the integration detail page', () => {
       render(<EditIntegrationForm />, { wrapper })
 
-      await user.click(screen.getByRole('button', { name: 'Cancel' }))
-
-      expect(mockNavigate).toHaveBeenCalledWith({ to: '/configuration/integrations/int-1' })
+      expect(screen.getByRole('link', { name: 'Cancel' })).toHaveAttribute('href', '/configuration/integrations/int-1')
     })
   })
 
