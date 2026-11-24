@@ -9,9 +9,12 @@
 # bundle ignores it — automation-orchestrator-operator#1573). When both land
 # on their mainlines, these pins drop and the stub converges to devel's.
 #
-# The pipeline bundle must carry the EP params + prepare-execution-plane task
-# (aap-konflux-pipelines#4746); until it merges and republishes, the digest
-# below points at the last pre-EP build and the EP pins are inert.
+# step-types-revision makes deploy-ao clone syntara-step-types and build the
+# ao-python-rhel9 / ao-bash-rhel9 workload images from that source
+# (aap-konflux-pipelines#5134) instead of pulling the prebuilt images, so the
+# e2e exercises the current step SDK contract. The pinned bundle is the
+# republished ao-api-tests carrying the EP and step-types params and the
+# bumped deploy-ao task (aap-konflux-pipelines#5164).
 apiVersion: tekton.dev/v1
 kind: PipelineRun
 metadata:
@@ -63,12 +66,16 @@ spec:
       value: https://github.com/automation-nexus/automation-orchestrator-operator.git
     - name: ao-operator-revision
       value: feat/ANSTRAT-1803
+    - name: step-types-git-url
+      value: https://github.com/syntara-orchestration/syntara-step-types.git
+    - name: step-types-revision
+      value: devel
   pipelineRef:
     params:
       - name: name
         value: ao-api-tests
       - name: bundle
-        value: quay.io/aap-ci/tekton-catalog/pipeline/test/ao-api-tests:0.1@sha256:bd91cdfb38e27153d679c6385e6c84e8a7a8379fa474196e2453fbcee9f6c479
+        value: quay.io/aap-ci/tekton-catalog/pipeline/test/ao-api-tests:0.1@sha256:5885d81428a3ac7a1d9878618ad0138b26019456a0bd3034850f4ea85959d689
       - name: kind
         value: pipeline
       - name: secret

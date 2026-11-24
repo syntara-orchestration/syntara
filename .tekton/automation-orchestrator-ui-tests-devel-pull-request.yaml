@@ -46,12 +46,16 @@ spec:
       value: https://github.com/automation-nexus/automation-orchestrator-operator.git
     - name: ao-operator-revision
       value: feat/ANSTRAT-1803
+    - name: step-types-git-url
+      value: https://github.com/syntara-orchestration/syntara-step-types.git
+    - name: step-types-revision
+      value: devel
   pipelineRef:
     params:
       - name: name
         value: ao-ui-tests
       - name: bundle
-        value: quay.io/aap-ci/tekton-catalog/pipeline/test/ao-ui-tests:0.1@sha256:1420e627fe1a2c743f480b11e4fd2f98f7284ccbfe565b75fb3efcaa988543d1
+        value: quay.io/aap-ci/tekton-catalog/pipeline/test/ao-ui-tests:0.1@sha256:f8ef3f95350e2f1f78243a6ddbd04b0501a77ddaeee77633c0087b976742bb20
       - name: kind
         value: pipeline
       - name: secret
