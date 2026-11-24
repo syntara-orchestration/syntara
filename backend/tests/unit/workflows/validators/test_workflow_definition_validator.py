@@ -1,6 +1,6 @@
 """Tests for WorkflowValidator.
 
-AAP-96925: Saving a Task Agent without an LLM credential must report a validation error.
+Saving a Task Agent without an LLM credential must report a validation error.
 """
 
 from typing import Any
