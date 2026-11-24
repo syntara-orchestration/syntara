@@ -1,4 +1,4 @@
-import { Badge, Button, DescriptionList, Stack, StackItem, Switch, Tab } from '@patternfly/react-core'
+import { Badge, Button, DescriptionList, Switch, Tab } from '@patternfly/react-core'
 import {
   RhUiCheckCircleIcon,
   RhUiEditIcon,
@@ -76,28 +76,24 @@ export function CredentialDetailsTabRoute() {
     useCredentialDetailTabContext()
 
   return (
-    <Stack hasGutter className={styles.detailsTabContent}>
-      <StackItem>
-        <DescriptionList isHorizontal>
-          <SynDetail label="Name">{credential.name}</SynDetail>
-          {hasDescription ? <SynDetail label="Description">{credential.description}</SynDetail> : null}
-          <SynDetail label="Type">{credentialTypeDisplayText}</SynDetail>
-          <SynDetail label="Workflows">{formatCount(credential.workflow_count)}</SynDetail>
-          <SynDetail label="Integrations">{formatCount(credential.integration_count)}</SynDetail>
-          <SynDetail label="Last modified">
-            <UserTimestamp user={credential.updated_by} timestamp={credential.updated_at} subtleTimestamp={false} />
-          </SynDetail>
-          <SynDetail label="Created">
-            <UserTimestamp user={credential.created_by} timestamp={credential.created_at} subtleTimestamp={false} />
-          </SynDetail>
-          <SynDetail label="State">
-            <EnabledStateLabel enabled={credential.enabled ?? false} />
-          </SynDetail>
+    <DescriptionList isHorizontal>
+      <SynDetail label="Name">{credential.name}</SynDetail>
+      {hasDescription ? <SynDetail label="Description">{credential.description}</SynDetail> : null}
+      <SynDetail label="Type">{credentialTypeDisplayText}</SynDetail>
+      <SynDetail label="Workflows">{formatCount(credential.workflow_count)}</SynDetail>
+      <SynDetail label="Integrations">{formatCount(credential.integration_count)}</SynDetail>
+      <SynDetail label="Last modified">
+        <UserTimestamp user={credential.updated_by} timestamp={credential.updated_at} subtleTimestamp={false} />
+      </SynDetail>
+      <SynDetail label="Created">
+        <UserTimestamp user={credential.created_by} timestamp={credential.created_at} subtleTimestamp={false} />
+      </SynDetail>
+      <SynDetail label="State">
+        <EnabledStateLabel enabled={credential.enabled ?? false} />
+      </SynDetail>
 
-          <DynamicCredentialFields typeFields={typeFields} credInputs={credInputs} />
-        </DescriptionList>
-      </StackItem>
-    </Stack>
+      <DynamicCredentialFields typeFields={typeFields} credInputs={credInputs} />
+    </DescriptionList>
   )
 }
 
