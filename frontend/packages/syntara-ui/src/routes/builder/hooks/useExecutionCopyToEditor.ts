@@ -45,8 +45,8 @@ export function useExecutionCopyToEditor({
     if (reducerSynced) return
 
     const copy = executionCopy
-    // Run after useBuilderWorkflowLifecycle queueMicrotask (INIT_WORKFLOW) so SET_MOST_RECENT is not cleared.
-    queueMicrotask(() => {
+    // Macrotask so lifecycle INIT (microtask) always runs first; still re-applies when INIT clears the run id.
+    const timer = window.setTimeout(() => {
       const workflowAtApply = useWorkflowStore.getState().currentWorkflow
       if (!workflowAtApply) return
 
@@ -83,16 +83,20 @@ export function useExecutionCopyToEditor({
           copiedRunActivityIds,
         },
       })
-    })
+    }, 0)
+    return () => window.clearTimeout(timer)
   }, [executionCopy, currentWorkflow, isWorkflowInitialized, reducerSynced, dispatch, markDirty, showSuccess])
 
-  // Clear query params only after reducer owns the execution id so a late INIT_WORKFLOW can re-apply.
+  // Clear query params after reducer sync; delay so copy can re-apply if INIT clears the run id first.
   useEffect(() => {
     if (!reducerSynced) return
-    const url = new URL(window.location.href)
-    if (!url.searchParams.has('fromExecution') && !url.searchParams.has('linkExecution')) return
-    url.searchParams.delete('fromExecution')
-    url.searchParams.delete('linkExecution')
-    window.history.replaceState({}, '', url.pathname + url.search)
+    const timer = window.setTimeout(() => {
+      const url = new URL(window.location.href)
+      if (!url.searchParams.has('fromExecution') && !url.searchParams.has('linkExecution')) return
+      url.searchParams.delete('fromExecution')
+      url.searchParams.delete('linkExecution')
+      window.history.replaceState({}, '', url.pathname + url.search)
+    }, 2_000)
+    return () => window.clearTimeout(timer)
   }, [reducerSynced])
 }

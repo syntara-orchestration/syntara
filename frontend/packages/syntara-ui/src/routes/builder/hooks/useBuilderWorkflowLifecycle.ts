@@ -32,6 +32,8 @@ export function useBuilderWorkflowLifecycle(options: {
     nodePositions?: Record<string, { x: number; y: number }>,
     projectId?: string | null
   ) => void
+  /** Copy-to-editor navigation: avoid INIT clearing a run panel that was just pinned. */
+  pendingExecutionCopy?: boolean
 }): { isWorkflowInitialized: boolean } {
   const {
     workflowId,
@@ -47,6 +49,7 @@ export function useBuilderWorkflowLifecycle(options: {
     setWorkflow,
     setStoredEdges,
     loadWorkflowWithEdges,
+    pendingExecutionCopy = false,
   } = options
 
   const queryClient = useQueryClient()
@@ -98,12 +101,24 @@ export function useBuilderWorkflowLifecycle(options: {
 
       queueMicrotask(() => {
         loadWorkflowWithEdges(flattenedWorkflow, generatedEdges, nodePositions, workflow.project_id ?? null)
-        dispatch({ type: 'INIT_WORKFLOW', payload: { ...initPayload, initialViewVersion } })
+        dispatch({
+          type: 'INIT_WORKFLOW',
+          payload: { ...initPayload, initialViewVersion, preserveMostRecentRun: pendingExecutionCopy },
+        })
         hasLoadedRef.current = true
         setIsWorkflowInitialized(true)
       })
     }
-  }, [isNew, workflow, workflowId, loadWorkflowWithEdges, workflowsListResources, dispatch, initialViewVersion])
+  }, [
+    isNew,
+    workflow,
+    workflowId,
+    loadWorkflowWithEdges,
+    workflowsListResources,
+    dispatch,
+    initialViewVersion,
+    pendingExecutionCopy,
+  ])
 
   useEffect(() => {
     if (!workflow || isNew || hasLoadedRef.current || workflow.id !== workflowId) {

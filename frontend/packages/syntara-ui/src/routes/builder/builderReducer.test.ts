@@ -641,6 +641,25 @@ describe('builderReducer', () => {
       expect(result.mostRecentRunPanelOpen).toBe(false)
       expect(result.copiedRunActivityIds).toBeNull()
     })
+
+    it('INIT_WORKFLOW preserves pinned run state when preserveMostRecentRun is set', () => {
+      const stateWithExecution: BuilderState = {
+        ...initialState,
+        mostRecentExecutionId: 'exec-pinned',
+        mostRecentRunPanelOpen: true,
+        copiedRunActivityIds: new Set(['task-1']),
+      }
+
+      const action: BuilderAction = {
+        type: 'INIT_WORKFLOW',
+        payload: { name: 'Fresh', description: '', preserveMostRecentRun: true },
+      }
+      const result = builderReducer(stateWithExecution, action)
+
+      expect(result.mostRecentExecutionId).toBe('exec-pinned')
+      expect(result.mostRecentRunPanelOpen).toBe(true)
+      expect(result.copiedRunActivityIds).toEqual(new Set(['task-1']))
+    })
   })
 
   describe('Version history actions', () => {

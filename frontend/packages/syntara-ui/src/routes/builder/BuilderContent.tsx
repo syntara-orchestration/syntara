@@ -185,6 +185,7 @@ export function BuilderContent(props: BuilderContentProps) {
     setWorkflow,
     setStoredEdges,
     loadWorkflowWithEdges,
+    pendingExecutionCopy: !!executionCopy,
   })
   useExecutionCopyToEditor({
     executionCopy,
