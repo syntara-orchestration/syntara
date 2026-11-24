@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { RegistryStepId } from '../../constants'
+import { RegistryStepId } from '../../constants/registryStepIds'
 import type { NodeKind } from '../../hooks/useNodeKindsQuery'
 
 import {

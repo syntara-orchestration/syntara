@@ -7,6 +7,7 @@ import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'r
 
 import { useUnsavedChanges } from '../../app/useUnsavedChanges'
 import { executionsClient, workflowClient } from '../../client'
+import { SynLabel } from '../../components/labels/SynLabel'
 import { SynPage } from '../../components/layout/SynPage'
 import { SynPanel } from '../../components/layout/SynPanel'
 import { SynPanelStack, SynPanelStackItem } from '../../components/layout/SynPanelStack'
@@ -15,7 +16,8 @@ import { SynStepExpandedAllContext } from '../../components/steps/SynStepExpande
 import { useSearchParams } from '../../hooks/routing/useSearchParams'
 import { useCursorPagination } from '../../hooks/useCursorPagination'
 import { useProjectSelector } from '../../hooks/useProjectSelector'
-import { useAlerts } from '../../providers/alerts'
+import { useAlerts } from '../../providers/alerts/AlertContext'
+import { useFeatureFlag } from '../../providers/use-feature-flag'
 import { useWorkflowStore } from '../../stores/useWorkflowStore'
 import { getErrorMessage } from '../../utils/apiErrors'
 import { detachPromise } from '../../utils/detachPromise'
@@ -69,6 +71,7 @@ type WorkflowVersion = WorkflowAPI.components['schemas']['WorkflowVersionRead']
 // eslint-disable-next-line max-lines-per-function, complexity
 export function BuilderContent(props: BuilderContentProps) {
   const { workflow, isNew, workflowId, initialProjectId, executionCopy, initialViewVersion } = props
+  const isWorkflowBuilderQolEnabled = useFeatureFlag('workflow_builder_qol')
   const navigate = useNavigate()
   const setLocation = useCallback(
     (to: string) => {
@@ -116,7 +119,7 @@ export function BuilderContent(props: BuilderContentProps) {
   } = useWorkflowStore()
   const { registerSaveHandler, unregisterSaveHandler, requestNavigation } = useUnsavedChanges()
   const handleExecutionNavigate = useCallback(
-    (id: string) => requestNavigation(`/executions/${id}`),
+    (id: string) => requestNavigation(`/executions/${id}?history=open`),
     [requestNavigation]
   )
 
@@ -302,6 +305,8 @@ export function BuilderContent(props: BuilderContentProps) {
     handleMostRecentResize,
     handleMostRecentNodeSelect,
     handleCloseMostRecentRunPanel,
+    isPanelExpanded: isMostRecentRunPanelExpanded,
+    panelExpandControl: mostRecentPanelExpandControl,
   } = useBuilderLiveRunPanel({
     mostRecentExecutionId,
     mostRecentRunPanelOpen,
@@ -645,6 +650,15 @@ export function BuilderContent(props: BuilderContentProps) {
                   isStepEditorOpen={isStepEditorOpen}
                 />
               </StackItem>
+              {/*
+                Temporary proof of concept. Remove this marker and flag once
+                workflow-builder improvements ship and no code depends on it.
+              */}
+              {isWorkflowBuilderQolEnabled && (
+                <StackItem>
+                  <SynLabel status="info">workflow_builder_qol is enabled (test proof of concept)</SynLabel>
+                </StackItem>
+              )}
               <BuilderReadOnlyBanner
                 canEdit={builderPermissions.canEdit}
                 isLoading={builderPermissions.isLoading}
@@ -669,36 +683,38 @@ export function BuilderContent(props: BuilderContentProps) {
                     style={{ pointerEvents: isStepEditorOpen && !versionPanel.isViewingVersion ? 'none' : 'auto' }}
                   >
                     <SynPanelStack>
-                      <SynPanelStackItem isFilled>
-                        <SynPanel hasNoPadding isFullHeight className={styles.canvasPanel}>
-                          <VersionInfoCard
-                            title={versionPanel.viewedVersionName}
-                            date={versionPanel.viewedVersionDate}
-                            description={versionPanel.viewedVersionDescription}
-                            publishedAt={versionPanel.viewedVersionPublishedAt}
-                            unpublishedAt={versionPanel.viewedVersionUnpublishedAt}
-                          />
-                          <BuilderFlow
-                            workflowId={workflowId}
-                            readOnly={versionPanel.isViewingVersion}
-                            canEdit={builderPermissions.canEdit}
-                            panelOpen={isAddStepPanelOpen || !!selectedNode}
-                            activeEdgeButtonNodeId={isAddStepPanelOpen ? sourceNodeId : null}
-                            activeEdgeButtonHandle={isAddStepPanelOpen ? sourceHandle : null}
-                            activeEdgeId={isAddStepPanelOpen ? edgeIdToReplace : null}
-                            executionStatus={canvasExecutionStatus}
-                            copiedRunActivityIds={copiedRunActivityIds}
-                            disableDeleteKey={isStepEditorOpen}
-                            disableSpacePanning={isStepEditorOpen || confirmDialogOpen}
-                            onNodeClick={wrappedHandleNodeClick}
-                            onAddNodeFromEdge={handleAddNodeFromEdge}
-                            onNodesDeleted={handleNodesDeleted}
-                            newNodeDesiredPosition={state.newNodeDesiredPosition}
-                            onClearDesiredPosition={handleClearDesiredPosition}
-                            validationErrors={state.validationErrors}
-                          />
-                        </SynPanel>
-                      </SynPanelStackItem>
+                      {!(showMostRecentRunPanelInEditor && isMostRecentRunPanelExpanded) && (
+                        <SynPanelStackItem isFilled>
+                          <SynPanel hasNoPadding isFullHeight className={styles.canvasPanel}>
+                            <VersionInfoCard
+                              title={versionPanel.viewedVersionName}
+                              date={versionPanel.viewedVersionDate}
+                              description={versionPanel.viewedVersionDescription}
+                              publishedAt={versionPanel.viewedVersionPublishedAt}
+                              unpublishedAt={versionPanel.viewedVersionUnpublishedAt}
+                            />
+                            <BuilderFlow
+                              workflowId={workflowId}
+                              readOnly={versionPanel.isViewingVersion}
+                              canEdit={builderPermissions.canEdit}
+                              panelOpen={isAddStepPanelOpen || !!selectedNode}
+                              activeEdgeButtonNodeId={isAddStepPanelOpen ? sourceNodeId : null}
+                              activeEdgeButtonHandle={isAddStepPanelOpen ? sourceHandle : null}
+                              activeEdgeId={isAddStepPanelOpen ? edgeIdToReplace : null}
+                              executionStatus={canvasExecutionStatus}
+                              copiedRunActivityIds={copiedRunActivityIds}
+                              disableDeleteKey={isStepEditorOpen}
+                              disableSpacePanning={isStepEditorOpen || confirmDialogOpen}
+                              onNodeClick={wrappedHandleNodeClick}
+                              onAddNodeFromEdge={handleAddNodeFromEdge}
+                              onNodesDeleted={handleNodesDeleted}
+                              newNodeDesiredPosition={state.newNodeDesiredPosition}
+                              onClearDesiredPosition={handleClearDesiredPosition}
+                              validationErrors={state.validationErrors}
+                            />
+                          </SynPanel>
+                        </SynPanelStackItem>
+                      )}
                       {showMostRecentRunPanelInEditor && mostRecentExecutionId && (
                         <ExecutionDetailsPanelWrapper
                           executionId={mostRecentExecutionId}
@@ -710,6 +726,8 @@ export function BuilderContent(props: BuilderContentProps) {
                           onResize={handleMostRecentResize}
                           isTerminalStatus={isTerminalStatus}
                           onClosePanel={handleCloseMostRecentRunPanel}
+                          isPanelExpanded={isMostRecentRunPanelExpanded}
+                          panelExpandControl={mostRecentPanelExpandControl}
                         />
                       )}
                     </SynPanelStack>

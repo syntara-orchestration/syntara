@@ -68,10 +68,13 @@ test.describe('Manual Trigger', () => {
       await expect(triggerNode).toBeVisible({ timeout: 15_000 })
       await expect(scriptNode).toBeVisible({ timeout: 15_000 })
 
-      // Verify the edge connection exists between the nodes
-      const edges = app.locator('[role="group"][aria-roledescription="edge"]')
-      const edgeCount = await edges.count()
-      expect(edgeCount).toBeGreaterThanOrEqual(1) // At least one edge: trigger -> script
+      // Verify the edge connection exists between the nodes (SVG path; see builder.spec.ts).
+      await expect(async () => {
+        const pathData = await app.evaluate(
+          () => document.querySelector('svg g.react-flow__edge path')?.getAttribute('d') ?? null
+        )
+        expect(pathData).toMatch(/^M/)
+      }).toPass({ timeout: 15_000 })
 
       // Test the full end-to-end journey: now run the workflow from the canvas
       const runButton = app.getByRole('button', { name: 'Run' })

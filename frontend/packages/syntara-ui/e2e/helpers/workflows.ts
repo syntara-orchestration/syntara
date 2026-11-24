@@ -1,5 +1,3 @@
-import { randomUUID } from 'node:crypto'
-
 import { type Page, expect, toAppUrl } from '../fixtures'
 import {
   createBasicWorkflowViaApi,
@@ -10,6 +8,7 @@ import {
 } from '../utils/api'
 
 import { clickAddConnectedStep } from './add-connected-step'
+import { canvasStepNode, clickCanvasStepToOpenEditor, expectCanvasStepTitleVisible } from './canvas-interaction'
 import { openNewWorkflowBuilder, selectProjectIfRequired } from './project-selection'
 import { waitForUIReady } from './ui-ready'
 import { clickSaveAndWait } from './workflow-save'
@@ -25,8 +24,8 @@ export {
   selectProjectDialog,
   selectProjectIfRequired,
 } from './project-selection'
-
-export const buildUniqueName = (prefix: string) => `${prefix}-${Date.now()}-${randomUUID()}`
+export { buildUniqueName } from './workflowNames'
+export { expectCanvasStepTitleVisible } from './canvas-interaction'
 
 export const addStepPanel = (page: Page) =>
   page.getByRole('region', {
@@ -49,7 +48,7 @@ export async function triggerLayout(page: Page) {
   await waitForUIReady(page)
 }
 
-export { clickStep, layoutCanvas } from './canvas-interaction'
+export { clickNode, clickStep, layoutCanvas } from './canvas-interaction'
 
 export async function closeStepEditorPanel(page: Page) {
   // The step editor cancel button has different aria-labels depending on mode:
@@ -108,7 +107,7 @@ export async function saveAndCloseStepForm(page: Page, isUpdate = false, stepNam
 }
 
 /**
- * Open a step for editing by double-clicking it on the canvas.
+ * Open a step for editing via the canvas step header Edit control.
  *
  * Retries layout + click while the editor hydrates. Under CI load the click can
  * land during a React Flow viewport transform and be lost, so callers must not
@@ -119,13 +118,13 @@ export async function saveAndCloseStepForm(page: Page, isUpdate = false, stepNam
  */
 export async function openStepForEditing(page: Page, stepName: string) {
   await triggerLayout(page)
-  const node = page.locator('[role="group"][aria-roledescription="node"]').filter({ hasText: stepName })
+  const node = canvasStepNode(page, stepName)
   await waitForUIReady(page)
 
   const nameInput = page.getByRole('textbox', { name: 'Name', exact: true })
   await expect(async () => {
     await expect(node).toBeVisible({ timeout: 5_000 })
-    await node.dblclick({ force: true, timeout: 5_000 })
+    await clickCanvasStepToOpenEditor(node, stepName)
     await expect(nameInput).toHaveValue(stepName, { timeout: 5_000 })
   }).toPass({ timeout: 30_000, intervals: [500, 1_000, 2_000] })
 }
@@ -442,7 +441,7 @@ export async function createWorkflowWithTrigger(page: Page, workflowName: string
   await nameInput.fill(workflowName)
   await clickSaveAndWait(page)
 
-  await expect(page.getByText('Manual trigger')).toBeVisible()
+  await expectCanvasStepTitleVisible(page, 'Manual trigger')
   await expect(page.getByRole('button', { name: 'Reset layout', exact: true })).toBeVisible()
 
   // Wait for canvas to be fully ready

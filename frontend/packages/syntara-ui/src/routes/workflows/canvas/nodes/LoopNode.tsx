@@ -3,7 +3,7 @@ import type { LoopActivity } from '@syntara/contracts'
 import { type Node, type NodeProps } from '@xyflow/react'
 
 import { SynStep } from '../../../../components/steps/SynStep'
-import { RegistryStepId } from '../../../../constants'
+import { RegistryStepId } from '../../../../constants/registryStepIds'
 import type { ActivityStatus } from '../../execution/types'
 import { semanticZoomActivityTitle } from '../semanticZoom'
 import { getStepTypeColor } from '../stepTypeColors'
@@ -21,7 +21,7 @@ export type LoopNode = { type: 'loop' } & Node<LoopActivity>
 export function LoopStepComponent(props: NodeProps<LoopNode>) {
   const metadata = stepMetadata.loop
   const iconColor = getStepTypeColor('loop')
-  const iconNode = renderStepIcon(metadata.icon, RegistryStepId.LOGIC_LOOP, 'canvas', iconColor)
+  const iconNode = renderStepIcon(metadata.icon, RegistryStepId.LOGIC_LOOP, 'header', iconColor)
   const semanticZoomIcon = renderStepIcon(metadata.icon, RegistryStepId.LOGIC_LOOP, 'semanticZoom', iconColor)
   const menuActions = useStepMenuActions({
     nodeId: props.data.id,
@@ -58,6 +58,7 @@ export function LoopStepComponent(props: NodeProps<LoopNode>) {
         { id: 'loop', ariaLabel: 'Loop branch output' },
       ]}
       semanticZoomIcon={semanticZoomIcon}
+      semanticZoomPreviewIcon={iconNode}
       semanticZoomMenuActions={menuActions}
     >
       <StandardStepHeader

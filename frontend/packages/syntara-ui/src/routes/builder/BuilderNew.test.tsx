@@ -80,7 +80,7 @@ describe('BuilderNew', () => {
 
   it('sets the browser tab title', () => {
     render(<BuilderNew />)
-    expectPageTitle(['New Workflow', 'Workflows'])
+    expectPageTitle('New Workflow | Workflows | Syntara')
   })
 
   it('asks for a project before opening the builder', () => {

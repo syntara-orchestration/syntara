@@ -12,7 +12,7 @@
  */
 
 import { test, expect, toAppUrl, type Page } from '../fixtures'
-import { buildUniqueName, openBuilderById } from '../helpers/workflows'
+import { buildUniqueName, openBuilderById, expectCanvasStepTitleVisible } from '../helpers/workflows'
 import {
   apiRequest,
   createWorkflowViaApi,
@@ -20,9 +20,8 @@ import {
   ensureProject,
   getAuthToken,
   pollExecutionStatus,
+  TERMINAL_STATUSES,
 } from '../utils/api'
-
-const TERMINAL_STATUSES = ['completed', 'failed', 'cancelled']
 
 /** Podman Compose E2E and merge queue runs need more headroom for Temporal to finish under load. */
 const TERMINAL_POLL_TIMEOUT_MS = process.env.CI ? 180_000 : 90_000
@@ -171,7 +170,7 @@ test.describe('Retry Execution', () => {
       expect(workflowId, 'workflowId must be set by beforeAll').not.toBeNull()
 
       await openBuilderById(app, workflowId!)
-      await expect(app.getByText('Manual trigger')).toBeVisible({ timeout: 30_000 })
+      await expectCanvasStepTitleVisible(app, 'Manual trigger', { timeout: 30_000 })
 
       // Open run history via the builder kebab menu → "Run history" item
       const workflowKebab = app.getByRole('button', { name: 'Workflow actions' })

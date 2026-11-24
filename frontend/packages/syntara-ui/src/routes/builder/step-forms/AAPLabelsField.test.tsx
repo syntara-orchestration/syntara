@@ -33,7 +33,7 @@ const mockLabels = [
 ]
 
 describe('AAPLabelsField', () => {
-  it('renders with placeholder text when no labels selected', () => {
+  it('includes helper text in the toggle accessible description', () => {
     render(
       <TestWrapper>
         <AAPLabelsField
@@ -47,7 +47,9 @@ describe('AAPLabelsField', () => {
       </TestWrapper>
     )
 
-    expect(screen.getByRole('button', { name: /Use default labels/i })).toBeInTheDocument()
+    const toggle = screen.getByRole('button', { name: /Use default labels/i })
+    expect(toggle).toBeInTheDocument()
+    expect(toggle).toHaveAccessibleDescription('Select labels to apply')
     expect(screen.getByText(/Select labels to apply/i)).toBeInTheDocument()
   })
 

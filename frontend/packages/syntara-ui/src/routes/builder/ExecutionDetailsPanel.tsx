@@ -11,6 +11,7 @@ import { useElapsedTime } from '../../hooks/useElapsedTime'
 import type { FilterConfig } from '../../types/filters'
 import { formatElapsedTime } from '../../utils/dateUtils'
 import { detachPromise } from '../../utils/detachPromise'
+import type { RunDetailsPanelExpandControl } from '../executions/RunDetailsPanelExpandButton'
 import { StepExecutionDetailsPanel } from '../executions/StepExecutionDetailsPanel'
 import type { ActivityState } from '../workflows/execution/types'
 import {
@@ -44,6 +45,7 @@ type ExecutionDetailsPanelProps = {
   onNodeSelect?: (nodeId: string, nodeName: string) => void
   headerLabel?: string
   onClosePanel?: () => void
+  panelExpandControl?: RunDetailsPanelExpandControl
 }
 
 type ThreePanelLayoutProps = {
@@ -72,6 +74,7 @@ type ThreePanelLayoutProps = {
   onRowClick?: (nodeId: string, nodeName: string) => void
   headerLabel?: string
   onClosePanel?: () => void
+  panelExpandControl?: RunDetailsPanelExpandControl
 }
 
 function ThreePanelLayout({
@@ -95,6 +98,7 @@ function ThreePanelLayout({
   onRowClick,
   headerLabel,
   onClosePanel,
+  panelExpandControl,
 }: Readonly<ThreePanelLayoutProps>) {
   return (
     <SynPanel
@@ -117,6 +121,7 @@ function ThreePanelLayout({
           onViewModeChange={onViewModeChange}
           headerLabel={headerLabel}
           onClosePanel={onClosePanel}
+          panelExpandControl={panelExpandControl}
         />
       </div>
       <Flex
@@ -209,6 +214,7 @@ type SinglePanelLayoutProps = {
   selectedNodeId?: string | null
   headerLabel?: string
   onClosePanel?: () => void
+  panelExpandControl?: RunDetailsPanelExpandControl
 }
 
 function SinglePanelLayout({
@@ -229,6 +235,7 @@ function SinglePanelLayout({
   selectedNodeId,
   headerLabel,
   onClosePanel,
+  panelExpandControl,
 }: Readonly<SinglePanelLayoutProps>) {
   const resolvedError = useMemo(
     () => resolveErrorDetails(execution.error_details, nameMap),
@@ -255,6 +262,7 @@ function SinglePanelLayout({
             onViewModeChange={onViewModeChange}
             headerLabel={headerLabel}
             onClosePanel={onClosePanel}
+            panelExpandControl={panelExpandControl}
           />
         </StackItem>
 
@@ -307,6 +315,7 @@ export function ExecutionDetailsPanel({
   onNodeSelect,
   headerLabel,
   onClosePanel,
+  panelExpandControl,
 }: Readonly<ExecutionDetailsPanelProps>) {
   const { setActivityExecutions } = useExecutionStoreActions()
   const activityStates = useExecutionStore((s) => s.activityStates)
@@ -358,15 +367,14 @@ export function ExecutionDetailsPanel({
   const hasFilteredOutActivities = hasActiveFilters && activityOrder.length > 0
   const showFilters = activityOrder.length > 0 || hasActiveFilters
 
-  const { resolvedNodeId, effectiveKey, displayStepName, selectedNodeState, selectedNodeType, handleRowClick } =
-    useSelectedActivity({
-      selectedNodeId,
-      selectedNodeNameProp,
-      activityStates,
-      activityOrder,
-      nameMap,
-      onNodeSelect,
-    })
+  const { effectiveKey, displayStepName, selectedNodeState, selectedNodeType, handleRowClick } = useSelectedActivity({
+    selectedNodeId,
+    selectedNodeNameProp,
+    activityStates,
+    activityOrder,
+    nameMap,
+    onNodeSelect,
+  })
 
   const handleViewModeChange = useCallback(
     (mode: ViewMode) => {
@@ -400,7 +408,7 @@ export function ExecutionDetailsPanel({
         showFilters={showFilters}
         filters={filters}
         onFilterChange={handleFilterChange}
-        selectedNodeId={resolvedNodeId}
+        selectedNodeId={effectiveKey}
         detailNodeId={effectiveKey}
         displayStepName={displayStepName}
         executionId={executionId}
@@ -411,6 +419,7 @@ export function ExecutionDetailsPanel({
         onRowClick={handleRowClick}
         headerLabel={headerLabel}
         onClosePanel={onClosePanel}
+        panelExpandControl={panelExpandControl}
       />
     )
   }
@@ -431,9 +440,10 @@ export function ExecutionDetailsPanel({
       viewMode={viewMode}
       onViewModeChange={handleViewModeChange}
       onRowClick={handleRowClick}
-      selectedNodeId={resolvedNodeId}
+      selectedNodeId={effectiveKey}
       headerLabel={headerLabel}
       onClosePanel={onClosePanel}
+      panelExpandControl={panelExpandControl}
     />
   )
 }

@@ -9,7 +9,7 @@ import { detachPromise } from '../../../utils/detachPromise'
 import { AAPIntegrationSection } from '../components/AAPIntegrationSection'
 import type { ExpandableCodeEditorHandle } from '../components/ExpandableCodeEditor'
 import { StepEditorAutoSubmitContext, useRegisterAutoSubmit } from '../hooks/useStepEditorAutoSubmit'
-import { hasExpressionValue } from '../utils/aapHelpers'
+import { resolveJobTemplateUseInputVariables } from '../utils/aapHelpers'
 import { useIsVersionView } from '../VersionViewContext'
 
 import { applyDefaultValues, sanitizeArrayField } from './aapFormHelpers'
@@ -269,17 +269,7 @@ export function AAPJobTemplateForm(props: Readonly<AAPStepFormProps>) {
     diff_mode: false,
     settings: {},
     ...initialData,
-    use_input_variables:
-      initialData?.use_input_variables === true ||
-      hasExpressionValue(
-        initialData?.organization_name,
-        initialData?.job_template_name,
-        initialData?.inventory_name,
-        initialData?.limit,
-        initialData?.tags,
-        initialData?.skip_tags,
-        initialData?.extra_vars
-      ),
+    use_input_variables: resolveJobTemplateUseInputVariables(initialData ?? {}),
   }
 
   const methods = useForm<AAPJobTemplateFormData>({

@@ -15,7 +15,7 @@ import { invalidateAuthzCaches } from '../../hooks/invalidateAuthzCaches'
 import { useCursorReset } from '../../hooks/useCursorPagination'
 import { useDialogState } from '../../hooks/useDialogState'
 import { useExpandableRowIds } from '../../hooks/useExpandableRowIds'
-import { useAlerts } from '../../providers/alerts'
+import { useAlerts } from '../../providers/alerts/AlertContext'
 import { FilterOperatorEnum, FilterTypeEnum } from '../../types/filters'
 import { getErrorMessage } from '../../utils/apiErrors'
 import { detachPromise } from '../../utils/detachPromise'
@@ -140,7 +140,6 @@ function AssignmentsTableBody({
       <Thead>
         <Tr>
           <Th
-            width={10}
             expand={{
               areAllExpanded: !allRowsExpanded,
               collapseAllAriaLabel: allRowsExpanded ? 'Collapse all' : 'Expand all',

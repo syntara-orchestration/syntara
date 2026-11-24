@@ -20,7 +20,7 @@ import { SynFormField } from '../../components/forms/SynFormField'
 import { SynSelect } from '../../components/SynSelect'
 import { useDebouncedValue } from '../../hooks/useDebouncedValue'
 import { useSynForm } from '../../hooks/useSynForm'
-import { useAlerts } from '../../providers/alerts'
+import { useAlerts } from '../../providers/alerts/AlertContext'
 import { getErrorMessage, isServiceUnavailableError } from '../../utils/apiErrors'
 import { batchedAllSettled } from '../../utils/batchedSettled'
 import { detachPromise } from '../../utils/detachPromise'
@@ -249,7 +249,7 @@ export function AssignRoleModal({
                     onChange={(value) => {
                       field.onChange(value)
                       setValue('projectId', '', { shouldValidate: true })
-                      setValue('roleIds', [], { shouldValidate: true })
+                      setValue('roleIds', [])
                     }}
                     options={roleAssignmentScopeOptions}
                   />
@@ -270,7 +270,7 @@ export function AssignRoleModal({
                     value={field.value ?? ''}
                     onChange={(value) => {
                       field.onChange(value)
-                      setValue('roleIds', [], { shouldValidate: true })
+                      setValue('roleIds', [])
                     }}
                     options={projectOptions}
                     placeholder="Select a project..."

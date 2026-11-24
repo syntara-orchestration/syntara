@@ -12,8 +12,8 @@ import pytest
 from temporalio.exceptions import ApplicationError
 from temporalio.service import RPCError, RPCStatusCode
 
-from syntara.workflows.clients.approvals_client import ApprovalsApiClientError
-from syntara.workflows.workflow_engine.activities.approval_activity import (
+from syntara.workflow_runtime.clients.approvals_client import ApprovalsApiClientError
+from syntara.workflow_runtime.engines.temporal.activities.approval_activity import (
     ApprovalActivityError,
     create_approval_request_activity,
     fail_detached_approval_activity,
@@ -111,7 +111,7 @@ async def test_create_approval_request_success(
 
     with (
         patch(
-            "syntara.workflows.workflow_engine.activities.approval_activity.ApprovalsApiClient",
+            "syntara.workflow_runtime.engines.temporal.activities.approval_activity.ApprovalsApiClient",
             return_value=mock_client,
         ),
         pytest.raises(CompleteAsyncError),
@@ -157,7 +157,7 @@ async def test_create_approval_request_forwards_prompt(
 
     with (
         patch(
-            "syntara.workflows.workflow_engine.activities.approval_activity.ApprovalsApiClient",
+            "syntara.workflow_runtime.engines.temporal.activities.approval_activity.ApprovalsApiClient",
             return_value=mock_client,
         ),
         pytest.raises(CompleteAsyncError),
@@ -195,7 +195,7 @@ async def test_create_approval_request_with_timeout(
 
     with (
         patch(
-            "syntara.workflows.workflow_engine.activities.approval_activity.ApprovalsApiClient",
+            "syntara.workflow_runtime.engines.temporal.activities.approval_activity.ApprovalsApiClient",
             return_value=mock_client,
         ),
         pytest.raises(CompleteAsyncError),
@@ -233,7 +233,7 @@ async def test_create_approval_request_with_rejected_path(
 
     with (
         patch(
-            "syntara.workflows.workflow_engine.activities.approval_activity.ApprovalsApiClient",
+            "syntara.workflow_runtime.engines.temporal.activities.approval_activity.ApprovalsApiClient",
             return_value=mock_client,
         ),
         pytest.raises(CompleteAsyncError),
@@ -269,7 +269,7 @@ async def test_create_approval_request_api_error(
 
     with (
         patch(
-            "syntara.workflows.workflow_engine.activities.approval_activity.ApprovalsApiClient",
+            "syntara.workflow_runtime.engines.temporal.activities.approval_activity.ApprovalsApiClient",
             return_value=mock_client,
         ),
         pytest.raises(ApprovalActivityError, match="Connection refused"),
@@ -300,7 +300,7 @@ async def test_create_approval_request_unexpected_error(
 
     with (
         patch(
-            "syntara.workflows.workflow_engine.activities.approval_activity.ApprovalsApiClient",
+            "syntara.workflow_runtime.engines.temporal.activities.approval_activity.ApprovalsApiClient",
             return_value=mock_client,
         ),
         pytest.raises(ApprovalActivityError, match="Unexpected error creating approval request"),
@@ -335,7 +335,7 @@ async def test_create_approval_request_missing_project_id(
     assert exc_info.value.type == "ConfigError"
 
 
-SYNC_SERVICE_PATH = "syntara.workflows.workflow_engine.activities.approval_activity.get_activity_sync_service"
+SYNC_SERVICE_PATH = "syntara.workflow_runtime.engines.temporal.activities.approval_activity.get_activity_sync_service"
 
 
 @pytest.mark.asyncio

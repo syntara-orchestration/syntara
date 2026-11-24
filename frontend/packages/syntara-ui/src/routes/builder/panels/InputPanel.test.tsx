@@ -1143,6 +1143,25 @@ describe('InputPanel', () => {
       // Should display the pinned output mock as input
       expect(screen.getByText('mocked_value')).toBeInTheDocument()
     })
+
+    it('updates existing node inputs when an upstream output mock changes', () => {
+      mockUseUpstreamNodes.mockReturnValue(upstreamNodes)
+      const staleExecutionData = { 'upstream-1': { mocked_field: 'stale-execution-value' } }
+
+      const { rerender } = render(<InputPanel nodeId="node-1" executionData={staleExecutionData} />)
+
+      expect(screen.getByText('stale-execution-value')).toBeInTheDocument()
+
+      mockPinnedData = {
+        'upstream-1': {
+          outputMock: { mocked_field: 'freshly-pinned-value' },
+        },
+      }
+      rerender(<InputPanel nodeId="node-1" executionData={staleExecutionData} />)
+
+      expect(screen.getByText('freshly-pinned-value')).toBeInTheDocument()
+      expect(screen.queryByText('stale-execution-value')).not.toBeInTheDocument()
+    })
   })
 
   describe('Unpin single predecessor inline button', () => {

@@ -25,6 +25,16 @@ export default {
       ExportDefaultDeclaration() {
         hasDefaultExport = true
       },
+      ExportNamedDeclaration(node) {
+        if (node.source !== null) return
+
+        const exportsDefault = node.specifiers.some((specifier) => {
+          const { exported } = specifier
+          return exported.type === 'Identifier' ? exported.name === 'default' : exported.value === 'default'
+        })
+
+        if (exportsDefault) hasDefaultExport = true
+      },
       'Program:exit'(node) {
         if (hasDefaultExport && !hasTitleElement) {
           // Report on the first statement (not Program) so file-level

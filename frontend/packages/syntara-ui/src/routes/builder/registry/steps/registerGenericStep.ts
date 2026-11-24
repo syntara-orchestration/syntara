@@ -1,6 +1,6 @@
 import { RhUiAddCircleFillIcon } from '@patternfly/react-icons'
 
-import { RegistryStepId } from '../../../../constants'
+import { RegistryStepId } from '../../../../constants/registryStepIds'
 import { createGenericActivity, useWorkflowStore } from '../../../../stores/useWorkflowStore'
 import { GenericStepForm } from '../../step-forms/GenericStepForm'
 import { buildNamedActivity } from '../../utils/stepCreationHelpers'

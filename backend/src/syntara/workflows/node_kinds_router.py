@@ -40,12 +40,12 @@ from syntara.authz.resolver import resolve_effective_policies, resolve_user_grou
 from syntara.core.database.session import get_db
 from syntara.core.models import User
 from syntara.core.syntara_router import NO_PERMISSION, SyntaraRouter
+from syntara.workflow_core.models import NodeType
 from syntara.workflows.node_kinds import (
     NODE_ACTION_WRITE,
     NODE_RESOURCE_TYPE,
     node_kind_display_label,
 )
-from syntara.workflows.workflow_engine.models.workflow_definition import NodeType
 
 router = SyntaraRouter(prefix="/node_kinds", tags=["Node Kinds"])
 

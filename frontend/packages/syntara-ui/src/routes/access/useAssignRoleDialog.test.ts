@@ -16,7 +16,7 @@ const mockOnSuccess = vi.fn()
 const mockInvalidateAuthzCaches = vi.hoisted(() => vi.fn())
 const mockCreateSystemAssignment = vi.fn()
 const mockCreateProjectAssignment = vi.fn()
-vi.mock('../../providers/alerts', () => ({
+vi.mock('../../providers/alerts/AlertContext', () => ({
   useAlerts: () => ({ showSuccess: mockShowSuccess, showAlert: vi.fn() }),
 }))
 

@@ -226,8 +226,6 @@ def _mock_evaluator_allow_all(monkeypatch: pytest.MonkeyPatch) -> None:
 
     This is a lightweight fallback for integration tests that don't live
     under ``tests/integration/api/`` (those use the CLI-based mock).
-    The ``api`` conftest's ``_mock_evaluator`` fixture overrides this one for
-    tests in that directory because pytest uses the most-specific conftest.
 
     The mock is installed on ``app.state.authz_evaluator`` — the single place
     ``get_authz_evaluator`` reads — and never via ``app.dependency_overrides``:
@@ -247,7 +245,7 @@ def _mock_evaluator_allow_all(monkeypatch: pytest.MonkeyPatch) -> None:
         }
     )
 
-    monkeypatch.setattr(app.state, "authz_evaluator", mock_evaluator, raising=False)
+    monkeypatch.setitem(app.state._state, "authz_evaluator", mock_evaluator)
 
 
 @pytest.fixture
