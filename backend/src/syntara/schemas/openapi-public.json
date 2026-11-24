@@ -37018,18 +37018,19 @@
             }
           },
           "409": {
-            "description": "Conflict",
+            "description": "Conflict. When the workflow is referenced by published parents the body is a WorkflowReferencedConfirmationProblem (carrying referencing_count); resend with confirm=true to delete. Other conflicts (for example active executions blocking deletion) use the generic problem shape.",
             "content": {
               "application/problem+json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ErrorData"
-                },
-                "example": {
-                  "type": "https://api.example.com/errors/conflict",
-                  "title": "Conflict",
-                  "detail": "The request conflicts with the current state of the resource",
-                  "code": "CONFLICT",
-                  "retryable": false
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/WorkflowReferencedConfirmationProblem"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ErrorData"
+                    }
+                  ],
+                  "title": "Response 409 Delete Workflow"
                 }
               }
             }
@@ -37885,7 +37886,7 @@
     "/workflows/{workflow_id}/used_by": {
       "get": {
         "summary": "List published workflows that reference this workflow",
-        "description": "List published workflows whose published version references this workflow (Used-By).\n\n``total_count`` is every distinct published parent across all projects; ``resources`` is the page of parents the caller may view. Access requires read permission on this workflow.",
+        "description": "List published workflows whose published version references this workflow (Used-By).\n\n``referencing_parent_count`` is every distinct published parent across all projects; ``resources`` is the page of parents the caller may view. Access requires read permission on this workflow.",
         "operationId": "list_workflow_used_by",
         "tags": [
           "Workflows"
@@ -37953,16 +37954,6 @@
                 }
               ],
               "title": "Sort"
-            }
-          },
-          {
-            "name": "include_total",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "boolean",
-              "default": false,
-              "title": "Include Total"
             }
           },
           {
@@ -38648,18 +38639,19 @@
             }
           },
           "409": {
-            "description": "Conflict",
+            "description": "Conflict. When publishing removes a Subworkflow Trigger invoked by published parents the body is a WorkflowPublishTriggerRemovalConfirmationProblem (carrying affected_count); resend with confirm=true. Other conflicts (version conflict, publish validation) use the generic problem shape.",
             "content": {
               "application/problem+json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ErrorData"
-                },
-                "example": {
-                  "type": "https://api.example.com/errors/conflict",
-                  "title": "Conflict",
-                  "detail": "The request conflicts with the current state of the resource",
-                  "code": "CONFLICT",
-                  "retryable": false
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/WorkflowPublishTriggerRemovalConfirmationProblem"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ErrorData"
+                    }
+                  ],
+                  "title": "Response 409 Publish Workflow Version"
                 }
               }
             }
@@ -52348,15 +52340,222 @@
           }
         ]
       },
+      "WorkflowReferencedConfirmationProblem": {
+        "description": "Typed RFC 9457 problem body for the delete-confirmation 409.\n\nExtends the base problem with the count of referencing published parents; their identities are\nnever disclosed, since the caller may lack read access to them. Mirrors\n``WorkflowReferencedConfirmationProblem`` in the OpenAPI spec so generated clients type the field.",
+        "examples": [
+          {
+            "code": "RATE_LIMIT_EXCEEDED",
+            "detail": "OpenRouter API rate limit exceeded. Please try again in a few moments.",
+            "instance": "/invocations/550e8400-e29b-41d4-a716-446655440000",
+            "retryable": true,
+            "title": "LLM Rate Limit Exceeded",
+            "type": "https://api.example.com/errors/llm-error"
+          },
+          {
+            "code": "STREAM_TIMEOUT",
+            "detail": "LLM streaming timed out after 30 seconds",
+            "instance": "/invocations/550e8400-e29b-41d4-a716-446655440000",
+            "retryable": true,
+            "title": "Streaming Timeout",
+            "type": "https://api.example.com/errors/timeout-error"
+          }
+        ],
+        "properties": {
+          "code": {
+            "const": "WORKFLOW_REFERENCED_CONFIRMATION_REQUIRED",
+            "description": "Machine-readable error code; fixed for this problem type.",
+            "title": "Code",
+            "type": "string"
+          },
+          "detail": {
+            "description": "Human-readable explanation specific to this occurrence",
+            "examples": [
+              "OpenRouter API returned error: rate limit exceeded. Please try again in a few moments."
+            ],
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Detail",
+            "type": "string"
+          },
+          "instance": {
+            "anyOf": [
+              {
+                "maxLength": 2048,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional URI reference identifying the specific occurrence",
+            "examples": [
+              "/invocations/550e8400-e29b-41d4-a716-446655440000"
+            ],
+            "title": "Instance"
+          },
+          "referencing_count": {
+            "description": "Distinct published parents that reference this workflow and would be affected by deletion.",
+            "minimum": 1.0,
+            "title": "Referencing Count",
+            "type": "integer"
+          },
+          "retryable": {
+            "description": "Whether this error can be retried by creating a new invocation",
+            "examples": [
+              true
+            ],
+            "title": "Retryable",
+            "type": "boolean"
+          },
+          "title": {
+            "description": "Short, human-readable summary of the problem",
+            "examples": [
+              "LLM Service Unavailable"
+            ],
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          },
+          "type": {
+            "description": "URI reference identifying the problem type",
+            "examples": [
+              "https://api.example.com/errors/llm-error"
+            ],
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "title",
+          "detail",
+          "code",
+          "retryable",
+          "referencing_count"
+        ],
+        "title": "WorkflowReferencedConfirmationProblem",
+        "type": "object"
+      },
+      "WorkflowPublishTriggerRemovalConfirmationProblem": {
+        "description": "Typed RFC 9457 problem body for the publish trigger-removal 409.\n\nExtends the base problem with the count of affected published parents (identities are never\ndisclosed). Mirrors ``WorkflowPublishTriggerRemovalConfirmationProblem`` in the OpenAPI spec.",
+        "examples": [
+          {
+            "code": "RATE_LIMIT_EXCEEDED",
+            "detail": "OpenRouter API rate limit exceeded. Please try again in a few moments.",
+            "instance": "/invocations/550e8400-e29b-41d4-a716-446655440000",
+            "retryable": true,
+            "title": "LLM Rate Limit Exceeded",
+            "type": "https://api.example.com/errors/llm-error"
+          },
+          {
+            "code": "STREAM_TIMEOUT",
+            "detail": "LLM streaming timed out after 30 seconds",
+            "instance": "/invocations/550e8400-e29b-41d4-a716-446655440000",
+            "retryable": true,
+            "title": "Streaming Timeout",
+            "type": "https://api.example.com/errors/timeout-error"
+          }
+        ],
+        "properties": {
+          "affected_count": {
+            "description": "Distinct published parents that invoke a Subworkflow Trigger removed by this publish.",
+            "minimum": 1.0,
+            "title": "Affected Count",
+            "type": "integer"
+          },
+          "code": {
+            "const": "WORKFLOW_PUBLISH_TRIGGER_REMOVAL_CONFIRMATION_REQUIRED",
+            "description": "Machine-readable error code; fixed for this problem type.",
+            "title": "Code",
+            "type": "string"
+          },
+          "detail": {
+            "description": "Human-readable explanation specific to this occurrence",
+            "examples": [
+              "OpenRouter API returned error: rate limit exceeded. Please try again in a few moments."
+            ],
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Detail",
+            "type": "string"
+          },
+          "instance": {
+            "anyOf": [
+              {
+                "maxLength": 2048,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional URI reference identifying the specific occurrence",
+            "examples": [
+              "/invocations/550e8400-e29b-41d4-a716-446655440000"
+            ],
+            "title": "Instance"
+          },
+          "retryable": {
+            "description": "Whether this error can be retried by creating a new invocation",
+            "examples": [
+              true
+            ],
+            "title": "Retryable",
+            "type": "boolean"
+          },
+          "title": {
+            "description": "Short, human-readable summary of the problem",
+            "examples": [
+              "LLM Service Unavailable"
+            ],
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          },
+          "type": {
+            "description": "URI reference identifying the problem type",
+            "examples": [
+              "https://api.example.com/errors/llm-error"
+            ],
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "title",
+          "detail",
+          "code",
+          "retryable",
+          "affected_count"
+        ],
+        "title": "WorkflowPublishTriggerRemovalConfirmationProblem",
+        "type": "object"
+      },
       "WorkflowUsedByResponse": {
         "type": "object",
         "required": [
           "resources",
-          "total_count"
+          "referencing_parent_count"
         ],
         "title": "WorkflowUsedByResponse",
-        "description": "Paginated Used-By response: published workflows that reference a given workflow.\n\n``resources`` is the page of referencing parents the requester may view; ``total_count`` is the number of distinct published parents across all projects, not filtered by visibility.",
+        "description": "Used-By response: the published parents that reference a given workflow.\n\n``resources`` is the RBAC-filtered page of referencing parents the requester may view, paged by\n``next``/``prev``. ``referencing_parent_count`` is a domain value -- not a pagination total --\ngiving the number of distinct published parents across all projects, counted regardless of the\nrequester's visibility, so the Used-By badge reflects true impact even when some parents sit in\nprojects the caller cannot see. The page envelope's ``total``/``include_total`` are deliberately\nomitted here: the visible page is already bounded by ``limit`` and the meaningful count is the\ncross-project domain value above.",
         "properties": {
+          "resources": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorkflowRead"
+            },
+            "maxItems": 100,
+            "title": "Resources",
+            "description": "Page of referencing published parents the caller may view."
+          },
           "next": {
             "anyOf": [
               {
@@ -52367,7 +52566,7 @@
               }
             ],
             "title": "Next",
-            "description": "Cursor for next page of results"
+            "description": "Cursor for the next page of referencing parents."
           },
           "prev": {
             "anyOf": [
@@ -52379,45 +52578,19 @@
               }
             ],
             "title": "Prev",
-            "description": "Cursor for previous page of results"
+            "description": "Cursor for the previous page of referencing parents."
           },
-          "total": {
-            "anyOf": [
-              {
-                "type": "integer",
-                "minimum": 0.0
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Total",
-            "description": "Total count of resources (only when include_total=true)"
-          },
-          "resources": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/WorkflowRead"
-            },
-            "maxItems": 100,
-            "title": "Resources",
-            "description": "Array of resources in current page"
-          },
-          "total_count": {
+          "referencing_parent_count": {
             "type": "integer",
             "minimum": 0.0,
-            "title": "Total Count",
-            "description": "Distinct published parent workflows that reference this workflow, counted across all projects regardless of the requester's visibility."
+            "title": "Referencing Parent Count",
+            "description": "Distinct published parent workflows that reference this workflow, counted across all projects regardless of the requester's visibility. A domain value, not a pagination total."
           }
         },
         "examples": [
           {
-            "next": "eyJpZCI6InV1aWQifQ",
-            "total": 150
-          },
-          {
-            "next": "eyJpZCI6Im5leHQifQ",
-            "prev": "eyJpZCI6InByZXYifQ"
+            "referencing_parent_count": 3,
+            "resources": []
           }
         ]
       },
@@ -52425,21 +52598,21 @@
         "type": "object",
         "required": [
           "workflow_id",
-          "total_count"
+          "referencing_parent_count"
         ],
         "title": "WorkflowUsedByCount",
-        "description": "Used-By total for a single workflow, returned by the batch counts endpoint.",
+        "description": "Used-By count for a single workflow, returned by the batch counts endpoint.",
         "properties": {
           "workflow_id": {
             "type": "string",
             "format": "uuid",
             "title": "Workflow Id"
           },
-          "total_count": {
+          "referencing_parent_count": {
             "type": "integer",
             "minimum": 0.0,
-            "title": "Total Count",
-            "description": "Distinct published parent workflows that reference this workflow, across all projects."
+            "title": "Referencing Parent Count",
+            "description": "Distinct published parent workflows that reference this workflow, across all projects, regardless of the requester's visibility."
           }
         }
       },
