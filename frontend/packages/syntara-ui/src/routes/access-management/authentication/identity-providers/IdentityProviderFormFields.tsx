@@ -243,6 +243,7 @@ type IdentityProviderFormFieldsProps = {
   isSaving?: boolean
   onSubmit?: (goToStepById: (id: string) => void) => void
   onCancel?: () => void
+  cancelTo?: string
 }
 
 export function IdentityProviderFormFields({
@@ -255,6 +256,7 @@ export function IdentityProviderFormFields({
   isSaving,
   onSubmit,
   onCancel,
+  cancelTo,
 }: Readonly<IdentityProviderFormFieldsProps>) {
   const { control, setValue, trigger } = form
   const claimsSupported = testResult?.claimsSupported
@@ -288,6 +290,7 @@ export function IdentityProviderFormFields({
             isSaving={isSaving}
             onSubmit={onSubmit}
             onCancel={onCancel}
+            cancelTo={cancelTo}
           />
         }
       >
