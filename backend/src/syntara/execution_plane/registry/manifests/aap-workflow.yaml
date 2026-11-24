@@ -1,0 +1,147 @@
+---
+apiVersion: syntara.io/v1alpha1
+kind: Action
+metadata:
+  name: aap-workflow
+  displayName: AAP Workflow
+  description: Launches and observes a workflow job template on an existing AAP instance.
+spec:
+  runtime:
+    kind: custom-runner
+    entryPoint: "syntara_node_aap_workflow:AapWorkflowStep"
+  integrationType: syntara.aap
+  input:
+    kind: inline
+    value:
+      type: object
+      additionalProperties: false
+      anyOf:
+        - required: [workflow_job_template_id]
+        - required: [workflow_job_template_name, organization_name]
+      properties:
+        workflow_job_template_id:
+          type: integer
+          minimum: 1
+          description: AAP workflow job template ID to launch (takes precedence over name).
+        workflow_job_template_name:
+          type: string
+          minLength: 1
+          description: AAP workflow job template name (requires organization_name).
+        organization_id:
+          type: integer
+          minimum: 1
+          description: AAP organization ID (takes precedence over organization_name).
+        organization_name:
+          type: string
+          minLength: 1
+          description: AAP organization name (required with name-based lookup).
+        extra_vars:
+          type: object
+          additionalProperties: true
+          description: Extra variables to pass to the workflow.
+        limit:
+          type: string
+          description: Limit workflow execution to specific hosts.
+        scm_branch:
+          type: string
+          description: Source control branch override.
+        tags:
+          type: string
+          description: Ansible tags to run (comma-separated; sent to AAP as job_tags).
+        skip_tags:
+          type: string
+          description: Ansible tags to skip (comma-separated).
+        labels:
+          type: array
+          items:
+            type: string
+          description: AAP label names to append to the template's default labels.
+        inventory_id:
+          type: integer
+          minimum: 1
+          description: Override default inventory by ID.
+        inventory_name:
+          type: string
+          minLength: 1
+          description: Override default inventory by name (requires organization_name).
+        timeout:
+          type: integer
+          minimum: 1
+          description: Execution budget for the workflow launch and observation, in seconds.
+  output:
+    kind: inline
+    value:
+      description: >-
+        Result structure preserving the in-process adapter's discriminated
+        union on status. Artifacts are truncated (largest keys dropped, listed
+        under __syntara_truncated_artifacts__) when the serialized result would
+        exceed the 1 MiB SDK limit; workflow identity fields are never dropped.
+      oneOf:
+        - title: Completed Result
+          type: object
+          additionalProperties: false
+          required: [status, workflow_job_id, created, started, finished]
+          properties:
+            status:
+              type: string
+              const: completed
+              description: Execution succeeded.
+            workflow_job_id:
+              type: integer
+              description: AAP workflow job ID.
+            workflow_job_url:
+              type: string
+              description: >-
+                URL to view the workflow job in the AAP UI (derived from the
+                integration endpoint and the job id).
+            workflow_job_status:
+              type: string
+              description: Workflow job status (successful, failed, etc.).
+            artifacts:
+              type: object
+              additionalProperties: true
+              description: Artifacts recorded on the workflow job.
+            created:
+              type: string
+              description: Workflow job creation timestamp (ISO 8601).
+            started:
+              type: string
+              description: Workflow job start timestamp (ISO 8601).
+            finished:
+              type: string
+              description: Workflow job finish timestamp (ISO 8601).
+        - title: Failed Result
+          type: object
+          additionalProperties: false
+          required: [status, error, workflow_job_id, workflow_job_status]
+          properties:
+            status:
+              type: string
+              const: failed
+            error:
+              type: string
+              description: Error detail.
+            workflow_job_id:
+              type: [integer, "null"]
+              description: AAP workflow job ID, when one was launched.
+            workflow_job_url:
+              type: [string, "null"]
+              description: URL to view the workflow job in the AAP UI, when known.
+            workflow_job_status:
+              type: [string, "null"]
+              description: Last observed workflow job status, when known.
+            artifacts:
+              type: [object, "null"]
+              additionalProperties: true
+              description: Artifacts recorded on the workflow job, when known.
+            created:
+              type: [string, "null"]
+            started:
+              type: [string, "null"]
+            finished:
+              type: [string, "null"]
+  error:
+    kind: inline
+    value:
+      type: object
+      additionalProperties: true

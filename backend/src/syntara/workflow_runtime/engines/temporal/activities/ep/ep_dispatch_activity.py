@@ -177,8 +177,15 @@ async def _dispatch_to_ep(  # noqa: C901, PLR0912, PLR0915 - service handoff and
     execution_id: uuid.UUID,
     execution_target_id: uuid.UUID | None,
     plugin_name: str,
+    runtime_context_additions: dict[str, object] | None = None,
 ) -> dict[str, Any] | None:
-    """Submit a stable work command and recover existing work after an ambiguous retry."""
+    """Submit a stable work command and recover existing work after an ambiguous retry.
+
+    ``runtime_context_additions`` carries plugin-visible context beyond the
+    execution correlation keys (for example, an Action's resolved integration
+    endpoint). Keys must not collide with the correlation keys built by
+    ``_work_runtime_context``.
+    """
     settings = get_settings()
     info = activity.info()
     work_item_id = execution_plane_work_item_id(execution_id, info.activity_id)
@@ -203,9 +210,12 @@ async def _dispatch_to_ep(  # noqa: C901, PLR0912, PLR0915 - service handoff and
         msg = f"No Execution Plane image is configured for Action '{plugin_name}'"
         raise ApplicationError(msg, type="ConfigError", non_retryable=True)
     try:
+        runtime_context = await _work_runtime_context(execution_id, info.activity_id)
+        if runtime_context_additions:
+            runtime_context.update(runtime_context_additions)
         message = WorkExecute(
             work_item_id=work_item_id,
-            runtime_context=await _work_runtime_context(execution_id, info.activity_id),
+            runtime_context=runtime_context,
             invocation=WorkloadInvocation.model_validate(
                 _build_invocation(input_config, step_identity, credential_recipe_ids)
             ),

@@ -881,6 +881,21 @@ SETTINGS_CATALOG: list[SettingDefinition] = [
         group=WorkflowEngineGroup.EXECUTION,
         validation_schema={"min": 1.0},
     ),
+    SettingDefinition(
+        key="workflow_engine.aap_workflow_ep_dispatch_enabled",
+        name="Dispatch AAP workflow nodes to the Execution Plane",
+        category=SettingCategory.WORKFLOW_EXECUTION,
+        value_type=SettingValueType.BOOLEAN,
+        default_value=False,
+        description=(
+            "When true, AAP workflow job template nodes run as the containerized "
+            "AAP Workflow Action on the Execution Plane instead of the in-process "
+            "control-plane executor. The node contract (inputs, outputs, error "
+            "handling) is unchanged; only the executor differs."
+        ),
+        helper_text="Default: false (in-process executor).",
+        group=WorkflowEngineGroup.EXECUTION,
+    ),
     # Authentication — Local login
     SettingDefinition(
         key="authentication.local_login_enabled",

@@ -43,6 +43,7 @@ with workflow.unsafe.imports_passed_through():
         INTERNAL_ACTIVITY_HEARTBEAT_TIMEOUT_SECONDS,
     )
     from syntara.workflow_runtime.engines.temporal.node_settings_resolver import (
+        aap_workflow_ep_dispatch_enabled,
         resolve_continue_on_failure,
         resolve_max_iterations,
         resolve_max_output_bytes,
@@ -812,7 +813,10 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
             workflow.logger.info(f"Scheduling node: {successor.id} (type: {successor.type})")
             task = asyncio.create_task(self._execute_node(node=successor, graph=graph))
             pending_tasks[successor.id] = task
-            if successor.type in _EXECUTION_PLANE_SUPPORTED_NODE_TYPES:
+            if successor.type in _EXECUTION_PLANE_SUPPORTED_NODE_TYPES or (
+                successor.type == NodeType.AAP_WORKFLOW_JOB_TEMPLATE
+                and aap_workflow_ep_dispatch_enabled(self._runtime_settings)
+            ):
                 self._active_ep_nodes.add(successor.id)
             self._handle_converge_timeout(successor.id, graph, pending_tasks)
 
@@ -1289,9 +1293,11 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         outputs: dict[str, str] | None,
         timeout_seconds: int,
         extra_args: list[Any] | None = None,
+        activity_name: str | None = None,
     ) -> dict[str, Any]:
         """Execute an executor node via the activity map."""
-        activity_name = self._EXECUTOR_ACTIVITY_MAP.get(node_type)
+        if activity_name is None:
+            activity_name = self._EXECUTOR_ACTIVITY_MAP.get(node_type)
         if not activity_name:
             return {"output": {"status": "skipped", "reason": f"Unknown executor type: {node_type}"}}
         args: list[Any] = [resolved_parameters, outputs]
@@ -1780,6 +1786,17 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         finally:
             self._scrub_activity_credentials(resolved_parameters)
 
+    def _resolve_executor_activity_name(self, node_type: str) -> str | None:
+        """Return an activity-name override, or None to use the executor map.
+
+        AAP workflow nodes can run as the containerized Action on the
+        Execution Plane instead of the in-process executor; the node contract
+        is identical, only the activity changes.
+        """
+        if node_type == NodeType.AAP_WORKFLOW_JOB_TEMPLATE and aap_workflow_ep_dispatch_enabled(self._runtime_settings):
+            return ActivityName.AAP_WORKFLOW_JOB_TEMPLATE_EP
+        return None
+
     async def _dispatch_node_to_executor(
         self,
         node: ActivityNode,
@@ -1818,6 +1835,7 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
                 node.outputs,
                 timeout_seconds=temporal_timeout,
                 extra_args=extra_args,
+                activity_name=self._resolve_executor_activity_name(node_type),
             )
         if node_type == NodeType.APPROVAL:
             return await self._execute_approval_node(node, graph, resolved_parameters)

@@ -133,6 +133,7 @@ class ActivityName(StrEnum):
     # Executor nodes
     AAP_JOB_TEMPLATE = "execute_aap_job_template_activity"
     AAP_WORKFLOW_JOB_TEMPLATE = "execute_aap_workflow_job_template_activity"
+    AAP_WORKFLOW_JOB_TEMPLATE_EP = "execute_aap_workflow_ep_activity"
     AGENTIC = "execute_agentic_activity"
     APPROVAL = "execute_approval_activity"
     HTTP_REQUEST = "execute_http_request_activity"

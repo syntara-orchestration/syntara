@@ -31,6 +31,9 @@ from syntara.workflow_runtime.engines.temporal.activities.credential_resolution_
     resolve_workflow_credentials,
 )
 from syntara.workflow_runtime.engines.temporal.activities.eda_trigger import eda_trigger
+from syntara.workflow_runtime.engines.temporal.activities.ep.aap_workflow_dispatch_activity import (
+    execute_aap_workflow_ep_activity,
+)
 from syntara.workflow_runtime.engines.temporal.activities.ep.ep_cancellation_activity import (
     cancel_execution_plane_work_activity,
 )
@@ -63,6 +66,7 @@ _TEMPORAL_ACTIVITIES: list[Callable[..., Any]] = [
     validate_node_references,
     execute_aap_job_template_activity,
     execute_aap_workflow_job_template_activity,
+    execute_aap_workflow_ep_activity,
     execute_agentic_activity,
     cancel_agentic_invocation_activity,
     cancel_approval_requests_activity,

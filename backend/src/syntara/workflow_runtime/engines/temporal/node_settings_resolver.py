@@ -132,6 +132,15 @@ def resolve_continue_on_failure(node: ActivityNode, runtime_settings: dict[str, 
     return bool(runtime_settings.get("workflow_engine.continue_on_failure", False))
 
 
+def aap_workflow_ep_dispatch_enabled(runtime_settings: dict[str, Any]) -> bool:
+    """Return whether AAP workflow nodes dispatch to the Execution Plane.
+
+    Resolution: catalog global only (no per-node override) → False. When
+    false, AAP workflow nodes run the in-process control-plane executor.
+    """
+    return bool(runtime_settings.get("workflow_engine.aap_workflow_ep_dispatch_enabled", False))
+
+
 def resolve_retry_policy(
     node: ActivityNode,
     runtime_settings: dict[str, Any],

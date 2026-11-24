@@ -4,6 +4,7 @@ from syntara.settings.catalog import SETTINGS_CATALOG
 from syntara.workflow_core.graph import ActivityNode
 from syntara.workflow_runtime.engines.temporal.constants import DEFAULT_MAX_OUTPUT_BYTES
 from syntara.workflow_runtime.engines.temporal.node_settings_resolver import (
+    aap_workflow_ep_dispatch_enabled,
     resolve_max_output_bytes,
     resolve_retry_policy,
 )
@@ -53,3 +54,14 @@ def test_resolve_max_output_bytes_non_script_node() -> None:
     node = ActivityNode(node_id="n", node_type="http_request", parameters={})
     result = resolve_max_output_bytes(node, {"workflow_engine.script_max_output_kb": 512})
     assert result == DEFAULT_MAX_OUTPUT_BYTES
+
+
+def test_aap_workflow_ep_dispatch_disabled_by_default() -> None:
+    """AAP workflow nodes run in-process unless the catalog flag is set."""
+    assert aap_workflow_ep_dispatch_enabled({}) is False
+    assert aap_workflow_ep_dispatch_enabled({"workflow_engine.aap_workflow_ep_dispatch_enabled": False}) is False
+
+
+def test_aap_workflow_ep_dispatch_enabled_from_catalog() -> None:
+    """The catalog flag switches AAP workflow nodes to EP dispatch."""
+    assert aap_workflow_ep_dispatch_enabled({"workflow_engine.aap_workflow_ep_dispatch_enabled": True}) is True
