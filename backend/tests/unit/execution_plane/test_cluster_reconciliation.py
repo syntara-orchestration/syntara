@@ -11,7 +11,7 @@ import pytest
 
 from syntara.core.config.base import get_settings
 from syntara.execution_plane import integration_sync
-from syntara.execution_plane.client import ExecutionPlaneUnavailableError
+from syntara.execution_plane.client import ExecutionPlaneRejectedError, ExecutionPlaneUnavailableError
 
 
 @pytest.fixture
@@ -47,9 +47,12 @@ def test_worker_uses_shared_reconciliation_coordination(monkeypatch: pytest.Monk
 
 
 @pytest.mark.asyncio
-async def test_one_failed_integration_does_not_block_another(reconciliation: tuple[AsyncMock, UUID, UUID]) -> None:
+@pytest.mark.parametrize("error", [ExecutionPlaneUnavailableError(), ExecutionPlaneRejectedError(status_code=409)])
+async def test_one_failed_integration_does_not_block_another(
+    reconciliation: tuple[AsyncMock, UUID, UUID], error: Exception
+) -> None:
     apply, first, second = reconciliation
-    apply.side_effect = [ExecutionPlaneUnavailableError(), True]
+    apply.side_effect = [error, True]
     result = await integration_sync.reconcile_integration_clusters(MagicMock())
     assert result == {"synced": 1, "failed": 1, "skipped": 0}
     assert [call.args[1] for call in apply.await_args_list] == [first, second]

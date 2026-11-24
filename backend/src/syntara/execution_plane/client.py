@@ -60,11 +60,33 @@ class ExecutionPlaneRejectedError(ExecutionPlaneError):
         *,
         status_code: int | None = None,
         detail: object = None,
+        code: str | None = None,
     ) -> None:
         """Retain HTTP status so callers can recover existing domain resources."""
         super().__init__(message)
         self.status_code = status_code
         self.detail = detail
+        self.code = code
+
+    @classmethod
+    def from_response(cls, response: httpx.Response) -> Self:
+        """Accept legacy string details and structured EP domain rejections."""
+        detail_str = "Execution Plane rejected the request"
+        raw_detail: object = None
+        error_code: str | None = None
+        with suppress(ValueError, AttributeError):
+            error_body = response.json()
+            if isinstance(error_body, dict) and "detail" in error_body:
+                raw_detail = error_body["detail"]
+                if isinstance(raw_detail, dict):
+                    code = raw_detail.get("code")
+                    error_code = code if isinstance(code, str) else None
+                    message = raw_detail.get("message")
+                    if isinstance(message, str):
+                        raw_detail = message
+                if isinstance(raw_detail, str):
+                    detail_str = raw_detail
+        return cls(detail_str, status_code=response.status_code, detail=raw_detail, code=error_code)
 
 
 def create_ep_service_token() -> str:
@@ -243,17 +265,7 @@ class ExecutionPlaneHttpClient:
                 or exc.response.status_code >= HTTPStatus.INTERNAL_SERVER_ERROR
             ):
                 raise ExecutionPlaneUnavailableError from exc
-            detail_str = "Execution Plane rejected the request"
-            raw_detail: object = None
-            with suppress(ValueError, AttributeError):
-                error_body = exc.response.json()
-                if isinstance(error_body, dict) and "detail" in error_body:
-                    raw_detail = error_body["detail"]
-                    if isinstance(raw_detail, str):
-                        detail_str = raw_detail
-            raise ExecutionPlaneRejectedError(
-                detail_str, status_code=exc.response.status_code, detail=raw_detail
-            ) from exc
+            raise ExecutionPlaneRejectedError.from_response(exc.response) from exc
         except httpx.RequestError as exc:
             raise ExecutionPlaneUnavailableError from exc
         if response.status_code == HTTPStatus.NO_CONTENT:

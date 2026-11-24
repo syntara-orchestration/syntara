@@ -3,6 +3,7 @@ from enum import Enum
 
 class ListRoleAssignmentsPrincipalTypeType0(str, Enum):
     GROUP = "group"
+    SERVICE = "service"
     SERVICE_ACCOUNT = "service_account"
     USER = "user"
 

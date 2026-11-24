@@ -55,8 +55,13 @@ test.describe('AAP-76528: Roles & Assignments', () => {
       await expect(app.getByRole('heading', { level: 1, name: 'Access Management' })).toBeVisible()
 
       const table = app.getByRole('grid', { name: 'Role assignments' })
+      await expect(table).toBeVisible({ timeout: 20_000 })
+      const principalNameFilter = app.getByRole('textbox', { name: /principal name filter/i })
+      await principalNameFilter.fill(saName)
+      await principalNameFilter.press('Enter')
+
       const saRow = table.getByRole('row').filter({ hasText: saName })
-      await expect(saRow).toBeVisible()
+      await expect(saRow).toBeVisible({ timeout: 20_000 })
       await expect(saRow.getByText('Service account')).toBeVisible()
     } finally {
       await deleteRoleAssignmentViaApi(app, assignment.id)

@@ -215,6 +215,10 @@ paths:
       summary: Update integration
       description: |-
         Update an integration.
+
+        OpenShift updates to cluster-synchronized fields require Execution Plane acceptance
+        before persistence. A protected default cluster returns 409; unavailability returns
+        503. Both failures leave the integration unchanged.
       operationId: update_integration
       tags:
         - Integrations
@@ -256,6 +260,18 @@ paths:
           $ref: "../base/shared-resources.openapi.yaml#/components/responses/ValidationError"
         "500":
           $ref: "../base/shared-resources.openapi.yaml#/components/responses/InternalServerError"
+        "502":
+          description: Execution Plane rejected the command or returned an invalid response
+          content:
+            application/problem+json:
+              schema:
+                $ref: "../base/shared-resources.openapi.yaml#/components/schemas/ErrorData"
+        "503":
+          description: Execution Plane unavailable; the integration update was not saved
+          content:
+            application/problem+json:
+              schema:
+                $ref: "../base/shared-resources.openapi.yaml#/components/schemas/ErrorData"
         "429":
           $ref: "../base/shared-resources.openapi.yaml#/components/responses/RateLimitError"
 

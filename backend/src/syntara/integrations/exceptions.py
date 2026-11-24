@@ -132,3 +132,14 @@ class IntegrationRefreshNotSupportedError(IntegrationError):
         super().__init__(
             f"Resource refresh is not supported for integration {integration_id} (type: {integration_type})."
         )
+
+
+@fastapi_exception(handler="syntara.integrations.error_handlers.integration_cluster_sync_handler")
+class IntegrationClusterSyncError(IntegrationError):
+    """An immediate cluster update failed before AO persistence."""
+
+    def __init__(self, status_code: int, code: str, message: str) -> None:
+        """Expose a safe domain error while retaining the upstream cause."""
+        self.status_code = status_code
+        self.code = code
+        super().__init__(message)

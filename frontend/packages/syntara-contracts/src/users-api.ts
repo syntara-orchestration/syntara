@@ -981,7 +981,7 @@ export interface components {
       /** Principal Name */
       principal_name: string
       /** Principal Type */
-      principal_type?: ('user' | 'group' | 'service_account') | null
+      principal_type?: ('user' | 'group' | 'service_account' | 'service') | null
       /** Role Name */
       role_name: string
       /** Role Description */

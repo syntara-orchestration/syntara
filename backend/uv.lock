@@ -975,14 +975,14 @@ wheels = [
 
 [[package]]
 name = "execution-plane-client"
-version = "0.1.26"
+version = "0.1.27"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "pydantic" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/82/74/a2c3de134b195f41a8d6e52983d510e570d574dbe740465a49215ead1352/execution_plane_client-0.1.26.tar.gz", hash = "sha256:2fe19dc65cd5e8a8fb95160b33738a612ac6808baccbd247742e03407244b3b0", size = 21562, upload-time = "2026-11-21T15:06:50.968Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/f2/1f/7d3cfc4b6f080efcfab9127ab1ecddfae02fcf68ccc8ea67892000dfe81c/execution_plane_client-0.1.27.tar.gz", hash = "sha256:60ff35261f039b48421f585bf3d1ecafcd42b3043680c3225ce1cb5ae95ce009", size = 21559, upload-time = "2026-11-24T01:06:06.526Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/48/1c/0f459c2a5188719d53fd2cc9a056fbc3a431fa4294ea49be098b4a771b9e/execution_plane_client-0.1.26-py3-none-any.whl", hash = "sha256:457637d0dd97d54c6b30fbfb95dc6f011aea8ef760d1b89c4e4f1ebba8a183b8", size = 34062, upload-time = "2026-11-21T15:06:49.863Z" },
+    { url = "https://files.pythonhosted.org/packages/12/20/5bf84d695145286580b527d987231b3ac7787e6c8e8dbb869a604a79f86d/execution_plane_client-0.1.27-py3-none-any.whl", hash = "sha256:f3bff596555a6f15393bfd83c416d319e9a48e2ac9bd3001131cf66cc0d7c6c7", size = 34063, upload-time = "2026-11-24T01:06:05.527Z" },
 ]
 
 [[package]]
@@ -4455,7 +4455,7 @@ requires-dist = [
     { name = "boto3-stubs", extras = ["s3"], marker = "extra == 'dev'", specifier = ">=1.35.0" },
     { name = "cachetools", specifier = ">=5.0" },
     { name = "cryptography", specifier = ">=48.0.1" },
-    { name = "execution-plane-client", specifier = ">=0.1.26,<0.2.0" },
+    { name = "execution-plane-client", specifier = ">=0.1.27,<0.2.0" },
     { name = "fastapi", specifier = ">=0.135.0" },
     { name = "fastmcp", marker = "extra == 'dev'", specifier = ">=3.2.0,<4.0.0" },
     { name = "filelock", specifier = ">=4.2.1" },
@@ -4547,7 +4547,7 @@ dev = [
 
 [[package]]
 name = "syntara-api-client"
-version = "1.6.0"
+version = "1.7.0"
 source = { editable = "src/api_client" }
 dependencies = [
     { name = "attrs" },
