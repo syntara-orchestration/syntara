@@ -118,7 +118,7 @@ describe('authMiddleware', () => {
 
     it('attempts refresh on 401 and retries request', async () => {
       const retryResponse = new Response('OK', { status: 200 })
-      vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(retryResponse)
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(retryResponse)
 
       mockGetState
         .mockReturnValueOnce({
@@ -139,7 +139,7 @@ describe('authMiddleware', () => {
       expect(mockRefresh).toHaveBeenCalled()
       expect(result).toBe(retryResponse)
 
-      const fetchCall = vi.mocked(globalThis.fetch).mock.calls[0][0] as Request
+      const fetchCall = new Request(fetchSpy.mock.calls[0][0])
       expect(fetchCall.headers.get('Authorization')).toBe('Bearer refreshed-token')
     })
 
@@ -163,7 +163,7 @@ describe('authMiddleware', () => {
 
     it('does not retry again when retried request also returns 401', async () => {
       const retry401Response = new Response('Unauthorized', { status: 401 })
-      vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(retry401Response)
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(retry401Response)
 
       mockGetState
         .mockReturnValueOnce({
@@ -184,7 +184,7 @@ describe('authMiddleware', () => {
       expect(mockRefresh).toHaveBeenCalledOnce()
       expect(result).toBe(retry401Response)
 
-      const fetchCall = vi.mocked(globalThis.fetch).mock.calls[0][0] as Request
+      const fetchCall = new Request(fetchSpy.mock.calls[0][0])
       expect(fetchCall.headers.get('X-Auth-Retry')).toBe('1')
     })
 

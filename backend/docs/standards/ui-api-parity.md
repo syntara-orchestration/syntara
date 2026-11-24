@@ -34,11 +34,12 @@ All clients apply `authMiddleware` from `client.tsx`, which handles token inject
 
 | Mechanism | Scope | Behavior |
 |-----------|-------|----------|
-| ESLint rule `syntara/no-raw-http-calls` | `frontend/packages/syntara-ui/` | Blocks `fetch()`, `XMLHttpRequest`, and `axios` imports at lint time |
-| `allowedFiles` config | ESLint config | Exempts specific files (e.g., `useFileUploadWithProgress.ts` for upload progress via XMLHttpRequest) |
-| Inline `eslint-disable-next-line` | Per-call | Requires justification after `--` (e.g., `-- pre-auth call before token middleware`) |
+| ESLint rule `@ansible/no-unapproved-http-client` | `frontend/packages/syntara-ui/` | Blocks direct `fetch()`, `XMLHttpRequest`, and unapproved HTTP-client imports at lint time |
+| Syntara ESLint supplements | `frontend/packages/syntara-ui/` | Warns when rule-disable directives lack explanations |
+| ESLint rule override | ESLint config | Allows `XMLHttpRequest` in `useFileUploadWithProgress.ts` for upload progress while keeping other HTTP-client checks active |
+| Inline `eslint-disable-next-line` | Per-call | Document why the direct call is needed after `--` (e.g., `-- pre-auth call before token middleware`) |
 
-**Rule source:** `frontend/packages/syntara-ui/eslint-plugin-syntara/rules/no-raw-http-calls.js`
+**Rule source:** `frontend/packages/syntara-ui/eslint.config.js` (`@ansible/no-unapproved-http-client`, `@eslint-community/eslint-comments/require-description`)
 
 ## Contract Generation
 
@@ -137,7 +138,7 @@ The scheduled workflow auto-closes drift issues when the drift is resolved.
 
 | Rule | Enforced By | Exception |
 |------|-------------|-----------|
-| Use typed API clients only | ESLint `syntara/no-raw-http-calls` | `eslint-disable-next-line` with justification |
+| Use typed API clients only | ESLint `@ansible/no-unapproved-http-client` | `eslint-disable-next-line` with justification |
 | Regenerate contracts when spec changes | CI warning + weekly drift check | `no-contract-regen: <justification>` in PR description |
 | Breaking changes blocked in place | Pre-commit + `openapi-breaking-changes` CI job | `breaking-change-approved` label (privileged), or route to a new major version at a new path |
 | Every spec change updates `info.version` | Pre-commit + `openapi-breaking-changes` CI job | N/A — a version update is always required |
@@ -149,7 +150,7 @@ The scheduled workflow auto-closes drift issues when the drift is resolved.
 | What | Path |
 |------|------|
 | Typed API clients | `frontend/packages/syntara-ui/src/client.tsx`, `frontend/packages/syntara-ui/src/routes/access/accessClient.ts` |
-| ESLint rule (no raw HTTP) | `frontend/packages/syntara-ui/eslint-plugin-syntara/rules/no-raw-http-calls.js` |
+| ESLint rules (no raw HTTP) | `frontend/packages/syntara-ui/eslint.config.js` (`@ansible/no-unapproved-http-client` and Syntara-specific supplements) |
 | Generated contracts | `frontend/packages/syntara-contracts/src/*.ts` |
 | Contract generation scripts | `frontend/packages/syntara-contracts/package.json` (`gen:local:*`) |
 | Backend domain sub-specs | `backend/src/syntara/schemas/` (see `gen:local:*` for paths) |

@@ -72,8 +72,10 @@
     "seroval": "^1.6.8"
   },
   "devDependencies": {
+    "@ansible/eslint-plugin": "^0.1.0",
     "@emnapi/core": "2.0.0-alpha.3",
     "@emnapi/runtime": "2.0.0-alpha.3",
+    "@eslint-community/eslint-plugin-eslint-comments": "^4.8.1",
     "@testing-library/dom": "^10.4.2",
     "@vitest/coverage-v8": "^5.0.3",
     "concurrently": "^10.0.6",

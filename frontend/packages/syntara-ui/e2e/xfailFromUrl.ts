@@ -149,8 +149,8 @@ export async function loadXfailEntries(source: string): Promise<XfailEntry[]> {
     if (isFilePath(source)) {
       content = await readFile(source, 'utf-8')
     } else {
-      const nodeFetch = globalThis.fetch
-      const response = await nodeFetch(source, { signal: AbortSignal.timeout(30_000) })
+      // eslint-disable-next-line @ansible/no-unapproved-http-client -- configured xfail sources are external Markdown, not API endpoints
+      const response = await fetch(source, { signal: AbortSignal.timeout(30_000) })
       if (!response.ok) {
         process.stderr.write(`xfail: failed to fetch ${source}: ${response.status} ${response.statusText}\n`)
         return []
