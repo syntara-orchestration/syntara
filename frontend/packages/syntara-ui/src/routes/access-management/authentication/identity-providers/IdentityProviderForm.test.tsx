@@ -128,7 +128,8 @@ describe('IdentityProviderForm', () => {
       setupMocks()
       render(<IdentityProviderForm mode="add" />, { wrapper })
 
-      expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument()
+      const cancel = screen.getByRole('link', { name: 'Cancel' })
+      expect(cancel).toHaveClass('pf-m-link')
     })
 
     it('renders all required form fields', () => {
