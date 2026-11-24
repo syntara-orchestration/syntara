@@ -8,13 +8,14 @@ import { axe } from 'vitest-axe'
 
 import { SubWorkflowNodeForm } from './SubWorkflowNodeForm'
 
-const mocks = vi.hoisted(() => ({ get: vi.fn(), listWorkflows: vi.fn(), workflowQuery: vi.fn() }))
+const mocks = vi.hoisted(() => ({ get: vi.fn(), listWorkflows: vi.fn(), workflowQuery: vi.fn(), useCanI: vi.fn() }))
 
 vi.mock('../../../client', () => ({
   workflowFetchClient: { GET: mocks.get },
   workflowClient: { useQuery: mocks.workflowQuery },
 }))
 vi.mock('../../access/accessClient', () => ({ accessFetchClient: { GET: mocks.listWorkflows } }))
+vi.mock('../../../hooks/useCanI', () => ({ useCanI: mocks.useCanI }))
 vi.mock('../hooks/useWorkflowEngineDefaults', () => ({
   useWorkflowEngineDefaults: vi.fn(() => ({ defaults: { continueOnFailure: true } })),
 }))
@@ -99,6 +100,7 @@ describe('SubWorkflowNodeForm', () => {
     })
     mocks.workflowQuery.mockImplementation(() => ({ data: undefined, isError: false, refetch: vi.fn() }))
     mocks.get.mockResolvedValue({ data: buildInvocationSchema(), response: new Response() })
+    mocks.useCanI.mockReturnValue({ allowed: true, isChecking: false, isError: false })
   })
 
   it('renders the workflow selector and loads schema fields after a child is selected', async () => {
@@ -421,6 +423,58 @@ describe('SubWorkflowNodeForm', () => {
     renderForm({ initialData: { workflow_id: 'workflow-1', trigger_node_id: 'sub-trigger-1' } })
 
     expect(await screen.findByText('You do not have permission to read this child workflow.')).toBeInTheDocument()
+    expect(mocks.useCanI).toHaveBeenLastCalledWith('run', 'execution', {
+      resourceProject: 'project-1',
+      enabled: false,
+    })
+  })
+
+  it('shows a non-blocking preview when the editor cannot execute the selected child workflow', async () => {
+    const onSubmit = vi.fn()
+    mocks.useCanI.mockReturnValue({ allowed: false, isChecking: false, isError: false })
+    const { container } = renderForm({
+      initialData: { name: 'Call child', workflow_id: 'workflow-1', trigger_node_id: 'sub-trigger-1' },
+      onSubmit,
+    })
+
+    expect(await screen.findByText('You may not be able to run executions in this project')).toBeInTheDocument()
+    expect(mocks.useCanI).toHaveBeenCalledWith('run', 'execution', {
+      resourceProject: 'project-1',
+      enabled: true,
+    })
+
+    submitWorkflowForm()
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ workflow_id: 'workflow-1' })))
+    expect(await axe(container)).toHaveNoViolations()
+  })
+
+  it('does not show permission warnings when the editor can execute the selected child', async () => {
+    mocks.useCanI.mockReturnValue({ allowed: true, isChecking: false, isError: false })
+    renderForm({ initialData: { name: 'Call child', workflow_id: 'workflow-1', trigger_node_id: 'sub-trigger-1' } })
+
+    await screen.findByRole('textbox', { name: 'host' })
+
+    expect(screen.queryByText('You may not be able to run executions in this project')).not.toBeInTheDocument()
+    expect(screen.queryByText('Unable to verify execution permission')).not.toBeInTheDocument()
+  })
+
+  it('does not report denied execution while the permission check is pending', () => {
+    mocks.useCanI.mockReturnValue({ allowed: false, isChecking: true, isError: false })
+    renderForm({ initialData: { workflow_id: 'workflow-1', trigger_node_id: 'sub-trigger-1' } })
+
+    expect(screen.queryByText('You may not be able to run executions in this project')).not.toBeInTheDocument()
+  })
+
+  it('does not treat a failed permission check as a denial and allows retrying', async () => {
+    const user = userEvent.setup()
+    const refetch = vi.fn().mockResolvedValue(undefined)
+    mocks.useCanI.mockReturnValue({ allowed: false, isChecking: false, isError: true, refetch })
+    renderForm({ initialData: { workflow_id: 'workflow-1', trigger_node_id: 'sub-trigger-1' } })
+
+    expect(screen.getByText('Unable to verify execution permission')).toBeInTheDocument()
+    expect(screen.queryByText('You may not be able to run executions in this project')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Retry' }))
+    expect(refetch).toHaveBeenCalledOnce()
   })
 
   it('shows a warning when the selected workflow is no longer eligible', async () => {
@@ -431,6 +485,10 @@ describe('SubWorkflowNodeForm', () => {
     renderForm({ initialData: { workflow_id: 'workflow-1' } })
 
     expect(await screen.findByText('This workflow has no eligible Sub-workflow Trigger.')).toBeInTheDocument()
+    expect(mocks.useCanI).toHaveBeenLastCalledWith('run', 'execution', {
+      resourceProject: 'project-1',
+      enabled: false,
+    })
   })
 
   it('has no accessibility violations after selecting an eligible child', async () => {
