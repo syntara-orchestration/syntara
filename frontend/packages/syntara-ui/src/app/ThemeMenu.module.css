@@ -1,3 +1,20 @@
 .themeMenu {
   width: max-content;
+  --pf-v6-c-popover--FontSize: var(--pf-t--global--font--size--body--default);
+  --pf-v6-c-menu__group-title--PaddingBlockStart: var(--pf-t--global--spacer--sm);
+  --pf-v6-c-menu__group-title--PaddingBlockEnd: var(--pf-t--global--spacer--sm);
+  --pf-v6-c-menu__group-title--PaddingInlineStart: var(--pf-t--global--spacer--md);
+  --pf-v6-c-menu__group-title--PaddingInlineEnd: var(--pf-t--global--spacer--md);
+  --pf-v6-c-menu__group-title--FontWeight: var(--pf-t--global--font--weight--body--bold);
+  --pf-v6-c-menu__group-title--Color: var(--pf-t--global--text--color--regular);
+  --pf-v6-c-menu__search--PaddingBlockStart: var(--pf-t--global--spacer--sm);
+  --pf-v6-c-menu__search--PaddingBlockEnd: var(--pf-t--global--spacer--sm);
+  --pf-v6-c-menu__search--PaddingInlineStart: var(--pf-t--global--spacer--md);
+  --pf-v6-c-menu__search--PaddingInlineEnd: var(--pf-t--global--spacer--md);
+}
+
+.themeContent {
+  display: grid;
+  row-gap: var(--pf-t--global--spacer--xs);
+  padding: var(--pf-t--global--spacer--xs);
 }
