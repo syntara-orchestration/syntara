@@ -1,10 +1,12 @@
 import {
+  Button,
   Content,
   ContentVariants,
   EmptyState,
   EmptyStateBody,
   Flex,
   FlexItem,
+  Icon,
   SearchInput,
   Spinner,
   Stack,
@@ -14,9 +16,12 @@ import {
   TabTitleText,
   Title,
   TitleSizes,
+  Tooltip,
 } from '@patternfly/react-core'
 import {
+  RhUiCompressArrowsIcon,
   RhUiDislikeFillIcon,
+  RhUiExpandArrowsIcon,
   RhUiExternalLinkIcon,
   RhUiLikeFillIcon,
   RhUiWarningFillIcon,
@@ -65,6 +70,19 @@ function NoDataState({ label }: Readonly<{ label: string }>) {
   )
 }
 
+type IoPaneLayout = 'split' | 'parameters' | 'output'
+
+const PANE_LAYOUT_ACTION_LABELS = {
+  parameters: {
+    expand: 'Expand parameters panel',
+    restore: 'Restore parameters panel layout',
+  },
+  output: {
+    expand: 'Expand output panel',
+    restore: 'Restore output panel layout',
+  },
+} as const
+
 type DataPaneProps = {
   title: string
   stepId: string
@@ -72,10 +90,25 @@ type DataPaneProps = {
   view: PanelView
   onViewChange: (view: PanelView) => void
   isErrorState?: boolean
+  paneKey: 'parameters' | 'output'
+  paneLayout: IoPaneLayout
+  onPaneLayoutChange: (layout: IoPaneLayout) => void
 }
 
-function DataPane({ title, stepId, data, view, onViewChange, isErrorState = false }: Readonly<DataPaneProps>) {
+function DataPane({
+  title,
+  stepId,
+  data,
+  view,
+  onViewChange,
+  isErrorState = false,
+  paneKey,
+  paneLayout,
+  onPaneLayoutChange,
+}: Readonly<DataPaneProps>) {
   const [searchTerm, setSearchTerm] = useState('')
+  const [layoutTooltipOpen, setLayoutTooltipOpen] = useState(false)
+  const [layoutTooltipContent, setLayoutTooltipContent] = useState('')
   const scrollContainerRef = useRef<HTMLDivElement>(null)
 
   const jsonText = useMemo(() => (data ? JSON.stringify(data, null, 2) : ''), [data])
@@ -116,34 +149,81 @@ function DataPane({ title, stepId, data, view, onViewChange, isErrorState = fals
     }
   }
 
+  const isPaneExpanded = paneLayout === paneKey
+  const paneLayoutActionLabel = isPaneExpanded
+    ? PANE_LAYOUT_ACTION_LABELS[paneKey].restore
+    : PANE_LAYOUT_ACTION_LABELS[paneKey].expand
+  const PaneLayoutIcon = isPaneExpanded ? RhUiCompressArrowsIcon : RhUiExpandArrowsIcon
+
+  function openLayoutTooltip() {
+    setLayoutTooltipContent(paneLayoutActionLabel)
+    setLayoutTooltipOpen(true)
+  }
+
+  function closeLayoutTooltip() {
+    setLayoutTooltipOpen(false)
+  }
+
+  function handlePaneLayoutClick() {
+    closeLayoutTooltip()
+    onPaneLayoutChange(isPaneExpanded ? 'split' : paneKey)
+  }
+
+  const searchAndViewControls = (
+    <Flex
+      alignItems={{ default: 'alignItemsCenter' }}
+      gap={{ default: 'gapSm' }}
+      flexWrap={{ default: 'wrap' }}
+      className={styles.dataPaneControlsStacked}
+    >
+      <FlexItem grow={{ default: 'grow' }} className={styles.searchWrap}>
+        <SearchInput
+          aria-label={`Search ${title.toLowerCase()} data`}
+          placeholder="Search"
+          value={searchTerm}
+          onChange={(_event, value) => setSearchTerm(value)}
+          onClear={() => setSearchTerm('')}
+        />
+      </FlexItem>
+      <FlexItem grow={{ default: 'grow' }}>
+        <ViewToggle activeView={view} onChange={onViewChange} ariaLabel={`${title} view selection`} />
+      </FlexItem>
+    </Flex>
+  )
+
   return (
     <Stack className={styles.contentContainer}>
       <StackItem className={styles.dataPaneHeaderRow}>
-        <Flex alignItems={{ default: 'alignItemsCenter' }} gap={{ default: 'gapSm' }} flexWrap={{ default: 'wrap' }}>
-          <FlexItem flex={{ default: 'flexNone' }} className={styles.dataPaneTitle}>
-            {title}
-          </FlexItem>
-          <FlexItem className={styles.dataPaneControlsWrap}>
-            <Flex
-              alignItems={{ default: 'alignItemsCenter' }}
-              gap={{ default: 'gapSm' }}
-              flexWrap={{ default: 'wrap' }}
-            >
-              <FlexItem grow={{ default: 'grow' }} className={styles.searchWrap}>
-                <SearchInput
-                  aria-label={`Search ${title.toLowerCase()} data`}
-                  placeholder="Search"
-                  value={searchTerm}
-                  onChange={(_event, value) => setSearchTerm(value)}
-                  onClear={() => setSearchTerm('')}
+        <div className={styles.dataPaneHeader}>
+          <Flex
+            className={styles.dataPaneTitleRow}
+            justifyContent={{ default: 'justifyContentSpaceBetween' }}
+            alignItems={{ default: 'alignItemsCenter' }}
+          >
+            <FlexItem className={styles.dataPaneTitle}>{title}</FlexItem>
+            <FlexItem>
+              <Tooltip content={layoutTooltipContent} trigger="manual" isVisible={layoutTooltipOpen}>
+                <Button
+                  variant="plain"
+                  aria-label={paneLayoutActionLabel}
+                  aria-pressed={isPaneExpanded}
+                  onMouseEnter={openLayoutTooltip}
+                  onMouseLeave={closeLayoutTooltip}
+                  onFocus={openLayoutTooltip}
+                  onBlur={closeLayoutTooltip}
+                  onPointerDown={closeLayoutTooltip}
+                  onClick={handlePaneLayoutClick}
+                  icon={
+                    <Icon isInline>
+                      <PaneLayoutIcon />
+                    </Icon>
+                  }
                 />
-              </FlexItem>
-              <FlexItem grow={{ default: 'grow' }}>
-                <ViewToggle activeView={view} onChange={onViewChange} ariaLabel={`${title} view selection`} />
-              </FlexItem>
-            </Flex>
-          </FlexItem>
-        </Flex>
+              </Tooltip>
+            </FlexItem>
+          </Flex>
+          {searchAndViewControls}
+        </div>
       </StackItem>
       <StackItem isFilled className={styles.scrollPane}>
         <div ref={scrollContainerRef}>{renderContent()}</div>
@@ -326,6 +406,7 @@ function StepContentArea({
 }: StepContentAreaProps) {
   const [inputView, setInputView] = useState<PanelView>('json')
   const [outputView, setOutputView] = useState<PanelView>('json')
+  const [paneLayout, setPaneLayout] = useState<IoPaneLayout>('split')
 
   if (error) {
     return (
@@ -338,25 +419,44 @@ function StepContentArea({
   if (activeTab === 'agent-steps' && isAgenticStep) {
     return <AgentTraceView agentTrace={extractAgentTrace(outputData)} />
   }
+  const showParameters = paneLayout !== 'output'
+  const showOutput = paneLayout !== 'parameters'
+
   return (
     <Flex
       flexWrap={{ default: 'nowrap' }}
       alignItems={{ default: 'alignItemsStretch' }}
       className={styles.dataPaneContainer}
     >
-      <FlexItem flex={{ default: 'flex_1' }} className={styles.paneItem}>
-        <DataPane title="Parameters" stepId={stepId} data={inputData} view={inputView} onViewChange={setInputView} />
-      </FlexItem>
-      <FlexItem flex={{ default: 'flex_1' }} className={styles.paneItem}>
-        <DataPane
-          title="Output"
-          stepId={stepId}
-          data={outputData}
-          view={outputView}
-          onViewChange={setOutputView}
-          isErrorState={stepIsFailed}
-        />
-      </FlexItem>
+      {showParameters && (
+        <FlexItem flex={{ default: 'flex_1' }} className={styles.paneItem}>
+          <DataPane
+            title="Parameters"
+            stepId={stepId}
+            data={inputData}
+            view={inputView}
+            onViewChange={setInputView}
+            paneKey="parameters"
+            paneLayout={paneLayout}
+            onPaneLayoutChange={setPaneLayout}
+          />
+        </FlexItem>
+      )}
+      {showOutput && (
+        <FlexItem flex={{ default: 'flex_1' }} className={styles.paneItem}>
+          <DataPane
+            title="Output"
+            stepId={stepId}
+            data={outputData}
+            view={outputView}
+            onViewChange={setOutputView}
+            isErrorState={stepIsFailed}
+            paneKey="output"
+            paneLayout={paneLayout}
+            onPaneLayoutChange={setPaneLayout}
+          />
+        </FlexItem>
+      )}
     </Flex>
   )
 }
@@ -424,6 +524,7 @@ export function StepExecutionDetailsPanel({
 
       <StackItem isFilled style={{ minHeight: 0, overflow: 'hidden' }}>
         <StepContentArea
+          key={stepId}
           stepId={stepId}
           inputData={inputData}
           outputData={outputData}
