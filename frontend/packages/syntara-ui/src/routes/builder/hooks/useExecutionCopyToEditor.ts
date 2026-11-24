@@ -38,25 +38,22 @@ export function useExecutionCopyToEditor({
     }
   }, [executionCopy])
 
-  const activeExecutionCopy = executionCopy ?? latchedExecutionCopyRef.current
-
   const reducerSynced =
-    !!activeExecutionCopy &&
+    !!executionCopy &&
     mostRecentExecutionId != null &&
-    mostRecentExecutionId === activeExecutionCopy.executionId
+    mostRecentExecutionId === executionCopy.executionId
 
   useEffect(() => {
-    if (!activeExecutionCopy && !mostRecentExecutionId) {
-      contentReplacedForExecutionRef.current = null
-    }
-  }, [activeExecutionCopy, mostRecentExecutionId])
+    if (executionCopy || mostRecentExecutionId) return
+    contentReplacedForExecutionRef.current = null
+    latchedExecutionCopyRef.current = undefined
+  }, [executionCopy, mostRecentExecutionId])
 
   useEffect(() => {
-    if (!activeExecutionCopy || !currentWorkflow || !isWorkflowInitialized) return
-    if (reducerSynced) return
+    const copy = executionCopy ?? latchedExecutionCopyRef.current
+    if (!copy || !currentWorkflow || !isWorkflowInitialized) return
+    if (mostRecentExecutionId === copy.executionId) return
 
-    const copy = activeExecutionCopy
-    // Macrotask so lifecycle init (microtask) finishes before we pin the run panel.
     const timer = window.setTimeout(() => {
       const workflowAtApply = useWorkflowStore.getState().currentWorkflow
       if (!workflowAtApply) return
@@ -97,16 +94,15 @@ export function useExecutionCopyToEditor({
     }, 0)
     return () => window.clearTimeout(timer)
   }, [
-    activeExecutionCopy,
+    executionCopy,
     currentWorkflow,
     isWorkflowInitialized,
-    reducerSynced,
+    mostRecentExecutionId,
     dispatch,
     markDirty,
     showSuccess,
   ])
 
-  // Clear query params after reducer sync; delay so copy can re-apply if run id was cleared mid-flight.
   useEffect(() => {
     if (!reducerSynced) return
     const timer = window.setTimeout(() => {
