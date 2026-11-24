@@ -33,6 +33,7 @@ type BuilderToolbarContentProps = Readonly<{
   onBackToEditor?: () => void
   onReviewApproval?: () => void
   dispatch: Dispatch<BuilderAction>
+  onRequestWorkflowRun?: (triggerIndex?: number) => void
   markDirty: () => void
   handleToggleHistory: () => void
   handleToggleVersionHistory: () => void
@@ -83,6 +84,7 @@ function BuilderToolbarContent({
   onBackToEditor,
   onReviewApproval,
   dispatch,
+  onRequestWorkflowRun,
   markDirty,
   handleToggleHistory,
   handleToggleVersionHistory,
@@ -190,6 +192,7 @@ function BuilderToolbarContent({
       workflowName={workflowName}
       workflowDescription={workflowDescription}
       dispatch={dispatch}
+      onRequestWorkflowRun={onRequestWorkflowRun}
       markDirty={markDirty}
       handleToggleHistory={handleToggleHistory}
       handleToggleVersionHistory={handleToggleVersionHistory}
@@ -318,6 +321,7 @@ export type BuilderWorkflowPageHeaderProps = Readonly<{
   builderPermissions: BuilderPermissions
   ProjectSelector: ReactNode
   dispatch: Dispatch<BuilderAction>
+  onRequestWorkflowRun?: (triggerIndex?: number) => void
   markDirty: () => void
   handleToggleHistory: () => void
   handleToggleVersionHistory: () => void
@@ -367,6 +371,7 @@ export function BuilderWorkflowPageHeader({
   builderPermissions,
   ProjectSelector,
   dispatch,
+  onRequestWorkflowRun,
   markDirty,
   handleToggleHistory,
   handleToggleVersionHistory,
@@ -400,6 +405,7 @@ export function BuilderWorkflowPageHeader({
       onBackToEditor={onBackToEditor}
       onReviewApproval={onReviewApproval}
       dispatch={dispatch}
+      onRequestWorkflowRun={onRequestWorkflowRun}
       markDirty={markDirty}
       handleToggleHistory={handleToggleHistory}
       handleToggleVersionHistory={handleToggleVersionHistory}

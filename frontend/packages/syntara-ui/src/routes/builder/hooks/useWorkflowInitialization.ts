@@ -43,6 +43,8 @@ export function useWorkflowInitialization({
     onAfterInitialLayoutRef.current = onAfterInitialLayout
   }, [onAfterInitialLayout])
 
+  const areAllNodesMeasured = nodes.length > 0 && nodes.every((node) => node.measured)
+
   // Reset initialization when workflow is replaced via setWorkflow (e.g., after save/redirect)
   useEffect(() => {
     if (workflowVersion !== workflowVersionRef.current) {
@@ -60,13 +62,13 @@ export function useWorkflowInitialization({
 
   // Apply initial layout after nodes are measured
   useEffect(() => {
-    if (!isInitialized && nodes.length > 0 && nodes.every((node) => node.measured)) {
+    if (!isInitialized && areAllNodesMeasured) {
       // Schedule state update to avoid cascading renders
       queueMicrotask(() => {
         setIsInitialized(true)
       })
     }
-  }, [nodes, isInitialized])
+  }, [areAllNodesMeasured, isInitialized])
 
   // Run layout once after initialization completes.
   // Skip when positions are already stored (undo/redo restores exact positions).

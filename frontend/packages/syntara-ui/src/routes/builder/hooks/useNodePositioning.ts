@@ -303,8 +303,7 @@ export function useNodePositioning({
   useEffect(() => {
     if (newlyAddedNodeIdsRef.current.size === 0 || !isInitialized) return
 
-    // Wait for next render to ensure useNodeUpdates has finished adding nodes to the DOM
-    // This prevents React from batching our setNodes call with useNodeUpdates' setNodes
+    // Wait for the builder-owned graph reconciliation to render new nodes before positioning them.
     const timeoutId = setTimeout(() => {
       const loopBodyNodeMap = buildLoopBodyNodeMap(edges)
       const triggers = useWorkflowStore.getState().currentWorkflow?.triggers ?? []

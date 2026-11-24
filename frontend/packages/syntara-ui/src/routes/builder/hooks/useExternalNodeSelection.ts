@@ -1,21 +1,21 @@
-import type { Dispatch, SetStateAction } from 'react'
-import { useEffect } from 'react'
-
 import type { NodeType } from '../../workflows/canvas/nodes/NodeType'
 
-export function useExternalNodeSelection(
-  selectedActivityId: string | null | undefined,
-  setNodes: Dispatch<SetStateAction<NodeType[]>>
-) {
-  useEffect(() => {
-    if (selectedActivityId == null) return
-    setNodes((prev) =>
-      prev.map((n) => {
-        const defId = 'definitionId' in n.data ? n.data.definitionId : undefined
-        const matches = n.id === selectedActivityId || defId === selectedActivityId
-        if (n.selected === matches) return n
-        return { ...n, selected: matches }
-      })
-    )
-  }, [selectedActivityId, setNodes])
+/** Applies selection from the owning view to the rendered node projection. */
+export function projectExternalNodeSelection(
+  nodes: NodeType[],
+  selectedActivityId: string | null | undefined
+): NodeType[] {
+  if (selectedActivityId == null) return nodes
+
+  let changed = false
+  const projectedNodes = nodes.map((node) => {
+    const definitionId = 'definitionId' in node.data ? node.data.definitionId : undefined
+    const selected = node.id === selectedActivityId || definitionId === selectedActivityId
+    if (node.selected === selected) return node
+
+    changed = true
+    return { ...node, selected }
+  })
+
+  return changed ? projectedNodes : nodes
 }
