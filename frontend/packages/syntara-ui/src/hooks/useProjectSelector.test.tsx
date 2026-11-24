@@ -176,6 +176,16 @@ describe('useProjectSelector', () => {
       expect(result.current.projects).toEqual(sampleProjects)
     })
 
+    it('selects a valid project through the shared selector callback', () => {
+      const onUserProjectSelect = vi.fn()
+      const { result } = renderHook(() => useProjectSelector({ onProjectSelect: onUserProjectSelect }), { wrapper })
+
+      expect(result.current.selectProject(sampleProjects[0])).toBe(true)
+      expect(mockSetSelectedProjectId).toHaveBeenCalledWith('proj-1', 'Alpha')
+      expect(onUserProjectSelect).toHaveBeenCalledWith(sampleProjects[0])
+      expect(result.current.selectProject({ ...sampleProjects[0], id: undefined })).toBe(false)
+    })
+
     it('returns empty projects when query data is undefined', () => {
       mockQueryResponse = { data: undefined, isPending: false, isFetching: false }
       Object.assign(mockQueryResponse, { refetch: mockRefetch, error: null })

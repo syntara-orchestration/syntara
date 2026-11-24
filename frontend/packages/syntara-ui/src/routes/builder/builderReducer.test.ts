@@ -15,6 +15,12 @@ describe('builderReducer', () => {
       expect(result.confirmDialogOpen).toBe(true)
     })
 
+    it('SET_FORCE_RUN_CONFIRMATION sets forceRunConfirmation', () => {
+      const action: BuilderAction = { type: 'SET_FORCE_RUN_CONFIRMATION', payload: true }
+      const result = builderReducer(initialState, action)
+      expect(result.forceRunConfirmation).toBe(true)
+    })
+
     it('SET_DELETE_DIALOG sets deleteDialogOpen', () => {
       const action: BuilderAction = { type: 'SET_DELETE_DIALOG', payload: true }
       const result = builderReducer(initialState, action)
@@ -516,6 +522,8 @@ describe('builderReducer', () => {
       // Start with state that has UI selections from a previous workflow
       const stateWithSelections: BuilderState = {
         ...initialState,
+        confirmDialogOpen: true,
+        forceRunConfirmation: true,
         selectedNode: { id: 'node-1', type: 'task' } as Node<NodeType['data']>,
         stepEditorMode: 'edit',
         addStepPanelOpen: true,
@@ -543,6 +551,8 @@ describe('builderReducer', () => {
       // Workflow metadata should be updated
       expect(result.workflowName).toBe('New Workflow')
       expect(result.workflowDescription).toBe('Fresh Start')
+      expect(result.confirmDialogOpen).toBe(false)
+      expect(result.forceRunConfirmation).toBe(false)
 
       // UI state should be reset to initial values
       expect(result.selectedNode).toBeNull()

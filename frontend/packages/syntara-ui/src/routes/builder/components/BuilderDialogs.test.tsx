@@ -124,6 +124,28 @@ describe('BuilderDialogs', () => {
     expect(screen.queryByText('Set mock output data for Manual Trigger')).not.toBeInTheDocument()
   })
 
+  it('forces confirmation despite a saved dismissal preference and clears the force flag on confirm', async () => {
+    const user = userEvent.setup()
+    const dispatch = vi.fn()
+    const storage = {
+      getItem: () => 'true',
+      setItem: vi.fn(),
+      removeItem: vi.fn(),
+      clear: vi.fn(),
+      key: () => null,
+      length: 0,
+    } as unknown as Storage
+    vi.stubGlobal('localStorage', storage)
+
+    renderDialogs({ confirmDialogOpen: true, forceRunConfirmation: true, dispatch })
+    expect(screen.getByText('Run workflow?')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Run now' }))
+    expect(dispatch).toHaveBeenCalledWith({ type: 'SET_FORCE_RUN_CONFIRMATION', payload: false })
+    expect(dispatch).toHaveBeenCalledWith({ type: 'SET_CONFIRM_DIALOG', payload: false })
+
+    vi.unstubAllGlobals()
+  })
+
   it('shows trigger name in confirmation dialog body when workflow is clean', () => {
     renderDialogs({ confirmDialogOpen: true, triggerName: 'Webhook' })
 

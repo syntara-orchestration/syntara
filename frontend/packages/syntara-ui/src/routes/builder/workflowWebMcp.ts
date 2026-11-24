@@ -4,8 +4,8 @@ import type { WorkflowDefinition } from '../../stores/workflowStoreTypes'
 import { generateActivityId } from '../../utils/generateUUID'
 
 import type { EdgeConnection } from './types/edge'
-import { validateWorkflow } from './utils/validation'
 import { validateMinimumWorkflow } from './utils/validation/rules/validateMinimumWorkflow'
+import { validateWorkflow } from './utils/validation/validateWorkflow'
 import { parseNodeSettings } from './workflowWebMcpSettings'
 
 /** User-selectable workflow nodes in the builder. */
