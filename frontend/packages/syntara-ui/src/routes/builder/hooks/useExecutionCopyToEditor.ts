@@ -44,43 +44,49 @@ export function useExecutionCopyToEditor({
     if (!executionCopy || !currentWorkflow || !isWorkflowInitialized) return
     if (reducerSynced) return
 
-    let copiedRunActivityIds: string[] | undefined
-    const contentAlreadyReplaced = contentReplacedForExecutionRef.current === executionCopy.executionId
+    const copy = executionCopy
+    // Run after useBuilderWorkflowLifecycle queueMicrotask (INIT_WORKFLOW) so SET_MOST_RECENT is not cleared.
+    queueMicrotask(() => {
+      const workflowAtApply = useWorkflowStore.getState().currentWorkflow
+      if (!workflowAtApply) return
 
-    if (!executionCopy.preserveWorkflow && !contentAlreadyReplaced) {
-      const { workflowDef, edges, nodePositions } = parseImportedDefinition(executionCopy.workflowDefinition)
-      useWorkflowStore.getState().replaceWorkflowContent(workflowDef, edges, nodePositions)
-      copiedRunActivityIds = collectCopiedRunActivityIds(workflowDef)
-      contentReplacedForExecutionRef.current = executionCopy.executionId
+      let copiedRunActivityIds: string[] | undefined
+      const contentAlreadyReplaced = contentReplacedForExecutionRef.current === copy.executionId
 
-      if (workflowDef.name && typeof workflowDef.name === 'string') {
-        dispatch({ type: 'SET_WORKFLOW_NAME', payload: workflowDef.name })
+      if (!copy.preserveWorkflow && !contentAlreadyReplaced) {
+        const { workflowDef, edges, nodePositions } = parseImportedDefinition(copy.workflowDefinition)
+        useWorkflowStore.getState().replaceWorkflowContent(workflowDef, edges, nodePositions)
+        copiedRunActivityIds = collectCopiedRunActivityIds(workflowDef)
+        contentReplacedForExecutionRef.current = copy.executionId
+
+        if (workflowDef.name && typeof workflowDef.name === 'string') {
+          dispatch({ type: 'SET_WORKFLOW_NAME', payload: workflowDef.name })
+        }
+        if (workflowDef.description && typeof workflowDef.description === 'string') {
+          dispatch({ type: 'SET_WORKFLOW_DESCRIPTION', payload: workflowDef.description })
+        }
+        markDirty()
+        showSuccess({
+          title: 'Run copied to editor',
+          description: 'The run has been loaded into the editor with pinned runtime data.',
+        })
+      } else if (copy.preserveWorkflow) {
+        copiedRunActivityIds = collectCopiedRunActivityIds(workflowAtApply)
+      } else {
+        copiedRunActivityIds = collectCopiedRunActivityIds(workflowAtApply)
       }
-      if (workflowDef.description && typeof workflowDef.description === 'string') {
-        dispatch({ type: 'SET_WORKFLOW_DESCRIPTION', payload: workflowDef.description })
-      }
-      markDirty()
-      showSuccess({
-        title: 'Run copied to editor',
-        description: 'The run has been loaded into the editor with pinned runtime data.',
+
+      dispatch({
+        type: 'SET_MOST_RECENT_EXECUTION',
+        payload: {
+          executionId: copy.executionId,
+          copiedRunActivityIds,
+        },
       })
-    } else if (executionCopy.preserveWorkflow) {
-      // Link execution to current graph — snapshot IDs so newly added nodes get no status
-      copiedRunActivityIds = collectCopiedRunActivityIds(currentWorkflow)
-    } else {
-      copiedRunActivityIds = collectCopiedRunActivityIds(currentWorkflow)
-    }
-
-    dispatch({
-      type: 'SET_MOST_RECENT_EXECUTION',
-      payload: {
-        executionId: executionCopy.executionId,
-        copiedRunActivityIds,
-      },
+      const url = new URL(window.location.href)
+      url.searchParams.delete('fromExecution')
+      url.searchParams.delete('linkExecution')
+      window.history.replaceState({}, '', url.pathname + url.search)
     })
-    const url = new URL(window.location.href)
-    url.searchParams.delete('fromExecution')
-    url.searchParams.delete('linkExecution')
-    window.history.replaceState({}, '', url.pathname + url.search)
   }, [executionCopy, currentWorkflow, isWorkflowInitialized, reducerSynced, dispatch, markDirty, showSuccess])
 }

@@ -109,18 +109,15 @@ export function useBuilderWorkflowLifecycle(options: {
     if (!workflow || isNew || hasLoadedRef.current || workflow.id !== workflowId) {
       return
     }
+    const name = workflow.name
+    const description = workflow.description ?? workflow.name ?? DEFAULT_WORKFLOW_NAME
     queueMicrotask(() => {
       if (hasLoadedRef.current) {
         return
       }
-      dispatch({
-        type: 'INIT_WORKFLOW',
-        payload: {
-          name: workflow.name,
-          description: workflow.description ?? workflow.name ?? DEFAULT_WORKFLOW_NAME,
-        },
-      })
-      // Graph load sets isWorkflowInitialized; metadata-only sync must not unblock execution copy.
+      // Metadata only — do not INIT_WORKFLOW here; it clears pinned run panel during copy-to-editor.
+      dispatch({ type: 'SET_WORKFLOW_NAME', payload: name })
+      dispatch({ type: 'SET_WORKFLOW_DESCRIPTION', payload: description })
     })
   }, [workflow, workflowId, isNew, dispatch])
 

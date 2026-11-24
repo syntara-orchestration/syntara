@@ -185,27 +185,13 @@ describe('useBuilderWorkflowLifecycle', () => {
     await waitFor(() => expect(result.current.isWorkflowInitialized).toBe(false))
   })
 
-  it('syncs INIT_WORKFLOW from workflow metadata when editing', async () => {
-    processExistingWorkflowMock.mockImplementationOnce((wf: WorkflowWithVersion) => ({
-      flattenedWorkflow: {
-        schema_version: '2.0.0',
-        name: wf.name,
-        description: wf.description ?? '',
-        workflow: { activities: [] },
-      },
-      generatedEdges: [] as EdgeConnection[],
-      initPayload: {
-        name: wf.name,
-        description: wf.description ?? wf.name ?? DEFAULT_WORKFLOW_NAME,
-      },
-    }))
+  it('syncs workflow metadata without INIT_WORKFLOW before graph load', async () => {
     const workflow = {
       id: 'wf-1',
       name: 'Named',
       description: 'Desc',
       is_enabled: true,
       labels: { env: 'prod' },
-      version: { workflow_definition: {} },
     } as unknown as WorkflowWithVersion
     const dispatch = vi.fn()
     renderHook(() =>
@@ -220,12 +206,14 @@ describe('useBuilderWorkflowLifecycle', () => {
     )
     await waitFor(() => {
       expect(dispatch).toHaveBeenCalledWith({
-        type: 'INIT_WORKFLOW',
-        payload: {
-          name: 'Named',
-          description: 'Desc',
-        },
+        type: 'SET_WORKFLOW_NAME',
+        payload: 'Named',
       })
+      expect(dispatch).toHaveBeenCalledWith({
+        type: 'SET_WORKFLOW_DESCRIPTION',
+        payload: 'Desc',
+      })
+      expect(dispatch).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'INIT_WORKFLOW' }) as BuilderAction)
     })
   })
 
