@@ -789,9 +789,7 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
                 ):
                     continue
                 self.skipped_nodes.add(skipped_successor)
-                workflow.logger.info(
-                    f"Node {skipped_successor} marked as skipped (on non-taken port '{edge_port}')"
-                )
+                workflow.logger.info(f"Node {skipped_successor} marked as skipped (on non-taken port '{edge_port}')")
                 self._mark_downstream_as_skipped(skipped_successor, graph)
 
     def _setup_loop_namespace(self, loop_node_id: str) -> None:
