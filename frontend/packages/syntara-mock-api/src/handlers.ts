@@ -4744,6 +4744,32 @@ export const handlers = [
     }
 
     const principalId = body.principal_id!
+    const serviceAccount = mockServiceAccounts.find((serviceAccount) => serviceAccount.id === principalId)
+    if (serviceAccount) {
+      const assignment = {
+        id: uuidv4(),
+        service_account_id: serviceAccount.id,
+        service_account_name: serviceAccount.name,
+        project_id: projectId,
+        role_id: mockRoles.find((role) => role.name === body.role_name)?.id ?? '',
+        role_name: body.role_name,
+        created_at: new Date().toISOString(),
+      }
+      mockServiceAccountRoleAssignments.push(assignment)
+      return HttpResponse.json(
+        {
+          id: assignment.id,
+          principal_id: assignment.service_account_id,
+          group_id: null,
+          principal_name: assignment.service_account_name,
+          role_name: assignment.role_name,
+          project_id: assignment.project_id,
+          created_at: assignment.created_at,
+        },
+        { status: 201 }
+      )
+    }
+
     const assignment = {
       id: uuidv4(),
       user_id: principalId,
@@ -4782,6 +4808,14 @@ export const handlers = [
     )
     if (groupIdx !== -1) {
       mockProjectGroupRoleAssignments.splice(groupIdx, 1)
+      return new HttpResponse(null, { status: 204 })
+    }
+
+    const serviceAccountIdx = mockServiceAccountRoleAssignments.findIndex(
+      (a) => a.id === assignmentId && a.project_id === projectId
+    )
+    if (serviceAccountIdx !== -1) {
+      mockServiceAccountRoleAssignments.splice(serviceAccountIdx, 1)
       return new HttpResponse(null, { status: 204 })
     }
 

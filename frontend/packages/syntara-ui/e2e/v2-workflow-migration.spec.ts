@@ -134,9 +134,9 @@ test.describe('V2 Workflow Schema Migration', () => {
     expect(def.triggers[0]).toHaveProperty('id')
     expect(def.triggers[0]).toHaveProperty('parameters')
 
-    // Script node: v2 uses type "script" directly (not v1 task wrapper)
+    // Python script node: v2 uses a direct executor type (not a v1 task wrapper)
     expect(def.nodes).toHaveLength(1)
-    expect(def.nodes[0].type).toBe('script')
+    expect(def.nodes[0].type).toBe('script_python')
     expect(def.nodes[0]).toHaveProperty('id')
     expect(def.nodes[0]).toHaveProperty('parameters')
     expect(def.nodes[0]).not.toHaveProperty('task') // no v1 task wrapper
@@ -194,7 +194,7 @@ test.describe('V2 Workflow Schema Migration', () => {
 
       // All 5 executor node types must be present
       const nodeTypes = def.nodes.map((n) => n.type)
-      expect(nodeTypes).toContain('script')
+      expect(nodeTypes).toContain('script_python')
       expect(nodeTypes).toContain('http_request')
       expect(nodeTypes).toContain('agentic')
       expect(nodeTypes).toContain('aap_job_template')
@@ -428,7 +428,7 @@ test.describe('V2 Workflow Schema Migration', () => {
 
     // Verify specific v2 node types are preserved
     expect(def.triggers[0].type).toBe('manual_trigger')
-    expect(def.nodes[0].type).toBe('script')
+    expect(def.nodes[0].type).toBe('script_python')
     expect(def.nodes[0]).not.toHaveProperty('task')
   })
 
