@@ -131,6 +131,43 @@ describe('SettingField', () => {
     expect(screen.getByDisplayValue('hello')).toBeInTheDocument()
   })
 
+  it('blocks an initially invalid URL value and clears validation when the value becomes valid', () => {
+    const onValidationChange = vi.fn()
+    const urlSetting = {
+      ...baseSetting,
+      key: 'context_manager.endpoint',
+      name: 'Endpoint',
+      value_type: 'string' as const,
+      validation_schema: { pattern: 'url' } as unknown as RuntimeSetting['validation_schema'],
+    }
+    const { rerender } = render(
+      <SettingField
+        setting={urlSetting}
+        value="not-a-url"
+        onChange={vi.fn()}
+        onResetSingle={vi.fn()}
+        onValidationChange={onValidationChange}
+      />
+    )
+
+    expect(screen.getByText('Must be a valid URL')).toBeInTheDocument()
+    expect(onValidationChange).toHaveBeenCalledWith(urlSetting.key, true)
+
+    onValidationChange.mockClear()
+    rerender(
+      <SettingField
+        setting={urlSetting}
+        value="https://example.com"
+        onChange={vi.fn()}
+        onResetSingle={vi.fn()}
+        onValidationChange={onValidationChange}
+      />
+    )
+
+    expect(screen.queryByText('Must be a valid URL')).not.toBeInTheDocument()
+    expect(onValidationChange).toHaveBeenCalledWith(urlSetting.key, false)
+  })
+
   it('renders json setting as comma-separated TextInput', () => {
     const jsonSetting = {
       ...baseSetting,

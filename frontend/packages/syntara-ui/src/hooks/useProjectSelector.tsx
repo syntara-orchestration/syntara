@@ -144,28 +144,28 @@ type ProjectSelectorSyncEffectsParams = {
   initialProjectId?: string | null
   clearSelectionOnMount?: boolean
   selectedProjectId: string | null
-  setSelectedProjectId: (id: string | null, name?: string | null) => void
   isInitialPage: boolean
   projects: ProjectRead[]
   projectsQueryIsFetching: boolean
   selectedProject: ProjectRead | null
-  syncName: (name: string | null) => void
 }
 
 /** Store sync + stale-selection guard; split out to keep `useProjectSelector` under max-lines. */
-/* eslint-disable reactYouMightNotNeedAnEffect/no-event-handler, reactYouMightNotNeedAnEffect/no-pass-data-to-parent -- parameters are Zustand actions / sync helpers, not React child event-handler props */
 function useProjectSelectorSyncEffects({
   initialProjectId,
   clearSelectionOnMount,
   selectedProjectId,
-  setSelectedProjectId,
   isInitialPage,
   projects,
   projectsQueryIsFetching,
   selectedProject,
-  syncName,
 }: ProjectSelectorSyncEffectsParams): void {
+  const setSelectedProjectId = useProjectStore((state) => state.setSelectedProjectId)
+  const syncName = useProjectStore((state) => state.setSelectedProjectName)
   const hasClearedOnMount = useRef(false)
+  const hasProjects = projects.length > 0
+  const isStaleSelection = hasProjects && !projects.some((project) => project.id === selectedProjectId)
+
   useEffect(() => {
     if (clearSelectionOnMount && !hasClearedOnMount.current) {
       hasClearedOnMount.current = true
@@ -183,19 +183,24 @@ function useProjectSelectorSyncEffects({
       selectedProjectId &&
       isInitialPage &&
       !projectsQueryIsFetching &&
-      projects.length > 0 &&
-      !projects.some((p) => p.id === selectedProjectId) &&
+      isStaleSelection &&
       !userExplicitlySelected
     ) {
       setSelectedProjectId(null)
     }
-  }, [initialProjectId, selectedProjectId, projects, setSelectedProjectId, isInitialPage, projectsQueryIsFetching])
+  }, [
+    initialProjectId,
+    selectedProjectId,
+    setSelectedProjectId,
+    isInitialPage,
+    projectsQueryIsFetching,
+    isStaleSelection,
+  ])
 
   useEffect(() => {
     if (selectedProject?.name) syncName(selectedProject.name)
   }, [selectedProject, syncName])
 }
-/* eslint-enable reactYouMightNotNeedAnEffect/no-event-handler, reactYouMightNotNeedAnEffect/no-pass-data-to-parent */
 
 export function useProjectSelector(options?: UseProjectSelectorOptions): UseProjectSelectorResult {
   const {
@@ -212,7 +217,6 @@ export function useProjectSelector(options?: UseProjectSelectorOptions): UseProj
     favoriteProjectIds,
     toggleFavoriteProjectId,
     selectedProjectName: storedProjectName,
-    setSelectedProjectName: syncName,
   } = useProjectStore()
   const menuToggleStatus = resolveMenuToggleStatus(requireProject, hasValidationError, selectedProjectId)
   const [isOpen, setIsOpen] = useState(false)
@@ -247,12 +251,10 @@ export function useProjectSelector(options?: UseProjectSelectorOptions): UseProj
     initialProjectId,
     clearSelectionOnMount,
     selectedProjectId,
-    setSelectedProjectId,
     isInitialPage,
     projects,
     projectsQueryIsFetching: projectsQuery.isFetching,
     selectedProject,
-    syncName,
   })
 
   const name = resolveDisplayName(selectedProject?.name, selectedProjectId, storedProjectName)
