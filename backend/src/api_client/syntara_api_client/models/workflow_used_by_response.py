@@ -17,25 +17,26 @@ T = TypeVar("T", bound="WorkflowUsedByResponse")
 
 @_attrs_define
 class WorkflowUsedByResponse:
-    """Paginated Used-By response: published workflows that reference a given workflow.
+    """Used-By response: the published parents that reference a given workflow.
 
-    ``resources`` is the page of referencing parents the requester may view; ``total_count`` is the number of distinct
-    published parents across all projects, not filtered by visibility.
+    ``resources`` is the RBAC-filtered page of referencing parents the requester may view, paged by ``next``/``prev``.
+    ``referencing_parent_count`` is a domain value -- not a pagination total -- giving the number of distinct published
+    parents across all projects, counted regardless of the requester's visibility, so the Used-By badge reflects true
+    impact even when some parents sit in projects the caller cannot see. The page envelope's ``total``/``include_total``
+    are deliberately omitted here.
 
         Attributes:
-            resources (list[WorkflowRead]): Array of resources in current page
-            total_count (int): Distinct published parent workflows that reference this workflow, counted across all projects
-                regardless of the requester's visibility.
-            next_ (None | str | Unset): Cursor for next page of results
-            prev (None | str | Unset): Cursor for previous page of results
-            total (int | None | Unset): Total count of resources (only when include_total=true)
+            resources (list[WorkflowRead]): Page of referencing published parents the caller may view.
+            referencing_parent_count (int): Distinct published parent workflows that reference this workflow, counted across
+                all projects regardless of the requester's visibility. A domain value, not a pagination total.
+            next_ (None | str | Unset): Cursor for the next page of referencing parents.
+            prev (None | str | Unset): Cursor for the previous page of referencing parents.
     """
 
     resources: list[WorkflowRead]
-    total_count: int
+    referencing_parent_count: int
     next_: None | str | Unset = UNSET
     prev: None | str | Unset = UNSET
-    total: int | None | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -44,7 +45,7 @@ class WorkflowUsedByResponse:
             resources_item = resources_item_data.to_dict()
             resources.append(resources_item)
 
-        total_count = self.total_count
+        referencing_parent_count = self.referencing_parent_count
 
         next_: None | str | Unset
         if isinstance(self.next_, Unset):
@@ -58,26 +59,18 @@ class WorkflowUsedByResponse:
         else:
             prev = self.prev
 
-        total: int | None | Unset
-        if isinstance(self.total, Unset):
-            total = UNSET
-        else:
-            total = self.total
-
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
             {
                 "resources": resources,
-                "total_count": total_count,
+                "referencing_parent_count": referencing_parent_count,
             }
         )
         if next_ is not UNSET:
             field_dict["next"] = next_
         if prev is not UNSET:
             field_dict["prev"] = prev
-        if total is not UNSET:
-            field_dict["total"] = total
 
         return field_dict
 
@@ -93,7 +86,7 @@ class WorkflowUsedByResponse:
 
             resources.append(resources_item)
 
-        total_count = d.pop("total_count")
+        referencing_parent_count = d.pop("referencing_parent_count")
 
         def _parse_next_(data: object) -> None | str | Unset:
             if data is None:
@@ -113,21 +106,11 @@ class WorkflowUsedByResponse:
 
         prev = _parse_prev(d.pop("prev", UNSET))
 
-        def _parse_total(data: object) -> int | None | Unset:
-            if data is None:
-                return data
-            if isinstance(data, Unset):
-                return data
-            return cast(int | None | Unset, data)
-
-        total = _parse_total(d.pop("total", UNSET))
-
         workflow_used_by_response = cls(
             resources=resources,
-            total_count=total_count,
+            referencing_parent_count=referencing_parent_count,
             next_=next_,
             prev=prev,
-            total=total,
         )
 
         workflow_used_by_response.additional_properties = d

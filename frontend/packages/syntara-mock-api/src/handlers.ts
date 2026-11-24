@@ -148,7 +148,10 @@ function getOrCreateVersionStore(workflowId: string, workflow: WorkflowWithVersi
         workflow_id: workflowId,
         version: 1,
         schema_version: workflow.version?.schema_version ?? '2.0.0',
-        workflow_definition: workflow.version?.workflow_definition,
+        workflow_definition:
+          workflow.version?.workflow_definition === undefined
+            ? undefined
+            : JSON.parse(JSON.stringify(workflow.version.workflow_definition)),
         change_description: 'Initial version',
         status: 'draft',
         name: null,
@@ -286,11 +289,6 @@ function paginate<T>(items: T[], cursor: string | null, limit: number, includeTo
 /** A sub-workflow node in a (mock) workflow definition: references a child workflow by id. */
 type SubWorkflowNode = { type?: string; parameters?: { workflow_id?: string; trigger_node_id?: string } }
 
-function workflowSubWorkflowNodes(workflow: WorkflowWithVersion): SubWorkflowNode[] {
-  const nodes = (workflow.version?.workflow_definition as { nodes?: unknown } | undefined)?.nodes
-  return Array.isArray(nodes) ? (nodes as SubWorkflowNode[]) : []
-}
-
 /**
  * Published workflows that use ``childId`` as a sub-workflow. When ``triggerNodeIds`` is non-empty,
  * only parents invoking one of those child Subworkflow Triggers are returned. Mirrors the real
@@ -302,7 +300,14 @@ function findPublishedParents(
 ): (WorkflowWithVersion & { project_id: string })[] {
   return workflows.filter((workflow) => {
     if (!workflow.published_version_id) return false
-    return workflowSubWorkflowNodes(workflow).some(
+    // Read the PUBLISHED version's nodes (via the version store), not workflow.version, which a
+    // draft edit (PATCH) replaces -- otherwise Used-By would reflect the draft, not what is live.
+    const publishedVersion = getOrCreateVersionStore(workflow.id, workflow).find(
+      (version) => version.id === workflow.published_version_id
+    )
+    const nodes = (publishedVersion?.workflow_definition as { nodes?: unknown } | undefined)?.nodes
+    const subNodes = Array.isArray(nodes) ? (nodes as SubWorkflowNode[]) : []
+    return subNodes.some(
       (node) =>
         node.type === 'sub_workflow' &&
         node.parameters?.workflow_id === childId &&
@@ -1114,7 +1119,7 @@ export const handlers = [
   http.get('/api/v1/workflows/used_by_counts', ({ request }) => {
     const url = new URL(request.url)
     const ids = url.searchParams.getAll('workflow_ids')
-    const counts = ids.map((id) => ({ workflow_id: id, total_count: findPublishedParents(id, []).length }))
+    const counts = ids.map((id) => ({ workflow_id: id, referencing_parent_count: findPublishedParents(id, []).length }))
     return HttpResponse.json({ counts })
   }),
   http.get('/api/v1/workflows/:workflowId/used_by', ({ request, params }) => {
@@ -1130,7 +1135,7 @@ export const handlers = [
       resources: page.resources,
       next: page.next,
       prev: page.prev,
-      total_count: parents.length,
+      referencing_parent_count: parents.length,
     })
   }),
   http.get('/api/v1/workflows/:workflowId', (request) => {
@@ -1323,6 +1328,23 @@ export const handlers = [
           instance: `/api/v1/workflows/${workflowId}`,
         },
         { status: 404 }
+      )
+    }
+
+    const deleteConfirm = new URL(request.request.url).searchParams.get('confirm') === 'true'
+    const referencingParents = findPublishedParents(String(workflowId), [])
+    if (referencingParents.length > 0 && !deleteConfirm) {
+      return HttpResponse.json(
+        {
+          type: 'https://api.example.com/errors/conflict',
+          title: 'Workflow Deletion Requires Confirmation',
+          detail: `This workflow is referenced by ${referencingParents.length} published parent workflow(s).`,
+          code: 'WORKFLOW_REFERENCED_CONFIRMATION_REQUIRED',
+          retryable: false,
+          instance: `/api/v1/workflows/${String(workflowId)}`,
+          referencing_count: referencingParents.length,
+        } satisfies WorkflowAPI.components['schemas']['WorkflowReferencedConfirmationProblem'],
+        { status: 409, headers: { 'Content-Type': 'application/problem+json' } }
       )
     }
 
@@ -1671,6 +1693,47 @@ export const handlers = [
         { status: 404 }
       )
     }
+    const publishConfirm = new URL(request.request.url).searchParams.get('confirm') === 'true'
+    const subworkflowTriggerIds = (definition: unknown): Set<string> => {
+      const ids = new Set<string>()
+      if (isRecord(definition) && Array.isArray(definition.triggers)) {
+        for (const trigger of definition.triggers) {
+          if (isRecord(trigger) && trigger.type === 'subworkflow_trigger' && typeof trigger.id === 'string') {
+            ids.add(trigger.id)
+          }
+        }
+      }
+      return ids
+    }
+    const previouslyPublishedId = workflow.published_version_id
+    const previouslyPublished =
+      typeof previouslyPublishedId === 'string'
+        ? getOrCreateVersionStore(String(workflowId), workflow).find((v) => v.id === previouslyPublishedId)
+        : undefined
+    if (previouslyPublished) {
+      const newTriggerIds = subworkflowTriggerIds(workflow.version?.workflow_definition)
+      const removedTriggerIds = [...subworkflowTriggerIds(previouslyPublished.workflow_definition)].filter(
+        (id) => !newTriggerIds.has(id)
+      )
+      if (removedTriggerIds.length > 0) {
+        const affectedParents = findPublishedParents(String(workflowId), removedTriggerIds)
+        if (affectedParents.length > 0 && !publishConfirm) {
+          return HttpResponse.json(
+            {
+              type: 'https://api.example.com/errors/conflict',
+              title: 'Publish Requires Confirmation',
+              detail: `Publishing removes a Subworkflow Trigger invoked by ${affectedParents.length} published workflow(s).`,
+              code: 'WORKFLOW_PUBLISH_TRIGGER_REMOVAL_CONFIRMATION_REQUIRED',
+              retryable: false,
+              instance: `/api/v1/workflows/${String(workflowId)}/versions/${String(request.params.version)}/publish`,
+              affected_count: affectedParents.length,
+            } satisfies WorkflowAPI.components['schemas']['WorkflowPublishTriggerRemovalConfirmationProblem'],
+            { status: 409, headers: { 'Content-Type': 'application/problem+json' } }
+          )
+        }
+      }
+    }
+
     const mutableWorkflow = workflow as MutableWorkflowWithVersion
     const versionObj = mutableWorkflow.version as Record<string, unknown>
     versionObj.name = body?.name ?? null

@@ -35,6 +35,22 @@ describe('useTriggerRemovalPublishConfirm', () => {
     expect(onRetry).toHaveBeenCalledTimes(1)
   })
 
+  it('does not open the dialog or retry on a malformed confirmation (missing count)', async () => {
+    const user = userEvent.setup()
+    const onRetry = vi.fn()
+    render(
+      <Harness
+        error={{ cause: { code: 'WORKFLOW_PUBLISH_TRIGGER_REMOVAL_CONFIRMATION_REQUIRED' } }}
+        onRetry={onRetry}
+      />
+    )
+
+    await user.click(screen.getByRole('button', { name: 'guard' }))
+
+    expect(screen.queryByRole('button', { name: 'Publish anyway' })).not.toBeInTheDocument()
+    expect(onRetry).not.toHaveBeenCalled()
+  })
+
   it('ignores unrelated errors and does not retry', async () => {
     const user = userEvent.setup()
     const onRetry = vi.fn()

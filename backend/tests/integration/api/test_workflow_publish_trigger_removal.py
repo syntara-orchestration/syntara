@@ -11,6 +11,7 @@ from uuid import UUID, uuid4
 
 import pytest
 
+from syntara.workflows.error_handlers import WorkflowPublishTriggerRemovalConfirmationProblem
 from syntara.workflows.models import Workflow, WorkflowVersion
 
 if TYPE_CHECKING:
@@ -126,6 +127,9 @@ async def test_publish_removing_referenced_trigger_requires_confirmation(
     body = resp.json()
     assert body["code"] == "WORKFLOW_PUBLISH_TRIGGER_REMOVAL_CONFIRMATION_REQUIRED"
     assert body["affected_count"] == 1
+    assert resp.headers["content-type"].startswith("application/problem+json")
+    # Conforms to the specialized schema (detects a missing/renamed count field or wrong code).
+    WorkflowPublishTriggerRemovalConfirmationProblem.model_validate(body)
     assert str(parent) not in resp.text
     assert parent_name not in resp.text
 

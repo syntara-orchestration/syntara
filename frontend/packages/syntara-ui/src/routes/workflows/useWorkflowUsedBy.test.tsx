@@ -14,7 +14,7 @@ const mockedUseQuery = vi.mocked(workflowClient.useQuery)
 describe('useWorkflowUsedBy', () => {
   it('derives total count and referencing parents from the response', () => {
     mockedUseQuery.mockReturnValue({
-      data: { total_count: 3, resources: [{ id: 'p1', name: 'Parent 1' }], next: null, prev: null },
+      data: { referencing_parent_count: 3, resources: [{ id: 'p1', name: 'Parent 1' }], next: null, prev: null },
       isLoading: false,
       error: null,
     })
@@ -69,8 +69,8 @@ describe('useWorkflowUsedByCounts / useVisibleUsedByCounts', () => {
     mockedUseQuery.mockReturnValue({
       data: {
         counts: [
-          { workflow_id: 'a', total_count: 2 },
-          { workflow_id: 'b', total_count: 0 },
+          { workflow_id: 'a', referencing_parent_count: 2 },
+          { workflow_id: 'b', referencing_parent_count: 0 },
         ],
       },
       isLoading: false,
@@ -85,7 +85,7 @@ describe('useWorkflowUsedByCounts / useVisibleUsedByCounts', () => {
 
   it('caps the visible id set at 100 and returns the counts map', () => {
     mockedUseQuery.mockReturnValue({
-      data: { counts: [{ workflow_id: 'w0', total_count: 5 }] },
+      data: { counts: [{ workflow_id: 'w0', referencing_parent_count: 5 }] },
       isLoading: false,
       error: null,
     })
@@ -101,7 +101,7 @@ describe('useWorkflowUsedByCounts / useVisibleUsedByCounts', () => {
   })
 
   it('returns a stable counts map across re-renders when the data is unchanged', () => {
-    const data = { counts: [{ workflow_id: 'a', total_count: 1 }] }
+    const data = { counts: [{ workflow_id: 'a', referencing_parent_count: 1 }] }
     mockedUseQuery.mockReturnValue({ data, isLoading: false, error: null })
 
     const { result, rerender } = renderHook(() => useWorkflowUsedByCounts(['a']))

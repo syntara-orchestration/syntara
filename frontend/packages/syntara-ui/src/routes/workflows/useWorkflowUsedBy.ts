@@ -1,5 +1,5 @@
 import type { WorkflowAPI } from '@syntara/contracts'
-import { createContext, useContext, useMemo } from 'react'
+import { createContext, use, useMemo } from 'react'
 
 import { workflowClient } from '../../client'
 
@@ -39,7 +39,7 @@ export function useWorkflowUsedBy(workflowId: string | undefined, options: UseWo
   )
 
   return {
-    totalCount: query.data?.total_count ?? 0,
+    totalCount: query.data?.referencing_parent_count ?? 0,
     referencingParents: (query.data?.resources ?? []) as ReferencingParent[],
     next: query.data?.next ?? null,
     prev: query.data?.prev ?? null,
@@ -64,7 +64,7 @@ export function useWorkflowUsedByCounts(workflowIds: string[], options: { enable
   const countsById = useMemo(() => {
     const map = new Map<string, number>()
     for (const entry of query.data?.counts ?? []) {
-      map.set(entry.workflow_id, entry.total_count)
+      map.set(entry.workflow_id, entry.referencing_parent_count)
     }
     return map
   }, [query.data])
@@ -80,7 +80,7 @@ export function useWorkflowUsedByCounts(workflowIds: string[], options: { enable
 export const WorkflowUsedByCountsContext = createContext<Map<string, number>>(new Map())
 
 export function useWorkflowUsedByCountsContext(): Map<string, number> {
-  return useContext(WorkflowUsedByCountsContext)
+  return use(WorkflowUsedByCountsContext)
 }
 
 /**

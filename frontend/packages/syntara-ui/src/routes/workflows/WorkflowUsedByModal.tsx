@@ -30,7 +30,7 @@ const PAGE_SIZE = 10
 
 /**
  * Drill-down for the Used-By summary: a paginated list of the published workflows that use this
- * workflow as a sub-workflow, with clickable names. ``total_count`` is the unfiltered total;
+ * workflow as a sub-workflow, with clickable names. ``referencing_parent_count`` is the unfiltered total;
  * only parents the caller may view are listed, and parents in projects the caller cannot access
  * are not shown (so the page size is not a reliable "hidden" count — we state this plainly
  * instead of computing a misleading difference).

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   extractPublishTriggerRemovalAffectedCount,
+  extractReferencedParentCount,
   getErrorCode,
   getErrorMessage,
   getErrorStatus,
@@ -9,6 +10,7 @@ import {
   getValidationFieldErrors,
   isAdminConfigurationError,
   isConflictError,
+  isWorkflowReferencedConfirmationError,
   isRetryableError,
   isPublishTriggerRemovalConfirmationError,
   isServiceUnavailableError,
@@ -458,9 +460,40 @@ describe('publish trigger-removal confirmation error', () => {
     expect(extractPublishTriggerRemovalAffectedCount(error)).toBe(3)
   })
 
-  it('returns false / zero for unrelated errors', () => {
+  it('returns false / null for unrelated errors', () => {
     const error = { code: 'SOMETHING_ELSE' }
     expect(isPublishTriggerRemovalConfirmationError(error)).toBe(false)
-    expect(extractPublishTriggerRemovalAffectedCount(error)).toBe(0)
+    expect(extractPublishTriggerRemovalAffectedCount(error)).toBeNull()
+  })
+
+  it('returns null for a malformed confirmation (missing or non-positive-integer count)', () => {
+    expect(
+      extractPublishTriggerRemovalAffectedCount({
+        cause: { code: 'WORKFLOW_PUBLISH_TRIGGER_REMOVAL_CONFIRMATION_REQUIRED' },
+      })
+    ).toBeNull()
+    expect(extractPublishTriggerRemovalAffectedCount({ cause: { affected_count: 0 } })).toBeNull()
+    expect(extractPublishTriggerRemovalAffectedCount({ cause: { affected_count: -2 } })).toBeNull()
+    expect(extractPublishTriggerRemovalAffectedCount({ cause: { affected_count: 1.5 } })).toBeNull()
+  })
+})
+
+describe('referenced delete confirmation error', () => {
+  it('detects the confirmation code and reads the referencing count', () => {
+    const error = { cause: { code: 'WORKFLOW_REFERENCED_CONFIRMATION_REQUIRED', referencing_count: 2 } }
+    expect(isWorkflowReferencedConfirmationError(error)).toBe(true)
+    expect(extractReferencedParentCount(error)).toBe(2)
+  })
+
+  it('returns false / null for unrelated errors', () => {
+    const error = { code: 'SOMETHING_ELSE' }
+    expect(isWorkflowReferencedConfirmationError(error)).toBe(false)
+    expect(extractReferencedParentCount(error)).toBeNull()
+  })
+
+  it('returns null for a malformed confirmation (missing or non-positive-integer count)', () => {
+    expect(extractReferencedParentCount({ cause: { code: 'WORKFLOW_REFERENCED_CONFIRMATION_REQUIRED' } })).toBeNull()
+    expect(extractReferencedParentCount({ cause: { referencing_count: 0 } })).toBeNull()
+    expect(extractReferencedParentCount({ cause: { referencing_count: -1 } })).toBeNull()
   })
 })

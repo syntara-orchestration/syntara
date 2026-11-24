@@ -26128,17 +26128,13 @@ paths:
                 retryable: false
                 instance: /api/v1/workflows
         '409':
-          description: Conflict
+          description: Conflict. When the workflow is referenced by published parents the body is a WorkflowReferencedConfirmationProblem (carrying referencing_count); resend with confirm=true to delete. Other conflicts (for example active executions blocking deletion) use the generic problem shape.
           content:
             application/problem+json:
               schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/conflict
-                title: Conflict
-                detail: The request conflicts with the current state of the resource
-                code: CONFLICT
-                retryable: false
+                anyOf:
+                  - $ref: '#/components/schemas/WorkflowReferencedConfirmationProblem'
+                  - $ref: '#/components/schemas/ErrorData'
         '422':
           description: Validation Error
           content:
@@ -26727,7 +26723,7 @@ paths:
       description: |-
         List published workflows whose published version references this workflow (Used-By).
 
-        ``total_count`` is every distinct published parent across all projects; ``resources`` is the page of parents the caller may view. Access requires read permission on this workflow.
+        ``referencing_parent_count`` is every distinct published parent across all projects; ``resources`` is the page of parents the caller may view. Access requires read permission on this workflow.
       operationId: list_workflow_used_by
       tags:
         - Workflows
@@ -26770,13 +26766,6 @@ paths:
                 pattern: ^-?[a-z][a-z0-9_]*$
               - type: 'null'
             title: Sort
-        - name: include_total
-          in: query
-          required: false
-          schema:
-            type: boolean
-            default: false
-            title: Include Total
         - name: trigger_node_ids
           in: query
           required: false
@@ -27248,17 +27237,13 @@ paths:
                 retryable: false
                 instance: /api/v1/workflows
         '409':
-          description: Conflict
+          description: Conflict. When publishing removes a Subworkflow Trigger invoked by published parents the body is a WorkflowPublishTriggerRemovalConfirmationProblem (carrying affected_count); resend with confirm=true. Other conflicts (version conflict, publish validation) use the generic problem shape.
           content:
             application/problem+json:
               schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/conflict
-                title: Conflict
-                detail: The request conflicts with the current state of the resource
-                code: CONFLICT
-                retryable: false
+                anyOf:
+                  - $ref: '#/components/schemas/WorkflowPublishTriggerRemovalConfirmationProblem'
+                  - $ref: '#/components/schemas/ErrorData'
         '422':
           description: Validation Error
           content:
@@ -36622,58 +36607,107 @@ components:
           total: 150
         - next: eyJpZCI6Im5leHQifQ
           prev: eyJpZCI6InByZXYifQ
+    WorkflowReferencedConfirmationProblem:
+      title: WorkflowReferencedConfirmationProblem
+      description: RFC 9457 problem body returned (HTTP 409) when deleting a workflow that is referenced by published parents without ``confirm=true``. Extends ``ErrorData`` with the count of referencing parents; their identities are never disclosed, since the caller may lack read access to them.
+      allOf:
+        - $ref: '#/components/schemas/ErrorData'
+        - type: object
+          required:
+            - code
+            - referencing_count
+          properties:
+            code:
+              type: string
+              enum:
+                - WORKFLOW_REFERENCED_CONFIRMATION_REQUIRED
+              title: Code
+              description: Machine-readable error code; fixed for this problem type.
+            referencing_count:
+              type: integer
+              minimum: 1
+              title: Referencing Count
+              description: Distinct published parent workflows that reference this workflow and would be affected by the deletion.
+      examples:
+        - type: https://api.example.com/errors/conflict
+          title: Workflow Deletion Requires Confirmation
+          detail: This workflow is referenced by 2 published parent workflows.
+          code: WORKFLOW_REFERENCED_CONFIRMATION_REQUIRED
+          retryable: false
+          referencing_count: 2
+    WorkflowPublishTriggerRemovalConfirmationProblem:
+      title: WorkflowPublishTriggerRemovalConfirmationProblem
+      description: RFC 9457 problem body returned (HTTP 409) when publishing a version that removes a Subworkflow Trigger invoked by published parents without ``confirm=true``. Extends ``ErrorData`` with the count of affected parents; their identities are never disclosed.
+      allOf:
+        - $ref: '#/components/schemas/ErrorData'
+        - type: object
+          required:
+            - code
+            - affected_count
+          properties:
+            code:
+              type: string
+              enum:
+                - WORKFLOW_PUBLISH_TRIGGER_REMOVAL_CONFIRMATION_REQUIRED
+              title: Code
+              description: Machine-readable error code; fixed for this problem type.
+            affected_count:
+              type: integer
+              minimum: 1
+              title: Affected Count
+              description: Distinct published parent workflows that invoke a Subworkflow Trigger removed by this publish.
+      examples:
+        - type: https://api.example.com/errors/conflict
+          title: Publish Requires Confirmation
+          detail: Publishing removes a Subworkflow Trigger invoked by 1 published parent workflow.
+          code: WORKFLOW_PUBLISH_TRIGGER_REMOVAL_CONFIRMATION_REQUIRED
+          retryable: false
+          affected_count: 1
     WorkflowUsedByResponse:
       type: object
       required:
         - resources
-        - total_count
+        - referencing_parent_count
       title: WorkflowUsedByResponse
       description: |-
-        Paginated Used-By response: published workflows that reference a given workflow.
+        Used-By response: the published parents that reference a given workflow.
 
-        ``resources`` is the page of referencing parents the requester may view; ``total_count`` is the number of distinct published parents across all projects, not filtered by visibility.
+        ``resources`` is the RBAC-filtered page of referencing parents the requester may view, paged by ``next``/``prev``. ``referencing_parent_count`` is a domain value -- not a pagination total -- giving the number of distinct published parents across all projects, counted regardless of the requester's visibility, so the Used-By badge reflects true impact even when some parents sit in projects the caller cannot see. The page envelope's ``total``/``include_total`` are deliberately omitted here.
       properties:
-        next:
-          anyOf:
-            - type: string
-            - type: 'null'
-          title: Next
-          description: Cursor for next page of results
-        prev:
-          anyOf:
-            - type: string
-            - type: 'null'
-          title: Prev
-          description: Cursor for previous page of results
-        total:
-          anyOf:
-            - type: integer
-              minimum: 0.0
-            - type: 'null'
-          title: Total
-          description: Total count of resources (only when include_total=true)
         resources:
           type: array
           items:
             $ref: '#/components/schemas/WorkflowRead'
           maxItems: 100
           title: Resources
-          description: Array of resources in current page
-        total_count:
+          description: Page of referencing published parents the caller may view.
+        next:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Next
+          description: Cursor for the next page of referencing parents.
+        prev:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Prev
+          description: Cursor for the previous page of referencing parents.
+        referencing_parent_count:
           type: integer
-          minimum: 0.0
-          title: Total Count
-          description: Distinct published parent workflows that reference this workflow, counted across all projects regardless of the requester's visibility.
+          minimum: 0
+          title: Referencing Parent Count
+          description: Distinct published parent workflows that reference this workflow, counted across all projects regardless of the requester's visibility. A domain value, not a pagination total.
       examples:
-        - next: eyJpZCI6InV1aWQifQ
-          total: 150
-        - next: eyJpZCI6Im5leHQifQ
-          prev: eyJpZCI6InByZXYifQ
+        - resources: []
+          next: null
+          prev: null
+          referencing_parent_count: 3
     WorkflowUsedByCount:
       type: object
       required:
         - workflow_id
-        - total_count
+        - referencing_parent_count
       title: WorkflowUsedByCount
       description: Used-By total for a single workflow, returned by the batch counts endpoint.
       properties:
@@ -36681,11 +36715,11 @@ components:
           type: string
           format: uuid
           title: Workflow Id
-        total_count:
+        referencing_parent_count:
           type: integer
-          minimum: 0.0
-          title: Total Count
-          description: Distinct published parent workflows that reference this workflow, across all projects.
+          minimum: 0
+          title: Referencing Parent Count
+          description: Distinct published parent workflows that reference this workflow, across all projects, regardless of the requester's visibility.
     WorkflowUsedByCountsResponse:
       type: object
       title: WorkflowUsedByCountsResponse

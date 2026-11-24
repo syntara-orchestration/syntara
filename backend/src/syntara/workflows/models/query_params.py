@@ -1,9 +1,10 @@
 """Query parameter models for workflow-related endpoints."""
 
 import re
+from typing import Annotated
 
 from pydantic import Field as PydanticField
-from pydantic import field_validator
+from pydantic import StringConstraints, field_validator
 from sqlmodel import Field, SQLModel
 
 from syntara.core.exceptions import SafeValueError
@@ -19,14 +20,27 @@ class WorkflowListParams(BaseListParams):
     # for complex filtering operations like created_by, is_enabled, etc.
 
 
-class WorkflowUsedByListParams(BaseListParams):
+# Sort pattern shared with core list params (kept local so this model does not inherit the
+# generic ``include_total`` field, which the Used-By contract does not support).
+_USED_BY_SORT_PATTERN = r"^-?[a-z][a-z0-9_]*$"
+
+
+class WorkflowUsedByListParams(SQLModel):
     """Query parameters for the Used-By endpoint.
 
-    Inherits the standard list params (``limit``, ``cursor``, ``sort``, ``include_total``). The
-    Used-By response always returns ``total_count`` regardless of ``include_total``. ``trigger_node_ids``
-    is a functional selector (not a generic field filter), so it is marked ``x-query-param``.
+    Cursor pagination (``limit``, ``cursor``, ``sort``) plus the functional ``trigger_node_ids``
+    selector. Unlike the generic list params this endpoint deliberately omits ``include_total``:
+    the Used-By response always returns ``referencing_parent_count`` (a domain value), and the
+    pagination envelope's ``total``/``include_total`` are not part of this contract.
+    ``trigger_node_ids`` is a functional selector (not a generic field filter), so it is marked
+    ``x-query-param``.
     """
 
+    limit: int = Field(default=20, gt=0, le=100, description="Maximum number of results per page")
+    cursor: str | None = Field(default=None, description="Pagination cursor from previous response")
+    sort: Annotated[str, StringConstraints(pattern=_USED_BY_SORT_PATTERN)] | None = Field(
+        default=None, description="Sort parameter (e.g., 'name', '-created_at')"
+    )
     trigger_node_ids: list[str] | None = PydanticField(
         default=None,
         description=(

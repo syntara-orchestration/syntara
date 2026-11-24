@@ -372,7 +372,7 @@ describe('useBuilderToolbarHandlers', () => {
 
     expect(deleteWorkflow).toHaveBeenCalledTimes(1)
     const [variables, options] = deleteWorkflow.mock.calls[0]
-    expect(variables).toEqual({ params: { path: { workflow_id: 'wf-1' }, query: { confirm: true } } })
+    expect(variables).toEqual({ params: { path: { workflow_id: 'wf-1' }, query: { confirm: false } } })
     expect(options?.onSuccess).toEqual(expect.any(Function))
     expect(options?.onError).toEqual(expect.any(Function))
     expect(showSuccess).toHaveBeenCalledWith({

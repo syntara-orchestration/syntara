@@ -2,6 +2,7 @@ import type { WorkflowAPI } from '@syntara/contracts'
 import { useCallback } from 'react'
 
 import { executionsFetchClient, workflowClient } from '../../client'
+import { useReferencedDeleteConfirm } from '../../hooks/useReferencedDeleteConfirm'
 import { useTriggerRemovalPublishConfirm } from '../../hooks/useTriggerRemovalPublishConfirm'
 import type { useAlerts } from '../../providers/alerts'
 import { getErrorMessage } from '../../utils/apiErrors'
@@ -39,6 +40,7 @@ export function useWorkflowActions({
   )
   const { mutate: unpublishWorkflow } = workflowClient.useMutation('post', '/workflows/{workflow_id}/unpublish')
   const { guardPublishError, triggerRemovalConfirmDialog } = useTriggerRemovalPublishConfirm()
+  const { guardDeleteError, referencedDeleteConfirmDialog } = useReferencedDeleteConfirm()
 
   const handleRunWorkflow = useCallback(
     async (workflow: Workflow, inputData: Record<string, unknown> = {}, triggerNodeId?: string) => {
@@ -77,27 +79,35 @@ export function useWorkflowActions({
   const handleDeleteWorkflow = useCallback(
     (workflow: Workflow) => {
       if (!workflow?.id) return
+      const workflowId = workflow.id
 
-      deleteWorkflow(
-        { params: { path: { workflow_id: workflow.id }, query: { confirm: true } } },
-        {
-          onSuccess: () => {
-            showSuccess({ title: 'Workflow deleted', description: `Workflow "${workflow.name}" has been deleted.` })
-            onRefetch()
-          },
-          onError: (error: unknown) => {
-            showError({
-              title: 'Failed to delete workflow',
-              description: `Failed to delete workflow "${workflow.name}": ${getErrorMessage(error)}`,
-            })
-          },
-          onSettled: () => {
-            onDeleteSettled?.()
-          },
-        }
-      )
+      // Start unconfirmed so the backend's referenced-by-published-parents gate is honored instead
+      // of bypassed; only retry with confirm=true after the user explicitly confirms.
+      const doDelete = (confirm: boolean) => {
+        deleteWorkflow(
+          { params: { path: { workflow_id: workflowId }, query: { confirm } } },
+          {
+            onSuccess: () => {
+              showSuccess({ title: 'Workflow deleted', description: `Workflow "${workflow.name}" has been deleted.` })
+              onRefetch()
+            },
+            onError: (error: unknown) => {
+              if (guardDeleteError(error, () => doDelete(true))) return
+              showError({
+                title: 'Failed to delete workflow',
+                description: `Failed to delete workflow "${workflow.name}": ${getErrorMessage(error)}`,
+              })
+            },
+            onSettled: () => {
+              onDeleteSettled?.()
+            },
+          }
+        )
+      }
+
+      doDelete(false)
     },
-    [deleteWorkflow, showSuccess, showError, onRefetch, onDeleteSettled]
+    [deleteWorkflow, guardDeleteError, showSuccess, showError, onRefetch, onDeleteSettled]
   )
 
   const handlePublishWorkflow = useCallback(
@@ -165,5 +175,6 @@ export function useWorkflowActions({
     isDeleting,
     isPublishing,
     triggerRemovalConfirmDialog,
+    referencedDeleteConfirmDialog,
   }
 }

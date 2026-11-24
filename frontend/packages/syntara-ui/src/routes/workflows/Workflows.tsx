@@ -121,7 +121,6 @@ function WorkflowsPageToolbar({
 }
 
 export default function Workflows() {
-  const workflowsDocLink = useDocLink('workflows')
   const { showAlert, showSuccess, showError } = useAlerts()
   const navigate = useNavigate()
   const setLocation = useCallback((to: string) => detachPromise(navigate({ to })), [navigate])
@@ -191,6 +190,7 @@ export default function Workflows() {
     isDeleting,
     isPublishing,
     triggerRemovalConfirmDialog,
+    referencedDeleteConfirmDialog,
   } = useWorkflowActions({
     showSuccess,
     showError,
@@ -242,17 +242,16 @@ export default function Workflows() {
     projectPermissions,
   })
 
-  const hasQueryError = !!workflowsQuery.error
   return (
     <>
       <SynPage>
         <SynPageTitle segments={['Workflows']} />
         <SynPageHeader
           title="Workflows"
-          docLink={workflowsDocLink}
-          projectSelector={hasQueryError ? undefined : ProjectSelector}
+          docLink={useDocLink('workflows')}
+          projectSelector={workflowsQuery.error ? undefined : ProjectSelector}
           toolbar={
-            !hasQueryError && showToolbar ? (
+            !workflowsQuery.error && showToolbar ? (
               <WorkflowsPageToolbar
                 headerProjectActions={headerProjectActions}
                 canCreate={permissions.canCreate && !selectedProject?.is_builtin}
@@ -333,6 +332,7 @@ export default function Workflows() {
         isDeletingProject={isDeletingProject}
       />
       {triggerRemovalConfirmDialog}
+      {referencedDeleteConfirmDialog}
     </>
   )
 }

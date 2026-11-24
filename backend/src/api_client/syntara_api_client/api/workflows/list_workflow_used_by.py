@@ -17,7 +17,6 @@ def _get_kwargs(
     limit: int | Unset = 20,
     cursor: None | str | Unset = UNSET,
     sort: None | str | Unset = UNSET,
-    include_total: bool | Unset = False,
     trigger_node_ids: list[str] | None | Unset = UNSET,
     additional_params: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
@@ -40,8 +39,6 @@ def _get_kwargs(
     else:
         json_sort = sort
     params["sort"] = json_sort
-
-    params["include_total"] = include_total
 
     json_trigger_node_ids: list[str] | None | Unset
     if isinstance(trigger_node_ids, Unset):
@@ -138,7 +135,6 @@ def sync_detailed(
     limit: int | Unset = 20,
     cursor: None | str | Unset = UNSET,
     sort: None | str | Unset = UNSET,
-    include_total: bool | Unset = False,
     trigger_node_ids: list[str] | None | Unset = UNSET,
     additional_params: dict[str, Any] | None = None,
 ) -> Response[ErrorData | WorkflowUsedByResponse]:
@@ -146,15 +142,14 @@ def sync_detailed(
 
      List published workflows whose published version references this workflow (Used-By).
 
-    ``total_count`` is every distinct published parent across all projects; ``resources`` is the page of
-    parents the caller may view. Access requires read permission on this workflow.
+    ``referencing_parent_count`` is every distinct published parent across all projects; ``resources``
+    is the page of parents the caller may view. Access requires read permission on this workflow.
 
     Args:
         workflow_id (UUID):
         limit (int | Unset):  Default: 20.
         cursor (None | str | Unset):
         sort (None | str | Unset):
-        include_total (bool | Unset):  Default: False.
         trigger_node_ids (list[str] | None | Unset):
 
     Raises:
@@ -170,7 +165,6 @@ def sync_detailed(
         limit=limit,
         cursor=cursor,
         sort=sort,
-        include_total=include_total,
         trigger_node_ids=trigger_node_ids,
         additional_params=additional_params,
     )
@@ -189,22 +183,20 @@ def sync(
     limit: int | Unset = 20,
     cursor: None | str | Unset = UNSET,
     sort: None | str | Unset = UNSET,
-    include_total: bool | Unset = False,
     trigger_node_ids: list[str] | None | Unset = UNSET,
 ) -> ErrorData | WorkflowUsedByResponse | None:
     """List published workflows that reference this workflow
 
      List published workflows whose published version references this workflow (Used-By).
 
-    ``total_count`` is every distinct published parent across all projects; ``resources`` is the page of
-    parents the caller may view. Access requires read permission on this workflow.
+    ``referencing_parent_count`` is every distinct published parent across all projects; ``resources``
+    is the page of parents the caller may view. Access requires read permission on this workflow.
 
     Args:
         workflow_id (UUID):
         limit (int | Unset):  Default: 20.
         cursor (None | str | Unset):
         sort (None | str | Unset):
-        include_total (bool | Unset):  Default: False.
         trigger_node_ids (list[str] | None | Unset):
 
     Raises:
@@ -221,7 +213,6 @@ def sync(
         limit=limit,
         cursor=cursor,
         sort=sort,
-        include_total=include_total,
         trigger_node_ids=trigger_node_ids,
     ).parsed
 
@@ -233,22 +224,20 @@ async def asyncio_detailed(
     limit: int | Unset = 20,
     cursor: None | str | Unset = UNSET,
     sort: None | str | Unset = UNSET,
-    include_total: bool | Unset = False,
     trigger_node_ids: list[str] | None | Unset = UNSET,
 ) -> Response[ErrorData | WorkflowUsedByResponse]:
     """List published workflows that reference this workflow
 
      List published workflows whose published version references this workflow (Used-By).
 
-    ``total_count`` is every distinct published parent across all projects; ``resources`` is the page of
-    parents the caller may view. Access requires read permission on this workflow.
+    ``referencing_parent_count`` is every distinct published parent across all projects; ``resources``
+    is the page of parents the caller may view. Access requires read permission on this workflow.
 
     Args:
         workflow_id (UUID):
         limit (int | Unset):  Default: 20.
         cursor (None | str | Unset):
         sort (None | str | Unset):
-        include_total (bool | Unset):  Default: False.
         trigger_node_ids (list[str] | None | Unset):
 
     Raises:
@@ -264,7 +253,6 @@ async def asyncio_detailed(
         limit=limit,
         cursor=cursor,
         sort=sort,
-        include_total=include_total,
         trigger_node_ids=trigger_node_ids,
     )
 
@@ -280,22 +268,20 @@ async def asyncio(
     limit: int | Unset = 20,
     cursor: None | str | Unset = UNSET,
     sort: None | str | Unset = UNSET,
-    include_total: bool | Unset = False,
     trigger_node_ids: list[str] | None | Unset = UNSET,
 ) -> ErrorData | WorkflowUsedByResponse | None:
     """List published workflows that reference this workflow
 
      List published workflows whose published version references this workflow (Used-By).
 
-    ``total_count`` is every distinct published parent across all projects; ``resources`` is the page of
-    parents the caller may view. Access requires read permission on this workflow.
+    ``referencing_parent_count`` is every distinct published parent across all projects; ``resources``
+    is the page of parents the caller may view. Access requires read permission on this workflow.
 
     Args:
         workflow_id (UUID):
         limit (int | Unset):  Default: 20.
         cursor (None | str | Unset):
         sort (None | str | Unset):
-        include_total (bool | Unset):  Default: False.
         trigger_node_ids (list[str] | None | Unset):
 
     Raises:
@@ -313,7 +299,6 @@ async def asyncio(
             limit=limit,
             cursor=cursor,
             sort=sort,
-            include_total=include_total,
             trigger_node_ids=trigger_node_ids,
         )
     ).parsed

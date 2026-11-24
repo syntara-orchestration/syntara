@@ -546,8 +546,8 @@ async def list_workflow_used_by(
 ) -> WorkflowUsedByResponse:
     """List published workflows whose published version references this workflow (Used-By).
 
-    ``total_count`` is every distinct published parent across all projects; ``resources`` is the
-    page of parents the caller may view. Access requires read permission on this workflow.
+    ``referencing_parent_count`` is every distinct published parent across all projects; ``resources``
+    is the page of parents the caller may view. Access requires read permission on this workflow.
     """
     # _wf_perm_read authorizes the action but does not assert the target exists (an admin may read
     # any id), so confirm existence here to return 404 for an unknown workflow instead of an empty page.

@@ -43,6 +43,13 @@ type PendingPublish = {
   version: number
   expectedVersion?: number
   workflowDefinition?: Record<string, unknown>
+  /**
+   * Trigger-removal confirmation computed at publish() time (from the publish form). Carried here so
+   * a publish routed through the output-contract-change dialog keeps it: confirmPublish passes it to
+   * publishNow instead of defaulting to false, so one informed confirmation covers both the contract
+   * change and the trigger removal rather than surfacing a second trigger-removal dialog afterwards.
+   */
+  confirm?: boolean
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -174,6 +181,7 @@ export function usePublishWorkflow({
         onSettled,
         version: versionToPublish,
         workflowDefinition,
+        confirm,
         ...(expectedVersion != null ? { expectedVersion } : {}),
       }
       if (!workflowDefinition) {
@@ -213,7 +221,9 @@ export function usePublishWorkflow({
     const pending = pendingPublish
     clearContractReview()
     setPendingPublish(null)
-    publishNow(pending)
+    // Preserve the trigger-removal confirm computed at publish() time so confirming the
+    // output-contract change also covers a trigger removal the user already acknowledged.
+    publishNow(pending, pending.confirm ?? false)
   }, [pendingPublish, clearContractReview, publishNow])
 
   const cancelBreakingChangeWarning = useCallback(() => {

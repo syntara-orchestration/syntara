@@ -287,29 +287,43 @@ class WorkflowListResponse(ResourcesResponse[WorkflowRead]):
     """Paginated list response for workflows."""
 
 
-class WorkflowUsedByResponse(ResourcesResponse[WorkflowRead]):
-    """Paginated Used-By response: published workflows that reference a given workflow.
+class WorkflowUsedByResponse(SQLModel):
+    """Used-By response: the published parents that reference a given workflow.
 
-    ``resources`` is the page of referencing parents the requester may view; ``total_count``
-    is the number of distinct published parents across all projects, not filtered by visibility.
+    ``resources`` is the RBAC-filtered page of referencing parents the requester may view, paged by
+    ``next``/``prev``. ``referencing_parent_count`` is a domain value -- not a pagination total --
+    giving the number of distinct published parents across all projects, counted regardless of the
+    requester's visibility, so the Used-By badge reflects true impact even when some parents sit in
+    projects the caller cannot see. The page envelope's ``total``/``include_total`` are deliberately
+    omitted here: the visible page is already bounded by ``limit`` and the meaningful count is the
+    cross-project domain value above.
     """
 
-    total_count: int = Field(
+    resources: list[WorkflowRead] = Field(
+        default_factory=list,
+        description="Page of referencing published parents the caller may view.",
+    )
+    next: str | None = Field(default=None, description="Cursor for the next page of referencing parents.")
+    prev: str | None = Field(default=None, description="Cursor for the previous page of referencing parents.")
+    referencing_parent_count: int = Field(
         ge=0,
         description=(
             "Distinct published parent workflows that reference this workflow, counted across all "
-            "projects regardless of the requester's visibility."
+            "projects regardless of the requester's visibility. A domain value, not a pagination total."
         ),
     )
 
 
 class WorkflowUsedByCount(SQLModel):
-    """Used-By total for a single workflow, returned by the batch counts endpoint."""
+    """Used-By count for a single workflow, returned by the batch counts endpoint."""
 
     workflow_id: UUID
-    total_count: int = Field(
+    referencing_parent_count: int = Field(
         ge=0,
-        description="Distinct published parent workflows that reference this workflow, across all projects.",
+        description=(
+            "Distinct published parent workflows that reference this workflow, across all projects, "
+            "regardless of the requester's visibility."
+        ),
     )
 
 

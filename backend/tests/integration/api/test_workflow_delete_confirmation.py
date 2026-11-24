@@ -13,7 +13,9 @@ from uuid import UUID, uuid4
 import pytest
 from sqlmodel import select
 
+from syntara.workflows.error_handlers import WorkflowReferencedConfirmationProblem
 from syntara.workflows.models import Workflow, WorkflowVersion
+from syntara.workflows.models.execution import Execution, ExecutionStatus
 
 if TYPE_CHECKING:
     from httpx import AsyncClient
@@ -97,6 +99,9 @@ async def test_delete_referenced_requires_confirmation(
     body = resp.json()
     assert body["code"] == "WORKFLOW_REFERENCED_CONFIRMATION_REQUIRED"
     assert body["referencing_count"] == 1
+    assert resp.headers["content-type"].startswith("application/problem+json")
+    # Conforms to the specialized schema (detects a missing/renamed count field or wrong code).
+    WorkflowReferencedConfirmationProblem.model_validate(body)
     # The referencing parent's identity must not leak in the confirmation response.
     assert str(parent) not in resp.text
     assert parent_name not in resp.text
@@ -140,3 +145,41 @@ async def test_delete_unreferenced_needs_no_confirmation(
     assert resp.status_code == 204
     test_db_session.expire_all()
     assert await test_db_session.get(Workflow, lone) is None
+
+
+@pytest.mark.asyncio
+async def test_delete_blocked_by_active_executions_is_generic_409(
+    auth_client: AsyncClient, test_db_session: AsyncSession, test_project_id, test_user
+) -> None:
+    """An active-executions 409 is a generic conflict with no referencing_count.
+
+    Exercises the ErrorData branch of the delete 409 ``anyOf``: the specialized confirmation schema
+    must not claim unrelated conflicts.
+    """
+    project_id = UUID(str(test_project_id))
+    wf = await _publish(
+        test_db_session,
+        created_by=test_user.id,
+        project_id=project_id,
+        definition=_plain_def(),
+        name=f"busy-{uuid4().hex[:8]}",
+    )
+    workflow = await test_db_session.get(Workflow, wf)
+    assert workflow is not None
+    test_db_session.add(
+        Execution(
+            workflow_id=wf,
+            workflow_version_id=workflow.published_version_id,
+            project_id=project_id,
+            temporal_workflow_id=f"tmp-{uuid4().hex}",
+            status=ExecutionStatus.RUNNING,
+        )
+    )
+    await test_db_session.commit()
+
+    resp = await auth_client.delete(f"/api/v1/workflows/{wf}")
+    assert resp.status_code == 409
+    assert resp.headers["content-type"].startswith("application/problem+json")
+    body = resp.json()
+    assert body["code"] == "ACTIVE_EXECUTIONS_BLOCK_DELETION"
+    assert "referencing_count" not in body  # generic branch, not the specialized confirmation schema

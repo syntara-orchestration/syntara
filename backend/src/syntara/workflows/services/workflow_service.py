@@ -864,6 +864,38 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
         )
         return list(result.all())
 
+    async def count_referencing_published_parents(
+        self, child_workflow_id: UUID, trigger_node_ids: list[str] | None = None
+    ) -> int:
+        """Count distinct published parents that reference the child (unfiltered by visibility).
+
+        Containment-based match (``_references_published_child``), shared by the single Used-By
+        endpoint and the publish/delete lifecycle gates. The batch endpoint
+        (``count_published_parents_batch``) counts the same concept with a set-based JSONB expansion
+        for efficiency; the two are separate query shapes over one domain rule. A parity test
+        (``test_batch_count_matches_single_count_helper``) pins the two paths on the fixtures it
+        covers (dedupe, draft exclusion, non-``sub_workflow`` nodes, cross-project, self-reference);
+        it reduces, but does not by itself eliminate, the risk of the two SQL expressions drifting.
+
+        Unfiltered by project on purpose: this is dependency discovery for lifecycle-impact
+        visibility, a separate concern from invocation eligibility. Same-project is the rule for
+        *invoking* a sub-workflow and is enforced at configuration/publish
+        (``validators.workflow_subworkflows``) and at runtime
+        (``sub_workflow_setup_activity._assert_child_in_parent_project``). This count instead reports
+        every persisted published reference to the child regardless of project, so a delete/publish
+        warning stays complete even for a reference that same-project validation would reject; it
+        does not permit any cross-project invocation.
+
+        When ``trigger_node_ids`` is given, only parents invoking one of those child Subworkflow
+        Triggers are counted; otherwise any sub-workflow reference to the child counts.
+        """
+        predicate = (
+            self._references_any_trigger(child_workflow_id, trigger_node_ids)
+            if trigger_node_ids
+            else self._references_published_child(child_workflow_id)
+        )
+        return (await self.session.scalar(select(func.count()).select_from(Workflow).where(predicate))) or 0
+
     async def list_published_parents(
         self,
         child_workflow_id: UUID,
@@ -876,8 +908,8 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
     ) -> WorkflowUsedByResponse:
         """List published workflows whose published version references ``child_workflow_id``.
 
-        ``total_count`` counts every distinct published parent across all projects, with no
-        visibility filter; ``resources`` is the RBAC-filtered, paginated page of parents the
+        ``referencing_parent_count`` counts every distinct published parent across all projects, with
+        no visibility filter; ``resources`` is the RBAC-filtered, paginated page of parents the
         caller may view. Draft-only references are excluded because the match is against each
         workflow's published version, and a parent is counted once even when it has several
         sub-workflow nodes pointing at the same child.
@@ -887,7 +919,7 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
             if trigger_node_ids
             else self._references_published_child(child_workflow_id)
         )
-        total_count = await self.session.scalar(select(func.count()).select_from(Workflow).where(references_child))
+        referencing_parent_count = await self.count_referencing_published_parents(child_workflow_id, trigger_node_ids)
 
         page = await self.list_resources(
             model=Workflow,
@@ -900,7 +932,7 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
         )
         await self.populate_published_version_numbers(page.resources)
         return WorkflowUsedByResponse(
-            total_count=total_count or 0,
+            referencing_parent_count=referencing_parent_count,
             resources=page.resources,
             next=page.next,
             prev=page.prev,
@@ -914,9 +946,20 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
     ) -> WorkflowUsedByCountsResponse:
         """Return the Used-By total for each requested workflow the caller may read.
 
-        Each total counts distinct published parents across all projects, matching the Used-By
-        badge. Workflows outside the caller's visibility are omitted, so the endpoint cannot be
-        used to probe reference counts for workflows the caller cannot see.
+        Each total counts distinct published parents across all projects (dependency discovery,
+        unfiltered by project -- see ``count_referencing_published_parents``), matching the Used-By
+        badge. Workflows outside the caller's visibility are omitted, so the endpoint cannot be used
+        to probe reference counts for workflows the caller cannot see.
+
+        Set-based implementation: one JSONB-expansion (``jsonb_array_elements``) aggregate that
+        unnests each published parent's nodes and groups by referenced child id, so N child ids are
+        counted in a single pass instead of one containment COUNT per child (which would be N+1).
+        The single-workflow path uses a containment match instead; retaining two shapes is a
+        current-access-pattern choice rather than a technical necessity -- a common set-based
+        expansion could serve both, including optional trigger filtering, and may be worth
+        consolidating later. There is no GIN index on ``workflow_versions.workflow_definition``
+        today, so neither shape is index-accelerated; the shared domain semantics are guarded by the
+        parity test, not by an index.
         """
         if not workflow_ids:
             return WorkflowUsedByCountsResponse(counts=[])
@@ -953,7 +996,10 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
         result = await self.session.execute(aggregate)
         counts_by_child: dict[str, int] = {str(child_id): int(cnt) for child_id, cnt in result.all()}
         counts = [
-            WorkflowUsedByCount(workflow_id=workflow_id, total_count=counts_by_child.get(str(workflow_id), 0))
+            WorkflowUsedByCount(
+                workflow_id=workflow_id,
+                referencing_parent_count=counts_by_child.get(str(workflow_id), 0),
+            )
             for workflow_id in readable_ids
         ]
         return WorkflowUsedByCountsResponse(counts=counts)

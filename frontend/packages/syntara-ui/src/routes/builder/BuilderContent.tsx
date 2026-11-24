@@ -350,6 +350,7 @@ export function BuilderContent(props: BuilderContentProps) {
     handleToggleDetails,
     handleToggleHistory,
     handleToggleVersionHistory: baseHandleToggleVersionHistory,
+    referencedDeleteConfirmDialog,
   } = useBuilderToolbarHandlers({
     workflow: workflow,
     workflowName,
@@ -851,6 +852,7 @@ export function BuilderContent(props: BuilderContentProps) {
               buttonLabel="Open without saving"
             />
             {publishTriggerRemovalDialog}
+            {referencedDeleteConfirmDialog}
           </SynPage>
         </VersionViewProvider>
       </SynStepExpandedAllContext.Provider>

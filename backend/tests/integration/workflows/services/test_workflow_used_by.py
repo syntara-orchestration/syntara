@@ -139,7 +139,7 @@ async def test_counts_published_parents_excludes_drafts_and_dedupes(
 
     result = await service.list_published_parents(child_id, allowed_projects=_ALL_PROJECTS)
 
-    assert result.total_count == 2
+    assert result.referencing_parent_count == 2
     ids = [r.id for r in result.resources]
     assert set(ids) == {a, b}
     assert ids.count(b) == 1  # three sub_workflow nodes, still one row
@@ -175,7 +175,7 @@ async def test_self_reference_is_counted(test_db_session: AsyncSession, test_use
 
     result = await service.list_published_parents(self_id, allowed_projects=_ALL_PROJECTS)
 
-    assert result.total_count >= 1
+    assert result.referencing_parent_count >= 1
     assert self_id in {r.id for r in result.resources}
 
 
@@ -184,7 +184,7 @@ async def test_self_reference_is_counted(test_db_session: AsyncSession, test_use
 async def test_rbac_filters_items_but_not_total_count(
     test_db_session: AsyncSession, test_user: User, test_project_id: UUID
 ) -> None:
-    """total_count spans all projects; the items and their metadata are limited to allowed projects."""
+    """referencing_parent_count spans all projects; the items and their metadata are limited to allowed projects."""
     service = WorkflowService(test_db_session, test_user)
     child_id = uuid4()
     other = Project(name=f"other-{uuid4().hex[:8]}", created_by=test_user.id)
@@ -209,7 +209,7 @@ async def test_rbac_filters_items_but_not_total_count(
     allowed = AllowedProjectsResult(all_projects=False, project_ids=[test_project_id])
     result = await service.list_published_parents(child_id, allowed_projects=allowed)
 
-    assert result.total_count == 2  # both projects counted
+    assert result.referencing_parent_count == 2  # both projects counted
     ids = {r.id for r in result.resources}
     assert ids == {visible}
     assert hidden not in ids
@@ -224,7 +224,7 @@ async def test_rbac_filters_items_but_not_total_count(
 async def test_rbac_none_visible_hides_all_items_keeps_total(
     test_db_session: AsyncSession, test_user: User, test_project_id: UUID
 ) -> None:
-    """A caller allowed no projects sees an empty items list but the full total_count."""
+    """A caller allowed no projects sees an empty items list but the full referencing_parent_count."""
     service = WorkflowService(test_db_session, test_user)
     child_id = uuid4()
     await _publish(
@@ -238,7 +238,7 @@ async def test_rbac_none_visible_hides_all_items_keeps_total(
     allowed = AllowedProjectsResult(all_projects=False, project_ids=[])
     result = await service.list_published_parents(child_id, allowed_projects=allowed)
 
-    assert result.total_count == 1
+    assert result.referencing_parent_count == 1
     assert result.resources == []
 
 
@@ -258,7 +258,7 @@ async def test_republish_reflects_reference_change(
         name=f"parent-{uuid4().hex[:8]}",
     )
     before = await service.list_published_parents(child_id, allowed_projects=_ALL_PROJECTS)
-    assert before.total_count == 1
+    assert before.referencing_parent_count == 1
 
     # Republish to a new version that no longer references the child.
     new_version_id = uuid4()
@@ -279,7 +279,7 @@ async def test_republish_reflects_reference_change(
     await test_db_session.commit()
 
     after = await service.list_published_parents(child_id, allowed_projects=_ALL_PROJECTS)
-    assert after.total_count == 0
+    assert after.referencing_parent_count == 0
     assert after.resources == []
 
 
@@ -298,7 +298,9 @@ async def test_deleted_parent_is_excluded(
         definition=_referencing_def(child_id),
         name=f"parent-{uuid4().hex[:8]}",
     )
-    assert (await service.list_published_parents(child_id, allowed_projects=_ALL_PROJECTS)).total_count == 1
+    assert (
+        await service.list_published_parents(child_id, allowed_projects=_ALL_PROJECTS)
+    ).referencing_parent_count == 1
 
     workflow = await test_db_session.get(Workflow, parent_id)
     assert workflow is not None
@@ -306,7 +308,7 @@ async def test_deleted_parent_is_excluded(
     await test_db_session.commit()
 
     after = await service.list_published_parents(child_id, allowed_projects=_ALL_PROJECTS)
-    assert after.total_count == 0
+    assert after.referencing_parent_count == 0
     assert after.resources == []
     assert await service.get_referencing_published_parent_ids(child_id) == []
 
@@ -375,11 +377,11 @@ async def test_trigger_node_id_filters_to_specific_trigger(
     )
 
     unfiltered = await service.list_published_parents(child_id, allowed_projects=_ALL_PROJECTS)
-    assert unfiltered.total_count == 2
+    assert unfiltered.referencing_parent_count == 2
     assert {r.id for r in unfiltered.resources} == {parent_a, parent_b}
 
     only_a = await service.list_published_parents(child_id, trigger_node_ids=["trig_a"], allowed_projects=_ALL_PROJECTS)
-    assert only_a.total_count == 1
+    assert only_a.referencing_parent_count == 1
     assert {r.id for r in only_a.resources} == {parent_a}
     assert parent_b not in {r.id for r in only_a.resources}
 
@@ -429,7 +431,7 @@ async def test_count_published_parents_batch_returns_totals(
     )
 
     result = await service.count_published_parents_batch([child_a, child_b, child_c], allowed_projects=_ALL_PROJECTS)
-    by_id = {c.workflow_id: c.total_count for c in result.counts}
+    by_id = {c.workflow_id: c.referencing_parent_count for c in result.counts}
     assert by_id == {child_a: 2, child_b: 1, child_c: 0}
 
 
@@ -475,9 +477,236 @@ async def test_count_published_parents_batch_omits_workflows_outside_visibility(
 
     allowed = AllowedProjectsResult(all_projects=False, project_ids=[test_project_id])
     result = await service.count_published_parents_batch([here_child, hidden_child], allowed_projects=allowed)
-    by_id = {c.workflow_id: c.total_count for c in result.counts}
+    by_id = {c.workflow_id: c.referencing_parent_count for c in result.counts}
     assert by_id.get(here_child) == 1
     assert hidden_child not in by_id
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_batch_count_matches_single_count_helper(
+    test_db_session: AsyncSession, test_user: User, test_project_id: UUID
+) -> None:
+    """The batch raw-SQL aggregate and the single count helper agree on every child.
+
+    Pins the two Used-By count implementations -- the ORM containment predicate behind
+    ``count_referencing_published_parents`` and the raw-SQL unnest in ``count_published_parents_batch``
+    -- so they cannot drift on published-only, distinctness, or node matching. The fixture covers a
+    parent with two sub_workflow nodes to the same child (counted once), a draft-only reference
+    (excluded), a published non-sub_workflow node that happens to carry a ``workflow_id`` param
+    (excluded), and a cross-project published parent (included, since the count ignores visibility).
+    """
+    service = WorkflowService(test_db_session, test_user)
+    other = Project(name=f"other-{uuid4().hex[:8]}", created_by=test_user.id)
+    test_db_session.add(other)
+    await test_db_session.commit()
+
+    # The target child must exist as a readable workflow for the batch path to return its count.
+    child = await _publish(
+        test_db_session,
+        created_by=test_user.id,
+        project_id=test_project_id,
+        definition=_plain_def(),
+        name=f"child-{uuid4().hex[:8]}",
+    )
+
+    # (1) one published parent with TWO sub_workflow nodes to the same child -> counts once
+    await _publish(
+        test_db_session,
+        created_by=test_user.id,
+        project_id=test_project_id,
+        definition=_referencing_def(child, node_count=2),
+        name=f"dup-{uuid4().hex[:8]}",
+    )
+    # (2) a draft-only reference -> excluded (no published version)
+    await _draft(
+        test_db_session,
+        created_by=test_user.id,
+        project_id=test_project_id,
+        definition=_referencing_def(child, 1),
+        name=f"draft-{uuid4().hex[:8]}",
+    )
+    # (3) a published non-sub_workflow node carrying a workflow_id param -> excluded
+    await _publish(
+        test_db_session,
+        created_by=test_user.id,
+        project_id=test_project_id,
+        definition=_definition(
+            [{"id": "notsub", "type": "script", "parameters": {"workflow_id": str(child), "code": "echo hi"}}]
+        ),
+        name=f"nonsub-{uuid4().hex[:8]}",
+    )
+    # (4) a cross-project published parent -> included (count is unfiltered by visibility)
+    await _publish(
+        test_db_session,
+        created_by=test_user.id,
+        project_id=other.id,
+        definition=_referencing_def(child, 1),
+        name=f"xproj-{uuid4().hex[:8]}",
+    )
+
+    single = await service.count_referencing_published_parents(child)
+    batch = await service.count_published_parents_batch([child], allowed_projects=_ALL_PROJECTS)
+    batch_count = {c.workflow_id: c.referencing_parent_count for c in batch.counts}[child]
+
+    # dup parent (counted once) + cross-project parent; draft and non-sub_workflow excluded
+    assert single == batch_count == 2
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_batch_single_parity_self_reference(
+    test_db_session: AsyncSession, test_user: User, test_project_id: UUID
+) -> None:
+    """A workflow that references itself is counted once by both the single and batch paths."""
+    service = WorkflowService(test_db_session, test_user)
+    self_id = uuid4()
+    test_db_session.add(
+        Workflow(id=self_id, name=f"self-{uuid4().hex[:8]}", created_by=test_user.id, project_id=test_project_id)
+    )
+    await test_db_session.flush()
+    version_id = uuid4()
+    test_db_session.add(
+        WorkflowVersion(
+            id=version_id,
+            workflow_id=self_id,
+            version=1,
+            schema_version="2.0.0",
+            workflow_definition=_referencing_def(self_id, 1),
+            created_by=test_user.id,
+        )
+    )
+    await test_db_session.flush()
+    workflow = await test_db_session.get(Workflow, self_id)
+    assert workflow is not None
+    workflow.is_enabled = True
+    workflow.published_version_id = version_id
+    await test_db_session.commit()
+
+    single = await service.count_referencing_published_parents(self_id)
+    batch = await service.count_published_parents_batch([self_id], allowed_projects=_ALL_PROJECTS)
+    batch_count = {c.workflow_id: c.referencing_parent_count for c in batch.counts}[self_id]
+    assert single == batch_count == 1
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_published_reference_survives_a_newer_draft_removal(
+    test_db_session: AsyncSession, test_user: User, test_project_id: UUID
+) -> None:
+    """A published parent still counts even after a newer *draft* drops the sub_workflow node.
+
+    The match is against the parent's published version, so an unpublished later draft that removes
+    the reference does not change the count. Exercises both the single and batch paths.
+    """
+    service = WorkflowService(test_db_session, test_user)
+    child = await _publish(
+        test_db_session,
+        created_by=test_user.id,
+        project_id=test_project_id,
+        definition=_plain_def(),
+        name=f"child-{uuid4().hex[:8]}",
+    )
+    parent_id = await _publish(
+        test_db_session,
+        created_by=test_user.id,
+        project_id=test_project_id,
+        definition=_referencing_def(child, 1),
+        name=f"parent-{uuid4().hex[:8]}",
+    )
+    # Add a newer draft (version 2) without the reference; do NOT move published_version_id.
+    test_db_session.add(
+        WorkflowVersion(
+            id=uuid4(),
+            workflow_id=parent_id,
+            version=2,
+            schema_version="2.0.0",
+            workflow_definition=_plain_def(),
+            created_by=test_user.id,
+        )
+    )
+    await test_db_session.commit()
+
+    single = await service.count_referencing_published_parents(child)
+    batch = await service.count_published_parents_batch([child], allowed_projects=_ALL_PROJECTS)
+    batch_count = {c.workflow_id: c.referencing_parent_count for c in batch.counts}[child]
+    assert single == batch_count == 1
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_reference_only_in_a_newer_draft_is_excluded(
+    test_db_session: AsyncSession, test_user: User, test_project_id: UUID
+) -> None:
+    """A reference that exists only in a newer *draft* of an already-published workflow is excluded.
+
+    The published version has no reference, so neither count path includes it until it is published.
+    """
+    service = WorkflowService(test_db_session, test_user)
+    child = await _publish(
+        test_db_session,
+        created_by=test_user.id,
+        project_id=test_project_id,
+        definition=_plain_def(),
+        name=f"child-{uuid4().hex[:8]}",
+    )
+    parent_id = await _publish(
+        test_db_session,
+        created_by=test_user.id,
+        project_id=test_project_id,
+        definition=_plain_def(),
+        name=f"parent-{uuid4().hex[:8]}",
+    )
+    # Newer draft (version 2) introduces the reference but is not published.
+    test_db_session.add(
+        WorkflowVersion(
+            id=uuid4(),
+            workflow_id=parent_id,
+            version=2,
+            schema_version="2.0.0",
+            workflow_definition=_referencing_def(child, 1),
+            created_by=test_user.id,
+        )
+    )
+    await test_db_session.commit()
+
+    single = await service.count_referencing_published_parents(child)
+    batch = await service.count_published_parents_batch([child], allowed_projects=_ALL_PROJECTS)
+    batch_counts = {c.workflow_id: c.referencing_parent_count for c in batch.counts}
+    assert single == 0
+    assert batch_counts.get(child, 0) == 0
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_referencing_parent_count_is_independent_of_page_size_and_cursor(
+    test_db_session: AsyncSession, test_user: User, test_project_id: UUID
+) -> None:
+    """``referencing_parent_count`` reports the full total regardless of limit or cursor."""
+    service = WorkflowService(test_db_session, test_user)
+    child = uuid4()
+    for _ in range(3):
+        await _publish(
+            test_db_session,
+            created_by=test_user.id,
+            project_id=test_project_id,
+            definition=_referencing_def(child, 1),
+            name=f"p-{uuid4().hex[:8]}",
+        )
+
+    full = await service.list_published_parents(child, allowed_projects=_ALL_PROJECTS)
+    assert full.referencing_parent_count == 3
+    assert len(full.resources) == 3
+
+    first = await service.list_published_parents(child, limit=1, allowed_projects=_ALL_PROJECTS)
+    assert first.referencing_parent_count == 3  # unchanged by a smaller page
+    assert len(first.resources) == 1
+    assert first.next is not None
+
+    second = await service.list_published_parents(child, limit=1, cursor=first.next, allowed_projects=_ALL_PROJECTS)
+    assert second.referencing_parent_count == 3  # unchanged across the cursor
+    assert len(second.resources) == 1
+    assert {r.id for r in first.resources}.isdisjoint({r.id for r in second.resources})
 
 
 @pytest.mark.integration

@@ -188,7 +188,7 @@ export interface paths {
      * List published workflows that reference this workflow
      * @description List published workflows whose published version references this workflow (Used-By).
      *
-     *     ``total_count`` is every distinct published parent across all projects; ``resources`` is the page of parents the caller may view. Access requires read permission on this workflow.
+     *     ``referencing_parent_count`` is every distinct published parent across all projects; ``resources`` is the page of parents the caller may view. Access requires read permission on this workflow.
      */
     get: operations['list_workflow_used_by']
     put?: never
@@ -911,45 +911,88 @@ export interface components {
       resources: components['schemas']['WorkflowRead'][]
     }
     /**
-     * WorkflowUsedByResponse
-     * @description Paginated Used-By response: published workflows that reference a given workflow.
-     *
-     *     ``resources`` is the page of referencing parents the requester may view; ``total_count`` is the number of distinct published parents across all projects, not filtered by visibility.
+     * WorkflowReferencedConfirmationProblem
+     * @description RFC 9457 problem body returned (HTTP 409) when deleting a workflow that is referenced by published parents without ``confirm=true``. Extends ``ErrorData`` with the count of referencing parents; their identities are never disclosed, since the caller may lack read access to them.
      * @example {
-     *       "next": "eyJpZCI6InV1aWQifQ",
-     *       "total": 150
+     *       "type": "https://api.example.com/errors/conflict",
+     *       "title": "Workflow Deletion Requires Confirmation",
+     *       "detail": "This workflow is referenced by 2 published parent workflows.",
+     *       "code": "WORKFLOW_REFERENCED_CONFIRMATION_REQUIRED",
+     *       "retryable": false,
+     *       "referencing_count": 2
      *     }
+     */
+    WorkflowReferencedConfirmationProblem: components['schemas']['ErrorData'] & {
+      /**
+       * Code
+       * @description Machine-readable error code; fixed for this problem type.
+       * @enum {string}
+       */
+      code: 'WORKFLOW_REFERENCED_CONFIRMATION_REQUIRED'
+      /**
+       * Referencing Count
+       * @description Distinct published parent workflows that reference this workflow and would be affected by the deletion.
+       */
+      referencing_count: number
+    }
+    /**
+     * WorkflowPublishTriggerRemovalConfirmationProblem
+     * @description RFC 9457 problem body returned (HTTP 409) when publishing a version that removes a Subworkflow Trigger invoked by published parents without ``confirm=true``. Extends ``ErrorData`` with the count of affected parents; their identities are never disclosed.
      * @example {
-     *       "next": "eyJpZCI6Im5leHQifQ",
-     *       "prev": "eyJpZCI6InByZXYifQ"
+     *       "type": "https://api.example.com/errors/conflict",
+     *       "title": "Publish Requires Confirmation",
+     *       "detail": "Publishing removes a Subworkflow Trigger invoked by 1 published parent workflow.",
+     *       "code": "WORKFLOW_PUBLISH_TRIGGER_REMOVAL_CONFIRMATION_REQUIRED",
+     *       "retryable": false,
+     *       "affected_count": 1
+     *     }
+     */
+    WorkflowPublishTriggerRemovalConfirmationProblem: components['schemas']['ErrorData'] & {
+      /**
+       * Code
+       * @description Machine-readable error code; fixed for this problem type.
+       * @enum {string}
+       */
+      code: 'WORKFLOW_PUBLISH_TRIGGER_REMOVAL_CONFIRMATION_REQUIRED'
+      /**
+       * Affected Count
+       * @description Distinct published parent workflows that invoke a Subworkflow Trigger removed by this publish.
+       */
+      affected_count: number
+    }
+    /**
+     * WorkflowUsedByResponse
+     * @description Used-By response: the published parents that reference a given workflow.
+     *
+     *     ``resources`` is the RBAC-filtered page of referencing parents the requester may view, paged by ``next``/``prev``. ``referencing_parent_count`` is a domain value -- not a pagination total -- giving the number of distinct published parents across all projects, counted regardless of the requester's visibility, so the Used-By badge reflects true impact even when some parents sit in projects the caller cannot see. The page envelope's ``total``/``include_total`` are deliberately omitted here.
+     * @example {
+     *       "resources": [],
+     *       "next": null,
+     *       "prev": null,
+     *       "referencing_parent_count": 3
      *     }
      */
     WorkflowUsedByResponse: {
       /**
+       * Resources
+       * @description Page of referencing published parents the caller may view.
+       */
+      resources: components['schemas']['WorkflowRead'][]
+      /**
        * Next
-       * @description Cursor for next page of results
+       * @description Cursor for the next page of referencing parents.
        */
       next?: string | null
       /**
        * Prev
-       * @description Cursor for previous page of results
+       * @description Cursor for the previous page of referencing parents.
        */
       prev?: string | null
       /**
-       * Total
-       * @description Total count of resources (only when include_total=true)
+       * Referencing Parent Count
+       * @description Distinct published parent workflows that reference this workflow, counted across all projects regardless of the requester's visibility. A domain value, not a pagination total.
        */
-      total?: number | null
-      /**
-       * Resources
-       * @description Array of resources in current page
-       */
-      resources: components['schemas']['WorkflowRead'][]
-      /**
-       * Total Count
-       * @description Distinct published parent workflows that reference this workflow, counted across all projects regardless of the requester's visibility.
-       */
-      total_count: number
+      referencing_parent_count: number
     }
     /**
      * WorkflowUsedByCount
@@ -962,10 +1005,10 @@ export interface components {
        */
       workflow_id: string
       /**
-       * Total Count
-       * @description Distinct published parent workflows that reference this workflow, across all projects.
+       * Referencing Parent Count
+       * @description Distinct published parent workflows that reference this workflow, across all projects, regardless of the requester's visibility.
        */
-      total_count: number
+      referencing_parent_count: number
     }
     /**
      * WorkflowUsedByCountsResponse
@@ -3039,7 +3082,16 @@ export interface operations {
       401: components['responses']['UnauthorizedError']
       403: components['responses']['ForbiddenError']
       404: components['responses']['NotFoundError']
-      409: components['responses']['ConflictError']
+      /** @description Conflict. When the workflow is referenced by published parents the body is a WorkflowReferencedConfirmationProblem (carrying referencing_count); resend with confirm=true to delete. Other conflicts (for example active executions blocking deletion) use the generic problem shape. */
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/problem+json':
+            components['schemas']['WorkflowReferencedConfirmationProblem'] | components['schemas']['ErrorData']
+        }
+      }
       422: components['responses']['ValidationError']
       429: components['responses']['RateLimitError']
       500: components['responses']['InternalServerError']
@@ -3214,7 +3266,6 @@ export interface operations {
         limit?: number
         cursor?: string | null
         sort?: string | null
-        include_total?: boolean
         trigger_node_ids?: string[] | null
       }
       header?: never
@@ -3349,7 +3400,17 @@ export interface operations {
       401: components['responses']['UnauthorizedError']
       403: components['responses']['ForbiddenError']
       404: components['responses']['NotFoundError']
-      409: components['responses']['ConflictError']
+      /** @description Conflict. When publishing removes a Subworkflow Trigger invoked by published parents the body is a WorkflowPublishTriggerRemovalConfirmationProblem (carrying affected_count); resend with confirm=true. Other conflicts (version conflict, publish validation) use the generic problem shape. */
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/problem+json':
+            | components['schemas']['WorkflowPublishTriggerRemovalConfirmationProblem']
+            | components['schemas']['ErrorData']
+        }
+      }
       422: components['responses']['ValidationError']
       429: components['responses']['RateLimitError']
       500: components['responses']['InternalServerError']

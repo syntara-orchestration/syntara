@@ -18,7 +18,11 @@ export function useTriggerRemovalPublishConfirm() {
 
   const guardPublishError = useCallback((error: unknown, retry: () => void): boolean => {
     if (!isPublishTriggerRemovalConfirmationError(error)) return false
-    setPending({ affectedCount: extractPublishTriggerRemovalAffectedCount(error), retry })
+    const affectedCount = extractPublishTriggerRemovalAffectedCount(error)
+    // A malformed confirmation (code present, count missing/invalid) is not a usable confirmation:
+    // fall through to the generic error path rather than show a misleading dialog or retry.
+    if (affectedCount === null) return false
+    setPending({ affectedCount, retry })
     return true
   }, [])
 

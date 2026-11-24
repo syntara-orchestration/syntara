@@ -1,6 +1,6 @@
 """API tests for GET /workflows/{workflow_id}/used_by.
 
-Verifies the endpoint is wired and returns the Used-By contract (``total_count`` plus the
+Verifies the endpoint is wired and returns the Used-By contract (``referencing_parent_count`` plus the
 ``resources`` page), and that access to a target that cannot be read is rejected by the standard
 ``_wf_perm_read`` gate. RBAC filtering of the parent list and non-disclosure of hidden parents are
 covered at the service layer in ``tests/integration/workflows/services/test_workflow_used_by.py``.
@@ -82,7 +82,7 @@ async def _publish(
 async def test_used_by_returns_referencing_parent(
     admin_client: AsyncClient, test_db_session: AsyncSession, test_user: User, test_project_id: str
 ) -> None:
-    """GET /used_by returns the published parent that references the target, with total_count."""
+    """GET /used_by returns the published parent that references the target, with referencing_parent_count."""
     project_id = UUID(test_project_id)
     child = await _publish(
         test_db_session,
@@ -103,7 +103,7 @@ async def test_used_by_returns_referencing_parent(
 
     assert resp.status_code == 200
     body = resp.json()
-    assert body["total_count"] == 1
+    assert body["referencing_parent_count"] == 1
     assert str(parent) in [r["id"] for r in body["resources"]]
 
 
@@ -111,6 +111,48 @@ async def test_used_by_returns_referencing_parent(
 async def test_used_by_unknown_target_is_rejected(admin_client: AsyncClient) -> None:
     """A target workflow that cannot be read is rejected by the _wf_perm_read gate."""
     resp = await admin_client.get(f"/api/v1/workflows/{uuid4()}/used_by")
+
+    assert resp.status_code in (403, 404)
+
+
+@pytest.mark.asyncio
+async def test_used_by_existing_inaccessible_target_is_rejected(
+    admin_client: AsyncClient,
+    auth_as: Callable[[User], None],
+    test_db_session: AsyncSession,
+    test_user: User,
+    test_project_id: str,
+    user_factory: Callable[..., Awaitable[User]],
+) -> None:
+    """An existing target in a project the caller cannot read is rejected, not disclosed.
+
+    Distinguishes target-workflow authorization (resource-level ``_wf_perm_read``) from the
+    aggregate disclosure of inaccessible *parents*: the ANSTRAT permits the latter but not a
+    Used-By response for a target the caller may not read.
+    """
+    from syntara.authz.models import RoleAssignment
+    from syntara.authz.models.project import Project
+
+    here = UUID(test_project_id)
+    other = Project(name=f"other-{uuid4().hex[:8]}", created_by=test_user.id)
+    test_db_session.add(other)
+    await test_db_session.commit()
+
+    # Target exists, but in a project the scoped caller cannot read.
+    target = await _publish(
+        test_db_session,
+        created_by=test_user.id,
+        project_id=other.id,
+        definition=_plain_def(),
+        name=f"target-{uuid4().hex[:8]}",
+    )
+
+    scoped = await user_factory(username=f"scoped-{uuid4().hex[:6]}", email=f"scoped-{uuid4().hex[:6]}@example.com")
+    test_db_session.add(RoleAssignment(principal_id=scoped.id, project_id=here, role_name="project-user"))
+    await test_db_session.commit()
+
+    auth_as(scoped)
+    resp = await admin_client.get(f"/api/v1/workflows/{target}/used_by")
 
     assert resp.status_code in (403, 404)
 
@@ -124,7 +166,7 @@ async def test_used_by_rbac_counts_all_but_lists_only_visible(
     test_project_id: str,
     user_factory: Callable[..., Awaitable[User]],
 ) -> None:
-    """Two parents reference the child; a caller who can see only one gets total_count=2 and one item."""
+    """Two parents reference the child; a caller who can see only one gets referencing_parent_count=2 and one item."""
     from syntara.authz.models import RoleAssignment
     from syntara.authz.models.project import Project
 
@@ -165,7 +207,7 @@ async def test_used_by_rbac_counts_all_but_lists_only_visible(
 
     assert resp.status_code == 200
     body = resp.json()
-    assert body["total_count"] == 2  # both referencing parents counted
+    assert body["referencing_parent_count"] == 2  # both referencing parents counted
     ids = {r["id"] for r in body["resources"]}
     assert ids == {str(visible)}  # only the parent in a project the caller can view
     assert str(hidden) not in ids
@@ -229,7 +271,7 @@ async def test_used_by_counts_batch_returns_totals(
     resp = await admin_client.get(f"/api/v1/workflows/used_by_counts?workflow_ids={child_a}&workflow_ids={child_b}")
 
     assert resp.status_code == 200
-    counts = {c["workflow_id"]: c["total_count"] for c in resp.json()["counts"]}
+    counts = {c["workflow_id"]: c["referencing_parent_count"] for c in resp.json()["counts"]}
     assert counts[str(child_a)] == 2
     assert counts[str(child_b)] == 1
 
@@ -291,7 +333,7 @@ async def test_used_by_counts_batch_omits_workflows_outside_visibility(
     )
 
     assert resp.status_code == 200
-    counts = {c["workflow_id"]: c["total_count"] for c in resp.json()["counts"]}
+    counts = {c["workflow_id"]: c["referencing_parent_count"] for c in resp.json()["counts"]}
     assert counts.get(str(here_child)) == 1
     assert str(hidden_child) not in counts
 
@@ -328,7 +370,7 @@ async def test_used_by_trigger_node_id_filter(
 
     assert resp.status_code == 200
     body = resp.json()
-    assert body["total_count"] == 1
+    assert body["referencing_parent_count"] == 1
     assert {r["id"] for r in body["resources"]} == {str(parent_a)}
 
 
