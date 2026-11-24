@@ -9,11 +9,21 @@ import {
 
 import { clickAddConnectedStep } from './add-connected-step'
 import { canvasStepNode, clickCanvasStepToOpenEditor, expectCanvasStepTitleVisible } from './canvas-interaction'
+import { openNewWorkflowBuilder, selectProjectIfRequired } from './project-selection'
+import { waitForUIReady } from './ui-ready'
 import { clickSaveAndWait } from './workflow-save'
 
 export { createBasicWorkflowViaApi, publishWorkflowViaApi }
 export { clickAddConnectedStep }
 export { clickSaveAndWait, isWorkflowSaveResponse } from './workflow-save'
+export { waitForUIReady } from './ui-ready'
+export {
+  confirmNewWorkflowProject,
+  openNewWorkflowBuilder,
+  selectFirstProject,
+  selectProjectDialog,
+  selectProjectIfRequired,
+} from './project-selection'
 export { buildUniqueName } from './workflowNames'
 export { expectCanvasStepTitleVisible } from './canvas-interaction'
 
@@ -21,23 +31,6 @@ export const addStepPanel = (page: Page) =>
   page.getByRole('region', {
     name: /add step|select an action step|select a trigger step|select a logic step|select an aap execution step/i,
   })
-
-/**
- * Wait for UI to be ready by ensuring no toast notifications or loading overlays are blocking interactions
- */
-export async function waitForUIReady(page: Page) {
-  // Wait for ALL PF6 toast alerts to disappear, not just the first.
-  // Scoped to the toast AlertGroup container (AlertGroup has no OUIA attribute);
-  // inline page alerts (ValidationBanner, BuilderReadOnlyBanner, etc.) are excluded.
-  await expect(page.locator('.pf-v6-c-alert-group [data-ouia-component-type="PF6/Alert"]'))
-    .toHaveCount(0, { timeout: 5000 })
-    .catch(() => {})
-
-  // Wait for ALL loading indicators to clear, not just the first.
-  await expect(page.getByLabel('Loading'))
-    .toHaveCount(0, { timeout: 10000 })
-    .catch(() => {})
-}
 
 /**
  * Click the "Reset layout" button to trigger an auto-layout of the canvas.
@@ -220,158 +213,6 @@ export async function fillCodeEditor(
 }
 
 /**
- * Select the first available project from a typeahead project selector dropdown.
- * Works on both mock API (where projects are available immediately) and real backend
- * (where project names vary). Skips "All projects" and "Create project" options.
- */
-export async function selectFirstProject(page: Page) {
-  const projectInput = page.getByPlaceholder(/All projects|Select a project/)
-  const hasInput = await projectInput
-    .waitFor({ state: 'visible', timeout: 5_000 })
-    .then(() => true)
-    .catch(() => false)
-  if (!hasInput) return
-
-  await projectInput.click()
-  await page.getByRole('option').first().waitFor({ state: 'visible', timeout: 10_000 })
-
-  // Retry until a real project option appears — API-loaded options arrive after
-  // static ones ("All projects", "Create project") on slower CI backends.
-  await clickFirstRealProjectOption(page)
-
-  // Wait for the "Select a project" placeholder to disappear before returning.
-  // Use not.toBeVisible (not not.toHaveAttribute) because the element may be
-  // removed from the DOM entirely after selection, which causes toHaveAttribute
-  // to throw "element(s) not found".
-  await expect(page.getByPlaceholder('Select a project')).not.toBeVisible()
-}
-
-/** Escape a literal string for embedding in a RegExp. */
-function escapeForRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-}
-
-/**
- * Select a project in the builder toolbar.
- * Required for new workflows on the real backend (Save is disabled without a project).
- * Falls back silently when the project selector is absent (e.g. mock API).
- */
-export async function selectProjectIfRequired(page: Page, projectName?: string) {
-  const projectInput = page.getByPlaceholder(/Select a project/)
-  // Use a short timeout — if the project is already selected ("default" shows
-  // in the toggle with no "Select a project" placeholder), the element will
-  // never appear and a 15s wait burns most of the test budget unnecessarily.
-  const needsSelection = await projectInput
-    .waitFor({ state: 'visible', timeout: 2_000 })
-    .then(() => true)
-    .catch(() => false)
-  if (!needsSelection) return
-
-  // The placeholder is briefly "Select a project" before the Zustand store
-  // restores a previously selected project and re-renders the toggle.
-  // Re-check that the locator still matches; if it vanished, a project is
-  // already selected and no action is needed.
-  if ((await projectInput.count()) === 0) return
-
-  // On saved workflows the project selector is disabled (project already assigned).
-  if (!(await projectInput.isEnabled())) return
-
-  await projectInput.click()
-  await page.getByRole('option').first().waitFor({ state: 'visible', timeout: 10_000 })
-
-  if (projectName) {
-    // Anchor at the start of the option's accessible name. Each option reads
-    // "<name> <description>", so a plain substring match for `default` also
-    // matches the built-in project's "Default project for ..." description and
-    // resolves to two elements.
-    const option = page.getByRole('option', { name: new RegExp(`^${escapeForRegExp(projectName)}(\\s|$)`) })
-    await option.waitFor({ state: 'visible', timeout: 15_000 })
-    await option.click()
-  } else {
-    await clickFirstRealProjectOption(page)
-  }
-}
-
-async function clickFirstRealProjectOption(page: Page) {
-  // First try: wait for an API-loaded project to appear
-  const found = await trySelectRealProject(page)
-  if (found) return
-
-  // No real projects exist — create one via the "Create project" UI option
-  await createProjectViaDropdown(page)
-}
-
-async function trySelectRealProject(page: Page): Promise<boolean> {
-  try {
-    await expect(async () => {
-      const options = page.getByRole('option')
-      if ((await options.count()) === 0) {
-        const toggle = page.getByPlaceholder(/All projects|Select a project/)
-        if ((await toggle.count()) > 0) await toggle.click()
-        await options.first().waitFor({ state: 'visible', timeout: 3_000 })
-      }
-
-      // Prefer `default` — the project `ensureProject` guarantees, and the only
-      // one no spec deletes. Taking whatever sorts first instead means picking a
-      // project another worker created and is about to clean up: the builder
-      // holds its id, the delete lands, and the save then fails with
-      // `404 {"detail":"Project <id> not found"}`. That was invisible before
-      // saves were gated on the response, because the weak URL guard passed
-      // regardless.
-      //
-      // Matched on the *accessible* name, not `textContent`. The option renders
-      // name and description as adjacent nodes with no separator, so
-      // `textContent` reads `defaultDefault project` and no anchored match on it
-      // can work; the accessible name joins them with a space. Anchoring matters
-      // either way — a bare `default` also matches the built-in project's
-      // "Default project for built-in workflows" description.
-      const preferred = page.getByRole('option', { name: /^default(\s|$)/ })
-      if ((await preferred.count()) === 1) {
-        await preferred.click()
-        return
-      }
-
-      const allOptions = await options.all()
-      for (const option of allOptions) {
-        const text = await option.textContent()
-        if (
-          text &&
-          !text.includes('All projects') &&
-          !text.includes('Create project') &&
-          !text.toLowerCase().includes('built-in')
-        ) {
-          await option.click()
-          return
-        }
-      }
-      throw new Error('No real project options yet')
-    }).toPass({ timeout: 15_000 })
-    return true
-  } catch {
-    return false
-  }
-}
-
-async function createProjectViaDropdown(page: Page) {
-  const options = page.getByRole('option')
-  if ((await options.count()) === 0) {
-    const toggle = page.getByPlaceholder(/All projects|Select a project/)
-    if ((await toggle.count()) > 0) await toggle.click()
-    await options.first().waitFor({ state: 'visible', timeout: 5_000 })
-  }
-
-  await page.getByRole('option', { name: 'Create project' }).click()
-
-  const dialog = page.getByRole('dialog')
-  await expect(dialog).toBeVisible()
-  await dialog.getByRole('textbox', { name: 'Project name' }).fill('default')
-  await dialog.getByRole('button', { name: 'Create project' }).click()
-
-  // Wait for dialog to close (project created)
-  await expect(dialog).not.toBeVisible({ timeout: 15_000 })
-}
-
-/**
  * Every step of the UI cleanup fallback is bounded by this.
  *
  * `playwright.config.ts` deliberately sets no `actionTimeout`, so an action with
@@ -518,7 +359,7 @@ export async function createBasicWorkflow(page: Page, workflowName: string, acti
   // Ensure a project exists before entering the builder (CI starts with empty DB)
   await ensureProject(page)
 
-  await page.goto(toAppUrl('/workflow-builder/new'))
+  await openNewWorkflowBuilder(page)
   await expect(page.getByRole('heading', { name: 'Select a trigger step' })).toBeVisible()
 
   // Add manual trigger
@@ -551,7 +392,7 @@ export async function createBasicWorkflow(page: Page, workflowName: string, acti
  */
 export async function startWorkflowWithTrigger(page: Page) {
   await ensureProject(page)
-  await page.goto(toAppUrl('/workflow-builder/new'))
+  await openNewWorkflowBuilder(page)
   await expect(page.getByRole('heading', { name: 'Select a trigger step' })).toBeVisible()
 
   await selectProjectIfRequired(page)
@@ -587,7 +428,7 @@ export async function createWorkflowWithTrigger(page: Page, workflowName: string
   // Ensure a project exists before entering the builder (CI starts with empty DB)
   await ensureProject(page)
 
-  await page.goto(toAppUrl('/workflow-builder/new'))
+  await openNewWorkflowBuilder(page)
   await expect(page.getByRole('heading', { name: 'Select a trigger step' })).toBeVisible()
 
   await page.getByRole('button', { name: 'Manual trigger' }).click()
@@ -734,7 +575,7 @@ export async function verifyStepVisible(page: Page, stepName: string) {
  */
 export async function navigateToApiActionForm(page: Page) {
   await ensureProject(page)
-  await page.goto(toAppUrl('/workflow-builder/new'))
+  await openNewWorkflowBuilder(page)
   await expect(page.getByRole('heading', { name: 'Select a trigger step' })).toBeVisible()
 
   await selectProjectIfRequired(page)

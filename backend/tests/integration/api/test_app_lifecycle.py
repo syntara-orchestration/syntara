@@ -1,7 +1,7 @@
 """Integration tests for application lifecycle - audit system startup and shutdown."""
 
-from collections.abc import AsyncGenerator
-from contextlib import asynccontextmanager
+from collections.abc import AsyncGenerator, Generator
+from contextlib import asynccontextmanager, contextmanager
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -15,6 +15,20 @@ from syntara.audit.outbox import session as outbox_session
 from syntara.audit.outbox import worker as outbox_worker
 from syntara.audit.outbox.session import AuditWorkerAsyncSessionLocal
 from syntara.core.database.session import AsyncSessionLocal
+
+
+@contextmanager
+def _router_discovery_disabled() -> Generator[None, None, None]:
+    """Turn off router discovery for a nested lifespan run."""
+    from syntara.core.config.base import get_settings
+
+    settings = get_settings()
+    previous = settings.router_discovery_enabled
+    settings.router_discovery_enabled = False
+    try:
+        yield
+    finally:
+        settings.router_discovery_enabled = previous
 
 
 @asynccontextmanager
@@ -46,6 +60,13 @@ async def _test_lifespan_context(test_db_engine: AsyncEngine) -> AsyncGenerator[
         patch("syntara.audit.outbox.worker.AuditWorkerAsyncSessionLocal", test_session_factory),
         patch("syntara.audit.outbox.session.AuditWorkerAsyncSessionLocal", test_session_factory),
         patch("syntara.api.main.RegoEvaluator", return_value=mock_evaluator),
+        # The session-scoped test app already registered its routers. Re-running
+        # discovery on the same app would re-register the routes while this
+        # directory's evaluator monkeypatch is active, baking the regopy mock
+        # into the re-registered routes and breaking later tests that share the
+        # worker (their allow-all evaluator override no longer matches the
+        # re-registered routes' dependencies).
+        _router_discovery_disabled(),
     ):
         # Seed required data before app startup
         from syntara.core.seed import run_seeders

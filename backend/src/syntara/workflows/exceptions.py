@@ -9,11 +9,26 @@ from uuid import UUID
 
 from syntara.core.exception_registry import fastapi_exception
 from syntara.core.exceptions import SyntaraError
+from syntara.workflows.models.node_permission import BlockedStepType
 from syntara.workflows.models.validation_finding import ValidationResult
 
 
 class WorkflowError(SyntaraError):
     """Base exception for all workflow errors."""
+
+
+@fastapi_exception(handler="syntara.workflows.error_handlers.node_kind_write_denied_handler")
+class NodeKindWriteDeniedError(WorkflowError):
+    """A workflow write requires a step type the caller cannot author."""
+
+    def __init__(self, operation: str, blocked_step_types: list[BlockedStepType]) -> None:
+        """Build a user-safe message without exposing policy names or scopes."""
+        self.blocked_step_types = blocked_step_types
+        blocked = "; ".join(
+            f"{item.label} ({'no matching write grant' if item.reason == 'no_matching_allow' else 'write denied'})"
+            for item in blocked_step_types
+        )
+        super().__init__(f"You can't {operation}: {blocked}.")
 
 
 @fastapi_exception(handler="syntara.workflows.error_handlers.validation_error_handler")

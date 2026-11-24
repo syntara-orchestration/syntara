@@ -3,11 +3,11 @@
  * Extracted from v2-steps.ts to keep file sizes within lint limits.
  */
 
-import { expect, type Page, toAppUrl } from '../fixtures'
+import { expect, type Page } from '../fixtures'
 
 import { canvasStepNode, clickCanvasStepToOpenEditor } from './canvas-interaction'
 import { addConditionStepWithBranch, addManualTrigger, openAddStepPanel, selectCategoryAndStepType } from './v2-steps'
-import { buildUniqueName, closeStepEditorPanel, triggerLayout } from './workflows'
+import { buildUniqueName, closeStepEditorPanel, openNewWorkflowBuilder, triggerLayout } from './workflows'
 
 const convergeStrategySelect = (page: Page) => page.getByRole('button', { name: 'Continue when criteria', exact: true })
 
@@ -41,7 +41,7 @@ export async function openConvergeStepParameters(page: Page, stepName: string) {
  * Used by validation-only tests that don't need to save the workflow.
  */
 export async function openConvergeStepFormOnNewWorkflow(page: Page) {
-  await page.goto(toAppUrl('/workflow-builder/new'))
+  await openNewWorkflowBuilder(page)
   await addManualTrigger(page, 'Manual trigger')
   await addConditionStepWithBranch(page, 'Condition', 'true')
   await openAddStepPanel(page)
@@ -153,8 +153,8 @@ export async function addConvergeStepWithTimeout(
 export async function createWorkflowWithBranchesForConverge(page: Page): Promise<string> {
   const workflowName = buildUniqueName('converge-test')
 
-  // Start on /workflow-builder/new
-  await page.goto(toAppUrl('/workflow-builder/new'))
+  // Start on /workflow-builder/new (through the project modal)
+  await openNewWorkflowBuilder(page)
 
   // Add manual trigger
   await addManualTrigger(page, 'Manual trigger')

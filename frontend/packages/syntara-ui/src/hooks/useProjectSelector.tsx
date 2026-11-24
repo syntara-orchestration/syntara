@@ -84,12 +84,19 @@ type UseProjectSelectorOptions = {
    */
   hasValidationError?: boolean
   /**
-   * Called when the user explicitly selects a project from the dropdown. Use this to clear
+   * Called when the user explicitly selects or creates a project. Use this to clear
    * any validation error state set by the caller (e.g. reset `saveAttemptedWithoutProject`).
    */
   onProjectSelect?: (project: ProjectRead | null) => void
   /** When true, the selector is disabled (greyed out, not interactive). Use for edit mode where project_id is immutable. */
   isDisabled?: boolean
+  /** When false, hides the "Project:" prefix inside the selector (e.g. inside a labelled form field). */
+  showTogglePrefix?: boolean
+  /**
+   * When true, renders the menu inside the selector rather than on `document.body`. Use inside a
+   * modal, which hides everything outside it from assistive technology.
+   */
+  isMenuInline?: boolean
   /** When true, clears the persisted project selection on first mount. Use for pages that must always start with no project (e.g., new workflow builder). */
   clearSelectionOnMount?: boolean
 }
@@ -112,6 +119,8 @@ type UseProjectSelectorResult = {
   stableProjectId: string | undefined
   isAllProjects: boolean
   projects: ProjectRead[]
+  /** Name of the selected project, falling back to the persisted name while it is absent from `projects`. */
+  selectedProjectName: string | undefined
   ProjectSelector: ReactNode
   /** Refetch the projects list (e.g., after creating, editing, or deleting a project) */
   refetchProjects: () => Promise<unknown>
@@ -204,6 +213,8 @@ export function useProjectSelector(options?: UseProjectSelectorOptions): UseProj
     hasValidationError = false,
     onProjectSelect: onUserProjectSelect,
     isDisabled = false,
+    showTogglePrefix = true,
+    isMenuInline = false,
     clearSelectionOnMount = false,
   } = options ?? {}
   const {
@@ -337,6 +348,9 @@ export function useProjectSelector(options?: UseProjectSelectorOptions): UseProj
       loadMore={loadMore}
       projectsQueryRefetch={projectsQuery.refetch}
       setSelectedProjectId={setSelectedProjectId}
+      onProjectSelect={onUserProjectSelect}
+      showTogglePrefix={showTogglePrefix}
+      isMenuInline={isMenuInline}
     />
   )
 
@@ -349,6 +363,7 @@ export function useProjectSelector(options?: UseProjectSelectorOptions): UseProj
     stableProjectId,
     isAllProjects,
     projects,
+    selectedProjectName: name,
     ProjectSelector,
     refetchProjects: projectsQuery.refetch,
   }

@@ -1,4 +1,4 @@
-import { AlertActionLink, Flex, FlexItem, StackItem } from '@patternfly/react-core'
+import { AlertActionLink, Content, ContentVariants, Flex, FlexItem, StackItem } from '@patternfly/react-core'
 import type { WorkflowAPI } from '@syntara/contracts'
 import { useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
@@ -70,7 +70,7 @@ type WorkflowVersion = WorkflowAPI.components['schemas']['WorkflowVersionRead']
 /* eslint-disable max-lines */
 // eslint-disable-next-line max-lines-per-function, complexity
 export function BuilderContent(props: BuilderContentProps) {
-  const { workflow, isNew, workflowId, executionCopy, initialViewVersion } = props
+  const { workflow, isNew, workflowId, initialProjectId, executionCopy, initialViewVersion } = props
   const isWorkflowBuilderQolEnabled = useFeatureFlag('workflow_builder_qol')
   const navigate = useNavigate()
   const setLocation = useCallback(
@@ -83,14 +83,26 @@ export function BuilderContent(props: BuilderContentProps) {
   const { showAlert, showSuccess, showWarning, showError } = useAlerts()
   const [saveAttemptedWithoutProject, setSaveAttemptedWithoutProject] = useState(false)
   const [pendingDuplicateNavigation, setPendingDuplicateNavigation] = useState<string | null>(null)
-  const { selectedProject, stableProjectId, ProjectSelector } = useProjectSelector({
+  // A new workflow arrives with the project chosen in BuilderNew's picker (R18), and an
+  // existing one keeps its project, so the toolbar only shows the project. The selector
+  // remains as a fallback for a new workflow opened without a project.
+  const fixedProjectId = isNew ? initialProjectId : (workflow?.project_id ?? undefined)
+  const { selectedProject, selectedProjectName, stableProjectId, ProjectSelector } = useProjectSelector({
     requireProject: isNew,
-    initialProjectId: isNew ? undefined : (workflow?.project_id ?? undefined),
+    initialProjectId: fixedProjectId,
     hasValidationError: saveAttemptedWithoutProject,
     onProjectSelect: () => setSaveAttemptedWithoutProject(false),
-    isDisabled: !isNew,
-    clearSelectionOnMount: isNew,
+    isDisabled: !isNew || !!fixedProjectId,
+    clearSelectionOnMount: isNew && !fixedProjectId,
   })
+  const projectDisplay =
+    !isNew || fixedProjectId ? (
+      <Content component={ContentVariants.p} className={styles.projectDisplay}>
+        Project: {selectedProjectName ?? '…'}
+      </Content>
+    ) : (
+      ProjectSelector
+    )
 
   const queryClient = useQueryClient()
   const reactFlowInstance = useReactFlow()
@@ -604,7 +616,7 @@ export function BuilderContent(props: BuilderContentProps) {
                   publishedVersionId={workflow?.published_version_id ?? null}
                   currentVersionId={workflow?.version?.id}
                   isPublishing={isPublishing}
-                  ProjectSelector={ProjectSelector}
+                  ProjectSelector={projectDisplay}
                   dispatch={dispatch}
                   markDirty={markDirty}
                   handleToggleHistory={handleToggleHistory}
@@ -727,6 +739,7 @@ export function BuilderContent(props: BuilderContentProps) {
                     sourceNodeId={sourceNodeId}
                     replacementNodeId={replacementNodeId}
                     hasNoWorkflowSteps={hasNoWorkflowSteps}
+                    projectId={builderProjectId}
                     dispatch={dispatch}
                     historyCardOpen={historyCardOpen}
                     isNew={isNew}

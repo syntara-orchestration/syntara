@@ -1275,7 +1275,11 @@ describe('Workflows Component', () => {
       const createButton = screen.getByRole('button', { name: 'Create workflow' })
       await user.click(createButton)
 
-      expect(routerTestState.navigate).toHaveBeenCalledWith({ to: '/workflow-builder/new' })
+      // The project in view pre-fills the new-workflow project picker (R18).
+      expect(routerTestState.navigate).toHaveBeenCalledWith({
+        to: '/workflow-builder/new',
+        search: { projectId: 'proj-default' },
+      })
     })
 
     it('shows EmptyStateFilter when active filters return no results', () => {

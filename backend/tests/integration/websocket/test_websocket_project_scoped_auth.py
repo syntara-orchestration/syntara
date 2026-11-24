@@ -217,6 +217,7 @@ class TestProjectScopedExecutionWebSocketAuthorization:
         test_db_session: AsyncSession,
         test_user: User,
         sync_test_client: TestClient,
+        allow_all_evaluator: MagicMock,
     ) -> None:
         """WebSocket must reject when execution's project has been hard-deleted.
 
@@ -238,7 +239,7 @@ class TestProjectScopedExecutionWebSocketAuthorization:
         test_db_session.add(execution)
         await test_db_session.commit()
 
-        service = ProjectService(session=test_db_session, user=test_user)
+        service = ProjectService(session=test_db_session, user=test_user, opa_client=allow_all_evaluator)
         await service.delete_project(project.id)
 
         fake_user = User(

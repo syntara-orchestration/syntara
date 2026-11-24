@@ -8,6 +8,7 @@ import type {
   FilesAPI,
   IdentityProvidersAPI,
   IntegrationsAPI,
+  NodeKindsAPI,
   SettingsAPI,
   ToolManagerAPI,
   UsersAPI,
@@ -135,6 +136,11 @@ settingsFetchClient.use(interfaceTagMiddleware)
 settingsFetchClient.use(authMiddleware)
 export { settingsFetchClient }
 export const settingsClient = createClient(settingsFetchClient)
+
+const nodeKindsFetchClient = createFetchClient<NodeKindsAPI.paths>({ baseUrl: '/api/v1/' })
+nodeKindsFetchClient.use(interfaceTagMiddleware)
+nodeKindsFetchClient.use(authMiddleware)
+export const nodeKindsClient = createClient(nodeKindsFetchClient)
 
 // integrationsFetchClient is exported for use in components that call the API directly inside
 // useQueries queryFn callbacks, where hooks (integrationsClient.useQuery) cannot be used.

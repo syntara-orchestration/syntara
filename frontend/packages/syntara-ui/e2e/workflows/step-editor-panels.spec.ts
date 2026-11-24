@@ -11,6 +11,7 @@ import {
   fillCodeEditor,
   layoutCanvas,
   selectProjectIfRequired,
+  openNewWorkflowBuilder,
 } from '../helpers/workflows'
 
 /**
@@ -154,7 +155,7 @@ test.describe('Step editor panels', () => {
     const workflowName = buildUniqueName('e2e-chain')
 
     // Build: Trigger → Gather Info → Process Data → Send Alert
-    await app.goto(toAppUrl('/workflow-builder/new'))
+    await openNewWorkflowBuilder(app)
     await addManualTrigger(app, 'Trigger')
     await addScriptStep(
       app,
@@ -325,7 +326,7 @@ test.describe('Step editor panels', () => {
     // Clicking "Analyze" should show the schema preview for script output fields
     // because its upstream node (Fetch Data) is a script node with known output schema.
     // No execution data — purely design-time schema discovery.
-    await app.goto(toAppUrl('/workflow-builder/new'))
+    await openNewWorkflowBuilder(app)
     await selectProjectIfRequired(app)
     await addManualTrigger(app, 'Trigger')
     await addScriptStep(app, 'Fetch Data', 'print("fetching")')
@@ -357,7 +358,7 @@ test.describe('Step editor panels', () => {
     const workflowName = buildUniqueName('e2e-real-input')
 
     // Build: Trigger → Fetch Data (script) → Analyze (script)
-    await app.goto(toAppUrl('/workflow-builder/new'))
+    await openNewWorkflowBuilder(app)
     await selectProjectIfRequired(app)
     await addManualTrigger(app, 'Trigger')
     await addScriptStep(app, 'Fetch Data', 'print("fetching")')
@@ -518,7 +519,7 @@ test.describe('Step editor panels', () => {
 
   test('input panel sections can be collapsed and expanded', async ({ app }) => {
     // Build: Trigger → Script A → Script B (so Script B has a script upstream with known schema)
-    await app.goto(toAppUrl('/workflow-builder/new'))
+    await openNewWorkflowBuilder(app)
     await selectProjectIfRequired(app)
     await addManualTrigger(app, 'Trigger')
     await addScriptStep(app, 'Script A', 'print("hello")')
@@ -561,7 +562,7 @@ test.describe('Step editor panels', () => {
 
   test.skip('input panel view switching: Schema, Table, and JSON with execution data', async ({ app }) => {
     const workflowName = buildUniqueName('e2e-views')
-    await app.goto(toAppUrl('/workflow-builder/new'))
+    await openNewWorkflowBuilder(app)
     await selectProjectIfRequired(app)
     await addManualTrigger(app, 'Trigger')
     await addScriptStep(app, 'Fetch', 'print("data")')
@@ -678,7 +679,7 @@ test.describe('Step editor panels', () => {
 
   test.skip('input panel expandable sections switch between upstream steps', async ({ app }) => {
     const workflowName = buildUniqueName('e2e-selector')
-    await app.goto(toAppUrl('/workflow-builder/new'))
+    await openNewWorkflowBuilder(app)
     await selectProjectIfRequired(app)
     await addManualTrigger(app, 'Trigger')
     await addScriptStep(app, 'Step A', 'print("alpha")')
@@ -923,7 +924,7 @@ test.describe('Step editor panels', () => {
 
   test('mock data pin flow in Input panel', async ({ app }) => {
     const workflowName = buildUniqueName('e2e-mock-pin')
-    await app.goto(toAppUrl('/workflow-builder/new'))
+    await openNewWorkflowBuilder(app)
     await selectProjectIfRequired(app)
 
     await app.getByRole('button', { name: 'Manual trigger' }).click()
@@ -980,7 +981,7 @@ test.describe('Step editor panels', () => {
 
   test('mock data unpin flow', async ({ app }) => {
     const workflowName = buildUniqueName('e2e-mock-unpin')
-    await app.goto(toAppUrl('/workflow-builder/new'))
+    await openNewWorkflowBuilder(app)
     await selectProjectIfRequired(app)
 
     await app.getByRole('button', { name: 'Manual trigger' }).click()
@@ -1033,7 +1034,7 @@ test.describe('Step editor panels', () => {
 
   test('mock data cancel flow', async ({ app }) => {
     const workflowName = buildUniqueName('e2e-mock-cancel')
-    await app.goto(toAppUrl('/workflow-builder/new'))
+    await openNewWorkflowBuilder(app)
     await selectProjectIfRequired(app)
 
     await app.getByRole('button', { name: 'Manual trigger' }).click()
@@ -1082,7 +1083,7 @@ test.describe('Step editor panels', () => {
 
   test('schema preview shows expected output fields in predecessor section', async ({ app }) => {
     const workflowName = buildUniqueName('e2e-test-alert')
-    await app.goto(toAppUrl('/workflow-builder/new'))
+    await openNewWorkflowBuilder(app)
     await selectProjectIfRequired(app)
 
     await app.getByRole('button', { name: 'Manual trigger' }).click()
@@ -1140,7 +1141,7 @@ test.describe('Step editor panels', () => {
 
   test('pinned data persists across step editor reopens', async ({ app }) => {
     const workflowName = buildUniqueName('e2e-mock-persist')
-    await app.goto(toAppUrl('/workflow-builder/new'))
+    await openNewWorkflowBuilder(app)
     await selectProjectIfRequired(app)
 
     await app.getByRole('button', { name: 'Manual trigger' }).click()
@@ -1199,7 +1200,7 @@ test.describe('Step editor panels', () => {
   })
 
   test('clicking the copy button on an Input panel field announces the expression was copied', async ({ app }) => {
-    await app.goto(toAppUrl('/workflow-builder/new'))
+    await openNewWorkflowBuilder(app)
     await selectProjectIfRequired(app)
     await addManualTrigger(app, 'Trigger')
     await addScriptStep(app, 'Script A', 'print("hello")')
@@ -1229,7 +1230,7 @@ test.describe('Step editor panels', () => {
   test.skip('dragging a field from the Input panel inserts the expression into a Parameters form field', async ({
     app,
   }) => {
-    await app.goto(toAppUrl('/workflow-builder/new'))
+    await openNewWorkflowBuilder(app)
     await selectProjectIfRequired(app)
     await addManualTrigger(app, 'Trigger')
     await addScriptStep(app, 'Script A', 'print("hello")')

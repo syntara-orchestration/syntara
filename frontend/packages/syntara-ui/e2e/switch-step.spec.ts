@@ -16,7 +16,7 @@
  * - The form enforces a minimum of 1 path (Remove button hidden at minimum)
  */
 
-import { test, expect, toAppUrl } from './fixtures'
+import { test, expect } from './fixtures'
 import {
   addManualTrigger,
   addSwitchStepWithCases,
@@ -30,6 +30,7 @@ import {
   deleteWorkflow,
   openWorkflowInBuilder,
   selectProjectIfRequired,
+  openNewWorkflowBuilder,
 } from './helpers/workflows'
 import { ensureProject } from './utils/api'
 
@@ -80,7 +81,7 @@ function expectSwitchStepConfig(
 test.describe('Switch Step — UI-15', () => {
   test.describe('Catalog', () => {
     test('Switch step is available under the Logic category', async ({ app }) => {
-      await app.goto(toAppUrl('/workflow-builder/new'))
+      await openNewWorkflowBuilder(app)
       await addManualTrigger(app, 'Manual trigger')
 
       try {
@@ -95,7 +96,7 @@ test.describe('Switch Step — UI-15', () => {
     })
 
     test('Opening Switch form shows path list and fallback section', async ({ app }) => {
-      await app.goto(toAppUrl('/workflow-builder/new'))
+      await openNewWorkflowBuilder(app)
       await addManualTrigger(app, 'Manual trigger')
 
       try {
@@ -116,7 +117,7 @@ test.describe('Switch Step — UI-15', () => {
     })
 
     test('Cancelling the Switch form does not add the step to the canvas', async ({ app }) => {
-      await app.goto(toAppUrl('/workflow-builder/new'))
+      await openNewWorkflowBuilder(app)
       await addManualTrigger(app, 'Manual trigger')
 
       await openAddStepPanel(app)
@@ -140,7 +141,7 @@ test.describe('Switch Step — UI-15', () => {
       const wfName = buildUniqueName('switch-two-cases')
 
       await ensureProject(app)
-      await app.goto(toAppUrl('/workflow-builder/new'))
+      await openNewWorkflowBuilder(app)
       await addManualTrigger(app, 'Manual trigger')
 
       try {
@@ -176,7 +177,7 @@ test.describe('Switch Step — UI-15', () => {
       const wfName = buildUniqueName('switch-default-labels')
 
       await ensureProject(app)
-      await app.goto(toAppUrl('/workflow-builder/new'))
+      await openNewWorkflowBuilder(app)
       await addManualTrigger(app, 'Manual trigger')
 
       try {
@@ -207,7 +208,7 @@ test.describe('Switch Step — UI-15', () => {
       const wfName = buildUniqueName('switch-one-case')
 
       await ensureProject(app)
-      await app.goto(toAppUrl('/workflow-builder/new'))
+      await openNewWorkflowBuilder(app)
       await addManualTrigger(app, 'Manual trigger')
 
       try {
@@ -235,7 +236,7 @@ test.describe('Switch Step — UI-15', () => {
       const wfName = buildUniqueName('switch-three-cases')
 
       await ensureProject(app)
-      await app.goto(toAppUrl('/workflow-builder/new'))
+      await openNewWorkflowBuilder(app)
       await addManualTrigger(app, 'Manual trigger')
 
       try {
@@ -274,7 +275,7 @@ test.describe('Switch Step — UI-15', () => {
 
   test.describe('Path management', () => {
     test('"Add path" button appends a new case to the form', async ({ app }) => {
-      await app.goto(toAppUrl('/workflow-builder/new'))
+      await openNewWorkflowBuilder(app)
       await addManualTrigger(app, 'Manual trigger')
 
       try {
@@ -298,7 +299,7 @@ test.describe('Switch Step — UI-15', () => {
     })
 
     test('"Remove path" button deletes the selected case', async ({ app }) => {
-      await app.goto(toAppUrl('/workflow-builder/new'))
+      await openNewWorkflowBuilder(app)
       await addManualTrigger(app, 'Manual trigger')
 
       try {
@@ -321,7 +322,7 @@ test.describe('Switch Step — UI-15', () => {
     })
 
     test('"Remove path" button is hidden when only one path remains', async ({ app }) => {
-      await app.goto(toAppUrl('/workflow-builder/new'))
+      await openNewWorkflowBuilder(app)
       await addManualTrigger(app, 'Manual trigger')
 
       try {
@@ -358,7 +359,7 @@ test.describe('Switch Step — UI-15', () => {
       const wfName = buildUniqueName('switch-roundtrip')
 
       await ensureProject(app)
-      await app.goto(toAppUrl('/workflow-builder/new'))
+      await openNewWorkflowBuilder(app)
       await addManualTrigger(app, 'Manual trigger')
 
       try {
@@ -392,7 +393,7 @@ test.describe('Switch Step — UI-15', () => {
       const wfName = buildUniqueName('switch-edit')
 
       await ensureProject(app)
-      await app.goto(toAppUrl('/workflow-builder/new'))
+      await openNewWorkflowBuilder(app)
       await addManualTrigger(app, 'Manual trigger')
 
       try {
@@ -436,7 +437,7 @@ test.describe('Switch Step — UI-15', () => {
       const wfName = buildUniqueName('switch-canvas')
 
       await ensureProject(app)
-      await app.goto(toAppUrl('/workflow-builder/new'))
+      await openNewWorkflowBuilder(app)
       await addManualTrigger(app, 'Manual trigger')
 
       try {
@@ -463,7 +464,7 @@ test.describe('Switch Step — UI-15', () => {
       const wfName = buildUniqueName('switch-panel-open')
 
       await ensureProject(app)
-      await app.goto(toAppUrl('/workflow-builder/new'))
+      await openNewWorkflowBuilder(app)
       await addManualTrigger(app, 'Manual trigger')
 
       try {

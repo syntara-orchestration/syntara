@@ -19,6 +19,7 @@ type BuilderSidePanelsProps = {
   sourceNodeId: string | null
   replacementNodeId: string | null
   hasNoWorkflowSteps: boolean
+  projectId?: string | null
   dispatch: React.Dispatch<BuilderAction>
   historyCardOpen: boolean
   isNew: boolean
@@ -41,6 +42,7 @@ export const BuilderSidePanels = memo(function BuilderSidePanels({
   sourceNodeId,
   replacementNodeId,
   hasNoWorkflowSteps,
+  projectId,
   dispatch,
   historyCardOpen,
   isNew,
@@ -70,6 +72,7 @@ export const BuilderSidePanels = memo(function BuilderSidePanels({
             sourceNodeId={sourceNodeId}
             replacementNodeId={replacementNodeId}
             hasNoWorkflowSteps={hasNoWorkflowSteps}
+            projectId={projectId}
           />
         </FlexItem>
       )}

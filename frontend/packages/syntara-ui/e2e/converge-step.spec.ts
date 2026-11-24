@@ -1,4 +1,4 @@
-import { test, expect, toAppUrl } from './fixtures'
+import { test, expect } from './fixtures'
 import { addManualTrigger, addConditionStepWithBranch } from './helpers/v2-steps'
 import {
   addConvergeStepWithAllStrategy,
@@ -17,13 +17,14 @@ import {
   deleteWorkflow,
   openWorkflowInBuilder,
   triggerLayout,
+  openNewWorkflowBuilder,
 } from './helpers/workflows'
 
 test.describe('Converge Step - E2E Tests', () => {
   test.describe('Catalog', () => {
     test('Select converge step from Logic category', async ({ app }) => {
       try {
-        await app.goto(toAppUrl('/workflow-builder/new'))
+        await openNewWorkflowBuilder(app)
         await addManualTrigger(app, 'Manual trigger')
         await addConditionStepWithBranch(app, 'Condition', 'true')
 

@@ -1117,6 +1117,8 @@ flowchart TB
 - `BuilderContent` component encapsulates all shared UI logic.
 - `BuilderFlow.tsx` handles workflow → graph conversion and legacy detection.
 - Routes: `/workflow-builder/new` (new) and `/workflow-builder/:workflowId` (edit).
+- A new workflow needs its project first: `BuilderNew` opens a "Select a project" modal and only renders `BuilderContent` after Continue, with the project as `initialProjectId`. The project decides which step types the add-step panel allows, so it is fixed in the builder (shown as text) for new and existing workflows. `?projectId=<uuid>` pre-fills the modal (the Workflows list and a project's Workflows tab pass it); otherwise the only project that can hold workflows is pre-filled (`useOnlyWorkflowProjectId`). Built-in projects are refused.
+- The add-step panel hides step types the caller may not author in that project; a "Show restricted steps" switch reveals them padlocked and disabled, with a tooltip naming why.
 
 ---
 

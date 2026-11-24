@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, renderHook, screen, waitFor } from '@testing-library/react'
+import { render, renderHook, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { RefObject } from 'react'
 import type React from 'react'
@@ -204,6 +204,20 @@ describe('useProjectSelector', () => {
       const { result } = renderHook(() => useProjectSelector(), { wrapper })
 
       expect(result.current.selectedProject).toEqual(sampleProjects[1])
+    })
+
+    it('returns the selected project name', () => {
+      mockSelectedProjectId = 'proj-2'
+      const { result } = renderHook(() => useProjectSelector(), { wrapper })
+
+      expect(result.current.selectedProjectName).toBe(sampleProjects[1].name)
+    })
+
+    it('returns no project name when nothing is selected', () => {
+      mockSelectedProjectId = null
+      const { result } = renderHook(() => useProjectSelector(), { wrapper })
+
+      expect(result.current.selectedProjectName).toBeUndefined()
     })
 
     it('returns null selectedProject when ID does not match any project', () => {
@@ -508,6 +522,18 @@ describe('useProjectSelector', () => {
     it('renders a visible Project: prefix before the typeahead value', () => {
       renderSelector()
       expect(screen.getByText(projectSelectorUx.togglePrefixLabel)).toBeInTheDocument()
+    })
+
+    it('renders the menu inside the selector when isMenuInline is true, so a modal keeps it reachable', async () => {
+      const user = userEvent.setup()
+      const { container } = renderSelector({ isMenuInline: true })
+      await user.click(screen.getByDisplayValue('All projects'))
+      expect(within(container).getAllByRole('option', { name: 'Create project' })).toHaveLength(1)
+    })
+
+    it('hides the Project: prefix when showTogglePrefix is false', () => {
+      renderSelector({ showTogglePrefix: false })
+      expect(screen.queryByText(projectSelectorUx.togglePrefixLabel)).not.toBeInTheDocument()
     })
 
     it('shows "All projects" in toggle when no project selected', () => {
@@ -1055,6 +1081,33 @@ describe('useProjectSelector', () => {
         )
         expect(mockSetSelectedProjectId).toHaveBeenCalledWith('proj-new')
         expect(mockRefetch).toHaveBeenCalled()
+      })
+    })
+
+    it('reports a created project through onProjectSelect, since creating also selects it', async () => {
+      const createdProject: ProjectRead = {
+        id: 'proj-created',
+        name: 'created',
+        description: '',
+        labels: {},
+        is_default: false,
+        created_at: '2024-03-01T00:00:00Z',
+        updated_at: '2024-03-01T00:00:00Z',
+      }
+      mockMutate.mockImplementation((_body: unknown, opts: { onSuccess: (data: ProjectRead) => void }) => {
+        opts.onSuccess(createdProject)
+      })
+      const onProjectSelect = vi.fn()
+
+      const user = userEvent.setup()
+      renderSelector({ onProjectSelect })
+      await user.click(screen.getByDisplayValue('All projects'))
+      await user.click(screen.getByRole('option', { name: 'Create project' }))
+      await user.type(screen.getByRole('textbox', { name: 'Project name' }), 'created')
+      await user.click(screen.getByRole('button', { name: 'Create project' }))
+
+      await waitFor(() => {
+        expect(onProjectSelect).toHaveBeenCalledWith(createdProject)
       })
     })
 

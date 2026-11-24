@@ -9,6 +9,7 @@ from ...client import AuthenticatedClient, Client
 from ...models.error_data import ErrorData
 from ...models.workflow_version_read import WorkflowVersionRead
 from ...models.workflow_version_update import WorkflowVersionUpdate
+from ...models.workflow_write_forbidden_problem_detail import WorkflowWriteForbiddenProblemDetail
 from ...types import Response
 
 
@@ -35,7 +36,7 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Any | ErrorData | WorkflowVersionRead | None:
+) -> Any | ErrorData | WorkflowVersionRead | WorkflowWriteForbiddenProblemDetail | None:
     if response.status_code == 200:
         response_200 = WorkflowVersionRead.from_dict(response.json())
 
@@ -52,7 +53,7 @@ def _parse_response(
         return response_401
 
     if response.status_code == 403:
-        response_403 = ErrorData.from_dict(response.json())
+        response_403 = WorkflowWriteForbiddenProblemDetail.from_dict(response.json())
 
         return response_403
 
@@ -88,7 +89,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[Any | ErrorData | WorkflowVersionRead]:
+) -> Response[Any | ErrorData | WorkflowVersionRead | WorkflowWriteForbiddenProblemDetail]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
@@ -105,7 +106,7 @@ def sync_detailed(
     *,
     client: AuthenticatedClient,
     body: WorkflowVersionUpdate,
-) -> Response[Any | ErrorData | WorkflowVersionRead]:
+) -> Response[Any | ErrorData | WorkflowVersionRead | WorkflowWriteForbiddenProblemDetail]:
     """Update workflow version metadata
 
      Update a workflow version's metadata (name, change_description).
@@ -121,7 +122,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Any | ErrorData | WorkflowVersionRead]
+        Response[Any | ErrorData | WorkflowVersionRead | WorkflowWriteForbiddenProblemDetail]
     """
 
     kwargs = _get_kwargs(
@@ -143,7 +144,7 @@ def sync(
     *,
     client: AuthenticatedClient,
     body: WorkflowVersionUpdate,
-) -> Any | ErrorData | WorkflowVersionRead | None:
+) -> Any | ErrorData | WorkflowVersionRead | WorkflowWriteForbiddenProblemDetail | None:
     """Update workflow version metadata
 
      Update a workflow version's metadata (name, change_description).
@@ -159,7 +160,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Any | ErrorData | WorkflowVersionRead
+        Any | ErrorData | WorkflowVersionRead | WorkflowWriteForbiddenProblemDetail
     """
 
     return sync_detailed(
@@ -176,7 +177,7 @@ async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
     body: WorkflowVersionUpdate,
-) -> Response[Any | ErrorData | WorkflowVersionRead]:
+) -> Response[Any | ErrorData | WorkflowVersionRead | WorkflowWriteForbiddenProblemDetail]:
     """Update workflow version metadata
 
      Update a workflow version's metadata (name, change_description).
@@ -192,7 +193,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Any | ErrorData | WorkflowVersionRead]
+        Response[Any | ErrorData | WorkflowVersionRead | WorkflowWriteForbiddenProblemDetail]
     """
 
     kwargs = _get_kwargs(
@@ -212,7 +213,7 @@ async def asyncio(
     *,
     client: AuthenticatedClient,
     body: WorkflowVersionUpdate,
-) -> Any | ErrorData | WorkflowVersionRead | None:
+) -> Any | ErrorData | WorkflowVersionRead | WorkflowWriteForbiddenProblemDetail | None:
     """Update workflow version metadata
 
      Update a workflow version's metadata (name, change_description).
@@ -228,7 +229,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Any | ErrorData | WorkflowVersionRead
+        Any | ErrorData | WorkflowVersionRead | WorkflowWriteForbiddenProblemDetail
     """
 
     return (

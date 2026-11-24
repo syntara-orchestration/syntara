@@ -12,7 +12,7 @@
  * - The error message specifies which step and which field is missing
  */
 
-import { test, expect, toAppUrl, type Page } from '../fixtures'
+import { test, expect, type Page } from '../fixtures'
 import { addManualTrigger, openAddStepPanel } from '../helpers/v2-steps'
 import { triggerVerifyWorkflow } from '../helpers/workflow-verify'
 import {
@@ -21,6 +21,7 @@ import {
   clickSaveAndWait,
   closeStepEditorPanel,
   selectProjectIfRequired,
+  openNewWorkflowBuilder,
 } from '../helpers/workflows'
 import { ensureProject, apiRequest } from '../utils/api'
 
@@ -65,9 +66,9 @@ test.describe('UI-32: Workflow Verification — Missing Required Configuration',
     const workflowName = buildUniqueName('e2e-ui32-validation')
     let workflowId: string | undefined
 
-    // ensureProject guarantees a project exists via API; selectProjectIfRequired handles the UI modal on first save
+    // ensureProject guarantees a project exists via API; openNewWorkflowBuilder picks it in the project modal
     await ensureProject(app)
-    await app.goto(toAppUrl('/workflow-builder/new'))
+    await openNewWorkflowBuilder(app)
 
     try {
       await addManualTrigger(app, 'Start workflow')

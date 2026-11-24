@@ -81,6 +81,8 @@ __all__ = (
     "BatchApprovalRequest",
     "BatchApprovalResponse",
     "BatchApprovalResult",
+    "BlockedStepType",
+    "BlockedStepTypeReason",
     "BodyToken",
     "CanIRequest",
     "CanIRequestResourceLabels",
@@ -302,6 +304,8 @@ __all__ = (
     "SettingUpdate",
     "SettingValueType",
     "SignalResponse",
+    "StepTypeBlockedBy",
+    "StepTypePermissionRead",
     "SubResourceRoleAssignmentCreate",
     "SwitchCase",
     "SwitchNode",
@@ -380,6 +384,7 @@ __all__ = (
     "WorkflowVersionReadStatus",
     "WorkflowVersionReadWorkflowDefinition",
     "WorkflowVersionUpdate",
+    "WorkflowWriteForbiddenProblemDetail",
 )
 
 _MODEL_MODULES = frozenset(path.stem for path in Path(__file__).parent.glob("*.py") if path.stem != "__init__")

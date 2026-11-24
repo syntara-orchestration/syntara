@@ -19,6 +19,7 @@ import {
   saveWorkflow,
   verifyStepVisible,
   waitForUIReady,
+  openNewWorkflowBuilder,
 } from './helpers/workflows'
 import { ensureProject } from './utils/api'
 
@@ -184,7 +185,7 @@ test.describe('Workflow Import/Export', () => {
     } as unknown as V2WorkflowDefinition
 
     try {
-      await app.goto(toAppUrl('/workflow-builder/new'))
+      await openNewWorkflowBuilder(app)
       await selectProjectIfRequired(app)
 
       const fileInput = app.locator('input[type="file"][accept=".json"]')
@@ -238,7 +239,7 @@ test.describe('Workflow Import/Export', () => {
     } as unknown as V2WorkflowDefinition
 
     try {
-      await app.goto(toAppUrl('/workflow-builder/new'))
+      await openNewWorkflowBuilder(app)
       await selectProjectIfRequired(app)
 
       const fileInput = app.locator('input[type="file"][accept=".json"]')

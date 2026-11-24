@@ -11,9 +11,11 @@ from fastapi.responses import JSONResponse
 from temporalio.service import RPCError
 
 from syntara.audit.dispatcher import AuditEventDispatcher
+from syntara.core.constants import FieldLimits
 from syntara.core.error_handlers import PROBLEM_TYPES, create_problem_details_response
 from syntara.workflow_core.models import NodeType
 from syntara.workflows.audit.webhook_auth import WebhookAuthFailureEvent
+from syntara.workflows.models.node_permission import NodeKindWriteDeniedProblemDetail
 
 if TYPE_CHECKING:
     from syntara.workflows.exceptions import (
@@ -23,6 +25,7 @@ if TYPE_CHECKING:
         ExecutionInTerminalStateError,
         ExecutionNotFoundError,
         ExecutionNotRetryableError,
+        NodeKindWriteDeniedError,
         PayloadTooLargeError,
         ScheduledTriggerNotFoundError,
         ScheduledTriggerSyncError,
@@ -48,6 +51,18 @@ if TYPE_CHECKING:
 logger = structlog.stdlib.get_logger(__name__)
 
 _PROBLEM_JSON_MEDIA_TYPE = "application/problem+json"
+
+
+def node_kind_write_denied_handler(request: Request, exc: "NodeKindWriteDeniedError") -> JSONResponse:
+    """Report blocked types while keeping policy provenance in audit only."""
+    problem = NodeKindWriteDeniedProblemDetail(
+        type=PROBLEM_TYPES["forbidden"],
+        title="Step types not allowed",
+        detail=str(exc)[: FieldLimits.DESCRIPTION_MAX_LENGTH],
+        instance=str(request.url),
+        blocked_step_types=exc.blocked_step_types,
+    )
+    return JSONResponse(status_code=403, content=problem.model_dump(), media_type=_PROBLEM_JSON_MEDIA_TYPE)
 
 
 def build_validation_problem_response(

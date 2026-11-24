@@ -11,6 +11,7 @@ import { AppRoute } from '../../src/app/AppRoute'
 import { toAppUrl } from '../fixtures'
 import { clickCanvasStepToOpenEditor } from '../helpers/canvas-interaction'
 import { credentialTypeOptionName } from '../helpers/credentials'
+import { confirmNewWorkflowProject } from '../helpers/project-selection'
 
 import { MOCK_IDENTITY_PROVIDER_ID } from './mock-ids'
 import type { CanvasPageEntry, PageEntry } from './page-registry'
@@ -465,6 +466,7 @@ export const builderInteractivePages: CanvasPageEntry[] = [
     maskCanvas: false,
     path: AppRoute.WorkflowBuilder.New,
     waitFor: async (page) => {
+      await confirmNewWorkflowProject(page)
       await expect(page.getByRole('heading', { name: 'Select a trigger step' })).toBeVisible({
         timeout: 30_000,
       })
@@ -488,6 +490,7 @@ export const builderInteractivePages: CanvasPageEntry[] = [
     maskCanvas: false,
     path: AppRoute.WorkflowBuilder.New,
     waitFor: async (page) => {
+      await confirmNewWorkflowProject(page)
       await expect(page.getByRole('heading', { name: 'Select a trigger step' })).toBeVisible({
         timeout: 30_000,
       })
@@ -503,6 +506,7 @@ export const builderInteractivePages: CanvasPageEntry[] = [
     perceptual: true,
     path: AppRoute.WorkflowBuilder.New,
     waitFor: async (page) => {
+      await confirmNewWorkflowProject(page)
       await expect(page.locator('.react-flow')).toBeVisible({ timeout: 30_000 })
     },
     setup: async (page) => {

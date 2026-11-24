@@ -7,7 +7,7 @@
  *   3. Playwright compares each screenshot pixel-by-pixel and fails on diff.
  */
 import { test, expect, toAppUrl } from '../fixtures'
-import { addStepPanel } from '../helpers/workflows'
+import { addStepPanel, openNewWorkflowBuilder } from '../helpers/workflows'
 
 // Allow 0.01 (1%) pixel diff to tolerate sub-pixel text rendering / anti-aliasing noise
 const screenshotOptions = { maxDiffPixelRatio: 0.01 } as const
@@ -25,7 +25,7 @@ test.describe('Visual regression — PF6 token migration', { tag: '@local-only' 
   })
 
   test('trigger step on canvas', async ({ app }) => {
-    await app.goto(toAppUrl('/workflow-builder/new'))
+    await openNewWorkflowBuilder(app)
     await expect(app.getByRole('heading', { name: 'Select a trigger step' })).toBeVisible()
 
     // Add a manual trigger so a TriggerNode renders on the canvas
@@ -40,7 +40,7 @@ test.describe('Visual regression — PF6 token migration', { tag: '@local-only' 
   })
 
   test('condition step with expression group', async ({ app }) => {
-    await app.goto(toAppUrl('/workflow-builder/new'))
+    await openNewWorkflowBuilder(app)
     await expect(app.getByRole('heading', { name: 'Select a trigger step' })).toBeVisible()
 
     // Add manual trigger first
@@ -65,7 +65,7 @@ test.describe('Visual regression — PF6 token migration', { tag: '@local-only' 
   })
 
   test('scheduled trigger with schedule builder', async ({ app }) => {
-    await app.goto(toAppUrl('/workflow-builder/new'))
+    await openNewWorkflowBuilder(app)
     await expect(app.getByRole('heading', { name: 'Select a trigger step' })).toBeVisible()
 
     // Add a scheduled trigger

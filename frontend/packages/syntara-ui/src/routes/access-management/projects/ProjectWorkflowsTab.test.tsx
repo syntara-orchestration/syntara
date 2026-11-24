@@ -206,7 +206,10 @@ describe('ProjectWorkflowsTab', () => {
     expect(screen.queryByText('No results found')).not.toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Create workflow' }))
-    expect(routerTestState.navigate).toHaveBeenCalledWith({ to: '/workflow-builder/new' })
+    expect(routerTestState.navigate).toHaveBeenCalledWith({
+      to: '/workflow-builder/new',
+      search: { projectId: 'proj-1' },
+    })
   })
 
   it('hides the create action when the user cannot create workflows', () => {

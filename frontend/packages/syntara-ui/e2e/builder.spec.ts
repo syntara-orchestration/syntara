@@ -8,11 +8,12 @@ import {
   createBasicWorkflowViaApi,
   fillCodeEditor,
   selectProjectIfRequired,
+  openNewWorkflowBuilder,
 } from './helpers/workflows'
 
 test('user creates and saves a multi-step workflow', async ({ app }) => {
   const workflowName = buildUniqueName('e2e-multi-node')
-  await app.goto(toAppUrl('/workflow-builder/new'))
+  await openNewWorkflowBuilder(app)
   await expect(app.getByRole('heading', { name: 'Select a trigger step' })).toBeVisible()
   await expect(app).toHaveTitle(`New Workflow | Workflows | ${APP_TITLE}`)
 

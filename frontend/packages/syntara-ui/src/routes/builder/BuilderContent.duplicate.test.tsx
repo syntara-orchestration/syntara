@@ -35,6 +35,18 @@ vi.mock('../../client', () => ({
   interfaceTagMiddleware: { onRequest: vi.fn() },
 }))
 
+// The add-step panel reads step-type verdicts; gating itself is covered by
+// AddStepPanel.stepTypeGating.test.tsx.
+vi.mock('../../hooks/useNodeKindsQuery', () => ({
+  useNodeKindsQuery: () => ({
+    query: { isPending: false },
+    nodeKinds: [],
+    nodeKindByKind: new Map(),
+    isLoading: false,
+    isUnavailable: false,
+  }),
+}))
+
 vi.mock('../../hooks/useProjectSelector', () => ({
   useProjectSelector: () => ({
     selectedProject: { id: 'project-1', name: 'Test Project' },

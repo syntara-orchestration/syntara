@@ -22,6 +22,7 @@ import { useDocLink } from '../../utils/docs/useDocLink'
 import { downloadWorkflowExportById } from '../../utils/downloadWorkflowExport'
 
 import { buildProjectRowActions } from './projectRowActions'
+import { useCreateWorkflowNavigation } from './useCreateWorkflowNavigation'
 import { useDuplicateWorkflow } from './useDuplicateWorkflow'
 import { useProjectActions } from './useProjectActions'
 import { useWorkflowActions } from './useWorkflowActions'
@@ -133,6 +134,7 @@ export default function Workflows() {
     ProjectSelector,
     refetchProjects,
   } = useProjectSelector()
+  const handleCreateWorkflow = useCreateWorkflowNavigation(selectedProject, stableProjectId)
   const projectsForGrouping = useProjectsForGrouping(projects, isAllProjects)
   const projectsById = useMemo(() => new Map(projectsForGrouping.map((p) => [p.id, p])), [projectsForGrouping])
   // UUID — same as builder `resourceProject` so useCanI cache keys stay aligned.
@@ -262,7 +264,7 @@ export default function Workflows() {
                 showWorkflowActions={showWorkflowActions}
                 showImportWorkflow={showImportWorkflow}
                 onImportClick={() => setImportDialogOpen(true)}
-                onCreateClick={() => detachPromise(navigate({ to: '/workflow-builder/new' }))}
+                onCreateClick={handleCreateWorkflow}
               />
             ) : undefined
           }
@@ -281,9 +283,7 @@ export default function Workflows() {
               onFilterChange={handleFilterChange}
               onClearAllFilters={handleClearAllFilters}
               onCreateWorkflow={
-                permissions.canCreate && !selectedProject?.is_builtin
-                  ? () => detachPromise(navigate({ to: '/workflow-builder/new' }))
-                  : undefined
+                permissions.canCreate && !selectedProject?.is_builtin ? handleCreateWorkflow : undefined
               }
               footer={getFooterProps(workflowsQuery.data)}
               getSortParams={getSortParams}

@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -100,6 +100,37 @@ describe('StepTypeOptionsList', () => {
     buttons.forEach((button) => {
       expect(button).toHaveAttribute('tabIndex', '0')
     })
+  })
+
+  it('renders a disabled entry padlocked, inert, with its tooltip', async () => {
+    const user = userEvent.setup()
+    const onSelect = vi.fn()
+    render(
+      <StepTypeOptionsList
+        stepTypes={[
+          {
+            id: 'script',
+            label: 'Script',
+            icon: vi.fn(),
+            isDisabled: true,
+            disabledTooltip: "You don't have permission to write this step.",
+          },
+          { id: 'loop', label: 'Loop', icon: vi.fn() },
+        ]}
+        onSelect={onSelect}
+      />
+    )
+
+    const script = screen.getByRole('button', { name: 'Script' })
+    expect(script).toHaveAttribute('aria-disabled', 'true')
+    expect(within(script).getByTestId('step-type-lock-icon')).toBeInTheDocument()
+    expect(within(screen.getByRole('button', { name: 'Loop' })).queryByTestId('step-type-lock-icon')).toBeNull()
+
+    await user.click(script)
+    expect(onSelect).not.toHaveBeenCalled()
+
+    await user.hover(script)
+    expect(await screen.findByText("You don't have permission to write this step.")).toBeInTheDocument()
   })
 
   it('uses bordered panels so card edges stay visible without glass or high contrast', () => {

@@ -15,7 +15,7 @@
  * - Test 43: Submit state (loading spinner, button disable)
  */
 
-import { test, expect, toAppUrl } from './fixtures'
+import { test, expect } from './fixtures'
 import {
   createTestCredential,
   deleteCredentialByName,
@@ -31,6 +31,7 @@ import {
   clickAddConnectedStep,
   navigateToApiActionForm,
   selectProjectIfRequired,
+  openNewWorkflowBuilder,
 } from './helpers/workflows'
 import { ensureProject } from './utils/api'
 
@@ -140,7 +141,7 @@ test.describe('Credential Selector — Error State', () => {
     })
 
     try {
-      await app.goto(toAppUrl('/workflow-builder/new'))
+      await openNewWorkflowBuilder(app)
       await expect(app.getByRole('heading', { name: 'Select a trigger step' })).toBeVisible()
 
       await selectProjectIfRequired(app)

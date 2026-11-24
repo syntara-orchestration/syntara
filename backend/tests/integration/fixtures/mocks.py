@@ -12,6 +12,16 @@ if TYPE_CHECKING:
 
 
 @pytest.fixture
+def allow_all_evaluator() -> MagicMock:
+    """Explicit evaluator for service tests unrelated to authorization."""
+    from syntara.authz.evaluator import AuthzEvaluator
+
+    evaluator = MagicMock(spec=AuthzEvaluator)
+    evaluator.evaluate.return_value = {"allow": True, "deny": False}
+    return evaluator
+
+
+@pytest.fixture
 def mock_openrouter_llm() -> Generator[MagicMock, None, None]:
     """Mock get_openrouter_llm to avoid requiring OPENROUTER_API_KEY."""
     from langchain_core.messages import AIMessage

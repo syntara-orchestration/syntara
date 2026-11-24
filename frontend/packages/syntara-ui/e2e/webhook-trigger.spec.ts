@@ -22,9 +22,9 @@ import {
   clickSaveAndWait,
   closeStepEditorPanel,
   deleteWorkflow,
-  fillCodeEditor,
-  selectProjectIfRequired,
   expectCanvasStepTitleVisible,
+  fillCodeEditor,
+  openNewWorkflowBuilder,
 } from './helpers/workflows'
 import { createServiceAccountViaApi, deleteServiceAccountViaApi, ensureProject } from './utils/api'
 
@@ -35,7 +35,11 @@ test.describe('Webhook Trigger', () => {
 
     const project = await ensureProject(app)
     const sa = await createServiceAccountViaApi(app, buildUniqueName('sa-webhook'))
-    await app.goto(toAppUrl('/workflow-builder/new'))
+    // Pin the workflow to the service account's own project. `ensureProject`
+    // puts the account in `default`, and the backend rejects the save with
+    // "Service account(s) not found in this project" if the workflow lands in
+    // any other project.
+    await openNewWorkflowBuilder(app, { projectName: project?.name })
 
     try {
       // Add webhook trigger
@@ -50,13 +54,7 @@ test.describe('Webhook Trigger', () => {
       await app.getByRole('button', { name: 'Create' }).click()
       await closeStepEditorPanel(app)
 
-      // Save workflow (select project right before save)
-      // Pin the workflow to the service account's own project. `ensureProject`
-      // puts the account in `default`, but an unnamed `selectProjectIfRequired`
-      // picks whichever project the dropdown lists first — and the backend
-      // rejects the save with "Service account(s) not found in this project"
-      // whenever those differ. The weak URL guard used to hide that 422.
-      await selectProjectIfRequired(app, project?.name)
+      // Save workflow
       await app.getByPlaceholder('Workflow name').fill(workflowName)
       await clickSaveAndWait(app)
 
@@ -83,7 +81,7 @@ test.describe('Webhook Trigger', () => {
   })
 
   test('webhook form shows URL preview that updates with path input', async ({ app }) => {
-    await app.goto(toAppUrl('/workflow-builder/new'))
+    await openNewWorkflowBuilder(app)
 
     // Wait for trigger selection and select Webhook trigger
     await expect(app.getByRole('heading', { name: /select a trigger step/i })).toBeVisible({ timeout: 10_000 })
@@ -106,7 +104,7 @@ test.describe('Webhook Trigger', () => {
     const sa = await createServiceAccountViaApi(app, buildUniqueName('sa-webhook'))
 
     try {
-      await app.goto(toAppUrl('/workflow-builder/new'))
+      await openNewWorkflowBuilder(app)
 
       await expect(app.getByRole('heading', { name: /select a trigger step/i })).toBeVisible({ timeout: 10_000 })
       await app.getByRole('button', { name: 'Webhook trigger', exact: true }).click()
@@ -138,7 +136,7 @@ test.describe('Webhook Trigger', () => {
   })
 
   test('webhook form validates invalid path characters', async ({ app }) => {
-    await app.goto(toAppUrl('/workflow-builder/new'))
+    await openNewWorkflowBuilder(app)
 
     await expect(app.getByRole('heading', { name: /select a trigger step/i })).toBeVisible({ timeout: 10_000 })
     await app.getByRole('button', { name: 'Webhook trigger', exact: true }).click()
@@ -160,7 +158,11 @@ test.describe('Webhook Trigger', () => {
 
     const project = await ensureProject(app)
     const sa = await createServiceAccountViaApi(app, buildUniqueName('sa-webhook'))
-    await app.goto(toAppUrl('/workflow-builder/new'))
+    // Pin the workflow to the service account's own project. `ensureProject`
+    // puts the account in `default`, and the backend rejects the save with
+    // "Service account(s) not found in this project" if the workflow lands in
+    // any other project.
+    await openNewWorkflowBuilder(app, { projectName: project?.name })
 
     try {
       // Add webhook trigger with leading slash and mixed case
@@ -176,12 +178,6 @@ test.describe('Webhook Trigger', () => {
       await closeStepEditorPanel(app)
 
       // Save and verify canvas shows normalized path (lowercase, no leading slash)
-      // Pin the workflow to the service account's own project. `ensureProject`
-      // puts the account in `default`, but an unnamed `selectProjectIfRequired`
-      // picks whichever project the dropdown lists first — and the backend
-      // rejects the save with "Service account(s) not found in this project"
-      // whenever those differ. The weak URL guard used to hide that 422.
-      await selectProjectIfRequired(app, project?.name)
       await app.getByPlaceholder('Workflow name').fill(workflowName)
       await clickSaveAndWait(app)
 
@@ -201,7 +197,11 @@ test.describe('Webhook Trigger', () => {
 
     const project = await ensureProject(app)
     const sa = await createServiceAccountViaApi(app, buildUniqueName('sa-webhook'))
-    await app.goto(toAppUrl('/workflow-builder/new'))
+    // Pin the workflow to the service account's own project. `ensureProject`
+    // puts the account in `default`, and the backend rejects the save with
+    // "Service account(s) not found in this project" if the workflow lands in
+    // any other project.
+    await openNewWorkflowBuilder(app, { projectName: project?.name })
 
     try {
       // Add webhook trigger
@@ -217,12 +217,6 @@ test.describe('Webhook Trigger', () => {
       await closeStepEditorPanel(app)
 
       // Save workflow
-      // Pin the workflow to the service account's own project. `ensureProject`
-      // puts the account in `default`, but an unnamed `selectProjectIfRequired`
-      // picks whichever project the dropdown lists first — and the backend
-      // rejects the save with "Service account(s) not found in this project"
-      // whenever those differ. The weak URL guard used to hide that 422.
-      await selectProjectIfRequired(app, project?.name)
       await app.getByPlaceholder('Workflow name').fill(workflowName)
       await clickSaveAndWait(app)
 

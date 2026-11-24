@@ -7,6 +7,7 @@ import {
   buildUniqueName,
   fillCodeEditor,
   closeStepEditorPanel,
+  openNewWorkflowBuilder,
 } from '../helpers/workflows'
 import { apiRequest } from '../utils/api'
 
@@ -38,7 +39,7 @@ test.describe('Approval Workflow Creation', () => {
 
     try {
       // Step 1: Navigate to workflow builder (new workflow)
-      await app.goto(toAppUrl('/workflow-builder/new'))
+      await openNewWorkflowBuilder(app)
 
       // Step 2: Add Manual Trigger
       await addManualTrigger(app, 'Manual Start')

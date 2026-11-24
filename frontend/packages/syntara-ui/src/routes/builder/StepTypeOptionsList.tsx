@@ -10,8 +10,10 @@ import {
   StackItem,
   Title,
 } from '@patternfly/react-core'
+import { RhUiLockIcon } from '@patternfly/react-icons'
 import type { CSSProperties } from 'react'
 
+import { DisabledWithTooltip } from '../../components/DisabledWithTooltip'
 import { SynPanel } from '../../components/layout/SynPanel'
 import { AAP_STEP_IDS, RegistryStepId } from '../../constants/registryStepIds'
 import { renderStepIcon } from '../workflows/canvas/nodes/renderStepIcon'
@@ -21,7 +23,15 @@ import type { StepSubtypeDefinition, StepTypeDefinition } from './registry/StepR
 import styles from './StepTypeOptionsList.module.css'
 import { resolveIconForType } from './utils/stepIcons'
 
-export type StepTypeOption = Pick<StepTypeDefinition | StepSubtypeDefinition, 'id' | 'label' | 'icon' | 'description'>
+export type StepTypeOption = Pick<
+  StepTypeDefinition | StepSubtypeDefinition,
+  'id' | 'label' | 'icon' | 'description'
+> & {
+  /** Entry is listed but cannot be added (for example a revealed restricted step type); shown padlocked. */
+  isDisabled?: boolean
+  /** Explains why the entry is disabled; shown in a tooltip on hover and focus. */
+  disabledTooltip?: string
+}
 
 type StepTypeOptionsListProps = {
   stepTypes: StepTypeOption[]
@@ -30,6 +40,7 @@ type StepTypeOptionsListProps = {
 
 export function StepTypeOptionsList(props: StepTypeOptionsListProps) {
   return props.stepTypes.map((stepType) => {
+    const isDisabled = stepType.isDisabled === true
     const { icon, id } = resolveIconForType({ stepTypeId: stepType.id })
     const accentColor = getAddStepPanelColor(stepType.id)
     // AAP steps use gray icons (no color tint)
@@ -39,63 +50,78 @@ export function StepTypeOptionsList(props: StepTypeOptionsListProps) {
 
     return (
       <StackItem key={stepType.id}>
-        <SynPanel
-          variant="bordered"
-          isGlass={false}
-          isScrollable={false}
-          onClick={() => props.onSelect(stepType.id)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault()
-              props.onSelect(stepType.id)
-            }
-          }}
-          className={accentColor ? styles.stepTypeOption : undefined}
-          style={{
-            cursor: 'pointer',
-            ...(accentColor ? ({ '--step-type-accent': accentColor } as CSSProperties) : {}),
-          }}
-          role="button"
-          tabIndex={0}
-          aria-label={stepType.label}
-        >
-          <Stack hasGutter>
-            <StackItem>
-              <Split hasGutter>
-                <SplitItem isFilled={false} style={{ width: '2rem', flexShrink: 0 }}>
-                  {stepIcon}
-                </SplitItem>
-                <SplitItem isFilled>
-                  <Flex
-                    alignItems={{ default: 'alignItemsCenter' }}
-                    gap={{ default: 'gapSm' }}
-                    flexWrap={{ default: 'nowrap' }}
-                  >
-                    <FlexItem flex={{ default: 'flexNone' }}>
-                      <Title headingLevel="h3" size="md">
-                        {stepType.label}
-                      </Title>
-                    </FlexItem>
-                    {stepType.id === RegistryStepId.ACTION_SCRIPT && (
-                      <FlexItem>
-                        <Label isCompact color="orange" style={{ fontSize: 'var(--pf-t--global--font--size--sm)' }}>
-                          Developer Preview
-                        </Label>
+        <DisabledWithTooltip isDisabled={isDisabled} content={stepType.disabledTooltip ?? ''} position="left">
+          <SynPanel
+            variant="bordered"
+            isGlass={false}
+            isScrollable={false}
+            onClick={isDisabled ? undefined : () => props.onSelect(stepType.id)}
+            onKeyDown={(e) => {
+              if (isDisabled) return
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault()
+                props.onSelect(stepType.id)
+              }
+            }}
+            className={accentColor ? styles.stepTypeOption : undefined}
+            style={{
+              cursor: isDisabled ? 'not-allowed' : 'pointer',
+              ...(isDisabled ? { opacity: 0.5 } : {}),
+              ...(accentColor ? ({ '--step-type-accent': accentColor } as CSSProperties) : {}),
+            }}
+            role="button"
+            tabIndex={0}
+            aria-label={stepType.label}
+            aria-disabled={isDisabled || undefined}
+          >
+            <Stack hasGutter>
+              <StackItem>
+                <Split hasGutter>
+                  <SplitItem isFilled={false} style={{ width: '2rem', flexShrink: 0 }}>
+                    {stepIcon}
+                  </SplitItem>
+                  <SplitItem isFilled>
+                    <Flex
+                      alignItems={{ default: 'alignItemsCenter' }}
+                      gap={{ default: 'gapSm' }}
+                      flexWrap={{ default: 'nowrap' }}
+                    >
+                      <FlexItem flex={{ default: isDisabled ? 'flex_1' : 'flexNone' }} style={{ minWidth: 0 }}>
+                        <Title headingLevel="h3" size="md">
+                          {stepType.label}
+                        </Title>
                       </FlexItem>
-                    )}
-                  </Flex>
-                </SplitItem>
-              </Split>
-            </StackItem>
-            <StackItem>
-              {stepType.description && (
-                <Content data-testid="step-type-description" component={ContentVariants.small}>
-                  {stepType.description}
-                </Content>
-              )}
-            </StackItem>
-          </Stack>
-        </SynPanel>
+                      {stepType.id === RegistryStepId.ACTION_SCRIPT && (
+                        <FlexItem>
+                          <Label isCompact color="orange" style={{ fontSize: 'var(--pf-t--global--font--size--sm)' }}>
+                            Developer Preview
+                          </Label>
+                        </FlexItem>
+                      )}
+                      {isDisabled && (
+                        <FlexItem
+                          flex={{ default: 'flexNone' }}
+                          aria-hidden="true"
+                          data-testid="step-type-lock-icon"
+                          style={{ color: 'var(--pf-t--global--icon--color--disabled)' }}
+                        >
+                          <RhUiLockIcon />
+                        </FlexItem>
+                      )}
+                    </Flex>
+                  </SplitItem>
+                </Split>
+              </StackItem>
+              <StackItem>
+                {stepType.description && (
+                  <Content data-testid="step-type-description" component={ContentVariants.small}>
+                    {stepType.description}
+                  </Content>
+                )}
+              </StackItem>
+            </Stack>
+          </SynPanel>
+        </DisabledWithTooltip>
       </StackItem>
     )
   })

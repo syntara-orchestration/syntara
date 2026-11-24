@@ -1,4 +1,5 @@
-import { getErrorCode, isValidationError } from '../../utils/apiErrors'
+import { getErrorCode, getErrorMessage, isValidationError } from '../../utils/apiErrors'
+import { isNodeKindWriteDeniedError } from '../../utils/nodeKindDenials'
 
 export const IMPORT_NAME_CONFLICT_MESSAGE = 'Name conflict: A workflow with this name already exists in the project.'
 
@@ -14,6 +15,7 @@ function isInvalidFormatApiError(error: unknown): boolean {
 
 /** Maps API import failures to user-friendly messages without exposing raw backend details. */
 export function getImportWorkflowApiErrorMessage(error: unknown): string {
+  if (isNodeKindWriteDeniedError(error)) return getErrorMessage(error)
   const code = getErrorCode(error)
 
   if (code === 'WORKFLOW_NAME_CONFLICT') {

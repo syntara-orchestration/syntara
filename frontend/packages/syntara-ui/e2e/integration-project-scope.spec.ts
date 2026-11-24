@@ -6,8 +6,8 @@
  * scoped to other projects are excluded.
  */
 import { type Page } from './fixtures'
-import { test, expect, toAppUrl } from './fixtures'
-import { buildUniqueName, clickAddConnectedStep } from './helpers/workflows'
+import { test, expect } from './fixtures'
+import { buildUniqueName, clickAddConnectedStep, openNewWorkflowBuilder } from './helpers/workflows'
 import {
   assignIntegrationProjectViaApi,
   createIntegrationViaApi,
@@ -18,17 +18,13 @@ import {
 import { apiRequest, ensureProject, getAuthToken } from './utils/api'
 
 /**
- * Navigate to a fresh workflow builder, select a project by name,
+ * Navigate to a fresh workflow builder, select a project by name in the "Select a project" modal,
  * add a manual trigger, then add a Task Agent node and open the
  * tool selector dropdown. Returns the tool options listbox locator.
  */
 async function openAgentToolSelector(app: Page, projectName: string) {
-  await app.goto(toAppUrl('/workflow-builder/new'))
+  await openNewWorkflowBuilder(app, { projectName })
   await expect(app.getByRole('heading', { name: 'Select a trigger step' })).toBeVisible()
-
-  const projectToggle = app.getByPlaceholder(/All projects|Select a project/)
-  await projectToggle.click()
-  await app.getByRole('option', { name: projectName }).click()
 
   await app.getByRole('button', { name: 'Manual trigger' }).click()
   await app.getByRole('textbox', { name: 'Name', exact: true }).fill('Manual trigger')

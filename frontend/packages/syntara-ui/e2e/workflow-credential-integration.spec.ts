@@ -1,5 +1,5 @@
 import { type Page } from './fixtures'
-import { test, expect, toAppUrl } from './fixtures'
+import { test, expect } from './fixtures'
 import {
   fillCredentialSecret,
   deleteCredentialByName,
@@ -9,7 +9,7 @@ import {
   waitForCredentialTypeSelectReady,
   ensureInlineCredentialProjectSelected,
 } from './helpers/credentials'
-import { buildUniqueName, clickAddConnectedStep, selectProjectIfRequired } from './helpers/workflows'
+import { buildUniqueName, clickAddConnectedStep, openNewWorkflowBuilder } from './helpers/workflows'
 import { ensureProject } from './utils/api'
 
 /**
@@ -20,10 +20,9 @@ import { ensureProject } from './utils/api'
  */
 async function navigateToApiActionForm(app: Page) {
   const project = await ensureProject(app)
-  await app.goto(toAppUrl('/workflow-builder/new'))
+  // Inline CredentialFormModal takes defaultProjectId from the workflow's project.
+  await openNewWorkflowBuilder(app, { projectName: project?.name })
   await expect(app.getByRole('heading', { name: 'Select a trigger step' })).toBeVisible()
-
-  await selectProjectIfRequired(app, project?.name)
 
   await app.getByRole('button', { name: 'Manual trigger' }).click()
   await app.getByRole('textbox', { name: 'Name', exact: true }).fill('Manual trigger')
@@ -36,8 +35,6 @@ async function navigateToApiActionForm(app: Page) {
 
   await expect(app.getByRole('textbox', { name: 'Name', exact: true })).toBeVisible()
   await credentialsLoaded
-  // Inline CredentialFormModal needs defaultProjectId from the builder header project.
-  await selectProjectIfRequired(app, project?.name)
   const credToggle = app.getByRole('button', { name: 'Authentication credential', exact: true })
   // The CredentialSelector re-queries when projectId populates (initial fetch without project_id,
   // then a second fetch with project_id). Use 30s to cover both fetches.

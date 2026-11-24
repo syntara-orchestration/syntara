@@ -294,6 +294,19 @@ describe('useBuilderSaveWorkflow', () => {
     )
   })
 
+  it('keeps blocked step types in the save error and leaves the workflow unsaved', async () => {
+    const detail = "You can't save workflow: Script (write denied)."
+    const updateWorkflow = vi.fn((...args: Parameters<UpdateWorkflow>) => {
+      detachPromise(args[1]?.onError?.({ cause: { code: 'NODE_KIND_WRITE_DENIED', detail } }))
+    }) as MockedFunction<UpdateWorkflow>
+    const showError = vi.fn()
+    const { result } = renderHook(() =>
+      useBuilderSaveWorkflow(buildParams({ workflowId: 'w1', isNew: false, updateWorkflow, showError }))
+    )
+    await expect(result.current()).resolves.toBe(false)
+    expect(showError).toHaveBeenCalledWith(expect.objectContaining({ description: expectStringContaining(detail) }))
+  })
+
   it('returns false when save succeeds with warnings and blockOnWarnings is true', async () => {
     const showWarning = vi.fn()
     const onVersionUpdated = vi.fn()
