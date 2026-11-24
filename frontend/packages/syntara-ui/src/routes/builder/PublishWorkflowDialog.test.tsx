@@ -107,10 +107,11 @@ describe('PublishWorkflowDialog', () => {
     expect(screen.getByText('Breaking output contract changes')).toBeInTheDocument()
     expect(
       screen.getByText(
-        'Output changes: Child trigger: Removed output: release_tag. Published parent workflows will use the updated child version on their next run.'
+        'This version removes the output “release_tag”. Published parent workflows will use the updated child version on their next run.'
       )
     ).toBeInTheDocument()
-    expect(screen.getByText('Child trigger: Removed output: release_tag')).not.toBeVisible()
+    expect(screen.getByRole('heading', { level: 2, name: 'Breaking output contract changes' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'View output change details' })).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Publish anyway' }))
 
     expect(onConfirmContractChanges).toHaveBeenCalledWith(expect.stringMatching(/\w+ \d+, \d{4}/), undefined)
@@ -154,12 +155,10 @@ describe('PublishWorkflowDialog', () => {
 
     expect(
       screen.getByText(
-        'Output changes: Child trigger: Added optional output: release.notes. Published parent workflows will use the updated child version on their next run.'
+        'This version adds the optional output “release.notes”. Published parent workflows will use the updated child version on their next run.'
       )
     ).toBeInTheDocument()
-    expect(screen.getByText('Child trigger: Added optional output: release.notes')).not.toBeVisible()
-    expect(screen.getByText('1 visible published parent workflow')).toBeInTheDocument()
-    expect(screen.getByText(/The count includes only parent workflows visible to you/)).toBeInTheDocument()
+    expect(screen.getByText('Used by 1 visible published workflow')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /view visible parent workflows/i })).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Publish with changes' }))
     expect(onConfirmContractChanges).toHaveBeenCalledWith(expect.stringMatching(/\w+ \d+, \d{4}/), undefined)

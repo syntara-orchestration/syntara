@@ -12,17 +12,26 @@ const contractChanges = [
     changes: [
       {
         change_type: 'removed_output',
-        field_path: 'release.tag',
-        description: 'Removed output: release.tag',
+        field_path: 'legacy_status',
+        old_type: 'string',
+        description: 'Removed output: legacy_status',
         is_breaking: true,
       },
       {
-        change_type: 'removed_output',
-        field_path: 'release.url',
-        description: 'Removed output: release.url',
-        is_breaking: true,
+        change_type: 'mapping_changed',
+        field_path: 'legacy_status',
+        description: 'Changed the source mapping for output: legacy_status',
+        is_breaking: false,
       },
     ],
+  },
+]
+
+const breakingChanges = [
+  {
+    trigger_id: 'child_trigger',
+    trigger_name: 'Child invocation',
+    changes: [contractChanges[0].changes[0]],
   },
 ]
 
@@ -44,30 +53,28 @@ const parentWorkflows = [
 ]
 
 describe('OutputContractChangeSummary', () => {
-  it('summarizes output and parent impact inline with expandable field details', async () => {
-    const user = userEvent.setup()
+  it('summarizes a breaking removal without repeating its mapping change', async () => {
     const { container } = render(
       <OutputContractChangeSummary
         context="publish"
         contractChanges={contractChanges}
+        breakingChanges={breakingChanges}
+        hasBreakingChanges
         parentWorkflows={parentWorkflows}
       />
     )
 
     expect(
       screen.getByText(
-        'Output changes: Child invocation: Removed output: release.tag; Child invocation: Removed output: release.url. Published parent workflows will use the updated child version on their next run.'
+        'This version removes the output “legacy_status”. Published parent workflows will use the updated child version on their next run.'
       )
     ).toBeInTheDocument()
-    expect(screen.getByText('1 visible published parent workflow')).toBeInTheDocument()
-    expect(screen.getByText(/The count includes only parent workflows visible to you/)).toBeInTheDocument()
-    expect(screen.getByText('Child invocation: Removed output: release.tag')).not.toBeVisible()
+    expect(screen.getByText('Used by 1 visible published workflow')).toBeInTheDocument()
+    expect(screen.queryByText(/source mapping/i)).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'View output change details' })).not.toBeInTheDocument()
+    expect(screen.queryByText(/The count includes only parent workflows visible to you/)).not.toBeInTheDocument()
     expect(screen.queryByRole('dialog', { name: 'Visible published parent workflows' })).not.toBeInTheDocument()
     expect(await axe(container)).toHaveNoViolations()
-
-    await user.click(screen.getByRole('button', { name: 'View all 2 output changes' }))
-    expect(screen.getByText('Child invocation: Removed output: release.tag')).toBeInTheDocument()
-    expect(screen.getByText('Child invocation: Removed output: release.url')).toBeInTheDocument()
   })
 
   it('does not show parent references for a draft-only save', () => {
@@ -77,14 +84,14 @@ describe('OutputContractChangeSummary', () => {
 
     expect(
       screen.getByText(
-        /Output changes: Child invocation: Removed output: release.tag; Child invocation: Removed output: release.url. Saving updates this draft only; published parent workflows continue using the latest published child version./
+        /This draft removes the output “legacy_status”. Saving updates this draft only; published parent workflows continue using the latest published child version./
       )
     ).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /visible parent workflows/i })).not.toBeInTheDocument()
     expect(screen.queryByText(/Deploy parent/)).not.toBeInTheDocument()
   })
 
-  it('shows trigger-removal details in the inline disclosure', async () => {
+  it('shows old and new output types in the inline disclosure', async () => {
     const user = userEvent.setup()
     render(
       <OutputContractChangeSummary
@@ -95,25 +102,44 @@ describe('OutputContractChangeSummary', () => {
             trigger_name: 'Child trigger',
             changes: [
               {
-                change_type: 'removed_trigger',
-                field_path: 'child_trigger',
-                description: 'Removed SubWorkflow Trigger: child_trigger',
+                change_type: 'type_change',
+                field_path: 'release.version',
+                old_type: 'string',
+                new_type: 'integer',
+                description: 'Type changed: release.version (string → integer)',
                 is_breaking: true,
               },
             ],
           },
         ]}
+        breakingChanges={[
+          {
+            trigger_id: 'child_trigger',
+            trigger_name: 'Child trigger',
+            changes: [
+              {
+                change_type: 'type_change',
+                field_path: 'release.version',
+                old_type: 'string',
+                new_type: 'integer',
+                description: 'Type changed: release.version (string → integer)',
+                is_breaking: true,
+              },
+            ],
+          },
+        ]}
+        hasBreakingChanges
         parentWorkflows={[]}
       />
     )
 
     expect(
       screen.getByText(
-        'Output changes: Child trigger: Removed SubWorkflow Trigger: child_trigger. Published parent workflows will use the updated child version on their next run.'
+        'This version changes the type of the output “release.version”. Published parent workflows will use the updated child version on their next run.'
       )
     ).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'View all 1 output changes' }))
-    expect(screen.getByText('Child trigger: Removed SubWorkflow Trigger: child_trigger')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'View output change details' }))
+    expect(screen.getByText('Child trigger: Type changed: release.version (string → integer)')).toBeInTheDocument()
   })
 
   it('uses visibility-scoped copy when no parent references are returned', () => {

@@ -1,4 +1,15 @@
-import { Alert, Button, Content, Form, Modal, ModalBody, ModalFooter, ModalHeader } from '@patternfly/react-core'
+import {
+  Alert,
+  Button,
+  Content,
+  Form,
+  Modal,
+  ModalBody,
+  ModalFooter,
+  ModalHeader,
+  Stack,
+  StackItem,
+} from '@patternfly/react-core'
 import type { WorkflowAPI } from '@syntara/contracts'
 import { format } from 'date-fns'
 import { useEffect } from 'react'
@@ -84,58 +95,78 @@ export function PublishWorkflowDialog({
     <Modal isOpen={isOpen} onClose={handleClose} variant="small" aria-label="Publish workflow">
       <ModalHeader title="Publish workflow?" />
       <ModalBody>
-        <Content component="p" style={{ marginBottom: 'var(--pf-t--global--spacer--md)' }}>
-          This will override any previously published workflow and your trigger step will now be able to trigger
-          workflow runs. These triggered runs will happen in the background and can be viewed in run history. The
-          previously published workflow can be viewed in version history.
-        </Content>
-        {requiresContractConfirmation && (
-          <Alert
-            variant="warning"
-            isInline
-            title={hasBreakingChanges ? 'Breaking output contract changes' : 'Output contract changes'}
-          >
-            <Content component="p">Review the impact on parent workflows before publishing this version.</Content>
-            <OutputContractChangeSummary
-              context="publish"
-              contractChanges={reviewedContractChanges}
-              parentWorkflows={parentWorkflows}
-            />
-          </Alert>
-        )}
-        {isCheckingContractChanges && (
-          <Alert variant="info" isInline title="Checking published parent impact">
-            Checking how this version may change the outputs used by published parent workflows.
-          </Alert>
-        )}
-        {hasContractReviewError && (
-          <Alert variant="warning" isInline title="Unable to verify output contract changes">
-            <Content component="p">Retry the check before publishing.</Content>
-            {onRetryContractReview && (
-              <Button
-                variant="link"
-                type="button"
-                onClick={onRetryContractReview}
-                isDisabled={isPublishing || isCheckingContractChanges}
+        <Stack hasGutter>
+          <StackItem>
+            <Content component="p">
+              This will override any previously published workflow and your trigger step will now be able to trigger
+              workflow runs. These triggered runs will happen in the background and can be viewed in run history. The
+              previously published workflow can be viewed in version history.
+            </Content>
+          </StackItem>
+          {requiresContractConfirmation && (
+            <StackItem>
+              <Alert
+                variant="warning"
+                isInline
+                component="h2"
+                title={hasBreakingChanges ? 'Breaking output contract changes' : 'Output contract changes'}
               >
-                Retry check
-              </Button>
-            )}
-          </Alert>
-        )}
-        <Form onSubmit={handleSubmit(onSubmit)} id="publish-workflow-form">
-          <SynForm form={form}>
-            <SynTextField name="name" label="Version name" fieldId="publish-name" isRequired ariaLabel="Version name" />
-            <SynTextAreaField
-              name="description"
-              label="Description"
-              fieldId="publish-description"
-              placeholder="Describe what changed"
-              rows={4}
-              ariaLabel="Description"
-            />
-          </SynForm>
-        </Form>
+                <OutputContractChangeSummary
+                  context="publish"
+                  contractChanges={reviewedContractChanges}
+                  breakingChanges={breakingChanges}
+                  hasBreakingChanges={hasBreakingChanges}
+                  parentWorkflows={parentWorkflows}
+                />
+              </Alert>
+            </StackItem>
+          )}
+          {isCheckingContractChanges && (
+            <StackItem>
+              <Alert variant="info" isInline component="h2" title="Checking published parent impact">
+                Checking how this version may change the outputs used by published parent workflows.
+              </Alert>
+            </StackItem>
+          )}
+          {hasContractReviewError && (
+            <StackItem>
+              <Alert variant="warning" isInline component="h2" title="Unable to verify output contract changes">
+                <Content component="p">Retry the check before publishing.</Content>
+                {onRetryContractReview && (
+                  <Button
+                    variant="link"
+                    type="button"
+                    onClick={onRetryContractReview}
+                    isDisabled={isPublishing || isCheckingContractChanges}
+                  >
+                    Retry check
+                  </Button>
+                )}
+              </Alert>
+            </StackItem>
+          )}
+          <StackItem>
+            <Form onSubmit={handleSubmit(onSubmit)} id="publish-workflow-form">
+              <SynForm form={form}>
+                <SynTextField
+                  name="name"
+                  label="Version name"
+                  fieldId="publish-name"
+                  isRequired
+                  ariaLabel="Version name"
+                />
+                <SynTextAreaField
+                  name="description"
+                  label="Description"
+                  fieldId="publish-description"
+                  placeholder="Describe what changed"
+                  rows={4}
+                  ariaLabel="Description"
+                />
+              </SynForm>
+            </Form>
+          </StackItem>
+        </Stack>
       </ModalBody>
       <ModalFooter>
         <Button
