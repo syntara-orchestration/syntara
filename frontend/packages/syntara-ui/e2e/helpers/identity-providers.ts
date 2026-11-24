@@ -40,7 +40,7 @@ export async function gotoIdentityProviderDetail(
   if (tab === 'group-mapping') {
     await expect(app.getByRole('tab', { name: /Group mapping/i })).toHaveAttribute('aria-selected', 'true')
     await expect(
-      app.getByRole('button', { name: /Add manually/i }).or(app.getByRole('button', { name: /Edit group mapping/i }))
+      app.getByRole('button', { name: /Add manually/i }).or(app.getByRole('link', { name: /Edit group mapping/i }))
     ).toBeVisible({ timeout: 15_000 })
   }
 }
@@ -93,7 +93,7 @@ export async function enterGroupMappingEditMode(app: Page): Promise<void> {
   if (fromEmptyState) {
     await addManually.click()
   } else {
-    await app.getByRole('button', { name: /Edit group mapping/i }).click()
+    await app.getByRole('link', { name: /Edit group mapping/i }).click()
   }
   const expectedHeading = fromEmptyState ? 'Add group mapping' : 'Edit group mapping'
   await expect(app.getByRole('heading', { level: 1, name: expectedHeading })).toBeVisible()
