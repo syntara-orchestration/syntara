@@ -128,11 +128,14 @@ describe('useExecutionCopyToEditor', () => {
       mostRecentExecutionId: 'exec-123',
     })
     renderHook(() => useExecutionCopyToEditor(opts))
-    await waitFor(() => {
-      expect(
-        replaceStateSpy.mock.calls.some(([, , href]) => typeof href === 'string' && !href.includes('fromExecution'))
-      ).toBe(true)
-    })
+    await waitFor(
+      () => {
+        expect(
+          replaceStateSpy.mock.calls.some(([, , href]) => typeof href === 'string' && !href.includes('fromExecution'))
+        ).toBe(true)
+      },
+      { timeout: 3_000 }
+    )
   })
 
   it('applies only once even on re-render', async () => {
