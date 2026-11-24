@@ -132,6 +132,32 @@ describe('useBuilderWorkflowLifecycle', () => {
     await waitFor(() => expect(loadWorkflowWithEdges).toHaveBeenCalledTimes(1))
   })
 
+  it('syncs metadata without INIT_WORKFLOW when copy-to-editor is pending', async () => {
+    const workflow = {
+      id: 'wf-1',
+      version: { workflow_definition: { nodes: [] } },
+    } as unknown as WorkflowWithVersion
+    const dispatch = vi.fn()
+    renderHook(() =>
+      useBuilderWorkflowLifecycle(
+        createDeps({
+          isNew: false,
+          workflowId: 'wf-1',
+          workflow,
+          dispatch,
+          pendingExecutionCopy: true,
+        })
+      )
+    )
+    await waitFor(() => {
+      expect(dispatch).toHaveBeenCalledWith({
+        type: 'SET_WORKFLOW_NAME',
+        payload: 'processed',
+      })
+    })
+    expect(dispatch).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'INIT_WORKFLOW' }) as BuilderAction)
+  })
+
   it('loads existing workflow via processExistingWorkflow when version is present', async () => {
     const workflow = {
       id: 'wf-1',

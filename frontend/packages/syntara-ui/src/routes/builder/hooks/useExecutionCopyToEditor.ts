@@ -29,23 +29,34 @@ export function useExecutionCopyToEditor({
   showSuccess,
 }: UseExecutionCopyToEditorOptions): void {
   const contentReplacedForExecutionRef = useRef<string | null>(null)
+  const latchedExecutionCopyRef = useRef<ExecutionCopyData | undefined>(undefined)
   const currentWorkflow = useWorkflowStore((s) => s.currentWorkflow)
 
-  const reducerSynced =
-    !!executionCopy && mostRecentExecutionId != null && mostRecentExecutionId === executionCopy.executionId
-
   useEffect(() => {
-    if (!executionCopy) {
-      contentReplacedForExecutionRef.current = null
+    if (executionCopy) {
+      latchedExecutionCopyRef.current = executionCopy
     }
   }, [executionCopy])
 
+  const activeExecutionCopy = executionCopy ?? latchedExecutionCopyRef.current
+
+  const reducerSynced =
+    !!activeExecutionCopy &&
+    mostRecentExecutionId != null &&
+    mostRecentExecutionId === activeExecutionCopy.executionId
+
   useEffect(() => {
-    if (!executionCopy || !currentWorkflow || !isWorkflowInitialized) return
+    if (!activeExecutionCopy && !mostRecentExecutionId) {
+      contentReplacedForExecutionRef.current = null
+    }
+  }, [activeExecutionCopy, mostRecentExecutionId])
+
+  useEffect(() => {
+    if (!activeExecutionCopy || !currentWorkflow || !isWorkflowInitialized) return
     if (reducerSynced) return
 
-    const copy = executionCopy
-    // Macrotask so lifecycle INIT (microtask) always runs first; still re-applies when INIT clears the run id.
+    const copy = activeExecutionCopy
+    // Macrotask so lifecycle init (microtask) finishes before we pin the run panel.
     const timer = window.setTimeout(() => {
       const workflowAtApply = useWorkflowStore.getState().currentWorkflow
       if (!workflowAtApply) return
@@ -85,9 +96,17 @@ export function useExecutionCopyToEditor({
       })
     }, 0)
     return () => window.clearTimeout(timer)
-  }, [executionCopy, currentWorkflow, isWorkflowInitialized, reducerSynced, dispatch, markDirty, showSuccess])
+  }, [
+    activeExecutionCopy,
+    currentWorkflow,
+    isWorkflowInitialized,
+    reducerSynced,
+    dispatch,
+    markDirty,
+    showSuccess,
+  ])
 
-  // Clear query params after reducer sync; delay so copy can re-apply if INIT clears the run id first.
+  // Clear query params after reducer sync; delay so copy can re-apply if run id was cleared mid-flight.
   useEffect(() => {
     if (!reducerSynced) return
     const timer = window.setTimeout(() => {
@@ -96,6 +115,9 @@ export function useExecutionCopyToEditor({
       url.searchParams.delete('fromExecution')
       url.searchParams.delete('linkExecution')
       window.history.replaceState({}, '', url.pathname + url.search)
+      window.setTimeout(() => {
+        latchedExecutionCopyRef.current = undefined
+      }, 500)
     }, 2_000)
     return () => window.clearTimeout(timer)
   }, [reducerSynced])

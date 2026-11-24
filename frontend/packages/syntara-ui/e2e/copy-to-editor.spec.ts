@@ -63,6 +63,7 @@ async function confirmCopyToEditorInBuilder(app: Page) {
   await expect(app).toHaveURL(/\/workflow-builder\//, { timeout: 30_000 })
   await waitForUIReady(app)
   await expect(app.locator('.react-flow')).toBeVisible({ timeout: 30_000 })
+  await expect(app.getByText('Run copied to editor')).toBeVisible({ timeout: 60_000 })
   await expect(async () => {
     await expect(app.getByRole('heading', { name: /run details/i })).toBeVisible()
   }).toPass({ timeout: 120_000, intervals: [2_000] })

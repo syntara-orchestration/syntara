@@ -101,10 +101,16 @@ export function useBuilderWorkflowLifecycle(options: {
 
       queueMicrotask(() => {
         loadWorkflowWithEdges(flattenedWorkflow, generatedEdges, nodePositions, workflow.project_id ?? null)
-        dispatch({
-          type: 'INIT_WORKFLOW',
-          payload: { ...initPayload, initialViewVersion, preserveMostRecentRun: pendingExecutionCopy },
-        })
+        if (pendingExecutionCopy) {
+          // Fresh reducer on copy navigation — metadata only; INIT_WORKFLOW clears pinned run state.
+          dispatch({ type: 'SET_WORKFLOW_NAME', payload: initPayload.name })
+          dispatch({ type: 'SET_WORKFLOW_DESCRIPTION', payload: initPayload.description })
+        } else {
+          dispatch({
+            type: 'INIT_WORKFLOW',
+            payload: { ...initPayload, initialViewVersion },
+          })
+        }
         hasLoadedRef.current = true
         setIsWorkflowInitialized(true)
       })
