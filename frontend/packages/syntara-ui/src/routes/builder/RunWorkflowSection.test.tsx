@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
@@ -187,11 +187,14 @@ describe('RunWorkflowSection', () => {
       expect(screen.getByRole('button', { name: /^Run$/i })).toHaveAttribute('aria-disabled', 'true')
     })
 
-    it('disables the multi-trigger toggle when validationErrorCount is greater than zero', () => {
+    it('explains why the multi-trigger menu is blocked to keyboard users', async () => {
+      const user = userEvent.setup()
+      const dispatch = vi.fn()
       render(
         <RunWorkflowSection
           {...defaultProps}
           validationErrorCount={1}
+          dispatch={dispatch}
           triggers={[
             { id: 'trigger-1', name: 'Manual' },
             { id: 'trigger-2', name: 'Webhook' },
@@ -199,19 +202,47 @@ describe('RunWorkflowSection', () => {
         />
       )
 
-      expect(screen.getByRole('button', { name: /Run workflow/i })).toBeDisabled()
+      const toggle = screen.getByRole('button', { name: 'Run workflow' })
+      await user.tab()
+
+      expect(toggle).toHaveFocus()
+      expect(toggle).toHaveAttribute('aria-disabled', 'true')
+      expect(await screen.findByRole('tooltip')).toHaveTextContent('Resolve validation issue before running')
+      await user.keyboard('{Enter} ')
+      await user.click(toggle)
+      expect(toggle).toHaveAttribute('aria-expanded', 'false')
+      expect(dispatch).not.toHaveBeenCalled()
     })
   })
 
   describe('click behavior', () => {
-    it('dispatches SET_CONFIRM_DIALOG when enabled and clicked', async () => {
+    it('closes the multi-trigger menu when run permission is revoked', async () => {
+      const user = userEvent.setup()
+      const props = {
+        ...defaultProps,
+        triggers: [...defaultProps.triggers, { id: 'trigger-2', name: 'Webhook' }],
+      }
+      const { rerender } = render(<RunWorkflowSection {...props} />)
+      await user.click(screen.getByRole('button', { name: 'Run workflow' }))
+      expect(await screen.findByRole('menuitem', { name: 'Webhook' })).toBeVisible()
+
+      rerender(<RunWorkflowSection {...props} builderPermissions={{ ...defaultPermissions, canRun: false }} />)
+
+      expect(screen.getByRole('button', { name: 'Run workflow' })).toHaveAttribute('aria-expanded', 'false')
+      await waitFor(() => expect(screen.queryByRole('menuitem', { name: 'Webhook' })).not.toBeInTheDocument())
+    })
+
+    it('opens confirmation for the only trigger', async () => {
       const user = userEvent.setup()
       const dispatch = vi.fn()
       render(<RunWorkflowSection {...defaultProps} dispatch={dispatch} />)
 
       await user.click(screen.getByRole('button', { name: /^Run$/i }))
 
-      expect(dispatch).toHaveBeenCalledWith({ type: 'SET_CONFIRM_DIALOG', payload: true })
+      expect(dispatch).toHaveBeenCalledWith({
+        type: 'OPEN_RUN_DIALOG',
+        payload: { triggerId: defaultProps.triggers[0]?.id, readOnly: false },
+      })
     })
 
     it('does not dispatch when disabled and clicked', async () => {

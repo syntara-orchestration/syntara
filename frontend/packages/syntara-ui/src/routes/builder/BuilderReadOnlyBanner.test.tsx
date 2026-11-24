@@ -1,18 +1,52 @@
 import { render, screen } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import userEvent from '@testing-library/user-event'
+import { describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 
 import { BuilderReadOnlyBanner } from './BuilderReadOnlyBanner'
 
 describe('BuilderReadOnlyBanner', () => {
-  it('renders nothing when canEdit is true', () => {
-    const { container } = render(<BuilderReadOnlyBanner canEdit={true} isLoading={false} isBuiltin={false} />)
-    expect(container).toBeEmptyDOMElement()
+  it('keeps an empty status region mounted when editing is available', () => {
+    render(<BuilderReadOnlyBanner canEdit={true} isLoading={false} isBuiltin={false} />)
+    expect(screen.getByRole('status')).toBeEmptyDOMElement()
   })
 
-  it('renders nothing when isLoading is true', () => {
-    const { container } = render(<BuilderReadOnlyBanner canEdit={false} isLoading={true} isBuiltin={false} />)
-    expect(container).toBeEmptyDOMElement()
+  it('keeps the status region quiet while the permission check is pending', () => {
+    render(<BuilderReadOnlyBanner canEdit={false} isLoading={true} isBuiltin={false} />)
+    expect(screen.getByRole('status')).toBeEmptyDOMElement()
+  })
+
+  it('announces denial, check failure, and recovery through the same region without changing focus', async () => {
+    const user = userEvent.setup()
+    function content(canEdit: boolean, isLoading: boolean, permissionCheckError = false) {
+      return (
+        <>
+          <button type="button">Inspect workflow</button>
+          <BuilderReadOnlyBanner
+            canEdit={canEdit}
+            isLoading={isLoading}
+            isBuiltin={false}
+            permissionCheckError={permissionCheckError}
+          />
+        </>
+      )
+    }
+    const { rerender } = render(content(true, false))
+    const status = screen.getByRole('status')
+    await user.tab()
+
+    rerender(content(false, true))
+    expect(status).toBeEmptyDOMElement()
+    rerender(content(false, false))
+    expect(status).toHaveTextContent('Editing is unavailable.')
+    rerender(content(false, false, true))
+    expect(status).toHaveTextContent('Unable to check step-type permissions.')
+    rerender(content(false, true))
+    expect(status).toBeEmptyDOMElement()
+    rerender(content(true, false))
+    expect(status).toHaveTextContent('Editing access restored.')
+    expect(screen.getByRole('status')).toBe(status)
+    expect(screen.getByRole('button', { name: 'Inspect workflow' })).toHaveFocus()
   })
 
   it('renders builtin title when isBuiltin is true', () => {
@@ -39,6 +73,45 @@ describe('BuilderReadOnlyBanner', () => {
     ).toBeInTheDocument()
   })
 
+  it('lists blocked step display names without policy details', () => {
+    render(
+      <BuilderReadOnlyBanner
+        canEdit={false}
+        isLoading={false}
+        isBuiltin={false}
+        blockedStepTypes={[
+          { kind: 'script', label: 'Script' },
+          { kind: 'http_request', label: 'REST API' },
+        ]}
+      />
+    )
+
+    expect(screen.getByText('You are viewing this workflow in read-only mode.')).toBeInTheDocument()
+    expect(
+      screen.getByText(
+        "This workflow includes Script, REST API steps, but your assigned policies don't allow you to write them."
+      )
+    ).toBeInTheDocument()
+  })
+
+  it('offers a retry action when permission checks fail', async () => {
+    const user = userEvent.setup()
+    const onRetryPermissionCheck = vi.fn()
+    render(
+      <BuilderReadOnlyBanner
+        canEdit={false}
+        isLoading={false}
+        isBuiltin={false}
+        permissionCheckError
+        onRetryPermissionCheck={onRetryPermissionCheck}
+      />
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Retry permission check' }))
+
+    expect(onRetryPermissionCheck).toHaveBeenCalledOnce()
+  })
+
   it('has no accessibility violations when showing builtin banner', async () => {
     const { container } = render(<BuilderReadOnlyBanner canEdit={false} isLoading={false} isBuiltin={true} />)
     expect(await axe(container)).toHaveNoViolations()
@@ -46,6 +119,28 @@ describe('BuilderReadOnlyBanner', () => {
 
   it('has no accessibility violations when showing read-only banner', async () => {
     const { container } = render(<BuilderReadOnlyBanner canEdit={false} isLoading={false} isBuiltin={false} />)
+    expect(await axe(container)).toHaveNoViolations()
+  })
+  it('shows an info alert with the Script explanation instead of policy details', async () => {
+    const { container } = render(
+      <BuilderReadOnlyBanner
+        canEdit={false}
+        isLoading={false}
+        isBuiltin={false}
+        blockedStepTypes={[
+          {
+            kind: 'script',
+            label: 'Script',
+          },
+        ]}
+      />
+    )
+    expect(screen.getByText('Info alert:')).toBeInTheDocument()
+    expect(screen.getByText('You are viewing this workflow in read-only mode.')).toBeInTheDocument()
+    expect(
+      screen.getByText("This workflow includes Script steps, but your assigned policies don't allow you to write them.")
+    ).toBeInTheDocument()
+    expect(screen.queryByText(/step_type:write|step-type-readonly-denied/)).not.toBeInTheDocument()
     expect(await axe(container)).toHaveNoViolations()
   })
 })

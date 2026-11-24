@@ -145,7 +145,10 @@ describe('BuilderEditorToolbar', () => {
 
     await user.click(screen.getByRole('button', { name: /^Run$/i }))
 
-    expect(dispatch).toHaveBeenCalledWith({ type: 'SET_CONFIRM_DIALOG', payload: true })
+    expect(dispatch).toHaveBeenCalledWith({
+      type: 'OPEN_RUN_DIALOG',
+      payload: { triggerId: 'trigger-1', readOnly: false },
+    })
   })
 
   it('renders workflow details in kebab menu', () => {
@@ -492,11 +495,13 @@ describe('BuilderEditorToolbar', () => {
       await user.click(screen.getByRole('button', { name: /Run workflow/i }))
       await user.click(screen.getByRole('menuitem', { name: 'HTTP Webhook' }))
 
-      expect(dispatch).toHaveBeenCalledWith({ type: 'SET_SELECTED_TRIGGER', payload: 0 })
-      expect(dispatch).toHaveBeenCalledWith({ type: 'SET_CONFIRM_DIALOG', payload: true })
+      expect(dispatch).toHaveBeenCalledWith({
+        type: 'OPEN_RUN_DIALOG',
+        payload: { triggerId: 'trigger-1', readOnly: false },
+      })
     })
 
-    it('disables run dropdown when canRun is false', () => {
+    it('marks the run dropdown aria-disabled when canRun is false', () => {
       render(
         <BuilderEditorToolbar
           {...multiTriggerProps}
@@ -504,7 +509,7 @@ describe('BuilderEditorToolbar', () => {
         />
       )
 
-      expect(screen.getByRole('button', { name: /Run workflow/i })).toBeDisabled()
+      expect(screen.getByRole('button', { name: /Run workflow/i })).toHaveAttribute('aria-disabled', 'true')
     })
 
     it('uses fallback name for triggers without a name', async () => {
@@ -669,7 +674,7 @@ describe('BuilderEditorToolbar', () => {
 
     await user.click(screen.getByRole('button', { name: /^Run$/i }))
 
-    expect(dispatch).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'SET_CONFIRM_DIALOG' }))
+    expect(dispatch).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'OPEN_RUN_DIALOG' }))
   })
 
   it('shows permission-denied tooltip on Save when canEdit is false', async () => {

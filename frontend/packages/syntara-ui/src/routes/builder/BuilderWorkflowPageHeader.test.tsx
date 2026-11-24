@@ -488,6 +488,32 @@ describe('BuilderWorkflowPageHeader', () => {
     expect(onRestoreVersion).toHaveBeenCalledTimes(1)
   })
 
+  it('keeps blocked Restore version focusable and prevents activation', async () => {
+    const user = userEvent.setup()
+    const onRestoreVersion = vi.fn()
+    const reason = 'You can’t restore this version because you don’t have permission to edit Wait steps.'
+    render(
+      <BuilderWorkflowPageHeader
+        {...baseProps}
+        isViewingVersion
+        onExitVersionView={vi.fn()}
+        onRestoreVersion={onRestoreVersion}
+        isRestoreDisabled
+        restoreTooltip={reason}
+      />
+    )
+
+    const restore = screen.getByRole('button', { name: 'Restore version' })
+    expect(restore).toHaveAttribute('aria-disabled', 'true')
+    screen.getByRole('button', { name: 'Back to editor' }).focus()
+    await user.tab({ shift: true })
+    expect(restore).toHaveFocus()
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(reason)
+    await user.keyboard('{Enter}[Space]')
+    await user.click(restore)
+    expect(onRestoreVersion).not.toHaveBeenCalled()
+  })
+
   it('hides Restore version button when onRestoreVersion is not provided', () => {
     render(
       <BuilderWorkflowPageHeader

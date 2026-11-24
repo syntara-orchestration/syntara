@@ -6,6 +6,18 @@ import { axe } from 'vitest-axe'
 import { VersionHistoryPanel } from './VersionHistoryPanel'
 import type { VersionStatus } from './VersionStatusBadge'
 
+vi.mock('../workflows/useStepTypePermissions', () => ({
+  getStepTypePermissionMessage: () => 'Step-type permission is required.',
+  getStepTypesFromDefinition: () => [],
+  useStepTypePermissions: () => ({
+    canAuthor: true,
+    blockedStepTypes: [],
+    isChecking: false,
+    isError: false,
+    retry: vi.fn().mockResolvedValue(undefined),
+  }),
+}))
+
 vi.mock('../../components/table/PaginationFooter', () => ({
   PaginationFooter: ({ total, perPage }: { total: number; perPage: number }) => (
     <div data-testid="pagination-footer">{`1 - ${perPage} of ${total}`}</div>
@@ -142,7 +154,7 @@ describe('VersionHistoryPanel', () => {
     await user.click(kebabButtons[0])
     await user.click(screen.getByText('Restore version'))
 
-    expect(defaultProps.onRestoreVersion).toHaveBeenCalledWith(3, '2026-05-19T21:59:00.000Z')
+    expect(defaultProps.onRestoreVersion).toHaveBeenCalledWith(defaultProps.versions[0])
   })
 
   it('calls onExportVersion via kebab menu', async () => {
@@ -505,7 +517,7 @@ describe('VersionHistoryPanel', () => {
     await user.click(kebabButtons[2])
     await user.click(screen.getByText('Restore version'))
 
-    expect(defaultProps.onRestoreVersion).toHaveBeenCalledWith(1, '2026-05-12T21:59:00.000Z')
+    expect(defaultProps.onRestoreVersion).toHaveBeenCalledWith(defaultProps.versions[2])
   })
 
   it('calls onExportVersion for non-first version via kebab', async () => {

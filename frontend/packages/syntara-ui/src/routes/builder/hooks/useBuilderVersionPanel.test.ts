@@ -1,16 +1,39 @@
+import type { WorkflowAPI } from '@syntara/contracts'
 import { renderHook, act } from '@testing-library/react'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 
 import { useBuilderVersionPanel } from './useBuilderVersionPanel'
 
-const mockRestoreDialogOpen = vi.fn()
-const mockRestoreDialogClose = vi.fn()
+type MockRestoreDialogItem = { version: number; dateTime: string; definition: Record<string, unknown> }
+const viewedDefinition = { name: 'Historical version', nodes: [], triggers: [] }
+const rowVersion = {
+  id: 'ver-1',
+  workflow_id: 'wf-1',
+  version: 1,
+  schema_version: '2.0.0',
+  status: 'draft',
+  created_at: '2026-01-01T00:00:00Z',
+  updated_at: '2026-01-01T00:00:00Z',
+  workflow_definition: { name: 'History row version', nodes: [], triggers: [] },
+} satisfies WorkflowAPI.components['schemas']['WorkflowVersionRead']
+const mockRestoreDialogOpen = vi.fn<(item: MockRestoreDialogItem) => void>()
+const mockRestoreDialogClose = vi.fn<() => void>()
 const mockRefetch = vi.fn().mockResolvedValue({})
 const mockExportVersion = vi.fn()
 const mockOpenInNewWindow = vi.fn()
 const mockPublishVersion = vi.fn()
 const mockHandleExitVersionView = vi.fn()
 const mockHandleConfirmRestore = vi.fn()
+let mockRestoreDialogItem: MockRestoreDialogItem | null = null
+let mockRestoreDialogIsOpen = false
+mockRestoreDialogOpen.mockImplementation((item) => {
+  mockRestoreDialogItem = item
+  mockRestoreDialogIsOpen = true
+})
+mockRestoreDialogClose.mockImplementation(() => {
+  mockRestoreDialogIsOpen = false
+  mockRestoreDialogItem = null
+})
 
 let mockIsDirty = false
 vi.mock('../../../stores/useWorkflowStore', () => ({
@@ -26,7 +49,10 @@ let mockViewedVersionDate: string | null = null
 const mockUpdateVersionMetadata = vi.fn()
 vi.mock('./useBuilderVersionHistory', () => ({
   useBuilderVersionHistory: () => ({
-    filteredVersions: [],
+    filteredVersions: [1, 2, 3].map((version) => ({
+      version,
+      workflow_definition: { nodes: [], triggers: [] },
+    })) as never,
     statusFilter: [],
     setStatusFilter: vi.fn(),
     exportVersion: mockExportVersion,
@@ -35,11 +61,12 @@ vi.mock('./useBuilderVersionHistory', () => ({
     isViewingVersion: mockIsViewingVersion,
     viewedVersionDate: mockViewedVersionDate,
     viewedVersionStatus: null,
+    viewedVersionDefinition: viewedDefinition,
     handleExitVersionView: mockHandleExitVersionView,
     handleConfirmRestore: mockHandleConfirmRestore,
     restoreDialog: {
-      isOpen: false,
-      item: null,
+      isOpen: mockRestoreDialogIsOpen,
+      item: mockRestoreDialogItem,
       open: mockRestoreDialogOpen,
       close: mockRestoreDialogClose,
     },
@@ -57,6 +84,18 @@ vi.mock('./useBuilderVersionHistory', () => ({
       onNext: vi.fn(),
       onPerPageChange: vi.fn(),
     },
+  }),
+}))
+
+let mockBlockedStepTypes: { kind: string; label: string }[] = []
+vi.mock('../../workflows/useStepTypePermissions', () => ({
+  getStepTypesFromDefinition: () => [],
+  useStepTypePermissions: () => ({
+    canAuthor: mockBlockedStepTypes.length === 0,
+    blockedStepTypes: mockBlockedStepTypes,
+    isChecking: false,
+    isError: false,
+    retry: vi.fn().mockResolvedValue(undefined),
   }),
 }))
 
@@ -78,16 +117,30 @@ function createParams(overrides: Record<string, unknown> = {}) {
     onClearExecutionFilters: vi.fn(),
     executedVersionNumbers: new Map(),
     onDuplicateVersion: vi.fn(),
+    canEdit: true,
+    canCreate: true,
+    saveTooltip: 'You cannot save changes to this workflow.',
     ...overrides,
   }
 }
 
 describe('useBuilderVersionPanel', () => {
   beforeEach(() => {
+    mockBlockedStepTypes = []
     vi.clearAllMocks()
     mockIsDirty = false
     mockIsViewingVersion = false
     mockViewedVersionDate = null
+    mockRestoreDialogItem = null
+    mockRestoreDialogIsOpen = false
+    mockRestoreDialogOpen.mockImplementation((item) => {
+      mockRestoreDialogItem = item
+      mockRestoreDialogIsOpen = true
+    })
+    mockRestoreDialogClose.mockImplementation(() => {
+      mockRestoreDialogItem = null
+      mockRestoreDialogIsOpen = false
+    })
   })
 
   it('returns isViewingVersion from inner hook', () => {
@@ -275,6 +328,7 @@ describe('useBuilderVersionPanel', () => {
       version: 1,
       name: 'Release 1.0',
       change_description: 'Initial',
+      workflow_definition: { nodes: [], triggers: [] },
     }
 
     act(() => {
@@ -297,16 +351,6 @@ describe('useBuilderVersionPanel', () => {
     })
 
     expect(onDuplicateVersion).toHaveBeenCalledWith(mockVersion)
-  })
-
-  it('onRestoreVersion calls restoreDialog.open with version and dateTime', () => {
-    const { result } = renderHook(() => useBuilderVersionPanel(createParams()))
-
-    act(() => {
-      result.current.versionSidePanel.onRestoreVersion(2, '2026-05-19T14:30:00.000Z')
-    })
-
-    expect(mockRestoreDialogOpen).toHaveBeenCalledWith({ version: 2, dateTime: '2026-05-19T14:30:00.000Z' })
   })
 
   it('onClose dispatches SET_VERSION_HISTORY_OPEN false', () => {
@@ -339,7 +383,13 @@ describe('useBuilderVersionPanel', () => {
 
   it('editDialog.onSave calls updateVersionMetadata and closes dialog', () => {
     const { result } = renderHook(() => useBuilderVersionPanel(createParams()))
-    const mockVersion = { id: 'ver-1', version: 2, name: 'Old', change_description: 'Old Desc' }
+    const mockVersion = {
+      id: 'ver-1',
+      version: 2,
+      name: 'Old',
+      change_description: 'Old Desc',
+      workflow_definition: { nodes: [], triggers: [] },
+    }
 
     act(() => {
       result.current.versionSidePanel.onEditVersion(mockVersion as never)
@@ -356,7 +406,13 @@ describe('useBuilderVersionPanel', () => {
 
   it('editDialog.onClose closes the dialog', () => {
     const { result } = renderHook(() => useBuilderVersionPanel(createParams()))
-    const mockVersion = { id: 'ver-1', version: 1, name: null, change_description: null }
+    const mockVersion = {
+      id: 'ver-1',
+      version: 1,
+      name: null,
+      change_description: null,
+      workflow_definition: { nodes: [], triggers: [] },
+    }
 
     act(() => {
       result.current.versionSidePanel.onEditVersion(mockVersion as never)
@@ -413,12 +469,30 @@ describe('useBuilderVersionPanel', () => {
     expect(mockRestoreDialogClose).toHaveBeenCalled()
   })
 
-  it('restoreDialog.onConfirm calls handleConfirmRestore', () => {
-    const { result } = renderHook(() => useBuilderVersionPanel(createParams()))
+  it('checks the clicked history row before confirming restore', () => {
+    const params = createParams()
+    const { result, rerender } = renderHook((currentParams) => useBuilderVersionPanel(currentParams), {
+      initialProps: params,
+    })
 
     act(() => {
-      result.current.versionSidePanel.onRestoreVersion(1, '2026-01-01T00:00:00Z')
+      result.current.versionSidePanel.onRestoreVersion(rowVersion)
     })
+    expect(mockRestoreDialogOpen).toHaveBeenCalledWith({
+      version: 1,
+      dateTime: '2026-01-01T00:00:00Z',
+      definition: rowVersion.workflow_definition,
+    })
+
+    mockBlockedStepTypes = [{ kind: 'wait', label: 'Wait' }]
+    rerender(params)
+    expect(result.current.versionSidePanel.restoreDialog.canConfirm).toBe(false)
+    act(() => result.current.versionSidePanel.restoreDialog.onConfirm())
+    expect(mockHandleConfirmRestore).not.toHaveBeenCalled()
+
+    mockBlockedStepTypes = []
+    rerender(params)
+    expect(result.current.versionSidePanel.restoreDialog.canConfirm).toBe(true)
 
     act(() => {
       result.current.versionSidePanel.restoreDialog.onConfirm()
@@ -521,16 +595,38 @@ describe('useBuilderVersionPanel', () => {
     expect(typeof result.current.openRestoreDialogForCurrentVersion).toBe('function')
   })
 
-  it('openRestoreDialogForCurrentVersion calls restoreDialog.open', () => {
+  it('explains the historical denial and guards opening the restore dialog', () => {
     mockIsViewingVersion = true
     mockViewedVersionDate = '2026-05-19T14:30:00.000Z'
-    const { result } = renderHook(() => useBuilderVersionPanel(createParams({ viewingVersion: 5 })))
+    mockBlockedStepTypes = [{ kind: 'wait', label: 'Wait' }]
+    const { result } = renderHook(() => useBuilderVersionPanel(createParams({ viewingVersion: 2 })))
+
+    expect(result.current.canRestoreSelectedVersion).toBe(false)
+    expect(result.current.restoreTooltip).toContain('permission to edit Wait steps')
+    act(() => result.current.openRestoreDialogForCurrentVersion?.())
+    expect(mockRestoreDialogOpen).not.toHaveBeenCalled()
+  })
+
+  it('can restore the viewed version when it is absent from filtered history', () => {
+    mockIsViewingVersion = true
+    mockViewedVersionDate = '2026-05-19T14:30:00.000Z'
+    const params = createParams({ viewingVersion: 5 })
+    const { result, rerender } = renderHook(() => useBuilderVersionPanel(params))
 
     act(() => {
       result.current.openRestoreDialogForCurrentVersion?.()
     })
 
-    expect(mockRestoreDialogOpen).toHaveBeenCalledWith({ version: 5, dateTime: '2026-05-19T14:30:00.000Z' })
+    expect(mockRestoreDialogOpen).toHaveBeenCalledWith({
+      version: 5,
+      dateTime: '2026-05-19T14:30:00.000Z',
+      definition: viewedDefinition,
+    })
+    rerender()
+    expect(result.current.versionSidePanel.restoreDialog.permissionCheckLoading).toBe(false)
+    expect(result.current.versionSidePanel.restoreDialog.canConfirm).toBe(true)
+    act(() => result.current.versionSidePanel.restoreDialog.onConfirm())
+    expect(mockHandleConfirmRestore).toHaveBeenCalledOnce()
   })
 
   it('onSelectVersion dispatches directly when isDirty but isViewingVersion', () => {
@@ -547,7 +643,7 @@ describe('useBuilderVersionPanel', () => {
     expect(result.current.versionSidePanel.saveBeforeViewDialog.isOpen).toBe(false)
   })
 
-  it('saveBeforeViewDialog.onSave does not set version when save fails', async () => {
+  it('keeps the save-before-view dialog open when saving fails', async () => {
     mockIsDirty = true
     const dispatch = vi.fn()
     const handleSaveWorkflow = vi.fn().mockResolvedValue(false)
@@ -562,6 +658,29 @@ describe('useBuilderVersionPanel', () => {
     })
 
     expect(dispatch).not.toHaveBeenCalledWith({ type: 'SET_VIEWING_VERSION', payload: 5 })
+    expect(result.current.versionSidePanel.saveBeforeViewDialog.isOpen).toBe(true)
+  })
+
+  it('blocks saving after permission is revoked while keeping the pending version available', async () => {
+    mockIsDirty = true
+    const params = createParams()
+    const { result, rerender } = renderHook((options) => useBuilderVersionPanel(options), { initialProps: params })
+
+    act(() => result.current.versionSidePanel.onSelectVersion(5))
+    rerender({ ...params, canEdit: false })
+    await act(async () => {
+      await result.current.versionSidePanel.saveBeforeViewDialog.onSave()
+    })
+
+    expect(result.current.versionSidePanel.saveBeforeViewDialog).toMatchObject({
+      isOpen: true,
+      canSave: false,
+      saveTooltip: params.saveTooltip,
+    })
+    expect(params.handleSaveWorkflow).not.toHaveBeenCalled()
+    expect(params.dispatch).not.toHaveBeenCalled()
+    act(() => result.current.versionSidePanel.saveBeforeViewDialog.onViewWithoutSaving())
+    expect(params.dispatch).toHaveBeenCalledWith({ type: 'SET_VIEWING_VERSION', payload: 5 })
   })
 
   it('editDialog.onSave is a no-op when no item is selected', () => {

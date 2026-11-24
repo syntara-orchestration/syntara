@@ -11,6 +11,9 @@ import { formatDateTime } from '../../../utils/dateUtils'
 import { detachPromise } from '../../../utils/detachPromise'
 import type { BuilderAction } from '../builderReducer'
 import { DEFAULT_MAX_WAIT_SECONDS, fetchMaxWaitDuration } from '../step-forms/useMaxWaitDuration'
+import type { EdgeConnection } from '../types/edge'
+import { hasTriggerId } from '../utils/hasTriggerId'
+import type { parseImportedDefinition } from '../utils/parseImportedDefinition'
 import { validateMinimumWorkflow } from '../utils/validation/rules/validateMinimumWorkflow'
 import { validateWorkflow } from '../utils/validation/validateWorkflow'
 import type { ConflictInfo } from '../VersionConflictDialog'
@@ -25,6 +28,13 @@ type CheckVersionConflictBeforeRunOptions = {
   loadedVersionCreatedAt?: string | null
 }
 
+async function fetchLatestWorkflow(workflowId: string) {
+  const { data } = await workflowFetchClient.GET('/workflows/{workflow_id}', {
+    params: { path: { workflow_id: workflowId } },
+  })
+  return data
+}
+
 async function checkVersionConflictBeforeRun({
   workflowId,
   loadedVersion,
@@ -32,9 +42,7 @@ async function checkVersionConflictBeforeRun({
   loadedVersionName,
   loadedVersionCreatedAt,
 }: CheckVersionConflictBeforeRunOptions): Promise<boolean> {
-  const { data: latest } = await workflowFetchClient.GET('/workflows/{workflow_id}', {
-    params: { path: { workflow_id: workflowId } },
-  })
+  const latest = await fetchLatestWorkflow(workflowId)
   const serverVersion = latest?.current_version ?? latest?.version?.version
   if (serverVersion != null && serverVersion > loadedVersion) {
     onRunConflict({
@@ -49,6 +57,96 @@ async function checkVersionConflictBeforeRun({
     return true
   }
   return false
+}
+
+async function stopForVersionConflict(options: {
+  workflowId: string
+  loadedVersion: number | null
+  skipPreflightCheck: boolean
+  onRunConflict?: (info: ConflictInfo) => void
+  loadedVersionName?: string | null
+  loadedVersionCreatedAt?: string | null
+  dispatch: Dispatch<BuilderAction>
+}): Promise<boolean> {
+  if (options.loadedVersion === null || options.skipPreflightCheck || !options.onRunConflict) return false
+  const hasConflict = await checkVersionConflictBeforeRun({
+    workflowId: options.workflowId,
+    loadedVersion: options.loadedVersion,
+    onRunConflict: options.onRunConflict,
+    loadedVersionName: options.loadedVersionName,
+    loadedVersionCreatedAt: options.loadedVersionCreatedAt,
+  })
+  if (hasConflict) options.dispatch({ type: 'SET_CONFIRM_DIALOG', payload: false })
+  return hasConflict
+}
+
+async function saveBeforeWorkflowRun(
+  isReadOnly: boolean,
+  handleSaveWorkflow: UseBuilderToolbarHandlersOptions['handleSaveWorkflow'],
+  dispatch: Dispatch<BuilderAction>
+): Promise<boolean> {
+  if (isReadOnly) return true
+  try {
+    const saved = await handleSaveWorkflow({ blockOnWarnings: true })
+    if (!saved) dispatch({ type: 'SET_CONFIRM_DIALOG', payload: false })
+    return saved
+  } catch {
+    dispatch({ type: 'SET_CONFIRM_DIALOG', payload: false })
+    return false
+  }
+}
+
+type WorkflowRunState = {
+  workflow: WorkflowDefinition
+  edges: EdgeConnection[]
+}
+
+const SAVED_VERSION_CHECK_FAILED = 'Could not check the saved workflow version. Try running again.'
+
+async function getSavedRunError({
+  workflowId,
+  savedVersion,
+  runState,
+  triggerNodeId,
+  refreshSavedWorkflow,
+}: {
+  workflowId: string
+  savedVersion: number | undefined
+  runState: WorkflowRunState
+  triggerNodeId: string | undefined
+  refreshSavedWorkflow?: () => Promise<unknown>
+}): Promise<string | undefined> {
+  if (savedVersion === undefined) return 'No saved workflow version is available.'
+  if (!hasTriggerId(runState.workflow.triggers, triggerNodeId)) {
+    return 'Select a trigger from the saved workflow.'
+  }
+  try {
+    const latest = await fetchLatestWorkflow(workflowId)
+    const serverVersion = latest?.current_version ?? latest?.version?.version
+    if (serverVersion === savedVersion) return undefined
+    if (serverVersion != null) {
+      await refreshSavedWorkflow?.()
+      return 'The saved workflow changed. Open Run again to use the latest version.'
+    }
+  } catch {
+    // Fall through to the shared failure message below.
+  }
+  return SAVED_VERSION_CHECK_FAILED
+}
+
+async function getWorkflowRunValidationError({ workflow, edges }: WorkflowRunState): Promise<string | null> {
+  const activities = workflow.workflow.activities
+  const triggers = workflow.triggers
+  const minimumValidation = validateMinimumWorkflow(activities, edges, triggers)
+  if (minimumValidation.length > 0) {
+    return minimumValidation.map((error) => error.message).join('\n• ')
+  }
+  const validationResult = validateWorkflow(activities, edges, { triggers })
+  if (!validationResult.valid) {
+    return `Workflow validation failed:\n• ${validationResult.errors.map((error) => error.message).join('\n• ')}`
+  }
+  const waitErrors = await validateWaitNodeDurations(activities)
+  return waitErrors.length > 0 ? waitErrors.join('\n• ') : null
 }
 
 type ExecuteWorkflowMutate = (
@@ -86,6 +184,12 @@ export type UseBuilderToolbarHandlersOptions = {
   loadedVersionName?: string | null
   loadedVersionCreatedAt?: string | null
   onRunConflict?: (info: ConflictInfo) => void
+  isReadOnly?: boolean
+  savedRunState?: ReturnType<typeof parseImportedDefinition>
+  savedVersion?: number
+  refreshSavedWorkflow?: () => Promise<unknown>
+  canRun?: boolean
+  canDelete?: boolean
 }
 
 /**
@@ -110,6 +214,12 @@ export function useBuilderToolbarHandlers({
   loadedVersionName,
   loadedVersionCreatedAt,
   onRunConflict,
+  isReadOnly = false,
+  savedRunState,
+  savedVersion,
+  refreshSavedWorkflow,
+  canRun = true,
+  canDelete = true,
 }: UseBuilderToolbarHandlersOptions) {
   const handleRunWorkflow = useCallback(
     async (
@@ -117,70 +227,57 @@ export function useBuilderToolbarHandlers({
       triggerNodeId?: string,
       runOptions?: { skipPreflightCheck?: boolean }
     ) => {
-      if (!workflow?.id) return
+      if (!workflow?.id || !canRun) return
 
-      if (loadedVersion != null && !runOptions?.skipPreflightCheck && onRunConflict) {
-        const hasConflict = await checkVersionConflictBeforeRun({
+      if (
+        !isReadOnly &&
+        (await stopForVersionConflict({
           workflowId: workflow.id,
           loadedVersion,
+          skipPreflightCheck: runOptions?.skipPreflightCheck === true,
           onRunConflict,
           loadedVersionName,
           loadedVersionCreatedAt,
+          dispatch,
+        }))
+      )
+        return
+
+      // Auto-layout positions do not mark dirty, so editable runs always save.
+      if (!(await saveBeforeWorkflowRun(isReadOnly, handleSaveWorkflow, dispatch))) return
+
+      const runState = isReadOnly
+        ? savedRunState && { workflow: savedRunState.workflowDef, edges: savedRunState.edges }
+        : currentWorkflow && { workflow: currentWorkflow, edges: useWorkflowStore.getState().edges }
+      if (!runState) {
+        showError({
+          title: 'Cannot run workflow',
+          description: isReadOnly ? 'No saved workflow definition is available' : 'No workflow data available',
         })
-        if (hasConflict) {
+        dispatch({ type: 'SET_CONFIRM_DIALOG', payload: false })
+        return
+      }
+
+      const validationError = await getWorkflowRunValidationError(runState)
+      if (validationError) {
+        showError({ title: 'Cannot run workflow', description: validationError })
+        dispatch({ type: 'SET_CONFIRM_DIALOG', payload: false })
+        return
+      }
+
+      if (isReadOnly) {
+        const savedRunError = await getSavedRunError({
+          workflowId: workflow.id,
+          savedVersion,
+          runState,
+          triggerNodeId,
+          refreshSavedWorkflow,
+        })
+        if (savedRunError) {
+          showError({ title: 'Cannot run workflow', description: savedRunError })
           dispatch({ type: 'SET_CONFIRM_DIALOG', payload: false })
           return
         }
-      }
-
-      // Always save before running to ensure node positions are persisted.
-      // Auto-layout positions don't mark isDirty, so we save unconditionally.
-      // blockOnWarnings prevents execution when stale tools were auto-cleared.
-      try {
-        const saved = await handleSaveWorkflow({ blockOnWarnings: true })
-        if (!saved) {
-          dispatch({ type: 'SET_CONFIRM_DIALOG', payload: false })
-          return
-        }
-      } catch {
-        dispatch({ type: 'SET_CONFIRM_DIALOG', payload: false })
-        return
-      }
-
-      // Validate workflow has minimum requirements to run (after save)
-      if (!currentWorkflow) {
-        showError({ title: 'Cannot run workflow', description: 'No workflow data available' })
-        dispatch({ type: 'SET_CONFIRM_DIALOG', payload: false })
-        return
-      }
-
-      const edges = useWorkflowStore.getState().edges
-      const activities = currentWorkflow.workflow.activities
-      const triggers = currentWorkflow.triggers
-
-      // Check minimum workflow requirements (trigger + node + connection)
-      const minimumValidation = validateMinimumWorkflow(activities, edges, triggers)
-      if (minimumValidation.length > 0) {
-        const errorMessages = minimumValidation.map((error) => error.message).join('\n• ')
-        showError({ title: 'Cannot run workflow', description: `${errorMessages}` })
-        dispatch({ type: 'SET_CONFIRM_DIALOG', payload: false })
-        return
-      }
-
-      // Check all other validation rules (dangling nodes, invalid connections, etc.)
-      const validationResult = validateWorkflow(activities, edges, { triggers })
-      if (!validationResult.valid) {
-        const errorMessages = validationResult.errors.map((error) => error.message).join('\n• ')
-        showError({ title: 'Cannot run workflow', description: `Workflow validation failed:\n• ${errorMessages}` })
-        dispatch({ type: 'SET_CONFIRM_DIALOG', payload: false })
-        return
-      }
-
-      const waitErrors = await validateWaitNodeDurations(activities)
-      if (waitErrors.length > 0) {
-        showError({ title: 'Cannot run workflow', description: waitErrors.join('\n• ') })
-        dispatch({ type: 'SET_CONFIRM_DIALOG', payload: false })
-        return
       }
 
       executeWorkflow(
@@ -221,11 +318,16 @@ export function useBuilderToolbarHandlers({
       loadedVersionName,
       loadedVersionCreatedAt,
       onRunConflict,
+      isReadOnly,
+      savedRunState,
+      savedVersion,
+      refreshSavedWorkflow,
+      canRun,
     ]
   )
 
   const handleDeleteWorkflow = useCallback(() => {
-    if (!workflow?.id) return
+    if (!canDelete || !workflow?.id) return
 
     deleteWorkflow(
       { params: { path: { workflow_id: workflow.id } } },
@@ -244,7 +346,7 @@ export function useBuilderToolbarHandlers({
         },
       }
     )
-  }, [workflow, workflowName, deleteWorkflow, showSuccess, showError, setLocation, dispatch])
+  }, [canDelete, workflow, workflowName, deleteWorkflow, showSuccess, showError, setLocation, dispatch])
 
   const handleToggleDetails = useCallback(() => {
     dispatch({ type: 'TOGGLE_DETAILS' })

@@ -1,7 +1,7 @@
 import { renderHook } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 
-import { useIsVersionView } from './VersionViewContext'
+import { StepFormReadOnlyContext, useIsStepFormReadOnly, useIsVersionView } from './VersionViewContext'
 import { VersionViewProvider } from './VersionViewProvider'
 
 describe('VersionViewContext', () => {
@@ -40,5 +40,17 @@ describe('VersionViewContext', () => {
     currentValue = true
     rerender()
     expect(result.current).toBe(true)
+  })
+
+  it('locks step forms without marking the workflow as a historical version', () => {
+    const { result } = renderHook(() => ({ isVersionView: useIsVersionView(), isReadOnly: useIsStepFormReadOnly() }), {
+      wrapper: ({ children }) => (
+        <StepFormReadOnlyContext.Provider value>
+          <VersionViewProvider value={false}>{children}</VersionViewProvider>
+        </StepFormReadOnlyContext.Provider>
+      ),
+    })
+
+    expect(result.current).toEqual({ isVersionView: false, isReadOnly: true })
   })
 })

@@ -5,6 +5,7 @@ import { describe, expect, it, vi, beforeEach, type MockedFunction } from 'vites
 import { useWorkflowStore } from '../../../stores/useWorkflowStore'
 import type { WorkflowDefinition } from '../../../stores/workflowStoreTypes'
 import { expectStringContaining } from '../../../test/test-helpers'
+import { parseImportedDefinition } from '../utils/parseImportedDefinition'
 
 import type { UseBuilderToolbarHandlersOptions } from './useBuilderToolbarHandlers'
 import { useBuilderToolbarHandlers } from './useBuilderToolbarHandlers'
@@ -27,6 +28,7 @@ vi.mock('../../../stores/useWorkflowStore', () => ({
     getState: vi.fn(),
     temporal: { getState: vi.fn(() => ({ clear: vi.fn() })) },
   },
+  getActivityMetadata: vi.fn(() => undefined),
 }))
 
 type ExecuteWorkflow = UseBuilderToolbarHandlersOptions['executeWorkflow']
@@ -343,6 +345,56 @@ describe('useBuilderToolbarHandlers', () => {
 
     expect(handleSaveWorkflow).toHaveBeenCalledTimes(1)
     expect(executeWorkflow).toHaveBeenCalledTimes(1)
+  })
+
+  it.each(['current', 'newer', 'unsaved trigger'] as const)('handles the %s saved run case', async (scenario) => {
+    const handleSaveWorkflow = vi.fn().mockResolvedValue(true)
+    const executeWorkflow = vi.fn()
+    const refreshSavedWorkflow = vi.fn().mockResolvedValue(undefined)
+    const showError = vi.fn()
+    const savedRunState = parseImportedDefinition({
+      triggers: [{ id: 'trigger-1', type: 'manual', parameters: {} }],
+      nodes: [{ id: 'task-1', type: 'action', name: 'Saved task', parameters: {} }],
+      edges: [{ from: 'trigger-1', to: 'task-1' }],
+    })
+    mockWorkflowFetchClientGET.mockResolvedValueOnce({
+      data: { current_version: scenario === 'newer' ? 2 : 1 },
+    })
+
+    const { result } = renderHook(() =>
+      useBuilderToolbarHandlers(
+        buildOptions({
+          isReadOnly: true,
+          savedRunState,
+          savedVersion: 1,
+          refreshSavedWorkflow,
+          showError,
+          handleSaveWorkflow,
+          executeWorkflow,
+          currentWorkflow: null,
+        })
+      )
+    )
+
+    const triggerId = scenario === 'unsaved trigger' ? 'local-only' : 'trigger-1'
+    await result.current.handleRunWorkflow({ saved: true }, triggerId)
+
+    expect(handleSaveWorkflow).not.toHaveBeenCalled()
+    if (scenario === 'current') {
+      expect(executeWorkflow).toHaveBeenCalledWith(
+        { body: { workflow_id: 'wf-1', trigger_node_id: 'trigger-1', input_data: { saved: true } } },
+        expect.anything()
+      )
+      expect(refreshSavedWorkflow).not.toHaveBeenCalled()
+    } else {
+      expect(executeWorkflow).not.toHaveBeenCalled()
+      expect(showError).toHaveBeenCalledWith(
+        expect.objectContaining({
+          description: expectStringContaining(scenario === 'newer' ? 'saved workflow changed' : 'Select a trigger'),
+        })
+      )
+      expect(refreshSavedWorkflow).toHaveBeenCalledTimes(scenario === 'newer' ? 1 : 0)
+    }
   })
 
   it('handleDeleteWorkflow does not call deleteWorkflow when workflow is missing', () => {
@@ -772,5 +824,19 @@ describe('useBuilderToolbarHandlers', () => {
       description: 'Failed to delete workflow "My workflow": delete failed',
     })
     expect(dispatch).toHaveBeenCalledWith({ type: 'SET_DELETE_DIALOG', payload: false })
+  })
+
+  it('shows blocked step types when workflow deletion is denied', () => {
+    const detail = "You can't delete workflow: Script (write denied)."
+    const deleteWorkflow = vi.fn((...args: Parameters<DeleteWorkflow>) => {
+      args[1]?.onError?.({ cause: { code: 'NODE_KIND_WRITE_DENIED', detail } })
+    }) as MockedFunction<DeleteWorkflow>
+    const showError = vi.fn()
+    const { result } = renderHook(() => useBuilderToolbarHandlers(buildOptions({ deleteWorkflow, showError })))
+    result.current.handleDeleteWorkflow()
+    expect(showError).toHaveBeenCalledWith({
+      title: 'Failed to delete workflow',
+      description: `Failed to delete workflow "My workflow": ${detail}`,
+    })
   })
 })

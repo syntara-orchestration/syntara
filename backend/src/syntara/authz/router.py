@@ -105,6 +105,8 @@ class CanIResponse(SQLModel):
     matched_policy: str = Field(title=None, description="Name of the policy that matched")
     denial_reason: str = Field(title=None, description="Reason for denial (empty if allowed)")
     denied_by: str = Field(title=None, description="Name of the deny policy (empty if allowed)")
+    denied_scope: str = Field(default="", title=None, description="Scope of the denying policy statement")
+    denied_project: str = Field(default="", title=None, description="Project of the denying statement or missing grant")
 
 
 class WhoCanRequest(BasePaginatedRequest):
@@ -835,12 +837,27 @@ async def can_i(
         ),
     )
 
+    statement = next(
+        (
+            policy
+            for policy in result.effective_policies
+            if policy.get("name") == result.denied_by
+            and (body.check_any_project or policy.get("project") in (None, "", resource_project))
+        ),
+        {},
+    )
+    denial_reason = result.denial_reason
+    if body.resource_type == "step_type" and not result.allowed and not result.denied and not result.denied_by:
+        denial_reason = "no_matching_allow"
+
     return CanIResponse(
         allowed=result.allowed,
         denied=result.denied,
         matched_policy=result.policy_name(result.matched_policy),
-        denial_reason=result.denial_reason,
-        denied_by=result.policy_name(result.denied_by),
+        denial_reason=denial_reason,
+        denied_by=str(statement.get("policy_name", result.denied_by)),
+        denied_scope=statement.get("scope", ""),
+        denied_project=(statement.get("project") or "") if result.denied_by else resource_project,
     )
 
 

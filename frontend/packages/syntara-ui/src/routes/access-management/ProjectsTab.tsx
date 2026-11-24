@@ -17,10 +17,10 @@ import { useTableSort } from '../../hooks/useTableSort'
 import { useAlerts } from '../../providers/alerts/AlertContext'
 import type { FilterFieldDefinition } from '../../types/filters'
 import { FilterOperatorEnum, FilterTypeEnum } from '../../types/filters'
-import { getErrorMessage } from '../../utils/apiErrors'
 import { detachPromise } from '../../utils/detachPromise'
 import { accessClient } from '../access/accessClient'
 import type { ProjectRead } from '../access/types'
+import { useProjectActions } from '../workflows/useProjectActions'
 
 import { getProjectDetailPath } from './accessManagementPaths'
 import { ProjectFormModal } from './ProjectFormModal'
@@ -158,7 +158,7 @@ export function ProjectsTab() {
   const permissions = useProjectPermissions()
   const deleteDialog = useDialogState<ProjectRead>()
   const formDialog = useDialogState<ProjectRead | null>()
-  const { showAlert } = useAlerts()
+  const { showSuccess, showError } = useAlerts()
 
   const {
     cursor,
@@ -195,37 +195,12 @@ export function ProjectsTab() {
     resetPagination,
   })
 
-  const { mutate: deleteProject } = accessClient.useMutation('delete', '/projects/{project_id}')
-
-  const handleDelete = () => {
-    const project = deleteDialog.item
-    if (!project) return
-    deleteProject(
-      { params: { path: { project_id: project.id ?? '' } } },
-      {
-        onSuccess: () => {
-          showAlert({
-            title: 'Project deleted',
-            description: `Project "${project.name}" has been deleted successfully.`,
-            variant: 'success',
-            autoDismiss: true,
-          })
-          refetch()
-        },
-        onError: (deleteError: unknown) => {
-          showAlert({
-            title: 'Delete failed',
-            description: `Failed to delete project "${project.name}": ${getErrorMessage(deleteError)}`,
-            variant: 'error',
-            autoDismiss: true,
-          })
-        },
-        onSettled: () => {
-          deleteDialog.close()
-        },
-      }
-    )
-  }
+  const { handleDeleteProject } = useProjectActions({
+    showSuccess,
+    showError,
+    onRefetch: refetch,
+    onDeleteSettled: deleteDialog.close,
+  })
 
   return (
     <>
@@ -299,7 +274,7 @@ export function ProjectsTab() {
         projectName={deleteDialog.item?.name}
         isOpen={deleteDialog.isOpen}
         onClose={deleteDialog.close}
-        onConfirm={handleDelete}
+        onConfirm={() => handleDeleteProject(deleteDialog.item)}
       />
     </>
   )

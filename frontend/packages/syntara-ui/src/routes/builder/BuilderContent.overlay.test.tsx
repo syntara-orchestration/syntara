@@ -76,6 +76,17 @@ vi.mock('./useBuilderPermissions', () => ({
   }),
 }))
 
+vi.mock('../workflows/useStepTypePermissions', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../workflows/useStepTypePermissions')>()),
+  useStepTypePermissions: () => ({
+    canAuthor: true,
+    blockedStepTypes: [],
+    isChecking: false,
+    isError: false,
+    retry: vi.fn(),
+  }),
+}))
+
 import { BuilderContent } from './BuilderContent'
 
 type BuilderContentProps = ComponentProps<typeof BuilderContent>

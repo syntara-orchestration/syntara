@@ -196,6 +196,27 @@ When `canEdit` is false, the builder:
 
 This is the correct pattern for editor-style pages where many controls are affected by a single permission. Use inline `DisabledWithTooltip` for pages with a small number of independent actions.
 
+The builder also checks `step_type:write` for every type in the latest saved and published definitions,
+using `resource_project` and `resource_labels.kind`. A denied type or a failed check locks all authoring
+actions. The read-only info banner, permission tooltips, and step editor name the blocked step types
+without policy identifiers, scope, or project details: "This workflow includes Script steps, but your
+assigned policies don't allow you to write them." The same message applies to explicit denials and
+missing allow grants. The frontend formats this wording from blocked step labels; `POST /authz/can_i`
+keeps its original structured denial reasons.
+Failed checks show a retryable permission-check error; historical versions keep
+their previous-version explanation. The canvas and step forms remain available for inspection,
+Run continues to use execution permission, and read-only Run
+does not save local edits first. Workflow-list row checks are deferred until a row menu opens and share
+TanStack Query cache keys by project and kind.
+
+When project deletion is blocked by step-type permissions, all project deletion views show an error
+titled `Cannot delete project "<project name>"`, with the blocked step types in the message:
+"This project includes workflows with Script steps, but your assigned policies don't allow you to
+write them." The shared frontend deletion handler generates the title from the project name and
+the message from the response's structured `blocked_step_types`. Rejected workflow writes use the
+same frontend formatter as permission checks. Other deletion failures and malformed denials keep
+their existing error handling; the frontend does not parse backend error text.
+
 ## Cache Behavior
 
 - `staleTime: Infinity` on all `useCanI` queries — permissions are fetched once per session.
@@ -203,6 +224,7 @@ This is the correct pattern for editor-style pages where many controls are affec
 - After role or assignment mutations: call `invalidateAuthzCaches(queryClient)` from
   `packages/syntara-ui/src/hooks/invalidateAuthzCaches.ts` (invalidates `['authz', 'can_i']`
   and `['all-permissions']`).
+- Workflow step-type checks use the same cache keys with `resource_labels.kind`, stale immediately, and refresh on window focus. They also share results across rows in the same project.
 
 **Trade-off**: `staleTime: Infinity` means permissions revoked server-side won't take effect in a user's browser until cache invalidation or logout. This is intentional — permission checks are high-frequency and low-change, so we trade freshness for reduced API load. Server-side enforcement remains the ultimate authority; the UI cache is a UX optimization, not a security boundary.
 

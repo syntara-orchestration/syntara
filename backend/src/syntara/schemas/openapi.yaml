@@ -28937,6 +28937,16 @@ components:
           type: string
           title: Denied By
           description: Name of the deny policy (empty if allowed)
+        denied_scope:
+          type: string
+          title: Denied Scope
+          description: Scope of the denying policy statement
+          default: ''
+        denied_project:
+          type: string
+          title: Denied Project
+          description: Project of the denying statement or missing grant
+          default: ''
     WhoCanRequest:
       type: object
       title: WhoCanRequest
@@ -35513,6 +35523,14 @@ components:
             - type: integer
             - type: 'null'
           title: Published Version Number
+        step_types:
+          anyOf:
+            - items:
+                type: string
+              type: array
+            - type: 'null'
+          title: Step Types
+          description: Sorted distinct step types in the latest draft and published definition; null when version data is unavailable.
         created_at:
           type: string
           format: date-time
@@ -35609,6 +35627,14 @@ components:
             - type: integer
             - type: 'null'
           title: Published Version Number
+        step_types:
+          anyOf:
+            - items:
+                type: string
+              type: array
+            - type: 'null'
+          title: Step Types
+          description: Sorted distinct step types in the latest draft and published definition; null when version data is unavailable.
         created_at:
           type: string
           format: date-time
@@ -35705,6 +35731,14 @@ components:
             - type: integer
             - type: 'null'
           title: Published Version Number
+        step_types:
+          anyOf:
+            - items:
+                type: string
+              type: array
+            - type: 'null'
+          title: Step Types
+          description: Sorted distinct step types in the latest draft and published definition; null when version data is unavailable.
         created_at:
           type: string
           format: date-time

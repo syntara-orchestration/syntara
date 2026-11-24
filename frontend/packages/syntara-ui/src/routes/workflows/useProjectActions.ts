@@ -4,6 +4,7 @@ import { useCallback } from 'react'
 import type { useAlerts } from '../../providers/alerts/AlertContext'
 import { getErrorMessage } from '../../utils/apiErrors'
 import { detachPromise } from '../../utils/detachPromise'
+import { getNodeKindWriteDeniedMessage } from '../../utils/nodeKindDenials'
 import { accessClient } from '../access/accessClient'
 import type { ProjectRead } from '../access/types'
 
@@ -22,7 +23,7 @@ export function useProjectActions({ showSuccess, showError, onRefetch, onDeleteS
   )
 
   const handleDeleteProject = useCallback(
-    (project: ProjectRead) => {
+    (project: ProjectRead | null) => {
       if (!project?.id) return
 
       deleteProject(
@@ -37,10 +38,18 @@ export function useProjectActions({ showSuccess, showError, onRefetch, onDeleteS
             onRefetch()
           },
           onError: (error: unknown) => {
-            showError({
-              title: 'Delete failed',
-              description: `Failed to delete project "${project.name}": ${getErrorMessage(error)}`,
-            })
+            const denialMessage = getNodeKindWriteDeniedMessage(error, true)
+            if (denialMessage) {
+              showError({
+                title: `Cannot delete project "${project.name}"`,
+                description: getErrorMessage(denialMessage),
+              })
+            } else {
+              showError({
+                title: 'Delete failed',
+                description: `Failed to delete project "${project.name}": ${getErrorMessage(error)}`,
+              })
+            }
           },
           onSettled: () => {
             onDeleteSettled?.()

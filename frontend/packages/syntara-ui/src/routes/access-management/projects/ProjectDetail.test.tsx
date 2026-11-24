@@ -216,6 +216,37 @@ describe('ProjectDetail', () => {
     expect(screen.queryByText('Delete project?')).not.toBeInTheDocument()
   })
 
+  it('formats the project name and blocked step labels when deletion is denied', async () => {
+    const user = userEvent.setup()
+    const deleteMutate = vi.fn()
+    vi.mocked(accessClient.useMutation).mockReturnValue({ mutate: deleteMutate, isPending: false })
+    render(<ProjectDetail />, { wrapper })
+
+    await user.click(screen.getByRole('button', { name: 'Project actions' }))
+    await user.click(screen.getByRole('menuitem', { name: /delete project/i }))
+    await user.click(screen.getByRole('checkbox'))
+    await user.click(screen.getByRole('button', { name: 'Delete project' }))
+    const callbacks = deleteMutate.mock.calls[0][1] as { onError: (error: unknown) => void; onSettled: () => void }
+    const detail =
+      "This project includes workflows with Wait steps, but your assigned policies don't allow you to write them."
+    act(() => {
+      callbacks.onError({
+        cause: {
+          code: 'NODE_KIND_WRITE_DENIED',
+          title: 'Step types not allowed',
+          detail: "You can't delete project: Wait (write denied).",
+          blocked_step_types: [{ kind: 'wait', label: 'Wait', reason: 'explicit_deny' }],
+        },
+      })
+      callbacks.onSettled()
+    })
+
+    expect(screen.getByText('Cannot delete project "Alpha Project"')).toBeInTheDocument()
+    expect(screen.getByText(detail)).toBeInTheDocument()
+    expect(screen.queryByText('Delete project?')).not.toBeInTheDocument()
+    expect(routerTestState.navigate).not.toHaveBeenCalled()
+  })
+
   it('disables delete action in kebab menu when canDelete is false', async () => {
     vi.mocked(useProjectPermissions).mockReturnValue({
       canCreate: true,

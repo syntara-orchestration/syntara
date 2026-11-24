@@ -19,7 +19,7 @@ import { useVersionHistory } from './useVersionHistory'
 type WorkflowWithVersion = WorkflowAPI.components['schemas']['WorkflowReadWithVersion']
 type V2Edge = { from: string; to: string; from_port?: string; to_port?: string }
 
-type RestoreDialogItem = { version: number; dateTime: string }
+type RestoreDialogItem = { version: number; dateTime: string; definition: Record<string, unknown> }
 
 type UseBuilderVersionHistoryParams = {
   workflowId: string | null
@@ -104,6 +104,7 @@ export function useBuilderVersionHistory({
   const viewedVersionName = viewedVersionQuery.data?.name ?? null
   const viewedVersionPublishedAt = viewedVersionQuery.data?.last_published_at ?? null
   const viewedVersionUnpublishedAt = viewedVersionQuery.data?.last_unpublished_at ?? null
+  const viewedVersionDefinition = viewedVersionQuery.data?.workflow_definition
 
   useEffect(() => {
     if (!isViewingVersion || !viewedVersionQuery.data?.workflow_definition) return
@@ -192,6 +193,9 @@ export function useBuilderVersionHistory({
     viewedVersionName,
     viewedVersionPublishedAt,
     viewedVersionUnpublishedAt,
+    viewedVersionDefinition,
+    viewedVersionIsLoading: viewedVersionQuery.isLoading,
+    refetchViewedVersion: viewedVersionQuery.refetch,
     handleExitVersionView,
     handleConfirmRestore,
     restoreDialog,

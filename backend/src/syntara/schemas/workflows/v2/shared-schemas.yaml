@@ -87,6 +87,14 @@ components:
             - type: integer
             - type: 'null'
           title: Published Version Number
+        step_types:
+          anyOf:
+            - items:
+                type: string
+              type: array
+            - type: 'null'
+          title: Step Types
+          description: Sorted distinct step types in the latest draft and published definition; null when version data is unavailable.
         created_at:
           type: string
           format: date-time
@@ -184,6 +192,14 @@ components:
             - type: integer
             - type: 'null'
           title: Published Version Number
+        step_types:
+          anyOf:
+            - items:
+                type: string
+              type: array
+            - type: 'null'
+          title: Step Types
+          description: Sorted distinct step types in the latest draft and published definition; null when version data is unavailable.
         created_at:
           type: string
           format: date-time
@@ -281,6 +297,14 @@ components:
             - type: integer
             - type: 'null'
           title: Published Version Number
+        step_types:
+          anyOf:
+            - items:
+                type: string
+              type: array
+            - type: 'null'
+          title: Step Types
+          description: Sorted distinct step types in the latest draft and published definition; null when version data is unavailable.
         created_at:
           type: string
           format: date-time

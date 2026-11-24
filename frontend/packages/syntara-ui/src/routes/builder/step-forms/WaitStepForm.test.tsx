@@ -2,6 +2,9 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 
+import { StepFormReadOnlyContext } from '../VersionViewContext'
+import { VersionViewProvider } from '../VersionViewProvider'
+
 import { renderWithHeader } from './test-utils/renderWithHeader'
 import { WaitStepForm, type WaitFormData } from './WaitStepForm'
 
@@ -14,6 +17,18 @@ describe('WaitStepForm', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+  })
+
+  it.each(['version', 'blocked'] as const)('disables configuration fields in %s view', (mode) => {
+    renderWithHeader(
+      <VersionViewProvider value={mode === 'version'}>
+        <StepFormReadOnlyContext.Provider value={mode === 'blocked'}>
+          <WaitStepForm onSubmit={mockOnSubmit} initialData={{ name: 'Read only', duration: 60 }} />
+        </StepFormReadOnlyContext.Provider>
+      </VersionViewProvider>
+    )
+    expect(screen.getByRole('spinbutton', { name: /Minutes/i })).toBeDisabled()
+    expect(screen.getByRole('spinbutton', { name: /Seconds/i })).toBeDisabled()
   })
 
   describe('Rendering', () => {
