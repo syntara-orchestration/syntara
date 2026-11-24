@@ -17,14 +17,11 @@ from syntara.audit.logging import AUDIT_LOGGER_NAME
 from syntara.audit.outbox import session as outbox_session
 from syntara.audit.outbox import worker as outbox_worker
 from syntara.audit.outbox.session import AuditWorkerAsyncSessionLocal
-from syntara.authz import resource_actions
 from syntara.core.database.session import AsyncSessionLocal
 from syntara.core.logging import lifecycle as logging_lifecycle
 from syntara.core.logging.logging import _UVICORN_LOGGER_NAMES
 from syntara.settings.cache import settings_cache as settings_cache_module
-
-_RegistryState = tuple[dict[str, list[str]] | None, frozenset[str], frozenset[str]]
-"""Snapshot of the process-global resource-actions registry holder."""
+from tests.fixtures.resource_actions_state import restore_registry_state, snapshot_registry_state
 
 _seeded_databases: set[str] = set()
 """Database URLs already seeded by _test_lifespan_context.
@@ -33,24 +30,6 @@ Keyed by URL rather than object identity so the guard holds even if the
 engine fixture's scope or lifetime ever changes; seeding is also per
 database, not per lifespan entry.
 """
-
-
-def _snapshot_resource_actions() -> _RegistryState:
-    """Capture the process-global resource-actions registry state."""
-    return (
-        resource_actions._registry,
-        resource_actions._all_pairs,
-        resource_actions._project_eligible,
-    )
-
-
-def _restore_resource_actions(state: _RegistryState) -> None:
-    """Reinstall a captured resource-actions registry state."""
-    (
-        resource_actions._registry,
-        resource_actions._all_pairs,
-        resource_actions._project_eligible,
-    ) = state
 
 
 @pytest.fixture(autouse=True)
@@ -149,7 +128,7 @@ async def _test_lifespan_context(test_db_engine: AsyncEngine) -> AsyncGenerator[
         # app.state writes stay away from the app shared with other tests.
         lifespan_app = FastAPI(lifespan=lifespan)
         saved_route_count = len(app.routes)
-        saved_registry = _snapshot_resource_actions()
+        saved_registry = snapshot_registry_state()
         saved_runtime_settings = settings_cache_module._runtime_settings
         try:
             async with lifespan_app.router.lifespan_context(lifespan_app):
@@ -171,14 +150,14 @@ async def _test_lifespan_context(test_db_engine: AsyncEngine) -> AsyncGenerator[
             #   validation and the project_eligible filter.
             # - set_runtime_settings() replaces the global settings cache
             #   with one whose watcher the shutdown then stops.
-            _restore_resource_actions(saved_registry)
+            restore_registry_state(saved_registry)
             settings_cache_module._runtime_settings = saved_runtime_settings
 
         # Post-restore guards: these verify the restores above ran and held.
         # They are intentionally after the finally block — their job is to
         # fail loudly if a future refactor drops or weakens a restore, not
         # to re-detect the (known) in-startup writes.
-        assert _snapshot_resource_actions() == saved_registry, (
+        assert snapshot_registry_state() == saved_registry, (
             "resource-actions registry must be restored after the lifespan"
         )
         assert settings_cache_module._runtime_settings is saved_runtime_settings, (

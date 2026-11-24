@@ -16,9 +16,9 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from syntara.authz import resource_actions as _resource_actions
 from syntara.authz.resource_actions import _set_registry
 from syntara.authz.seed import seed_authz_data
+from tests.fixtures.resource_actions_state import restore_registry_state, snapshot_registry_state
 
 # ---------------------------------------------------------------------------
 # Resource-actions registry — integration tests bypass app startup, so we
@@ -48,11 +48,7 @@ def _install_test_resource_actions() -> Generator[None, None, None]:
     the duration of the test, and restores the previous state on teardown so the
     stub never leaks into other tests running in the same process.
     """
-    saved = (
-        _resource_actions._registry,
-        _resource_actions._all_pairs,
-        _resource_actions._project_eligible,
-    )
+    saved = snapshot_registry_state()
     _set_registry(
         _TEST_RESOURCE_ACTIONS,
         project_eligible=frozenset({"workflow", "execution", "project"}),
@@ -60,11 +56,7 @@ def _install_test_resource_actions() -> Generator[None, None, None]:
     try:
         yield
     finally:
-        (
-            _resource_actions._registry,
-            _resource_actions._all_pairs,
-            _resource_actions._project_eligible,
-        ) = saved
+        restore_registry_state(saved)
 
 
 # Path to the rego policy file
