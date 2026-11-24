@@ -79,12 +79,7 @@ async function getPreviousHealthState(
 
   try {
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000)
-    const recentRuns = await github.getWorkflowRuns(
-      'merge-queue-health-poll.yml',
-      oneHourAgo,
-      currentRunId,
-      eventName
-    )
+    const recentRuns = await github.getWorkflowRuns('merge-queue-health-poll.yml', oneHourAgo, currentRunId, eventName)
 
     if (recentRuns.length === 0) {
       console.log('No previous runs found')

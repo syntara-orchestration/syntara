@@ -68,9 +68,7 @@ export class SlackNotifier {
   }): Promise<void> {
     const { dequeues, timeWindowMinutes, queueUrl } = params
 
-    const prLinks = dequeues
-      .map((pr) => `<${pr.url}|#${pr.number}>`)
-      .join(', ')
+    const prLinks = dequeues.map((pr) => `<${pr.url}|#${pr.number}>`).join(', ')
     const message: SlackMessage = {
       attachments: [
         {
