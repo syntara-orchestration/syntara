@@ -1,5 +1,6 @@
 """Tests for URL validation utilities (SSRF prevention)."""
 
+import os
 import socket
 from unittest.mock import patch
 
@@ -396,3 +397,16 @@ class TestValidateUrlNoSsrf:
             pytest.raises(ValueError, match="resolve"),
         ):
             validate_url_no_ssrf("https://internal.example.com")
+
+    def test_kubernetes_api_not_auto_allowed_by_shared_core_policy(self) -> None:
+        """The in-cluster API auto-allow is integration-layer policy; the core does not inherit it.
+
+        The shared core policy backs workflow HTTP-request nodes too, so an auto-allow
+        landing here would widen far beyond integration base_urls. This pins the scoping.
+        """
+        with (
+            patch.dict(os.environ, {"KUBERNETES_SERVICE_HOST": "10.96.0.1"}),
+            patch(_PATCH_GETADDRINFO, return_value=_mock_getaddrinfo("10.96.0.1")),
+            pytest.raises(ValueError, match="SSRF blocked"),
+        ):
+            validate_url_no_ssrf("https://kubernetes.default.svc", allowed_hosts=[], allow_http=True)

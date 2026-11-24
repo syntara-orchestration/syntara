@@ -48,7 +48,7 @@ spec:
     - name: ao-operator-git-url
       value: https://github.com/automation-nexus/automation-orchestrator-operator.git
     - name: ao-operator-revision
-      value: early-access
+      value: feat/ANSTRAT-1803
     - name: step-types-git-url
       value: https://github.com/syntara-orchestration/syntara-step-types.git
     - name: step-types-revision

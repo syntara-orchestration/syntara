@@ -730,8 +730,10 @@ class ServerSettings(BaseSettings):
         default_factory=list,
         description="Hostnames that integration base_url fields are permitted to use "
         "despite resolving to private or loopback IPs (e.g. add 'localhost' to allow a "
-        "local MCP server). Cloud metadata endpoints are always blocked regardless of "
-        "this allowlist. Set via APP_INTEGRATION_URL_ALLOWED_HOSTS as a JSON array.",
+        "local MCP server). The in-cluster Kubernetes API hostnames are always allowed "
+        "when running inside a cluster and need no entry here. Cloud metadata endpoints "
+        "are always blocked regardless of this allowlist. Set via "
+        "APP_INTEGRATION_URL_ALLOWED_HOSTS as a JSON array.",
     )
 
 
