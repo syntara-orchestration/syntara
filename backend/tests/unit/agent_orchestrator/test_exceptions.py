@@ -11,6 +11,7 @@ from syntara.agent_orchestrator.exceptions import (
     EmptyLLMResponseError,
     LLMConfigurationError,
     OrchestrationError,
+    StructuredOutputValidationError,
 )
 from syntara.core.exceptions import RetryableError
 
@@ -72,6 +73,33 @@ class TestEmptyLLMResponseError:
     def test_inherits_from_both_base_classes(self) -> None:
         """Test EmptyLLMResponseError inherits from AgentOrchestratorError and RetryableError."""
         error = EmptyLLMResponseError(invocation_id="test-id")
+
+        assert isinstance(error, AgentOrchestratorError)
+        assert isinstance(error, RetryableError)
+
+
+class TestStructuredOutputValidationError:
+    """Tests for StructuredOutputValidationError exception."""
+
+    def test_initialization_with_invocation_id(self) -> None:
+        """Test StructuredOutputValidationError preserves invocation_id."""
+        invocation_id = str(uuid4())
+        error = StructuredOutputValidationError(invocation_id=invocation_id)
+
+        assert str(error) == "Structured output did not match the response schema"
+        assert error.message == "Structured output did not match the response schema"
+        assert error.invocation_id == invocation_id
+
+    def test_initialization_without_invocation_id(self) -> None:
+        """Test StructuredOutputValidationError defaults invocation_id to None."""
+        error = StructuredOutputValidationError()
+
+        assert str(error) == "Structured output did not match the response schema"
+        assert error.invocation_id is None
+
+    def test_inherits_from_both_base_classes(self) -> None:
+        """Test StructuredOutputValidationError inherits from AgentOrchestratorError and RetryableError."""
+        error = StructuredOutputValidationError(invocation_id="test-id")
 
         assert isinstance(error, AgentOrchestratorError)
         assert isinstance(error, RetryableError)
