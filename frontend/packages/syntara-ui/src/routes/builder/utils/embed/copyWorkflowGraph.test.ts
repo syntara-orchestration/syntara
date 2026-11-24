@@ -97,7 +97,7 @@ describe('copyWorkflowGraph', () => {
       edges: [],
     }
     const r = copyWorkflowGraph(def)
-    expect(r.subWorkflowNodes).toEqual([{ nodeId: 'activity_2' }])
+    expect(r.subWorkflowNodes).toEqual([{ nodeId: 'activity_2', workflowId: 'wf-1' }])
   })
 
   it('preserves a copied sub_workflow node: target ids intact, input expressions remapped', () => {
@@ -130,7 +130,7 @@ describe('copyWorkflowGraph', () => {
     // internal input expression is remapped to the copied node id
     expect(ref.parameters?.input_mapping?.host).toBe('${activity_1.outputs.host}')
     // still surfaced (informational) and introduces no credential/integration block
-    expect(r.subWorkflowNodes).toEqual([{ nodeId: 'activity_2' }])
+    expect(r.subWorkflowNodes).toEqual([{ nodeId: 'activity_2', workflowId: 'wf-child' }])
     expect(r.resourceReferenceNodes).toEqual([])
   })
 
@@ -144,7 +144,10 @@ describe('copyWorkflowGraph', () => {
       edges: [],
     }
     const r = copyWorkflowGraph(def)
-    expect(r.subWorkflowNodes).toEqual([{ nodeId: 'activity_1' }, { nodeId: 'activity_2' }])
+    expect(r.subWorkflowNodes).toEqual([
+      { nodeId: 'activity_1', workflowId: 'wf-1' },
+      { nodeId: 'activity_2', workflowId: 'wf-2' },
+    ])
     expect(r.activities.map((a) => (a as { parameters?: { workflow_id?: string } }).parameters?.workflow_id)).toEqual([
       'wf-1',
       'wf-2',

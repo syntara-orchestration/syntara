@@ -17,29 +17,64 @@ import type { CopyWorkflowGraphResult } from './utils/embed/copyWorkflowGraph'
 
 /** Horizontal gap (px) between existing nodes and the embedded graph. */
 const PLACEMENT_GAP = 120
+/** Grid spacing (px) used to lay out copied nodes that carry no source coordinates. */
+const GENERATED_COL_GAP = 220
+const GENERATED_ROW_GAP = 160
+const GENERATED_COLS = 4
 
 /**
- * Shift the copied positions so the embedded graph sits clear of existing nodes
- * (placed to the right, top-aligned), instead of a blind fixed offset that can stack
- * copied nodes on top of the current canvas. The internal layout is preserved.
+ * Compute canvas positions for the copied graph, placed clear of the existing nodes
+ * (to the right, top-aligned) instead of a blind fixed offset that stacks the copy on
+ * top of the current canvas.
+ *
+ * - Copied nodes that carry source coordinates keep their relative layout and are shifted
+ *   as a block (D3: keep coordinates, move right of the farthest-right existing step).
+ * - Copied nodes with NO source coordinates (e.g. a source saved without canvas positions)
+ *   are given a generated grid position so they never collapse onto a single point — the
+ *   stacking bug Ana reported. They sit below any coordinate-bearing block.
+ * - When there are no existing nodes and every copied node already has a coordinate, the
+ *   source layout is kept verbatim (nothing to sit beside).
  */
 function placeClearOfExisting(
+  copiedIds: string[],
   copied: Record<string, { x: number; y: number }>,
   existing: Record<string, { x: number; y: number }>
 ): Record<string, { x: number; y: number }> {
-  const copiedVals = Object.values(copied)
-  const existingVals = Object.values(existing)
-  if (copiedVals.length === 0 || existingVals.length === 0) return copied
+  if (copiedIds.length === 0) return copied
 
-  const existingMaxX = Math.max(...existingVals.map((p) => p.x))
-  const existingMinY = Math.min(...existingVals.map((p) => p.y))
-  const copiedMinX = Math.min(...copiedVals.map((p) => p.x))
-  const copiedMinY = Math.min(...copiedVals.map((p) => p.y))
-  const dx = existingMaxX + PLACEMENT_GAP - copiedMinX
-  const dy = existingMinY - copiedMinY
+  const existingVals = Object.values(existing)
+  const known = copiedIds.filter((id) => copied[id])
+  const missing = copiedIds.filter((id) => !copied[id])
+
+  // Nothing to place beside, and every node already has a coordinate: keep as-is.
+  if (existingVals.length === 0 && missing.length === 0) return copied
+
+  const baseX = existingVals.length > 0 ? Math.max(...existingVals.map((p) => p.x)) + PLACEMENT_GAP : 0
+  const baseY = existingVals.length > 0 ? Math.min(...existingVals.map((p) => p.y)) : 0
 
   const placed: Record<string, { x: number; y: number }> = {}
-  for (const [id, pos] of Object.entries(copied)) placed[id] = { x: pos.x + dx, y: pos.y + dy }
+
+  // Coordinate-bearing nodes: preserve relative layout, shifted so the block's top-left
+  // lands at the base point (only shifted when there are existing nodes to clear).
+  if (known.length > 0) {
+    const knownVals = known.map((id) => copied[id])
+    const dx = existingVals.length > 0 ? baseX - Math.min(...knownVals.map((p) => p.x)) : 0
+    const dy = existingVals.length > 0 ? baseY - Math.min(...knownVals.map((p) => p.y)) : 0
+    for (const id of known) placed[id] = { x: copied[id].x + dx, y: copied[id].y + dy }
+  }
+
+  // Coordinate-less nodes: generated grid, below any preserved block.
+  if (missing.length > 0) {
+    const placedVals = Object.values(placed)
+    const startY = placedVals.length > 0 ? Math.max(...placedVals.map((p) => p.y)) + GENERATED_ROW_GAP : baseY
+    missing.forEach((id, i) => {
+      placed[id] = {
+        x: baseX + (i % GENERATED_COLS) * GENERATED_COL_GAP,
+        y: startY + Math.floor(i / GENERATED_COLS) * GENERATED_ROW_GAP,
+      }
+    })
+  }
+
   return placed
 }
 
@@ -56,9 +91,10 @@ export function useEmbedWorkflow() {
         activities: result.activities,
         edges: [...edges, ...result.edges],
       })
-      // Place the copied graph clear of existing nodes, folded into the same undo entry
-      // (skipTracking avoids a second entry).
-      const positions = placeClearOfExisting(result.positions, nodePositions)
+      // Place every copied node clear of existing nodes (coordinate-less nodes get a
+      // generated layout rather than stacking), folded into the same undo entry.
+      const copiedIds = result.activities.map((a) => a.id)
+      const positions = placeClearOfExisting(copiedIds, result.positions, nodePositions)
       useWorkflowStore.getState().updateNodePositions(positions, { skipTracking: true })
     },
     [batchAddActivitiesAndEdges]

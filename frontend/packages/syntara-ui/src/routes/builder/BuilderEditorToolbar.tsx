@@ -325,7 +325,11 @@ export function BuilderEditorToolbar({
       {embedOpen && (
         <EmbedWorkflowDialog
           isOpen
-          onClose={() => setEmbedOpen(false)}
+          onClose={() => {
+            setEmbedOpen(false)
+            // Return focus to the Workflow actions toggle so keyboard users continue where they opened it.
+            requestAnimationFrame(() => document.querySelector<HTMLElement>('[aria-label="Workflow actions"]')?.focus())
+          }}
           projectId={projectId}
           currentWorkflowId={workflow?.id}
         />

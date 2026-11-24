@@ -68,11 +68,12 @@ export type CopyWorkflowGraphResult = {
   /**
    * Copied nodes that are themselves `sub_workflow` reference nodes. These ARE copied with their
    * target `workflow_id`/`trigger_node_id` preserved, so the embedded copy stays a live reference
-   * to the referenced workflow (child execution + Used-By). The caller surfaces this to the user
-   * (informational); it no longer blocks embed. Credential/integration references remain blocked
-   * (see `resourceReferenceNodes`).
+   * to the referenced workflow (child execution + Used-By). `workflowId` is the referenced child
+   * id, so the caller can detect a self-reference (a step that points back at the workflow being
+   * edited) and block that embed. Otherwise this is informational and does not block embed;
+   * credential/integration references remain blocked (see `resourceReferenceNodes`).
    */
-  subWorkflowNodes: Array<{ nodeId: string }>
+  subWorkflowNodes: Array<{ nodeId: string; workflowId: string | null }>
   /** `${...}` references to a source node that was not copied (e.g. an excluded trigger). */
   danglingExpressionRefs: Array<{ nodeId: string; namespace: string; expression: string }>
 }
@@ -135,7 +136,7 @@ export function copyWorkflowGraph(
   for (const n of sourceNodes) idMap.set(n.id, generateActivityId())
 
   const resourceReferenceNodes: Array<{ nodeId: string; fields: string[] }> = []
-  const subWorkflowNodes: Array<{ nodeId: string }> = []
+  const subWorkflowNodes: Array<{ nodeId: string; workflowId: string | null }> = []
   const danglingExpressionRefs: Array<{ nodeId: string; namespace: string; expression: string }> = []
   const positions: Record<string, { x: number; y: number }> = {}
 
@@ -158,7 +159,11 @@ export function copyWorkflowGraph(
     const resourceFields = detectResourceFields(clone.parameters)
     if (resourceFields.length > 0) resourceReferenceNodes.push({ nodeId: newId, fields: resourceFields })
 
-    if (n.type === SUB_WORKFLOW_NODE_TYPE) subWorkflowNodes.push({ nodeId: newId })
+    if (n.type === SUB_WORKFLOW_NODE_TYPE) {
+      const referencedWorkflowId =
+        typeof clone.parameters?.workflow_id === 'string' ? clone.parameters.workflow_id : null
+      subWorkflowNodes.push({ nodeId: newId, workflowId: referencedWorkflowId })
+    }
 
     if (clone.position && Number.isFinite(clone.position.x) && Number.isFinite(clone.position.y)) {
       positions[newId] = { x: clone.position.x + offset.x, y: clone.position.y + offset.y }
