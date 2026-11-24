@@ -1,7 +1,7 @@
 import { EdgeHandleEnum } from '@syntara/contracts'
 import type { Node, ReactFlowInstance } from '@xyflow/react'
 
-import { FlowNodeType } from '../../../constants'
+import { FlowNodeType } from '../../../constants/nodeTypes'
 import { useWorkflowStore } from '../../../stores/useWorkflowStore'
 import type { OnAddNodeFromEdge } from '../types'
 
@@ -121,7 +121,7 @@ type PendingPanelConnect = {
 }
 
 /**
- * After the add-node panel connects two nodes, apply edges and cleanup once the target is measured.
+ * After the add-step panel connects two nodes, apply edges and cleanup once the target is measured.
  */
 export function applyConnectFromPanelWhenTargetMeasured(
   flow: PanelConnectReactFlowAdapter,

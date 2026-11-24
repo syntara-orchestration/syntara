@@ -5,14 +5,18 @@ import { useEffect, useMemo, type ReactNode } from 'react'
 // Storybook renders stories in an iframe, outside the routes that normally load React Flow's required canvas styles.
 import '@xyflow/react/dist/style.css'
 import '../src/index.css'
-import { type ColorScheme, applyDocumentColorScheme, resolveColorScheme } from '../src/providers/theme/colorScheme'
+import type { ColorSchemePreference } from '../src/providers/theme/colorScheme'
 import { ColorSchemeProvider } from '../src/providers/theme/ColorSchemeProvider'
+import { ensureDocumentTheme } from '../src/providers/theme/documentTheme'
 import { useColorScheme } from '../src/providers/theme/useColorScheme'
 
 // Prevent FOUC: apply theme classes before React mounts (mirrors the inline script in index.html).
 // index.html sets these on the real app's <html>; Storybook's iframe has no equivalent bootstrap.
-document.documentElement.classList.add('pf-v6-theme-glass') // required for both light and dark — do not remove
-applyDocumentColorScheme(resolveColorScheme())
+ensureDocumentTheme()
+
+function isColorSchemePreference(value: string): value is ColorSchemePreference {
+  return value === 'system' || value === 'light' || value === 'dark'
+}
 
 // Bridges the toolbar global to ColorSchemeProvider. Must remain a child of ColorSchemeProvider
 // so it can call useColorScheme(); moving it outside will throw at runtime.
@@ -20,9 +24,9 @@ function ThemeSync({ toolbarValue, children }: { toolbarValue: string; children:
   const { setColorScheme } = useColorScheme()
 
   useEffect(() => {
-    // 'system' resolves the OS preference at call time; the concrete value is persisted, not the string 'system'.
-    const scheme: ColorScheme = toolbarValue === 'system' ? resolveColorScheme() : (toolbarValue as ColorScheme)
-    setColorScheme(scheme)
+    if (isColorSchemePreference(toolbarValue)) {
+      setColorScheme(toolbarValue)
+    }
   }, [toolbarValue, setColorScheme])
 
   return <>{children}</>

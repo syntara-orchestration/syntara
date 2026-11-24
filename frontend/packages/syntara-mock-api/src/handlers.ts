@@ -5372,6 +5372,8 @@ export const handlers = [
         allowed = false
       } else if (resourceType === 'user_identity') {
         allowed = false
+      } else if (resourceType === 'authz' && action === 'query') {
+        allowed = false
       }
     } else if (username === 'padmin' || username === 'project-admin') {
       // Project-admin: project-scoped grants only apply with project context.

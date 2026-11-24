@@ -8,7 +8,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { axe } from 'vitest-axe'
 
 import { credentialsClient, integrationsClient } from '../../../client'
-import { AlertProvider } from '../../../providers/alerts'
+import { AlertProvider } from '../../../providers/alerts/AlertProvider'
 import { formatDateTime } from '../../../utils/dateUtils'
 
 import { IntegrationDetail } from './IntegrationDetail'
@@ -37,26 +37,13 @@ vi.mock('./useItemSelection', () => ({
     mockUseItemSelection(...args) as ReturnType<typeof import('./useItemSelection').useItemSelection>,
 }))
 
+const mockUseIntegrationModelsState = vi.fn()
+
 vi.mock('./useIntegrationModelsState', () => ({
-  useIntegrationModelsState: () => ({
-    models: [],
-    isLoading: false,
-    error: null,
-    refetchModels: vi.fn().mockResolvedValue(undefined),
-    enabledModelIds: new Set<string>(),
-    enabledCount: 0,
-    allSelected: false,
-    isDirty: false,
-    isSaving: false,
-    handleSave: vi.fn(),
-    handleSelectAll: vi.fn(),
-    defaultModelId: null,
-    handleSelectWithDefaultClear: vi.fn(),
-    handleSetDefault: vi.fn(),
-    handleRemoveDefault: vi.fn(),
-    resetSelectionToServer: vi.fn(),
-    resetDefault: vi.fn(),
-  }),
+  useIntegrationModelsState: (...args: unknown[]) =>
+    mockUseIntegrationModelsState(...args) as ReturnType<
+      typeof import('./useIntegrationModelsState').useIntegrationModelsState
+    >,
 }))
 
 const mockNavigate = vi.fn()
@@ -257,6 +244,25 @@ describe('IntegrationDetail', () => {
       handleSelectAll: vi.fn(),
       handleSelectItem: vi.fn(),
       resetToServer: vi.fn(),
+    })
+    mockUseIntegrationModelsState.mockReturnValue({
+      models: [],
+      isLoading: false,
+      error: null,
+      refetchModels: vi.fn().mockResolvedValue(undefined),
+      enabledModelIds: new Set<string>(),
+      enabledCount: 0,
+      allSelected: false,
+      isDirty: false,
+      isSaving: false,
+      handleSave: vi.fn(),
+      handleSelectAll: vi.fn(),
+      defaultModelId: null,
+      handleSelectWithDefaultClear: vi.fn(),
+      handleSetDefault: vi.fn(),
+      handleRemoveDefault: vi.fn(),
+      resetSelectionToServer: vi.fn(),
+      resetDefault: vi.fn(),
     })
   })
 
@@ -484,19 +490,19 @@ describe('IntegrationDetail', () => {
       expect(screen.getByText('Disabled')).toBeInTheDocument()
     })
 
-    it('shows Edit integration as a primary button in toolbar', () => {
+    it('shows Edit integration as a primary link in toolbar', () => {
       render(<IntegrationDetail />, { wrapper })
 
-      expect(screen.getByRole('button', { name: 'Edit integration' })).toBeInTheDocument()
+      expect(screen.getByRole('link', { name: 'Edit integration' })).toBeInTheDocument()
     })
 
-    it('navigates to edit page when Edit integration is clicked', async () => {
-      const user = userEvent.setup()
+    it('links to the edit route from Edit integration', () => {
       render(<IntegrationDetail />, { wrapper })
 
-      await user.click(screen.getByRole('button', { name: 'Edit integration' }))
-
-      expect(mockNavigate).toHaveBeenCalledWith({ to: '/configuration/integrations/int-1/edit' })
+      expect(screen.getByRole('link', { name: 'Edit integration' })).toHaveAttribute(
+        'href',
+        '/configuration/integrations/int-1/edit'
+      )
     })
 
     it('shows kebab menu', () => {
@@ -658,6 +664,12 @@ describe('IntegrationDetail', () => {
 
     it('shows save button disabled on resources tab when no changes are made', () => {
       mockActiveTab = 'resources'
+      mockUseAllIntegrationTools.mockReturnValue({
+        tools: [{ id: 't1', name: 'tool-1', description: 'A tool', status: 'available' }],
+        isLoading: false,
+        error: null,
+        refetch: vi.fn(),
+      })
       render(<IntegrationDetail />, { wrapper })
 
       const saveButton = screen.getByRole('button', { name: 'Save tools' })
@@ -666,6 +678,12 @@ describe('IntegrationDetail', () => {
 
     it('shows save button enabled on resources tab when changes are made', () => {
       mockActiveTab = 'resources'
+      mockUseAllIntegrationTools.mockReturnValue({
+        tools: [{ id: 't1', name: 'tool-1', description: 'A tool', status: 'available' }],
+        isLoading: false,
+        error: null,
+        refetch: vi.fn(),
+      })
       mockUseItemSelection.mockReturnValue({
         enabledIds: new Set(['t1']),
         enabledCount: 1,
@@ -1096,12 +1114,12 @@ describe('IntegrationDetail', () => {
   })
 
   describe('Permission gating', () => {
-    it('disables Edit button when canUpdate is false', () => {
+    it('disables Edit link when canUpdate is false', () => {
       mockPermissions.canUpdate = false
       render(<IntegrationDetail />, { wrapper })
 
-      const editButton = screen.getByRole('button', { name: 'Edit integration' })
-      expect(editButton).toHaveAttribute('aria-disabled', 'true')
+      const editLink = screen.getByRole('link', { name: 'Edit integration' })
+      expect(editLink).toHaveAttribute('aria-disabled', 'true')
     })
 
     it('disables toggle switch with correct label when canUpdate is false', () => {
@@ -1299,19 +1317,59 @@ describe('IntegrationDetail', () => {
       enabled_tool_count: 0,
     }
 
-    it('shows Save model changes button on LLM resources tab', () => {
+    it('shows Save model changes button on LLM resources tab when models exist', () => {
       setupDefaultMocks({ integration: llmIntegration })
+      mockUseIntegrationModelsState.mockReturnValue({
+        models: [{ id: 'm1', name: 'model-1' }],
+        isLoading: false,
+        error: null,
+        refetchModels: vi.fn().mockResolvedValue(undefined),
+        enabledModelIds: new Set<string>(['m1']),
+        enabledCount: 1,
+        allSelected: false,
+        isDirty: false,
+        isSaving: false,
+        handleSave: vi.fn(),
+        handleSelectAll: vi.fn(),
+        defaultModelId: null,
+        handleSelectWithDefaultClear: vi.fn(),
+        handleSetDefault: vi.fn(),
+        handleRemoveDefault: vi.fn(),
+        resetSelectionToServer: vi.fn(),
+        resetDefault: vi.fn(),
+      })
       mockActiveTab = 'resources'
       render(<IntegrationDetail />, { wrapper })
 
       expect(screen.getByRole('button', { name: 'Save models' })).toBeInTheDocument()
     })
 
-    it('shows Save tools button on MCP server resources tab', () => {
+    it('hides Save models footer on LLM resources tab when no models discovered', () => {
+      setupDefaultMocks({ integration: llmIntegration })
+      mockActiveTab = 'resources'
+      render(<IntegrationDetail />, { wrapper })
+
+      expect(screen.queryByRole('button', { name: 'Save models' })).not.toBeInTheDocument()
+    })
+
+    it('shows Save tools button on MCP server resources tab when tools exist', () => {
+      mockUseAllIntegrationTools.mockReturnValue({
+        tools: [{ id: 't1', name: 'tool-1', description: 'A tool', status: 'available' }],
+        isLoading: false,
+        error: null,
+        refetch: vi.fn(),
+      })
       mockActiveTab = 'resources'
       render(<IntegrationDetail />, { wrapper })
 
       expect(screen.getByRole('button', { name: 'Save tools' })).toBeInTheDocument()
+    })
+
+    it('hides Save tools footer on MCP resources tab when no tools discovered', () => {
+      mockActiveTab = 'resources'
+      render(<IntegrationDetail />, { wrapper })
+
+      expect(screen.queryByRole('button', { name: 'Save tools' })).not.toBeInTheDocument()
     })
   })
 })

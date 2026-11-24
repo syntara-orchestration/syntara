@@ -52,7 +52,7 @@ test('large workflow remains usable across semantic zoom after adding a step', a
   // zoom level with many nodes, so assert by role rather than visible text.
   const terminalImportedStep = app
     .locator('.react-flow')
-    .getByRole('button', { name: `Imported step ${IMPORTED_STEP_COUNT}` })
+    .getByRole('button', { name: `Imported step ${IMPORTED_STEP_COUNT}, Script` })
   await expect(terminalImportedStep, 'the imported 60-step workflow should be on the canvas').toBeAttached({
     timeout: 15_000,
   })
@@ -65,7 +65,7 @@ test('large workflow remains usable across semantic zoom after adding a step', a
   await app.getByRole('button', { name: 'Create', exact: true }).click()
   await expect(app.getByRole('button', { name: 'Create', exact: true })).not.toBeAttached({ timeout: 15_000 })
 
-  // SynStepSemanticZoomBody collapses nodes to a single tooltip button at this zoom level;
+  // SynStepSemanticZoomBody collapses nodes to a compact tile at this zoom level;
   // past the threshold they render a full card with a heading instead — hence the two locators below.
   const addedStepSemanticZoomButton = app
     .locator('.react-flow')

@@ -10,8 +10,8 @@ vi.mock('@xyflow/react', async () => {
   }
 })
 
-vi.mock('./renderNodeIcon', () => ({
-  renderNodeIcon: () => null,
+vi.mock('./renderStepIcon', () => ({
+  renderStepIcon: () => null,
 }))
 
 vi.mock('./hooks/useCredentialName', () => ({

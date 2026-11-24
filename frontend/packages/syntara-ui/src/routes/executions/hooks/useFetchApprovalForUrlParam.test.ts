@@ -33,26 +33,30 @@ describe('useFetchApprovalForUrlParam', () => {
   it('returns undefined when no approval param in URL', () => {
     vi.mocked(approvalsClient.useQuery).mockReturnValue({
       data: undefined,
+      error: null,
+      isPending: false,
     })
 
     const { result } = renderHook(() => useFetchApprovalForUrlParam(''), {
       wrapper: makeWrapper(queryClient),
     })
 
-    expect(result.current).toBeUndefined()
+    expect(result.current).toEqual({ approval: undefined, error: undefined, isPending: false })
   })
 
   it('fetches approval when approval param is present', () => {
     const mockApproval = { id: 'approval-1', name: 'Test' }
     vi.mocked(approvalsClient.useQuery).mockReturnValue({
       data: mockApproval,
+      error: null,
+      isPending: false,
     })
 
     const { result } = renderHook(() => useFetchApprovalForUrlParam('approval=approval-1'), {
       wrapper: makeWrapper(queryClient),
     })
 
-    expect(result.current).toEqual(mockApproval)
+    expect(result.current).toEqual({ approval: mockApproval, error: undefined, isPending: false })
     expect(approvalsClient.useQuery).toHaveBeenCalledWith(
       'get',
       '/approvals/{approval_id}',
@@ -64,6 +68,8 @@ describe('useFetchApprovalForUrlParam', () => {
   it('passes enabled=false when no approval param', () => {
     vi.mocked(approvalsClient.useQuery).mockReturnValue({
       data: undefined,
+      error: null,
+      isPending: false,
     })
 
     renderHook(() => useFetchApprovalForUrlParam('history=open'), {
@@ -78,9 +84,26 @@ describe('useFetchApprovalForUrlParam', () => {
     )
   })
 
+  it('exposes query errors from the by-id fetch', () => {
+    const fetchError = { code: 'APPROVAL_NOT_FOUND' }
+    vi.mocked(approvalsClient.useQuery).mockReturnValue({
+      data: undefined,
+      error: fetchError,
+      isPending: false,
+    })
+
+    const { result } = renderHook(() => useFetchApprovalForUrlParam('?approval=missing'), {
+      wrapper: makeWrapper(queryClient),
+    })
+
+    expect(result.current).toEqual({ approval: undefined, error: fetchError, isPending: false })
+  })
+
   it('handles searchParams with question mark prefix', () => {
     vi.mocked(approvalsClient.useQuery).mockReturnValue({
       data: undefined,
+      error: null,
+      isPending: false,
     })
 
     renderHook(() => useFetchApprovalForUrlParam('?approval=test-id'), {

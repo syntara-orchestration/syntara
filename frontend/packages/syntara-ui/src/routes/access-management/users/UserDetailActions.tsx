@@ -1,10 +1,10 @@
-import { Button } from '@patternfly/react-core'
-import { RhUiBanIcon, RhUiEditIcon, RhUiTrashIcon } from '@patternfly/react-icons'
+import { RhUiBanIcon, RhUiTrashIcon } from '@patternfly/react-icons'
 import type { User } from '@syntara/contracts'
 
 import { SynConfirmationDialog } from '../../../components/dialogs/SynConfirmationDialog'
 import { DisabledWithTooltip } from '../../../components/DisabledWithTooltip'
 import { IconLabel } from '../../../components/IconLabel'
+import { SynDetailEditLink } from '../../../components/SynDetailEditLink'
 import { SynKebabMenu } from '../../../components/SynKebabMenu'
 import { useDialogState } from '../../../hooks/useDialogState'
 import { useUserPermissions } from '../useUserPermissions'
@@ -62,27 +62,22 @@ export function UserDetailConfirmationDialogs({
 export function UserDetailToolbar({
   permissions,
   showKebabMenu,
-  onEdit,
+  editTo,
   onRevoke,
   onDelete,
 }: Readonly<{
   permissions: ReturnType<typeof useUserPermissions>
   showKebabMenu: boolean
-  onEdit: () => void
+  editTo: string
   onRevoke: () => void
   onDelete: () => void
 }>) {
   return (
     <>
       <DisabledWithTooltip isDisabled={!permissions.canUpdate} content={permissions.tooltips.update}>
-        <Button
-          variant="primary"
-          icon={<RhUiEditIcon />}
-          isAriaDisabled={!permissions.canUpdate}
-          onClick={permissions.canUpdate ? onEdit : undefined}
-        >
+        <SynDetailEditLink to={editTo} isAriaDisabled={!permissions.canUpdate}>
           Edit user
-        </Button>
+        </SynDetailEditLink>
       </DisabledWithTooltip>
       {showKebabMenu && (
         <SynKebabMenu

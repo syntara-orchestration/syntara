@@ -32,8 +32,12 @@ function mockWorkflow(overrides: Partial<Workflow> = {}): Workflow {
   }
 }
 
-function mockGetResponse(data: Record<string, unknown> | undefined, error?: Record<string, unknown>) {
-  return { data, error, response: new Response() } as never
+function mockGetResponse(
+  data: Record<string, unknown> | undefined,
+  error?: Record<string, unknown>,
+  status = data && !error ? 200 : 500
+) {
+  return { data, error, response: new Response(null, { status }) } as never
 }
 
 describe('resolveWorkflowRunTrigger', () => {
@@ -46,10 +50,10 @@ describe('resolveWorkflowRunTrigger', () => {
     expect(workflowFetchClient.GET).not.toHaveBeenCalled()
   })
 
-  it('returns null when workflow fetch fails', async () => {
-    vi.mocked(workflowFetchClient.GET).mockResolvedValue(mockGetResponse(undefined, { detail: 'not found' }))
+  it('throws when workflow fetch fails', async () => {
+    vi.mocked(workflowFetchClient.GET).mockResolvedValue(mockGetResponse(undefined, { detail: 'not found' }, 404))
 
-    await expect(resolveWorkflowRunTrigger(mockWorkflow())).resolves.toBeNull()
+    await expect(resolveWorkflowRunTrigger(mockWorkflow())).rejects.toMatchObject({ status: 404 })
   })
 
   it('returns the first trigger from the current version when it matches published', async () => {

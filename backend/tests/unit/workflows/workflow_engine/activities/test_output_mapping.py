@@ -12,7 +12,8 @@ from typing import Any
 import pytest
 from temporalio.exceptions import ApplicationError
 
-from syntara.workflows.workflow_engine.activities.output_mapping import apply_output_mapping
+from syntara.workflow_core.models import ScriptOutput
+from syntara.workflow_runtime.engines.temporal.activities.output_mapping import apply_output_mapping, dump_output
 
 # ---------------------------------------------------------------------------
 # None config — no mapping
@@ -104,5 +105,14 @@ class TestOutputMappingErrors:
         result: dict[str, Any] = {"a": 1}
         with pytest.raises(ApplicationError) as exc_info:
             apply_output_mapping(result, {"x": "${result.nonexistent}"})
+        assert exc_info.value.type == "OutputMappingError"
+        assert exc_info.value.non_retryable is True
+
+    def test_model_dump_mapping_failure_is_non_retryable(self) -> None:
+        """Model-based activity outputs preserve the Temporal error contract."""
+        output = ScriptOutput()
+        with pytest.raises(ApplicationError) as exc_info:
+            dump_output(output, {"value": "${result.stdout_json.value}"})
+
         assert exc_info.value.type == "OutputMappingError"
         assert exc_info.value.non_retryable is True
