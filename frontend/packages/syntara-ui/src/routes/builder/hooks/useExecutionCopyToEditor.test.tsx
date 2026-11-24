@@ -117,11 +117,15 @@ describe('useExecutionCopyToEditor', () => {
     )
   })
 
-  it('cleans the URL query params', async () => {
+  it('cleans the URL query params after reducer syncs', async () => {
+    window.history.replaceState({}, '', '/workflow-builder/wf-1?fromExecution=exec-123')
     const replaceStateSpy = vi.spyOn(window.history, 'replaceState')
-    const opts = buildOptions({ executionCopy: buildExecutionCopy() })
+    const opts = buildOptions({
+      executionCopy: buildExecutionCopy({ executionId: 'exec-123' }),
+      mostRecentExecutionId: 'exec-123',
+    })
     renderHook(() => useExecutionCopyToEditor(opts))
-    await waitFor(() => expect(replaceStateSpy).toHaveBeenCalledWith({}, '', window.location.pathname))
+    await waitFor(() => expect(replaceStateSpy).toHaveBeenCalledWith({}, '', '/workflow-builder/wf-1'))
   })
 
   it('applies only once even on re-render', async () => {

@@ -83,10 +83,16 @@ export function useExecutionCopyToEditor({
           copiedRunActivityIds,
         },
       })
-      const url = new URL(window.location.href)
-      url.searchParams.delete('fromExecution')
-      url.searchParams.delete('linkExecution')
-      window.history.replaceState({}, '', url.pathname + url.search)
     })
   }, [executionCopy, currentWorkflow, isWorkflowInitialized, reducerSynced, dispatch, markDirty, showSuccess])
+
+  // Clear query params only after reducer owns the execution id so a late INIT_WORKFLOW can re-apply.
+  useEffect(() => {
+    if (!reducerSynced) return
+    const url = new URL(window.location.href)
+    if (!url.searchParams.has('fromExecution') && !url.searchParams.has('linkExecution')) return
+    url.searchParams.delete('fromExecution')
+    url.searchParams.delete('linkExecution')
+    window.history.replaceState({}, '', url.pathname + url.search)
+  }, [reducerSynced])
 }
