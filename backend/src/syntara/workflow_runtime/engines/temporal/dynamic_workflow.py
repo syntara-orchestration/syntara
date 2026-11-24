@@ -16,13 +16,29 @@ from temporalio.common import RetryPolicy
 from temporalio.exceptions import ActivityError, ApplicationError
 from temporalio.exceptions import TimeoutError as TemporalTimeoutError
 
+# Everything this package contributes to the workflow is passed through. The
+# sandbox reloads any module that is not, on every run and every replay, and
+# the reloaded copies are never freed: jsonschema, attrs and referencing come
+# in through the node models and the expression evaluator, so a worker that
+# replays completed executions to answer queries leaked about 2 MB per replay.
 with workflow.unsafe.imports_passed_through():
     from syntara.core.exceptions import SafeValueError
-    from syntara.workflow_core.models import ActivityName
+    from syntara.workflow_core.graph import ActivityNode, WorkflowGraph
+    from syntara.workflow_core.models import (
+        NODE_OUTPUT_MODELS,
+        ActivityName,
+        ConvergeStrategy,
+        DoWhileLoopState,
+        ForEachLoopState,
+        LoopState,
+        LoopType,
+        NodeType,
+    )
     from syntara.workflow_core.utils.credential_scrubber import (
         scrub_credential_values,
         scrub_credentials,
     )
+    from syntara.workflow_core.utils.namespace_resolver import NamespaceResolver
     from syntara.workflow_runtime.engines.temporal.activities.credential_resolution_activity import (
         resolve_workflow_credentials,
     )
@@ -31,12 +47,14 @@ with workflow.unsafe.imports_passed_through():
     )
     from syntara.workflow_runtime.engines.temporal.activities.integration_scope_activity import validate_node_references
     from syntara.workflow_runtime.engines.temporal.activities.wait_activity import complete_wait
+    from syntara.workflow_runtime.engines.temporal.approval_mixin import WorkflowApprovalMixin
     from syntara.workflow_runtime.engines.temporal.constants import (
         DEFAULT_ACTIVITY_TIMEOUT_SECONDS,
         ENGINE_MAX_OUTPUT_BYTES_KEY,
         ENGINE_TIMEOUT_SECONDS_KEY,
         INTERNAL_ACTIVITY_HEARTBEAT_TIMEOUT_SECONDS,
     )
+    from syntara.workflow_runtime.engines.temporal.converge_mixin import WorkflowConvergeMixin
     from syntara.workflow_runtime.engines.temporal.node_settings_resolver import (
         resolve_continue_on_failure,
         resolve_max_iterations,
@@ -44,22 +62,9 @@ with workflow.unsafe.imports_passed_through():
         resolve_retry_policy,
         resolve_timeout,
     )
+    from syntara.workflow_runtime.engines.temporal.utils.loop_iteration_ids import loop_control_activity_id
+    from syntara.workflow_runtime.engines.unified_eval import safe_eval_with_namespace
     from syntara.workflow_runtime.engines.utils.timeout_messages import build_timeout_error_message
-from syntara.workflow_core.graph import ActivityNode, WorkflowGraph
-from syntara.workflow_core.models import (
-    NODE_OUTPUT_MODELS,
-    ConvergeStrategy,
-    DoWhileLoopState,
-    ForEachLoopState,
-    LoopState,
-    LoopType,
-    NodeType,
-)
-from syntara.workflow_core.utils.namespace_resolver import NamespaceResolver
-from syntara.workflow_runtime.engines.temporal.approval_mixin import WorkflowApprovalMixin
-from syntara.workflow_runtime.engines.temporal.converge_mixin import WorkflowConvergeMixin
-from syntara.workflow_runtime.engines.temporal.utils.loop_iteration_ids import loop_control_activity_id
-from syntara.workflow_runtime.engines.unified_eval import safe_eval_with_namespace
 
 # Trigger types allowed for dynamic dispatch via Temporal activities.
 # Each entry must have a corresponding @activity.defn with a matching name.
