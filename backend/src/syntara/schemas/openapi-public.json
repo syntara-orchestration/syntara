@@ -9721,7 +9721,8 @@
                   "enum": [
                     "user",
                     "group",
-                    "service_account"
+                    "service_account",
+                    "service"
                   ]
                 },
                 {
@@ -42029,7 +42030,8 @@
                 "enum": [
                   "user",
                   "group",
-                  "service_account"
+                  "service_account",
+                  "service"
                 ]
               },
               {
