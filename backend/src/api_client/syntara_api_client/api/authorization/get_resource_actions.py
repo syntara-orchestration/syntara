@@ -92,7 +92,9 @@ def sync_detailed(
 ) -> Response[ErrorData | ResourceActionsResponse]:
     """List available resource types and actions
 
-     Returns the catalog of all resource types and the actions that can be performed on each.
+     Returns the catalog of all resource types and the actions that can be performed on each. Built from
+    route dependency introspection, built-in policies, and explicit non-routed pairs such as
+    step_type:write.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -117,7 +119,9 @@ def sync(
 ) -> ErrorData | ResourceActionsResponse | None:
     """List available resource types and actions
 
-     Returns the catalog of all resource types and the actions that can be performed on each.
+     Returns the catalog of all resource types and the actions that can be performed on each. Built from
+    route dependency introspection, built-in policies, and explicit non-routed pairs such as
+    step_type:write.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -138,7 +142,9 @@ async def asyncio_detailed(
 ) -> Response[ErrorData | ResourceActionsResponse]:
     """List available resource types and actions
 
-     Returns the catalog of all resource types and the actions that can be performed on each.
+     Returns the catalog of all resource types and the actions that can be performed on each. Built from
+    route dependency introspection, built-in policies, and explicit non-routed pairs such as
+    step_type:write.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -161,7 +167,9 @@ async def asyncio(
 ) -> ErrorData | ResourceActionsResponse | None:
     """List available resource types and actions
 
-     Returns the catalog of all resource types and the actions that can be performed on each.
+     Returns the catalog of all resource types and the actions that can be performed on each. Built from
+    route dependency introspection, built-in policies, and explicit non-routed pairs such as
+    step_type:write.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

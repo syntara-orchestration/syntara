@@ -34,7 +34,7 @@ registry/
 
 Each registered step type consists of:
 
-- **id**: Unique identifier
+- **id**: Unique identifier from `RegistryStepId` in `@syntara/contracts`
 - **label**: Display name in UI
 - **icon**: Icon component (PatternFly or custom)
 - **category**: Optional grouping (trigger, action, logic, etc.)
@@ -44,6 +44,18 @@ Each registered step type consists of:
 - **onSubmit**: Handler function when form is submitted
 - **order**: Display order (lower = earlier)
 - **enabled**: Whether the step type is available in the Add step panel
+
+Concrete step and subtype IDs use the existing backend step type values directly:
+Script uses `script`, REST API uses `http_request`, and Manual trigger uses
+`manual_trigger`. These values come from `ActivityTypeEnum` and `TriggerTypeEnum`
+in the shared contracts; no translation mapping or extra registry metadata is needed.
+When adding a supported concrete step, use its backend type as the registry ID.
+
+Groups such as `action`, `logic`, `trigger`, and `aap-execution`, and the internal
+`generic` placeholder, retain frontend-only IDs. Display labels and grouping remain
+local registry data. React Flow rendering types such as `task` are separate from
+these concrete backend step types. Policy conditions continue using the backend
+value under `resource_labels.kind`.
 
 ### 3. Subtypes
 

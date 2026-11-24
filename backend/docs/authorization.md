@@ -85,7 +85,8 @@ Defined in `BUILTIN_ROLES` in `src/syntara/authz/role_conventions.py`:
 | `project-admin` | yes | project | Full access within a project | Manage project, assign roles, CRUD workflows/executions, create custom roles/policies |
 | `project-user` | yes | project | Standard access within a project | Read project, CRUD workflows, run executions |
 | `project-auditor` | yes | project | Read-only within a project | Read project, workflows, executions, roles, policies |
-| `authenticated` | no | system | Default permissions for all authenticated users | Read/update self, read own role assignments, manage own identity links |
+| `authenticated` | yes | system | Default permissions for all authenticated users | Read/update self, read own role assignments, manage own identity links |
+| `step-author` | yes | system | Author all workflow step types; restrict with deny policies, do not remove | `step_type:write:any` |
 
 ## Database Schema
 
@@ -157,12 +158,13 @@ On first boot, the seed module (`src/syntara/authz/seed.py`) creates:
 - `admin` user (member of `admins` and `users` groups)
 - `system` user (member of `admins` and `users` groups)
 - `authenticated` role → `authenticated` group via `RoleAssignment` (principal_type=group, project_id=NULL, global, **builtin**)
+- `step-author` role → `authenticated` group via `RoleAssignment` (principal_type=group, project_id=NULL, global, **builtin**)
 - `user` role → `users` group via `RoleAssignment` (principal_type=group, project_id=NULL, global, **builtin**)
 - `admin` role → `admins` group via `RoleAssignment` (principal_type=group, project_id=NULL, global, **builtin**)
 - `auditor` role → `auditors` group via `RoleAssignment` (principal_type=group, project_id=NULL, global, **builtin**)
 - `project-user` role → `users` group via `RoleAssignment` (principal_type=group, project_id=default project, project-scoped, revocable)
 
-The `authenticated`, `user`, `admin`, and `auditor` role assignments are marked `is_builtin=True` and cannot be revoked via the API. The `project-user` assignment on the `users` group is revocable, allowing admins to customise default project permissions.
+The `authenticated`, `step-author`, `user`, `admin`, and `auditor` role assignments are marked `is_builtin=True` and cannot be revoked via the API. The `project-user` assignment on the `users` group is revocable, allowing admins to customise default project permissions.
 
 New local users are automatically added to the `users` group by default. The API accepts an optional `group_names` field on user creation: omit it to use the default, pass an empty list to skip group assignment, or pass specific group names to override.
 
@@ -171,6 +173,32 @@ There are two seeding paths:
 - `seed_groups_project_admin()` — lightweight seed that creates groups, project, admin user, and role assignments. Used at app startup after migrations have already run.
 
 Both functions only create groups, the default project, the admin user, and role assignments. Built-in policies and roles are not seeded into the database — they are resolved from `role_conventions.py` at runtime.
+
+### Default step-type authoring permissions
+
+The built-in `step-author` role includes `step_type:write:any`, which allows
+`step_type:write` at `any` scope without conditions. The built-in `authenticated`
+group has a global assignment to both `authenticated` and `step-author`, so every
+authenticated user can author all step types, including newly introduced types.
+
+The policy and role appear as **Built-in** in Access Management and cannot be
+edited or deleted. Roles and policies resolve from the code registry; both seed
+paths create the group assignment idempotently. Workflow and project permissions
+still apply independently.
+
+For selective restrictions, compose built-in deny policies into custom roles:
+
+- `step_type:write:any:deny:script` denies Script steps across all projects when attached to a system role.
+- `step_type:write:project:deny:script` denies Script steps only in projects where its project role is assigned.
+
+Both variants exist for every grantable step kind, including triggers and
+control-flow steps. System-only `internal_activity` is excluded. These policies
+are built-in, cannot be edited or deleted, and are not assigned automatically.
+Their kind conditions are evaluated by the existing policy engine, where an
+explicit deny overrides matching allows. Remove the policy from the role or
+revoke the role assignment to lift the restriction.
+
+Deploy the default allow before enabling workflow-save enforcement.
 
 ## Protecting API Endpoints
 
@@ -334,6 +362,46 @@ The evaluator response includes:
 - `denied_by` — name of the first deny policy that fired
 - `denial_reason` — `"policy_deny"` if explicitly denied
 - `allowed_projects` — set of project names the user can access (for list filtering)
+
+### Step-type deny policies
+
+The policy API accepts `deny` only for the literal action `step_type:write`
+with scope `any` or `project`. Wildcard deny actions (`step_type:*`) and denies
+on other resources are rejected with HTTP 422. Keeping policy, role, and
+role-assignment recovery actions outside this allowlist prevents lockout.
+Existing allow statements retain their wildcard and scope behavior.
+
+```json
+{
+  "effect": "deny",
+  "actions": ["step_type:write"],
+  "scope": "any",
+  "conditions": {"resource_labels": {"kind": "script"}}
+}
+```
+
+Step-type `kind` selectors in both allow and deny policies accept any
+non-empty string, including kinds that are not registered yet. This lets policies be prepared before a
+new step type ships; they match when a resource emits that exact kind. Only
+the `kind` label is supported. Omitting the selector covers every step kind.
+
+A globally assigned `any` deny applies in every project. Project role
+assignments narrow a statement to that project, even if its original scope
+was `any`. Denies override matching allows for every principal, including
+admins. Creating a policy alone does not attach it to a principal: a role and
+role assignment must make it effective.
+
+`can_i` accepts `resource_type: "step_type"`, `action: "write"`,
+`resource_labels: {"kind": "script"}`, and a project name or UUID in
+`resource_project`. Its response fields are unchanged. `denied_by` and
+`matched_policy` show original policy names, never internal statement IDs.
+`what_can_i` lists effective deny statements under their original policy names;
+`who_can` excludes users blocked for the requested kind/project and retains
+its existing query authorization gate. These policy checks do not enforce
+workflow saves or expose a palette endpoint.
+Default authoring grants are seeded as editable custom records by the
+separate default-policy story; no built-in grant is added here. Save
+enforcement must ship with that seeding so existing authors retain access.
 
 ## Query Endpoints
 

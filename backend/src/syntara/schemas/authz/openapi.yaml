@@ -150,7 +150,7 @@ paths:
   /authz/resource_actions:
     get:
       summary: List available resource types and actions
-      description: Returns the catalog of all resource types and the actions that can be performed on each.
+      description: Returns the catalog of all resource types and the actions that can be performed on each. Built from route dependency introspection, built-in policies, and explicit non-routed pairs such as step_type:write.
       operationId: get_resource_actions
       x-app-permission:
         resource: null

@@ -224,7 +224,7 @@ async def ws_user_role_user(
 async def ws_unprivileged_user(
     user_factory: Callable[..., Awaitable[User]],
 ) -> User:
-    """User in the ``authenticated`` group only — no role beyond default."""
+    """User with only the implicit authenticated-group role assignments."""
     return await user_factory(username="ws-unpriv", email="ws-unpriv@example.com")
 
 

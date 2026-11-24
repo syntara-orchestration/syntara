@@ -85,16 +85,11 @@ def _add_builtin_role_statements(
     from syntara.authz.role_conventions import builtin_role_policy_names  # noqa: PLC0415
 
     for policy_name in builtin_role_policy_names(role_name):
-        for stmt in resolve_builtin_policy_statements(policy_name):
+        for index, stmt in enumerate(resolve_builtin_policy_statements(policy_name)):
             if not _action_matches(stmt, action_accept):
                 continue
-            entry = {**stmt, "name": policy_name}
-            name = f"{policy_name}@{project}" if project else policy_name
-            if project:
-                entry = _scope_entry_to_project(entry, project)
-            if name not in seen:
-                seen.add(name)
-                result.append(entry)
+            entry = {**stmt, "name": policy_name, "policy_name": policy_name, "statement_index": index}
+            _add_stmt(entry, policy_name, seen, result, project)
 
 
 async def _load_custom_policies(
@@ -168,10 +163,11 @@ def _expand_role_policies(
     """Expand a single role's policy names into statement entries."""
     for pn in role.policy_names:
         stmts, fallback = _resolve_policy_statements(pn, custom_policies)
-        for stmt in stmts:
+        for index, stmt in enumerate(stmts):
             if not _action_matches(stmt, action_accept):
                 continue
-            _add_stmt(stmt, fallback, seen, result, project)
+            entry = {**stmt, "policy_name": stmt.get("policy_name", fallback), "statement_index": index}
+            _add_stmt(entry, fallback, seen, result, project)
 
 
 def _resolve_policy_statements(
@@ -198,7 +194,7 @@ def _add_stmt(
     name = f"{name}@{project}" if project else name
     if name not in seen:
         seen.add(name)
-        result.append(entry)
+        result.append({**entry, "name": name})
 
 
 async def get_user_group_ids(db: AsyncSession, user_id: UUID) -> list[UUID]:

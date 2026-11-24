@@ -156,6 +156,13 @@ class AuthzResult:
     denied_by: str
     effective_policies: list[dict[str, Any]]
 
+    def policy_name(self, identifier: str) -> str:
+        """Resolve an evaluation identifier to its originating display policy name."""
+        for statement in self.effective_policies:
+            if statement.get("name") == identifier:
+                return str(statement.get("policy_name", identifier))
+        return identifier
+
 
 async def authorize(
     db: AsyncSession,

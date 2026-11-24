@@ -157,6 +157,42 @@ describe('PoliciesTab', () => {
     expect(screen.getByText('Custom')).toBeInTheDocument()
   })
 
+  it.each(['any', 'project'])('shows the built-in default allow and %s step deny', (scope) => {
+    const description =
+      'Allow authoring every workflow step type. Step authoring depends on this policy: restrict step types with deny policies instead of removing it.'
+    setupPoliciesQuery([
+      {
+        ...samplePolicies[0],
+        name: 'step_type:write:any',
+        description,
+        statements: [{ effect: 'allow', actions: ['step_type:write'], scope: 'any' }],
+      },
+      {
+        ...samplePolicies[0],
+        id: 'deny-script',
+        name: `step_type:write:${scope}:deny:script`,
+        scope,
+        is_project_eligible: scope === 'project',
+        statements: [
+          { effect: 'deny', actions: ['step_type:write'], scope, conditions: { resource_labels: { kind: 'script' } } },
+        ],
+      },
+    ])
+
+    render(<PoliciesTab />, { wrapper })
+
+    const allowRow = screen.getByRole('row', { name: /step_type:write:any Allow authoring every workflow step type/ })
+    expect(within(allowRow).getByText('Built-in')).toBeInTheDocument()
+    expect(within(allowRow).queryByText('Custom')).not.toBeInTheDocument()
+    expect(within(allowRow).getByText('Allow')).toBeInTheDocument()
+    expect(within(allowRow).getByText(description)).toBeInTheDocument()
+    const denyRow = screen.getByRole('row', { name: new RegExp(`step_type:write:${scope}:deny:script`) })
+    expect(within(denyRow).getByText('Built-in')).toBeInTheDocument()
+    expect(within(denyRow).getByText('Deny')).toBeInTheDocument()
+    expect(within(denyRow).getByText('Step type: script')).toBeInTheDocument()
+    expect(within(denyRow).getByText(`Scope: ${scope}`)).toBeInTheDocument()
+  })
+
   it('shows dash for null description', () => {
     setupPoliciesQuery([
       {
@@ -274,8 +310,27 @@ describe('PoliciesTab', () => {
     render(<PoliciesTab />, { wrapper })
 
     expect(screen.getAllByText('Allow').length).toBeGreaterThan(0)
-    expect(screen.getByText('scope: any')).toBeInTheDocument()
+    expect(screen.getByText('Scope: any')).toBeInTheDocument()
     expect(screen.getByText('workflow:write')).toBeInTheDocument()
+  })
+
+  it('shows a step type in the table and preserves it in the policy definition', async () => {
+    const user = userEvent.setup()
+    const statements = [
+      {
+        effect: 'allow',
+        scope: 'project',
+        actions: ['step_type:write'],
+        conditions: { resource_labels: { kind: 'script' } },
+      },
+    ]
+    setupPoliciesQuery([{ ...samplePolicies[1], statements }])
+    render(<PoliciesTab />, { wrapper })
+
+    expect(screen.getByText('Step type: script')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Kebab toggle' }))
+    await user.click(await screen.findByRole('menuitem', { name: /view policy definition/i }))
+    expect(within(screen.getByRole('dialog')).getByText(/"resource_labels":\{"kind":"script"\}/)).toBeInTheDocument()
   })
 
   it('renders — for policies with no statements', () => {

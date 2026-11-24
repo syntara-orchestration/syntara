@@ -35,6 +35,8 @@ from syntara_api_client.models.upload_files_body import UploadFilesBody
 from syntara_api_client.models.workflow_create import WorkflowCreate
 from syntara_api_client.models.workflow_update import WorkflowUpdate
 
+from syntara.workflows.node_kinds import NODE_KINDS
+
 if TYPE_CHECKING:
     from collections.abc import Callable
     from uuid import UUID
@@ -408,6 +410,10 @@ OWN_SCOPED_CASES: list[PolicyTestCase] = [
 # ---------------------------------------------------------------------------
 
 E2E_COVERAGE_EXEMPT: set[str] = {
+    # Non-routed step authoring: every catalog entry is evaluated with real Rego
+    # in unit/authz/test_step_type_policy_catalog.py; save enforcement comes later.
+    "step_type:write:any",
+    *(f"step_type:write:{scope}:deny:{kind}" for kind in NODE_KINDS for scope in ("any", "project")),
     # System-scoped CRUD policies that follow the same pattern as the
     # representative cases already tested e2e (create/read tested, so
     # update/delete for the same resource are unit-test-only).
