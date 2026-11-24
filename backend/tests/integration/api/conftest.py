@@ -225,7 +225,7 @@ def _mock_evaluator(monkeypatch: pytest.MonkeyPatch) -> None:
     mock_evaluator = AsyncMock()
     mock_evaluator.evaluate = MagicMock(side_effect=_opa_evaluate_cli)
 
-    monkeypatch.setattr(app.state, "authz_evaluator", mock_evaluator, raising=False)
+    monkeypatch.setitem(app.state._state, "authz_evaluator", mock_evaluator)
 
 
 def mcp_payload(name: str | None = None, scope: str = "global") -> dict[str, object]:
