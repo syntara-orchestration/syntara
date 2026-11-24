@@ -24,6 +24,7 @@ describe('GitHubClient', () => {
           created_at: '2026-08-11T10:00:00Z',
           html_url: 'https://github.com/owner/repo/actions/runs/123',
           head_branch: 'gh-readonly-queue/devel/pr-42-abc',
+          event: 'schedule',
         },
         {
           id: 124,
@@ -33,6 +34,7 @@ describe('GitHubClient', () => {
           created_at: '2026-08-11T10:05:00Z',
           html_url: 'https://github.com/owner/repo/actions/runs/124',
           head_branch: 'gh-readonly-queue/devel/pr-43-def',
+          event: 'schedule',
         },
       ]
 
@@ -63,6 +65,7 @@ describe('GitHubClient', () => {
           created_at: '2026-08-11T10:00:00Z',
           html_url: 'https://github.com/owner/repo/actions/runs/123',
           head_branch: 'gh-readonly-queue/devel/pr-42-abc',
+          event: 'schedule',
         },
         {
           id: 124,
@@ -72,6 +75,7 @@ describe('GitHubClient', () => {
           created_at: '2026-08-11T10:05:00Z',
           html_url: 'https://github.com/owner/repo/actions/runs/124',
           head_branch: 'gh-readonly-queue/devel/pr-43-def',
+          event: 'workflow_dispatch',
         },
       ]
 
@@ -239,6 +243,173 @@ describe('GitHubClient', () => {
       const branch = await client.getDefaultBranch()
 
       expect(branch).toBe('main')
+    })
+  })
+
+  describe('getRecentDequeues', () => {
+    it('returns PRs with removed_from_merge_queue events in the window', async () => {
+      const since = new Date('2026-08-25T12:00:00Z')
+
+      server.use(
+        http.get('https://api.github.com/repos/owner/repo/pulls', ({ request }) => {
+          const url = new URL(request.url)
+          const state = url.searchParams.get('state')
+
+          if (state === 'open') {
+            return HttpResponse.json([
+              {
+                number: 10,
+                title: 'Open dequeued PR',
+                merged_at: null,
+                updated_at: '2026-08-25T12:30:00Z',
+              },
+            ])
+          }
+
+          return HttpResponse.json([
+            {
+              number: 11,
+              title: 'Closed dequeued PR',
+              merged_at: null,
+              updated_at: '2026-08-25T12:20:00Z',
+            },
+            {
+              number: 12,
+              title: 'Successfully merged PR',
+              merged_at: '2026-08-25T12:15:00Z',
+              updated_at: '2026-08-25T12:15:00Z',
+            },
+          ])
+        }),
+        http.get('https://api.github.com/repos/owner/repo/issues/:number/timeline', ({ params }) => {
+          const number = Number(params.number)
+
+          if (number === 10) {
+            return HttpResponse.json([
+              {
+                event: 'removed_from_merge_queue',
+                created_at: '2026-08-25T12:10:00Z',
+              },
+              {
+                event: 'removed_from_merge_queue',
+                created_at: '2026-08-25T12:40:00Z',
+              },
+            ])
+          }
+
+          if (number === 11) {
+            return HttpResponse.json([
+              {
+                event: 'removed_from_merge_queue',
+                created_at: '2026-08-25T12:05:00Z',
+              },
+            ])
+          }
+
+          return HttpResponse.json([])
+        })
+      )
+
+      const dequeues = await client.getRecentDequeues('devel', since)
+
+      expect(dequeues).toEqual([
+        {
+          number: 10,
+          title: 'Open dequeued PR',
+          dequeuedAt: '2026-08-25T12:40:00Z',
+        },
+        {
+          number: 11,
+          title: 'Closed dequeued PR',
+          dequeuedAt: '2026-08-25T12:05:00Z',
+        },
+      ])
+    })
+
+    it('skips merged PRs and dequeues outside the time window', async () => {
+      const since = new Date('2026-08-25T12:00:00Z')
+
+      server.use(
+        http.get('https://api.github.com/repos/owner/repo/pulls', ({ request }) => {
+          const state = new URL(request.url).searchParams.get('state')
+
+          if (state === 'open') {
+            return HttpResponse.json([
+              {
+                number: 20,
+                title: 'Old dequeue',
+                merged_at: null,
+                updated_at: '2026-08-25T12:50:00Z',
+              },
+            ])
+          }
+
+          return HttpResponse.json([
+            {
+              number: 21,
+              title: 'Merged',
+              merged_at: '2026-08-25T12:45:00Z',
+              updated_at: '2026-08-25T12:45:00Z',
+            },
+          ])
+        }),
+        http.get('https://api.github.com/repos/owner/repo/issues/20/timeline', () => {
+          return HttpResponse.json([
+            {
+              event: 'removed_from_merge_queue',
+              created_at: '2026-08-25T11:00:00Z',
+            },
+            {
+              event: 'commented',
+              created_at: '2026-08-25T12:30:00Z',
+            },
+          ])
+        })
+      )
+
+      const dequeues = await client.getRecentDequeues('devel', since)
+
+      expect(dequeues).toEqual([])
+    })
+
+    it('fails when a timeline fetch fails for a PR', async () => {
+      const since = new Date('2026-08-25T12:00:00Z')
+
+      server.use(
+        http.get('https://api.github.com/repos/owner/repo/pulls', ({ request }) => {
+          const url = new URL(request.url)
+          if (url.searchParams.get('state') === 'open') {
+            return HttpResponse.json([
+              {
+                number: 30,
+                title: 'Fails timeline',
+                merged_at: null,
+                updated_at: '2026-08-25T12:10:00Z',
+              },
+              {
+                number: 31,
+                title: 'Ok dequeue',
+                merged_at: null,
+                updated_at: '2026-08-25T12:10:00Z',
+              },
+            ])
+          }
+          return HttpResponse.json([])
+        }),
+        http.get('https://api.github.com/repos/owner/repo/issues/30/timeline', () =>
+          HttpResponse.json({ message: 'Not Found' }, { status: 404 })
+        ),
+        http.get('https://api.github.com/repos/owner/repo/issues/31/timeline', () =>
+          HttpResponse.json([
+            {
+              event: 'removed_from_merge_queue',
+              created_at: '2026-08-25T12:10:00Z',
+            },
+          ])
+        )
+      )
+
+      await expect(client.getRecentDequeues('devel', since)).rejects.toThrow('Could not fetch timeline for PR #30')
     })
   })
 

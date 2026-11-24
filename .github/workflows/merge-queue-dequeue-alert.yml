@@ -6,12 +6,19 @@ on:
     - cron: '*/15 * * * *'
   workflow_dispatch:
 
+concurrency:
+  group: merge-queue-dequeue-alert
+  cancel-in-progress: false
+
 jobs:
   dequeue-burst-detection:
     runs-on: ubuntu-24.04
     permissions:
       contents: read
       actions: read
+      # pulls.list and the issue timeline API need these to detect dequeues
+      pull-requests: read
+      issues: read
     env:
       SLACK_CI_MONITORING_WEBHOOK_URL: ${{ secrets.SLACK_CI_MONITORING_WEBHOOK_URL }}
 
