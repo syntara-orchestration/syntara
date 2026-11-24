@@ -2,7 +2,7 @@ import { StackItem } from '@patternfly/react-core'
 import { Thead, Tr, Th } from '@patternfly/react-table'
 import type { Execution } from '@syntara/contracts'
 import { useSearch } from '@tanstack/react-router'
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 
 import { executionsClient } from '../../client'
 import { FilterBar } from '../../components/filters/FilterBar'
@@ -10,15 +10,20 @@ import { SynPage, SynPageBody } from '../../components/layout/SynPage'
 import { SynPageHeader } from '../../components/layout/SynPageHeader'
 import { SynPanel } from '../../components/layout/SynPanel'
 import { SynPanelContentStack } from '../../components/layout/SynPanelContentStack'
+import { SynEmptyStateAccessDenied } from '../../components/states/SynEmptyStateAccessDenied'
 import { SynEmptyStateFilter } from '../../components/states/SynEmptyStateFilter'
 import { SynEmptyStateNoData } from '../../components/states/SynEmptyStateNoData'
-import { useQueryState } from '../../components/states/useQueryState'
+import { SynEmptyStateServiceUnavailable } from '../../components/states/SynEmptyStateServiceUnavailable'
+import { SynErrorState } from '../../components/states/SynErrorState'
+import { SynLoadingState } from '../../components/states/SynLoadingState'
 import { SynPageTitle } from '../../components/SynPageTitle'
 import { SynScrollableTableContainer } from '../../components/table/SynScrollableTableContainer'
+import { useApiErrorAlert } from '../../hooks/useApiErrorAlert'
 import { useCursorPagination, useCursorReset } from '../../hooks/useCursorPagination'
 import { useProjectSelector } from '../../hooks/useProjectSelector'
 import { useProjectsForGrouping } from '../../hooks/useProjectsForGrouping'
 import type { FilterFieldDefinition } from '../../types/filters'
+import { getErrorStatus, isForbiddenError, isRetryableError, isServiceUnavailableError } from '../../utils/apiErrors'
 import { detachPromise } from '../../utils/detachPromise'
 import { useDocLink } from '../../utils/docs/useDocLink'
 
@@ -29,6 +34,7 @@ import {
   getExecutionVersionFilterFromExecutions,
   transformExecutionStatusFilter,
 } from './executionFilters'
+import { getExecutionsListLoadErrorMessage } from './executionsListLoadErrors'
 import { FlatExecutionsTableBody, GroupedExecutionsTableBody } from './ExecutionsTableBody'
 import { executionDefaultSort, executionTableColumns } from './executionTableColumns'
 
@@ -39,6 +45,43 @@ function buildFilterFieldDefinitions(executions: Execution[], projectId: string 
     getExecutionVersionFilterFromExecutions(executions),
     getExecutionCreatedAtFilterDefinition(),
   ].filter((def): def is FilterFieldDefinition => def !== null)
+}
+
+function renderExecutionsListQueryState(
+  listError: unknown,
+  listErrorMessage: string,
+  isPending: boolean,
+  onRetry: () => void
+): ReactNode {
+  if (listError) {
+    if (isServiceUnavailableError(listError)) {
+      return (
+        <SynEmptyStateServiceUnavailable
+          title="Service unavailable"
+          description={listErrorMessage}
+          showAdminHint={false}
+        />
+      )
+    }
+    if (isForbiddenError(listError)) {
+      return <SynEmptyStateAccessDenied description={listErrorMessage} />
+    }
+    return (
+      <SynErrorState
+        title="Unable to load workflow runs"
+        message={{
+          status: getErrorStatus(listError),
+          detail: listErrorMessage,
+          retryable: isRetryableError(listError),
+        }}
+        onRetry={onRetry}
+      />
+    )
+  }
+  if (isPending) {
+    return <SynLoadingState />
+  }
+  return null
 }
 
 export default function Executions() {
@@ -145,10 +188,18 @@ export default function Executions() {
     })
   }
 
-  const queryState = useQueryState(executionsQuery, {
-    title: 'Error loading executions',
-    onRetry: () => detachPromise(executionsQuery.refetch()),
+  const listError = executionsQuery.error
+  const listErrorMessage = getExecutionsListLoadErrorMessage(listError)
+  useApiErrorAlert(listError, {
+    title: 'Unable to load workflow runs',
+    message: listErrorMessage,
+    suppress503: true,
   })
+
+  const queryState = renderExecutionsListQueryState(listError, listErrorMessage, executionsQuery.isPending, () =>
+    detachPromise(executionsQuery.refetch())
+  )
+
   if (queryState) {
     return (
       <SynPage>
