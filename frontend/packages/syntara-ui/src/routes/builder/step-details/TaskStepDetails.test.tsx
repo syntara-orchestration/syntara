@@ -497,8 +497,8 @@ describe('TaskStepDetails Component', () => {
     expect(mockUpdateActivity).toHaveBeenCalledWith('task-aap', expect.objectContaining({ name: 'Updated AAP Task' }))
   })
 
-  // AAP-92997: toggling "Use input variables" off after the node was previously
-  // saved with it on must not invalidate the already-selected job template.
+  // Toggling "Use input variables" off after the node was previously saved with
+  // it on must not invalidate the already-selected job template.
   it('keeps the job template valid when "Use input variables" is turned back off', async () => {
     const user = userEvent.setup()
     const taskData = {
@@ -514,7 +514,7 @@ describe('TaskStepDetails Component', () => {
       },
     }
 
-    renderTaskNodeDetails(taskData, 'task-aap')
+    renderTaskStepDetails(taskData, 'task-aap')
 
     // User toggles "Use input variables" back off and submits without
     // re-picking from the job template dropdown.
