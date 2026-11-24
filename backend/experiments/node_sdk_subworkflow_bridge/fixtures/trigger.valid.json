@@ -1,0 +1,52 @@
+{
+  "apiVersion": "syntara.io/v1alpha1",
+  "kind": "Trigger",
+  "metadata": {
+    "name": "publish-artifact-requested",
+    "displayName": "Publish artifact requested",
+    "description": "Starts the publish-artifact workflow when a parent workflow invokes it."
+  },
+  "spec": {
+    "driver": "subworkflow.v1",
+    "runtime": {
+      "kind": "platform-runner",
+      "implementation": "syntara.subworkflow.event@1.0.0"
+    },
+    "configuration": {
+      "kind": "inline",
+      "value": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "artifact": { "type": "string" },
+          "channel": { "type": "string" }
+        },
+        "required": ["artifact", "channel"]
+      }
+    },
+    "input": {
+      "kind": "inline",
+      "value": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "artifact": { "type": "string" },
+          "channel": { "type": "string" }
+        },
+        "required": ["artifact", "channel"]
+      }
+    },
+    "output": {
+      "kind": "inline",
+      "value": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "artifact": { "type": "string" },
+          "channel": { "type": "string" }
+        },
+        "required": ["artifact", "channel"]
+      }
+    }
+  }
+}
