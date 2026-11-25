@@ -167,6 +167,7 @@ async def test_seed_resyncs_password_for_existing_admin_from_current_secret() ->
     with patch("syntara.authz.seed._read_admin_password_plain", return_value=_BOOTSTRAP_TEST_PASSWORD):
         await _run_seed(session)
 
+    assert admin.password_hash is not None
     assert admin.password_hash != stale_hash
     assert verify_password(_BOOTSTRAP_TEST_PASSWORD, admin.password_hash)
 
