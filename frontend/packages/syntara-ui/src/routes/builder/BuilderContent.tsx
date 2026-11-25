@@ -88,6 +88,7 @@ export function BuilderContent(props: BuilderContentProps) {
     createWorkflow: authoring.createWorkflow,
     setLocation,
     pinnedMockDataForDialog: workspace.pinnedMockDataForDialog,
+    getImportRefusal: workspace.getImportRefusal,
   })
   return (
     <StepActionsContext.Provider value={workspace.stepActionsValue}>

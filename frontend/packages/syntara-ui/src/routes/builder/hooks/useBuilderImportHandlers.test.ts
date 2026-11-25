@@ -71,6 +71,37 @@ describe('useBuilderImportHandlers', () => {
       expect(params.markDirty).toHaveBeenCalled()
       expect(setPendingImport).toHaveBeenCalledWith(null)
     })
+
+    it('refuses the import and applies nothing when getImportRefusal returns a message', () => {
+      const getImportRefusal = vi.fn(() => "You don't have permission to write Script steps.")
+      const params = createParams({ getImportRefusal })
+      const setPendingImport = vi.fn()
+      const { result } = renderHook(() => useBuilderImportHandlers(params, mockPendingImport, setPendingImport))
+
+      act(() => result.current.handleImportCurrent())
+
+      expect(getImportRefusal).toHaveBeenCalledWith(mockPendingImport)
+      expect(params.showError).toHaveBeenCalledWith({
+        title: 'Cannot import into this workflow',
+        description: "You don't have permission to write Script steps.",
+      })
+      expect(mockReplaceWorkflowContent).not.toHaveBeenCalled()
+      expect(params.markDirty).not.toHaveBeenCalled()
+      expect(setPendingImport).not.toHaveBeenCalled()
+    })
+
+    it('applies the import when getImportRefusal allows it', () => {
+      const getImportRefusal = vi.fn(() => null)
+      const params = createParams({ getImportRefusal })
+      const setPendingImport = vi.fn()
+      const { result } = renderHook(() => useBuilderImportHandlers(params, mockPendingImport, setPendingImport))
+
+      act(() => result.current.handleImportCurrent())
+
+      expect(params.showError).not.toHaveBeenCalled()
+      expect(mockReplaceWorkflowContent).toHaveBeenCalled()
+      expect(setPendingImport).toHaveBeenCalledWith(null)
+    })
   })
 
   describe('handleImportNew', () => {

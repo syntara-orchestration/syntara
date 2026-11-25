@@ -7,6 +7,7 @@ import { useBuilderLiveRunPanel } from './hooks/useBuilderLiveRunPanel'
 import { useBuilderWindowEffects } from './hooks/useBuilderWindowEffects'
 import { useRunStepDialog } from './hooks/useRunStepDialog'
 import { useStepPanelNavigation } from './hooks/useStepPanelNavigation'
+import { useStepTypeCanvasGuards } from './stepTypeCanvasGuards'
 import { createAddStepHandler } from './utils/panelActions'
 
 type Session = ReturnType<typeof useBuilderSession>
@@ -20,7 +21,17 @@ export function useBuilderWorkspace(session: Session, guardedSaveWorkflow: () =>
     nodesInitialized,
     mostRecentExecutionQuery,
   } = session
-  const { currentWorkflow, duplicateActivity } = session.store
+  const { currentWorkflow } = session.store
+  const clearDesiredPosition = useCallback(() => dispatch({ type: 'CLEAR_NEW_NODE_DESIRED_POSITION' }), [dispatch])
+  // Refuse duplicating or pasting a step type the caller may not author in
+  // this project, with the add-step panel's message (UX only; the server
+  // still rejects the save).
+  const { duplicateActivity, getImportRefusal } = useStepTypeCanvasGuards({
+    projectId: session.builderProjectId,
+    currentWorkflow,
+    duplicateActivity: session.store.duplicateActivity,
+    onDuplicateRefused: clearDesiredPosition,
+  })
   const { mostRecentExecutionId, mostRecentRunPanelOpen, edgeIdToReplace, targetNodeId, sourceHandle, targetHandle } =
     session.state
   const mostRecentExecution = mostRecentExecutionQuery.data
@@ -116,6 +127,7 @@ export function useBuilderWorkspace(session: Session, guardedSaveWorkflow: () =>
     handleConnectFromPanel,
     handleNodesDeleted,
     stepActionsValue,
+    getImportRefusal,
     handleNavigateToStep,
     handleAddStepFromPanel,
     pendingApproval,

@@ -26,6 +26,14 @@ export function stepTypeBlockedTooltip(blockedBy: BlockedStepType): string {
   return `You don't have permission to write ${blockedBy.label} steps.`
 }
 
+/**
+ * Message shown when pasting or duplicating a blocked step type on the canvas
+ * is refused. Same wording as the palette tooltip for the blocked kind.
+ */
+export function stepTypeBlockedMessage(blockedBy: BlockedStepType): string {
+  return stepTypeBlockedTooltip(blockedBy)
+}
+
 /** Tooltip shown on every entry when the permissions endpoint is unavailable. */
 export const STEP_TYPE_PERMISSIONS_UNAVAILABLE_TOOLTIP =
   'Step type permissions could not be loaded. Ask an administrator to check the server.'
