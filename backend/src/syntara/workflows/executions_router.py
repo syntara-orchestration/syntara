@@ -17,6 +17,10 @@ from syntara.authz.models.project import Project
 from syntara.core.database.session import get_db
 from syntara.core.models import User
 from syntara.core.syntara_router import NO_PERMISSION, SyntaraRouter
+from syntara.workflow_runtime.execution import (
+    WorkflowExecutionService,
+    create_workflow_execution_service,
+)
 from syntara.workflows.models import ActivitySignalPayload, ExecutionListParams, SignalResponse
 from syntara.workflows.models.activity_execution import ActivityExecutionListResponse
 from syntara.workflows.models.execution import (
@@ -27,10 +31,6 @@ from syntara.workflows.models.execution import (
 )
 from syntara.workflows.models.query_params import ActivityListParams, ExecutionIncludeParams
 from syntara.workflows.services import ExecutionService
-from syntara.workflows.workflow_engine.services.temporal_execution_service import (
-    TemporalExecutionService,
-    create_temporal_execution_service,
-)
 
 logger = structlog.stdlib.get_logger(__name__)
 
@@ -55,18 +55,18 @@ _exec_perm_run = PermissionChecker(
 # ============================================================================
 
 
-async def get_temporal_execution_service() -> TemporalExecutionService | None:
+async def get_temporal_execution_service() -> WorkflowExecutionService | None:
     """Dependency provider for Temporal execution service.
 
     FastAPI will call this function automatically when a route depends on it.
     Returns None if Temporal is unavailable (graceful degradation for testing).
 
     Returns:
-        TemporalExecutionService if available, None otherwise
+        WorkflowExecutionService if available, None otherwise
 
     """
     try:
-        return await create_temporal_execution_service()
+        return await create_workflow_execution_service()
     except (RPCError, OSError, RuntimeError) as e:
         logger.warning("Temporal service unavailable", error=str(e))
         return None
@@ -76,7 +76,7 @@ def get_execution_service(
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
     temporal_service: Annotated[
-        TemporalExecutionService | None,
+        WorkflowExecutionService | None,
         Depends(get_temporal_execution_service),
     ],
 ) -> ExecutionService:

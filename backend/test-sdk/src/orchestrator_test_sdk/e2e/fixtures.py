@@ -480,7 +480,7 @@ def llm_model() -> str:
     Reads APP_OPENROUTER_MODEL from the environment; falls back to the
     app's default so local runs work without any extra configuration.
     """
-    return os.environ.get("APP_OPENROUTER_MODEL", "anthropic/claude-sonnet-4")
+    return os.environ.get("APP_OPENROUTER_MODEL", "anthropic/claude-sonnet-4.5")
 
 
 @pytest.fixture(scope="session")

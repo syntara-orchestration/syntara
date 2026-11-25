@@ -22,6 +22,7 @@ import { useState } from 'react'
 import { AppRoute } from '../../../app/AppRoute'
 import { breadcrumbsUserDetailEarlyShell } from '../../../app/breadcrumbBuilders'
 import { usersClient } from '../../../client'
+import { SynFormCancelButton } from '../../../components/forms/SynFormCancelButton'
 import { SynPage, SynPageBody } from '../../../components/layout/SynPage'
 import { DocLinkButton, SynPageHeader } from '../../../components/layout/SynPageHeader'
 import { SynPanel } from '../../../components/layout/SynPanel'
@@ -29,7 +30,7 @@ import { SynLoadingState } from '../../../components/states/SynLoadingState'
 import { useQueryState } from '../../../components/states/useQueryState'
 import { SynPageTitle } from '../../../components/SynPageTitle'
 import { useMutationErrorHandler } from '../../../hooks/useMutationErrorHandler'
-import { useAlerts } from '../../../providers/alerts'
+import { useAlerts } from '../../../providers/alerts/AlertContext'
 import { detachPromise } from '../../../utils/detachPromise'
 import { useDocLink } from '../../../utils/docs/useDocLink'
 import { isValidUUID } from '../../../utils/generateUUID'
@@ -66,9 +67,7 @@ function WizardFooterStep1({ isNextDisabled, onCancel }: Readonly<{ isNextDisabl
         </ActionListGroup>
         <ActionListGroup>
           <ActionListItem>
-            <Button variant="link" onClick={onCancel}>
-              Cancel
-            </Button>
+            <SynFormCancelButton onClick={onCancel} />
           </ActionListItem>
         </ActionListGroup>
       </ActionList>
@@ -106,9 +105,7 @@ function WizardFooterStep2({
         </ActionListGroup>
         <ActionListGroup>
           <ActionListItem>
-            <Button variant="link" onClick={onCancel}>
-              Cancel
-            </Button>
+            <SynFormCancelButton onClick={onCancel} />
           </ActionListItem>
         </ActionListGroup>
       </ActionList>

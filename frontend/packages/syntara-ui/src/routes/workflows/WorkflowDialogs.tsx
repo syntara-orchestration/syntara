@@ -3,7 +3,7 @@ import { useCallback, useState } from 'react'
 
 import { SynConfirmationDialog } from '../../components/dialogs/SynConfirmationDialog'
 import type { DialogState } from '../../hooks/useDialogState'
-import { useAlerts } from '../../providers/alerts'
+import { useAlerts } from '../../providers/alerts/AlertContext'
 import { detachPromise } from '../../utils/detachPromise'
 import type { ProjectRead } from '../access/types'
 import { ProjectFormModal } from '../access-management/ProjectFormModal'
@@ -15,6 +15,7 @@ import { hasNonEmptyInputSchema } from '../builder/utils/triggerReferenceCheck'
 import { ImportWorkflowDialog } from './ImportWorkflowDialog'
 import { resolveWorkflowRunTrigger, type WorkflowRunTrigger } from './resolveWorkflowRunTrigger'
 import { WorkflowDeleteDialog } from './WorkflowDeleteDialog'
+import { getWorkflowRunTriggerDetailsErrorMessage } from './workflowRunTriggerDetailsError'
 
 type Workflow = WorkflowAPI.components['schemas']['WorkflowRead']
 
@@ -121,7 +122,7 @@ export function WorkflowDialogs({
         .catch((error: unknown) => {
           showError({
             title: 'Cannot run workflow',
-            description: error instanceof Error ? error.message : 'Failed to load workflow trigger details',
+            description: getWorkflowRunTriggerDetailsErrorMessage(error),
           })
           closeRunDialog()
         })

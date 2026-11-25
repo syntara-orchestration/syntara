@@ -1,4 +1,4 @@
-import { AUTHORIZED_SERVICE_ACCOUNT_REQUIRED_MESSAGE } from '../../node-forms/triggerFormSchema'
+import { AUTHORIZED_SERVICE_ACCOUNT_REQUIRED_MESSAGE } from '../../step-forms/triggerFormSchema'
 
 const KEY_PREFIX_PATTERN = /^(\w+(?:\.\w+)*): /
 

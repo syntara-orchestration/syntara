@@ -2,7 +2,7 @@
 
 Welcome to Syntara! This guide provides architectural deep-dives and practical examples to help you understand and work with our codebase patterns.
 
-For setup instructions, see [README.md](../README.md).
+For setup instructions, see [README.md](https://github.com/syntara-orchestration/syntara/blob/devel/backend/README.md).
 
 ## Understanding Base Resource Classes
 

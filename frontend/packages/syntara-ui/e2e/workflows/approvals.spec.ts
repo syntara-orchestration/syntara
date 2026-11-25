@@ -10,7 +10,7 @@ import { type Page } from '../fixtures'
 import { test, expect, toAppUrl } from '../fixtures'
 import { applyApprovalNameFilter, dismissConnectionBanner, navigateToApprovalAndOpen } from '../helpers/approvals'
 import { APP_TITLE } from '../helpers/appTitle'
-import { addApprovalNodeWithBranch } from '../helpers/v2-nodes'
+import { addApprovalStepWithBranch } from '../helpers/v2-steps'
 import { runWorkflowFromBuilder, waitForExecutionPaused } from '../helpers/workflow-run'
 import { buildUniqueName, openWorkflowInBuilder } from '../helpers/workflows'
 import {
@@ -424,6 +424,7 @@ test.describe('Approval Workflow Operations', () => {
   })
 
   test('user selects all filtered approvals using the header checkbox', async ({ app }) => {
+    test.slow()
     // Create 2 pending approvals with a shared prefix for filtering
     const batchId = `batch-${Date.now()}`
     const approval1 = await createPendingApproval(app, batchId)
@@ -437,25 +438,17 @@ test.describe('Approval Workflow Operations', () => {
       const table = app.getByRole('grid', { name: 'Approvals table' })
       await table.waitFor({ state: 'visible', timeout: 15_000 })
 
-      // Filter to show only our test approvals using shared batch ID
-      await app.getByPlaceholder('Filter by name').fill(batchId)
-      await app.getByRole('button', { name: 'Apply filter' }).click()
+      await applyApprovalNameFilter(app, table, batchId)
 
-      // Wait for filter chip to confirm filter was applied and both rows to appear
-      await expect(app.getByRole('search', { name: 'Filters' }).getByRole('list', { name: 'Name' })).toBeVisible({
-        timeout: 15_000,
-      })
       const rows = table.getByRole('row')
-      await expect(rows.filter({ hasText: approval1.approvalName })).toBeVisible({
-        timeout: 15_000,
-      })
-      await expect(rows.filter({ hasText: approval2.approvalName })).toBeVisible({
-        timeout: 15_000,
-      })
+      const row1 = rows.filter({ hasText: approval1.approvalName })
+      const row2 = rows.filter({ hasText: approval2.approvalName })
+      await expect(row1).toBeVisible({ timeout: 15_000 })
+      await expect(row2).toBeVisible({ timeout: 15_000 })
 
       // Click header row checkbox to select all. Bulk actions live in the page header
       // (Compass toolbar has no accessible name) — same pattern as sibling batch tests.
-      // Under Konflux cluster load the checkbox click can fail to register; retry the whole sequence.
+      // Under merge_group / cluster load the checkbox click can fail to register; retry the whole sequence.
       const selectAllCheckbox = table.getByRole('checkbox', { name: /select all/i })
       await expect(selectAllCheckbox).toBeEnabled()
       const pageHeader = app.getByTestId('page-header')
@@ -463,8 +456,11 @@ test.describe('Approval Workflow Operations', () => {
 
       await expect(async () => {
         await selectAllCheckbox.check()
+        await expect(selectAllCheckbox).toBeChecked()
+        await expect(row1.getByRole('checkbox')).toBeChecked()
+        await expect(row2.getByRole('checkbox')).toBeChecked()
         await expect(selectedText).toBeVisible()
-      }).toPass({ timeout: 15_000, intervals: [500] })
+      }).toPass({ timeout: 45_000, intervals: [500, 1_000, 2_000] })
 
       // Uncheck header checkbox to deselect all
       await selectAllCheckbox.uncheck()
@@ -497,7 +493,7 @@ test.describe('Approval Workflow Operations', () => {
 
     try {
       // Add approval node with a unique name so we can find it in the approvals list
-      await addApprovalNodeWithBranch(app, approvalNodeName)
+      await addApprovalStepWithBranch(app, approvalNodeName)
       await app.getByRole('button', { name: 'Save workflow' }).click()
       await runWorkflowFromBuilder(app)
       const executionId = app.url().match(/\/executions\/([^/?]+)/)?.[1]

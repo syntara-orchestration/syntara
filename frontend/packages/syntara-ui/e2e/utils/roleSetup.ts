@@ -21,7 +21,7 @@ import { randomBytes } from 'node:crypto'
 
 import type { APIRequestContext } from '@playwright/test'
 
-import { buildUniqueName } from '../helpers/workflows'
+import { buildUniqueName } from '../helpers/workflowNames'
 
 export function generatePassword(): string {
   return `E2e-${randomBytes(16).toString('hex')}!A1`

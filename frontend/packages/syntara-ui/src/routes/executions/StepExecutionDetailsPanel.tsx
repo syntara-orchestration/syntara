@@ -1,0 +1,541 @@
+import {
+  Button,
+  Content,
+  ContentVariants,
+  EmptyState,
+  EmptyStateBody,
+  Flex,
+  FlexItem,
+  Icon,
+  SearchInput,
+  Spinner,
+  Stack,
+  StackItem,
+  Tab,
+  Tabs,
+  TabTitleText,
+  Title,
+  TitleSizes,
+  Tooltip,
+} from '@patternfly/react-core'
+import {
+  RhUiCompressArrowsIcon,
+  RhUiDislikeFillIcon,
+  RhUiExpandArrowsIcon,
+  RhUiExternalLinkIcon,
+  RhUiLikeFillIcon,
+  RhUiWarningFillIcon,
+} from '@patternfly/react-icons'
+import { ActivityTypeEnum } from '@syntara/contracts'
+import { useEffect, useMemo, useRef, useState } from 'react'
+
+import { SynCodeBlock } from '../../components/details/SynCodeBlock'
+import { SynLabel } from '../../components/labels/SynLabel'
+import { SynErrorState } from '../../components/states/SynErrorState'
+import { ExecutionTimestamp } from '../../components/table/ExecutionTimestamp'
+import { useElapsedTime } from '../../hooks/useElapsedTime'
+import { extractAAPJobUrl, isAAPNodeType } from '../../utils/aapJobUrl'
+import { capitalize } from '../../utils/capitalize'
+import { formatElapsedTime } from '../../utils/dateUtils'
+import { detachPromise } from '../../utils/detachPromise'
+import { highlightTextLines } from '../../utils/highlightText'
+import { ActivityStatusLabel } from '../builder/ExecutionStatus'
+import { InputSchemaView } from '../builder/panels/views/InputSchemaView'
+import { InputTableView } from '../builder/panels/views/InputTableView'
+import { ViewToggle, type PanelView } from '../builder/panels/ViewToggle'
+import type { ActivityState } from '../workflows/execution/types'
+import { extractApprovalAudit, type ApprovalAudit } from '../workflows/execution/utils/activityState'
+
+import { extractAgentTrace } from './agentTraceTypes'
+import { AgentTraceView } from './AgentTraceView'
+import { useStepExecutionDetails } from './hooks/useStepExecutionDetails'
+import styles from './StepExecutionDetailsPanel.module.css'
+import { extractUsedTools, type UsedTool } from './utils/extractUsedTools'
+
+type StepExecutionDetailsPanelProps = {
+  stepId: string
+  stepName: string
+  executionId: string
+  /** Activity state from the execution store, used for status and elapsed time. */
+  stepState?: ActivityState
+  /** Step type from workflow definition (e.g. 'aap_job_template'). */
+  stepType?: string
+}
+
+function NoDataState({ label }: Readonly<{ label: string }>) {
+  return (
+    <EmptyState headingLevel="h3" titleText={`No ${label} data`} variant="xs">
+      <EmptyStateBody>No {label} data is available for this activity.</EmptyStateBody>
+    </EmptyState>
+  )
+}
+
+type IoPaneLayout = 'split' | 'parameters' | 'output'
+
+const PANE_LAYOUT_ACTION_LABELS = {
+  parameters: {
+    expand: 'Expand parameters panel',
+    restore: 'Restore parameters panel layout',
+  },
+  output: {
+    expand: 'Expand output panel',
+    restore: 'Restore output panel layout',
+  },
+} as const
+
+type DataPaneProps = {
+  title: string
+  stepId: string
+  data: Record<string, unknown> | null
+  view: PanelView
+  onViewChange: (view: PanelView) => void
+  isErrorState?: boolean
+  paneKey: 'parameters' | 'output'
+  paneLayout: IoPaneLayout
+  onPaneLayoutChange: (layout: IoPaneLayout) => void
+}
+
+function DataPane({
+  title,
+  stepId,
+  data,
+  view,
+  onViewChange,
+  isErrorState = false,
+  paneKey,
+  paneLayout,
+  onPaneLayoutChange,
+}: Readonly<DataPaneProps>) {
+  const [searchTerm, setSearchTerm] = useState('')
+  const [layoutTooltipOpen, setLayoutTooltipOpen] = useState(false)
+  const [layoutTooltipContent, setLayoutTooltipContent] = useState('')
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
+
+  const jsonText = useMemo(() => (data ? JSON.stringify(data, null, 2) : ''), [data])
+
+  const highlightedJson = useMemo(() => {
+    if (!jsonText) return undefined
+    return highlightTextLines(jsonText, searchTerm)
+  }, [jsonText, searchTerm])
+
+  useEffect(() => {
+    if (searchTerm && scrollContainerRef.current) {
+      requestAnimationFrame(() => {
+        const firstMark = scrollContainerRef.current?.querySelector('mark')
+        if (firstMark && typeof firstMark.scrollIntoView === 'function') {
+          firstMark.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        }
+      })
+    }
+  }, [searchTerm, view, highlightedJson])
+
+  function renderContent() {
+    if (!data) {
+      return <NoDataState label={title.toLowerCase()} />
+    }
+    switch (view) {
+      case 'schema':
+        return <InputSchemaView data={data} nodeId={stepId} searchTerm={searchTerm} />
+      case 'table':
+        return <InputTableView data={data} searchTerm={searchTerm} />
+      case 'json':
+        return (
+          <div style={isErrorState ? { color: 'var(--pf-t--global--color--status--danger--default)' } : undefined}>
+            <SynCodeBlock enableCopy enableExpand expandTitle={`${title} JSON`} noMaxHeight copyContent={jsonText}>
+              {highlightedJson ?? jsonText}
+            </SynCodeBlock>
+          </div>
+        )
+    }
+  }
+
+  const isPaneExpanded = paneLayout === paneKey
+  const paneLayoutActionLabel = isPaneExpanded
+    ? PANE_LAYOUT_ACTION_LABELS[paneKey].restore
+    : PANE_LAYOUT_ACTION_LABELS[paneKey].expand
+  const PaneLayoutIcon = isPaneExpanded ? RhUiCompressArrowsIcon : RhUiExpandArrowsIcon
+
+  function openLayoutTooltip() {
+    setLayoutTooltipContent(paneLayoutActionLabel)
+    setLayoutTooltipOpen(true)
+  }
+
+  function closeLayoutTooltip() {
+    setLayoutTooltipOpen(false)
+  }
+
+  function handlePaneLayoutClick() {
+    closeLayoutTooltip()
+    onPaneLayoutChange(isPaneExpanded ? 'split' : paneKey)
+  }
+
+  const searchAndViewControls = (
+    <Flex
+      alignItems={{ default: 'alignItemsCenter' }}
+      gap={{ default: 'gapSm' }}
+      flexWrap={{ default: 'wrap' }}
+      className={styles.dataPaneControlsStacked}
+    >
+      <FlexItem grow={{ default: 'grow' }} className={styles.searchWrap}>
+        <SearchInput
+          aria-label={`Search ${title.toLowerCase()} data`}
+          placeholder="Search"
+          value={searchTerm}
+          onChange={(_event, value) => setSearchTerm(value)}
+          onClear={() => setSearchTerm('')}
+        />
+      </FlexItem>
+      <FlexItem grow={{ default: 'grow' }}>
+        <ViewToggle activeView={view} onChange={onViewChange} ariaLabel={`${title} view selection`} />
+      </FlexItem>
+    </Flex>
+  )
+
+  return (
+    <Stack className={styles.contentContainer}>
+      <StackItem className={styles.dataPaneHeaderRow}>
+        <div className={styles.dataPaneHeader}>
+          <Flex
+            className={styles.dataPaneTitleRow}
+            justifyContent={{ default: 'justifyContentSpaceBetween' }}
+            alignItems={{ default: 'alignItemsCenter' }}
+          >
+            <FlexItem className={styles.dataPaneTitle}>{title}</FlexItem>
+            <FlexItem>
+              <Tooltip content={layoutTooltipContent} trigger="manual" isVisible={layoutTooltipOpen}>
+                <Button
+                  variant="plain"
+                  aria-label={paneLayoutActionLabel}
+                  aria-pressed={isPaneExpanded}
+                  onMouseEnter={openLayoutTooltip}
+                  onMouseLeave={closeLayoutTooltip}
+                  onFocus={openLayoutTooltip}
+                  onBlur={closeLayoutTooltip}
+                  onPointerDown={closeLayoutTooltip}
+                  onClick={handlePaneLayoutClick}
+                  icon={
+                    <Icon isInline>
+                      <PaneLayoutIcon />
+                    </Icon>
+                  }
+                />
+              </Tooltip>
+            </FlexItem>
+          </Flex>
+          {searchAndViewControls}
+        </div>
+      </StackItem>
+      <StackItem isFilled className={styles.scrollPane}>
+        <div ref={scrollContainerRef}>{renderContent()}</div>
+      </StackItem>
+    </Stack>
+  )
+}
+
+const decisionStatusMap: Record<string, 'success' | 'danger' | 'warning' | 'info'> = {
+  approved: 'success',
+  rejected: 'danger',
+  expired: 'warning',
+}
+
+const decisionIconMap: Record<string, React.ComponentType<{ className?: string }>> = {
+  approved: RhUiLikeFillIcon,
+  rejected: RhUiDislikeFillIcon,
+  expired: RhUiWarningFillIcon,
+}
+
+function ApprovalAuditSection({ audit }: Readonly<{ audit: ApprovalAudit }>) {
+  const status = decisionStatusMap[audit.decision] ?? 'info'
+  const IconComponent = decisionIconMap[audit.decision]
+
+  return (
+    <Flex className={styles.auditStrip} gap={{ default: 'gapLg' }} alignItems={{ default: 'alignItemsCenter' }}>
+      <FlexItem>
+        <Stack>
+          <StackItem className={styles.auditLabel}>Decision</StackItem>
+          <StackItem>
+            <SynLabel variant="outline" status={status} icon={IconComponent ? <IconComponent /> : undefined}>
+              {capitalize(audit.decision)}
+            </SynLabel>
+          </StackItem>
+        </Stack>
+      </FlexItem>
+      <FlexItem>
+        <Stack>
+          <StackItem className={styles.auditLabel}>Decided by</StackItem>
+          <StackItem className={styles.auditValue}>{audit.decidedBy}</StackItem>
+        </Stack>
+      </FlexItem>
+      <FlexItem>
+        <Stack>
+          <StackItem className={styles.auditLabel}>Decided at</StackItem>
+          <StackItem className={styles.auditValue}>
+            <ExecutionTimestamp dateString={audit.decidedAt} />
+          </StackItem>
+        </Stack>
+      </FlexItem>
+      {audit.decisionNotes && (
+        <FlexItem>
+          <Stack>
+            <StackItem className={styles.auditLabel}>Notes</StackItem>
+            <StackItem className={styles.auditValue}>{audit.decisionNotes}</StackItem>
+          </Stack>
+        </FlexItem>
+      )}
+    </Flex>
+  )
+}
+
+function AAPJobLink({
+  outputData,
+  stepType,
+}: Readonly<{ outputData: Record<string, unknown> | null; stepType?: string }>) {
+  const jobUrl = isAAPNodeType(stepType) ? extractAAPJobUrl(outputData) : null
+  if (!jobUrl) return null
+
+  return (
+    <StackItem style={{ flexShrink: 0, textAlign: 'right', paddingBottom: 'var(--pf-t--global--spacer--xs)' }}>
+      <a
+        href={jobUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        style={{ textDecoration: 'underline dotted', textUnderlineOffset: '3px' }}
+      >
+        View job in AAP <RhUiExternalLinkIcon />
+      </a>
+    </StackItem>
+  )
+}
+
+function UsedToolsSection({ tools }: Readonly<{ tools: UsedTool[] }>) {
+  return (
+    <StackItem className={styles.usedToolsItem}>
+      <Flex className={styles.auditStrip} gap={{ default: 'gapLg' }} alignItems={{ default: 'alignItemsCenter' }}>
+        <FlexItem>
+          <Stack>
+            <StackItem className={styles.auditLabel}>Tools used</StackItem>
+            <StackItem className={styles.auditValue}>
+              {tools.map((tool) => `${tool.name} (${tool.count})`).join(', ')}
+            </StackItem>
+          </Stack>
+        </FlexItem>
+      </Flex>
+    </StackItem>
+  )
+}
+
+function StepDetailsHeader({
+  stepName,
+  stepStarted,
+  stepCompleted,
+  stepElapsedLabel,
+  status,
+}: Readonly<{
+  stepName: string
+  stepStarted: string | null
+  stepCompleted: string | null
+  stepElapsedLabel?: string
+  status?: ActivityState['status']
+}>) {
+  return (
+    <StackItem className={styles.headerRow}>
+      <Flex justifyContent={{ default: 'justifyContentSpaceBetween' }} alignItems={{ default: 'alignItemsCenter' }}>
+        <FlexItem>
+          <Title headingLevel="h2" size={TitleSizes.md} style={{ margin: 0 }}>
+            {stepName}
+          </Title>
+        </FlexItem>
+        <FlexItem>
+          <Flex gap={{ default: 'gapMd' }} alignItems={{ default: 'alignItemsCenter' }}>
+            {stepStarted && (
+              <Content
+                component={ContentVariants.small}
+                style={{ color: 'var(--pf-t--global--text--color--subtle)', margin: 0 }}
+              >
+                <ExecutionTimestamp dateString={stepStarted} />
+                {stepCompleted && (
+                  <>
+                    {' - '}
+                    <ExecutionTimestamp dateString={stepCompleted} />
+                  </>
+                )}
+              </Content>
+            )}
+            {stepElapsedLabel && (
+              <Content
+                component={ContentVariants.small}
+                style={{ color: 'var(--pf-t--global--text--color--subtle)', margin: 0 }}
+              >
+                Elapsed time: {stepElapsedLabel}
+              </Content>
+            )}
+            {status && (
+              <FlexItem style={{ display: 'flex', alignItems: 'center' }}>
+                <ActivityStatusLabel status={status} />
+              </FlexItem>
+            )}
+          </Flex>
+        </FlexItem>
+      </Flex>
+    </StackItem>
+  )
+}
+
+type StepContentAreaProps = Readonly<{
+  stepId: string
+  inputData: Record<string, unknown> | null
+  outputData: Record<string, unknown> | null
+  isLoading: boolean
+  error: unknown
+  refetch: () => Promise<unknown>
+  stepIsFailed: boolean
+  isAgenticStep: boolean
+  activeTab: 'io' | 'agent-steps'
+}>
+
+function StepContentArea({
+  stepId,
+  inputData,
+  outputData,
+  isLoading,
+  error,
+  refetch,
+  stepIsFailed,
+  isAgenticStep,
+  activeTab,
+}: StepContentAreaProps) {
+  const [inputView, setInputView] = useState<PanelView>('json')
+  const [outputView, setOutputView] = useState<PanelView>('json')
+  const [paneLayout, setPaneLayout] = useState<IoPaneLayout>('split')
+
+  if (error) {
+    return (
+      <SynErrorState title="Error loading activity data" message={error} onRetry={() => detachPromise(refetch())} />
+    )
+  }
+  if (isLoading) {
+    return <Spinner aria-label="Loading activity data" />
+  }
+  if (activeTab === 'agent-steps' && isAgenticStep) {
+    return <AgentTraceView agentTrace={extractAgentTrace(outputData)} />
+  }
+  const showParameters = paneLayout !== 'output'
+  const showOutput = paneLayout !== 'parameters'
+
+  return (
+    <Flex
+      flexWrap={{ default: 'nowrap' }}
+      alignItems={{ default: 'alignItemsStretch' }}
+      className={styles.dataPaneContainer}
+    >
+      {showParameters && (
+        <FlexItem flex={{ default: 'flex_1' }} className={styles.paneItem}>
+          <DataPane
+            title="Parameters"
+            stepId={stepId}
+            data={inputData}
+            view={inputView}
+            onViewChange={setInputView}
+            paneKey="parameters"
+            paneLayout={paneLayout}
+            onPaneLayoutChange={setPaneLayout}
+          />
+        </FlexItem>
+      )}
+      {showOutput && (
+        <FlexItem flex={{ default: 'flex_1' }} className={styles.paneItem}>
+          <DataPane
+            title="Output"
+            stepId={stepId}
+            data={outputData}
+            view={outputView}
+            onViewChange={setOutputView}
+            isErrorState={stepIsFailed}
+            paneKey="output"
+            paneLayout={paneLayout}
+            onPaneLayoutChange={setPaneLayout}
+          />
+        </FlexItem>
+      )}
+    </Flex>
+  )
+}
+
+export function StepExecutionDetailsPanel({
+  stepId,
+  stepName,
+  executionId,
+  stepState,
+  stepType,
+}: Readonly<StepExecutionDetailsPanelProps>) {
+  const [activeTab, setActiveTab] = useState<'io' | 'agent-steps'>('io')
+  const isAgenticStep = stepType === ActivityTypeEnum.AGENTIC
+  const { inputData, outputData, isLoading, error, refetch } = useStepExecutionDetails(
+    stepId,
+    executionId,
+    stepState?.status,
+    stepState?.iteration
+  )
+
+  const approvalAudit = useMemo(() => extractApprovalAudit(outputData), [outputData])
+  const usedTools = useMemo(() => extractUsedTools(outputData), [outputData])
+
+  const stepStarted = stepState?.startedAt ?? null
+  const stepCompleted = stepState?.completedAt ?? null
+  const stepIsRunning = stepState?.status === 'running'
+  const stepIsFailed = stepState?.status === 'failed'
+  const { elapsedMs } = useElapsedTime(stepStarted, stepCompleted, stepIsRunning)
+  const stepElapsedLabel = elapsedMs === undefined ? undefined : formatElapsedTime(elapsedMs)
+
+  return (
+    <Stack className={styles.contentContainer}>
+      <StepDetailsHeader
+        stepName={stepName}
+        stepStarted={stepStarted}
+        stepCompleted={stepCompleted}
+        stepElapsedLabel={stepElapsedLabel}
+        status={stepState?.status}
+      />
+
+      {/* Approval audit strip (shown only for decided approval steps) */}
+      {approvalAudit && (
+        <StackItem style={{ flexShrink: 0 }}>
+          <ApprovalAuditSection audit={approvalAudit} />
+        </StackItem>
+      )}
+
+      {usedTools && <UsedToolsSection tools={usedTools} />}
+
+      <AAPJobLink outputData={outputData} stepType={stepType} />
+
+      {/* Tab bar for agentic steps */}
+      {isAgenticStep && (
+        <StackItem className={styles.tabBar}>
+          <Tabs
+            activeKey={activeTab}
+            onSelect={(_e, key) => setActiveTab(key as 'io' | 'agent-steps')}
+            variant="default"
+          >
+            <Tab eventKey="io" title={<TabTitleText>Input/Output</TabTitleText>} />
+            <Tab eventKey="agent-steps" title={<TabTitleText>Agent steps</TabTitleText>} />
+          </Tabs>
+        </StackItem>
+      )}
+
+      <StackItem isFilled style={{ minHeight: 0, overflow: 'hidden' }}>
+        <StepContentArea
+          key={stepId}
+          stepId={stepId}
+          inputData={inputData}
+          outputData={outputData}
+          isLoading={isLoading}
+          error={error}
+          refetch={refetch}
+          stepIsFailed={stepIsFailed}
+          isAgenticStep={isAgenticStep}
+          activeTab={activeTab}
+        />
+      </StackItem>
+    </Stack>
+  )
+}

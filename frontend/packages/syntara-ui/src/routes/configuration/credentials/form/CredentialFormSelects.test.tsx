@@ -82,5 +82,18 @@ describe('CredentialFormSelects', () => {
 
       expect(onSelect).toHaveBeenCalledWith(expect.anything(), 'type-2')
     })
+
+    it('passes type descriptions to SelectOption', async () => {
+      const user = userEvent.setup()
+      const typesWithDescriptions = [
+        { id: 'type-1', name: 'HTTP Bearer Token', description: 'Authenticate with a bearer token.' },
+        { id: 'type-2', name: 'SSH Key', description: '   ' },
+      ]
+      render(<CredentialTypeSelect types={typesWithDescriptions} selectedTypeId="" onSelect={vi.fn()} />)
+
+      await user.click(screen.getByRole('button', { name: 'Credential type' }))
+      const listbox = screen.getByRole('listbox', { name: 'Credential type options' })
+      expect(listbox).toHaveTextContent('Authenticate with a bearer token.')
+    })
   })
 })

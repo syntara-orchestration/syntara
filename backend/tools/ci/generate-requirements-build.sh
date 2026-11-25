@@ -34,7 +34,7 @@ fi
 echo "Generating requirements-build.txt (this may take several minutes)..." >&2
 
 set +e
-python tools/ci/run_pybuild_deps_compile.py compile \
+pybuild-deps compile \
 	--generate-hashes \
 	--output-file=requirements-build.txt \
 	requirements-build-constraints.in \

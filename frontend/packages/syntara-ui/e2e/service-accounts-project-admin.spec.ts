@@ -62,7 +62,8 @@ test.describe('UI-11: Service Account CRUD Lifecycle', () => {
       await editModal.getByRole('button', { name: 'Save service account' }).click()
 
       await expect(app.getByText('Service account updated')).toBeVisible()
-      await expect(app.getByRole('heading', { level: 1, name: editedName })).toBeVisible()
+      await expect(editModal).not.toBeVisible({ timeout: 15_000 })
+      await expect(app.getByTestId('page-header').getByRole('heading', { level: 1, name: editedName })).toBeVisible()
 
       // Delete the service account via kebab menu
       await app.getByRole('button', { name: 'Service account actions' }).click()

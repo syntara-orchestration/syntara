@@ -18,7 +18,7 @@ const mockGetState = vi.fn<() => Record<string, unknown>>()
 
 const mockHandleVerify = vi.fn()
 
-vi.mock('../../providers/alerts', () => ({
+vi.mock('../../providers/alerts/AlertContext', () => ({
   useAlerts: () => ({ showError: mockShowError }),
 }))
 

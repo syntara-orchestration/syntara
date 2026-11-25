@@ -463,4 +463,4 @@ def get_value() -> int:
 
 - [Python threading documentation](https://docs.python.org/3/library/threading.html)
 - [Python GIL explanation](https://wiki.python.org/moin/GlobalInterpreterLock)
-- [Services](/docs/standards/services.md) - Service lifecycle patterns
+- [Services](services.md) - Service lifecycle patterns
