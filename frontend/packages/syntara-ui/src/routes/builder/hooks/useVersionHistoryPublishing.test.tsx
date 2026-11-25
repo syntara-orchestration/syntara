@@ -113,7 +113,7 @@ describe('useVersionHistoryPublishing', () => {
     expect(mocks.review).toHaveBeenCalledOnce()
     expect(mocks.mutate).toHaveBeenCalledWith(
       {
-        params: { path: { workflow_id: 'workflow-1', version: 2 } },
+        params: { path: { workflow_id: 'workflow-1', version: 2 }, query: { confirm: false } },
         body: { name: 'Release 2', change_description: 'Publish reviewed contract' },
       },
       expect.objectContaining({ onSettled })
