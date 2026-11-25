@@ -83,8 +83,15 @@ pytestmark = pytest.mark.unit
             "TOOL_SELECTION_UNAVAILABLE",
             False,
         ),
+        # LangGraph checkpoint msgpack failures (not generic serialization errors)
+        (
+            TypeError("Type is not msgpack serializable: ToolMessage"),
+            "TOOL_RESULT_SERIALIZATION_FAILED",
+            False,
+        ),
         # Unknown errors
         (ValueError("Invalid input format"), "UNKNOWN_ERROR", False),
+        (Exception("Object is not serializable to JSON"), "UNKNOWN_ERROR", False),
         (Exception("Something went wrong"), "UNKNOWN_ERROR", False),
         (Exception(""), "UNKNOWN_ERROR", False),
         # A 4xx status is not a server error
@@ -115,7 +122,9 @@ pytestmark = pytest.mark.unit
         "tool_discovery_zero_provision",
         "tool_discovery_zero_match",
         "tool_selection_unavailable",
+        "tool_result_msgpack_serialization",
         "unknown_value_error",
+        "unknown_non_msgpack_serializable",
         "unknown_generic",
         "unknown_empty",
         "unknown_4xx",
@@ -274,6 +283,26 @@ def test_agent_timeout_takes_precedence_over_builtin_timeout() -> None:
     # Must be AGENT_TIMEOUT not STREAM_TIMEOUT
     assert error.code == "AGENT_TIMEOUT"
     assert error.retryable is False
+
+
+def test_tool_result_serialization_failure_not_generic_llm_error() -> None:
+    """Tool-result serialization failures must surface distinctly.
+
+    A LangGraph checkpoint TypeError for a non-msgpack-serializable ToolMessage
+    must surface as an actionable tool-result serialization category, not fall
+    through to the generic UNKNOWN_ERROR / "LLM Streaming Error" bucket.
+    """
+    invocation_id = uuid4()
+    exception = TypeError("Type is not msgpack serializable: ToolMessage")
+    error = classify_streaming_error(exception, invocation_id)
+
+    assert error.code == "TOOL_RESULT_SERIALIZATION_FAILED"
+    assert error.retryable is False
+    assert error.title == "Tool Result Serialization Failed"
+    assert error.type == f"{ERROR_TYPE_BASE_URI}/tool-result-serialization-error"
+    assert error.instance == f"/invocations/{invocation_id}"
+    assert error.code != "UNKNOWN_ERROR"
+    assert "could not be serialized" in (error.detail or "")
 
 
 def test_multiple_invocations_independent() -> None:
