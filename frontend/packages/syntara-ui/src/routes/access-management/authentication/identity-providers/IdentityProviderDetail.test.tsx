@@ -7,7 +7,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { axe } from 'vitest-axe'
 
 import { adminClient, identityProvidersClient } from '../../../../client'
-import { AlertProvider } from '../../../../providers/alerts'
+import { AlertProvider } from '../../../../providers/alerts/AlertProvider'
 import { routerTestState } from '../../../../test/setup'
 import { accessFetchClient } from '../../../access/accessClient'
 
@@ -251,14 +251,15 @@ describe('IdentityProviderDetail', () => {
     expect(mockRefetch).toHaveBeenCalled()
   })
 
-  it('navigates to edit page from primary Edit provider button', async () => {
-    const user = userEvent.setup()
+  it('links to the edit route from primary Edit provider control', () => {
     vi.mocked(identityProvidersClient.useQuery).mockReturnValue(mockQueryReturn())
 
     render(<IdentityProviderDetail />, { wrapper: createWrapper() })
 
-    await user.click(screen.getByRole('button', { name: /edit provider/i }))
-    expect(routerTestState.navigate).toHaveBeenCalled()
+    expect(screen.getByRole('link', { name: /edit provider/i })).toHaveAttribute(
+      'href',
+      `/system-administration/authentication/identity-providers/${VALID_PROVIDER_ID}/edit`
+    )
   })
 
   it('shows manual endpoints when auto_discovery is false', () => {
@@ -878,7 +879,7 @@ describe('IdentityProviderDetail', () => {
 
     render(<IdentityProviderDetail />, { wrapper: createWrapper() })
 
-    expect(screen.getByRole('button', { name: 'Edit provider' })).toHaveAttribute('aria-disabled', 'true')
+    expect(screen.getByRole('link', { name: 'Edit provider' })).toHaveAttribute('aria-disabled', 'true')
   })
 
   it('disables revoke action in kebab menu when canRevoke is false', async () => {

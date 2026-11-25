@@ -14,7 +14,7 @@ import structlog
 
 from syntara.core.config.base import get_settings
 from syntara.core.tls.http_client import build_internal_http_client
-from syntara.workflows.utils.url import generate_activity_signal_url
+from syntara.workflow_runtime.utils.url import generate_activity_signal_url
 
 # HTTP status code constants for error classification
 _HTTP_STATUS_MIN_SERVER_ERROR = 500

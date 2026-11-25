@@ -1,7 +1,7 @@
 import { type Page } from '../fixtures'
 import { test, expect } from '../fixtures'
 import { addApprovalStepWithBranch } from '../helpers/v2-steps'
-import { runWorkflowFromBuilder, waitForExecutionPaused } from '../helpers/workflow-run'
+import { runWorkflowFromBuilder, waitForExecutionPaused, waitForExecutionTerminal } from '../helpers/workflow-run'
 import { buildUniqueName, createBasicWorkflowViaApi, openWorkflowInBuilder, deleteWorkflow } from '../helpers/workflows'
 
 /**
@@ -131,6 +131,10 @@ test.describe('Approval Pending Badge', () => {
   })
 
   test('does NOT show "Pending approval" badge when execution has no pending approvals', async ({ app }) => {
+    // Triples the 60s default timeout: under Konflux cluster load a Temporal execution
+    // can take longer than the default budget to reach a terminal state.
+    test.slow()
+
     let workflowName: string | undefined
 
     try {
@@ -149,37 +153,20 @@ test.describe('Approval Pending Badge', () => {
       const executionId = app.url().match(/executions\/([^/?]+)/)?.[1]
       if (!executionId) throw new Error('Failed to extract execution ID')
 
-      // Wait for the execution detail page to load by checking for the page heading
-      await expect(app.getByRole('heading', { level: 1 })).toBeVisible({ timeout: 10_000 })
+      // Wait for the execution to reach a terminal state and for the header status
+      // badge to reflect it. Polls the API first: the badge and activity rows are
+      // driven by WebSocket patches that can lag under CI load, and the backend is
+      // the source of truth for "the execution finished".
+      await waitForExecutionTerminal(app, executionId)
 
-      // Wait for at least one activity to show a terminal status (Successful/Failed) in the activities table
-      // This confirms the execution has finished running
-      const reachedTerminal = await app
-        .getByRole('row')
-        .filter({ hasText: /Successful|Failed/ })
-        .waitFor({ state: 'visible', timeout: 30_000 })
-        .then(() => true)
-        .catch(() => false)
-      expect(
-        reachedTerminal,
-        'Workflow execution did not complete in time — may indicate worker/runtime issues in CI'
-      ).toBeTruthy()
-
-      // Give WebSocket updates a moment to settle after terminal state is reached
-      await app.waitForTimeout(2000)
-
-      // Verify "Pending approval" badge does NOT appear in the execution detail header
+      // Verify the "Pending approval" badge does NOT appear in the execution detail header.
       // This must be true regardless of whether the execution succeeded or failed,
-      // because this workflow has NO approval node
-      const pendingBadgeOnPage = app.getByText('Pending approval', { exact: true })
-      await expect(pendingBadgeOnPage).toHaveCount(0)
+      // because this workflow has NO approval node.
+      await expect(app.getByTestId('approval-status-badge')).toHaveCount(0)
 
       // Navigate to executions list
       await app.goto('/executions')
       await expect(app.getByRole('grid')).toBeVisible({ timeout: 10_000 })
-
-      // Wait for any WebSocket updates to settle after page load
-      await app.waitForTimeout(1000)
 
       // Find the specific row for this execution
       const executionRow = app.locator('tr', { has: app.getByText(executionId.slice(0, 8)) })

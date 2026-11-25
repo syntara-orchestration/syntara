@@ -15,7 +15,7 @@ vi.mock('../../../stores/useWorkflowStore', () => ({
   useWorkflowStore: vi.fn((selector: (s: any) => unknown) => selector({ isDirty: false, markDirty: vi.fn() })),
 }))
 
-vi.mock('../../../providers/alerts', () => ({
+vi.mock('../../../providers/alerts/AlertContext', () => ({
   useAlerts: () => ({ showSuccess: vi.fn(), showError: vi.fn() }),
 }))
 

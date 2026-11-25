@@ -2,7 +2,7 @@ import { EdgeHandleEnum } from '@syntara/contracts'
 import type { ReactFlowInstance, Node as FlowNode } from '@xyflow/react'
 import { describe, expect, it, vi } from 'vitest'
 
-import { FlowNodeType } from '../../../constants'
+import { FlowNodeType } from '../../../constants/nodeTypes'
 
 import type { EdgeConnectionParams } from './edgeConnectionHelpers'
 import { calculateEdgeConnection, applyEdgeConnection, resetPollingConnectionCounter } from './edgeConnectionHelpers'

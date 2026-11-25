@@ -42,7 +42,7 @@ export function GroupMappingTab({ providerId, groupMapping, readOnly = false }: 
     <ReadOnlyView
       entries={entries}
       mappedGroups={mappedGroups}
-      onEditMapping={readOnly ? undefined : () => navigateToEdit()}
+      editMappingTo={readOnly ? undefined : identityProviderGroupMappingEditPath(providerId)}
     />
   )
 }

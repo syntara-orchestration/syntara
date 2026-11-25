@@ -2,7 +2,7 @@ import { Icon } from '@patternfly/react-core'
 import type { IconSize } from '@patternfly/react-core'
 import type { ComponentType, CSSProperties, ReactNode } from 'react'
 
-import { AAP_STEP_IDS, RegistryStepId } from '../../../../constants'
+import { AAP_STEP_IDS, RegistryStepId } from '../../../../constants/registryStepIds'
 
 export type StepIconVariant = 'canvas' | 'semanticZoom' | 'list' | 'header' | 'legend'
 
