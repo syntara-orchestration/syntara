@@ -69,11 +69,58 @@ See [read-query semantics](read-query-contract.md) and the generated EP OpenAPI 
 
 ## Work and completion
 
-AO validates a script node, selects its digest-pinned image, persists an
-encrypted request binding with the Temporal task token, and submits a versioned
-invocation to EP over HTTP. It retries a lost or unavailable submission with
-the same request ID and frozen payload. EP's API stores the request in its own
-database; EP's worker dispatches it independently.
+AO seeds the Python and Bash Actions only from `RELATED_IMAGE_SCRIPT_PYTHON`
+and `RELATED_IMAGE_SCRIPT_BASH`; both values must be fully qualified
+`repository@sha256:<digest>` references. There is no mutable-tag fallback.
+The seed validates each Action's repository against the installed image policy
+and verifies its Cosign signature. Reseeding advances an image only while the
+database value still matches the last seed-managed value. An administrator's
+different database pin is preserved and must still pass the same policy before
+dispatch.
+
+The backend and its migration Job read the policy file named by
+`APP_SCRIPT_IMAGE_POLICY_PATH`. Its JSON form maps each Action identity to one
+exact release-approved image digest and the public key used to verify it:
+
+```json
+{
+  "version": 1,
+  "actions": {
+    "syntara.script-python.script-python": {
+      "image_reference": "registry.redhat.io/ansible-automation-platform/ao-python-rhel9@sha256:<approved-digest>",
+      "key_file": "cosign-redhat.pub"
+    },
+    "syntara.script-bash.script-bash": {
+      "image_reference": "registry.redhat.io/ansible-automation-platform/ao-bash-rhel9@sha256:<approved-digest>",
+      "key_file": "cosign-redhat.pub"
+    }
+  }
+}
+```
+
+The configured image reference must match the Action identity's exact approved
+digest. The key filename must refer to a key mounted beside the policy file.
+Restrict write access to the policy ConfigMap to platform release administrators;
+the digest and public key together define which publisher is trusted. An
+administrator-managed database pin remains in place across reseeds, but dispatch
+will reject it until the installed policy and `RELATED_IMAGE_*` selection
+authorize that exact reference.
+AO verifies the mapping and Cosign signature before seeding, then checks the
+database reference against the mapping immediately before submitting work. EP
+checks the exact mapping at command intake and independently verifies the
+signature before creating a workload Job. A missing policy, unapproved digest, tag, missing
+Cosign executable, missing key, or failed signature check blocks seeding or
+execution.
+
+Installations without the policy file keep the built-in script Actions
+unavailable during seeding. Existing Action rows are not rewritten or deleted;
+dispatch remains blocked until an approved policy and its key are installed.
+Install the policy before enabling script workflows.
+
+AO persists an encrypted request binding with the Temporal task token and
+submits a versioned invocation to EP over HTTP. It retries a lost or
+unavailable submission with the same request ID and frozen payload. EP's API
+stores the request in its own database; EP's worker dispatches it independently.
 
 The cold-start EP backend allocates a one-attempt Kubernetes Job and talks to
 the SDK node runtime only over gRPC, tunneled through the authenticated

@@ -15,6 +15,8 @@ from temporalio import activity
 from temporalio.exceptions import ApplicationError
 
 from syntara.execution_plane.client import ExecutionPlaneRejectedError, ExecutionPlaneUnavailableError
+from syntara.execution_plane.registry.image_policy import ScriptImagePolicyError
+from syntara.workflow_core.models import NodeType
 from syntara.workflow_runtime.engines.temporal.activities.ep import ep_dispatch_activity as activity_module
 from syntara.workflow_runtime.engines.temporal.constants import ENGINE_MAX_OUTPUT_BYTES_KEY, ENGINE_TIMEOUT_SECONDS_KEY
 
@@ -101,6 +103,7 @@ def mock_activity_context() -> Generator[MagicMock, None, None]:
         patch(ACTIVITY_INFO_PATH, return_value=info) as activity_info,
         patch("temporalio.activity.heartbeat"),
         patch.object(activity_module, "ExecutionPlaneHttpClient", _FakeEPClient),
+        patch.object(activity_module, "validate_script_image_reference", MagicMock()),
         patch.object(activity_module, "AsyncSessionLocal", _FakePluginSession),
         patch.object(
             activity_module,
@@ -108,6 +111,7 @@ def mock_activity_context() -> Generator[MagicMock, None, None]:
             AsyncMock(
                 return_value=SimpleNamespace(
                     name="script-bash",
+                    node_type=NodeType.SCRIPT_BASH,
                     image_reference="quay.io/example/script-bash:test",
                     step_identity="syntara.script-bash.script-bash",
                     manifest=_plugin_manifest(),
@@ -162,6 +166,7 @@ class TestScriptActivityValidation:
             AsyncMock(
                 return_value=SimpleNamespace(
                     name="script-bash",
+                    node_type=NodeType.SCRIPT_BASH,
                     image_reference="quay.io/example/script-bash:test",
                     step_identity="syntara.script-bash.script-bash",
                     manifest=_plugin_manifest(require_environment=True),
@@ -179,6 +184,21 @@ class TestScriptActivityValidation:
 
 class TestScriptActivityDispatch:
     """Exercise the service boundary and stable idempotency behavior."""
+
+    @pytest.mark.asyncio
+    async def test_unapproved_image_is_rejected_before_submission(self) -> None:
+        with patch.object(
+            activity_module,
+            "validate_script_image_reference",
+            side_effect=ScriptImagePolicyError("invalid image"),
+        ):
+            with pytest.raises(ApplicationError) as exc_info:
+                await activity_module.execute_bash_script_activity({"code": "echo ok"}, None, EXECUTION_ID)
+
+        assert exc_info.value.type == "ConfigError"
+        assert exc_info.value.non_retryable is True
+        assert "image policy" in str(exc_info.value)
+        assert _FakeEPClient.submissions == []
 
     @pytest.mark.asyncio
     async def test_completed_response_returns_ep_result(self) -> None:
@@ -304,6 +324,7 @@ class TestScriptActivityDispatch:
                 AsyncMock(
                     return_value=SimpleNamespace(
                         name="script-bash",
+                        node_type=NodeType.SCRIPT_BASH,
                         image_reference="quay.io/example/script-bash:test",
                         step_identity="syntara.script-bash.script-bash",
                         manifest=_plugin_manifest(),

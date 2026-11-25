@@ -73,6 +73,7 @@ def ep_submission(
                 )
             ),
         ),
+        patch.object(dispatch, "validate_script_image_reference", Mock()),
         patch.object(dispatch, "ExecutionPlaneHttpClient"),
         patch.object(dispatch, "_submit_and_read_work", return_value={"status": "pending"}) as submission,
     ):
@@ -259,6 +260,7 @@ async def test_loop_body_completion_correlates_canvas_activity(
                 )
             ),
         ),
+        patch.object(dispatch, "validate_script_image_reference", Mock()),
         patch.object(dispatch, "ExecutionPlaneHttpClient"),
         patch.object(dispatch, "_submit_and_read_work", return_value={"status": "pending"}),
     ):
