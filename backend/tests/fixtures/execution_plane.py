@@ -4,6 +4,9 @@ from __future__ import annotations
 
 from typing import Any
 
+SCRIPT_PYTHON_TEST_IMAGE_REFERENCE = "registry.example/test/ao-python@sha256:" + "a" * 64
+SCRIPT_BASH_TEST_IMAGE_REFERENCE = "registry.example/test/ao-bash@sha256:" + "b" * 64
+
 ECHO_ACTION_MANIFEST: dict[str, Any] = {
     "apiVersion": "syntara.io/v1alpha1",
     "kind": "Action",

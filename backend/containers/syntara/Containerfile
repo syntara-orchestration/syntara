@@ -51,6 +51,7 @@ RUN dnf install --setopt=install_weak_deps=0 --nodocs -y \
 
 COPY README.md alembic.ini ./
 COPY tools/ci/sanitize_pyproject_for_hermetic.py /usr/local/bin/sanitize_pyproject_for_hermetic.py
+COPY tools/install_cosign.py /usr/local/bin/install_cosign.py
 COPY src/ ./src/
 RUN --mount=from=override,source=/,target=/tmp/override \
     if [ "$BRANDING" = "true" ] && [ -d /tmp/override/backend ]; then \
@@ -88,6 +89,7 @@ RUN if [ -n "${PIP_FIND_LINKS:-}" ]; then \
     else \
         uv sync --frozen --no-dev; \
     fi
+RUN python3.12 /usr/local/bin/install_cosign.py
 
 # Stage 2: Runtime - minimal image with Python and app copied from builder
 FROM registry.access.redhat.com/ubi9/ubi-minimal:latest@sha256:2d4c4551af6831dcd26bbf86108c4385de5183ec8fe6b5868f6f9640fe47f4ed AS runtime-base
@@ -130,6 +132,7 @@ RUN microdnf install --setopt=install_weak_deps=0 --nodocs -y \
 
 COPY --from=syntara-builder /opt/app-root/ /opt/app-root/
 COPY --from=syntara-builder /usr/local/bin/uv /usr/local/bin/uv
+COPY --from=syntara-builder /usr/local/bin/cosign /usr/local/bin/cosign
 
 ENV PYTHONPATH=/opt/app-root/src/src \
     PATH="/opt/app-root/src/.venv/bin:/opt/app-root/bin:$PATH" \

@@ -26,6 +26,7 @@ from syntara.workflow_runtime.engines.temporal.activities.ep import ep_dispatch_
 from syntara.workflow_runtime.engines.temporal.services.activity_sync_service import ActivitySyncService
 from syntara.workflows.models.activity_execution import ActivityExecution, ActivityStatus
 from syntara.workflows.models.execution import Execution
+from tests.fixtures.execution_plane import SCRIPT_BASH_TEST_IMAGE_REFERENCE
 
 _NODE_ID = "test_activity"
 _DEFINITIONS = {
@@ -67,12 +68,13 @@ def ep_submission(
                 return_value=SimpleNamespace(
                     name="script-bash",
                     node_type=NodeType.SCRIPT_BASH,
-                    image_reference="quay.io/example/script-bash:test",
+                    image_reference=SCRIPT_BASH_TEST_IMAGE_REFERENCE,
                     step_identity="syntara.script-bash.script-bash",
                     manifest=_PLUGIN_MANIFEST,
                 )
             ),
         ),
+        patch.object(dispatch, "validate_script_image_reference", Mock()),
         patch.object(dispatch, "ExecutionPlaneHttpClient"),
         patch.object(dispatch, "_submit_and_read_work", return_value={"status": "pending"}) as submission,
     ):
@@ -253,12 +255,13 @@ async def test_loop_body_completion_correlates_canvas_activity(
                 return_value=SimpleNamespace(
                     name="script-bash",
                     node_type=NodeType.SCRIPT_BASH,
-                    image_reference="quay.io/example/script-bash:test",
+                    image_reference=SCRIPT_BASH_TEST_IMAGE_REFERENCE,
                     step_identity="syntara.script-bash.script-bash",
                     manifest=_PLUGIN_MANIFEST,
                 )
             ),
         ),
+        patch.object(dispatch, "validate_script_image_reference", Mock()),
         patch.object(dispatch, "ExecutionPlaneHttpClient"),
         patch.object(dispatch, "_submit_and_read_work", return_value={"status": "pending"}),
     ):

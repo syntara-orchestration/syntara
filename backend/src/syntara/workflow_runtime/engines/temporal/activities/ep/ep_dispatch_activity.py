@@ -26,6 +26,7 @@ from syntara.execution_plane.client import (
     ExecutionPlaneUnavailableError,
 )
 from syntara.execution_plane.registry.bindings import legacy_credential_bindings
+from syntara.execution_plane.registry.image_policy import ScriptImagePolicyError, validate_script_image_reference
 from syntara.execution_plane.registry.repository import (
     execution_plane_plugin_credential_recipe_ids,
     execution_plane_plugin_input_schema,
@@ -191,6 +192,11 @@ async def _dispatch_to_ep(  # noqa: C901, PLR0912, PLR0915 - service handoff and
             raise ApplicationError(msg, type="ConfigError", non_retryable=True)
         image = plugin.image_reference
         step_identity = plugin.step_identity
+        try:
+            validate_script_image_reference(plugin.node_type, image)
+        except ScriptImagePolicyError as error:
+            msg = f"Execution Plane image policy rejected Action '{plugin_name}'"
+            raise ApplicationError(msg, type="ConfigError", non_retryable=True) from error
         try:
             input_schema = execution_plane_plugin_input_schema(plugin)
             credential_recipe_ids = await execution_plane_plugin_credential_recipe_ids(session, plugin)
