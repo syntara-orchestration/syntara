@@ -43,14 +43,8 @@ _PLUGIN_SEEDS = (
     ),
 )
 _LEGACY_SEED_REFERENCES = {
-    "script-python": (
-        "quay.io/aap/ansible-automation-platform/ao-python-rhel9:devel",
-        "registry.redhat.io/ansible-automation-platform/ao-python-rhel9:2026.8",
-    ),
-    "script-bash": (
-        "quay.io/aap/ansible-automation-platform/ao-bash-rhel9:devel",
-        "registry.redhat.io/ansible-automation-platform/ao-bash-rhel9:2026.8",
-    ),
+    "script-python": ("quay.io/aap/ansible-automation-platform/ao-python-rhel9:devel",),
+    "script-bash": ("quay.io/aap/ansible-automation-platform/ao-bash-rhel9:devel",),
 }
 
 

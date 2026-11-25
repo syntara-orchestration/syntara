@@ -66,7 +66,7 @@ async def test_seed_upserts_managed_images_and_preserves_an_administrator_pin(
     assert final_by_name["script-bash"].id == initial_ids[1]
     assert final_by_name["script-bash"].image_reference == bash_e
 
-    final_by_name["script-bash"].image_reference = "registry.redhat.io/ansible-automation-platform/ao-bash-rhel9:2026.8"
+    final_by_name["script-bash"].image_reference = "quay.io/aap/ansible-automation-platform/ao-bash-rhel9:devel"
     test_db_session.add(final_by_name["script-bash"])
     await test_db_session.commit()
     bash_f = _reference("registry.redhat.io/ansible-automation-platform/ao-bash-rhel9", "f")
