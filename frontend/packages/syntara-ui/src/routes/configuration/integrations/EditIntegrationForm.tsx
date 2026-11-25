@@ -13,7 +13,7 @@ import { IntegrationTypeEnum } from '@syntara/contracts'
 import { useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useParams, useRouterState } from '@tanstack/react-router'
 import { useEffect, useMemo, useRef } from 'react'
-import { useFormContext, useFormState, useWatch, type UseFormSetValue } from 'react-hook-form'
+import { useFormContext, useFormState, useWatch, type Control, type UseFormSetValue } from 'react-hook-form'
 
 import { breadcrumbsIntegrationEdit } from '../../../app/breadcrumbBuilders'
 import { integrationsClient } from '../../../client'
@@ -44,6 +44,9 @@ import { EditSecurityFields } from './EditSecurityFields'
 import { ScopeFields } from './form/ScopeFields'
 import { integrationHelp } from './integrationFieldHelp'
 import {
+  getKafkaCredentialCompatibilityError,
+  getKafkaCredentialTypes,
+  getKafkaTlsMode,
   isIntegrationCredentialRequired,
   CREDENTIAL_TYPES_BY_INTEGRATION,
   INTEGRATION_TYPE_LABELS,
@@ -53,6 +56,7 @@ import { getIntegrationPaths, getProviderHint, getStoredConfiguration, isLLMProv
 import { formatBootstrapServers } from './kafkaBootstrapServers'
 import { DEFAULT_KAFKA_SASL_MECHANISM } from './kafkaSasl'
 import { useEditTestConnection } from './useEditTestConnection'
+import { useKafkaCredentialType } from './useKafkaCredentialType'
 import { useProjectAssignmentSync } from './useProjectAssignmentSync'
 
 const CREDENTIAL_DESCRIPTION: Record<string, string> = {
@@ -63,7 +67,7 @@ const CREDENTIAL_DESCRIPTION: Record<string, string> = {
   [IntegrationTypeEnum.ANSIBLE_AUTOMATION_PLATFORM]:
     'This credential is used to verify the connection to the Ansible Automation Platform. Workflow credentials are configured separately in the workflow builder.',
   [IntegrationTypeEnum.KAFKA]:
-    'SASL_SSL uses this Kafka login to verify the brokers. SSL and PLAINTEXT allow the credential to be omitted. Workflow credentials are configured separately in the workflow builder.',
+    'This credential is used for integration connection checks. Workflow credentials are configured separately in the workflow builder.',
 }
 
 function configurationFormFields(config: ReturnType<typeof getStoredConfiguration>) {
@@ -92,10 +96,40 @@ function allowHttpForEdit(integration: IntegrationRead): boolean {
   return Boolean(config.allow_http)
 }
 
+function useEditConnectionCredential(
+  control: Control<EditIntegrationFormValues>,
+  integrationType?: IntegrationRead['integration_type']
+) {
+  const credentialId = useWatch({ control, name: 'management_credential_id' })
+  const protocol = useWatch({ control, name: 'security_protocol' })
+  const skipTlsVerification = useWatch({ control, name: 'insecure_skip_tls_verify' })
+  const isKafka = integrationType === IntegrationTypeEnum.KAFKA
+  const credentialType = useKafkaCredentialType(isKafka ? credentialId : undefined)
+  const credentialError = getKafkaCredentialCompatibilityError(credentialType, protocol, skipTlsVerification)
+  const isCredentialRequired = isIntegrationCredentialRequired(integrationType ?? '', protocol)
+  const tlsMode =
+    isKafka && !credentialError && (!credentialId || credentialType)
+      ? getKafkaTlsMode(protocol, credentialType)
+      : undefined
+
+  return {
+    isKafka,
+    protocol,
+    credentialError,
+    hasError: Boolean(credentialError),
+    isCredentialRequired,
+    missingRequiredCredential: isCredentialRequired && !credentialId,
+    compatibleTypeNames: isKafka
+      ? getKafkaCredentialTypes(protocol)
+      : CREDENTIAL_TYPES_BY_INTEGRATION[integrationType ?? IntegrationTypeEnum.MCP_SERVER],
+    tlsMode,
+  }
+}
+
 type FormFieldsProps = Readonly<{
   integration: IntegrationRead
   scope: string
-  credentialId: string | null | undefined
+  connection: ReturnType<typeof useEditConnectionCredential>
   isTesting: boolean
   setValue: UseFormSetValue<EditIntegrationFormValues>
   onTestConnection: () => void
@@ -104,17 +138,15 @@ type FormFieldsProps = Readonly<{
 function EditIntegrationFormFields({
   integration,
   scope,
-  credentialId,
+  connection,
   isTesting,
   setValue,
   onTestConnection,
 }: FormFieldsProps) {
   const { control } = useFormContext<EditIntegrationFormValues>()
   const { errors } = useFormState({ control })
-  const isKafka = integration.integration_type === IntegrationTypeEnum.KAFKA
-  const protocol = useWatch({ control, name: 'security_protocol' })
-  const isCredentialRequired = isIntegrationCredentialRequired(integration.integration_type ?? '', protocol)
-  const isTestDisabled = (isCredentialRequired && !credentialId) || isTesting
+  const { isKafka, protocol, isCredentialRequired, compatibleTypeNames, credentialError, tlsMode } = connection
+  const isTestDisabled = connection.missingRequiredCredential || isTesting || connection.hasError
   const isAnsibleAutomationPlatform = integration.integration_type === IntegrationTypeEnum.ANSIBLE_AUTOMATION_PLATFORM
   const isLLM = isLLMProvider(integration)
   const hideBaseUrl = shouldHideBaseUrl(integration)
@@ -203,18 +235,18 @@ function EditIntegrationFormFields({
           <CredentialSelector
             value={field.value ?? undefined}
             onChange={(id) => setValue('management_credential_id', id ?? null)}
-            compatibleTypeNames={
-              CREDENTIAL_TYPES_BY_INTEGRATION[integration.integration_type ?? IntegrationTypeEnum.MCP_SERVER]
-            }
+            compatibleTypeNames={compatibleTypeNames}
             label="Health check credential"
             fieldId="edit-credential-select"
             isRequired={isCredentialRequired}
             allowCreate
             placeholder="Select a credential"
             labelHelp={integrationHelp.healthCheckCredential}
+            errorMessage={credentialError}
           />
         )}
       </SynFormField>
+      {tlsMode && <Content component={ContentVariants.small}>{tlsMode}</Content>}
 
       <FormGroup fieldId="test-connection">
         <Button
@@ -230,7 +262,11 @@ function EditIntegrationFormFields({
   )
 }
 
-function EditFormFooter({ isSaving, onCancel }: Readonly<{ isSaving: boolean; onCancel: () => void }>) {
+function EditFormFooter({
+  isSaving,
+  hasCredentialError,
+  onCancel,
+}: Readonly<{ isSaving: boolean; hasCredentialError: boolean; onCancel: () => void }>) {
   return (
     <ActionGroup>
       <Button
@@ -238,7 +274,7 @@ function EditFormFooter({ isSaving, onCancel }: Readonly<{ isSaving: boolean; on
         type="submit"
         form="edit-integration-form"
         isLoading={isSaving}
-        isAriaDisabled={isSaving}
+        isAriaDisabled={isSaving || hasCredentialError}
       >
         Save integration
       </Button>
@@ -348,7 +384,8 @@ export function EditIntegrationForm() {
   } = form
 
   const scope = useWatch({ control, name: 'scope' })
-  const credentialId = useWatch({ control, name: 'management_credential_id' })
+  const connection = useEditConnectionCredential(control, integration?.integration_type)
+  const goToDetail = () => detachPromise(navigate({ to: detailPath }))
 
   const { dismiss } = useDirtyFormGuard({
     isDirty,
@@ -370,7 +407,7 @@ export function EditIntegrationForm() {
   const { handleTestConnection, isTesting } = useEditTestConnection(integration, getValues)
 
   function onSubmit(values: EditIntegrationFormValues) {
-    if (!integrationId || !integration) return
+    if (!integrationId || !integration || connection.hasError) return
 
     const integrationType = integration.integration_type ?? IntegrationTypeEnum.MCP_SERVER
 
@@ -413,7 +450,7 @@ export function EditIntegrationForm() {
             autoDismiss: true,
           })
           dismiss()
-          detachPromise(navigate({ to: detailPath }))
+          goToDetail()
         } catch (error: unknown) {
           handleError({ title: 'Failed to update integration', context: `Integration "${values.name}"` })(error)
         }
@@ -449,7 +486,7 @@ export function EditIntegrationForm() {
           isFullHeight
           isScrollable
           panelMainBodyProps={{ className: styles.panelBody }}
-          footer={<EditFormFooter isSaving={isSaving} onCancel={() => detachPromise(navigate({ to: detailPath }))} />}
+          footer={<EditFormFooter isSaving={isSaving} hasCredentialError={connection.hasError} onCancel={goToDetail} />}
         >
           <Form
             id="edit-integration-form"
@@ -463,7 +500,7 @@ export function EditIntegrationForm() {
               <EditIntegrationFormFields
                 integration={integration}
                 scope={scope}
-                credentialId={credentialId}
+                connection={connection}
                 isTesting={isTesting}
                 setValue={setValue}
                 onTestConnection={handleTestConnection}

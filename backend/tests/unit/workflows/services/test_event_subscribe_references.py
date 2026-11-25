@@ -10,9 +10,11 @@ import pytest
 from syntara.authz.engine import AllowedProjectsResult
 from syntara.authz.exceptions import AuthorizationDeniedError
 from syntara.core.exceptions import SafeValueError
+from syntara.credentials.exceptions import CredentialValidationError
 from syntara.credentials.models.credential import Credential
 from syntara.integrations.exceptions import IntegrationCredentialTypeMismatchError
 from syntara.integrations.models.integration import Integration, IntegrationScope, IntegrationType
+from syntara.integrations.models.integration_configuration import KafkaConfiguration
 from syntara.workflows.services.workflow_service import WorkflowService
 from syntara.workflows.validators.workflow_integrations import (
     _extract_integration_ids,
@@ -21,6 +23,16 @@ from syntara.workflows.validators.workflow_integrations import (
 )
 
 SERVICE = "syntara.workflows.services.workflow_service"
+
+
+def _kafka_integration(*, skip_tls: bool = False) -> SimpleNamespace:
+    return SimpleNamespace(
+        integration_type="kafka",
+        enabled=True,
+        configuration=KafkaConfiguration(
+            bootstrap_servers=["broker.example:9093"], security_protocol="SSL", insecure_skip_tls_verify=skip_tls
+        ),
+    )
 
 
 async def test_unsaved_preflight_rechecks_existing_resource_permissions(
@@ -125,8 +137,9 @@ async def test_actor_visibility_and_credential_compatibility_delegation(
     params = definition["triggers"][0]["parameters"]
     integration_id = UUID(params["integration_id"])
     credential_id = UUID(params["credential_id"])
+    integration = _kafka_integration()
     cast("AsyncMock", service.session).get.side_effect = [
-        SimpleNamespace(integration_type="kafka", enabled=True),
+        integration,
         SimpleNamespace(enabled=True),
     ]
     with (
@@ -138,7 +151,7 @@ async def test_actor_visibility_and_credential_compatibility_delegation(
     ):
         if visible:
             await service._validate_event_subscribe_bindings(definition)
-            validate_type.assert_awaited_once_with("kafka", credential_id)
+            validate_type.assert_awaited_once_with("kafka", credential_id, configuration=integration.configuration)
             cast("AsyncMock", service.session).get.assert_any_await(Integration, integration_id)
             cast("AsyncMock", service.session).get.assert_any_await(Credential, credential_id)
         else:
@@ -149,7 +162,7 @@ async def test_actor_visibility_and_credential_compatibility_delegation(
 
 async def test_credential_type_error_propagates(service: WorkflowService, definition: dict[str, Any]) -> None:
     cast("AsyncMock", service.session).get.side_effect = [
-        SimpleNamespace(integration_type="kafka", enabled=True),
+        _kafka_integration(),
         SimpleNamespace(enabled=True),
     ]
     error = IntegrationCredentialTypeMismatchError("kafka", "HTTP Basic Auth", frozenset({"Kafka"}))
@@ -188,7 +201,7 @@ async def test_scoped_visibility_without_read_all(
     memberships.scalars.return_value.all.return_value = [project_id]
     cast("AsyncMock", service.session).execute.return_value = memberships
     cast("AsyncMock", service.session).get.side_effect = [
-        SimpleNamespace(integration_type="kafka", enabled=True),
+        _kafka_integration(),
         SimpleNamespace(enabled=True),
     ]
     with (
@@ -341,7 +354,7 @@ async def test_draft_with_wrong_credential_type_is_rejected(
 ) -> None:
     definition["triggers"][0]["parameters"].pop("topic")
     cast("AsyncMock", service.session).get.side_effect = [
-        SimpleNamespace(integration_type="kafka", enabled=True),
+        _kafka_integration(),
         SimpleNamespace(enabled=True),
     ]
     with (
@@ -353,6 +366,25 @@ async def test_draft_with_wrong_credential_type_is_rejected(
         pytest.raises(IntegrationCredentialTypeMismatchError),
     ):
         await service._validate_event_subscribe_bindings(definition, allow_incomplete=True)
+
+
+@pytest.mark.parametrize("skip_tls", [False, True])
+async def test_subscribe_draft_checks_mtls_verification_at_save(
+    service: WorkflowService, definition: dict[str, Any], *, skip_tls: bool
+) -> None:
+    credential = SimpleNamespace(enabled=True, credential_type_id=uuid4())
+    cast("AsyncMock", service.session).get.side_effect = [
+        _kafka_integration(skip_tls=skip_tls),
+        credential,
+        credential,
+        SimpleNamespace(name="mTLS Client Identity"),
+    ]
+    with patch.object(service, "_resolve_visible_integration_ids", return_value=None):
+        if skip_tls:
+            with pytest.raises(CredentialValidationError, match="Turn on TLS certificate verification"):
+                await service._validate_event_subscribe_bindings(definition, allow_incomplete=True)
+        else:
+            await service._validate_event_subscribe_bindings(definition, allow_incomplete=True)
 
 
 async def test_draft_reference_validation_allows_omissions_only_on_advisory_save(definition: dict[str, Any]) -> None:

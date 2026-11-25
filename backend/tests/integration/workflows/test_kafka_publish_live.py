@@ -67,7 +67,7 @@ async def test_publish_activity_round_trip_over_fixture_sasl_tls(monkeypatch: py
     context.return_value.__aenter__ = AsyncMock()
     context.return_value.__aexit__ = AsyncMock(return_value=False)
     monkeypatch.setattr(module, "_session_factory", context)
-    monkeypatch.setattr(module, "current_publish_resources", AsyncMock(return_value=(config, "revision")))
+    monkeypatch.setattr(module, "current_publish_resources", AsyncMock(return_value=(config, "revision", "Kafka")))
     await admin.start()
     try:
         await admin.create_topics([NewTopic(topic, num_partitions=1, replication_factor=1)])

@@ -98,7 +98,13 @@ async def create_credential(
     data: CredentialCreate,
     service: Annotated[CredentialService, Depends(get_credential_service)],
 ) -> CredentialRead:
-    """Create a new Credential with encrypted inputs."""
+    """Create a new Credential with encrypted inputs.
+
+    The mTLS Client Identity type requires `client_certificate` and `client_private_key` in PEM format.
+    An optional `client_key_passphrase` must contain at least four characters.
+    A 422 response can identify the invalid field using `MTLS_INVALID_CLIENT_CERTIFICATE`,
+    `MTLS_INVALID_PRIVATE_KEY`, `MTLS_WRONG_PASSPHRASE`, or `MTLS_CERTIFICATE_KEY_MISMATCH`.
+    """
     return await service.create_credential(data)
 
 
@@ -195,7 +201,12 @@ async def update_credential(
     data: CredentialUpdate,
     service: Annotated[CredentialService, Depends(get_credential_service)],
 ) -> CredentialRead:
-    """Update a Credential. Fields set to $encrypted$ retain existing values."""
+    """Update a Credential. Fields set to $encrypted$ retain existing values.
+
+    An mTLS Client Identity is validated after the update is merged with the stored inputs.
+    The same mTLS validation codes apply as on create. Set `client_key_passphrase` to null
+    to clear it when replacing a protected key with an unprotected key.
+    """
     return await service.update_credential(credential_id, data)
 
 

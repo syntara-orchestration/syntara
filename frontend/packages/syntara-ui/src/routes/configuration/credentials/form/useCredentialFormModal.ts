@@ -6,7 +6,7 @@ import { credentialsClient } from '../../../../client'
 import { useSynForm } from '../../../../hooks/useSynForm'
 import { useAlerts } from '../../../../providers/alerts'
 import { useSelectableProjects } from '../../../access/useAllProjects'
-import type { Credential } from '../credentialConstants'
+import { MTLS_CLIENT_IDENTITY_TYPE_NAME, type Credential } from '../credentialConstants'
 
 import type { CredentialFormData } from './credentialFormSchema'
 import {
@@ -18,6 +18,8 @@ import {
   getDefaultInputs,
   getTypeInputs,
   getVisibleFields,
+  prepareMtlsInputs,
+  setMtlsCredentialError,
   stripHiddenGroupFields,
   validateAllDynamicFields,
 } from './credentialFormUtils'
@@ -64,6 +66,7 @@ export function useCredentialFormModal({
   }, [allTypes, compatibleTypeNames])
 
   const selectedType = useMemo(() => types.find((t) => t.id === selectedTypeId), [types, selectedTypeId])
+  const isMtlsIdentity = selectedType?.name === MTLS_CLIENT_IDENTITY_TYPE_NAME
   const typeInputs = useMemo(() => (selectedType ? getTypeInputs(selectedType) : null), [selectedType])
 
   const exclusiveGroups = useMemo(() => (typeInputs ? buildExclusiveGroups(typeInputs) : []), [typeInputs])
@@ -191,7 +194,7 @@ export function useCredentialFormModal({
     setTouchedSecrets((prev) => new Set(prev).add(fieldId))
   }, [])
 
-  const onSubmit = (formData: CredentialFormData) => {
+  const validateSubmissionInputs = (formData: CredentialFormData) => {
     const submitType = allTypes.find((t) => t.id === formData.credential_type_id)
     const submitTypeInputs = submitType ? getTypeInputs(submitType) : typeInputs
     const submitVisibleFields = submitTypeInputs ? getVisibleFields(submitTypeInputs, activeGroupIndex) : visibleFields
@@ -199,25 +202,48 @@ export function useCredentialFormModal({
 
     if (!submitTypeInputs) {
       setError('credential_type_id', { message: 'Credential type is required' })
-      return
+      return null
     }
 
+    const submitsMtlsIdentity = submitType?.name === MTLS_CLIENT_IDENTITY_TYPE_NAME
+    const preparedInputs = submitsMtlsIdentity
+      ? prepareMtlsInputs(latestInputs, submitTypeInputs, credentialSeedRef.current?.inputs)
+      : latestInputs
     if (
       !validateAllDynamicFields(
         {
           typeInputs: submitTypeInputs,
-          inputs: latestInputs,
+          inputs: preparedInputs,
           visibleFields: submitVisibleFields,
           isEditMode,
+          isMtlsIdentity: submitsMtlsIdentity,
           touchedSecrets,
         },
         setError
       )
     ) {
-      return
+      return null
     }
 
-    const cleanedInputs = stripHiddenGroupFields(latestInputs, submitTypeInputs, submitVisibleFields)
+    const cleanedInputs = stripHiddenGroupFields(preparedInputs, submitTypeInputs, submitVisibleFields)
+    return { cleanedInputs, submitTypeInputs, submitsMtlsIdentity }
+  }
+
+  const onInvalidSubmit = () => {
+    if (isMtlsIdentity) validateSubmissionInputs(getValues())
+  }
+
+  const onSubmit = (formData: CredentialFormData) => {
+    const submission = validateSubmissionInputs(formData)
+    if (!submission) return
+    const { cleanedInputs, submitTypeInputs, submitsMtlsIdentity } = submission
+    const reportSaveError = handleError({
+      title: isEditMode ? 'Failed to update credential' : 'Failed to create credential',
+    })
+    const onSaveError = (error: unknown) => {
+      if (submitsMtlsIdentity && setMtlsCredentialError(error, setError)) return
+      reportSaveError(error)
+    }
 
     if (isEditMode && credentialToEdit) {
       patchCredential(
@@ -226,7 +252,7 @@ export function useCredentialFormModal({
           body: {
             name: formData.name,
             description: formData.description || null,
-            inputs: buildEditInputs(cleanedInputs, submitTypeInputs, touchedSecrets),
+            inputs: buildEditInputs(cleanedInputs, submitTypeInputs, touchedSecrets, submitsMtlsIdentity),
           },
         },
         {
@@ -235,7 +261,7 @@ export function useCredentialFormModal({
             onSuccess?.()
             handleClose()
           },
-          onError: handleError({ title: 'Failed to update credential' }),
+          onError: onSaveError,
         }
       )
       return
@@ -260,7 +286,7 @@ export function useCredentialFormModal({
           onSuccess?.()
           handleClose()
         },
-        onError: handleError({ title: 'Failed to create credential' }),
+        onError: onSaveError,
       }
     )
   }
@@ -285,6 +311,7 @@ export function useCredentialFormModal({
     handleSubmit,
     handleClose,
     onSubmit,
+    onInvalidSubmit,
     isSubmitting,
     projects,
     isLoadingProjects,
@@ -292,6 +319,7 @@ export function useCredentialFormModal({
     types,
     typesQuery,
     isEditMode,
+    isMtlsIdentity,
     isTypeSelectDisabled,
     exclusiveGroups,
     activeGroupIndex,

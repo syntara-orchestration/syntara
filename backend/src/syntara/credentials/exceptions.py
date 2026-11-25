@@ -28,6 +28,11 @@ class CredentialNameConflictError(CredentialError):
 class CredentialValidationError(CredentialError):
     """Exception raised for credential input validation errors."""
 
+    def __init__(self, message: str, *, code: str = "CREDENTIAL_VALIDATION_ERROR") -> None:
+        """Use the default code unless the caller supplies a specific safe code."""
+        self.code = code
+        super().__init__(message)
+
 
 @fastapi_exception(handler="syntara.credentials.error_handlers.credential_decryption_error_handler")
 class CredentialDecryptionError(CredentialError):

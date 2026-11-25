@@ -41,6 +41,8 @@ from syntara.credentials.exceptions import (
     CredentialNotFoundError,
     CredentialValidationError,
 )
+from syntara.credentials.lib.mtls_identity import validate_mtls_identity
+from syntara.credentials.lib.preseed import MTLS_CLIENT_IDENTITY_TYPE_NAME
 from syntara.credentials.models.credential import (
     Credential,
     CredentialCreate,
@@ -287,6 +289,14 @@ def _validate_inputs(
         _validate_field_value(field_id, value, field_def)
 
 
+def _validate_mtls_credential_inputs(inputs: dict[str, Any], credential_type: CredentialType) -> None:
+    """Validate the identity as a whole after applying any credential edits."""
+    if credential_type.name == MTLS_CLIENT_IDENTITY_TYPE_NAME:
+        validate_mtls_identity(
+            inputs.get("client_certificate"), inputs.get("client_private_key"), inputs.get("client_key_passphrase")
+        )
+
+
 class CredentialEnrichQuery(EnrichQueryMixin):
     """Eager-load credential type relationship."""
 
@@ -368,10 +378,12 @@ class CredentialService(UserReferenceResolverMixin, BaseService):
     ) -> CredentialRead:
         """Build a CredentialRead with selective masking — secret fields masked, non-secret in plaintext."""
         secret_field_ids = _get_secret_field_ids(credential_type.inputs)
+        is_mtls_identity = credential_type.name == MTLS_CLIENT_IDENTITY_TYPE_NAME
         read = CredentialRead.model_validate(credential)
         read.inputs = {
             field_id: (ENCRYPTED_SENTINEL if field_id in secret_field_ids else value)
             for field_id, value in decrypted_inputs.items()
+            if not (is_mtls_identity and field_id == "client_key_passphrase" and value in (None, ""))
         }
         return read
 
@@ -393,6 +405,7 @@ class CredentialService(UserReferenceResolverMixin, BaseService):
 
         # Validate inputs against type schema (always validate — empty dict may miss required fields)
         _validate_inputs(data.inputs, credential_type.inputs)
+        _validate_mtls_credential_inputs(data.inputs, credential_type)
 
         existing = await self._find_by_name(data.name, data.project_id)
         if existing:
@@ -541,15 +554,16 @@ class CredentialService(UserReferenceResolverMixin, BaseService):
         if data.inputs is not None:
             _validate_inputs(data.inputs, credential_type.inputs, allow_sentinel=True)
         try:
+            existing_inputs = await self._retrieve_or_empty(credential.secret_id)
+            decrypted_inputs = existing_inputs
             if data.inputs is not None:
-                existing_inputs = await self._retrieve_or_empty(credential.secret_id)
                 decrypted_inputs = self._merge_inputs(existing_inputs, data.inputs)
                 _validate_field_constraints(decrypted_inputs, credential_type.inputs)
-                if decrypted_inputs != existing_inputs:
-                    credential.secret_id = await self._store_inputs(credential, decrypted_inputs)
-                    note_external_field_change(credential, "inputs")
-                return decrypted_inputs
-            return await self._retrieve_or_empty(credential.secret_id)
+            _validate_mtls_credential_inputs(decrypted_inputs, credential_type)
+            if decrypted_inputs != existing_inputs:
+                credential.secret_id = await self._store_inputs(credential, decrypted_inputs)
+                note_external_field_change(credential, "inputs")
+            return decrypted_inputs
         except CredentialDecryptionError:
             self._emit_decryption_failure(credential)
             raise
@@ -581,7 +595,7 @@ class CredentialService(UserReferenceResolverMixin, BaseService):
             credential.name = data.name
             has_changes = True
 
-        has_changes = has_changes or self._apply_credential_scalar_updates(credential, data)
+        has_changes = self._apply_credential_scalar_updates(credential, data) or has_changes
 
         decrypted_inputs = await self._apply_credential_inputs_update(credential, data, credential_type)
         has_changes = has_changes or bool(external_field_changes(credential))

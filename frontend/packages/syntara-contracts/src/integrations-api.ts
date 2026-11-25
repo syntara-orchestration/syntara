@@ -841,9 +841,10 @@ export interface components {
      * KafkaConfiguration
      * @description Configuration for a Kafka cluster integration.
      *
-     *     Broker addresses live here. The username and password stay on the
-     *     linked Kafka credential when SASL_SSL is selected. Unauthenticated SSL
-     *     and explicitly opted-in PLAINTEXT do not require a credential.
+     *     Broker addresses live here. SASL_SSL uses the username and password on
+     *     the linked Kafka credential. SSL can use an mTLS Client Identity when
+     *     broker certificate verification is enabled. SSL without a client identity
+     *     and explicitly opted-in PLAINTEXT allow an omitted credential.
      */
     KafkaConfiguration: {
       /**
@@ -946,7 +947,19 @@ export interface components {
      * @description Classification of health check failures.
      * @enum {string}
      */
-    HealthCheckErrorType: 'auth_failure' | 'connection_error' | 'rate_limit' | 'ssl_error' | 'timeout'
+    HealthCheckErrorType:
+      | 'auth_failure'
+      | 'connection_error'
+      | 'rate_limit'
+      | 'ssl_error'
+      | 'timeout'
+      | 'mtls_untrusted_ca'
+      | 'mtls_invalid_client_certificate'
+      | 'mtls_invalid_private_key'
+      | 'mtls_wrong_passphrase'
+      | 'mtls_certificate_key_mismatch'
+      | 'mtls_hostname_mismatch'
+      | 'mtls_handshake_failed'
     /**
      * ValidateResult
      * @description Result of a lightweight connectivity ping (validate endpoint).

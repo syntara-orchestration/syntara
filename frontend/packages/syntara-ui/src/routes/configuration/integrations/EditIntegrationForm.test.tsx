@@ -6,9 +6,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 
 import { integrationsClient } from '../../../client'
+import { FormFieldError } from '../../../components/FormFieldError'
 import { AlertProvider } from '../../../providers/alerts'
 
 import { EditIntegrationForm } from './EditIntegrationForm'
+import { useKafkaCredentialType } from './useKafkaCredentialType'
+
+vi.mock('./useKafkaCredentialType', () => ({ useKafkaCredentialType: vi.fn() }))
 
 vi.mock('../../../client', () => ({
   integrationsClient: {
@@ -65,14 +69,17 @@ vi.mock('../../builder/components/CredentialSelector', () => ({
     fieldId,
     onChange,
     value,
+    errorMessage,
   }: {
     label?: string
     fieldId?: string
     onChange?: (id: string | undefined) => void
     value?: string
+    errorMessage?: string
   }) => (
     <div data-testid="credential-selector" aria-label={label}>
       <input id={fieldId} aria-label={label} readOnly value={value ?? ''} />
+      <FormFieldError message={errorMessage} />
       <button data-testid="select-credential" onClick={() => onChange?.('cred-123')}>
         Select credential
       </button>
@@ -195,6 +202,9 @@ function setupMutationMocks(patchMutateAsync?: ReturnType<typeof vi.fn>, discove
 describe('EditIntegrationForm', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.mocked(useKafkaCredentialType).mockImplementation((id) =>
+      id === 'cred-mtls' ? 'mTLS Client Identity' : undefined
+    )
     mockPathname = '/configuration/integrations/int-1/edit'
     setupMocks()
     setupMutationMocks()
@@ -810,7 +820,7 @@ describe('EditIntegrationForm', () => {
       )
       expect(screen.getByText('SCRAM-SHA-512')).toBeInTheDocument()
       expect(screen.queryByRole('textbox', { name: /api url/i })).not.toBeInTheDocument()
-      expect(screen.getByText(/SASL_SSL uses this Kafka login/i)).toBeInTheDocument()
+      expect(screen.getByText(/This credential is used for integration connection checks/i)).toBeInTheDocument()
     })
 
     it('hides Allow HTTP so the connection stays SASL_SSL', async () => {
@@ -832,6 +842,35 @@ describe('EditIntegrationForm', () => {
       await user.click(screen.getByTestId('select-credential'))
 
       expect(screen.getByRole('button', { name: 'Test connection' })).not.toHaveAttribute('aria-disabled', 'true')
+    })
+
+    it('keeps the identity selected and blocks saving until broker verification is enabled', async () => {
+      const user = userEvent.setup()
+      const { patchMutate } = setupMutationMocks()
+      setupMocks({
+        integration: {
+          ...mockKafkaIntegration,
+          management_credential_id: 'cred-mtls',
+          configuration: { ...mockKafkaIntegration.configuration, security_protocol: 'SSL' },
+        },
+      })
+      render(<EditIntegrationForm />, { wrapper })
+
+      const save = screen.getByRole('button', { name: 'Save integration' })
+      const testConnection = screen.getByRole('button', { name: 'Test connection' })
+      expect(screen.getByRole('textbox', { name: 'Health check credential' })).toHaveValue('cred-mtls')
+      expect(screen.getByText(/Turn on TLS certificate verification to use an mTLS Client Identity/)).toBeVisible()
+      expect(save).toHaveAttribute('aria-disabled', 'true')
+      expect(testConnection).toHaveAttribute('aria-disabled', 'true')
+      await user.click(save)
+      expect(patchMutate).not.toHaveBeenCalled()
+
+      await user.click(screen.getByText('Security'))
+      await user.click(screen.getByRole('checkbox', { name: 'Disable TLS certificate verification' }))
+
+      expect(screen.getByText('Mutual TLS')).toBeInTheDocument()
+      expect(save).not.toHaveAttribute('aria-disabled', 'true')
+      expect(testConnection).not.toHaveAttribute('aria-disabled', 'true')
     })
 
     it('saves the broker list and the selected SASL mechanism', async () => {

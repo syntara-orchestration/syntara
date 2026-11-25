@@ -31,7 +31,7 @@ def _mock_connection(monkeypatch: pytest.MonkeyPatch) -> AsyncMock:
     context.return_value.__aexit__ = AsyncMock(return_value=False)
     for module in (sender, preparation):
         monkeypatch.setattr(module, "_session_factory", context)
-        monkeypatch.setattr(module, "current_publish_resources", AsyncMock(return_value=(config, "revision")))
+        monkeypatch.setattr(module, "current_publish_resources", AsyncMock(return_value=(config, "revision", "Kafka")))
     monkeypatch.setattr(preparation, "create_secret_service", MagicMock())
     resolve = AsyncMock(
         return_value={

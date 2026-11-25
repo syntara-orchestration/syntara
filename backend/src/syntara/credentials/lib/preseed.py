@@ -17,9 +17,17 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from syntara.credentials.lib.auth_types import AUTH_TYPE_KAFKA_CONNECTION
+from syntara.credentials.lib.mtls_identity import (
+    MTLS_CERTIFICATE_VAR,
+    MTLS_PASSPHRASE_MIN_LENGTH,
+    MTLS_PASSPHRASE_VAR,
+    MTLS_PRIVATE_KEY_VAR,
+)
 from syntara.credentials.models.credential_type import CredentialType
 
 logger = structlog.stdlib.get_logger(__name__)
+
+MTLS_CLIENT_IDENTITY_TYPE_NAME = "mTLS Client Identity"
 
 # Must stay >= workflows.workflow_engine.utils.credential_scrubber.MIN_SECRET_LENGTH
 # (currently 4). Values shorter than that threshold are skipped by workflow-output
@@ -69,6 +77,49 @@ GA_CREDENTIAL_TYPES: list[dict[str, Any]] = [
                 "auth_type": AUTH_TYPE_KAFKA_CONNECTION,
                 "kafka_username": "{{username}}",
                 "kafka_password": "{{password}}",
+            },
+            "env": {},
+            "file": {},
+        },
+    },
+    {
+        "name": MTLS_CLIENT_IDENTITY_TYPE_NAME,
+        "description": "Lets a service prove its identity to an external system that requires mTLS.",
+        "inputs": {
+            "fields": [
+                {
+                    "id": "client_certificate",
+                    "label": "Client certificate",
+                    "type": "string",
+                    "multiline": True,
+                    "secret": False,
+                    "default": "-----BEGIN CERTIFICATE-----\n\n-----END CERTIFICATE-----",
+                    "help_text": "Paste the certificate contents between the markers.",
+                },
+                {
+                    "id": "client_private_key",
+                    "label": "Private key",
+                    "type": "string",
+                    "multiline": True,
+                    "secret": True,
+                    "help_text": "Paste the complete PEM private key, including its BEGIN and END markers.",
+                },
+                {
+                    "id": "client_key_passphrase",
+                    "label": "Key passphrase",
+                    "type": "string",
+                    "secret": True,
+                    "min_length": MTLS_PASSPHRASE_MIN_LENGTH,
+                    "help_text": "Enter a passphrase only if the private key is passphrase protected.",
+                },
+            ],
+            "required": ["client_certificate", "client_private_key"],
+        },
+        "injectors": {
+            "extra_vars": {
+                MTLS_CERTIFICATE_VAR: "{{client_certificate}}",
+                MTLS_PRIVATE_KEY_VAR: "{{client_private_key}}",
+                MTLS_PASSPHRASE_VAR: "{{client_key_passphrase}}",
             },
             "env": {},
             "file": {},

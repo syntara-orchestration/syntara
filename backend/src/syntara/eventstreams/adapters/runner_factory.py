@@ -10,6 +10,8 @@ from syntara.core.services.secret_service import SecretService
 from syntara.core.services.storage_backend import DatabaseBackend
 from syntara.credentials.lib.injector_resolver import InjectorResolver
 from syntara.credentials.lib.kafka_connection import kafka_credential_required
+from syntara.credentials.lib.mtls_identity import mtls_identity_vars
+from syntara.credentials.lib.preseed import MTLS_CLIENT_IDENTITY_TYPE_NAME
 from syntara.eventstreams.adapters.kafka_consumer import KafkaPartitionConsumer
 from syntara.eventstreams.adapters.kafka_record_runner import KafkaRecordRunner
 from syntara.eventstreams.adapters.kafka_source_configuration import KafkaSourceConfiguration
@@ -20,8 +22,9 @@ from syntara.eventstreams.services.admission_service import EventAdmissionServic
 from syntara.eventstreams.services.connection_provider import EventConnectionProvider
 from syntara.eventstreams.services.execution_preparation_service import EventExecutionPreparationService
 from syntara.eventstreams.services.worker_resources import EventWorkerResources
-from syntara.integrations.adapters.kafka import KafkaAdapter
+from syntara.integrations.adapters.kafka import KafkaAdapter, KafkaAuthenticationConfigurationError
 from syntara.integrations.adapters.kafka_credentials import resolve_kafka_authentication
+from syntara.integrations.adapters.kafka_tls import KafkaMTLSError
 from syntara.integrations.lib.credential_resolver import fetch_credential_with_type
 from syntara.integrations.models.integration import Integration
 from syntara.integrations.models.integration_configuration import KafkaConfiguration
@@ -54,6 +57,12 @@ class ManagedRunnerFactory:
             raise SubscriptionRuntimeError(RuntimeFailureCode.CONFIGURATION_UNAVAILABLE)
         try:
             connection = await self.resolve_connection(snapshot)
+        except KafkaMTLSError as exc:
+            raise SubscriptionRuntimeError(
+                RuntimeFailureCode.CONFIGURATION_UNAVAILABLE, reason=exc.code.value
+            ) from None
+        except KafkaAuthenticationConfigurationError:
+            raise SubscriptionRuntimeError(RuntimeFailureCode.CONFIGURATION_UNAVAILABLE) from None
         except SQLAlchemyError as exc:
             self._resources.database_failed()
             raise SubscriptionRuntimeError(RuntimeFailureCode.CONNECTION_UNAVAILABLE, transient=True) from exc
@@ -96,17 +105,18 @@ class ManagedRunnerFactory:
             decrypted = await secrets.retrieve_secret(credential.secret_id)  # type: ignore[arg-type]
             resolved = InjectorResolver.resolve(credential_type.injectors or {}, decrypted)
             config = integration.configuration
-            username = password = None
-            if kafka_credential_required(config.security_protocol):
-                username, password = resolve_kafka_authentication(resolved.extra_vars)
-            connection = ResolvedKafkaConnection(
-                bootstrap_servers=list(config.bootstrap_servers),
-                security_protocol=config.security_protocol,
-                sasl_mechanism=config.sasl_mechanism if username is not None else None,
-                sasl_plain_username=username,
-                sasl_plain_password=password,
-                ssl_context=KafkaAdapter(config)._ssl_context()  # noqa: SLF001 - reuse Integration TLS semantics
-                if config.security_protocol != "PLAINTEXT"
-                else None,
-            )
-        return connection  # noqa: RET504 - session must close before client construction
+            extra_vars = resolved.extra_vars
+            if credential_type.name == MTLS_CLIENT_IDENTITY_TYPE_NAME:
+                extra_vars = mtls_identity_vars(extra_vars)
+
+        username = password = None
+        if kafka_credential_required(config.security_protocol):
+            username, password = resolve_kafka_authentication(extra_vars)
+        return ResolvedKafkaConnection(
+            bootstrap_servers=list(config.bootstrap_servers),
+            security_protocol=config.security_protocol,
+            sasl_mechanism=config.sasl_mechanism if username is not None else None,
+            sasl_plain_username=username,
+            sasl_plain_password=password,
+            ssl_context=KafkaAdapter(config).connection_ssl_context(extra_vars),
+        )

@@ -1,6 +1,7 @@
 import type { UseFormSetError } from 'react-hook-form'
 
-import type { CredentialType } from '../credentialConstants'
+import { getErrorCode, getErrorMessage } from '../../../../utils/apiErrors'
+import type { Credential, CredentialType } from '../credentialConstants'
 import { ENCRYPTED_SENTINEL } from '../credentialConstants'
 
 import type { CredentialFormData } from './credentialFormSchema'
@@ -19,6 +20,45 @@ export type TypeInputs = {
 export type ExclusiveGroup = {
   fieldIds: string[]
   label: string
+}
+
+const MTLS_ERROR_FIELDS = new Map<string, `inputs.${string}`>([
+  ['MTLS_INVALID_CLIENT_CERTIFICATE', 'inputs.client_certificate'],
+  ['MTLS_INVALID_PRIVATE_KEY', 'inputs.client_private_key'],
+  ['MTLS_WRONG_PASSPHRASE', 'inputs.client_key_passphrase'],
+  ['MTLS_CERTIFICATE_KEY_MISMATCH', 'inputs.client_private_key'],
+])
+
+/** Prepare the identity values for validation and preserve an existing blanked key. */
+export function prepareMtlsInputs(
+  inputs: Record<string, unknown>,
+  typeInputs: TypeInputs,
+  storedInputs?: Credential['inputs']
+): Record<string, unknown> {
+  const prepared = { ...inputs }
+  const certificate = prepared.client_certificate
+  const certificateDefault = typeInputs.fields.find((field) => field.id === 'client_certificate')?.default
+  if (typeof certificate === 'string') {
+    const content = certificate.replace(/\s/g, '')
+    const markers = typeof certificateDefault === 'string' ? certificateDefault.replace(/\s/g, '') : undefined
+    if (!content || content === markers) prepared.client_certificate = ''
+  }
+
+  const privateKey = prepared.client_private_key
+  if (privateKey == null || (typeof privateKey === 'string' && !privateKey.trim())) {
+    const hasStoredPrivateKey = storedInputs?.client_private_key === ENCRYPTED_SENTINEL
+    prepared.client_private_key = hasStoredPrivateKey ? ENCRYPTED_SENTINEL : ''
+  }
+  if (prepared.client_key_passphrase === '') delete prepared.client_key_passphrase
+  return prepared
+}
+
+/** Put the server's safe identity message beneath the field that needs correction. */
+export function setMtlsCredentialError(error: unknown, setError: UseFormSetError<CredentialFormData>): boolean {
+  const field = MTLS_ERROR_FIELDS.get(getErrorCode(error) ?? '')
+  if (!field) return false
+  setError(field, { type: 'server', message: getErrorMessage(error) })
+  return true
 }
 
 /** Extract the dynamic field definitions, required field IDs, and field constraints from a credential type's inputs schema. */
@@ -188,6 +228,7 @@ type ValidateDynamicFieldsOptions = {
   inputs: Record<string, unknown>
   visibleFields: FieldDefinition[]
   isEditMode: boolean
+  isMtlsIdentity?: boolean
   touchedSecrets: Set<string>
 }
 
@@ -200,6 +241,11 @@ function validateRequiredField(
   const val = inputs[fieldId]
   const field = typeInputs?.fields.find((f) => f.id === fieldId)
 
+  if (options.isMtlsIdentity) {
+    if (val != null && val !== '') return true
+    setError(`inputs.${fieldId}`, { message: `${field?.label ?? fieldId} is required.` })
+    return false
+  }
   if (isEditMode) {
     return validateEditModeRequiredDynamicField({
       requiredId: fieldId,
@@ -212,6 +258,18 @@ function validateRequiredField(
   return validateCreateModeRequiredDynamicField(fieldId, val, field, setError)
 }
 
+function validateMtlsPassphrase(
+  typeInputs: TypeInputs,
+  passphrase: unknown,
+  setError: UseFormSetError<CredentialFormData>
+): boolean {
+  const minLength = typeInputs.fields.find((field) => field.id === 'client_key_passphrase')?.min_length
+  if (typeof passphrase !== 'string' || passphrase === ENCRYPTED_SENTINEL || minLength == null) return true
+  if (Array.from(passphrase).length >= minLength) return true
+  setError('inputs.client_key_passphrase', { message: `Key passphrase must be at least ${minLength} characters.` })
+  return false
+}
+
 /** Validate all dynamic required fields plus field constraints. */
 export function validateAllDynamicFields(
   options: ValidateDynamicFieldsOptions,
@@ -219,7 +277,8 @@ export function validateAllDynamicFields(
 ): boolean {
   const { typeInputs, visibleFields } = options
   if (!typeInputs) return true
-  let valid = true
+  let valid =
+    !options.isMtlsIdentity || validateMtlsPassphrase(typeInputs, options.inputs.client_key_passphrase, setError)
 
   const visibleFieldIds = new Set(visibleFields.map((f) => f.id))
 
@@ -246,14 +305,18 @@ export function validateAllDynamicFields(
 export function buildEditInputs(
   currentInputs: Record<string, unknown>,
   typeInputs: TypeInputs | null,
-  touchedSecrets: Set<string>
+  touchedSecrets: Set<string>,
+  isMtlsIdentity = false
 ): Record<string, unknown> {
   if (!typeInputs) return currentInputs
   const result = { ...currentInputs }
   for (const field of typeInputs.fields) {
     if (field.secret) {
       const val = result[field.id]
-      if (!touchedSecrets.has(field.id) || val === '' || val == null || val === ENCRYPTED_SENTINEL) {
+      const wasEdited = touchedSecrets.has(field.id)
+      if (isMtlsIdentity && field.id === 'client_key_passphrase' && wasEdited && (val === '' || val == null)) {
+        result[field.id] = null
+      } else if (!wasEdited || val === '' || val == null || val === ENCRYPTED_SENTINEL) {
         result[field.id] = ENCRYPTED_SENTINEL
       }
     }

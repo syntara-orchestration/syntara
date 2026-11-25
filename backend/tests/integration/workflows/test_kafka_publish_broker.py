@@ -63,7 +63,7 @@ async def test_wire_values_missing_topic_and_lower_broker_limit(
     context.return_value.__aenter__ = AsyncMock()
     context.return_value.__aexit__ = AsyncMock(return_value=False)
     monkeypatch.setattr(sender, "_session_factory", context)
-    monkeypatch.setattr(sender, "current_publish_resources", AsyncMock(return_value=(config, "revision")))
+    monkeypatch.setattr(sender, "current_publish_resources", AsyncMock(return_value=(config, "revision", "Kafka")))
     consumer = AIOKafkaConsumer(
         topic, bootstrap_servers=kafka_broker, enable_auto_commit=False, auto_offset_reset="earliest"
     )

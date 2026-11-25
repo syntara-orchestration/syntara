@@ -1,9 +1,8 @@
 """Kafka credential rules.
 
-The credential stores SASL username/password fields when the connection needs
-them. Connection settings stay on the Kafka integration. Publish requires a
+Connection settings stay on the Kafka integration. Publish requires a
 credential reference in every mode; connector and listener references follow
-their shared connection rules. Login resolution reads only the supplied id.
+their shared connection rules. Resolution reads only the supplied id.
 """
 
 from enum import StrEnum
@@ -18,6 +17,9 @@ from syntara.credentials.exceptions import (
     CredentialDisabledError,
     CredentialValidationError,
 )
+from syntara.credentials.lib.injector_resolver import InjectorResolver
+from syntara.credentials.lib.mtls_identity import mtls_identity_vars
+from syntara.credentials.lib.preseed import MTLS_CLIENT_IDENTITY_TYPE_NAME
 from syntara.credentials.models.credential import Credential
 from syntara.credentials.models.credential_type import CredentialType
 
@@ -35,6 +37,16 @@ class KafkaSecurityProtocol(StrEnum):
     PLAINTEXT = "PLAINTEXT"
     SSL = "SSL"
     SASL_SSL = "SASL_SSL"
+
+
+def validate_kafka_mtls_configuration(*, security_protocol: str, insecure_skip_tls_verify: bool = False) -> None:
+    """Reject Kafka settings that cannot use a mutual TLS client identity."""
+    if security_protocol != KafkaSecurityProtocol.SSL:
+        msg = "Select SSL to use an mTLS Client Identity."
+        raise CredentialValidationError(msg)
+    if insecure_skip_tls_verify:
+        msg = "Turn on TLS certificate verification to use an mTLS Client Identity."
+        raise CredentialValidationError(msg)
 
 
 def kafka_credential_required(security_protocol: str) -> bool:
@@ -106,20 +118,20 @@ async def _load_supplied_kafka_login(
     *,
     credential_id: UUID | None,
     security_protocol: str,
+    insecure_skip_tls_verify: bool,
 ) -> dict[str, str] | None:
-    """Load one credential id, decrypt it, and apply the Kafka login rules.
+    """Load one credential id, decrypt it, and apply the Kafka credential rules.
 
     There is no second id. Connector validation passes its management
     credential. Listener runtime passes its step-selected credential.
     A missing runtime id is not replaced with the management credential.
     """
-    required = kafka_credential_required(security_protocol)
     if credential_id is None:
-        if required:
-            msg = "SASL_SSL requires a Kafka credential"
-            raise CredentialValidationError(msg)
-        return None
+        return resolve_supplied_kafka_login(
+            credential_id=None, decrypted_inputs=None, security_protocol=security_protocol
+        )
 
+    required = kafka_credential_required(security_protocol)
     credential = await session.get(Credential, credential_id)
     if credential is None:
         msg = "Kafka credential inputs were not supplied for the requested credential"
@@ -128,11 +140,16 @@ async def _load_supplied_kafka_login(
         raise CredentialDisabledError(credential.name)
 
     cred_type = await session.get(CredentialType, credential.credential_type_id)
-    if cred_type is None or cred_type.name != KAFKA_CONNECTION_TYPE_NAME:
+    if cred_type is None or cred_type.name not in {KAFKA_CONNECTION_TYPE_NAME, MTLS_CLIENT_IDENTITY_TYPE_NAME}:
         msg = "The supplied credential is not a Kafka credential"
         raise CredentialValidationError(msg)
 
-    if not required:
+    uses_mtls = cred_type.name == MTLS_CLIENT_IDENTITY_TYPE_NAME
+    if uses_mtls:
+        validate_kafka_mtls_configuration(
+            security_protocol=security_protocol, insecure_skip_tls_verify=insecure_skip_tls_verify
+        )
+    elif not required:
         return None
     if credential.secret_id is None:
         msg = "Kafka credential inputs were not supplied for the requested credential"
@@ -144,6 +161,9 @@ async def _load_supplied_kafka_login(
         msg = "Kafka credential could not be decrypted"
         raise CredentialDecryptionError(msg) from exc
 
+    if uses_mtls:
+        resolved = InjectorResolver.resolve(cred_type.injectors or {}, decrypted_inputs)
+        return mtls_identity_vars(resolved.extra_vars)
     return resolve_supplied_kafka_login(
         credential_id=credential_id,
         decrypted_inputs=decrypted_inputs,
@@ -157,8 +177,9 @@ async def resolve_connector_kafka_login(
     *,
     management_credential_id: UUID | None,
     security_protocol: str,
+    insecure_skip_tls_verify: bool = False,
 ) -> dict[str, str] | None:
-    """Resolve the Kafka login for connector validation.
+    """Resolve the Kafka connection credential for connector validation.
 
     The id is the integration's management credential. This does not read
     any other credential.
@@ -168,6 +189,7 @@ async def resolve_connector_kafka_login(
         secret_service,
         credential_id=management_credential_id,
         security_protocol=security_protocol,
+        insecure_skip_tls_verify=insecure_skip_tls_verify,
     )
 
 
@@ -177,8 +199,9 @@ async def resolve_listener_kafka_login(
     *,
     runtime_credential_id: UUID | None,
     security_protocol: str,
+    insecure_skip_tls_verify: bool = False,
 ) -> dict[str, str] | None:
-    """Resolve the Kafka login for listener runtime.
+    """Resolve the Kafka connection credential for listener runtime.
 
     The id is the credential selected on the listener step. This function
     has no management-credential parameter, so it cannot substitute one.
@@ -188,6 +211,7 @@ async def resolve_listener_kafka_login(
         secret_service,
         credential_id=runtime_credential_id,
         security_protocol=security_protocol,
+        insecure_skip_tls_verify=insecure_skip_tls_verify,
     )
 
 
@@ -197,6 +221,7 @@ async def resolve_publish_kafka_login(
     *,
     runtime_credential_id: UUID,
     security_protocol: str,
+    insecure_skip_tls_verify: bool = False,
 ) -> dict[str, str] | None:
     """Validate a required Publish binding with mode-specific credential contents."""
     return await _load_supplied_kafka_login(
@@ -204,4 +229,5 @@ async def resolve_publish_kafka_login(
         secret_service,
         credential_id=runtime_credential_id,
         security_protocol=security_protocol,
+        insecure_skip_tls_verify=insecure_skip_tls_verify,
     )

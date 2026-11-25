@@ -35,7 +35,13 @@ vi.mock('../../../../client', () => ({
     })),
   },
   credentialsClient: {
-    useQuery: vi.fn(() => ({ data: { results: [] }, isLoading: false, error: null, refetch: vi.fn() })),
+    useQuery: vi.fn((_method: string, path: string) => ({
+      data:
+        path === '/credential_types' ? { resources: [{ id: 'type-mtls', name: 'mTLS Client Identity' }] } : undefined,
+      isLoading: false,
+      error: null,
+      refetch: vi.fn(),
+    })),
   },
 }))
 
@@ -48,15 +54,24 @@ vi.mock('../../../access/useAllProjects', () => {
   return { useAllProjects: projectsMock, useSelectableProjects: projectsMock }
 })
 
+vi.mock('../../../builder/components/useAllCredentials', () => ({
+  useAllCredentials: () => ({
+    credentials: [{ id: 'cred-mtls', credential_type_id: 'type-mtls' }],
+    isLoading: false,
+  }),
+}))
+
 vi.mock('../../../builder/components/CredentialSelector', () => ({
   CredentialSelector: ({
     label,
     fieldId,
     onChange,
+    compatibleTypeNames,
   }: {
     label?: string
     fieldId?: string
     onChange?: (id: string | undefined) => void
+    compatibleTypeNames?: string[]
   }) => (
     <div data-testid="credential-selector" aria-label={label}>
       <input id={fieldId} aria-label={label} />
@@ -66,6 +81,11 @@ vi.mock('../../../builder/components/CredentialSelector', () => ({
       <button data-testid="clear-credential" onClick={() => onChange?.(undefined)}>
         Clear credential
       </button>
+      {compatibleTypeNames?.includes('mTLS Client Identity') && (
+        <button type="button" onClick={() => onChange?.('cred-mtls')}>
+          Select client identity
+        </button>
+      )}
     </div>
   ),
 }))
@@ -540,6 +560,28 @@ describe('IntegrationForm', () => {
           })
         )
       })
+    })
+
+    it('offers a client identity with SSL and saves the selected health check credential', async () => {
+      const user = userEvent.setup()
+      const { createAsyncMutate } = mockMutations()
+      render(<IntegrationForm />, { wrapper })
+      await selectKafka(user)
+      await user.type(screen.getByRole('textbox', { name: 'Name' }), 'Production Kafka')
+      await user.type(screen.getByRole('textbox', { name: 'Bootstrap servers' }), 'broker.example.com:9093')
+      await user.click(screen.getByRole('button', { name: 'Security protocol' }))
+      await user.click(screen.getByRole('option', { name: 'SSL — TLS with optional client identity' }))
+      await user.click(screen.getByRole('button', { name: 'Next' }))
+
+      expect(screen.getByText('Server-only TLS')).toBeInTheDocument()
+      await user.click(screen.getByRole('button', { name: 'Select client identity' }))
+      expect(screen.getByText('Mutual TLS')).toBeInTheDocument()
+      await user.click(screen.getByRole('button', { name: 'Save integration' }))
+
+      await waitFor(() => expect(createAsyncMutate).toHaveBeenCalledOnce())
+      const request = createAsyncMutate.mock.calls[0]?.[0] as unknown
+      expect(request).toHaveProperty('body.management_credential_id', 'cred-mtls')
+      expect(request).toHaveProperty('body.configuration.security_protocol', 'SSL')
     })
 
     it('shows a validation alert when bootstrap servers are cleared before save', async () => {

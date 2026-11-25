@@ -33,6 +33,7 @@ from syntara.core.services.user_reference_resolution import UserReferenceResolve
 from syntara.credentials.exceptions import CredentialError
 from syntara.credentials.lib.auth_types import AUTH_TYPE_URL
 from syntara.credentials.lib.kafka_connection import resolve_publish_kafka_login
+from syntara.credentials.lib.preseed import MTLS_CLIENT_IDENTITY_TYPE_NAME
 from syntara.credentials.models.credential import Credential
 from syntara.credentials.models.credential_type import CredentialType
 from syntara.eventstreams.adapters.subscribe_parameters import (
@@ -557,16 +558,18 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
             if credential is None or not credential.enabled:
                 msg = "One or more Kafka Publish resource references are unavailable"
                 raise SafeValueError(msg)
-            await integration_service._validate_credential_type(  # noqa: SLF001 -- reuse shared compatibility rules
-                IntegrationType.KAFKA, credential_id
+            configuration = integration.configuration if integration is not None else None
+            credential_type_name = await integration_service._validate_credential_type(  # noqa: SLF001
+                IntegrationType.KAFKA, credential_id, configuration=configuration
             )
-            if integration is not None and isinstance(integration.configuration, KafkaConfiguration):
+            if isinstance(configuration, KafkaConfiguration) and credential_type_name != MTLS_CLIENT_IDENTITY_TYPE_NAME:
                 try:
                     await resolve_publish_kafka_login(
                         self.session,
                         create_secret_service(self.session),
                         runtime_credential_id=credential_id,
-                        security_protocol=integration.configuration.security_protocol,
+                        security_protocol=configuration.security_protocol,
+                        insecure_skip_tls_verify=configuration.insecure_skip_tls_verify,
                     )
                 except CredentialError:
                     msg = (
@@ -635,7 +638,7 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
                 raise SafeValueError(msg) from exc
             if config.credential_id is not None:
                 await integration_service._validate_credential_type(  # noqa: SLF001 -- reuse Integration compatibility rules
-                    integration.integration_type, config.credential_id
+                    integration.integration_type, config.credential_id, configuration=integration.configuration
                 )
 
     async def _resolve_visible_integration_ids(self) -> list[UUID] | None:

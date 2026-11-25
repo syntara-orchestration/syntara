@@ -13,15 +13,22 @@ from __future__ import annotations
 import asyncio
 import ssl
 from datetime import UTC, datetime
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import structlog
 from aiokafka.errors import KafkaConnectionError, KafkaError, KafkaTimeoutError
 
 from syntara.core.exceptions import SafeValueError
-from syntara.credentials.lib.kafka_connection import KafkaSecurityProtocol, kafka_credential_required
+from syntara.credentials.exceptions import CredentialValidationError
+from syntara.credentials.lib.kafka_connection import (
+    KafkaSecurityProtocol,
+    kafka_credential_required,
+    validate_kafka_mtls_configuration,
+)
+from syntara.credentials.lib.mtls_identity import MTLS_IDENTITY_VARS
 from syntara.integrations.adapters.factory import register_health_check_adapter
 from syntara.integrations.adapters.kafka_credentials import resolve_kafka_authentication
+from syntara.integrations.adapters.kafka_tls import KafkaMTLSError, build_kafka_mtls_context
 from syntara.integrations.adapters.protocol import (
     DiscoverResult,
     HealthCheckErrorType,
@@ -31,6 +38,9 @@ from syntara.integrations.lib.kafka_connection import KafkaHealthClient
 from syntara.integrations.models.integration import IntegrationType
 from syntara.integrations.models.integration_configuration import KafkaConfiguration  # noqa: TC001
 
+if TYPE_CHECKING:
+    from collections.abc import Mapping
+
 logger = structlog.stdlib.get_logger(__name__)
 
 _CLIENT_ID = "syntara-kafka-integration"
@@ -38,7 +48,7 @@ _MS_PER_SECOND = 1000
 
 
 class KafkaAuthenticationConfigurationError(ValueError):
-    """Kafka connection options require usable normalized SASL credentials."""
+    """Kafka connection options require credentials compatible with the security protocol."""
 
 
 class KafkaAdapter:
@@ -93,6 +103,21 @@ class KafkaAdapter:
             context.load_verify_locations(cadata=self._config.ca_certificate)
         return context
 
+    def connection_ssl_context(self, resolved_credential: Mapping[str, object]) -> ssl.SSLContext | None:
+        """Build the TLS settings for the supplied identity and security protocol."""
+        if not MTLS_IDENTITY_VARS.isdisjoint(resolved_credential):
+            try:
+                validate_kafka_mtls_configuration(
+                    security_protocol=self._config.security_protocol,
+                    insecure_skip_tls_verify=self._config.insecure_skip_tls_verify,
+                )
+            except CredentialValidationError as exc:
+                raise KafkaAuthenticationConfigurationError(exc.message) from None
+            return build_kafka_mtls_context(self._config.ca_certificate, resolved_credential)
+        if self._config.security_protocol == KafkaSecurityProtocol.PLAINTEXT:
+            return None
+        return self._ssl_context()
+
     def connection_options(self, resolved_credential: dict[str, Any], timeout_seconds: int) -> dict[str, Any]:
         """Validate credentials and build shared management/runtime options.
 
@@ -100,8 +125,9 @@ class KafkaAdapter:
         network resources when SASL is required and either normalized credential is empty.
         Password whitespace remains part of the stored credential.
         """
-        login = _sasl_login(resolved_credential)
-        if login is None and kafka_credential_required(self._config.security_protocol):
+        uses_mtls = not MTLS_IDENTITY_VARS.isdisjoint(resolved_credential)
+        login = None if uses_mtls else _sasl_login(resolved_credential)
+        if not uses_mtls and login is None and kafka_credential_required(self._config.security_protocol):
             msg = "Authentication configuration is incomplete"
             raise KafkaAuthenticationConfigurationError(msg)
         username, password = login or (None, None)
@@ -111,9 +137,7 @@ class KafkaAdapter:
             "sasl_mechanism": self._config.sasl_mechanism,
             "sasl_plain_username": username,
             "sasl_plain_password": password,
-            "ssl_context": self._ssl_context()
-            if self._config.security_protocol != KafkaSecurityProtocol.PLAINTEXT
-            else None,
+            "ssl_context": self.connection_ssl_context(resolved_credential),
             "request_timeout_ms": timeout_seconds * _MS_PER_SECOND,
         }
 
@@ -126,7 +150,7 @@ class KafkaAdapter:
 
         Args:
             resolved_credential: extra_vars dict from InjectorResolver.resolve().
-                Recognized keys: ``kafka_username``, ``kafka_password``.
+                Contains SASL login or mutual TLS identity variables.
             timeout_seconds: Maximum seconds for the whole bootstrap. Each broker
                 also gets this value as ``request_timeout_ms``, which is only a
                 per-attempt budget.
@@ -134,14 +158,17 @@ class KafkaAdapter:
         """
         try:
             options = self.connection_options(resolved_credential, timeout_seconds)
-        except KafkaAuthenticationConfigurationError:
+        except KafkaAuthenticationConfigurationError as exc:
             logger.warning("Kafka validate: no usable credentials configured")
             return ValidateResult(
                 success=False,
                 checked_at=datetime.now(UTC),
-                error="Authentication configuration is incomplete",
+                error=str(exc),
                 error_type=HealthCheckErrorType.AUTH_FAILURE,
             )
+        except KafkaMTLSError as exc:
+            logger.warning("Kafka validate TLS setup failed", error_code=exc.code.value)
+            return ValidateResult(success=False, checked_at=datetime.now(UTC), error=exc.message, error_type=exc.code)
         rejected = self._plaintext_rejection()
         if rejected is not None:
             logger.warning("Kafka validate rejected an unsafe transport configuration")
@@ -153,6 +180,10 @@ class KafkaAdapter:
                 bootstrap_servers=self._config.bootstrap_servers,
             )
 
+        return await self._validate_broker_connection(options, timeout_seconds)
+
+    async def _validate_broker_connection(self, options: dict[str, Any], timeout_seconds: int) -> ValidateResult:
+        """Probe the brokers and close the health client after each result."""
         client = KafkaHealthClient(
             bootstrap_servers=list(self._config.bootstrap_servers),
             **options,
@@ -173,6 +204,11 @@ class KafkaAdapter:
             error_msg = f"Connection timed out after {timeout_seconds}s"
             error_type = HealthCheckErrorType.TIMEOUT
             logger.warning("Kafka validate timed out", timeout_seconds=timeout_seconds)
+        except KafkaMTLSError as exc:
+            success = False
+            error_msg = exc.message
+            error_type = exc.code
+            logger.warning("Kafka validate TLS connection failed", error_code=exc.code.value)
         except ssl.SSLError as exc:
             success = False
             error_msg = "SSL/TLS verification failed"

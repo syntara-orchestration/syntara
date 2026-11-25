@@ -9,12 +9,30 @@ import styles from './KafkaCredentialConnection.module.css'
 
 function CredentialStatus({
   isPending,
-  icon,
-  label,
-}: Readonly<{ isPending: boolean; icon?: ReactElement; label?: string }>) {
-  return isPending ? (
-    <Skeleton fontSize="sm" screenreaderText="Loading Kafka runtime credential" />
-  ) : (
+  configured,
+  isClientIdentity,
+  needsCredential,
+  credentialName,
+  credentialLabel,
+}: Readonly<{
+  isPending: boolean
+  configured: boolean
+  isClientIdentity?: boolean
+  needsCredential: boolean
+  credentialName?: string
+  credentialLabel: string
+}>) {
+  if (isPending) return <Skeleton fontSize="sm" screenreaderText="Loading Kafka runtime credential" />
+
+  const missingCredentialText = `${credentialLabel} ${needsCredential ? 'not configured' : 'optional'}`
+  const label = configured || isClientIdentity ? (credentialName ?? missingCredentialText) : missingCredentialText
+  let icon: ReactElement | undefined
+  if (configured) {
+    icon = <RhUiCheckCircleIcon className={styles.checkIcon} aria-hidden />
+  } else if (needsCredential) {
+    icon = <RhUiWarningFillIcon className={styles.warningIcon} aria-hidden />
+  }
+  return (
     <IconLabel icon={icon}>
       <Content component="small">{label}</Content>
     </IconLabel>
@@ -23,8 +41,10 @@ function CredentialStatus({
 
 type KafkaCredentialConnectionProps = Readonly<{
   credentialName?: string
+  isClientIdentity?: boolean
   isPending: boolean
   errorMessage?: string
+  tlsMode?: string
   isDisabled: boolean
   isRequired?: boolean
   isCompact?: boolean
@@ -35,8 +55,10 @@ type KafkaCredentialConnectionProps = Readonly<{
 /** Compact credential setup; configured credentials do not imply verified broker access. */
 export function KafkaCredentialConnection({
   credentialName,
+  isClientIdentity = false,
   isPending,
   errorMessage,
+  tlsMode,
   isDisabled,
   isRequired = true,
   isCompact = false,
@@ -57,14 +79,6 @@ export function KafkaCredentialConnection({
   )
   const visibleError = isPending ? undefined : errorMessage
   const configured = Boolean(credentialName && !visibleError)
-  const needsCredential = isRequired || Boolean(visibleError)
-  const missingCredentialText = `${credentialLabel} ${needsCredential ? 'not configured' : 'optional'}`
-  let statusIcon: ReactElement | undefined
-  if (configured) {
-    statusIcon = <RhUiCheckCircleIcon className={styles.checkIcon} aria-hidden />
-  } else if (needsCredential) {
-    statusIcon = <RhUiWarningFillIcon className={styles.warningIcon} aria-hidden />
-  }
   const closePicker = () => {
     setRestoreFocus(true)
     setIsPickerOpen(false)
@@ -84,8 +98,11 @@ export function KafkaCredentialConnection({
           <FlexItem grow={{ default: 'grow' }} className={styles.statusLabel}>
             <CredentialStatus
               isPending={isPending}
-              icon={statusIcon}
-              label={configured ? credentialName : missingCredentialText}
+              configured={configured}
+              isClientIdentity={isClientIdentity}
+              needsCredential={isRequired || Boolean(visibleError)}
+              credentialName={credentialName}
+              credentialLabel={credentialLabel}
             />
           </FlexItem>
           {!isDisabled && (
@@ -104,6 +121,11 @@ export function KafkaCredentialConnection({
           )}
         </Flex>
       </StackItem>
+      {configured && tlsMode && (
+        <StackItem>
+          <Content component="small">{tlsMode}</Content>
+        </StackItem>
+      )}
       {!isPickerOpen && visibleError && (
         <StackItem>
           <FormFieldError id={errorId} message={visibleError} />

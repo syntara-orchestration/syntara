@@ -31,6 +31,7 @@ export function CredentialFormModalFields({ form, state }: Readonly<CredentialFo
     types,
     typesQuery,
     isEditMode,
+    isMtlsIdentity,
     isTypeSelectDisabled,
     exclusiveGroups,
     activeGroupIndex,
@@ -122,6 +123,7 @@ export function CredentialFormModalFields({ form, state }: Readonly<CredentialFo
               field={field}
               isRequired={isRequired}
               isEditMode={isEditMode}
+              isMtlsIdentity={isMtlsIdentity}
               onSecretTouch={handleSecretTouch}
             />
           </Fragment>

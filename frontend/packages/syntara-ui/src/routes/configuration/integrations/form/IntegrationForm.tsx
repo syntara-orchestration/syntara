@@ -28,7 +28,12 @@ import { useAlerts } from '../../../../providers/alerts'
 import { getErrorMessage } from '../../../../utils/apiErrors'
 import { detachPromise } from '../../../../utils/detachPromise'
 import { useDocLink } from '../../../../utils/docs/useDocLink'
-import { isIntegrationCredentialRequired } from '../integrationFilters'
+import {
+  getKafkaCredentialCompatibilityError,
+  getKafkaTlsMode,
+  isIntegrationCredentialRequired,
+} from '../integrationFilters'
+import { useKafkaCredentialType } from '../useKafkaCredentialType'
 
 import { CredentialStep } from './CredentialStep'
 import { EnableModelsWrapper } from './EnableModelsStep'
@@ -60,6 +65,7 @@ type WizardNavFooterProps = Readonly<{
   integrationTypeValue: string
   scopeValue: string
   isCredentialRequired: boolean
+  hasCredentialError: boolean
   onDetailsStepValidated: () => void
 }>
 
@@ -70,6 +76,7 @@ function WizardNavFooter({
   integrationTypeValue,
   scopeValue,
   isCredentialRequired,
+  hasCredentialError,
   onDetailsStepValidated,
 }: WizardNavFooterProps) {
   const { goToNextStep, goToPrevStep, activeStep } = useWizardContext()
@@ -96,7 +103,7 @@ function WizardNavFooter({
   }, [trigger, isFirst, goToNextStep, integrationTypeValue, scopeValue, onDetailsStepValidated])
 
   const isNextDisabled = isSecond && isCredentialRequired && !credentialId
-  const isSaveDisabled = isSecond && isCredentialRequired && !credentialId
+  const isSaveDisabled = isSecond && ((isCredentialRequired && !credentialId) || hasCredentialError)
 
   return (
     <WizardFooterWrapper>
@@ -312,6 +319,11 @@ export function IntegrationForm() {
   const { showAlert } = useAlerts()
   const isLLM = integrationTypeValue === IntegrationTypeEnum.LLM_PROVIDER
   const protocol = useWatch({ control, name: 'configuration.security_protocol' })
+  const skipTlsVerification = useWatch({ control, name: 'configuration.insecure_skip_tls_verify' })
+  const isKafka = integrationTypeValue === IntegrationTypeEnum.KAFKA
+  const credentialType = useKafkaCredentialType(isKafka ? credentialId : undefined)
+  const credentialError = getKafkaCredentialCompatibilityError(credentialType, protocol, skipTlsVerification)
+  const tlsMode = isKafka && (!credentialId || credentialType) ? getKafkaTlsMode(protocol, credentialType) : undefined
   const isCredentialRequired = isIntegrationCredentialRequired(integrationTypeValue, protocol)
 
   const onTypeChange = useCallback(
@@ -327,6 +339,7 @@ export function IntegrationForm() {
 
   const onSubmit = handleSubmit(
     (formData) => {
+      if (credentialError) return
       if (formData.integration_type === IntegrationTypeEnum.LLM_PROVIDER) {
         const discoveredModels = Array.from(selectedModels.values())
         createIntegration(formData, undefined, discoveredModels)
@@ -382,6 +395,7 @@ export function IntegrationForm() {
                   integrationTypeValue={integrationTypeValue}
                   scopeValue={scopeValue}
                   isCredentialRequired={isCredentialRequired}
+                  hasCredentialError={Boolean(credentialError)}
                   onDetailsStepValidated={() => setIsDetailsStepValid(true)}
                 />
               }
@@ -396,6 +410,8 @@ export function IntegrationForm() {
                   credentialId={credentialId}
                   integrationTypeValue={integrationTypeValue}
                   isTesting={isTesting}
+                  credentialError={credentialError}
+                  tlsMode={tlsMode}
                   onTestConnection={handleTestConnection}
                   onCredentialChange={resetTestState}
                 />

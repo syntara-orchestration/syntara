@@ -5,7 +5,11 @@ import { useWatch, type UseFormSetValue } from 'react-hook-form'
 import { SynFormField } from '../../../../components/forms/SynFormField'
 import { CredentialSelector } from '../../../builder/components/CredentialSelector'
 import { integrationHelp } from '../integrationFieldHelp'
-import { isIntegrationCredentialRequired, CREDENTIAL_TYPES_BY_INTEGRATION } from '../integrationFilters'
+import {
+  CREDENTIAL_TYPES_BY_INTEGRATION,
+  getKafkaCredentialTypes,
+  isIntegrationCredentialRequired,
+} from '../integrationFilters'
 
 import type { IntegrationFormData } from './integrationFormSchema'
 import styles from './WizardSteps.module.css'
@@ -18,7 +22,7 @@ const STEP_DESCRIPTION: Record<string, string> = {
   [IntegrationTypeEnum.ANSIBLE_AUTOMATION_PLATFORM]:
     'This credential is used to verify that the Ansible Automation Platform is reachable and the token is valid. Workflow credentials are configured separately in the workflow builder.',
   [IntegrationTypeEnum.KAFKA]:
-    'SASL_SSL uses this Kafka login to verify the brokers. SSL and PLAINTEXT allow the credential to be omitted. Workflow credentials are configured separately in the workflow builder.',
+    'This credential is used for integration connection checks. Workflow credentials are configured separately in the workflow builder.',
 }
 
 type CredentialStepProps = Readonly<{
@@ -26,6 +30,8 @@ type CredentialStepProps = Readonly<{
   credentialId: string | null | undefined
   integrationTypeValue: string
   isTesting: boolean
+  credentialError?: string
+  tlsMode?: string
   onTestConnection: () => void
   onCredentialChange: () => void
 }>
@@ -35,6 +41,8 @@ export function CredentialStep({
   credentialId,
   integrationTypeValue,
   isTesting,
+  credentialError,
+  tlsMode,
   onTestConnection,
   onCredentialChange,
 }: CredentialStepProps) {
@@ -42,7 +50,11 @@ export function CredentialStep({
     useWatch<IntegrationFormData, 'configuration.security_protocol'>({ name: 'configuration.security_protocol' }) ??
     'SASL_SSL'
   const isRequired = isIntegrationCredentialRequired(integrationTypeValue, protocol)
-  const isTestDisabled = isRequired ? !credentialId || isTesting : isTesting
+  const isTestDisabled = (isRequired && !credentialId) || isTesting || Boolean(credentialError)
+  const compatibleTypeNames =
+    integrationTypeValue === IntegrationTypeEnum.KAFKA
+      ? getKafkaCredentialTypes(protocol)
+      : CREDENTIAL_TYPES_BY_INTEGRATION[integrationTypeValue]
 
   return (
     <>
@@ -69,16 +81,18 @@ export function CredentialStep({
                 setValue('management_credential_id', id ?? null)
                 onCredentialChange()
               }}
-              compatibleTypeNames={CREDENTIAL_TYPES_BY_INTEGRATION[integrationTypeValue]}
+              compatibleTypeNames={compatibleTypeNames}
               label="Health check credential"
               fieldId="credential-select"
               isRequired={isRequired}
               allowCreate
               placeholder="Select a credential"
               labelHelp={integrationHelp.healthCheckCredential}
+              errorMessage={credentialError}
             />
           )}
         </SynFormField>
+        {!credentialError && tlsMode && <Content component={ContentVariants.small}>{tlsMode}</Content>}
         <FormGroup fieldId="test-connection">
           <Button
             variant="secondary"

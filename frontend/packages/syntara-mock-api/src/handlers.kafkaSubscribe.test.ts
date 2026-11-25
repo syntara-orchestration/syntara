@@ -5,6 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { handlers } from './handlers'
 import { createMockJwt } from './mockJwt'
+import { integrations } from './resources/integrations'
 import { workflows } from './resources/workflows'
 
 let server: Server
@@ -60,6 +61,40 @@ describe('Kafka subscription preflight mock', () => {
 
   it.each(['viewer', 'auditor'])('denies %s', async (username) => {
     expect((await preflight(username)).status).toBe(403)
+  })
+
+  it.each([
+    { protocol: 'SSL', skipVerification: false, detail: undefined },
+    {
+      protocol: 'SSL',
+      skipVerification: true,
+      detail: 'Turn on TLS certificate verification to use an mTLS Client Identity.',
+    },
+    { protocol: 'SASL_SSL', skipVerification: false, detail: 'Select SSL to use an mTLS Client Identity.' },
+    { protocol: 'PLAINTEXT', skipVerification: false, detail: 'Select SSL to use an mTLS Client Identity.' },
+  ] as const)('checks an identity with $protocol and skip verification $skipVerification', async (settings) => {
+    const integration = integrations.find((item) => item.id === body.integration_id)
+    if (integration?.configuration?.integration_type !== 'kafka') throw new Error('Missing Kafka test integration')
+    const configuration = integration.configuration
+    integration.configuration = {
+      ...configuration,
+      security_protocol: settings.protocol,
+      insecure_skip_tls_verify: settings.skipVerification,
+    }
+
+    try {
+      const response = await preflight('admin', {
+        ...body,
+        credential_id: '88888888-8888-4888-8888-888888888888',
+      })
+
+      expect(response.status).toBe(settings.detail ? 422 : 200)
+      expect(await response.json()).toMatchObject(
+        settings.detail ? { detail: settings.detail } : { success: true, connection: 'verified' }
+      )
+    } finally {
+      integration.configuration = configuration
+    }
   })
 
   it.each([

@@ -25,9 +25,10 @@ class KafkaIntegrationCreate:
         name (str):
         configuration (KafkaConfiguration): Configuration for a Kafka cluster integration.
 
-            Broker addresses live here. The username and password stay on the
-            linked Kafka credential when SASL_SSL is selected. Unauthenticated SSL
-            and explicitly opted-in PLAINTEXT do not require a credential.
+            Broker addresses live here. SASL_SSL uses the username and password on
+            the linked Kafka credential. SSL can use an mTLS Client Identity when
+            broker certificate verification is enabled. SSL without a client identity
+            and explicitly opted-in PLAINTEXT allow an omitted credential.
         description (None | str | Unset):
         integration_type (Literal['kafka'] | Unset):  Default: 'kafka'.
         management_credential_id (None | Unset | UUID):

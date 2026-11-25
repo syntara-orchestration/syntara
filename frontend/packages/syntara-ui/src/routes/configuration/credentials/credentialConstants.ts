@@ -2,6 +2,7 @@ import type { CredentialsAPI } from '@syntara/contracts'
 
 /** Sentinel value used by the API to represent encrypted secret fields */
 export const ENCRYPTED_SENTINEL = '$encrypted$'
+export const MTLS_CLIENT_IDENTITY_TYPE_NAME = 'mTLS Client Identity'
 
 /** Credential resource from the API */
 export type Credential = CredentialsAPI.components['schemas']['CredentialRead']

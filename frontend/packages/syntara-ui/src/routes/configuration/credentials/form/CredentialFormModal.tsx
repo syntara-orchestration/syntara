@@ -1,6 +1,6 @@
 import { Button, Form, Modal, ModalBody, ModalFooter, ModalHeader } from '@patternfly/react-core'
-import { RhUiAddIcon } from '@patternfly/react-icons'
-import { useCallback } from 'react'
+import { RhUiAddIcon, RhUiEditIcon } from '@patternfly/react-icons'
+import { useCallback, useId } from 'react'
 
 import { credentialsClient } from '../../../../client'
 import { SynErrorState } from '../../../../components/states/SynErrorState'
@@ -42,6 +42,7 @@ export function CredentialFormModal({
 }: Readonly<CredentialFormModalProps>) {
   const isEditMode = Boolean(credentialToEdit)
   const title = isEditMode && credentialToEdit ? `Edit ${credentialToEdit.name}` : 'Create credential'
+  const titleId = useId()
 
   const form = useSynForm({
     schema: credentialFormSchema,
@@ -57,8 +58,7 @@ export function CredentialFormModal({
   const { handleClose } = form
 
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} variant="medium">
-      <ModalHeader title={title} />
+    <Modal isOpen={isOpen} onClose={handleClose} variant="medium" aria-labelledby={titleId}>
       {isOpen && (
         <CredentialFormModalLoader
           key={credentialToEdit?.id ?? 'create'}
@@ -71,6 +71,8 @@ export function CredentialFormModal({
           defaultProjectId={defaultProjectId}
           compatibleTypeNames={compatibleTypeNames}
           onSuccess={onSuccess}
+          title={title}
+          titleId={titleId}
         />
       )}
     </Modal>
@@ -87,6 +89,8 @@ type CredentialFormModalContentProps = {
   defaultProjectId?: string
   compatibleTypeNames?: string[]
   onSuccess?: () => void
+  title: string
+  titleId: string
 }
 
 function CredentialFormModalLoader(props: Readonly<CredentialFormModalContentProps>) {
@@ -105,6 +109,7 @@ function CredentialEditFormLoader(props: Readonly<CredentialFormModalContentProp
 
   return (
     <>
+      <ModalHeader title={props.title} labelId={props.titleId} />
       <ModalBody>
         {query.isError ? (
           <SynErrorState
@@ -138,6 +143,8 @@ function CredentialFormModalContent({
   defaultProjectId,
   compatibleTypeNames,
   onSuccess,
+  title,
+  titleId,
 }: Readonly<CredentialFormModalContentProps>) {
   const modalState = useCredentialFormModal({
     form,
@@ -151,18 +158,22 @@ function CredentialFormModalContent({
     onSuccess,
   })
 
-  const { handleSubmit, handleClose, onSubmit, isSubmitting } = modalState
+  const { handleSubmit, handleClose, onSubmit, onInvalidSubmit, isSubmitting, isMtlsIdentity } = modalState
+  const isMtlsEdit = isEditMode && isMtlsIdentity
+  const saveLabel = isMtlsEdit ? 'Save changes' : 'Save credential'
+  const editIcon = isMtlsEdit ? <RhUiEditIcon /> : undefined
 
   // Explicit click submit (not form= association) so create works inside the builder
   // action-node-form without the outer form swallowing the footer submit.
   const handlePrimaryClick = useCallback(() => {
-    detachPromise(handleSubmit(onSubmit)())
-  }, [handleSubmit, onSubmit])
+    detachPromise(handleSubmit(onSubmit, onInvalidSubmit)())
+  }, [handleSubmit, onSubmit, onInvalidSubmit])
 
   return (
     <>
+      <ModalHeader title={isMtlsEdit ? 'Edit credential' : title} labelId={titleId} />
       <ModalBody>
-        <Form id={CREDENTIAL_FORM_ID} onSubmit={handleSubmit(onSubmit)}>
+        <Form id={CREDENTIAL_FORM_ID} onSubmit={handleSubmit(onSubmit, onInvalidSubmit)}>
           <CredentialFormModalFields form={form} state={modalState} />
         </Form>
       </ModalBody>
@@ -173,9 +184,9 @@ function CredentialFormModalContent({
           onClick={handlePrimaryClick}
           isDisabled={isSubmitting}
           isLoading={isSubmitting}
-          icon={isEditMode ? undefined : <RhUiAddIcon />}
+          icon={isEditMode ? editIcon : <RhUiAddIcon />}
         >
-          {isEditMode ? 'Save credential' : 'Create credential'}
+          {isEditMode ? saveLabel : 'Create credential'}
         </Button>
         <Button variant="link" onClick={handleClose} isDisabled={isSubmitting}>
           Cancel

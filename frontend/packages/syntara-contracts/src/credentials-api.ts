@@ -23,6 +23,11 @@ export interface paths {
     /**
      * Create credential
      * @description Create a new Credential with encrypted inputs.
+     *
+     *     The mTLS Client Identity type requires `client_certificate` and `client_private_key` in PEM format.
+     *     An optional `client_key_passphrase` must contain at least four characters.
+     *     A 422 response can identify the invalid field using `MTLS_INVALID_CLIENT_CERTIFICATE`,
+     *     `MTLS_INVALID_PRIVATE_KEY`, `MTLS_WRONG_PASSPHRASE`, or `MTLS_CERTIFICATE_KEY_MISMATCH`.
      */
     post: operations['create_credential']
     delete?: never
@@ -55,6 +60,10 @@ export interface paths {
     /**
      * Update credential
      * @description Update a Credential. Fields set to $encrypted$ retain existing values.
+     *
+     *     An mTLS Client Identity is validated after the update is merged with the stored inputs.
+     *     The same mTLS validation codes apply as on create. Set `client_key_passphrase` to null
+     *     to clear it when replacing a protected key with an unprotected key.
      */
     patch: operations['update_credential']
     trace?: never

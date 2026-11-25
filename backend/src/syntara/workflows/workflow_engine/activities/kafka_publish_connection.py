@@ -19,7 +19,13 @@ from temporalio.exceptions import ApplicationError
 from syntara.core.database.session import AsyncSessionLocal
 from syntara.core.models.secret import EncryptedSecret
 from syntara.core.services.secret_service import create_secret_service
-from syntara.credentials.lib.kafka_connection import KAFKA_CONNECTION_TYPE_NAME, kafka_credential_required
+from syntara.credentials.exceptions import CredentialValidationError
+from syntara.credentials.lib.kafka_connection import (
+    KAFKA_CONNECTION_TYPE_NAME,
+    kafka_credential_required,
+    validate_kafka_mtls_configuration,
+)
+from syntara.credentials.lib.preseed import MTLS_CLIENT_IDENTITY_TYPE_NAME
 from syntara.credentials.models.credential import Credential
 from syntara.credentials.models.credential_type import CredentialType
 from syntara.eventstreams.adapters.kafka_preflight import NonCreatingMetadataRequest, _close, _connect
@@ -49,7 +55,7 @@ _session_factory = AsyncSessionLocal
 
 async def current_publish_resources(
     session: AsyncSession, parameters: KafkaPublishParameters, project_id: str
-) -> tuple[KafkaConfiguration, str]:
+) -> tuple[KafkaConfiguration, str, str]:
     """Check scope/enabled/type and derive a revision without reading secret values."""
     if not project_id:
         fail_publish("kafka_invalid_reference")
@@ -66,8 +72,19 @@ async def current_publish_resources(
     if credential is None or not credential.enabled or str(credential.project_id) != project_id:
         fail_publish("kafka_invalid_reference")
     credential_type = await session.get(CredentialType, credential.credential_type_id)
-    if credential_type is None or credential_type.name != KAFKA_CONNECTION_TYPE_NAME:
+    if credential_type is None or credential_type.name not in {
+        KAFKA_CONNECTION_TYPE_NAME,
+        MTLS_CLIENT_IDENTITY_TYPE_NAME,
+    }:
         fail_publish("kafka_invalid_reference")
+    uses_mtls = credential_type.name == MTLS_CLIENT_IDENTITY_TYPE_NAME
+    if uses_mtls:
+        try:
+            validate_kafka_mtls_configuration(
+                security_protocol=config.security_protocol, insecure_skip_tls_verify=config.insecure_skip_tls_verify
+            )
+        except CredentialValidationError:
+            fail_publish("kafka_invalid_reference")
     secret_updated_at = None
     if credential.secret_id is not None:
         secret_updated_at = (
@@ -77,7 +94,7 @@ async def current_publish_resources(
         ).one_or_none()
         if secret_updated_at is None:
             fail_publish("kafka_invalid_reference")
-    elif kafka_credential_required(config.security_protocol):
+    elif uses_mtls or kafka_credential_required(config.security_protocol):
         fail_publish("kafka_invalid_reference")
     revision.extend(
         str(value)
@@ -90,7 +107,7 @@ async def current_publish_resources(
             secret_updated_at,
         )
     )
-    return config, hashlib.sha256(json.dumps(revision).encode()).hexdigest()
+    return config, hashlib.sha256(json.dumps(revision).encode()).hexdigest(), credential_type.name
 
 
 async def check_publish_topic(config: KafkaConfiguration, credentials: dict[str, Any], topic: str) -> None:
@@ -153,14 +170,16 @@ async def prepare_kafka_publish(
                 # The revision and decrypted fields must describe the same
                 # database snapshot when a credential rotates during preparation.
                 await session.connection(execution_options={"isolation_level": "REPEATABLE READ"})
-                config, revision = await current_publish_resources(session, model, project_id)
+                config, revision, credential_type_name = await current_publish_resources(session, model, project_id)
                 credentials: dict[str, Any] = {
                     "credential_id": model.credential_id,
-                    "credential_type_name": KAFKA_CONNECTION_TYPE_NAME,
+                    "credential_type_name": credential_type_name,
                     "extra_vars": {},
                     "_secret_values": [],
                 }
-                if kafka_credential_required(config.security_protocol):
+                if credential_type_name == MTLS_CLIENT_IDENTITY_TYPE_NAME or kafka_credential_required(
+                    config.security_protocol
+                ):
                     credentials = await _resolve_single_credential(
                         session, create_secret_service(session), "kafka_publish", model.credential_id, project_id
                     )

@@ -2,13 +2,17 @@ import { IntegrationStatusEnum, IntegrationTypeEnum, LLMProviderHintEnum } from 
 
 import type { FilterFieldDefinition } from '../../../types/filters'
 import { FilterOperatorEnum, FilterTypeEnum } from '../../../types/filters'
+import { MTLS_CLIENT_IDENTITY_TYPE_NAME } from '../credentials/credentialConstants'
+
+const KAFKA_LOGIN_TYPES = ['Kafka']
+const KAFKA_CREDENTIAL_TYPES = [...KAFKA_LOGIN_TYPES, MTLS_CLIENT_IDENTITY_TYPE_NAME]
 
 /** Credential type names allowed per integration type. Maps to the backend's ALLOWED_CREDENTIAL_TYPES. */
 export const CREDENTIAL_TYPES_BY_INTEGRATION: Record<string, string[]> = {
   [IntegrationTypeEnum.MCP_SERVER]: ['HTTP Bearer Token'],
   [IntegrationTypeEnum.LLM_PROVIDER]: ['LLM Provider'],
   [IntegrationTypeEnum.ANSIBLE_AUTOMATION_PLATFORM]: ['Ansible Automation Platform'],
-  [IntegrationTypeEnum.KAFKA]: ['Kafka'],
+  [IntegrationTypeEnum.KAFKA]: KAFKA_CREDENTIAL_TYPES,
 }
 
 /** Integration types that require a management credential for discovery and validation. */
@@ -76,4 +80,24 @@ export const getIntegrationTypeFilterDefinition = (): FilterFieldDefinition => (
 
 export function isIntegrationCredentialRequired(type: string, protocol = 'SASL_SSL'): boolean {
   return type === IntegrationTypeEnum.KAFKA ? protocol === 'SASL_SSL' : CREDENTIAL_REQUIRED_TYPES.has(type)
+}
+
+export function getKafkaCredentialTypes(protocol?: string): string[] {
+  return protocol === 'SSL' ? KAFKA_CREDENTIAL_TYPES : KAFKA_LOGIN_TYPES
+}
+
+export function getKafkaCredentialCompatibilityError(
+  credentialType: string | undefined,
+  protocol: string | undefined,
+  skipTlsVerification = false
+): string | undefined {
+  if (credentialType !== MTLS_CLIENT_IDENTITY_TYPE_NAME || protocol == null) return undefined
+  if (protocol !== 'SSL') return 'Select SSL to use an mTLS Client Identity.'
+  if (skipTlsVerification) return 'Turn on TLS certificate verification to use an mTLS Client Identity.'
+  return undefined
+}
+
+export function getKafkaTlsMode(protocol: string | undefined, credentialType: string | undefined) {
+  if (protocol !== 'SSL') return undefined
+  return credentialType === MTLS_CLIENT_IDENTITY_TYPE_NAME ? 'Mutual TLS' : 'Server-only TLS'
 }

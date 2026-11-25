@@ -86,6 +86,39 @@ describe('Kafka credential connection', () => {
     expect(screen.getByRole('button', { name: 'Cancel' })).not.toHaveAttribute('aria-describedby')
   })
 
+  it.each([
+    { tlsMode: 'Server-only TLS', isClientIdentity: false },
+    { tlsMode: 'Mutual TLS', isClientIdentity: true },
+  ])('shows $tlsMode for a configured connection', async (props) => {
+    const { container } = renderConnection({ ...props, credentialName: 'Orders runtime' })
+
+    expect(screen.getByText(props.tlsMode)).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Change' })).toBeEnabled()
+    expect(await axe(container)).toHaveNoViolations()
+  })
+
+  it('keeps the incompatible identity visible and offers keyboard access to the picker', async () => {
+    const user = userEvent.setup()
+    const { container } = renderConnection({
+      credentialName: 'Orders client identity',
+      isClientIdentity: true,
+      tlsMode: 'Mutual TLS',
+      errorMessage: 'Select SSL to use an mTLS Client Identity.',
+    })
+
+    const setup = screen.getByRole('button', { name: 'Set up connection' })
+    expect(screen.getByText('Orders client identity')).toBeVisible()
+    expect(screen.queryByText('Mutual TLS')).not.toBeInTheDocument()
+    expect(setup).toHaveAccessibleDescription(/Select SSL to use an mTLS Client Identity/)
+    expect(await axe(container)).toHaveNoViolations()
+
+    await user.tab()
+    expect(setup).toHaveFocus()
+    await user.keyboard('{Enter}')
+
+    expect(screen.getByRole('button', { name: 'Choose credential' })).toBeEnabled()
+  })
+
   it('preserves the configured credential when setup is cancelled and restores focus', async () => {
     const user = userEvent.setup()
     renderConnection({ credentialName: 'Orders runtime', isRequired: false })

@@ -37,12 +37,13 @@ class TestGACredentialTypes:
     """Tests for GA managed credential type definitions."""
 
     def test_ga_types_defined(self) -> None:
-        assert len(GA_CREDENTIAL_TYPES) == 7
+        assert len(GA_CREDENTIAL_TYPES) == 8
 
     @pytest.mark.parametrize(
         "name",
         [
             "Kafka",
+            "mTLS Client Identity",
             "HTTP Bearer Token",
             "HTTP Basic Auth",
             "Ansible Automation Platform",
@@ -75,6 +76,33 @@ class TestGACredentialTypes:
         assert fields[1]["secret"] is True
         assert kafka["injectors"]["extra_vars"]["auth_type"] == "kafka_connection"
         assert "SASL_SSL requires a username and password" in kafka["description"]
+
+    def test_mtls_identity_schema_and_injectors(self) -> None:
+        identity = next(item for item in GA_CREDENTIAL_TYPES if item["name"] == "mTLS Client Identity")
+        inputs = identity["inputs"]
+        certificate, private_key, passphrase = inputs["fields"]
+
+        assert identity["description"] == "Lets a service prove its identity to an external system that requires mTLS."
+        assert [field["id"] for field in inputs["fields"]] == [
+            "client_certificate",
+            "client_private_key",
+            "client_key_passphrase",
+        ]
+        assert inputs["required"] == ["client_certificate", "client_private_key"]
+        assert not inputs.get("required_together")
+        assert certificate["multiline"] is True
+        assert certificate["secret"] is False
+        assert certificate["default"] == "-----BEGIN CERTIFICATE-----\n\n-----END CERTIFICATE-----"
+        assert private_key["multiline"] is True
+        assert private_key["secret"] is True
+        assert passphrase["secret"] is True
+        assert not passphrase.get("multiline")
+        assert passphrase["min_length"] == 4
+        assert identity["injectors"]["extra_vars"] == {
+            "mtls_client_certificate": "{{client_certificate}}",
+            "mtls_client_private_key": "{{client_private_key}}",
+            "mtls_client_key_passphrase": "{{client_key_passphrase}}",
+        }
 
     def test_all_have_injector_sections(self) -> None:
         for type_def in GA_CREDENTIAL_TYPES:

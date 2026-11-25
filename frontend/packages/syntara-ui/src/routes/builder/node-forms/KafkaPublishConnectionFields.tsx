@@ -7,6 +7,13 @@ import { integrationsClient } from '../../../client'
 import { SynFormField } from '../../../components/forms/SynFormField'
 import { SynErrorState } from '../../../components/states/SynErrorState'
 import { detachPromise } from '../../../utils/detachPromise'
+import { MTLS_CLIENT_IDENTITY_TYPE_NAME } from '../../configuration/credentials/credentialConstants'
+import {
+  getKafkaCredentialCompatibilityError,
+  getKafkaCredentialTypes,
+  getKafkaTlsMode,
+} from '../../configuration/integrations/integrationFilters'
+import { useKafkaCredentialType } from '../../configuration/integrations/useKafkaCredentialType'
 import { useCredentialName } from '../../workflows/canvas/nodes/hooks/useCredentialName'
 import { CredentialSelector } from '../components/CredentialSelector'
 import { IntegrationSelector } from '../components/IntegrationSelector'
@@ -27,6 +34,7 @@ export function KafkaPublishConnectionFields({ projectId }: Readonly<{ projectId
   const credentialId = useWatch({ control, name: 'credential_id' })
   const readOnly = useIsVersionView()
   const { name: credentialName, isPending: isCredentialPending } = useCredentialName(credentialId || undefined)
+  const credentialType = useKafkaCredentialType(credentialId, projectId)
   const { data, isError, error, refetch } = integrationsClient.useQuery(
     'get',
     '/kafka_integrations/{integration_id}',
@@ -36,12 +44,21 @@ export function KafkaPublishConnectionFields({ projectId }: Readonly<{ projectId
     { enabled: !!integrationId }
   )
   const connectionReady = !!integrationId && !!data && !isError
+  const configuration = data?.configuration
+  const protocol = configuration?.security_protocol ?? (configuration ? 'SASL_SSL' : undefined)
+  const credentialError = getKafkaCredentialCompatibilityError(
+    credentialType,
+    protocol,
+    configuration?.insecure_skip_tls_verify
+  )
+  const connectionValid = connectionReady && !credentialError
+  const tlsMode = credentialType ? getKafkaTlsMode(protocol, credentialType) : undefined
 
   // Synchronize validation with the connection returned by the Integration API.
   useEffect(() => {
-    setValue('connection_ready', connectionReady)
+    setValue('connection_ready', connectionValid)
     if (isSubmitted) detachPromise(trigger(['integration_id', 'connection_ready', 'credential_id']))
-  }, [connectionReady, integrationId, isSubmitted, setValue, trigger])
+  }, [connectionValid, integrationId, isSubmitted, setValue, trigger])
 
   return (
     <Stack className={styles.connectionFields}>
@@ -92,12 +109,14 @@ export function KafkaPublishConnectionFields({ projectId }: Readonly<{ projectId
               <KafkaCredentialConnection
                 key={integrationId}
                 credentialName={credentialName}
+                isClientIdentity={credentialType === MTLS_CLIENT_IDENTITY_TYPE_NAME}
                 credentialLabel="Kafka credential"
                 isPending={(!connectionReady && !isError) || isCredentialPending}
                 isDisabled={readOnly || isError}
                 isRequired
                 isCompact
-                errorMessage={fieldState.error?.message}
+                errorMessage={credentialError ?? fieldState.error?.message}
+                tlsMode={tlsMode}
               >
                 {(onSelected) => (
                   <CredentialSelector
@@ -106,13 +125,13 @@ export function KafkaPublishConnectionFields({ projectId }: Readonly<{ projectId
                     fieldId="publish-credential"
                     placeholder="Select a credential"
                     projectId={projectId}
-                    compatibleTypeNames={['Kafka']}
+                    compatibleTypeNames={getKafkaCredentialTypes(protocol)}
                     value={field.value || undefined}
                     onChange={(value) => {
                       field.onChange(value ?? '')
                       onSelected()
                     }}
-                    errorMessage={connectionReady ? fieldState.error?.message : undefined}
+                    errorMessage={connectionReady ? (credentialError ?? fieldState.error?.message) : undefined}
                     isRequired
                     isDisabled={readOnly || !connectionReady}
                   />

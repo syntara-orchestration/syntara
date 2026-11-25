@@ -63,7 +63,7 @@ def credential_validation_error_handler(request: Request, exc: "CredentialValida
         problem_type=PROBLEM_TYPES["validation_error"],
         title="Credential Validation Error",
         detail=exc.message,
-        code="CREDENTIAL_VALIDATION_ERROR",
+        code=exc.code,
         retryable=False,
         instance=str(request.url),
     )

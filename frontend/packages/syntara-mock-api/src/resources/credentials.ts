@@ -15,6 +15,7 @@ type FieldDef = {
   choices?: string[]
   default?: unknown
   multiline?: boolean
+  min_length?: number
 }
 
 type FieldConstraints = {
@@ -199,6 +200,51 @@ export const credentialTypes: CredentialTypeRead[] = [
     updated_at: '2025-06-01T09:00:00Z',
     labels: {},
   },
+  {
+    id: 'ctype-mtls-client-identity',
+    name: 'mTLS Client Identity',
+    description: 'Lets a service prove its identity to an external system that requires mTLS.',
+    inputs: typeInputs(
+      [
+        {
+          id: 'client_certificate',
+          type: 'string',
+          label: 'Client certificate',
+          multiline: true,
+          secret: false,
+          default: '-----BEGIN CERTIFICATE-----\n\n-----END CERTIFICATE-----',
+          help_text: 'Paste the certificate contents between the markers.',
+        },
+        {
+          id: 'client_private_key',
+          type: 'string',
+          label: 'Private key',
+          multiline: true,
+          secret: true,
+          help_text: 'Paste the complete PEM private key, including its BEGIN and END markers.',
+        },
+        {
+          id: 'client_key_passphrase',
+          type: 'string',
+          label: 'Key passphrase',
+          secret: true,
+          min_length: 4,
+          help_text: 'Enter a passphrase only if the private key is passphrase protected.',
+        },
+      ],
+      ['client_certificate', 'client_private_key']
+    ),
+    injectors: typeInjectors({
+      mtls_client_certificate: '{{client_certificate}}',
+      mtls_client_private_key: '{{client_private_key}}',
+      mtls_client_key_passphrase: '{{client_key_passphrase}}',
+    }),
+    managed: true,
+    credential_count: 1,
+    created_at: '2025-06-01T09:00:00Z',
+    updated_at: '2025-06-01T09:00:00Z',
+    labels: {},
+  },
 ]
 
 // Workflow references for credential detail pages
@@ -226,6 +272,22 @@ export const credentials: (CredentialRead & { project_id?: string })[] = [
     name: 'Orders Kafka runtime',
     credential_type_id: 'ctype-kafka',
     inputs: { username: 'orders-consumer', password: '$encrypted$' },
+    enabled: true,
+    project_id: 'p-001',
+    created_at: '2026-06-15T10:00:00.000Z',
+    updated_at: '2026-06-15T10:00:00.000Z',
+    labels: {},
+  },
+  {
+    id: '88888888-8888-4888-8888-888888888888',
+    name: 'Sample client identity',
+    description: 'Sample credential for mock mode.',
+    credential_type_id: 'ctype-mtls-client-identity',
+    inputs: {
+      client_certificate: '-----BEGIN CERTIFICATE-----\nMock certificate contents\n-----END CERTIFICATE-----',
+      client_private_key: '$encrypted$',
+      client_key_passphrase: '$encrypted$',
+    },
     enabled: true,
     project_id: 'p-001',
     created_at: '2026-06-15T10:00:00.000Z',

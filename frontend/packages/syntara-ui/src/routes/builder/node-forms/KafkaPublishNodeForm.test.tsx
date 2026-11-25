@@ -17,10 +17,11 @@ import { VersionViewContext } from '../VersionViewContext'
 
 import { KafkaPublishNodeForm } from './KafkaPublishNodeForm'
 
-const { updateActivity, connection, integrationQuery } = vi.hoisted(() => ({
+const { updateActivity, connection, integrationQuery, credentialTypeQuery } = vi.hoisted(() => ({
   updateActivity: vi.fn(),
   connection: { protocol: 'SSL' },
   integrationQuery: vi.fn(),
+  credentialTypeQuery: vi.fn(),
 }))
 
 vi.mock('../components/ExpandableCodeEditor', () => ({
@@ -46,6 +47,9 @@ vi.mock('../components/ExpandableCodeEditor', () => ({
 }))
 vi.mock('../../../client', () => ({
   integrationsClient: { useQuery: integrationQuery },
+}))
+vi.mock('../../configuration/integrations/useKafkaCredentialType', () => ({
+  useKafkaCredentialType: credentialTypeQuery,
 }))
 vi.mock('../hooks/useWorkflowEngineDefaults', () => ({
   useWorkflowEngineDefaults: () => ({ defaults: null, isLoading: false }),
@@ -120,6 +124,7 @@ describe('Kafka Publish builder', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     updateActivity.mockReset()
+    credentialTypeQuery.mockReset()
     connection.protocol = 'SSL'
     integrationQuery.mockImplementation(() => ({ data: { configuration: { security_protocol: connection.protocol } } }))
   })
@@ -377,7 +382,7 @@ describe('Kafka Publish builder', () => {
       await user.click(screen.getByRole('button', { name: 'Set up connection' }))
       expect(screen.getByRole('textbox', { name: 'Runtime credential' })).toHaveAttribute('aria-required', 'true')
       expect(screen.getByRole('status', { name: 'Credential compatibility' })).toHaveTextContent(
-        'Kafka:workflow-project'
+        protocol === 'SSL' ? 'Kafka,mTLS Client Identity:workflow-project' : 'Kafka:workflow-project'
       )
       await user.click(screen.getByRole('textbox', { name: 'Runtime credential' }))
       await user.paste('22222222-2222-4222-8222-222222222222')
@@ -385,6 +390,27 @@ describe('Kafka Publish builder', () => {
       await waitFor(() => expect(onSubmit).toHaveBeenCalledOnce())
     }
   )
+
+  it('keeps an incompatible client identity visible and allows changing it', async () => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn()
+    connection.protocol = 'SASL_SSL'
+    credentialTypeQuery.mockReturnValue('mTLS Client Identity')
+    const initialData = {
+      integration_id: parameters.integration_id,
+      credential_id: parameters.credential_id,
+      topic: 'outcomes',
+    }
+    render(<KafkaPublishNodeForm onSubmit={onSubmit} initialData={initialData} />)
+
+    const setup = screen.getByRole('button', { name: 'Set up connection' })
+    expect(setup).toHaveAccessibleDescription(/Select SSL to use an mTLS Client Identity/)
+    expect(screen.getByText('Publish runtime credential')).toBeInTheDocument()
+    expect(screen.queryByText('Mutual TLS')).not.toBeInTheDocument()
+    await user.click(setup)
+    expect(screen.getByRole('textbox', { name: 'Runtime credential' })).toBeEnabled()
+    expect(screen.getByRole('status', { name: 'Credential compatibility' })).toHaveTextContent(/^Kafka:$/)
+  })
 
   it('clears a previous credential and requires a new selection when switching to SSL', async () => {
     connection.protocol = 'SASL_SSL'

@@ -108,7 +108,7 @@ class SubscriptionSupervisor:
                 reason = RuntimeFailureCode.CONFIGURATION_UNAVAILABLE.value
             elif self._failure is not None:
                 state = RuntimeState.BACKOFF if self._failure.transient else RuntimeState.BLOCKED
-                reason = self._failure.code.value
+                reason = self._failure.reason
             elif self._starting:
                 state = RuntimeState.STARTING
             elif self._runner is not None:
@@ -217,7 +217,7 @@ class SubscriptionSupervisor:
             RuntimeFailureCode.CONFIGURATION_UNAVAILABLE,
         }:
             # Remote access can recover without a local configuration revision.
-            failure = SubscriptionRuntimeError(failure.code, transient=True)
+            failure = SubscriptionRuntimeError(failure.code, transient=True, reason=failure.reason)
         self._failure = failure
         self._failure_count += 1
         self._retry_at = None
@@ -226,7 +226,7 @@ class SubscriptionSupervisor:
         logger.warning(
             "event_subscription_runtime_unavailable",
             subscription_id=str(self._subscription_id),
-            code=failure.code.value,
+            code=failure.reason,
         )
 
     async def _converge(self, *, deadline: float | None = None) -> None:

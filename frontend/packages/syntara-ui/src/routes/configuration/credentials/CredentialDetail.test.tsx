@@ -6,7 +6,7 @@ import type { ReactNode } from 'react'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { axe } from 'vitest-axe'
 
-import { credentialsClient } from '../../../client'
+import { credentialsClient, integrationsClient } from '../../../client'
 import { AlertProvider } from '../../../providers/alerts'
 import { accessFetchClient } from '../../access/accessClient'
 
@@ -501,6 +501,20 @@ describe('CredentialDetail', () => {
     await user.click(await screen.findByRole('tab', { name: /Workflows/ }))
 
     expect(mockNavigate).toHaveBeenCalledWith(expect.objectContaining({ to: '/configuration/credentials/1/workflows' }))
+  })
+
+  it('looks up linked Kafka integrations for a mutual TLS client identity', async () => {
+    const user = userEvent.setup()
+    vi.mocked(credentialsClient.useQuery).mockImplementation(
+      mockQuery(mockCredential, { ...mockCredentialType, name: 'mTLS Client Identity' })
+    )
+    render(<CredentialDetail />, { wrapper })
+
+    await user.click(await screen.findByRole('tab', { name: /Integrations/ }))
+
+    expect(integrationsClient.useQuery).toHaveBeenCalledWith('get', '/kafka_integrations', {
+      params: { query: { management_credential_id: mockCredential.id } },
+    })
   })
 
   it('calls patch mutation to enable credential', async () => {
