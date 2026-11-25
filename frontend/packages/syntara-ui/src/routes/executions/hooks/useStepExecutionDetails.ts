@@ -15,6 +15,17 @@ type StepExecutionDetails = {
   refetch: () => Promise<unknown>
 }
 
+export type UseStepExecutionDetailsParams = {
+  stepId: string
+  executionId: string | null | undefined
+  activityStatus?: ActivityStatus
+  iteration?: number | null
+  /**
+   * Output from a pre-resolved (mock data) step when the backend has no activity record.
+   */
+  fallbackOutputData?: Record<string, unknown> | null
+}
+
 /**
  * Fetches execution details (input/output data) for a specific workflow step.
  *
@@ -29,13 +40,13 @@ type StepExecutionDetails = {
  * `fallbackOutputData` (the node's in-memory ActivityState.outputData) is used
  * as the Output pane content in that case.
  */
-export function useStepExecutionDetails(
-  stepId: string,
-  executionId: string | null | undefined,
-  activityStatus?: ActivityStatus,
-  iteration?: number | null,
-  fallbackOutputData?: Record<string, unknown> | null
-): StepExecutionDetails {
+export function useStepExecutionDetails({
+  stepId,
+  executionId,
+  activityStatus,
+  iteration,
+  fallbackOutputData,
+}: UseStepExecutionDetailsParams): StepExecutionDetails {
   const { baseId, iteration: keyIteration } = parseCompositeKey(stepId)
   const effectiveIteration = iteration ?? keyIteration
   const activityName =
