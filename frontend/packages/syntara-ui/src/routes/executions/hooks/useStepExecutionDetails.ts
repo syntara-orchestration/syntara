@@ -15,17 +15,6 @@ type StepExecutionDetails = {
   refetch: () => Promise<unknown>
 }
 
-export type UseStepExecutionDetailsParams = {
-  stepId: string
-  executionId: string | null | undefined
-  activityStatus?: ActivityStatus
-  iteration?: number | null
-  /**
-   * Output from a pre-resolved (mock data) step when the backend has no activity record.
-   */
-  fallbackOutputData?: Record<string, unknown> | null
-}
-
 /**
  * Fetches execution details (input/output data) for a specific workflow step.
  *
@@ -35,13 +24,12 @@ export type UseStepExecutionDetailsParams = {
  * When `activityStatus` changes (e.g. from WebSocket updates), the query
  * refetches so the Parameters/Output panes stay current.
  */
-export function useStepExecutionDetails({
-  stepId,
-  executionId,
-  activityStatus,
-  iteration,
-  fallbackOutputData,
-}: UseStepExecutionDetailsParams): StepExecutionDetails {
+export function useStepExecutionDetails(
+  stepId: string,
+  executionId: string | null | undefined,
+  activityStatus?: ActivityStatus,
+  iteration?: number | null
+): StepExecutionDetails {
   const { baseId, iteration: keyIteration } = parseCompositeKey(stepId)
   const effectiveIteration = iteration ?? keyIteration
   const activityName =
@@ -69,21 +57,21 @@ export function useStepExecutionDetails({
   }, [activityStatus, refetch])
 
   return useMemo(() => {
-    const activity = data?.resources?.[0]
-
-    if (!activity) {
-      return { inputData: null, outputData: fallbackOutputData ?? null, isLoading, error, refetch }
+    if (!data) {
+      return { inputData: null, outputData: null, isLoading, error, refetch }
     }
+
+    const activity = data.resources?.[0]
 
     // Contract types input_data as Record<string, never> — the runtime values
     // are arbitrary JSON objects, so we widen to Record<string, unknown>.
     // output_data is already typed as Record<string, unknown> | null in the contract.
     return {
-      inputData: activity.input_data ?? null,
-      outputData: activity.output_data ?? null,
+      inputData: activity?.input_data ?? null,
+      outputData: activity?.output_data ?? null,
       isLoading,
       error,
       refetch,
     }
-  }, [data, isLoading, error, refetch, fallbackOutputData])
+  }, [data, isLoading, error, refetch])
 }
