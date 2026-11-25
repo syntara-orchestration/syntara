@@ -1,6 +1,12 @@
 import { renderHook, act } from '@testing-library/react'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 
+import type { NodeKind } from '../../../hooks/useNodeKindsQuery'
+import {
+  STEP_TYPE_PERMISSIONS_LOADING_MESSAGE,
+  STEP_TYPE_PERMISSIONS_UNAVAILABLE_TOOLTIP,
+} from '../../builder/stepTypePaletteGating'
+
 import { useForkWorkflow } from './useForkWorkflow'
 
 const mockShowError = vi.fn()
@@ -23,6 +29,16 @@ vi.mock('../../../client', () => ({
   interfaceTagMiddleware: { onRequest: vi.fn() },
 }))
 
+let mockVerdicts: { nodeKindByKind: Map<string, NodeKind>; isLoading: boolean; isUnavailable: boolean }
+
+vi.mock('../../../hooks/useNodeKindsQuery', () => ({
+  useNodeKindsQuery: () => mockVerdicts,
+}))
+
+function verdict(kind: string, canWrite: boolean, label = kind): NodeKind {
+  return { kind, category: 'action', can_write: canWrite, blocked_by: canWrite ? null : { kind, label } }
+}
+
 const MOCK_DEFINITION: Record<string, unknown> = {
   schema_version: '2.0.0',
   name: 'Test Workflow',
@@ -31,10 +47,38 @@ const MOCK_DEFINITION: Record<string, unknown> = {
   triggers: [],
 }
 
+const BLOCKED_DEFINITION: Record<string, unknown> = {
+  schema_version: '2.0.0',
+  name: 'Test Workflow',
+  nodes: [
+    { id: 'a', type: 'http' },
+    { id: 'b', type: 'script' },
+  ],
+  edges: [
+    { from: 't1', to: 'a' },
+    { from: 'a', to: 'b' },
+  ],
+  triggers: [{ id: 't1', type: 'webhook' }],
+}
+
+function sentDefinition(): unknown {
+  const callArgs = mockMutateAsync.mock.calls[0] as [{ body: Record<string, unknown> }]
+  return callArgs[0].body.workflow_definition
+}
+
 describe('useForkWorkflow', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockIsPending = false
+    mockVerdicts = {
+      nodeKindByKind: new Map([
+        ['http', verdict('http', true)],
+        ['script', verdict('script', false, 'Script')],
+        ['webhook', verdict('webhook', false, 'Webhook')],
+      ]),
+      isLoading: false,
+      isUnavailable: false,
+    }
   })
 
   it('creates a new workflow and returns its id', async () => {
@@ -55,8 +99,9 @@ describe('useForkWorkflow', () => {
     const body = callArgs[0].body
     expect(body.name).toContain('My Workflow - copy-')
     expect(body.description).toBe('')
-    expect(body.workflow_definition).toBeDefined()
+    expect(body.workflow_definition).toBe(MOCK_DEFINITION)
     expect(body.project_id).toBe('project-1')
+    expect(result.current.blockedFork).toBeNull()
   })
 
   it('returns undefined and shows error on API failure', async () => {
@@ -121,8 +166,63 @@ describe('useForkWorkflow', () => {
     expect(result.current.isForkLoading).toBe(true)
   })
 
-  it('shows error and returns undefined on exception', async () => {
-    mockMutateAsync.mockRejectedValue(new Error('Network failure'))
+  it('asks before forking a run with blocked step types, then forks without them', async () => {
+    mockMutateAsync.mockResolvedValue({ id: 'new-wf-456' })
+
+    const { result } = renderHook(() =>
+      useForkWorkflow({ workflowDefinition: BLOCKED_DEFINITION, workflowName: 'Wf', projectId: 'project-1' })
+    )
+
+    let newId: string | undefined
+    await act(async () => {
+      newId = await result.current.forkAsNewWorkflow()
+    })
+
+    expect(newId).toBeUndefined()
+    expect(mockMutateAsync).not.toHaveBeenCalled()
+    expect(result.current.blockedFork).toEqual(
+      expect.objectContaining({ labels: ['Script', 'Webhook'], losesAllTriggers: true })
+    )
+
+    await act(async () => {
+      newId = await result.current.confirmBlockedFork()
+    })
+
+    expect(newId).toBe('new-wf-456')
+    expect(mockMutateAsync).toHaveBeenCalledOnce()
+    expect(sentDefinition()).toEqual({
+      schema_version: '2.0.0',
+      name: 'Test Workflow',
+      nodes: [{ id: 'a', type: 'http' }],
+      edges: [],
+      triggers: [],
+    })
+    expect(result.current.blockedFork).toBeNull()
+    expect(mockShowError).not.toHaveBeenCalled()
+  })
+
+  it('creates nothing when the blocked fork is cancelled', async () => {
+    const { result } = renderHook(() =>
+      useForkWorkflow({ workflowDefinition: BLOCKED_DEFINITION, workflowName: 'Wf', projectId: 'project-1' })
+    )
+
+    await act(async () => {
+      await result.current.forkAsNewWorkflow()
+    })
+    act(() => result.current.cancelBlockedFork())
+
+    expect(result.current.blockedFork).toBeNull()
+    await act(async () => {
+      await result.current.confirmBlockedFork()
+    })
+    expect(mockMutateAsync).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['loading', { isLoading: true, isUnavailable: false }, STEP_TYPE_PERMISSIONS_LOADING_MESSAGE],
+    ['unavailable', { isLoading: false, isUnavailable: true }, STEP_TYPE_PERMISSIONS_UNAVAILABLE_TOOLTIP],
+  ])('refuses while the verdicts are %s', async (_state, flags, description) => {
+    mockVerdicts = { ...mockVerdicts, ...flags }
 
     const { result } = renderHook(() =>
       useForkWorkflow({ workflowDefinition: MOCK_DEFINITION, workflowName: 'Wf', projectId: 'project-1' })
@@ -134,6 +234,30 @@ describe('useForkWorkflow', () => {
     })
 
     expect(newId).toBeUndefined()
-    expect(mockShowError).toHaveBeenCalledWith(expect.objectContaining({ title: 'Fork failed' }))
+    expect(mockMutateAsync).not.toHaveBeenCalled()
+    expect(result.current.blockedFork).toBeNull()
+    expect(mockShowError).toHaveBeenCalledWith({ title: 'Cannot fork workflow', description })
+  })
+
+  it('names the step types when the server still denies them', async () => {
+    mockMutateAsync.mockRejectedValue({
+      code: 'NODE_KIND_WRITE_DENIED',
+      blocked_step_types: [{ kind: 'script', label: 'Script', reason: 'explicit_deny' }],
+    })
+
+    const { result } = renderHook(() =>
+      useForkWorkflow({ workflowDefinition: MOCK_DEFINITION, workflowName: 'Wf', projectId: 'project-1' })
+    )
+
+    let newId: string | undefined
+    await act(async () => {
+      newId = await result.current.forkAsNewWorkflow()
+    })
+
+    expect(newId).toBeUndefined()
+    expect(mockShowError).toHaveBeenCalledWith({
+      title: 'Cannot fork workflow',
+      description: "You don't have permission to write these step types: Script.",
+    })
   })
 })

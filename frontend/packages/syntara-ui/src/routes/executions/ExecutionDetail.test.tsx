@@ -262,6 +262,9 @@ vi.mock('./hooks/useForkWorkflow', () => ({
   useForkWorkflow: vi.fn(() => ({
     forkAsNewWorkflow: mockForkAsNewWorkflow,
     isForkLoading: false,
+    blockedFork: null,
+    confirmBlockedFork: vi.fn(),
+    cancelBlockedFork: vi.fn(),
   })),
 }))
 
