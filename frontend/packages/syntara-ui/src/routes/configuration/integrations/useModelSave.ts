@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useCallback, useRef, useState } from 'react'
 
 import { integrationsClient } from '../../../client'
-import { useAlerts } from '../../../providers/alerts'
+import { useAlerts } from '../../../providers/alerts/AlertContext'
 import { getErrorMessage } from '../../../utils/apiErrors'
 
 type LLMModelRead = IntegrationsAPI.components['schemas']['LLMModelRead']

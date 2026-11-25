@@ -1,7 +1,7 @@
 """Tests for loop-body discovery used by activity synchronization."""
 
-from syntara.workflows.workflow_engine.models.workflow_definition import NodeType
-from syntara.workflows.workflow_engine.services.activity_node_sync import ActivityNodeSyncMixin
+from syntara.workflow_core.models import NodeType
+from syntara.workflow_runtime.engines.temporal.services.activity_node_sync import ActivityNodeSyncMixin
 
 
 def test_nested_loop_complete_edge_remains_in_outer_body() -> None:

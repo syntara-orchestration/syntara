@@ -1,7 +1,7 @@
 """Shared test helpers for workflow engine unit tests."""
 
 from syntara.settings.catalog import SETTINGS_CATALOG
-from syntara.workflows.workflow_engine.dynamic_workflow import OrchestratorWorkflow
+from syntara.workflow_runtime.engines.temporal.dynamic_workflow import OrchestratorWorkflow
 
 
 def make_workflow_runtime_settings() -> dict[str, object]:

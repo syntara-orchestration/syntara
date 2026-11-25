@@ -8,7 +8,7 @@ import {
 } from '@patternfly/react-icons'
 import { ActivityTypeEnum } from '@syntara/contracts'
 
-import { RegistryStepId } from '../../../../constants'
+import { RegistryStepId } from '../../../../constants/registryStepIds'
 import { LogicStepForm, type LogicFormData } from '../../step-forms/LogicStepForm'
 import { createCustomStep } from '../helpers/stepTemplates'
 import { StepRegistry } from '../StepRegistry'

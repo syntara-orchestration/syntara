@@ -26,7 +26,7 @@ let mockVersions: Array<{
   { version: 1, status: 'previously_published', workflow_definition: { name: 'v1' } },
 ]
 
-vi.mock('../../../providers/alerts', () => ({
+vi.mock('../../../providers/alerts/AlertContext', () => ({
   useAlerts: () => ({
     showSuccess: mockShowSuccess,
     showError: mockShowError,

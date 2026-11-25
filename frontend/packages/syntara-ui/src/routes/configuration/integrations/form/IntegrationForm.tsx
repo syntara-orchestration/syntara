@@ -15,16 +15,16 @@ import { useWatch, type UseFormTrigger } from 'react-hook-form'
 
 import { AppRoute } from '../../../../app/AppRoute'
 import { breadcrumbsIntegrationConfigure } from '../../../../app/breadcrumbBuilders'
-import { tanstackRouter } from '../../../../app/tanstackRouter'
 import { integrationsClient } from '../../../../client'
 import { SynForm } from '../../../../components/forms/SynForm'
+import { SynFormCancelButton } from '../../../../components/forms/SynFormCancelButton'
 import { SynPage, SynPageBody } from '../../../../components/layout/SynPage'
 import { SynPageHeader } from '../../../../components/layout/SynPageHeader'
 import { SynPanel } from '../../../../components/layout/SynPanel'
 import { SynPageTitle } from '../../../../components/SynPageTitle'
 import { useDirtyFormGuard } from '../../../../hooks/useDirtyFormGuard'
 import { useSynForm } from '../../../../hooks/useSynForm'
-import { useAlerts } from '../../../../providers/alerts'
+import { useAlerts } from '../../../../providers/alerts/AlertContext'
 import { getErrorMessage } from '../../../../utils/apiErrors'
 import { detachPromise } from '../../../../utils/detachPromise'
 import { useDocLink } from '../../../../utils/docs/useDocLink'
@@ -126,14 +126,7 @@ function WizardNavFooter({
         </ActionListGroup>
         <ActionListGroup>
           <ActionListItem>
-            <Button
-              variant="link"
-              onClick={() => {
-                detachPromise(tanstackRouter.navigate({ to: AppRoute.Configuration.Integrations.Root }))
-              }}
-            >
-              Cancel
-            </Button>
+            <SynFormCancelButton to={AppRoute.Configuration.Integrations.Root} />
           </ActionListItem>
         </ActionListGroup>
       </ActionList>

@@ -1031,7 +1031,7 @@ test.describe('Permission gating — Detail page header actions', () => {
       await expect(auditorApp.getByRole('heading', { level: 1, name: username })).toBeVisible()
 
       // aria-disabled is set after the permissions API resolves — give it extra time
-      await expect(auditorApp.getByRole('button', { name: 'Edit user' })).toHaveAttribute('aria-disabled', 'true', {
+      await expect(auditorApp.getByRole('link', { name: 'Edit user' })).toHaveAttribute('aria-disabled', 'true', {
         timeout: 30_000,
       })
 
@@ -1122,7 +1122,7 @@ test.describe('Permission gating — Detail page header actions', () => {
       await expect(auditorApp.getByRole('heading', { level: 1, name: idpName })).toBeVisible()
 
       // aria-disabled is set after the permissions API resolves — give it extra time
-      await expect(auditorApp.getByRole('button', { name: 'Edit provider' })).toHaveAttribute('aria-disabled', 'true', {
+      await expect(auditorApp.getByRole('link', { name: 'Edit provider' })).toHaveAttribute('aria-disabled', 'true', {
         timeout: 30_000,
       })
 

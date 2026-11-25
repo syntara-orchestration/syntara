@@ -27,6 +27,11 @@ from syntara.core.constants import WebhookLimits
 from syntara.core.database.session import get_db
 from syntara.core.models import User
 from syntara.core.syntara_router import SyntaraRouter
+from syntara.workflow_core.models import NodeType
+from syntara.workflow_runtime.execution import (
+    WorkflowExecutionService,
+    create_workflow_execution_service,
+)
 from syntara.workflows.audit.webhook_auth import WebhookAuthSuccessEvent
 from syntara.workflows.exceptions import (
     PayloadTooLargeError,
@@ -36,11 +41,6 @@ from syntara.workflows.exceptions import (
 )
 from syntara.workflows.services.execution_service import ExecutionService
 from syntara.workflows.services.webhook_trigger_service import WebhookTriggerService
-from syntara.workflows.workflow_engine.models.workflow_definition import NodeType
-from syntara.workflows.workflow_engine.services.temporal_execution_service import (
-    TemporalExecutionService,
-    create_temporal_execution_service,
-)
 
 logger = structlog.stdlib.get_logger(__name__)
 
@@ -95,13 +95,13 @@ async def _check_payload_size(request: Request) -> None:
     request._body = bytes(body)  # noqa: SLF001
 
 
-async def get_webhook_temporal_service() -> TemporalExecutionService | None:
+async def get_webhook_temporal_service() -> WorkflowExecutionService | None:
     """Dependency provider for Temporal execution service in webhook context.
 
     Returns None if Temporal is unavailable (graceful degradation).
     """
     try:
-        return await create_temporal_execution_service()
+        return await create_workflow_execution_service()
     except (RPCError, OSError, RuntimeError) as e:
         logger.warning("Temporal service unavailable for webhook", error=str(e))
         return None
@@ -150,7 +150,7 @@ async def _handle_webhook_request(
     payload: Any,  # noqa: ANN401
     trigger_type: str,
     caller: tuple[User, UUID],
-    temporal_service: TemporalExecutionService | None,
+    temporal_service: WorkflowExecutionService | None,
     db: AsyncSession,
     label: str = "",
 ) -> WebhookResponse:
@@ -242,7 +242,7 @@ async def receive_webhook(
     webhook_path: Annotated[str, Path(max_length=WebhookLimits.PATH_MAX_LENGTH, pattern=WebhookLimits.PATH_PATTERN)],
     payload: Annotated[Any, Body()],  # noqa: ANN401
     caller: Annotated[tuple[User, UUID], Depends(get_webhook_caller)],
-    temporal_service: Annotated[TemporalExecutionService | None, Depends(get_webhook_temporal_service)],
+    temporal_service: Annotated[WorkflowExecutionService | None, Depends(get_webhook_temporal_service)],
     db: Annotated[AsyncSession, Depends(get_db)],
     _payload_size: Annotated[None, Depends(_check_payload_size)],
 ) -> WebhookResponse:
@@ -288,7 +288,7 @@ async def receive_eda_webhook(
     webhook_path: Annotated[str, Path(max_length=WebhookLimits.PATH_MAX_LENGTH, pattern=WebhookLimits.PATH_PATTERN)],
     payload: Annotated[Any, Body()],  # noqa: ANN401
     caller: Annotated[tuple[User, UUID], Depends(get_webhook_caller)],
-    temporal_service: Annotated[TemporalExecutionService | None, Depends(get_webhook_temporal_service)],
+    temporal_service: Annotated[WorkflowExecutionService | None, Depends(get_webhook_temporal_service)],
     db: Annotated[AsyncSession, Depends(get_db)],
     _payload_size: Annotated[None, Depends(_check_payload_size)],
 ) -> WebhookResponse:

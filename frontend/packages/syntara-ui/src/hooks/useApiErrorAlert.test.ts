@@ -6,7 +6,7 @@ import { useApiErrorAlert } from './useApiErrorAlert'
 // Mock useAlerts
 const mockShowError = vi.fn()
 const mockShowWarning = vi.fn()
-vi.mock('../providers/alerts', () => ({
+vi.mock('../providers/alerts/AlertContext', () => ({
   useAlerts: () => ({
     showError: mockShowError,
     showWarning: mockShowWarning,
@@ -50,6 +50,12 @@ describe('useApiErrorAlert', () => {
     renderHook(() => useApiErrorAlert({ detail: 'Failed' }, { title: 'Custom Title' }))
 
     expect(mockShowError).toHaveBeenCalledWith({ title: 'Custom Title', description: 'Failed' })
+  })
+
+  it('uses a supplied message instead of raw backend detail', () => {
+    renderHook(() => useApiErrorAlert({ status: 500, detail: 'Raw backend detail' }, { message: 'Try again.' }))
+
+    expect(mockShowError).toHaveBeenCalledWith({ title: 'Error', description: 'Try again.' })
   })
 
   it('includes context in message when provided', () => {

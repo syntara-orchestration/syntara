@@ -1,5 +1,6 @@
 import { SynPanelStackItem } from '../../../components/layout/SynPanelStack'
 import { ResizableDivider } from '../../../components/ResizableDivider'
+import type { RunDetailsPanelExpandControl } from '../../executions/RunDetailsPanelExpandButton'
 import { ExecutionDetailsPanel } from '../ExecutionDetailsPanel'
 
 type ExecutionDetailsPanelWrapperProps = {
@@ -12,6 +13,8 @@ type ExecutionDetailsPanelWrapperProps = {
   onResize: (newHeight: number) => void
   isTerminalStatus: boolean
   onClosePanel?: () => void
+  isPanelExpanded: boolean
+  panelExpandControl?: RunDetailsPanelExpandControl
 }
 
 export function ExecutionDetailsPanelWrapper(props: ExecutionDetailsPanelWrapperProps) {
@@ -25,12 +28,17 @@ export function ExecutionDetailsPanelWrapper(props: ExecutionDetailsPanelWrapper
     onResize,
     isTerminalStatus,
     onClosePanel,
+    isPanelExpanded,
+    panelExpandControl,
   } = props
 
   return (
     <>
-      <ResizableDivider onResize={onResize} />
-      <SynPanelStackItem style={{ height: `${String(panelHeight)}px` }}>
+      {!isPanelExpanded && <ResizableDivider onResize={onResize} />}
+      <SynPanelStackItem
+        isFilled={isPanelExpanded}
+        style={isPanelExpanded ? { minHeight: 0 } : { height: `${String(panelHeight)}px` }}
+      >
         <ExecutionDetailsPanel
           executionId={executionId}
           workflowDefinition={workflowDefinition}
@@ -39,6 +47,7 @@ export function ExecutionDetailsPanelWrapper(props: ExecutionDetailsPanelWrapper
           onNodeSelect={onNodeSelect}
           headerLabel="Most recent run details"
           onClosePanel={isTerminalStatus ? onClosePanel : undefined}
+          panelExpandControl={panelExpandControl}
         />
       </SynPanelStackItem>
     </>
