@@ -6,6 +6,7 @@ import { axe } from 'vitest-axe'
 import { DRAG_TYPE_FIELD } from '../utils/dragTypes'
 
 import { InputSchemaPreview } from './InputSchemaPreview'
+import type { InputSchemaPreviewNode } from './InputSchemaPreview'
 
 const sampleFields: OutputFieldDef[] = [
   { name: 'stdout', type: 'string', description: 'Standard output from the script execution' },
@@ -118,6 +119,48 @@ describe('InputSchemaPreview', () => {
 
     expect(setDataCalls[1][0]).toBe('text/plain')
     expect(setDataCalls[1][1]).toBe('${step-1.hostname}')
+  })
+
+  it('builds the public dotted-path expression when dragging a nested declared output', () => {
+    const nestedOutputTree: InputSchemaPreviewNode[] = [
+      {
+        name: 'outputs',
+        type: 'object',
+        description: 'Declared outputs',
+        fieldPath: ['outputs'],
+        isGroup: true,
+        children: [
+          {
+            name: 'release',
+            type: 'object',
+            description: 'Release metadata',
+            fieldPath: ['outputs', 'release'],
+            isGroup: true,
+            children: [
+              {
+                name: 'version',
+                type: 'string',
+                description: 'Published release version',
+                fieldPath: ['outputs', 'release', 'version'],
+              },
+            ],
+          },
+        ],
+      },
+    ]
+    render(<InputSchemaPreview tree={nestedOutputTree} nodeId="invoke_child" />)
+
+    const expression = '${invoke_child.outputs.release.version}'
+    const setDataCalls: Array<[string, string]> = []
+    fireEvent.dragStart(screen.getByText('T version'), {
+      dataTransfer: {
+        setData: (format: string, value: string) => setDataCalls.push([format, value]),
+        effectAllowed: '',
+      },
+    })
+
+    expect(setDataCalls.find(([format]) => format === 'text/plain')?.[1]).toBe(expression)
+    expect(screen.getByRole('button', { name: `Copy expression ${expression}` })).toBeInTheDocument()
   })
 
   it('renders schema preview for a loop-iteration composite activity id', () => {
