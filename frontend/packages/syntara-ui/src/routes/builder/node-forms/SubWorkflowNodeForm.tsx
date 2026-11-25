@@ -4,6 +4,8 @@ import { useCallback, use, useEffect, useMemo } from 'react'
 import { Controller, FormProvider, useForm, useWatch, type UseFormReturn } from 'react-hook-form'
 import { z } from 'zod'
 
+import { useCanI } from '../../../hooks/useCanI'
+import { detachPromise } from '../../../utils/detachPromise'
 import { NodeEditorAutoSubmitContext, useRegisterAutoSubmit } from '../hooks/useNodeEditorAutoSubmit'
 import type { BaseNodeFormProps } from '../registry/NodeRegistry'
 import { useIsVersionView } from '../VersionViewContext'
@@ -68,6 +70,63 @@ function normalizeProjectId(projectId: string | undefined): string | null {
 
 function normalizeWorkflowId(workflowId: string): string | null {
   return workflowId || null
+}
+
+function ChildExecutionPermissionPreview({
+  workflowId,
+  projectId,
+  isVersionView,
+  selectedSchemaError,
+  hasEligibleTrigger,
+}: Readonly<{
+  workflowId: string
+  projectId: string | undefined
+  isVersionView: boolean
+  selectedSchemaError: unknown
+  hasEligibleTrigger: boolean | undefined
+}>) {
+  const isInvocationUnavailable =
+    isInvocationSchemaForbidden(selectedSchemaError) ||
+    isInvocationSchemaNotFound(selectedSchemaError) ||
+    hasEligibleTrigger === false
+  // The picker only offers same-project children, and runtime execution checks are project-scoped.
+  const permission = useCanI('run', 'execution', {
+    resourceProject: projectId,
+    enabled: Boolean(workflowId && projectId && !isVersionView && !isInvocationUnavailable),
+  })
+
+  if (!workflowId || !projectId || isVersionView || isInvocationUnavailable || permission.allowed) {
+    return null
+  }
+  if (permission.isError) {
+    return (
+      <StackItem>
+        <Alert variant="warning" isInline title="Unable to verify execution permission">
+          This permission preview is unavailable. Runtime authorization will still apply when the parent runs.{' '}
+          {permission.refetch && (
+            <Button
+              variant="link"
+              type="button"
+              isDisabled={permission.isChecking || permission.isRefetching}
+              onClick={() => detachPromise(permission.refetch?.())}
+            >
+              {permission.isChecking || permission.isRefetching ? 'Checking' : 'Retry'}
+            </Button>
+          )}
+        </Alert>
+      </StackItem>
+    )
+  }
+  if (permission.isChecking || permission.isRefetching) return null
+
+  return (
+    <StackItem>
+      <Alert variant="info" isInline title="You may not be able to run executions in this project">
+        This advisory checks your execution permission for the selected child workflow's project. The user or service
+        account that runs the parent workflow may have different permissions; configuration and saving remain available.
+      </Alert>
+    </StackItem>
+  )
 }
 
 function getInvocationTriggers(invocation: WorkflowSelectorState): InvocationTrigger[] {
@@ -392,6 +451,15 @@ export function SubWorkflowNodeForm({
           isVersionView={isVersionView}
         />
       </StackItem>
+      <ChildExecutionPermissionPreview
+        workflowId={workflowId}
+        projectId={projectId}
+        isVersionView={isVersionView}
+        selectedSchemaError={invocation.selectedSchemaError}
+        hasEligibleTrigger={
+          invocation.selectedSchema ? invocation.selectedSchema.is_eligible && triggers.length > 0 : undefined
+        }
+      />
       <WorkflowInputMappingSection
         canConfigure={canConfigureInputMapping}
         hasNoDeclaredInputs={hasNoDeclaredInputs}
