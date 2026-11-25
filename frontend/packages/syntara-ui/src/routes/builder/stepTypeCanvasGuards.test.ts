@@ -4,10 +4,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { NodeKind } from '../../hooks/useNodeKindsQuery'
 
 import {
+  blockedStepTypesIn,
   importRefusal,
   stepTypeRefusal,
   useStepTypeCanvasGuards,
   verdictsFailClosedMessage,
+  withoutStepTypes,
+  type CanvasDefinition,
 } from './stepTypeCanvasGuards'
 import {
   STEP_TYPE_NO_PROJECT_TOOLTIP,
@@ -225,5 +228,91 @@ describe('useStepTypeCanvasGuards', () => {
 
     expect(result.current.getImportRefusal(pendingImport(['script']))).toBe(blockedMessage)
     expect(result.current.getImportRefusal(pendingImport(['http_request']))).toBeNull()
+  })
+})
+
+describe('blockedStepTypesIn', () => {
+  function definition(activityTypes: string[], triggerTypes: string[] = []) {
+    return pendingImport(activityTypes, triggerTypes).workflowDef
+  }
+
+  it('lists a blocked activity type by its step type label', () => {
+    expect(blockedStepTypesIn(definition(['http_request', 'script']), verdictsByKind)).toEqual([scriptDeny])
+  })
+
+  it('lists a blocked trigger type', () => {
+    const triggerDeny = { kind: 'manual_trigger', label: 'Manual trigger' } as const
+    const byKind = registry(
+      kind({ kind: 'manual_trigger', category: 'trigger', can_write: false, blocked_by: triggerDeny })
+    )
+    expect(blockedStepTypesIn(definition([], ['manual_trigger']), byKind)).toEqual([triggerDeny])
+  })
+
+  it('allows permitted kinds and kinds with no verdict', () => {
+    expect(
+      blockedStepTypesIn(definition(['http_request', 'unknown_kind'], ['manual_trigger']), verdictsByKind)
+    ).toEqual([])
+  })
+
+  it('lists each blocked kind once, in first-seen order, falling back to the kind', () => {
+    const byKind = registry(
+      kind({ kind: 'script', can_write: false, blocked_by: scriptDeny }),
+      kind({ kind: 'http_request', can_write: false })
+    )
+    expect(blockedStepTypesIn(definition(['http_request', 'script', 'http_request', 'script']), byKind)).toEqual([
+      { kind: 'http_request', label: 'http_request' },
+      scriptDeny,
+    ])
+  })
+})
+
+describe('withoutStepTypes', () => {
+  function canvasDefinition(): CanvasDefinition {
+    return {
+      workflowDef: {
+        name: 'Run',
+        workflow: {
+          activities: [
+            { id: 'a-http', type: 'http_request', name: 'HTTP' },
+            { id: 'a-script', type: 'script', name: 'Script' },
+            { id: 'a-untyped', name: 'Untyped' },
+          ],
+        },
+        triggers: [
+          { id: 't-manual', type: 'manual_trigger', name: 'Manual' },
+          { id: 't-webhook', type: 'webhook_trigger', name: 'Webhook' },
+        ],
+      } as unknown as CanvasDefinition['workflowDef'],
+      edges: [
+        { id: 'e1', source: 't-manual', target: 'a-http' },
+        { id: 'e2', source: 'a-http', target: 'a-script' },
+        { id: 'e3', source: 't-webhook', target: 'a-untyped' },
+      ],
+      nodePositions: {
+        'a-http': { x: 0, y: 0 },
+        'a-script': { x: 1, y: 1 },
+        't-manual': { x: 2, y: 2 },
+        't-webhook': { x: 3, y: 3 },
+      },
+    }
+  }
+
+  it('drops the steps of the given types with their edges and positions', () => {
+    const result = withoutStepTypes(canvasDefinition(), ['script', 'manual_trigger'])
+
+    expect(result.workflowDef.workflow.activities.map((a) => a.id)).toEqual(['a-http', 'a-untyped'])
+    expect(result.workflowDef.triggers?.map((t) => t.id)).toEqual(['t-webhook'])
+    expect(result.edges.map((e) => e.id)).toEqual(['e3'])
+    expect(Object.keys(result.nodePositions)).toEqual(['a-http', 't-webhook'])
+    expect(result.workflowDef.name).toBe('Run')
+  })
+
+  it('does not mutate the input', () => {
+    const input = canvasDefinition()
+    const snapshot = structuredClone(input)
+
+    withoutStepTypes(input, ['script', 'manual_trigger'])
+
+    expect(input).toEqual(snapshot)
   })
 })

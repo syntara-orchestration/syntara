@@ -1,8 +1,9 @@
 import { useCallback } from 'react'
 
-import { useNodeKindsQuery, type NodeKind } from '../../hooks/useNodeKindsQuery'
+import { useNodeKindsQuery, type BlockedStepType, type NodeKind } from '../../hooks/useNodeKindsQuery'
 import { useAlerts } from '../../providers/alerts/AlertContext'
 import { useWorkflowStore } from '../../stores/useWorkflowStore'
+import type { WorkflowDefinition } from '../../stores/workflowStoreTypes'
 
 import {
   STEP_TYPE_NO_PROJECT_TOOLTIP,
@@ -10,6 +11,7 @@ import {
   STEP_TYPE_PERMISSIONS_UNAVAILABLE_TOOLTIP,
   stepTypeBlockedMessage,
 } from './stepTypePaletteGating'
+import type { EdgeConnection } from './types/edge'
 import type { PendingImportData } from './useWorkflowImportExport'
 
 /** Step-type verdicts for the builder's project, as read from `GET /node_kinds`. */
@@ -50,6 +52,56 @@ export function importRefusal(data: PendingImportData, verdicts: StepTypeVerdict
     if (refusal) return refusal
   }
   return null
+}
+
+/**
+ * Step types in `workflowDef` the caller may not write, unique and in the order
+ * they first appear (activities, then triggers).
+ *
+ * The label is the step type's own name, never the policy that denies it.
+ * Kinds with no verdict are allowed, as in `stepTypeRefusal`.
+ */
+export function blockedStepTypesIn(
+  workflowDef: Pick<WorkflowDefinition, 'workflow' | 'triggers'>,
+  nodeKindByKind: ReadonlyMap<string, NodeKind>
+): BlockedStepType[] {
+  const blocked = new Map<string, BlockedStepType>()
+  for (const step of [...workflowDef.workflow.activities, ...(workflowDef.triggers ?? [])]) {
+    const verdict = step.type ? nodeKindByKind.get(step.type) : undefined
+    if (!verdict || verdict.can_write || blocked.has(verdict.kind)) continue
+    blocked.set(verdict.kind, { kind: verdict.kind, label: verdict.blocked_by?.label ?? verdict.kind })
+  }
+  return [...blocked.values()]
+}
+
+/** A workflow definition as laid out on the canvas: steps, edges and node positions. */
+export type CanvasDefinition = {
+  workflowDef: WorkflowDefinition
+  edges: EdgeConnection[]
+  nodePositions: Record<string, { x: number; y: number }>
+}
+
+/**
+ * `parsed` without the activities and triggers of the given step types, the
+ * edges touching them and their node positions. Does not mutate `parsed`.
+ */
+export function withoutStepTypes(parsed: CanvasDefinition, kinds: Iterable<string>): CanvasDefinition {
+  const removedKinds = new Set(kinds)
+  const removedIds = new Set<string>()
+  const keep = (step: { id?: string; type?: string }): boolean => {
+    if (!step.type || !removedKinds.has(step.type)) return true
+    if (step.id) removedIds.add(step.id)
+    return false
+  }
+
+  const { workflowDef } = parsed
+  const activities = workflowDef.workflow.activities.filter(keep)
+  const triggers = workflowDef.triggers?.filter(keep)
+  return {
+    workflowDef: { ...workflowDef, workflow: { ...workflowDef.workflow, activities }, triggers },
+    edges: parsed.edges.filter((edge) => !removedIds.has(edge.source) && !removedIds.has(edge.target)),
+    nodePositions: Object.fromEntries(Object.entries(parsed.nodePositions).filter(([id]) => !removedIds.has(id))),
+  }
 }
 
 /**
