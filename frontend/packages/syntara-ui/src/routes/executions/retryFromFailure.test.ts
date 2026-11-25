@@ -1,0 +1,283 @@
+import { ExecutionStatusEnum } from '@syntara/contracts'
+
+import {
+  canConfirmRetryFromFailure,
+  eligibleRetryPointIds,
+  getRetryInputOverridePointIds,
+  getRetryPlanPoints,
+  getSanitizedOutputWarning,
+  getUnavailableRetryPlanPoints,
+  isRetryFromFailureEligible,
+  selectedRetryPointId,
+  unavailableOutputIds,
+  type RetryFromFailurePreview,
+} from './retryFromFailure'
+
+function preview(overrides: Partial<RetryFromFailurePreview> = {}): RetryFromFailurePreview {
+  return {
+    eligible: true,
+    eligible_point_ids: ['node-a'],
+    total_step_count: 3,
+    ...overrides,
+  }
+}
+
+describe('isRetryFromFailureEligible', () => {
+  it.each([ExecutionStatusEnum.FAILED, ExecutionStatusEnum.COMPLETED_WITH_ERRORS])(
+    'allows a retry from failure for %s',
+    (status) => {
+      expect(isRetryFromFailureEligible(status)).toBe(true)
+    }
+  )
+
+  it.each([
+    ExecutionStatusEnum.COMPLETED,
+    ExecutionStatusEnum.CANCELLED,
+    ExecutionStatusEnum.RUNNING,
+    ExecutionStatusEnum.PENDING,
+    ExecutionStatusEnum.PAUSED,
+  ])('refuses a retry from failure for %s', (status) => {
+    expect(isRetryFromFailureEligible(status)).toBe(false)
+  })
+
+  it('refuses a retry from failure for a test execution even when failed', () => {
+    expect(isRetryFromFailureEligible(ExecutionStatusEnum.FAILED, 'test')).toBe(false)
+  })
+
+  it('refuses a retry from failure when status is missing', () => {
+    expect(isRetryFromFailureEligible(null)).toBe(false)
+    expect(isRetryFromFailureEligible(undefined)).toBe(false)
+  })
+})
+
+describe('eligibleRetryPointIds', () => {
+  it('returns the backend-reported points', () => {
+    expect(eligibleRetryPointIds(preview({ eligible_point_ids: ['a', 'b'] }))).toEqual(['a', 'b'])
+  })
+
+  it('returns an empty list when the preview is absent', () => {
+    expect(eligibleRetryPointIds(undefined)).toEqual([])
+  })
+})
+
+describe('getRetryPlanPoints', () => {
+  it('resolves display names, iteration labels, and backend step counts', () => {
+    expect(
+      getRetryPlanPoints(
+        preview({
+          eligible_point_ids: ['node-a', 'node-b#iter-2'],
+          step_count_by_eligible_point: { 'node-a': 4, 'node-b#iter-2': 2 },
+        }),
+        new Map([
+          ['node-a', 'First Step'],
+          ['node-b', 'Loop Step'],
+        ]),
+        new Map([
+          ['node-a', 'script'],
+          ['node-b', 'loop'],
+        ])
+      )
+    ).toEqual([
+      { id: 'node-a', name: 'First Step', typeLabel: 'Script', stepCount: 4, sanitizedFailedNodeNames: [] },
+      {
+        id: 'node-b#iter-2',
+        name: 'Loop Step (Iteration 3)',
+        typeLabel: 'Loop',
+        stepCount: 2,
+        sanitizedFailedNodeNames: [],
+      },
+    ])
+  })
+
+  it('identifies the failed step replaced by a sanitized retry start', () => {
+    expect(
+      getRetryPlanPoints(
+        preview({
+          eligible_point_ids: ['fetch-inventory'],
+          sanitized_replacements: { 'process-inventory': ['fetch-inventory'] },
+        }),
+        new Map([
+          ['fetch-inventory', 'Fetch inventory'],
+          ['process-inventory', 'Process inventory'],
+        ]),
+        new Map([['fetch-inventory', 'script']])
+      )
+    ).toEqual([
+      {
+        id: 'fetch-inventory',
+        name: 'Fetch inventory',
+        typeLabel: 'Script',
+        stepCount: undefined,
+        sanitizedFailedNodeNames: ['Process inventory'],
+      },
+    ])
+  })
+
+  it('falls back to the source node ID if its display name is unavailable', () => {
+    expect(getRetryPlanPoints(preview({ eligible_point_ids: ['unknown-node'] }), new Map())).toEqual([
+      {
+        id: 'unknown-node',
+        name: 'unknown-node',
+        typeLabel: 'Step',
+        stepCount: undefined,
+        sanitizedFailedNodeNames: [],
+      },
+    ])
+  })
+})
+
+describe('selectedRetryPointId', () => {
+  it('uses a selected failure activity as a base-node retry point', () => {
+    expect(selectedRetryPointId('node-a#iter-3', preview({ eligible_point_ids: ['node-a', 'node-b'] }))).toBe('node-a')
+  })
+
+  it('does not turn a non-failure selection into an explicit retry point', () => {
+    expect(selectedRetryPointId('completed-node', preview({ eligible_point_ids: ['node-a'] }))).toBeUndefined()
+  })
+
+  it('allows a sanitized replacement to become an explicit retry point', () => {
+    expect(
+      selectedRetryPointId(
+        'sanitized-node',
+        preview({ eligible_point_ids: ['failed-node', 'sanitized-node'], auto_included_node_ids: ['sanitized-node'] })
+      )
+    ).toBe('sanitized-node')
+  })
+})
+
+describe('getRetryInputOverridePointIds', () => {
+  const edges = [
+    { source: 'fetch-inventory', target: 'process-inventory' },
+    { source: 'call-api', target: 'publish-results' },
+  ]
+
+  it('lets the failed step stay editable when retry starts at a sanitized replacement', () => {
+    expect(
+      getRetryInputOverridePointIds(
+        preview({
+          eligible_point_ids: ['fetch-inventory'],
+          auto_included_node_ids: ['fetch-inventory'],
+          sanitized_replacements: { 'process-inventory': ['fetch-inventory'] },
+        }),
+        ['process-inventory', 'call-api'],
+        edges
+      )
+    ).toEqual(['process-inventory'])
+  })
+
+  it('keeps a selected failed branch editable and leaves unselected failures out', () => {
+    expect(
+      getRetryInputOverridePointIds(
+        preview({
+          eligible_point_ids: ['call-api'],
+          sanitized_replacements: { 'process-inventory': ['fetch-inventory'] },
+        }),
+        ['process-inventory', 'call-api'],
+        edges
+      )
+    ).toEqual(['call-api'])
+  })
+
+  it('still targets a failed start point when no output was sanitized', () => {
+    expect(getRetryInputOverridePointIds(preview({ eligible_point_ids: ['call-api'] }), ['call-api'], edges)).toEqual([
+      'call-api',
+    ])
+  })
+
+  it('returns no editor targets when the preview is ineligible', () => {
+    expect(
+      getRetryInputOverridePointIds(
+        preview({ eligible: false, eligible_point_ids: ['fetch-inventory'] }),
+        ['process-inventory'],
+        edges
+      )
+    ).toEqual([])
+  })
+})
+
+describe('unavailableOutputIds', () => {
+  it('includes auto-included sanitized nodes and eligible replacements', () => {
+    expect(
+      unavailableOutputIds(
+        preview({
+          eligible_point_ids: ['approval', 'rest-api'],
+          auto_included_node_ids: ['rest-api'],
+          sanitized_replacements: { script: ['rest-api'] },
+        })
+      )
+    ).toEqual(['rest-api'])
+  })
+
+  it('returns no unavailable output when the preview is ineligible', () => {
+    expect(unavailableOutputIds(preview({ eligible: false, auto_included_node_ids: ['rest-api'] }))).toEqual([])
+  })
+})
+
+describe('getUnavailableRetryPlanPoints', () => {
+  it('maps sanitized replacements to retry plan rows', () => {
+    expect(
+      getUnavailableRetryPlanPoints(
+        preview({
+          eligible_point_ids: ['approval', 'rest-api'],
+          auto_included_node_ids: ['rest-api'],
+          sanitized_replacements: { script: ['rest-api'] },
+        }),
+        new Map([['rest-api', 'REST API']])
+      )
+    ).toEqual([
+      {
+        id: 'rest-api',
+        name: 'REST API',
+        typeLabel: 'Step',
+        stepCount: undefined,
+        sanitizedFailedNodeNames: ['script'],
+      },
+    ])
+  })
+})
+
+describe('getSanitizedOutputWarning', () => {
+  it('describes the sanitized replacement and the failed node it regenerates input for', () => {
+    expect(
+      getSanitizedOutputWarning(
+        preview({
+          eligible_point_ids: ['transform-records'],
+          auto_included_node_ids: ['transform-records'],
+          sanitized_replacements: { 'connect-upstream': ['transform-records'] },
+        }),
+        new Map([
+          ['transform-records', 'Transform records'],
+          ['connect-upstream', 'Connect to upstream service'],
+        ])
+      )
+    ).toBe(
+      'Output from Transform records was sanitized and cannot be reused. The retry will begin at Transform records to regenerate the missing input for Connect to upstream service.'
+    )
+  })
+})
+
+describe('canConfirmRetryFromFailure', () => {
+  it('allows confirming an eligible preview with at least one point', () => {
+    expect(canConfirmRetryFromFailure(preview(), false, false)).toBe(true)
+  })
+
+  it('blocks confirming while the preview is loading', () => {
+    expect(canConfirmRetryFromFailure(preview(), true, false)).toBe(false)
+  })
+
+  it('blocks confirming when the preview errored', () => {
+    expect(canConfirmRetryFromFailure(preview(), false, true)).toBe(false)
+  })
+
+  it('blocks confirming an ineligible preview', () => {
+    expect(canConfirmRetryFromFailure(preview({ eligible: false }), false, false)).toBe(false)
+  })
+
+  it('blocks confirming an eligible preview that reports no retry points', () => {
+    expect(canConfirmRetryFromFailure(preview({ eligible_point_ids: [] }), false, false)).toBe(false)
+  })
+
+  it('blocks confirming when there is no preview', () => {
+    expect(canConfirmRetryFromFailure(undefined, false, false)).toBe(false)
+  })
+})

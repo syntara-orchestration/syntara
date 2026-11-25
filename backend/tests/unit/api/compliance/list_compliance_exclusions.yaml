@@ -29,6 +29,9 @@ exclusions:
   - operation_id: validate_workflow_definition
     reason: "Validation result not a paginated list (ValidationResult), returns findings/is_valid/error_count/warning_count"
 
+  - operation_id: retry_from_failure_preview
+    reason: "Single verdict for one execution, not a collection. Returns one RetryFromFailureValidationResponse object; the eligible_point_ids and sanitized_node_ids arrays are attributes of that verdict, not a page of resources. No id field because the resource is addressed by the execution_id path parameter."
+
   # ===========================================================================
   # TEMPORARY EXCLUSIONS (tech debt - should fix)
   # ===========================================================================

@@ -17,6 +17,7 @@ import type { ActivityOrderItem } from './ExecutionActivityTable'
 import { ActivityStatusLabel } from './ExecutionStatus'
 import { getActivityStatusDisplayLabel } from './executionStatusConstants'
 import { ACTIVITY_STATUS } from './utils/executionState/executionHelpers'
+import { getRetryActivityMarkers } from './utils/replayedNodes'
 
 function activityListItemAriaLabel(displayName: string, status: ActivityStatus, nodeType?: string): string {
   return `${displayName}, ${getActivityStatusDisplayLabel(status, nodeType)}`
@@ -27,6 +28,8 @@ export type CompactActivityListProps = {
   activityOrder: ActivityOrderItem[]
   onRowClick?: (nodeId: string, nodeName: string) => void
   selectedNodeId?: string | null
+  /** Timestamp replayed steps predate; set only for retry executions. */
+  replayBaselineAt?: string | null
 }
 
 export function CompactActivityList({
@@ -34,6 +37,7 @@ export function CompactActivityList({
   activityOrder,
   onRowClick,
   selectedNodeId,
+  replayBaselineAt,
 }: Readonly<CompactActivityListProps>) {
   const displayNameById = useMemo(() => new Map(activityOrder.map(({ id, name }) => [id, name ?? id])), [activityOrder])
 
@@ -63,6 +67,7 @@ export function CompactActivityList({
     >
       {activityOrder.map(({ id, name, type }) => {
         const state = activityStates.get(id)
+        const retryMarkers = getRetryActivityMarkers(state, replayBaselineAt, type)
         const hasTimeRange = Boolean(state?.startedAt)
         const displayName = name ?? id
         const titleId = `activity-list-item-${id}-title`
@@ -80,7 +85,13 @@ export function CompactActivityList({
                         {displayName}
                       </Content>
                       <div className={styles.statusCell}>
-                        <ActivityStatusLabel status={status} nodeType={type} />
+                        <ActivityStatusLabel
+                          status={status}
+                          nodeType={type}
+                          replayed={retryMarkers.replayed}
+                          retainedFailure={retryMarkers.retainedFailure}
+                          triggerInputReused={retryMarkers.triggerInputReused}
+                        />
                       </div>
                       {hasTimeRange && (
                         <Content component={ContentVariants.small} className={styles.subtleText}>

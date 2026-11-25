@@ -11,10 +11,13 @@ import { useElapsedTime } from '../../hooks/useElapsedTime'
 import type { FilterConfig } from '../../types/filters'
 import { formatElapsedTime } from '../../utils/dateUtils'
 import { detachPromise } from '../../utils/detachPromise'
+import type { RetryInputOverridesState } from '../executions/retryInputOverrides'
 import type { RunDetailsPanelExpandControl } from '../executions/RunDetailsPanelExpandButton'
 import { StepExecutionDetailsPanel } from '../executions/StepExecutionDetailsPanel'
 import type { ActivityState } from '../workflows/execution/types'
+import { parseCompositeKey } from '../workflows/execution/utils/activityState'
 import {
+  selectRetryReplayBaseline,
   useExecutionStore,
   useExecutionStoreActions,
   useExecutionWithLiveStatus,
@@ -46,6 +49,8 @@ type ExecutionDetailsPanelProps = {
   headerLabel?: string
   onClosePanel?: () => void
   panelExpandControl?: RunDetailsPanelExpandControl
+  retryMode?: boolean
+  retryInputOverrides?: RetryInputOverridesState
 }
 
 type ThreePanelLayoutProps = {
@@ -75,6 +80,9 @@ type ThreePanelLayoutProps = {
   headerLabel?: string
   onClosePanel?: () => void
   panelExpandControl?: RunDetailsPanelExpandControl
+  replayBaselineAt?: string | null
+  retryMode: boolean
+  retryInputOverrides?: RetryInputOverridesState
 }
 
 function ThreePanelLayout({
@@ -99,7 +107,30 @@ function ThreePanelLayout({
   headerLabel,
   onClosePanel,
   panelExpandControl,
+  replayBaselineAt,
+  retryMode,
+  retryInputOverrides,
 }: Readonly<ThreePanelLayoutProps>) {
+  const retryTarget = retryInputOverrides
+    ? findRetryInputOverrideTarget(detailNodeId, retryInputOverrides.targets)
+    : undefined
+  const retryInputOverride =
+    retryTarget && retryInputOverrides
+      ? {
+          target: retryTarget,
+          canEdit: retryInputOverrides.canEdit,
+          isDisabled: retryInputOverrides.isDisabled,
+          savedOverride: retryInputOverrides.savedOverrides[retryTarget.id],
+          draft: retryInputOverrides.drafts[retryTarget.id],
+          error: retryInputOverrides.errors[retryTarget.id],
+          isEditing: retryInputOverrides.editingTargetIds.has(retryTarget.id),
+          onEdit: retryInputOverrides.onEdit,
+          onCancel: retryInputOverrides.onCancel,
+          onSave: retryInputOverrides.onSave,
+          onDraftChange: retryInputOverrides.onDraftChange,
+        }
+      : undefined
+
   return (
     <SynPanel
       hasNoPadding
@@ -133,10 +164,12 @@ function ThreePanelLayout({
             alignItems={{ default: 'alignItemsStretch' }}
             gap={{ default: 'gapNone' }}
           >
-            <FlexItem className={styles.activityList}>
+            <FlexItem
+              className={retryMode ? `${styles.activityList} ${styles.activityListRetryMode}` : styles.activityList}
+            >
               <Stack className={styles.activityListColumn}>
                 {showFilters && (
-                  <StackItem className={styles.activityListFilter}>
+                  <StackItem className={`${styles.activityListFilter} ${styles.filterBarWrapperInActivityList}`}>
                     <section aria-label="Activity filter">
                       <FilterBar
                         fieldDefinitions={ACTIVITY_FILTER_DEFINITIONS}
@@ -157,6 +190,7 @@ function ThreePanelLayout({
                       activityOrder={activityOrder}
                       onRowClick={onRowClick}
                       selectedNodeId={selectedNodeId}
+                      replayBaselineAt={replayBaselineAt}
                     />
                   )}
                 </StackItem>
@@ -173,6 +207,8 @@ function ThreePanelLayout({
                   executionId={executionId}
                   stepState={selectedNodeState}
                   stepType={selectedNodeType}
+                  replayBaselineAt={replayBaselineAt}
+                  retryInputOverride={retryInputOverride}
                 />
               ) : (
                 <NoSelectionState />
@@ -219,6 +255,18 @@ type SinglePanelLayoutProps = {
   headerLabel?: string
   onClosePanel?: () => void
   panelExpandControl?: RunDetailsPanelExpandControl
+  replayBaselineAt?: string | null
+}
+
+function findRetryInputOverrideTarget(
+  detailNodeId: string | null,
+  targets: RetryInputOverridesState['targets']
+): RetryInputOverridesState['targets'][number] | undefined {
+  if (!detailNodeId) return undefined
+  const exactTarget = targets.find((target) => target.id === detailNodeId)
+  if (exactTarget) return exactTarget
+  const baseId = parseCompositeKey(detailNodeId).baseId
+  return targets.find((target) => parseCompositeKey(target.id).baseId === baseId)
 }
 
 function SinglePanelLayout({
@@ -240,6 +288,7 @@ function SinglePanelLayout({
   headerLabel,
   onClosePanel,
   panelExpandControl,
+  replayBaselineAt,
 }: Readonly<SinglePanelLayoutProps>) {
   const resolvedError = useMemo(
     () => resolveErrorDetails(execution.error_details, nameMap),
@@ -304,6 +353,7 @@ function SinglePanelLayout({
                 executionError={resolvedError}
                 onRowClick={onRowClick}
                 selectedNodeId={selectedNodeId}
+                replayBaselineAt={replayBaselineAt}
               />
             </div>
           )}
@@ -322,9 +372,13 @@ export function ExecutionDetailsPanel({
   headerLabel,
   onClosePanel,
   panelExpandControl,
+  retryMode = false,
+  retryInputOverrides,
 }: Readonly<ExecutionDetailsPanelProps>) {
   const { setActivityExecutions } = useExecutionStoreActions()
   const activityStates = useExecutionStore((s) => s.activityStates)
+  const replayBaselineAt = useExecutionStore(selectRetryReplayBaseline)
+  const [retryModeViewMode, setRetryModeViewMode] = useState<ViewMode>('details')
   const [viewMode, setViewMode] = useState<ViewMode>('overview')
 
   const executionQuery = executionsClient.useQuery('get', '/executions/{execution_id}', {
@@ -382,15 +436,21 @@ export function ExecutionDetailsPanel({
     onNodeSelect,
   })
 
+  const effectiveViewMode: ViewMode = retryMode ? retryModeViewMode : viewMode
+
   const handleViewModeChange = useCallback(
     (mode: ViewMode) => {
-      setViewMode(mode)
+      if (retryMode) {
+        setRetryModeViewMode(mode)
+      } else {
+        setViewMode(mode)
+      }
       if (mode === 'details' && effectiveKey === null && filteredActivityOrder.length > 0) {
         const first = filteredActivityOrder[0]
         handleRowClick(first.id, first.name ?? first.id)
       }
     },
-    [effectiveKey, filteredActivityOrder, handleRowClick]
+    [effectiveKey, filteredActivityOrder, handleRowClick, retryMode]
   )
 
   const queryState = useQueryState(executionQuery, {
@@ -402,7 +462,7 @@ export function ExecutionDetailsPanel({
     return <LoadingErrorState queryState={queryState} />
   }
 
-  if (viewMode === 'details') {
+  if (effectiveViewMode === 'details') {
     return (
       <ThreePanelLayout
         execution={execution}
@@ -420,12 +480,15 @@ export function ExecutionDetailsPanel({
         executionId={executionId}
         selectedNodeState={selectedNodeState}
         selectedNodeType={selectedNodeType}
-        viewMode={viewMode}
+        viewMode={effectiveViewMode}
         onViewModeChange={handleViewModeChange}
         onRowClick={handleRowClick}
         headerLabel={headerLabel}
         onClosePanel={onClosePanel}
+        replayBaselineAt={replayBaselineAt}
         panelExpandControl={panelExpandControl}
+        retryMode={retryMode}
+        retryInputOverrides={retryInputOverrides}
       />
     )
   }
@@ -443,12 +506,13 @@ export function ExecutionDetailsPanel({
       filters={filters}
       onFilterChange={handleFilterChange}
       now={now}
-      viewMode={viewMode}
+      viewMode={effectiveViewMode}
       onViewModeChange={handleViewModeChange}
       onRowClick={handleRowClick}
       selectedNodeId={effectiveKey}
       headerLabel={headerLabel}
       onClosePanel={onClosePanel}
+      replayBaselineAt={replayBaselineAt}
       panelExpandControl={panelExpandControl}
     />
   )

@@ -20,3 +20,7 @@
 .executionSpinnerIcon {
   --pf-v6-c-spinner--Color: var(--pf-t--global--color--brand--default);
 }
+
+.retryPreviewLabel {
+  white-space: nowrap;
+}

@@ -38,6 +38,15 @@ export type Persona = {
   assignmentId: string | null
 }
 
+export type ProjectPersona = {
+  userId: string
+  username: string
+  password: string
+  projectId: string
+  roleId: string
+  assignmentId: string
+}
+
 /**
  * Create a test user with a custom role granting the specified permissions.
  * Uses the admin-authenticated API to:
@@ -117,6 +126,92 @@ export async function cleanupPersona(app: Page, persona: Persona): Promise<void>
   if (persona.assignmentId) await deleteRoleAssignmentViaApi(app, persona.assignmentId)
   if (persona.roleId) await deleteRoleViaApi(app, persona.roleId)
   if (persona.policyId) await deletePolicyViaApi(app, persona.policyId)
+  await deleteUserViaApi(app, persona.userId)
+}
+
+/**
+ * Create a user with a project-scoped role for real-backend authorization tests.
+ *
+ * The role is limited to the supplied project and policies, avoiding unrelated
+ * global permissions when a test needs to model a project operator.
+ */
+export async function createProjectPersona(
+  app: Page,
+  projectId: string,
+  name: string,
+  policies: string[]
+): Promise<ProjectPersona> {
+  const user = await createUserViaApi(app, {
+    username: name,
+    password: E2E_TEST_PASSWORD,
+  })
+  if (!user) throw new Error(`Failed to create project persona user "${name}"`)
+
+  let roleId: string | null = null
+  let assignmentId: string | null = null
+  try {
+    const token = await getAuthToken(app)
+    if (!token) throw new Error('No admin token to create project persona')
+
+    const roleName = `${name}-role`
+    const roleResponse = await apiRequest(app, 'post', `/projects/${projectId}/roles`, {
+      token,
+      data: { name: roleName, policies },
+    })
+    if (!roleResponse.ok()) {
+      const body = await roleResponse.text().catch(() => '(unreadable)')
+      throw new Error(`Failed to create project role "${roleName}": ${roleResponse.status()} ${body}`)
+    }
+    const role = (await roleResponse.json()) as { id?: string }
+    if (!role.id) throw new Error(`Project role "${roleName}" did not return an id`)
+    roleId = role.id
+
+    const assignmentResponse = await apiRequest(app, 'post', `/projects/${projectId}/role_assignments`, {
+      token,
+      data: { principal_id: user.id, role_name: roleName },
+    })
+    if (!assignmentResponse.ok()) {
+      const body = await assignmentResponse.text().catch(() => '(unreadable)')
+      throw new Error(`Failed to assign project role "${roleName}": ${assignmentResponse.status()} ${body}`)
+    }
+    const assignment = (await assignmentResponse.json()) as { id?: string }
+    if (!assignment.id) throw new Error(`Project role assignment for "${roleName}" did not return an id`)
+    assignmentId = assignment.id
+
+    return {
+      userId: user.id,
+      username: user.username,
+      password: E2E_TEST_PASSWORD,
+      projectId,
+      roleId,
+      assignmentId,
+    }
+  } catch (error) {
+    await cleanupProjectPersonaResources(app, { userId: user.id, projectId, roleId, assignmentId })
+    throw error
+  }
+}
+
+/** Best-effort cleanup for a project persona and its project-scoped role. */
+export async function cleanupProjectPersona(app: Page, persona: ProjectPersona): Promise<void> {
+  await cleanupProjectPersonaResources(app, persona)
+}
+
+async function cleanupProjectPersonaResources(
+  app: Page,
+  persona: { userId: string; projectId: string; roleId: string | null; assignmentId: string | null }
+): Promise<void> {
+  const token = await getAuthToken(app).catch(() => null)
+  if (token && persona.assignmentId) {
+    await apiRequest(app, 'delete', `/projects/${persona.projectId}/role_assignments/${persona.assignmentId}`, {
+      token,
+    }).catch(() => undefined)
+  }
+  if (token && persona.roleId) {
+    await apiRequest(app, 'delete', `/projects/${persona.projectId}/roles/${persona.roleId}`, { token }).catch(
+      () => undefined
+    )
+  }
   await deleteUserViaApi(app, persona.userId)
 }
 

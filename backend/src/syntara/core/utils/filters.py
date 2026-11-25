@@ -8,6 +8,7 @@ import re
 from datetime import datetime
 from enum import Enum
 from typing import Any, TypeVar
+from uuid import UUID
 
 import structlog
 from pydantic import BaseModel
@@ -26,7 +27,7 @@ logger = structlog.stdlib.get_logger(__name__)
 TP = TypeVar("TP", bound=tuple[Any, ...])
 
 # Type for filter values - more specific than Any
-FilterValue = str | int | float | bool | datetime | Enum
+FilterValue = str | int | float | bool | datetime | Enum | UUID
 
 
 class FilterOperator(str, Enum):
@@ -299,6 +300,34 @@ def _convert_numeric_value(value: str, python_type: type[int | float], field_att
         raise SafeValueError(msg) from e
 
 
+def _convert_uuid_value(value: str, field_attr: Any) -> UUID:  # noqa: ANN401
+    """Convert string value to UUID.
+
+    Args:
+        value: String value to convert
+        field_attr: SQLAlchemy field attribute for error context
+
+    Returns:
+        Parsed UUID
+
+    Raises:
+        SafeValueError: If the value is not a valid UUID
+
+    """
+    try:
+        return UUID(value)
+    except ValueError as e:
+        field_name = getattr(field_attr, "key", "unknown")
+        logger.warning(
+            "Failed to parse UUID value",
+            value=value,
+            field=field_name,
+            error=str(e),
+        )
+        msg = f"Invalid UUID value for field '{field_name}': {value}"
+        raise SafeValueError(msg) from e
+
+
 def _convert_enum_value(value: str, python_type: type[Enum], field_attr: Any) -> Enum:  # noqa: ANN401
     """Convert string value to enum type.
 
@@ -354,8 +383,8 @@ def _convert_filter_value(value: FilterValue, field_attr: Any) -> FilterValue:  
         # Get the Python type from the SQLAlchemy column
         python_type = field_attr.type.python_type
     except (AttributeError, NotImplementedError):
-        # Some SQLAlchemy types don't implement python_type (like UUID, custom types)
-        # This is expected, just use string comparison for these fields
+        # Some SQLAlchemy types don't implement python_type (custom types).
+        # This is expected, just use string comparison for these fields.
         logger.debug(
             "Field does not provide python_type, using string comparison",
             field=getattr(field_attr, "key", "unknown"),
@@ -378,7 +407,12 @@ def _convert_filter_value(value: FilterValue, field_attr: Any) -> FilterValue:  
     if python_type in (int, float):
         return _convert_numeric_value(value, python_type, field_attr)
 
-    # For other types (str, UUID, custom types), use string comparison
+    # Uuid columns store CHAR(32) hex. A dashed UUID string will not match
+    # unless it is converted so SQLAlchemy's bind processor can normalize it.
+    if python_type is UUID:
+        return _convert_uuid_value(value, field_attr)
+
+    # For other types (str, custom types), use string comparison
     return value
 
 

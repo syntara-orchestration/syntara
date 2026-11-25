@@ -1,3 +1,4 @@
+import { ActivityTypeEnum } from '@syntara/contracts'
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
@@ -9,14 +10,22 @@ import { CompactActivityList } from './CompactActivityList'
 import type { ActivityOrderItem } from './ExecutionActivityTable'
 
 vi.mock('./ExecutionStatus', () => ({
-  ActivityStatusLabel: ({ status }: { status: string }) => <span>{status}</span>,
+  ActivityStatusLabel: ({ status, replayed }: { status: string; replayed?: boolean }) => (
+    <span>
+      {status}
+      {replayed && <span data-testid="activity-status-label-replayed" />}
+    </span>
+  ),
 }))
 
 function state(id: string, overrides: Partial<ActivityState> = {}): [string, ActivityState] {
   return [id, { activityId: id, status: 'pending', ...overrides }]
 }
 
-const order: ActivityOrderItem[] = [{ id: 'task-1', name: 'Fetch Data' }, { id: 'task-2' }]
+const order: ActivityOrderItem[] = [
+  { id: 'task-1', name: 'Fetch Data', type: ActivityTypeEnum.SCRIPT },
+  { id: 'task-2', type: ActivityTypeEnum.SCRIPT },
+]
 
 const states = new Map([
   state('task-1', { status: 'completed', startedAt: '2024-01-01T00:00:00Z', completedAt: '2024-01-01T00:01:00Z' }),
@@ -127,6 +136,32 @@ describe('CompactActivityList', () => {
     expect(items[0]).not.toHaveClass('pf-m-selected')
     expect(items[1]).toHaveClass('pf-m-selected')
     expect(items[2]).not.toHaveClass('pf-m-selected')
+  })
+
+  it('marks a row replayed when its start predates the retry baseline', () => {
+    render(
+      <CompactActivityList activityStates={states} activityOrder={order} replayBaselineAt="2024-01-02T00:00:00Z" />
+    )
+
+    expect(screen.getAllByTestId('activity-status-label-replayed')).toHaveLength(1)
+  })
+
+  it('does not mark a retained failure without output as replayed', () => {
+    render(
+      <CompactActivityList
+        activityStates={new Map([state('task-1', { status: 'failed', startedAt: '2024-01-01T00:00:00Z' })])}
+        activityOrder={[{ id: 'task-1', name: 'Script', type: ActivityTypeEnum.SCRIPT }]}
+        replayBaselineAt="2024-01-02T00:00:00Z"
+      />
+    )
+
+    expect(screen.queryByTestId('activity-status-label-replayed')).not.toBeInTheDocument()
+  })
+
+  it('does not mark a row replayed when there is no retry baseline', () => {
+    render(<CompactActivityList activityStates={states} activityOrder={order} />)
+
+    expect(screen.queryByTestId('activity-status-label-replayed')).not.toBeInTheDocument()
   })
 
   it('shows pending status when activity state is missing', () => {
