@@ -1,18 +1,64 @@
 ---
+# Apply path-based labels to PRs, including PRs from forks.
+#
+# Labeling needs `pull-requests: write`, which the default token does NOT grant
+# to `pull_request` runs triggered by forks. This workflow therefore runs as a
+# `workflow_run` finisher: the "CI Pre-commit" workflow runs on every PR (with a
+# read-only token for forks) and uploads the PR number as an artifact; this
+# workflow then runs in the base-repo context — where the default token DOES have
+# write access — and labels the PR.
+#
+# This replaces an earlier `pull_request_target` trigger. GitHub blocks
+# `pull_request_target` by default on public repositories from 2026-12-02; the
+# `workflow_run` pattern is the supported, admin-independent replacement and is
+# already used by this repo's SonarCloud and OpenAPI comment workflows.
+#
+# SECURITY: no fork code is checked out or executed here. The checkout pulls the
+# base repo (default branch) only for the labeler configuration, and
+# actions/labeler reads the PR diff through the API. Do NOT add steps that run
+# fork-controlled code (npm, make, etc.).
 name: Label PR
+
 on:
-  # pull_request_target so the token has write access for fork PRs (safe — no fork code is checked out or executed).
-  # See: https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#pull_request_target:~:text=This%20event%20allows%20your%20workflow%20to%20do%20things%20like%20label%20or%20comment%20on%20pull%20requests%20from%20forks.
-  pull_request_target:
-    types: [opened, synchronize, reopened] # cover full PR lifecycle so labels stay accurate after force-pushes or reopens
+  workflow_run:
+    workflows: ["CI Pre-commit"]
+    types: [completed]
+
 permissions:
   contents: read
   pull-requests: write
+
 jobs:
   label:
     runs-on: ubuntu-24.04
+    if: github.event.workflow_run.event == 'pull_request'
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
-      - uses: actions/labeler@f27b608878404679385c85cfa523b85ccb86e213 # v6.1.0
+      - name: Checkout base repo (labeler config only)
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          persist-credentials: false
+
+      - name: Download PR number
+        id: download
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: precommit-pr_number
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+        continue-on-error: true
+
+      - name: Skip if no PR number
+        if: steps.download.outcome == 'failure'
+        run: echo "No precommit-pr_number artifact — nothing to label."
+
+      - name: Read PR number
+        if: steps.download.outcome == 'success'
+        id: pr
+        run: echo "number=$(cat pr_number.txt)" >> "$GITHUB_OUTPUT"
+
+      - name: Apply labels
+        if: steps.download.outcome == 'success'
+        uses: actions/labeler@f27b608878404679385c85cfa523b85ccb86e213 # v6.1.0
         with:
           sync-labels: true
+          pr-number: ${{ steps.pr.outputs.number }}

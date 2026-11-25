@@ -1,0 +1,50 @@
+---
+# Detect application of the privileged `breaking-change-approved` label.
+#
+# This is the read-only half of the Breaking Change Label Guard. It runs on the
+# `labeled` event with a read-only token and NO secrets, so it is safe for PRs
+# from forks. When the privileged label is added it records the PR number, head
+# SHA, and the actor who added it as an artifact; the privileged
+# "Breaking Change Label Guard" workflow_run finisher then verifies authority in
+# the base-repo context (where it has the org-read token and write access).
+#
+# This split replaces an earlier single `pull_request_target` workflow. GitHub
+# blocks `pull_request_target` by default on public repositories from 2026-12-02;
+# `workflow_run` cannot trigger on `labeled` events directly, so the enforcement
+# is split into this detector plus a finisher.
+#
+# SECURITY: no secrets, read-only token, no code checkout. Keep it that way.
+name: Breaking Change Label Detect
+
+on:
+  pull_request:
+    types: [labeled]
+
+permissions:
+  contents: read
+
+jobs:
+  record:
+    # Only emit when the privileged label is the one that was added.
+    if: github.event.label.name == 'breaking-change-approved'
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Record label event
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          ACTOR: ${{ github.event.sender.login }}
+          LABEL: ${{ github.event.label.name }}
+        run: |
+          {
+            echo "pr_number=${PR_NUMBER}"
+            echo "head_sha=${HEAD_SHA}"
+            echo "actor=${ACTOR}"
+            echo "label=${LABEL}"
+          } > label-event.txt
+
+      - name: Upload label event
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: breaking-change-label-event
+          path: label-event.txt

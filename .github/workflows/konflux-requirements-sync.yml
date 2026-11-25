@@ -1,14 +1,26 @@
 ---
-# SECURITY: This workflow uses pull_request_target (runs in base repo context
-# with write permissions) and checks out PR code. This is safe ONLY because:
-# 1. The `if:` guard restricts to Konflux bot PRs (specific actor + branch prefix)
-# 2. `make sync-requirements` is a deterministic uv export + hash filter, not arbitrary code
-# 3. Commits go through the GitHub API, not git push
-# If modifying this workflow, do NOT remove the actor/branch guards.
+# Keep backend/requirements.txt in sync with backend/uv.lock on Konflux
+# MintMaker PRs.
+#
+# SECURITY: this workflow checks out PR code and commits with `contents: write`.
+# It is safe ONLY because of the layered guards below; do NOT remove any of them:
+#   1. The `if:` guard restricts execution to the Konflux MintMaker bot on its
+#      own branch prefix. Those PRs originate from branches in THIS repository
+#      (not forks), so `pull_request` grants the write token the sync needs
+#      without `pull_request_target`.
+#   2. The requirements are regenerated with an inline `uv export` + the tracked
+#      hash-filter script — no Makefile from the PR tree is trusted to drive the
+#      sync.
+#   3. The commit goes through the GitHub Contents API, not `git push`.
+#
+# This replaces an earlier `pull_request_target` trigger. GitHub blocks
+# `pull_request_target` by default on public repositories from 2026-12-02;
+# because MintMaker PRs are same-repo (non-fork), plain `pull_request` is the
+# correct, admin-independent replacement here.
 name: Konflux Requirements
 
 on:
-  pull_request_target:
+  pull_request:
     branches: [devel, early-access]
     paths:
       - backend/uv.lock
@@ -35,8 +47,14 @@ jobs:
         uses: astral-sh/setup-uv@8d55fbecc275b1c35dbe060458839f8d30439ccf # v3
 
       - name: Sync requirements.txt
-        run: make sync-requirements
+        # Inline export + hash filter, mirroring `make sync-requirements`, so the
+        # sync logic does not depend on a Makefile read from the PR tree.
         working-directory: backend
+        run: |
+          uv export --frozen --python=3.12 --no-dev --no-editable \
+            --no-emit-package pywin32 --no-emit-package colorama \
+            --no-emit-workspace --output-file requirements.txt
+          uv run python tools/ci/filter_requirements_hashes.py
 
       - name: Commit via GitHub API
         env:
