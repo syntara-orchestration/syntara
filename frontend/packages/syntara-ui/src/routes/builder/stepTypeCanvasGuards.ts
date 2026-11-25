@@ -2,10 +2,11 @@ import { useCallback } from 'react'
 
 import { useNodeKindsQuery, type NodeKind } from '../../hooks/useNodeKindsQuery'
 import { useAlerts } from '../../providers/alerts/AlertContext'
-import type { WorkflowDefinition } from '../../stores/workflowStoreTypes'
+import { useWorkflowStore } from '../../stores/useWorkflowStore'
 
 import {
   STEP_TYPE_NO_PROJECT_TOOLTIP,
+  STEP_TYPE_PERMISSIONS_LOADING_MESSAGE,
   STEP_TYPE_PERMISSIONS_UNAVAILABLE_TOOLTIP,
   stepTypeBlockedMessage,
 } from './stepTypePaletteGating'
@@ -56,20 +57,21 @@ export function importRefusal(data: PendingImportData, verdicts: StepTypeVerdict
  *
  * Denies are evaluated per project, so without one the guards fail closed like
  * the add-step panel does. They also fail closed until the verdicts arrive,
- * not only when the request fails.
+ * not only when the request fails, with a message that says which it is.
  */
-export function verdictsFailClosedMessage(projectId: string | null | undefined, isPending: boolean): string | null {
+export function verdictsFailClosedMessage(
+  projectId: string | null | undefined,
+  isLoading: boolean,
+  isUnavailable: boolean
+): string | null {
   if (!projectId) return STEP_TYPE_NO_PROJECT_TOOLTIP
-  return isPending ? STEP_TYPE_PERMISSIONS_UNAVAILABLE_TOOLTIP : null
+  if (isLoading) return STEP_TYPE_PERMISSIONS_LOADING_MESSAGE
+  return isUnavailable ? STEP_TYPE_PERMISSIONS_UNAVAILABLE_TOOLTIP : null
 }
 
 type UseStepTypeCanvasGuardsParams = {
   /** Project whose step-type denies apply (the builder's project, saved or not). */
   projectId: string | null | undefined
-  currentWorkflow: Pick<WorkflowDefinition, 'workflow'> | null
-  duplicateActivity: (nodeId: string) => void
-  /** Called after a duplicate is refused, for example to drop a pending node position. */
-  onDuplicateRefused?: () => void
 }
 
 /**
@@ -80,28 +82,24 @@ type UseStepTypeCanvasGuardsParams = {
  * and fails closed while they are loading, unavailable, or no project is
  * selected. The server still rejects the save; this is UX only.
  */
-export function useStepTypeCanvasGuards({
-  projectId,
-  currentWorkflow,
-  duplicateActivity,
-  onDuplicateRefused,
-}: UseStepTypeCanvasGuardsParams) {
+export function useStepTypeCanvasGuards({ projectId }: UseStepTypeCanvasGuardsParams) {
   const { showError } = useAlerts()
   const { nodeKindByKind, isLoading, isUnavailable } = useNodeKindsQuery(projectId)
-  const failClosedMessage = verdictsFailClosedMessage(projectId, isLoading || isUnavailable)
+  const failClosedMessage = verdictsFailClosedMessage(projectId, isLoading, isUnavailable)
 
-  const guardedDuplicateActivity = useCallback(
-    (nodeId: string) => {
-      const activity = currentWorkflow?.workflow.activities?.find((a) => a.id === nodeId)
+  // Checked before the duplicate starts, so a refusal changes nothing in the
+  // builder. Reads the workflow from the store to keep a stable identity
+  // across edits: the step menu of every canvas node depends on it.
+  const canDuplicateActivity = useCallback(
+    (nodeId: string): boolean => {
+      const activities = useWorkflowStore.getState().currentWorkflow?.workflow.activities
+      const activity = activities?.find((a) => a.id === nodeId)
       const refusal = activity?.type ? stepTypeRefusal(activity.type, { nodeKindByKind, failClosedMessage }) : null
-      if (refusal) {
-        onDuplicateRefused?.()
-        showError({ title: 'Cannot duplicate step', description: refusal })
-        return
-      }
-      duplicateActivity(nodeId)
+      if (!refusal) return true
+      showError({ title: 'Cannot duplicate step', description: refusal })
+      return false
     },
-    [currentWorkflow, nodeKindByKind, failClosedMessage, duplicateActivity, onDuplicateRefused, showError]
+    [nodeKindByKind, failClosedMessage, showError]
   )
 
   const getImportRefusal = useCallback(
@@ -109,5 +107,5 @@ export function useStepTypeCanvasGuards({
     [nodeKindByKind, failClosedMessage]
   )
 
-  return { duplicateActivity: guardedDuplicateActivity, getImportRefusal }
+  return { canDuplicateActivity, getImportRefusal }
 }

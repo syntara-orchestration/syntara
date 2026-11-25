@@ -1,8 +1,7 @@
-import { act, renderHook } from '@testing-library/react'
+import { renderHook } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { NodeKind } from '../../hooks/useNodeKindsQuery'
-import type { WorkflowDefinition } from '../../stores/workflowStoreTypes'
 
 import {
   importRefusal,
@@ -12,14 +11,16 @@ import {
 } from './stepTypeCanvasGuards'
 import {
   STEP_TYPE_NO_PROJECT_TOOLTIP,
+  STEP_TYPE_PERMISSIONS_LOADING_MESSAGE,
   STEP_TYPE_PERMISSIONS_UNAVAILABLE_TOOLTIP,
   stepTypeBlockedMessage,
   stepTypeBlockedTooltip,
 } from './stepTypePaletteGating'
 import type { PendingImportData } from './useWorkflowImportExport'
 
-const { mockShowError, mockNodeKinds } = vi.hoisted(() => ({
+const { mockShowError, mockNodeKinds, mockCurrentWorkflow } = vi.hoisted(() => ({
   mockShowError: vi.fn(),
+  mockCurrentWorkflow: vi.fn<() => unknown>(),
   mockNodeKinds: {
     byKind: new Map<string, unknown>(),
     isLoading: false,
@@ -29,6 +30,10 @@ const { mockShowError, mockNodeKinds } = vi.hoisted(() => ({
 
 vi.mock('../../providers/alerts/AlertContext', () => ({
   useAlerts: () => ({ showError: mockShowError }),
+}))
+
+vi.mock('../../stores/useWorkflowStore', () => ({
+  useWorkflowStore: { getState: () => ({ currentWorkflow: mockCurrentWorkflow() }) },
 }))
 
 vi.mock('../../hooks/useNodeKindsQuery', () => ({
@@ -63,7 +68,7 @@ const currentWorkflow = {
       { id: 'act-http', type: 'http_request', name: 'HTTP' },
     ],
   },
-} as unknown as Pick<WorkflowDefinition, 'workflow'>
+}
 
 function pendingImport(activityTypes: string[], triggerTypes: string[] = []): PendingImportData {
   return {
@@ -82,6 +87,7 @@ function pendingImport(activityTypes: string[], triggerTypes: string[] = []): Pe
 
 beforeEach(() => {
   vi.clearAllMocks()
+  mockCurrentWorkflow.mockReturnValue(currentWorkflow)
   mockNodeKinds.byKind = verdictsByKind
   mockNodeKinds.isLoading = false
   mockNodeKinds.isUnavailable = false
@@ -95,15 +101,19 @@ describe('stepTypeBlockedMessage', () => {
 
 describe('verdictsFailClosedMessage', () => {
   it('fails closed without a project', () => {
-    expect(verdictsFailClosedMessage(undefined, false)).toBe(STEP_TYPE_NO_PROJECT_TOOLTIP)
+    expect(verdictsFailClosedMessage(undefined, false, false)).toBe(STEP_TYPE_NO_PROJECT_TOOLTIP)
   })
 
-  it('fails closed while the verdicts are pending or unavailable', () => {
-    expect(verdictsFailClosedMessage('proj-1', true)).toBe(STEP_TYPE_PERMISSIONS_UNAVAILABLE_TOOLTIP)
+  it('says the verdicts are still loading', () => {
+    expect(verdictsFailClosedMessage('proj-1', true, false)).toBe(STEP_TYPE_PERMISSIONS_LOADING_MESSAGE)
+  })
+
+  it('says the verdicts are unavailable', () => {
+    expect(verdictsFailClosedMessage('proj-1', false, true)).toBe(STEP_TYPE_PERMISSIONS_UNAVAILABLE_TOOLTIP)
   })
 
   it('trusts the verdicts once they arrived', () => {
-    expect(verdictsFailClosedMessage('proj-1', false)).toBeNull()
+    expect(verdictsFailClosedMessage('proj-1', false, false)).toBeNull()
   })
 })
 
@@ -160,62 +170,53 @@ describe('importRefusal', () => {
 
 describe('useStepTypeCanvasGuards', () => {
   function renderGuards(projectId: string | null = 'proj-1') {
-    const duplicateActivity = vi.fn()
-    const onDuplicateRefused = vi.fn()
-    const { result } = renderHook(() =>
-      useStepTypeCanvasGuards({ projectId, currentWorkflow, duplicateActivity, onDuplicateRefused })
-    )
-    return { result, duplicateActivity, onDuplicateRefused }
+    return renderHook(() => useStepTypeCanvasGuards({ projectId }))
   }
 
   it('refuses duplicating a blocked step type with the palette message', () => {
-    const { result, duplicateActivity, onDuplicateRefused } = renderGuards()
+    const { result } = renderGuards()
 
-    act(() => result.current.duplicateActivity('act-script'))
-
-    expect(duplicateActivity).not.toHaveBeenCalled()
-    expect(onDuplicateRefused).toHaveBeenCalledOnce()
+    expect(result.current.canDuplicateActivity('act-script')).toBe(false)
     expect(mockShowError).toHaveBeenCalledWith({ title: 'Cannot duplicate step', description: blockedMessage })
   })
 
-  it('duplicates a permitted step type', () => {
-    const { result, duplicateActivity, onDuplicateRefused } = renderGuards()
+  it('allows duplicating a permitted step type', () => {
+    const { result } = renderGuards()
 
-    act(() => result.current.duplicateActivity('act-http'))
-
-    expect(duplicateActivity).toHaveBeenCalledWith('act-http')
-    expect(onDuplicateRefused).not.toHaveBeenCalled()
+    expect(result.current.canDuplicateActivity('act-http')).toBe(true)
     expect(mockShowError).not.toHaveBeenCalled()
   })
 
+  it('keeps the same duplicate check when the workflow changes', () => {
+    const { result, rerender } = renderGuards()
+    const before = result.current.canDuplicateActivity
+
+    mockCurrentWorkflow.mockReturnValue({ workflow: { activities: [{ id: 'act-new', type: 'script', name: 'New' }] } })
+    rerender()
+
+    expect(result.current.canDuplicateActivity).toBe(before)
+    expect(result.current.canDuplicateActivity('act-new')).toBe(false)
+  })
+
   it.each([
-    ['loading', { isLoading: true, isUnavailable: false }],
-    ['unavailable', { isLoading: false, isUnavailable: true }],
-  ])('fails closed while the verdicts are %s', (_label, state) => {
+    ['loading', { isLoading: true, isUnavailable: false }, STEP_TYPE_PERMISSIONS_LOADING_MESSAGE],
+    ['unavailable', { isLoading: false, isUnavailable: true }, STEP_TYPE_PERMISSIONS_UNAVAILABLE_TOOLTIP],
+  ])('fails closed while the verdicts are %s', (_label, state, message) => {
     mockNodeKinds.isLoading = state.isLoading
     mockNodeKinds.isUnavailable = state.isUnavailable
     mockNodeKinds.byKind = new Map()
-    const { result, duplicateActivity } = renderGuards()
+    const { result } = renderGuards()
 
-    act(() => result.current.duplicateActivity('act-http'))
-
-    expect(duplicateActivity).not.toHaveBeenCalled()
-    expect(mockShowError).toHaveBeenCalledWith({
-      title: 'Cannot duplicate step',
-      description: STEP_TYPE_PERMISSIONS_UNAVAILABLE_TOOLTIP,
-    })
-    expect(result.current.getImportRefusal(pendingImport(['http_request']))).toBe(
-      STEP_TYPE_PERMISSIONS_UNAVAILABLE_TOOLTIP
-    )
+    expect(result.current.canDuplicateActivity('act-http')).toBe(false)
+    expect(mockShowError).toHaveBeenCalledWith({ title: 'Cannot duplicate step', description: message })
+    expect(result.current.getImportRefusal(pendingImport(['http_request']))).toBe(message)
   })
 
   it('fails closed without a project (new workflow with no project picked)', () => {
     mockNodeKinds.byKind = new Map()
-    const { result, duplicateActivity } = renderGuards(null)
+    const { result } = renderGuards(null)
 
-    act(() => result.current.duplicateActivity('act-http'))
-
-    expect(duplicateActivity).not.toHaveBeenCalled()
+    expect(result.current.canDuplicateActivity('act-http')).toBe(false)
     expect(result.current.getImportRefusal(pendingImport(['http_request']))).toBe(STEP_TYPE_NO_PROJECT_TOOLTIP)
   })
 

@@ -22,15 +22,11 @@ export function useBuilderWorkspace(session: Session, guardedSaveWorkflow: () =>
     mostRecentExecutionQuery,
   } = session
   const { currentWorkflow } = session.store
-  const clearDesiredPosition = useCallback(() => dispatch({ type: 'CLEAR_NEW_NODE_DESIRED_POSITION' }), [dispatch])
   // Refuse duplicating or pasting a step type the caller may not author in
   // this project, with the add-step panel's message (UX only; the server
   // still rejects the save).
-  const { duplicateActivity, getImportRefusal } = useStepTypeCanvasGuards({
+  const { canDuplicateActivity, getImportRefusal } = useStepTypeCanvasGuards({
     projectId: session.builderProjectId,
-    currentWorkflow,
-    duplicateActivity: session.store.duplicateActivity,
-    onDuplicateRefused: clearDesiredPosition,
   })
   const { mostRecentExecutionId, mostRecentRunPanelOpen, edgeIdToReplace, targetNodeId, sourceHandle, targetHandle } =
     session.state
@@ -72,7 +68,8 @@ export function useBuilderWorkspace(session: Session, guardedSaveWorkflow: () =>
   } = useBuilderFlowInteractionHandlers({
     reactFlowInstance,
     dispatch,
-    duplicateActivity,
+    duplicateActivity: session.store.duplicateActivity,
+    canDuplicateActivity,
     edgeIdToReplace,
     targetNodeId,
     sourceHandle,

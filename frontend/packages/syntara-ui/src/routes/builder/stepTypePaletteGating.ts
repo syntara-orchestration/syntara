@@ -34,6 +34,9 @@ export function stepTypeBlockedMessage(blockedBy: BlockedStepType): string {
   return stepTypeBlockedTooltip(blockedBy)
 }
 
+/** Message shown when a canvas action is refused because the permissions are still loading. */
+export const STEP_TYPE_PERMISSIONS_LOADING_MESSAGE = 'Step type permissions are still loading. Try again in a moment.'
+
 /** Tooltip shown on every entry when the permissions endpoint is unavailable. */
 export const STEP_TYPE_PERMISSIONS_UNAVAILABLE_TOOLTIP =
   'Step type permissions could not be loaded. Ask an administrator to check the server.'

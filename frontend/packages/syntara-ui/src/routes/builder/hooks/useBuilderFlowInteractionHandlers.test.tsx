@@ -40,7 +40,7 @@ describe('useBuilderFlowInteractionHandlers', () => {
     calculateEdgeConnection.mockReturnValue({ activityReorderTarget: null })
   })
 
-  function renderWith(dispatch = vi.fn()) {
+  function renderWith(dispatch = vi.fn(), canDuplicateActivity?: (nodeId: string) => boolean) {
     const duplicateActivity = vi.fn()
     const reactFlowInstance = rf({
       getEdge: vi.fn((): Edge | undefined => ({
@@ -57,6 +57,7 @@ describe('useBuilderFlowInteractionHandlers', () => {
         reactFlowInstance,
         dispatch,
         duplicateActivity,
+        canDuplicateActivity,
         edgeIdToReplace: 'e1',
         targetNodeId: 't1',
         sourceHandle: null,
@@ -245,6 +246,17 @@ describe('useBuilderFlowInteractionHandlers', () => {
       payload: { x: 420, y: 20 },
     })
     expect(duplicateActivity).toHaveBeenCalledWith('dup')
+  })
+
+  it('handleDuplicateStep changes nothing when the duplicate is refused', () => {
+    const canDuplicateActivity = vi.fn(() => false)
+    const { result, dispatch, duplicateActivity } = renderWith(vi.fn(), canDuplicateActivity)
+    act(() => {
+      result.current.stepActionsValue.onDuplicate('dup')
+    })
+    expect(canDuplicateActivity).toHaveBeenCalledWith('dup')
+    expect(dispatch).not.toHaveBeenCalled()
+    expect(duplicateActivity).not.toHaveBeenCalled()
   })
 
   it('handleDuplicateStep still calls duplicateActivity when getNode returns undefined', () => {
