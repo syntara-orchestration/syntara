@@ -9,6 +9,10 @@ type UseCanIResult = {
   isChecking: boolean
   /** `true` when the permission check failed (network/server error). */
   isError: boolean
+  /** `true` while a cached permission check is being refreshed. */
+  isRefetching?: boolean
+  /** Re-run this permission check after an error. */
+  refetch?: () => Promise<unknown>
 }
 
 type UseCanIOptions = {
@@ -54,7 +58,7 @@ export function useCanI(action: string, resourceType: string, options?: UseCanIO
     ...(checkAnyProject ? { check_any_project: true } : {}),
   }
 
-  const { data, isLoading, isError } = useQuery({
+  const { data, isLoading, isFetching, isError, refetch } = useQuery({
     queryKey: ['authz', 'can_i', body],
     queryFn: () =>
       accessFetchClient.POST('/authz/can_i', {
@@ -66,5 +70,11 @@ export function useCanI(action: string, resourceType: string, options?: UseCanIO
     retry: false,
   })
 
-  return { allowed: data ?? false, isChecking: isLoading, isError }
+  return {
+    allowed: data ?? false,
+    isChecking: isLoading,
+    isError,
+    isRefetching: isFetching && !isLoading,
+    refetch: () => refetch(),
+  }
 }

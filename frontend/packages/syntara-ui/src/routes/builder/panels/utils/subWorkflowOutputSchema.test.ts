@@ -131,6 +131,41 @@ describe('buildSubWorkflowOutputSchemaTree', () => {
     )
   })
 
+  it('builds dotted expressions for deeply nested declared public outputs', () => {
+    const outputSchema = {
+      type: 'object',
+      properties: {
+        release: {
+          type: 'object',
+          properties: {
+            artifact: {
+              type: 'object',
+              properties: { download_url: { type: 'string' } },
+            },
+          },
+        },
+      },
+    }
+    const outputFields = getDeclaredOutputFields(outputSchema)
+    const tree = buildSubWorkflowOutputSchemaTree([
+      {
+        id: '__declared_outputs__',
+        name: 'Declared Outputs',
+        type: 'subworkflow_declared_outputs',
+        outputSchema,
+        outputFields,
+      },
+    ])
+    const outputs = tree.find((field) => field.name === 'outputs')
+    const release = outputs?.children?.find((field) => field.name === 'release')
+    const artifact = release?.children?.find((field) => field.name === 'artifact')
+    const downloadUrl = artifact?.children?.find((field) => field.name === 'download_url')
+
+    expect(buildExpression({ nodeId: 'invoke_child', fieldPath: downloadUrl?.fieldPath ?? [] })).toBe(
+      '${invoke_child.outputs.release.artifact.download_url}'
+    )
+  })
+
   it('does not expose internal child step outputs without a declared contract', () => {
     const tree = buildSubWorkflowOutputSchemaTree([
       {
