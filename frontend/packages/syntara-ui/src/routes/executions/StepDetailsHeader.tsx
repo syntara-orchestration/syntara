@@ -8,26 +8,26 @@ import styles from './StepExecutionDetailsPanel.module.css'
 
 type StepDetailsHeaderProps = {
   stepName: string
-  startedAt: string | null
-  completedAt: string | null
-  elapsedLabel: string | null
+  stepStarted: string | null
+  stepCompleted: string | null
+  stepElapsedLabel?: string
   status?: ActivityState['status']
   nodeType?: string
-  replayed?: boolean
-  retainedFailure?: boolean
-  triggerInputReused?: boolean
+  replayed: boolean
+  retainedFailure: boolean
+  triggerInputReused: boolean
 }
 
 export function StepDetailsHeader({
   stepName,
-  startedAt,
-  completedAt,
-  elapsedLabel,
+  stepStarted,
+  stepCompleted,
+  stepElapsedLabel,
   status,
   nodeType,
-  replayed = false,
-  retainedFailure = false,
-  triggerInputReused = false,
+  replayed,
+  retainedFailure,
+  triggerInputReused,
 }: Readonly<StepDetailsHeaderProps>) {
   return (
     <StackItem className={styles.headerRow}>
@@ -42,7 +42,7 @@ export function StepDetailsHeader({
             {stepName}
           </Title>
         </FlexItem>
-        {(startedAt || completedAt || elapsedLabel || status) && (
+        {(stepStarted || stepCompleted || stepElapsedLabel || status) && (
           <FlexItem>
             <Flex
               gap={{ default: 'gapMd' }}
@@ -50,26 +50,26 @@ export function StepDetailsHeader({
               role="group"
               aria-label="Step timing and status"
             >
-              {(startedAt || completedAt) && (
+              {(stepStarted || stepCompleted) && (
                 <Content
                   component={ContentVariants.small}
                   style={{ color: 'var(--pf-t--global--text--color--subtle)', margin: 0 }}
                 >
-                  {startedAt && <ExecutionTimestamp dateString={startedAt} />}
-                  {startedAt && completedAt && ' - '}
-                  {completedAt && <ExecutionTimestamp dateString={completedAt} />}
+                  {stepStarted && <ExecutionTimestamp dateString={stepStarted} />}
+                  {stepStarted && stepCompleted && ' - '}
+                  {stepCompleted && <ExecutionTimestamp dateString={stepCompleted} />}
                 </Content>
               )}
-              {elapsedLabel && (
+              {stepElapsedLabel && (
                 <Content
                   component={ContentVariants.small}
                   style={{ color: 'var(--pf-t--global--text--color--subtle)', margin: 0 }}
                 >
-                  Elapsed time: {elapsedLabel}
+                  Elapsed time: {stepElapsedLabel}
                 </Content>
               )}
               {status && (
-                <FlexItem>
+                <FlexItem style={{ display: 'flex', alignItems: 'center' }}>
                   <ActivityStatusLabel
                     status={status}
                     nodeType={nodeType}

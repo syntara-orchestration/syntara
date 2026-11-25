@@ -22,6 +22,7 @@ import { useState } from 'react'
 import { AppRoute } from '../../../app/AppRoute'
 import { breadcrumbsUserDetailEarlyShell } from '../../../app/breadcrumbBuilders'
 import { usersClient } from '../../../client'
+import { SynFormCancelButton } from '../../../components/forms/SynFormCancelButton'
 import { SynPage, SynPageBody } from '../../../components/layout/SynPage'
 import { DocLinkButton, SynPageHeader } from '../../../components/layout/SynPageHeader'
 import { SynPanel } from '../../../components/layout/SynPanel'
@@ -66,9 +67,7 @@ function WizardFooterStep1({ isNextDisabled, onCancel }: Readonly<{ isNextDisabl
         </ActionListGroup>
         <ActionListGroup>
           <ActionListItem>
-            <Button variant="link" onClick={onCancel}>
-              Cancel
-            </Button>
+            <SynFormCancelButton onClick={onCancel} />
           </ActionListItem>
         </ActionListGroup>
       </ActionList>
@@ -106,9 +105,7 @@ function WizardFooterStep2({
         </ActionListGroup>
         <ActionListGroup>
           <ActionListItem>
-            <Button variant="link" onClick={onCancel}>
-              Cancel
-            </Button>
+            <SynFormCancelButton onClick={onCancel} />
           </ActionListItem>
         </ActionListGroup>
       </ActionList>

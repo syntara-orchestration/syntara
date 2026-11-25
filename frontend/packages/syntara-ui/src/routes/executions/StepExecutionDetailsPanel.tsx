@@ -1,11 +1,8 @@
 import {
   Button,
-  EmptyState,
-  EmptyStateBody,
   Flex,
   FlexItem,
   Icon,
-  SearchInput,
   Spinner,
   Stack,
   StackItem,
@@ -23,20 +20,17 @@ import {
   RhUiWarningFillIcon,
 } from '@patternfly/react-icons'
 import { ActivityTypeEnum } from '@syntara/contracts'
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useMemo, useState, type ComponentType } from 'react'
 
-import { SynCodeBlock } from '../../components/details/SynCodeBlock'
 import { SynLabel } from '../../components/labels/SynLabel'
 import { SynErrorState } from '../../components/states/SynErrorState'
 import { ExecutionTimestamp } from '../../components/table/ExecutionTimestamp'
+import { useElapsedTime } from '../../hooks/useElapsedTime'
 import { extractAAPJobUrl, isAAPNodeType } from '../../utils/aapJobUrl'
 import { capitalize } from '../../utils/capitalize'
 import { formatElapsedTime } from '../../utils/dateUtils'
 import { detachPromise } from '../../utils/detachPromise'
-import { highlightTextLines } from '../../utils/highlightText'
-import { InputSchemaView } from '../builder/panels/views/InputSchemaView'
-import { InputTableView } from '../builder/panels/views/InputTableView'
-import { ViewToggle, type PanelView } from '../builder/panels/ViewToggle'
+import type { PanelView } from '../builder/panels/ViewToggle'
 import { getRetryActivityMarkers } from '../builder/utils/replayedNodes'
 import type { ActivityState } from '../workflows/execution/types'
 import { extractApprovalAudit, type ApprovalAudit } from '../workflows/execution/utils/activityState'
@@ -47,6 +41,7 @@ import { useStepExecutionDetails } from './hooks/useStepExecutionDetails'
 import { RetryInputOverrideDetails, type RetryInputOverrideDetailsProps } from './RetryInputOverrideDetails'
 import { getEffectiveRetryInputs, getRetryInputEditorValue } from './retryInputOverrides'
 import { StepDetailsHeader } from './StepDetailsHeader'
+import { StepExecutionDataPane, type IoPaneLayout } from './StepExecutionDataPane'
 import styles from './StepExecutionDetailsPanel.module.css'
 import { extractUsedTools, type UsedTool } from './utils/extractUsedTools'
 
@@ -63,126 +58,13 @@ type StepExecutionDetailsPanelProps = {
   retryInputOverride?: Omit<RetryInputOverrideDetailsProps, 'resolvedInputs'>
 }
 
-function NoDataState({ label }: Readonly<{ label: string }>) {
-  return (
-    <EmptyState headingLevel="h3" titleText={`No ${label} data`} variant="xs">
-      <EmptyStateBody>No {label} data is available for this activity.</EmptyStateBody>
-    </EmptyState>
-  )
-}
-
-type DataPaneProps = {
-  title: string
-  stepId: string
-  data: Record<string, unknown> | null
-  view: PanelView
-  onViewChange: (view: PanelView) => void
-  titleAddon?: ReactNode
-  titleAction?: ReactNode
-  stackControls?: boolean
-  className?: string
-  isErrorState?: boolean
-}
-
-function DataPane({
-  title,
-  stepId,
-  data,
-  view,
-  onViewChange,
-  titleAddon,
-  titleAction,
-  stackControls = false,
-  className,
-  isErrorState = false,
-}: Readonly<DataPaneProps>) {
-  const [searchTerm, setSearchTerm] = useState('')
-  const scrollContainerRef = useRef<HTMLDivElement>(null)
-
-  const jsonText = useMemo(() => (data ? JSON.stringify(data, null, 2) : ''), [data])
-
-  const highlightedJson = useMemo(() => {
-    if (!jsonText) return undefined
-    return highlightTextLines(jsonText, searchTerm)
-  }, [jsonText, searchTerm])
-
-  useEffect(() => {
-    if (searchTerm && scrollContainerRef.current) {
-      requestAnimationFrame(() => {
-        const firstMark = scrollContainerRef.current?.querySelector('mark')
-        if (firstMark && typeof firstMark.scrollIntoView === 'function') {
-          firstMark.scrollIntoView({ behavior: 'smooth', block: 'center' })
-        }
-      })
-    }
-  }, [searchTerm, view, highlightedJson])
-
-  function renderContent() {
-    if (!data) {
-      return <NoDataState label={title.toLowerCase()} />
-    }
-    switch (view) {
-      case 'schema':
-        return <InputSchemaView data={data} nodeId={stepId} searchTerm={searchTerm} />
-      case 'table':
-        return <InputTableView data={data} searchTerm={searchTerm} />
-      case 'json':
-        return (
-          <div style={isErrorState ? { color: 'var(--pf-t--global--color--status--danger--default)' } : undefined}>
-            <SynCodeBlock enableCopy enableExpand expandTitle={`${title} JSON`} noMaxHeight copyContent={jsonText}>
-              {highlightedJson ?? jsonText}
-            </SynCodeBlock>
-          </div>
-        )
-    }
-  }
-
-  return (
-    <Stack className={`${styles.contentContainer}${className ? ` ${className}` : ''}`}>
-      <StackItem className={styles.dataPaneHeaderRow}>
-        <div className={styles.dataPaneHeader}>
-          <div className={styles.dataPaneTitleRow}>
-            <span className={styles.dataPaneTitle}>{title}</span>
-            {titleAddon && <span className={styles.dataPaneTitleAddon}>{titleAddon}</span>}
-            {titleAction}
-          </div>
-          <div className={styles.dataPaneControlsWrap}>
-            <Flex
-              alignItems={{ default: stackControls ? 'alignItemsStretch' : 'alignItemsCenter' }}
-              direction={stackControls ? { default: 'column' } : undefined}
-              gap={{ default: 'gapSm' }}
-              className={`${styles.dataPaneControls}${stackControls ? ` ${styles.dataPaneControlsStack}` : ''}`}
-            >
-              <FlexItem className={styles.searchWrap}>
-                <SearchInput
-                  aria-label={`Search ${title.toLowerCase()} data`}
-                  placeholder="Search"
-                  value={searchTerm}
-                  onChange={(_event, value) => setSearchTerm(value)}
-                  onClear={() => setSearchTerm('')}
-                />
-              </FlexItem>
-              <FlexItem className={styles.viewToggleWrap}>
-                <ViewToggle activeView={view} onChange={onViewChange} ariaLabel={`${title} view selection`} />
-              </FlexItem>
-            </Flex>
-          </div>
-        </div>
-      </StackItem>
-      <StackItem isFilled className={styles.scrollPane}>
-        <div ref={scrollContainerRef}>{renderContent()}</div>
-      </StackItem>
-    </Stack>
-  )
-}
-
 const decisionStatusMap: Record<string, 'success' | 'danger' | 'warning' | 'info'> = {
   approved: 'success',
   rejected: 'danger',
   expired: 'warning',
 }
 
-const decisionIconMap: Record<string, React.ComponentType<{ className?: string }>> = {
+const decisionIconMap: Record<string, ComponentType<{ className?: string }>> = {
   approved: RhUiLikeFillIcon,
   rejected: RhUiDislikeFillIcon,
   expired: RhUiWarningFillIcon,
@@ -301,6 +183,7 @@ function StepContentArea({
 }: StepContentAreaProps) {
   const [inputView, setInputView] = useState<PanelView>('json')
   const [outputView, setOutputView] = useState<PanelView>('json')
+  const [paneLayout, setPaneLayout] = useState<IoPaneLayout>('split')
   const effectiveInputData = useMemo(
     () => getEffectiveRetryInputs(inputData, retryInputOverride?.savedOverride),
     [inputData, retryInputOverride?.savedOverride]
@@ -317,7 +200,6 @@ function StepContentArea({
   if (activeTab === 'agent-steps' && isAgenticStep) {
     return <AgentTraceView agentTrace={extractAgentTrace(outputData)} />
   }
-
   const hasSavedRetryOverride = Boolean(
     retryInputOverride?.savedOverride && Object.keys(retryInputOverride.savedOverride).length > 0
   )
@@ -331,68 +213,90 @@ function StepContentArea({
     )
   }
 
+  const showParameters = paneLayout !== 'output'
+  const showOutput = paneLayout !== 'parameters'
+
   return (
     <Flex
       flexWrap={{ default: 'nowrap' }}
       alignItems={{ default: 'alignItemsStretch' }}
       className={styles.dataPaneContainer}
     >
-      <FlexItem flex={{ default: 'flex_1' }} className={styles.paneItem}>
-        {retryEditorProps ? (
-          <div className={styles.retryParametersPane}>
-            <DataPane
-              title="Input parameters"
+      {showParameters && (
+        <FlexItem flex={{ default: 'flex_1' }} className={styles.paneItem}>
+          {retryEditorProps ? (
+            <div className={styles.retryParametersPane}>
+              <StepExecutionDataPane
+                title="Input parameters"
+                stepId={stepId}
+                data={effectiveInputData}
+                view={inputView}
+                onViewChange={setInputView}
+                stackControls
+                className={styles.retryParametersViewer}
+                titleAddon={hasSavedRetryOverride ? RETRY_EDIT_BADGE : undefined}
+                titleAction={
+                  retryEditorProps.canEdit ? (
+                    <Tooltip content="Edit parameters for retry">
+                      <Button
+                        variant="plain"
+                        aria-label="Edit parameters for retry"
+                        isDisabled={retryEditorProps.isDisabled}
+                        onClick={() =>
+                          retryEditorProps.onEdit(
+                            retryEditorProps.target.id,
+                            getRetryInputEditorValue(
+                              inputData,
+                              retryEditorProps.savedOverride,
+                              retryEditorProps.target.parameterNames
+                            )
+                          )
+                        }
+                        icon={
+                          <Icon isInline>
+                            <RhUiEditIcon />
+                          </Icon>
+                        }
+                      />
+                    </Tooltip>
+                  ) : undefined
+                }
+                paneKey="parameters"
+                paneLayout={paneLayout}
+                onPaneLayoutChange={setPaneLayout}
+              />
+              <RetryInputOverrideDetails {...retryEditorProps} />
+            </div>
+          ) : (
+            <StepExecutionDataPane
+              title="Parameters"
               stepId={stepId}
-              data={effectiveInputData}
+              data={inputData}
               view={inputView}
               onViewChange={setInputView}
-              stackControls
-              className={styles.retryParametersViewer}
-              titleAddon={hasSavedRetryOverride ? RETRY_EDIT_BADGE : undefined}
-              titleAction={
-                retryEditorProps.canEdit ? (
-                  <Tooltip content="Edit parameters for retry">
-                    <Button
-                      variant="plain"
-                      aria-label="Edit parameters for retry"
-                      isDisabled={retryEditorProps.isDisabled}
-                      onClick={() =>
-                        retryEditorProps.onEdit(
-                          retryEditorProps.target.id,
-                          getRetryInputEditorValue(
-                            inputData,
-                            retryEditorProps.savedOverride,
-                            retryEditorProps.target.parameterNames
-                          )
-                        )
-                      }
-                      icon={
-                        <Icon isInline>
-                          <RhUiEditIcon />
-                        </Icon>
-                      }
-                    />
-                  </Tooltip>
-                ) : undefined
-              }
+              paneKey="parameters"
+              paneLayout={paneLayout}
+              onPaneLayoutChange={setPaneLayout}
             />
-            <RetryInputOverrideDetails {...retryEditorProps} />
-          </div>
-        ) : (
-          <DataPane title="Parameters" stepId={stepId} data={inputData} view={inputView} onViewChange={setInputView} />
-        )}
-      </FlexItem>
-      <FlexItem flex={{ default: 'flex_1' }} className={styles.paneItem}>
-        <DataPane
-          title="Output"
-          stepId={stepId}
-          data={outputData}
-          view={outputView}
-          onViewChange={setOutputView}
-          stackControls={Boolean(retryEditorProps)}
-          isErrorState={stepIsFailed}
-        />
-      </FlexItem>
+          )}
+        </FlexItem>
+      )}
+      {showOutput && (
+        <FlexItem flex={{ default: 'flex_1' }} className={styles.paneItem}>
+          <StepExecutionDataPane
+            title="Output"
+            stepId={stepId}
+            data={outputData}
+            view={outputView}
+            onViewChange={setOutputView}
+            stackControls={Boolean(retryEditorProps)}
+            isErrorState={stepIsFailed}
+            paneKey="output"
+            paneLayout={paneLayout}
+            onPaneLayoutChange={setPaneLayout}
+          />
+        </FlexItem>
+      )}
     </Flex>
   )
 }
@@ -418,24 +322,21 @@ export function StepExecutionDetailsPanel({
   const approvalAudit = useMemo(() => extractApprovalAudit(outputData), [outputData])
   const usedTools = useMemo(() => extractUsedTools(outputData), [outputData])
 
-  const startedAt = stepState?.startedAt ?? null
-  const completedAt = stepState?.completedAt ?? null
-  const startedAtMs = startedAt ? Date.parse(startedAt) : Number.NaN
-  const completedAtMs = completedAt ? Date.parse(completedAt) : Number.NaN
-  const elapsedLabel =
-    Number.isFinite(startedAtMs) && Number.isFinite(completedAtMs)
-      ? formatElapsedTime(Math.max(0, completedAtMs - startedAtMs))
-      : null
+  const stepStarted = stepState?.startedAt ?? null
+  const stepCompleted = stepState?.completedAt ?? null
+  const stepIsRunning = stepState?.status === 'running'
   const stepIsFailed = stepState?.status === 'failed'
+  const { elapsedMs } = useElapsedTime(stepStarted, stepCompleted, stepIsRunning)
+  const stepElapsedLabel = elapsedMs === undefined ? undefined : formatElapsedTime(elapsedMs)
   const retryMarkers = getRetryActivityMarkers(stepState, replayBaselineAt, stepType)
 
   return (
     <Stack className={styles.contentContainer}>
       <StepDetailsHeader
         stepName={stepName}
-        startedAt={startedAt}
-        completedAt={completedAt}
-        elapsedLabel={elapsedLabel}
+        stepStarted={stepStarted}
+        stepCompleted={stepCompleted}
+        stepElapsedLabel={stepElapsedLabel}
         status={stepState?.status}
         nodeType={stepType}
         replayed={retryMarkers.replayed}
@@ -470,6 +371,7 @@ export function StepExecutionDetailsPanel({
 
       <StackItem isFilled style={{ minHeight: 0, overflow: 'hidden' }}>
         <StepContentArea
+          key={stepId}
           stepId={stepId}
           inputData={inputData}
           outputData={outputData}

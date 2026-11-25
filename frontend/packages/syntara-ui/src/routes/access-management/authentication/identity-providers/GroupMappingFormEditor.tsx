@@ -3,6 +3,7 @@ import type { MutableRefObject } from 'react'
 import { useLayoutEffect } from 'react'
 
 import { SynForm } from '../../../../components/forms/SynForm'
+import { SynFormCancelButton } from '../../../../components/forms/SynFormCancelButton'
 import { SynPage, SynPageBody } from '../../../../components/layout/SynPage'
 import { SynPageHeader } from '../../../../components/layout/SynPageHeader'
 import { SynPanel } from '../../../../components/layout/SynPanel'
@@ -58,9 +59,7 @@ function GroupMappingFormEditorContent({
                 >
                   Save mapping
                 </Button>
-                <Button variant="link" onClick={editForm.onCancel}>
-                  Cancel
-                </Button>
+                <SynFormCancelButton onClick={editForm.onCancel} />
               </ActionGroup>
             }
           >

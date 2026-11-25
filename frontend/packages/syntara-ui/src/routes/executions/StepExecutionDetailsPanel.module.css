@@ -1,6 +1,10 @@
 .dataPaneTitle {
   display: block;
   font-weight: var(--pf-t--global--font--weight--body--bold);
+  /* Must match the wider title ("Parameters") so both panes wrap at the same threshold */
+  min-width: 5.5rem;
+  margin: 0;
+  line-height: var(--pf-t--global--font--line-height--heading);
 }
 
 .auditStrip {
@@ -24,33 +28,9 @@
   padding-bottom: var(--pf-t--global--spacer--sm);
 }
 
-.dataPaneHeader {
-  display: flex;
-  flex-direction: column;
-  gap: var(--pf-t--global--spacer--xs);
-}
-
-.dataPaneTitleRow {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: var(--pf-t--global--spacer--sm);
-  min-height: 2.25rem;
-}
-
-.dataPaneControlsWrap {
-  width: 100%;
-  min-width: 0;
-}
-
-.dataPaneControls {
-  --pf-v6-l-flex--FlexWrap: nowrap;
-  min-width: 0;
-}
-
 .searchWrap {
-  flex: 1 1 5rem;
-  min-width: 4rem;
+  /* Forces vertical stacking at very narrow widths (title / search / toggle each on own row) */
+  min-width: 8rem;
 }
 
 .viewToggleWrap {
@@ -77,23 +57,6 @@
   height: 100%;
   min-width: 0;
   overflow: hidden;
-  container-name: data-pane;
-  container-type: inline-size;
-}
-
-@container data-pane (max-width: 15rem) {
-  .dataPaneControls {
-    --pf-v6-l-flex--FlexWrap: wrap;
-  }
-
-  .searchWrap,
-  .viewToggleWrap {
-    flex: 1 0 100%;
-  }
-
-  .searchWrap {
-    min-width: 0;
-  }
 }
 
 .headerRow {
@@ -103,7 +66,27 @@
 
 .dataPaneHeaderRow {
   flex-shrink: 0;
-  padding-bottom: var(--pf-t--global--spacer--xs);
+  padding-bottom: var(--pf-t--global--spacer--sm);
+}
+
+.dataPaneHeader {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pf-t--global--spacer--sm);
+}
+
+.dataPaneTitleRow {
+  width: 100%;
+}
+
+/* PF plain icon buttons keep block padding that reads as extra space under the label row */
+.dataPaneTitleRow :global(.pf-v6-c-button.pf-m-plain) {
+  --pf-v6-c-button--PaddingBlockStart: 0;
+  --pf-v6-c-button--PaddingBlockEnd: 0;
+}
+
+.dataPaneControlsStacked {
+  width: 100%;
 }
 
 .scrollPane {

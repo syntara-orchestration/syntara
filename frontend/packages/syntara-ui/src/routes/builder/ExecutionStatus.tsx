@@ -17,10 +17,9 @@ import type React from 'react'
 
 import { SynLabel } from '../../components/labels/SynLabel'
 import { SynReplayedOutputBadge } from '../../components/labels/SynReplayedOutputBadge'
-import { capitalize } from '../../utils/capitalize'
 
 import styles from './ExecutionStatus.module.css'
-import { activityStatusDisplayLabels, executionStatusDisplayLabels } from './executionStatusConstants'
+import { executionStatusDisplayLabels, getActivityStatusDisplayLabel } from './executionStatusConstants'
 
 type ExecutionStatus = ExecutionsAPI.components['schemas']['ExecutionStatus']
 type ActivityStatus = ExecutionsAPI.components['schemas']['ActivityStatus']
@@ -95,12 +94,13 @@ export function ActivityStatusLabel({
   retainedFailure?: boolean
   triggerInputReused?: boolean
 }>) {
-  const isRunningWait = nodeType === ActivityTypeEnum.WAIT && status === 'waiting'
-
-  const IconComponent = activityStatusIcons[status] ?? RhUiEllipsisHorizontalFillIcon
-  const variant = activityStatusVariant[status] ?? 'custom'
-  const displayLabel = activityStatusDisplayLabels[status] ?? capitalize(status)
-  const statusLabel = isRunningWait ? (
+  const isWaitNodeRunning = nodeType === ActivityTypeEnum.WAIT && status === 'waiting'
+  const IconComponent = isWaitNodeRunning
+    ? RhUiSyncIcon
+    : (activityStatusIcons[status] ?? RhUiEllipsisHorizontalFillIcon)
+  const variant = isWaitNodeRunning ? 'custom' : (activityStatusVariant[status] ?? 'custom')
+  const displayLabel = getActivityStatusDisplayLabel(status, nodeType)
+  const statusLabel = isWaitNodeRunning ? (
     <SynLabel variant="outline" status="custom" icon={<RhUiSyncIcon />}>
       Running
     </SynLabel>
