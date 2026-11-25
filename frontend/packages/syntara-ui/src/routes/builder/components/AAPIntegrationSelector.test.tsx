@@ -456,4 +456,23 @@ describe('AAPIntegrationSelector', () => {
     expect(screen.getByText('AAP Production')).toBeInTheDocument()
     expect(screen.queryByText('AAP Staging')).not.toBeInTheDocument()
   })
+
+  it('excludes project-scoped integrations when no project is selected', async () => {
+    const projectOnlyIntegration = {
+      id: 'int-aap-3',
+      name: 'AAP Project Only',
+      scope: 'project' as const,
+      project_ids: ['proj-aap-123'],
+      configuration: { base_url: 'https://aap-project-only.example.com' },
+    }
+    mockClients({ integrations: [mockIntegrations[0], projectOnlyIntegration] })
+    const user = userEvent.setup()
+    renderSelector()
+
+    const input = screen.getByRole('textbox', { name: /integration/i })
+    await user.click(input)
+
+    expect(screen.getByText('AAP Production')).toBeInTheDocument()
+    expect(screen.queryByText('AAP Project Only')).not.toBeInTheDocument()
+  })
 })
