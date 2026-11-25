@@ -288,9 +288,15 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Fetch devel branch for OpenAPI comparison
+      - name: Fetch pull-request base branch for OpenAPI comparison
         if: github.event_name != 'merge_group'
-        run: git fetch origin devel
+        env:
+          GITHUB_BASE_REF: ${{ github.base_ref }}
+        run: |
+          set -euo pipefail
+          base_ref="${GITHUB_BASE_REF:-devel}"
+          git fetch origin "$base_ref"
+          echo "OPENAPI_BASE_REF=$base_ref" >> "$GITHUB_ENV"
 
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
@@ -322,7 +328,7 @@ jobs:
         run: ./scripts/openapi/resolve-merge-group-pr-labels.py
         working-directory: backend
 
-      - name: Check OpenAPI breaking changes against devel
+      - name: Check OpenAPI breaking changes against pull-request base
         if: github.event_name != 'merge_group'
         run: make check-openapi-breaking-pre-commit
         working-directory: backend

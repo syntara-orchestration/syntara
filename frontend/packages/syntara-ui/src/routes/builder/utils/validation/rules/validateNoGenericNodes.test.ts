@@ -6,7 +6,7 @@ import { validateNoGenericNodes } from './validateNoGenericNodes'
 describe('validateNoGenericNodes', () => {
   it('returns no errors for workflow without generic nodes', () => {
     const activities: Activity[] = [
-      { type: 'script', id: 'task-1', name: 'Normal Task', parameters: { language: 'python', code: 'print("hello")' } },
+      { type: 'script_python', id: 'task-1', name: 'Normal Task', parameters: { code: 'print("hello")' } },
       {
         type: 'condition',
         id: 'condition-1',
@@ -22,10 +22,10 @@ describe('validateNoGenericNodes', () => {
   it('returns error for generic node with __isGeneric in metadata', () => {
     const activities: Activity[] = [
       {
-        type: 'script',
+        type: 'script_python',
         id: 'generic-1',
         name: 'Placeholder',
-        parameters: { language: 'python', code: '' },
+        parameters: { code: '' },
         metadata: { __isGeneric: true },
       },
     ]
@@ -45,10 +45,10 @@ describe('validateNoGenericNodes', () => {
   it('returns error for generic node without name', () => {
     const activities: Activity[] = [
       {
-        type: 'script',
+        type: 'script_python',
         id: 'generic-1',
         name: '',
-        parameters: { language: 'python', code: '' },
+        parameters: { code: '' },
         metadata: { __isGeneric: true },
       },
     ]
@@ -61,23 +61,23 @@ describe('validateNoGenericNodes', () => {
   it('returns multiple errors for multiple generic nodes', () => {
     const activities: Activity[] = [
       {
-        type: 'script',
+        type: 'script_python',
         id: 'generic-1',
         name: 'First Placeholder',
-        parameters: { language: 'python', code: '' },
+        parameters: { code: '' },
         metadata: { __isGeneric: true },
       },
       {
-        type: 'script',
+        type: 'script_python',
         id: 'normal-1',
         name: 'Normal Task',
-        parameters: { language: 'python', code: 'print("hello")' },
+        parameters: { code: 'print("hello")' },
       },
       {
-        type: 'script',
+        type: 'script_python',
         id: 'generic-2',
         name: 'Second Placeholder',
-        parameters: { language: 'python', code: '' },
+        parameters: { code: '' },
         metadata: { __isGeneric: true },
       },
     ]
@@ -91,10 +91,10 @@ describe('validateNoGenericNodes', () => {
   it('ignores nodes without __isGeneric in metadata', () => {
     const activities: Activity[] = [
       {
-        type: 'script',
+        type: 'script_python',
         id: 'task-1',
         name: 'Task with other metadata',
-        parameters: { language: 'python', code: 'print("hello")' },
+        parameters: { code: 'print("hello")' },
         metadata: { someOtherFlag: true },
       },
     ]
@@ -106,10 +106,10 @@ describe('validateNoGenericNodes', () => {
   it('ignores nodes with __isGeneric set to false', () => {
     const activities: Activity[] = [
       {
-        type: 'script',
+        type: 'script_python',
         id: 'task-1',
         name: 'Not Generic',
-        parameters: { language: 'python', code: 'print("hello")' },
+        parameters: { code: 'print("hello")' },
         metadata: { __isGeneric: false },
       },
     ]
@@ -121,10 +121,10 @@ describe('validateNoGenericNodes', () => {
   it('SECURITY: ignores __isGeneric in config (prevents API injection bypass)', () => {
     const activities: Activity[] = [
       {
-        type: 'script',
+        type: 'script_python',
         id: 'task-1',
         name: 'Malicious Activity',
-        parameters: { language: 'python', code: 'print("hello")', __isGeneric: true },
+        parameters: { code: 'print("hello")', __isGeneric: true },
         // No metadata.__isGeneric, so not actually generic
       },
     ]

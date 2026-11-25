@@ -76,6 +76,10 @@ __all__ = (
     "AuthProviderInfo",
     "AuthProvidersResponse",
     "AuthType",
+    "BashScriptExecutorParameters",
+    "BashScriptExecutorParametersEnvironment",
+    "BashScriptNode",
+    "BashScriptNodeOutputsType0",
     "BatchApprovalDecision",
     "BatchApprovalDecisionStatus",
     "BatchApprovalRequest",
@@ -97,6 +101,7 @@ __all__ = (
     "ConvergeNodeOutputsType0",
     "ConvergeNodeParameters",
     "ConvergeStrategy",
+    "CredentialBinding",
     "CredentialCreate",
     "CredentialCreateInputs",
     "CredentialCreateLabels",
@@ -132,6 +137,7 @@ __all__ = (
     "ExecutionReadInputData",
     "ExecutionReadLabels",
     "ExecutionStatus",
+    "ExecutionTargetProfile",
     "FileDetailResponse",
     "FilesMetadataResponse",
     "FileStatus",
@@ -219,6 +225,7 @@ __all__ = (
     "OIDCTestResult",
     "OIDCTestResultClaimAliasesType0",
     "OIDCTestResultMetadataType0",
+    "OpenShiftConfiguration",
     "PercentileStats",
     "PermissionEntry",
     "PolicyCreate",
@@ -254,6 +261,10 @@ __all__ = (
     "PublishVersionRequestWorkflowDefinitionType1",
     "PublishWorkflowVersionResponse",
     "PublishWorkflowVersionResponseLabels",
+    "PythonScriptExecutorParameters",
+    "PythonScriptExecutorParametersEnvironment",
+    "PythonScriptNode",
+    "PythonScriptNodeOutputsType0",
     "RefreshResult",
     "ResetInternalMetricsStoreResponseResetInternalMetricsStore",
     "ResourceActionsResponse",
@@ -282,11 +293,6 @@ __all__ = (
     "RuntimeSettingRead",
     "RuntimeSettingReadLabels",
     "RuntimeSettingReadValidationSchemaType0",
-    "ScriptExecutorParameters",
-    "ScriptExecutorParametersEnvironment",
-    "ScriptLanguage",
-    "ScriptNode",
-    "ScriptNodeOutputsType0",
     "ServiceAccountCreate",
     "ServiceAccountCredentialCreate",
     "ServiceAccountCredentialCreateResponse",
@@ -390,6 +396,10 @@ __all__ = (
 
 _MODEL_MODULES = frozenset(path.stem for path in Path(__file__).parent.glob("*.py") if path.stem != "__init__")
 
+# Match module_name overrides in tools/openapi-python-client.yaml. The lazy
+# loader cannot infer product-specific spelling from a class name alone.
+_MODEL_MODULE_OVERRIDES = {"OpenShiftConfiguration": "openshift_configuration"}
+
 
 def _class_name_to_module(name: str) -> str:
     module_name = re.sub(r"[-\s]+", "_", name)
@@ -399,7 +409,7 @@ def _class_name_to_module(name: str) -> str:
 
 
 def __getattr__(name: str) -> Any:
-    module_name = _class_name_to_module(name)
+    module_name = _MODEL_MODULE_OVERRIDES.get(name, _class_name_to_module(name))
     if module_name not in _MODEL_MODULES:
         msg = f"module {__name__!r} has no attribute {name!r}"
         raise AttributeError(msg)

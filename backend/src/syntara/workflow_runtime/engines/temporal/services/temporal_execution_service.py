@@ -27,6 +27,11 @@ from syntara.workflow_runtime.engines.temporal.dynamic_workflow import Orchestra
 logger = structlog.stdlib.get_logger(__name__)
 
 
+def _is_async_activity_already_closed(error: RPCError) -> bool:
+    message = str(error).lower()
+    return "not found" in message or "workflow execution already completed" in message
+
+
 class TemporalExecutionService:
     """Service for managing workflow executions."""
 
@@ -215,7 +220,7 @@ class TemporalExecutionService:
             logger.info("Workflow cancelled successfully", temporal_workflow_id=temporal_workflow_id)
 
         except RPCError as e:
-            if "not found" in str(e).lower():
+            if _is_async_activity_already_closed(e):
                 logger.info(
                     "Workflow already completed, cancel is a no-op",
                     temporal_workflow_id=temporal_workflow_id,
@@ -253,7 +258,7 @@ class TemporalExecutionService:
             )
 
         except RPCError as e:
-            if "not found" in str(e).lower():
+            if _is_async_activity_already_closed(e):
                 logger.warning(
                     "Async activity already completed or timed out (idempotent no-op)",
                     activity_id=activity_id,
@@ -296,7 +301,7 @@ class TemporalExecutionService:
             )
 
         except RPCError as e:
-            if "not found" in str(e).lower():
+            if _is_async_activity_already_closed(e):
                 logger.warning(
                     "Async activity already completed or timed out (idempotent no-op)",
                     activity_id=activity_id,
@@ -305,6 +310,47 @@ class TemporalExecutionService:
                 return
             logger.exception(
                 "Failed to fail async activity",
+                activity_id=activity_id,
+                temporal_workflow_id=temporal_workflow_id,
+            )
+            raise
+
+    async def report_cancellation_async_activity(
+        self,
+        temporal_workflow_id: str,
+        activity_id: str,
+    ) -> None:
+        """Report cancellation for an async-completion activity.
+
+        Args:
+            temporal_workflow_id: Temporal workflow ID.
+            activity_id: Activity ID from workflow definition.
+
+        """
+        try:
+            handle = self.temporal_client.get_async_activity_handle(
+                workflow_id=temporal_workflow_id,
+                run_id=None,
+                activity_id=activity_id,
+            )
+            await handle.report_cancellation()
+
+            logger.info(
+                "Async activity cancellation reported",
+                activity_id=activity_id,
+                temporal_workflow_id=temporal_workflow_id,
+            )
+
+        except RPCError as e:
+            if _is_async_activity_already_closed(e):
+                logger.warning(
+                    "Async activity already closed; cancellation report is a no-op",
+                    activity_id=activity_id,
+                    temporal_workflow_id=temporal_workflow_id,
+                )
+                return
+            logger.exception(
+                "Failed to report async activity cancellation",
                 activity_id=activity_id,
                 temporal_workflow_id=temporal_workflow_id,
             )

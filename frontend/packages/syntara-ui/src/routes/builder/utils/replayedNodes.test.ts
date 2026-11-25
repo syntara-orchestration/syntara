@@ -12,7 +12,7 @@ import {
 const RETRY_CREATED_AT = '2026-10-09T12:00:00Z'
 const SOURCE_RUN_START = '2026-10-09T11:00:00Z'
 const SOURCE_RUN_END = '2026-10-09T11:05:00Z'
-const ACTION_NODE_TYPE = ActivityTypeEnum.SCRIPT
+const ACTION_NODE_TYPE = ActivityTypeEnum.SCRIPT_PYTHON
 /** Step that genuinely ran inside the retry. */
 const RETRY_RUN_START = '2026-10-09T12:00:05Z'
 

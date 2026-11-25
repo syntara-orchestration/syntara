@@ -293,13 +293,13 @@ class TestNodeExecutionEvent:
     def test_valid_success_event(self):
         event = NodeExecutionEvent(
             workflow_execution_id=VALID_WORKFLOW_EXECUTION_ID,
-            node_type="script",
+            node_type="script_python",
             node_hash=VALID_NODE_HASH,
             status="completed",
             error_type=None,
             entitlement_id="",
         )
-        assert event.node_type == "script"
+        assert event.node_type == "script_python"
         assert event.status == "completed"
         assert event.error_type is None
 
@@ -316,7 +316,7 @@ class TestNodeExecutionEvent:
     def test_to_segment_event(self):
         event = NodeExecutionEvent(
             workflow_execution_id=VALID_WORKFLOW_EXECUTION_ID,
-            node_type="script",
+            node_type="script_python",
             node_hash=VALID_NODE_HASH,
             status="completed",
             entitlement_id="",
@@ -324,14 +324,14 @@ class TestNodeExecutionEvent:
         segment_event = event.to_segment_event()
         assert segment_event["event"] == "node_execution"
         props = segment_event["properties"]
-        assert props["node_type"] == "script"
+        assert props["node_type"] == "script_python"
 
     def test_workflow_metrics_properties_in_segment(self):
         """AAP-92215: node events carry workflow_id and mode."""
         event = NodeExecutionEvent(
             workflow_execution_id=VALID_WORKFLOW_EXECUTION_ID,
             workflow_id=VALID_WORKFLOW_ID,
-            node_type="script",
+            node_type="script_python",
             node_hash=VALID_NODE_HASH,
             status="completed",
             mode=ExecutionMode.TEST,
@@ -345,7 +345,7 @@ class TestNodeExecutionEvent:
         """entitlement_id value must appear in segment event properties."""
         event = NodeExecutionEvent(
             workflow_execution_id=VALID_WORKFLOW_EXECUTION_ID,
-            node_type="script",
+            node_type="script_python",
             node_hash=VALID_NODE_HASH,
             status="completed",
             entitlement_id="ent-activity-789",
@@ -368,7 +368,7 @@ class TestNodeExecutionEventBuilder:
         # Build event and verify basic properties
         event = builder.build_event(
             execution_id=VALID_WORKFLOW_EXECUTION_ID,
-            node_type="script",
+            node_type="script_python",
             node_def={"a": 1, "b": 2},
             status="completed",
             entitlement_id="",
@@ -380,7 +380,7 @@ class TestNodeExecutionEventBuilder:
         # Verify hash is deterministic and key-order independent
         event_same = builder.build_event(
             execution_id=VALID_WORKFLOW_EXECUTION_ID,
-            node_type="script",
+            node_type="script_python",
             node_def={"b": 2, "a": 1},
             status="completed",
             entitlement_id="",
@@ -393,7 +393,7 @@ class TestNodeExecutionEventBuilder:
         event = builder.build_event(
             execution_id=VALID_WORKFLOW_EXECUTION_ID,
             workflow_id=VALID_WORKFLOW_ID,
-            node_type="script",
+            node_type="script_python",
             node_def={"a": 1},
             status="completed",
             mode=ExecutionMode.DEBUG,

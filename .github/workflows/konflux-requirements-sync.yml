@@ -13,6 +13,7 @@ on:
     paths:
       - backend/uv.lock
       - backend/requirements.txt
+      - backend/requirements-vcs.txt
 
 concurrency:
   group: konflux-requirements-${{ github.head_ref }}
@@ -34,7 +35,7 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@8d55fbecc275b1c35dbe060458839f8d30439ccf # v3
 
-      - name: Sync requirements.txt
+      - name: Sync requirements manifests
         run: make sync-requirements
         working-directory: backend
 
@@ -43,21 +44,21 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
         run: |
-          if git diff --quiet backend/requirements.txt; then
-            echo "requirements.txt is already in sync"
-            exit 0
-          fi
-
-          SHA=$(gh api "repos/${{ github.repository }}/contents/backend/requirements.txt?ref=${PR_HEAD_REF}" \
-            --jq '.sha')
-
-          TMPFILE=$(mktemp)
-          base64 -w 0 backend/requirements.txt > "$TMPFILE"
-          jq -Rs \
-            --arg message "chore: sync requirements.txt with uv.lock" \
-            --arg sha "$SHA" \
-            --arg branch "${PR_HEAD_REF}" \
-            '{message: $message, content: ., sha: $sha, branch: $branch}' \
-            "$TMPFILE" \
-            | gh api --method PUT repos/${{ github.repository }}/contents/backend/requirements.txt \
-              --input -
+          for manifest in requirements.txt requirements-vcs.txt; do
+            if git diff --quiet "backend/$manifest"; then
+              continue
+            fi
+            SHA=$(gh api "repos/${{ github.repository }}/contents/backend/$manifest?ref=${PR_HEAD_REF}" \
+              --jq '.sha')
+            TMPFILE=$(mktemp)
+            base64 -w 0 "backend/$manifest" > "$TMPFILE"
+            jq -Rs \
+              --arg message "chore: sync $manifest with uv.lock" \
+              --arg sha "$SHA" \
+              --arg branch "${PR_HEAD_REF}" \
+              '{message: $message, content: ., sha: $sha, branch: $branch}' \
+              "$TMPFILE" \
+              | gh api --method PUT "repos/${{ github.repository }}/contents/backend/$manifest" \
+                --input -
+            rm -f "$TMPFILE"
+          done

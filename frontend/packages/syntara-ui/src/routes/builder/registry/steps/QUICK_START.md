@@ -22,19 +22,16 @@ import type { BaseStepFormProps } from '../registry/StepRegistry'
 
 export interface MyNewStepFormData {
   name: string
-  language: string
   code: string
-  inputs?: string
 }
 
 export function MyNewStepForm({ onSubmit, onCancel }: BaseStepFormProps<MyNewStepFormData>) {
   const [name, setName] = useState('')
-  const [language, setLanguage] = useState('python')
   const [code, setCode] = useState('')
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    onSubmit({ name, language, code })
+    onSubmit({ name, code })
   }
 
   return (
@@ -58,7 +55,7 @@ Choose the appropriate template based on your needs:
 import { RhUiRobotIcon } from '@patternfly/react-icons'
 import { StepRegistry } from '../StepRegistry'
 import { useWorkflowStore } from '../../../../stores/useWorkflowStore'
-import { createScriptActivity } from '../../../../stores/workflowFactories'
+import { createPythonScriptActivity } from '../../../../stores/workflowFactories'
 import { MyNewStepForm } from '../../step-forms/MyNewStepForm'
 import { buildNamedActivity } from '../../utils/stepCreationHelpers'
 import { getDefaultStepBaseName } from '../../utils/stepNaming'
@@ -78,12 +75,10 @@ export default function registerMyNewStep() {
       try {
         const baseName = getDefaultStepBaseName('my-new-node')
         const { activityId, activity } = buildNamedActivity(baseName, data.name, (id, name) =>
-          createScriptActivity({
+          createPythonScriptActivity({
             id,
             name,
-            language: data.language ?? 'python',
             code: data.code ?? '',
-            inputs: data.inputs,
           })
         )
         useWorkflowStore.getState().addActivity(activity)

@@ -50,9 +50,8 @@ nodes:
 
   - id: analyze_repo
     name: Analyze Repository Data
-    type: script
+    type: script_python
     parameters:
-      language: python
       environment:
         INPUT_NAME: ${fetch_repo.body.name}
         INPUT_DESCRIPTION: ${fetch_repo.body.description}

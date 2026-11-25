@@ -123,8 +123,8 @@ def test_per_node_timeout_overrides_global(syntara_api: SyntaraApiRegistry, firs
                 {
                     "id": "slow_script",
                     "name": "Slow Script",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": "sleep 10 && echo done"},
+                    "type": "script_bash",
+                    "parameters": {"code": "sleep 10 && echo done"},
                     "settings": {"timeout": 2},
                 },
             ],
@@ -156,8 +156,8 @@ def test_per_node_timeout_allows_longer_execution(syntara_api: SyntaraApiRegistr
                     {
                         "id": "script",
                         "name": "Script",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "sleep 3 && echo done"},
+                        "type": "script_bash",
+                        "parameters": {"code": "sleep 3 && echo done"},
                         "settings": {"timeout": 15},
                     },
                 ],
@@ -191,8 +191,8 @@ def test_timeout_fallback_to_global(syntara_api: SyntaraApiRegistry, first_proje
                     {
                         "id": "slow_script",
                         "name": "Slow Script",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "sleep 10 && echo done"},
+                        "type": "script_bash",
+                        "parameters": {"code": "sleep 10 && echo done"},
                     },
                 ],
                 "edges": [{"from": "trigger", "to": "slow_script"}],
@@ -224,15 +224,15 @@ def test_continue_on_failure_downstream_executes(syntara_api: SyntaraApiRegistry
                 {
                     "id": "failing_script",
                     "name": "Failing Script",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": "exit 1"},
+                    "type": "script_bash",
+                    "parameters": {"code": "exit 1"},
                     "settings": {"continue_on_failure": True},
                 },
                 {
                     "id": "downstream",
                     "name": "Downstream",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": "echo success"},
+                    "type": "script_bash",
+                    "parameters": {"code": "echo success"},
                 },
             ],
             "edges": [
@@ -266,14 +266,14 @@ def test_continue_on_failure_false_skips_downstream(syntara_api: SyntaraApiRegis
                 {
                     "id": "failing_script",
                     "name": "Failing Script",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": "exit 1"},
+                    "type": "script_bash",
+                    "parameters": {"code": "exit 1"},
                 },
                 {
                     "id": "downstream",
                     "name": "Downstream",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": "echo success"},
+                    "type": "script_bash",
+                    "parameters": {"code": "echo success"},
                 },
             ],
             "edges": [
@@ -311,14 +311,14 @@ def test_global_cof_default_applies(syntara_api: SyntaraApiRegistry, first_proje
                     {
                         "id": "failing_script",
                         "name": "Failing Script",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "exit 1"},
+                        "type": "script_bash",
+                        "parameters": {"code": "exit 1"},
                     },
                     {
                         "id": "downstream",
                         "name": "Downstream",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo success"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo success"},
                     },
                 ],
                 "edges": [
@@ -358,15 +358,15 @@ def test_per_node_cof_overrides_global(syntara_api: SyntaraApiRegistry, first_pr
                     {
                         "id": "failing_script",
                         "name": "Failing Script",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "exit 1"},
+                        "type": "script_bash",
+                        "parameters": {"code": "exit 1"},
                         "settings": {"continue_on_failure": False},
                     },
                     {
                         "id": "downstream",
                         "name": "Downstream",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo success"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo success"},
                     },
                 ],
                 "edges": [
@@ -493,8 +493,8 @@ def test_retry_not_applied_to_script_nodes(syntara_api: SyntaraApiRegistry, firs
                     {
                         "id": "script",
                         "name": "Failing Script",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "exit 1"},
+                        "type": "script_bash",
+                        "parameters": {"code": "exit 1"},
                     },
                 ],
                 "edges": [{"from": "trigger", "to": "script"}],
@@ -504,8 +504,25 @@ def test_retry_not_applied_to_script_nodes(syntara_api: SyntaraApiRegistry, firs
         elapsed = time.monotonic() - start
 
         assert result.status == ExecutionStatus.FAILED, f"Expected FAILED, got {result.status}"
-        # If retry applied, 5 retries x 2s interval = >10s. Script should fail well under that.
-        assert elapsed < 30, f"Script should fail fast (no retry despite global retry=5), took {elapsed:.1f}s"
+        # Wall clock conflates "no retries" with "fast dispatch": the script
+        # node's dispatch cold start (Job scheduling, pod, port-forward, gRPC)
+        # alone can exceed 30s on podman-compose e2e runs. The activity's
+        # retry_count is the timing-independent proof that the global retry
+        # policy is not applied to script nodes.
+        # include="activities" only returns the ActivityData summary; the
+        # full ActivityExecution (with retry_count) comes from the dedicated
+        # activities endpoint.
+        activities = (
+            syntara_api.executions.list_activities(execution_id=UUID(str(result.id))).assert_and_get().resources
+        )
+        script = [a for a in activities if a.temporal_activity_id == "script"]
+        assert script, f"Script activity missing from the execution: {[a.temporal_activity_id for a in activities]}"
+        assert all(a.retry_count == 0 for a in script), (
+            f"Global retry must not apply to script nodes: retry_counts={[a.retry_count for a in script]}"
+        )
+        # If retry applied, 5 retries x 2s interval would dominate: a generous
+        # wall-clock bound still separates "failed once" from "failed 6 times".
+        assert elapsed < 120, f"Script should fail without retry delay, took {elapsed:.1f}s"
     finally:
         _restore_settings(syntara_api, {key_max: orig_max, key_interval: orig_interval})
 
@@ -529,15 +546,15 @@ def test_cof_with_multiple_branches_mixed_status(syntara_api: SyntaraApiRegistry
                 {
                     "id": "fail_branch",
                     "name": "Failing Branch",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": "exit 1"},
+                    "type": "script_bash",
+                    "parameters": {"code": "exit 1"},
                     "settings": {"continue_on_failure": True},
                 },
                 {
                     "id": "success_branch",
                     "name": "Success Branch",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": "echo ok"},
+                    "type": "script_bash",
+                    "parameters": {"code": "echo ok"},
                 },
                 {
                     "id": "converge",
@@ -548,8 +565,8 @@ def test_cof_with_multiple_branches_mixed_status(syntara_api: SyntaraApiRegistry
                 {
                     "id": "final",
                     "name": "Final",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": "echo done"},
+                    "type": "script_bash",
+                    "parameters": {"code": "echo done"},
                 },
             ],
             "edges": [
@@ -599,14 +616,14 @@ def test_control_node_with_empty_settings_completes(syntara_api: SyntaraApiRegis
                 {
                     "id": "action",
                     "name": "Action",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": "echo matched"},
+                    "type": "script_bash",
+                    "parameters": {"code": "echo matched"},
                 },
                 {
                     "id": "default_action",
                     "name": "Default",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": "echo default"},
+                    "type": "script_bash",
+                    "parameters": {"code": "echo default"},
                 },
             ],
             "edges": [
@@ -781,21 +798,21 @@ def test_sequential_cof_second_failure_without_cof_is_failed(
                 {
                     "id": "first_fail",
                     "name": "First Failure (recovered)",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": "exit 1"},
+                    "type": "script_bash",
+                    "parameters": {"code": "exit 1"},
                     "settings": {"continue_on_failure": True},
                 },
                 {
                     "id": "second_fail",
                     "name": "Second Failure (unrecovered)",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": "exit 1"},
+                    "type": "script_bash",
+                    "parameters": {"code": "exit 1"},
                 },
                 {
                     "id": "final",
                     "name": "Final",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": "echo done"},
+                    "type": "script_bash",
+                    "parameters": {"code": "echo done"},
                 },
             ],
             "edges": [
@@ -804,6 +821,9 @@ def test_sequential_cof_second_failure_without_cof_is_failed(
                 {"from": "second_fail", "to": "final"},
             ],
         },
+        # Two sequential script nodes pay Execution Plane cold-start and queueing
+        # latency, which can exceed the default 60-second poll budget.
+        timeout=120,
         project_id=first_project_id,
     )
 

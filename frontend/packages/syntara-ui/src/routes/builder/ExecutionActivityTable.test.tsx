@@ -61,7 +61,7 @@ describe('ExecutionActivityTable', () => {
     it('shows formatted dates and elapsed for completed activity', () => {
       renderTable({
         states: new Map([state('task-1', { status: 'completed', startedAt: T0, completedAt: T2 })]),
-        order: [{ id: 'task-1', name: 'Task', type: ActivityTypeEnum.SCRIPT }],
+        order: [{ id: 'task-1', name: 'Task', type: ActivityTypeEnum.SCRIPT_PYTHON }],
       })
 
       expect(screen.getByText('1m 0s')).toBeInTheDocument()
@@ -121,7 +121,7 @@ describe('ExecutionActivityTable', () => {
     it('marks a row replayed when its start predates the retry baseline', () => {
       renderTable({
         states: new Map([state('task-1', { status: 'completed', startedAt: T0 })]),
-        order: [{ id: 'task-1', name: 'Task', type: ActivityTypeEnum.SCRIPT }],
+        order: [{ id: 'task-1', name: 'Task', type: ActivityTypeEnum.SCRIPT_PYTHON }],
         replayBaselineAt: T2,
       })
 
@@ -131,7 +131,7 @@ describe('ExecutionActivityTable', () => {
     it('does not mark a retained failure without output as replayed', () => {
       renderTable({
         states: new Map([state('task-1', { status: 'failed', startedAt: T0 })]),
-        order: [{ id: 'task-1', name: 'Script', type: ActivityTypeEnum.SCRIPT }],
+        order: [{ id: 'task-1', name: 'Script', type: ActivityTypeEnum.SCRIPT_PYTHON }],
         replayBaselineAt: T2,
       })
 
@@ -141,7 +141,7 @@ describe('ExecutionActivityTable', () => {
     it('does not mark a row replayed when there is no retry baseline', () => {
       renderTable({
         states: new Map([state('task-1', { status: 'completed', startedAt: T0 })]),
-        order: [{ id: 'task-1', name: 'Task', type: ActivityTypeEnum.SCRIPT }],
+        order: [{ id: 'task-1', name: 'Task', type: ActivityTypeEnum.SCRIPT_PYTHON }],
       })
 
       expect(screen.queryByTestId('activity-status-label-replayed')).not.toBeInTheDocument()
@@ -189,7 +189,7 @@ describe('ExecutionActivityTable', () => {
     it('hides AAP column when no AAP steps exist', () => {
       renderTable({
         states: new Map([state('task-1', { status: 'completed' })]),
-        order: [{ id: 'task-1', name: 'Script step', type: 'script' }],
+        order: [{ id: 'task-1', name: 'Script step', type: 'script_python' }],
       })
 
       expect(screen.queryByRole('link', { name: /View job in AAP/i })).not.toBeInTheDocument()
@@ -203,7 +203,7 @@ describe('ExecutionActivityTable', () => {
           state('aap-1', { status: 'running', outputData: { job_url: 'https://aap.example.com/j/1' } }),
         ]),
         order: [
-          { id: 'task-1', name: 'Script', type: 'script' },
+          { id: 'task-1', name: 'Script', type: 'script_python' },
           { id: 'aap-1', name: 'AAP Job', type: 'aap_job_template' },
         ],
       })

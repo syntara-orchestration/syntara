@@ -1,6 +1,5 @@
 """Utility functions for the audit package."""
 
-from functools import lru_cache
 from uuid import UUID
 
 import structlog
@@ -8,7 +7,7 @@ import structlog
 from syntara.audit.models.audit_event import EventSeverity
 from syntara.core.constants import FieldLimits
 from syntara.core.lib.sanitization import strip_control_chars
-from syntara.core.models.principal import KNOWN_SERVICE_CNS, PrincipalType, service_principal_id
+from syntara.core.models.principal import PrincipalType, configured_service_cns, service_principal_id
 
 logger = structlog.stdlib.get_logger(__name__)
 
@@ -33,9 +32,8 @@ def escalate_severity(current: EventSeverity, minimum: EventSeverity) -> EventSe
     return current if _SEVERITY_RANK[current] >= _SEVERITY_RANK[minimum] else minimum
 
 
-@lru_cache(maxsize=1)
 def _get_service_principal_ids() -> frozenset[UUID]:
-    return frozenset(service_principal_id(cn) for cn in KNOWN_SERVICE_CNS)
+    return frozenset(service_principal_id(cn) for cn in configured_service_cns())
 
 
 def escalate_actor_type(actor_id: UUID) -> PrincipalType:

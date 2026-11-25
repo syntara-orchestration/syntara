@@ -25,7 +25,7 @@ describe('buildMockJsonSkeleton', () => {
       { name: 'status', type: 'string', description: 'Status code' },
     ])
 
-    const result = buildMockJsonSkeleton('script', null)
+    const result = buildMockJsonSkeleton('script_python', null)
     const parsed: unknown = JSON.parse(result)
 
     expect(parsed).toEqual({
@@ -54,7 +54,7 @@ describe('buildMockJsonSkeleton', () => {
 
     const schemaFields: OutputFieldDef[] = [{ name: 'fallback', type: 'string', description: 'Fallback' }]
 
-    const result = buildMockJsonSkeleton('script', schemaFields)
+    const result = buildMockJsonSkeleton('script_python', schemaFields)
     const parsed: unknown = JSON.parse(result)
 
     expect(parsed).toEqual({ stdout: '' })
@@ -62,7 +62,7 @@ describe('buildMockJsonSkeleton', () => {
 
   it('handles empty schema array', () => {
     mockGetNodeOutputSchema.mockReturnValue([])
-    expect(buildMockJsonSkeleton('script', null)).toBe('{}')
+    expect(buildMockJsonSkeleton('script_python', null)).toBe('{}')
   })
 
   it('handles schema with multiple field types', () => {

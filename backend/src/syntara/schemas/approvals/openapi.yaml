@@ -497,7 +497,7 @@ components:
         type:
           type: string
           title: Type
-          description: Activity type (script, approval, agentic, etc.)
+          description: Activity type (script_python, script_bash, approval, agentic, etc.)
 
     ApprovalCreateRequest:
       type: object

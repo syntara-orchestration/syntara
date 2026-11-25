@@ -30,6 +30,7 @@ from syntara.core.services.user_reference_resolution import UserReferenceResolve
 from syntara.credentials.lib.auth_types import AUTH_TYPE_URL
 from syntara.credentials.models.credential import Credential
 from syntara.credentials.models.credential_type import CredentialType
+from syntara.execution_plane.deletion import delete_execution_plane_work_items
 from syntara.metrics.dependencies import get_metrics_recorder
 from syntara.metrics.types import ComponentLabel, MetricType
 from syntara.workflows.audit.workflow_lifecycle import WorkflowAction, WorkflowLifecycleEvent
@@ -212,7 +213,7 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
         if current_version:
             try:
                 stored_normalized = WorkflowDefinition.model_validate(current_version.workflow_definition).model_dump(
-                    exclude_defaults=True
+                    mode="json", exclude_defaults=True
                 )
             except Exception:  # noqa: BLE001
                 stored_normalized = current_version.workflow_definition
@@ -380,6 +381,7 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
         Extracts from:
         - node.parameters.credential_id (HTTP request, AAP, etc.)
         - node.parameters.integration_connections[].credential_id (Task Agent)
+        - node.parameters.credential_bindings[].credential_ref
         """
         cred_ids: set[str] = set()
         for node in workflow_definition.get("nodes", []):
@@ -389,6 +391,16 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
             for conn in params.get("integration_connections") or []:
                 if cred_id := conn.get("credential_id"):
                     cred_ids.add(cred_id)
+            for binding in params.get("credential_bindings") or []:
+                if not isinstance(binding, dict):
+                    logger.warning(
+                        "Invalid credential binding shape",
+                        node_id=node.get("id"),
+                        binding_type=type(binding).__name__,
+                    )
+                    continue
+                if cred_id := binding.get("credential_ref"):
+                    cred_ids.add(str(cred_id))
         return cred_ids
 
     async def _validate_credential_project_scope(
@@ -1690,6 +1702,8 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
         )
         if non_terminal_count:
             raise WorkflowHasActiveExecutionsError(non_terminal_count, workflow_id=workflow_id)
+
+        await delete_execution_plane_work_items(owner_field="workflow_id", owner_id=workflow_id)
 
         # Explicit cleanup retained so trigger deletion is logged individually
         # (delete_triggers_for_workflow logs each removal); DB CASCADE would also

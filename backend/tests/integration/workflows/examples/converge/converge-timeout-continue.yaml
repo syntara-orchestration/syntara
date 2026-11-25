@@ -14,17 +14,15 @@ nodes:
 
   - id: fast_task
     name: Fast Task
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       code: |
         echo "Fast task completed"
 
   - id: slow_task
     name: Slow Task
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       code: |
         sleep 3
         echo "Slow task completed"
@@ -46,9 +44,8 @@ nodes:
 
   - id: post_converge_task
     name: Post-Converge Task
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       code: |
         echo "Post-converge task executed after timeout"
 edges:

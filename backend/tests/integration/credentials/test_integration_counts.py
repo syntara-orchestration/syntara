@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 from unittest.mock import MagicMock
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 
@@ -12,6 +12,8 @@ from syntara.core.models.secret import Secret
 from syntara.credentials.models.credential import Credential
 from syntara.credentials.services.credential_service import CredentialService
 from syntara.integrations.models.integration import Integration, IntegrationScope, IntegrationType
+from syntara.workflows.models.workflow import Workflow
+from syntara.workflows.models.workflow_version import WorkflowVersion
 
 if TYPE_CHECKING:
     from sqlmodel.ext.asyncio.session import AsyncSession
@@ -141,3 +143,61 @@ class TestGetIntegrationCountsIntegration:
         result = await service.get_integration_counts([cred.id])
 
         assert result.get(cred.id, 0) == 0
+
+
+@pytest.mark.asyncio
+class TestGetWorkflowCountsIntegration:
+    """Verify workflow credential reference SQL against a real database."""
+
+    async def test_counts_and_returns_credential_bindings(
+        self,
+        test_db_session: AsyncSession,
+        test_user: User,
+        bearer_type: CredentialType,
+        test_project_id: str,
+    ) -> None:
+        credential = await _create_credential(test_db_session, test_user, bearer_type, test_project_id)
+        workflow = Workflow(
+            name=f"binding-workflow-{uuid4().hex[:8]}",
+            created_by=test_user.id,
+            is_enabled=False,
+            current_version=1,
+            project_id=UUID(test_project_id),
+        )
+        test_db_session.add(workflow)
+        version = WorkflowVersion(
+            workflow_id=workflow.id,
+            version=1,
+            schema_version="2.0.0",
+            workflow_definition={
+                "schema_version": "2.0.0",
+                "name": workflow.name,
+                "triggers": [{"id": "trigger", "type": "manual_trigger"}],
+                "nodes": [
+                    {
+                        "id": "script",
+                        "name": "Run Script",
+                        "type": "script_python",
+                        "parameters": {
+                            "code": "print('done')",
+                            "credential_bindings": [
+                                {
+                                    "credential_recipe_id": "example.token",
+                                    "credential_ref": str(credential.id),
+                                }
+                            ],
+                        },
+                    }
+                ],
+                "edges": [{"from": "trigger", "to": "script"}],
+            },
+            created_by=test_user.id,
+        )
+        test_db_session.add(version)
+        await test_db_session.commit()
+
+        service = CredentialService(test_db_session, test_user, MagicMock())
+        assert await service.get_workflow_counts([credential.id]) == {credential.id: 1}
+        references = await service.get_credential_workflows(credential.id)
+        assert [reference.id for reference in references] == [workflow.id]
+        assert references[0].node_names == ["Run Script"]

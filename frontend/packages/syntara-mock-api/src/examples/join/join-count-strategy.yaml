@@ -10,21 +10,18 @@ nodes:
     type: parallel
 
   - id: count_task1
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       code: echo "Count task 1"
 
   - id: count_task2
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       code: echo "Count task 2"
 
   - id: count_task3
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       code: echo "Count task 3"
 
   - id: join_count

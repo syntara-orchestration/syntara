@@ -196,7 +196,7 @@ class TestCollectExpectedIntegrationTypes:
         assert result[UUID(mcp_id)] == "mcp_server"
 
     def test_script_node_ignored(self) -> None:
-        definition = {"nodes": [{"type": "script", "parameters": {"language": "python"}}]}
+        definition = {"nodes": [{"type": "script_python", "parameters": {}}]}
         result = _collect_expected_integration_types(definition)
         assert result == {}
 

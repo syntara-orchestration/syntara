@@ -42,7 +42,7 @@ test.describe('EDA Trigger', () => {
       // Add a connected script action
       const panel = await clickAddConnectedStep(app)
       await panel.getByRole('button', { name: 'Action', exact: true }).click()
-      await panel.getByRole('button', { name: 'Script', exact: true }).click()
+      await panel.getByRole('button', { name: 'Python Script', exact: true }).click()
       await app.getByRole('textbox', { name: 'Name', exact: true }).fill('Process event')
       await fillCodeEditor(app, { value: 'print("processing EDA event")' })
       await app.getByRole('button', { name: 'Create', exact: true }).click()

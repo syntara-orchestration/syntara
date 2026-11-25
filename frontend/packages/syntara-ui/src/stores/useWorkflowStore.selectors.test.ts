@@ -3,7 +3,7 @@ import { describe, expect, it, beforeEach, vi } from 'vitest'
 
 import {
   useWorkflowStore,
-  createScriptActivity,
+  createPythonScriptActivity,
   createManualTrigger,
   // New typed selectors
   selectCurrentWorkflow,
@@ -121,8 +121,8 @@ describe('useWorkflowStore - Selectors and Best Practices', () => {
     it('computes activitiesCount correctly', () => {
       const workflow = createTestWorkflow('Test Workflow', {
         activities: [
-          createScriptActivity({ id: 'A', name: 'Task A', language: 'python', code: 'print("A")' }),
-          createScriptActivity({ id: 'B', name: 'Task B', language: 'python', code: 'print("B")' }),
+          createPythonScriptActivity({ id: 'A', name: 'Task A', code: 'print("A")' }),
+          createPythonScriptActivity({ id: 'B', name: 'Task B', code: 'print("B")' }),
         ],
       })
 
@@ -265,7 +265,7 @@ describe('useWorkflowStore - Selectors and Best Practices', () => {
     it('allows synchronous state access outside React', () => {
       useWorkflowStore.setState({
         currentWorkflow: createTestWorkflow('Test Workflow', {
-          activities: [createScriptActivity({ id: 'A', name: 'Task A', language: 'python', code: 'print("A")' })],
+          activities: [createPythonScriptActivity({ id: 'A', name: 'Task A', code: 'print("A")' })],
         }),
         workflowVersion: 1,
         edges: [],
@@ -287,9 +287,7 @@ describe('useWorkflowStore - Selectors and Best Practices', () => {
       expect(store.getState().currentWorkflow?.name).toBe('Test')
 
       // Add activity directly
-      store
-        .getState()
-        .addActivity(createScriptActivity({ id: 'A', name: 'Task A', language: 'python', code: 'print("A")' }))
+      store.getState().addActivity(createPythonScriptActivity({ id: 'A', name: 'Task A', code: 'print("A")' }))
 
       expect(store.getState().currentWorkflow?.workflow.activities).toHaveLength(1)
     })
@@ -345,7 +343,7 @@ describe('useWorkflowStore - Selectors and Best Practices', () => {
   describe('Immutability guarantees', () => {
     it('creates new state objects on updates', () => {
       const initialWorkflow = createTestWorkflow('Initial', {
-        activities: [createScriptActivity({ id: 'A', name: 'Task A', language: 'python', code: 'print("A")' })],
+        activities: [createPythonScriptActivity({ id: 'A', name: 'Task A', code: 'print("A")' })],
       })
 
       useWorkflowStore.getState().setWorkflow(initialWorkflow)
@@ -418,7 +416,7 @@ describe('useWorkflowStore - Selectors and Best Practices', () => {
 
       useWorkflowStore.getState().setWorkflow(
         createTestWorkflow('Test', {
-          activities: [createScriptActivity({ id: 'A', name: 'Task A', language: 'python', code: 'print("A")' })],
+          activities: [createPythonScriptActivity({ id: 'A', name: 'Task A', code: 'print("A")' })],
         })
       )
 
@@ -443,8 +441,8 @@ describe('useWorkflowStore - Selectors and Best Practices', () => {
       useWorkflowStore.getState().setWorkflow(
         createTestWorkflow('Test', {
           activities: [
-            createScriptActivity({ id: 'A', name: 'Task A', language: 'python', code: 'print("A")' }),
-            createScriptActivity({ id: 'B', name: 'Task B', language: 'python', code: 'print("B")' }),
+            createPythonScriptActivity({ id: 'A', name: 'Task A', code: 'print("A")' }),
+            createPythonScriptActivity({ id: 'B', name: 'Task B', code: 'print("B")' }),
           ],
         })
       )
@@ -488,7 +486,7 @@ describe('useWorkflowStore - Selectors and Best Practices', () => {
       useWorkflowStore.getState().setWorkflow(
         createTestWorkflow('Test', {
           triggers: [createManualTrigger('trigger-1', false)],
-          activities: [createScriptActivity({ id: 'A', name: 'Task A', language: 'python', code: 'print("A")' })],
+          activities: [createPythonScriptActivity({ id: 'A', name: 'Task A', code: 'print("A")' })],
         })
       )
 
@@ -523,7 +521,7 @@ describe('useWorkflowStore - Selectors and Best Practices', () => {
 
   describe('isDirty flag', () => {
     const trigger = createManualTrigger('trigger-1', false)
-    const activity = createScriptActivity({ id: 'A', name: 'Task A', language: 'python', code: 'print("A")' })
+    const activity = createPythonScriptActivity({ id: 'A', name: 'Task A', code: 'print("A")' })
 
     it.each([
       ['setWorkflow', () => useWorkflowStore.getState().setWorkflow(createTestWorkflow('Test'))],
@@ -639,7 +637,7 @@ describe('useWorkflowStore - Selectors and Best Practices', () => {
 
       expect(useWorkflowStore.getState().currentWorkflow?.name).toBe('Test via actions')
 
-      actions.addActivity(createScriptActivity({ id: 'A', name: 'Task A', language: 'python', code: 'print("A")' }))
+      actions.addActivity(createPythonScriptActivity({ id: 'A', name: 'Task A', code: 'print("A")' }))
 
       expect(useWorkflowStore.getState().currentWorkflow?.workflow.activities).toHaveLength(1)
     })
@@ -670,8 +668,8 @@ describe('useWorkflowStore - Selectors and Best Practices', () => {
         currentWorkflow: createTestWorkflow('Test Workflow', {
           triggers: [createManualTrigger('trigger-1', false), createManualTrigger('trigger-2', true)],
           activities: [
-            createScriptActivity({ id: 'A', name: 'Task A', language: 'python', code: 'print("A")' }),
-            createScriptActivity({ id: 'B', name: 'Task B', language: 'python', code: 'print("B")' }),
+            createPythonScriptActivity({ id: 'A', name: 'Task A', code: 'print("A")' }),
+            createPythonScriptActivity({ id: 'B', name: 'Task B', code: 'print("B")' }),
           ],
         }),
         workflowVersion: 5,

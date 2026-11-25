@@ -30,6 +30,8 @@ from syntara.workflows.models.workflow import Workflow
 from syntara.workflows.models.workflow_version import WorkflowVersion
 from tests.helpers.workflow import create_minimal_workflow_definition
 
+pytestmark = pytest.mark.usefixtures("ep_deletion_acknowledged")
+
 
 @pytest.fixture
 async def seeded_db(test_db_session: AsyncSession) -> AsyncSession:

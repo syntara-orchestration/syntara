@@ -883,10 +883,15 @@ def test_services_run_starts_services_from_the_compose_file(tmp_path: Path) -> N
 
     started = _services_after(up, "-d", skip_options_with_values=("-p", "-f", "--profile"))
 
-    assert started == _expected_services(enabled_profiles, {"syntara", "syntara-ui"})
+    assert started == _expected_services(
+        enabled_profiles, {"syntara", "syntara-ui", "execution-plane-db-init", "execution-plane-migrate"}
+    )
     # Spot-check against the compose file as it is today.
     assert {"database", "redis", "temporal", "temporal-worker", "moto", "mcp-server-scenarios"} <= set(started)
     assert not {"syntara", "syntara-ui"} & set(started), "make dev runs the API and UI locally"
+    assert not {"execution-plane-db-init", "execution-plane-migrate"} & set(started), (
+        "one-shot setup jobs are not readiness services"
+    )
     assert "mock-segment" not in started, "services behind other profiles stay off"
 
 

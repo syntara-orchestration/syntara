@@ -9,17 +9,15 @@ triggers:
 
 nodes:
   - id: bash_step
-    type: script
+    type: script_python
     parameters:
-      language: python
       code: |
         import json
         print(json.dumps({"data": "from bash"}))
 
   - id: python_step
-    type: script
+    type: script_python
     parameters:
-      language: python
       environment:
         INPUT_BASH_DATA: ${bash_step.stdout_json.data}
       code: |

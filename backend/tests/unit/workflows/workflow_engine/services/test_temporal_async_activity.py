@@ -12,6 +12,10 @@ def _make_rpc_error(message: str) -> RPCError:
     return RPCError(message, status=RPCStatusCode.NOT_FOUND, raw_grpc_status=b"")
 
 
+def _make_completed_workflow_error() -> RPCError:
+    return RPCError("workflow execution already completed", status=RPCStatusCode.NOT_FOUND, raw_grpc_status=b"")
+
+
 def _make_service() -> tuple[TemporalExecutionService, Mock]:
     """Create a TemporalExecutionService with mocked client."""
     mock_client = Mock()
@@ -44,6 +48,16 @@ class TestCompleteAsyncActivity:
         service, mock_client = _make_service()
         mock_handle = AsyncMock()
         mock_handle.complete.side_effect = _make_rpc_error("activity not found")
+        mock_client.get_async_activity_handle.return_value = mock_handle
+
+        await service.complete_async_activity("wf-123", "node-1", {"output": {}})
+
+    @pytest.mark.asyncio
+    async def test_idempotent_on_completed_workflow(self) -> None:
+        """Test that a completed Temporal workflow does not cause callback retries."""
+        service, mock_client = _make_service()
+        mock_handle = AsyncMock()
+        mock_handle.complete.side_effect = _make_completed_workflow_error()
         mock_client.get_async_activity_handle.return_value = mock_handle
 
         await service.complete_async_activity("wf-123", "node-1", {"output": {}})
@@ -95,6 +109,16 @@ class TestFailAsyncActivity:
         await service.fail_async_activity("wf-123", "node-1", RuntimeError("err"))
 
     @pytest.mark.asyncio
+    async def test_idempotent_on_completed_workflow(self) -> None:
+        """Test that a completed Temporal workflow does not cause callback retries."""
+        service, mock_client = _make_service()
+        mock_handle = AsyncMock()
+        mock_handle.fail.side_effect = _make_completed_workflow_error()
+        mock_client.get_async_activity_handle.return_value = mock_handle
+
+        await service.fail_async_activity("wf-123", "node-1", RuntimeError("err"))
+
+    @pytest.mark.asyncio
     async def test_raises_on_other_rpc_error(self) -> None:
         """Test that non-'not found' RPCError is re-raised."""
         service, mock_client = _make_service()
@@ -108,3 +132,33 @@ class TestFailAsyncActivity:
 
         with pytest.raises(RPCError, match="connection refused"):
             await service.fail_async_activity("wf-123", "node-1", RuntimeError("err"))
+
+
+class TestReportCancellationAsyncActivity:
+    """Tests for TemporalExecutionService.report_cancellation_async_activity."""
+
+    @pytest.mark.asyncio
+    async def test_reports_cancellation(self) -> None:
+        """Test that cancellation is reported to the async activity handle."""
+        service, mock_client = _make_service()
+        mock_handle = AsyncMock()
+        mock_client.get_async_activity_handle.return_value = mock_handle
+
+        await service.report_cancellation_async_activity("wf-123", "node-1")
+
+        mock_client.get_async_activity_handle.assert_called_once_with(
+            workflow_id="wf-123",
+            run_id=None,
+            activity_id="node-1",
+        )
+        mock_handle.report_cancellation.assert_called_once_with()
+
+    @pytest.mark.asyncio
+    async def test_idempotent_on_completed_workflow(self) -> None:
+        """Test that a completed Temporal workflow does not cause callback retries."""
+        service, mock_client = _make_service()
+        mock_handle = AsyncMock()
+        mock_handle.report_cancellation.side_effect = _make_completed_workflow_error()
+        mock_client.get_async_activity_handle.return_value = mock_handle
+
+        await service.report_cancellation_async_activity("wf-123", "node-1")

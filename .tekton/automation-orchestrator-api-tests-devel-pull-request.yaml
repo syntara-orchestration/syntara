@@ -1,4 +1,20 @@
 ---
+# Thin stub: the ao-api-tests bundle pipeline with an Execution Plane.
+#
+# The execution-plane integration dispatches every script-node activity to the standalone
+# Execution Plane, so the e2e environment must deploy one: ep-revision pins
+# the EP source for deploy-ao (aap-konflux-pipelines#4719), and
+# ao-operator-revision pins the operator branch that honors
+# ENABLE_EXECUTION_PLANE in {cr-name}-admin-settings (the prebuilt operator
+# bundle ignores it — automation-orchestrator-operator#1573). When both land
+# on their mainlines, these pins drop and the stub converges to devel's.
+#
+# step-types-revision makes deploy-ao clone syntara-step-types and build the
+# ao-python-rhel9 / ao-bash-rhel9 workload images from that source
+# (aap-konflux-pipelines#5134) instead of pulling the prebuilt images, so the
+# e2e exercises the current step SDK contract. The pinned bundle is the
+# republished ao-api-tests carrying the EP and step-types params and the
+# bumped deploy-ao task (aap-konflux-pipelines#5164).
 apiVersion: tekton.dev/v1
 kind: PipelineRun
 metadata:
@@ -13,6 +29,7 @@ metadata:
       event == "pull_request" &&
       (target_branch == "devel" || target_branch.startsWith("feature/") || target_branch.startsWith("feat/")) &&
       (files.all.exists(x, x.startsWith("backend/")) ||
+      files.all.exists(x, x.startsWith("tools/")) ||
       ".tekton/automation-orchestrator-api-tests-devel-pull-request.yaml".pathChanged())
   creationTimestamp: null
   labels:
@@ -37,12 +54,28 @@ spec:
       value: '{{revision}}'
     - name: pipeline-github-pr-number
       value: '{{pull_request_number}}'
+    - name: ao-revision
+      value: '{{revision}}'
+    - name: ao-pr-number
+      value: '{{pull_request_number}}'
+    - name: ep-git-url
+      value: https://github.com/syntara-orchestration/syntara-execution-plane.git
+    - name: ep-revision
+      value: devel
+    - name: ao-operator-git-url
+      value: https://github.com/automation-nexus/automation-orchestrator-operator.git
+    - name: ao-operator-revision
+      value: feat/ANSTRAT-1803
+    - name: step-types-git-url
+      value: https://github.com/syntara-orchestration/syntara-step-types.git
+    - name: step-types-revision
+      value: devel
   pipelineRef:
     params:
       - name: name
         value: ao-api-tests
       - name: bundle
-        value: quay.io/aap-ci/tekton-catalog/pipeline/test/ao-api-tests:0.1
+        value: quay.io/aap-ci/tekton-catalog/pipeline/test/ao-api-tests:0.1@sha256:5885d81428a3ac7a1d9878618ad0138b26019456a0bd3034850f4ea85959d689
       - name: kind
         value: pipeline
       - name: secret
@@ -51,7 +84,7 @@ spec:
 
   taskRunTemplate:
     serviceAccountName: konflux-integration-runner
-    
+
   workspaces:
     - name: workspace
       volumeClaimTemplate:
@@ -60,4 +93,4 @@ spec:
             - ReadWriteOnce
           resources:
             requests:
-              storage: 1Gi
+              storage: 1G

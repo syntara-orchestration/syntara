@@ -162,7 +162,7 @@ const sampleWorkflow = {
   triggers: [{ type: 'manual_trigger', name: 'Manual Trigger' }],
   workflow: {
     activities: [
-      { id: 'task-1', type: 'script', name: 'Script 1', parameters: { type: 'script', language: 'python', code: '' } },
+      { id: 'task-1', type: 'script_python', name: 'Script 1', parameters: { type: 'script_python', code: '' } },
     ],
   },
 }
@@ -186,9 +186,9 @@ const loopWorkflow = {
       },
       {
         id: 'task-1',
-        type: 'script',
+        type: 'script_python',
         name: 'Loop body',
-        parameters: { type: 'script', language: 'python', code: 'print("body")' },
+        parameters: { type: 'script_python', code: 'print("body")' },
       },
     ],
   },

@@ -17,6 +17,11 @@ describe('resolveScope', () => {
     expect(formatScopeLine(result)).toBe('SCOPE=(?:^|\\s)(workflows)/')
   })
 
+  it('scopes execution-plane route changes to that section', () => {
+    const result = resolveScope(['frontend/packages/syntara-ui/src/routes/execution-plane/CreateExecutionTarget.tsx'])
+    expect(result).toEqual({ full: false, sections: ['execution-plane'] })
+  })
+
   it('forces FULL for syntara-mock-api changes alone', () => {
     expect(resolveScope(['frontend/packages/syntara-mock-api/src/handlers.ts'])).toEqual({ full: true })
     expect(formatScopeLine(resolveScope(['frontend/packages/syntara-mock-api/src/handlers.ts']))).toBe('SCOPE=FULL')

@@ -23,8 +23,8 @@ def _converge_workflow_payload(
         {
             "id": f"branch_{chr(97 + i)}",
             "name": f"Branch {chr(65 + i)}",
-            "type": "script",
-            "parameters": {"language": "bash", "code": f'echo "Branch {chr(65 + i)}"'},
+            "type": "script_bash",
+            "parameters": {"code": f'echo "Branch {chr(65 + i)}"'},
         }
         for i in range(branch_count)
     ]
@@ -50,8 +50,8 @@ def _converge_workflow_payload(
                 {
                     "id": "final_action",
                     "name": "Final Action",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": 'echo "Done"'},
+                    "type": "script_bash",
+                    "parameters": {"code": 'echo "Done"'},
                 },
             ],
             "edges": [
@@ -167,6 +167,7 @@ class TestConvergeCRUD:
         assert len(converge_nodes) == 1
         assert converge_nodes[0]["parameters"] == updated_config
 
+    @pytest.mark.usefixtures("ep_deletion_acknowledged")
     async def test_delete_workflow_with_converge_node(self, jwt_client: AsyncClient, test_project_id: UUID) -> None:
         """Delete workflow containing converge node."""
         payload = _converge_workflow_payload(

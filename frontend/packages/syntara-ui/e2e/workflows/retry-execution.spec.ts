@@ -8,7 +8,8 @@
  * 3. Builder run history panel kebab menu
  *
  * Requires a real backend with Temporal — the workflow must complete before
- * retry actions become available.
+ * retry actions become available. Uses a short wait node (not script) so the
+ * fixture does not depend on Execution Plane cold-start dispatch.
  */
 
 import { test, expect, toAppUrl, type Page } from '../fixtures'
@@ -31,6 +32,9 @@ let completedExecutionId: string | null = null
 const retriedExecutionIds: string[] = []
 
 test.beforeAll(async ({ browser }) => {
+  // Hook default matches test timeout (60s); allow the full terminal poll budget.
+  test.setTimeout(TERMINAL_POLL_TIMEOUT_MS + 30_000)
+
   const page = await browser.newPage()
   try {
     const project = await ensureProject(page)
@@ -45,27 +49,28 @@ test.beforeAll(async ({ browser }) => {
       triggers: [{ id: 'trigger_manual', type: 'manual_trigger', name: 'Manual trigger', parameters: {} }],
       nodes: [
         {
-          id: 'echo_node',
-          type: 'script',
-          name: 'Quick Echo',
-          parameters: { language: 'bash', code: 'echo done' },
+          id: 'quick_wait',
+          type: 'wait',
+          name: 'Quick Wait',
+          parameters: { duration: 1 },
         },
       ],
-      edges: [{ from: 'trigger_manual', to: 'echo_node' }],
+      edges: [{ from: 'trigger_manual', to: 'quick_wait' }],
     }))
 
     const runResp = await apiRequest(page, 'post', '/executions', {
       token,
       data: { workflow_id: workflowId, trigger_node_id: 'trigger_manual' },
     })
-    if (runResp.ok()) {
-      const body = (await runResp.json()) as { id: string }
-      completedExecutionId = body.id
-      await pollExecutionStatus(page, completedExecutionId, TERMINAL_STATUSES, {
-        token,
-        timeout: TERMINAL_POLL_TIMEOUT_MS,
-      })
+    if (!runResp.ok()) {
+      throw new Error(`Failed to start retry fixture execution: ${runResp.status()} ${await runResp.text()}`)
     }
+    const body = (await runResp.json()) as { id: string }
+    completedExecutionId = body.id
+    await pollExecutionStatus(page, completedExecutionId, TERMINAL_STATUSES, {
+      token,
+      timeout: TERMINAL_POLL_TIMEOUT_MS,
+    })
   } finally {
     await page.close()
   }

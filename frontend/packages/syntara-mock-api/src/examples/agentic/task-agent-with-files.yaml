@@ -31,10 +31,9 @@ nodes:
         - 'a1b2c3d4-0001-0001-0001-000000000003'
 
   - id: generate_report
-    type: script
+    type: script_python
     name: Generate Report
     parameters:
-      language: python
       environment:
         INPUT_ANALYSIS: ${analyze_docs.output}
       code: |

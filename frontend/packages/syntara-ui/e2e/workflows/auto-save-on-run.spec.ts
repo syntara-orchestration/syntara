@@ -15,7 +15,7 @@ import {
   deleteWorkflow,
   closeStepEditorPanel,
   createWorkflowWithTrigger,
-  addScriptStep,
+  addPythonScriptStep,
   expectCanvasStepTitleVisible,
 } from '../helpers/workflows'
 
@@ -28,8 +28,8 @@ test('workflow auto-saves when clicking Run with unsaved changes', async ({ app 
     await expectCanvasStepTitleVisible(app, 'Manual trigger')
 
     // Make changes to the workflow (add multiple nodes to verify complex state)
-    await addScriptStep(app, 'Auto-Save Test 1', 'print("auto-save-1")')
-    await addScriptStep(app, 'Auto-Save Test 2', 'print("auto-save-2")')
+    await addPythonScriptStep(app, 'Auto-Save Test 1', 'print("auto-save-1")')
+    await addPythonScriptStep(app, 'Auto-Save Test 2', 'print("auto-save-2")')
 
     // Verify the nodes are added (workflow is now dirty)
     await expect(
@@ -134,7 +134,7 @@ test('canceling run dialog with unsaved changes keeps workflow dirty', async ({ 
     await expectCanvasStepTitleVisible(app, 'Manual trigger')
 
     // Make changes
-    await addScriptStep(app, 'Cancel Run Test', 'print("cancel")')
+    await addPythonScriptStep(app, 'Cancel Run Test', 'print("cancel")')
     await expect(
       app.locator('[role="group"][aria-roledescription="node"]').filter({ hasText: 'Cancel Run Test' })
     ).toBeVisible()

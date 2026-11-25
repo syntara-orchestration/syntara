@@ -10,7 +10,7 @@ import { getTriggerInputSchemaFields } from './utils/triggerSchemaUtils'
 // Mock the getNodeOutputSchema function
 vi.mock('@syntara/contracts', () => ({
   getNodeOutputSchema: vi.fn((type: string) => {
-    if (type === 'script') {
+    if (type === 'script_python' || type === 'script_bash') {
       return {
         stdout: { type: 'string' },
         return_code: { type: 'number' },
@@ -67,7 +67,7 @@ vi.mock('./utils/triggerSchemaUtils', () => ({
 const mockUpstreamNode: UpstreamStepInfo = {
   id: 'upstream-1',
   name: 'Previous Step',
-  type: 'script',
+  type: 'script_python',
 }
 
 const mockTriggerNode: UpstreamStepInfo = {

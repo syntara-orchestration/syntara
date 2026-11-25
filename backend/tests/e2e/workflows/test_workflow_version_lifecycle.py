@@ -43,8 +43,8 @@ def _simple_definition(activity_id: str = "task1", description: str = "v1") -> W
                 {
                     "id": activity_id,
                     "name": activity_id,
-                    "type": "script",
-                    "parameters": {"language": "python", "code": f'print("{description}")'},
+                    "type": "script_python",
+                    "parameters": {"code": f'print("{description}")'},
                 },
             ],
             "edges": [{"from": "trigger", "to": activity_id}],

@@ -273,6 +273,34 @@ describe('useDeleteAction', () => {
     )
   })
 
+  it('uses custom successDescription when provided', () => {
+    // Arrange
+    const item = createTestItem({ name: 'Staging OpenShift' })
+    const options = createDefaultOptions({
+      successTitle: 'Deletion accepted',
+      successDescription: (itemName) =>
+        `Execution target "${itemName}" deletion was accepted; it may remain listed briefly while draining completes.`,
+      deleteFn: vi.fn((_params, callbacks: { onSuccess: () => void }) => {
+        callbacks.onSuccess()
+      }),
+    })
+    const { result } = renderHook(() => useDeleteAction(options))
+
+    // Act
+    act(() => {
+      result.current(item)
+    })
+
+    // Assert
+    expect(mockShowAlert).toHaveBeenCalledWith({
+      title: 'Deletion accepted',
+      description:
+        'Execution target "Staging OpenShift" deletion was accepted; it may remain listed briefly while draining completes.',
+      variant: 'success',
+      autoDismiss: true,
+    })
+  })
+
   it('uses custom errorTitle when provided', () => {
     // Arrange
     const item = createTestItem()

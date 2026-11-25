@@ -1,6 +1,7 @@
-import { EdgeHandleEnum, TriggerTypeEnum } from '@syntara/contracts'
+import { ActivityTypeEnum, EdgeHandleEnum, TriggerTypeEnum } from '@syntara/contracts'
 import { describe, expect, it } from 'vitest'
 
+import { ScriptAffinityEnum } from '../routes/builder/utils/scriptExecutionProfile'
 import { buildSwitchCasePort } from '../routes/builder/utils/switchCaseHelpers'
 
 import {
@@ -16,7 +17,8 @@ import {
   createLoopActivity,
   createManualTrigger,
   createScheduledTrigger,
-  createScriptActivity,
+  createPythonScriptActivity,
+  createBashScriptActivity,
   createSwitchActivity,
   createWaitActivity,
   createWebhookTrigger,
@@ -229,50 +231,37 @@ describe('workflowFactories', () => {
   })
 
   describe('Activity Factories', () => {
-    describe('createScriptActivity', () => {
-      it('creates a script activity', () => {
-        const activity = createScriptActivity({
+    describe('createPythonScriptActivity', () => {
+      it('creates a Python script activity without a language parameter', () => {
+        const activity = createPythonScriptActivity({
           id: 'task-1',
           name: 'My Script',
-          language: 'python',
           code: 'print("hello")',
         })
 
-        expect(activity.type).toBe('script')
+        expect(activity.type).toBe(ActivityTypeEnum.SCRIPT_PYTHON)
         expect(activity.id).toBe('task-1')
         expect(activity.name).toBe('My Script')
-        expect(activity.parameters.language).toBe('python')
         expect(activity.parameters.code).toBe('print("hello")')
+        expect(activity.parameters).not.toHaveProperty('language')
       })
 
-      it('creates a bash script activity', () => {
-        const activity = createScriptActivity({
+      it('creates a Bash script activity without a language parameter', () => {
+        const activity = createBashScriptActivity({
           id: 'task-2',
           name: 'Bash Script',
-          language: 'bash',
           code: 'echo hello',
         })
 
-        expect(activity.parameters.language).toBe('bash')
-      })
-
-      it('includes credential_id when provided', () => {
-        const activity = createScriptActivity({
-          id: 'task-3',
-          name: 'Script',
-          language: 'python',
-          code: 'pass',
-          credentialId: 'cred-1',
-        })
-
-        expect(activity.parameters.credential_id).toBe('cred-1')
+        expect(activity.type).toBe(ActivityTypeEnum.SCRIPT_BASH)
+        expect(activity.parameters.code).toBe('echo hello')
+        expect(activity.parameters).not.toHaveProperty('language')
       })
 
       it('includes settings when provided', () => {
-        const activity = createScriptActivity({
+        const activity = createPythonScriptActivity({
           id: 'task-4',
           name: 'Script',
-          language: 'python',
           code: 'pass',
           settings: { timeout: 300 },
         })
@@ -281,10 +270,9 @@ describe('workflowFactories', () => {
       })
 
       it('omits settings when not provided', () => {
-        const activity = createScriptActivity({
+        const activity = createPythonScriptActivity({
           id: 'task-5',
           name: 'Script',
-          language: 'python',
           code: 'pass',
         })
 
@@ -292,10 +280,9 @@ describe('workflowFactories', () => {
       })
 
       it('includes parsed environment when valid JSON provided', () => {
-        const activity = createScriptActivity({
+        const activity = createPythonScriptActivity({
           id: 'task-6',
           name: 'Script',
-          language: 'python',
           code: 'pass',
           environment: '{"MY_VAR": "hello", "OTHER": "world"}',
         })
@@ -304,10 +291,9 @@ describe('workflowFactories', () => {
       })
 
       it('omits environment when not provided', () => {
-        const activity = createScriptActivity({
+        const activity = createPythonScriptActivity({
           id: 'task-7',
           name: 'Script',
-          language: 'python',
           code: 'pass',
         })
 
@@ -315,15 +301,56 @@ describe('workflowFactories', () => {
       })
 
       it('omits environment when invalid JSON provided', () => {
-        const activity = createScriptActivity({
+        const activity = createPythonScriptActivity({
           id: 'task-8',
           name: 'Script',
-          language: 'python',
           code: 'pass',
           environment: 'not valid json',
         })
 
         expect(activity.parameters).not.toHaveProperty('environment')
+      })
+
+      it('includes execution_profile when affinity is required_target', () => {
+        const activity = createPythonScriptActivity({
+          id: 'task-9',
+          name: 'Script',
+          code: 'pass',
+          affinity: ScriptAffinityEnum.REQUIRED_TARGET,
+          executionTargetId: 'target-1',
+        })
+
+        expect(activity.parameters.execution_profile).toEqual({
+          type: 'execution_target',
+          execution_target_id: 'target-1',
+        })
+      })
+
+      it('includes execution_profile for Bash scripts when affinity is required_target', () => {
+        const activity = createBashScriptActivity({
+          id: 'task-11',
+          name: 'Bash Script',
+          code: 'echo hello',
+          affinity: ScriptAffinityEnum.REQUIRED_TARGET,
+          executionTargetId: 'target-2',
+        })
+
+        expect(activity.parameters.execution_profile).toEqual({
+          type: 'execution_target',
+          execution_target_id: 'target-2',
+        })
+      })
+
+      it('omits execution_profile when affinity is none', () => {
+        const activity = createPythonScriptActivity({
+          id: 'task-10',
+          name: 'Script',
+          code: 'pass',
+          affinity: ScriptAffinityEnum.NONE,
+          executionTargetId: 'target-1',
+        })
+
+        expect(activity.parameters).not.toHaveProperty('execution_profile')
       })
     })
 

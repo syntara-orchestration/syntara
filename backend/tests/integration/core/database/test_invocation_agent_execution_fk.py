@@ -23,6 +23,8 @@ from tests.integration.helpers.execution import ExecutionFactory
 from tests.integration.helpers.invocations import InvocationFactory
 from tests.integration.helpers.workflow import WorkflowFactory
 
+pytestmark = pytest.mark.usefixtures("ep_deletion_acknowledged")
+
 
 async def _agent_execution_id(session: AsyncSession, invocation_id: uuid.UUID) -> uuid.UUID | None:
     result = await session.exec(

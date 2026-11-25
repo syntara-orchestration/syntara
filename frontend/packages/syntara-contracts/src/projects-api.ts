@@ -739,7 +739,7 @@ export interface components {
       /** Principal Name */
       principal_name: string
       /** Principal Type */
-      principal_type?: ('user' | 'group' | 'service_account') | null
+      principal_type?: ('user' | 'group' | 'service_account' | 'service') | null
       /** Role Name */
       role_name: string
       /** Role Description */
@@ -1250,7 +1250,7 @@ export interface components {
       name: string
       /**
        * Type
-       * @description Activity type (script, approval, agentic, etc.)
+       * @description Activity type (script_python, script_bash, approval, agentic, etc.)
        */
       type: string
     } & {

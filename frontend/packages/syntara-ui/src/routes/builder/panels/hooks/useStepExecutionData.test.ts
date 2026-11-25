@@ -116,8 +116,8 @@ describe('useStepExecutionData', () => {
 
   it('returns inputData keyed by upstream node IDs', () => {
     mockUpstreamNodes.mockReturnValue([
-      { id: 'upstream-a', name: 'Script A', type: 'script' },
-      { id: 'upstream-b', name: 'Script B', type: 'script' },
+      { id: 'upstream-a', name: 'Script A', type: 'script_python' },
+      { id: 'upstream-b', name: 'Script B', type: 'script_python' },
     ])
 
     mockUseQuery.mockReturnValue({
@@ -153,7 +153,7 @@ describe('useStepExecutionData', () => {
   })
 
   it('returns null inputData when upstream nodes have no output_data', () => {
-    mockUpstreamNodes.mockReturnValue([{ id: 'upstream-a', name: 'Script A', type: 'script' }])
+    mockUpstreamNodes.mockReturnValue([{ id: 'upstream-a', name: 'Script A', type: 'script_python' }])
 
     mockUseQuery.mockReturnValue({
       data: {
@@ -197,8 +197,8 @@ describe('useStepExecutionData', () => {
 
   it('only includes upstream nodes that have matching activities', () => {
     mockUpstreamNodes.mockReturnValue([
-      { id: 'upstream-a', name: 'Script A', type: 'script' },
-      { id: 'upstream-missing', name: 'Missing', type: 'script' },
+      { id: 'upstream-a', name: 'Script A', type: 'script_python' },
+      { id: 'upstream-missing', name: 'Missing', type: 'script_python' },
     ])
 
     mockUseQuery.mockReturnValue({
@@ -235,7 +235,7 @@ describe('useStepExecutionData', () => {
 
   describe('workflowId fallback path', () => {
     it('fetches latest completed execution when workflowId is provided without executionId', () => {
-      mockUpstreamNodes.mockReturnValue([{ id: 'upstream-1', name: 'Script', type: 'script' }])
+      mockUpstreamNodes.mockReturnValue([{ id: 'upstream-1', name: 'Script', type: 'script_python' }])
 
       mockUseQuery.mockImplementation((_method: unknown, path: unknown) => {
         if (path === '/executions') {

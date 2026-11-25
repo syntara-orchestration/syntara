@@ -6,7 +6,7 @@ import pytest
 VALID_WORKFLOW_EXECUTION_ID = "550e8400-e29b-41d4-a716-446655440000"
 VALID_WORKFLOW_ID = "b8edd493-98c0-44e8-babb-34eb9256aa50"
 VALID_NODE_HASH = "b" * 64
-SAMPLE_NODE_DEF = {"name": "test-node", "type": "script"}
+SAMPLE_NODE_DEF = {"name": "test-node", "type": "script_python"}
 
 
 @pytest.fixture

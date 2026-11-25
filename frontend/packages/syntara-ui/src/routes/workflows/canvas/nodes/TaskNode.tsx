@@ -125,6 +125,8 @@ export function TaskActivityDetails(
   const taskExecutorLabel = executorMeta?.label ?? 'Task'
   const taskExecutor = actualExecutor || (props.data.type ?? '')
   const config = props.data.parameters ?? {}
+  const isScriptExecutor =
+    taskExecutor === ExecutorTypeEnum.SCRIPT_PYTHON || taskExecutor === ExecutorTypeEnum.SCRIPT_BASH
   const isAapJobTemplate = taskExecutor === ExecutorTypeEnum.AAP_JOB_TEMPLATE
   const isAapWorkflowTemplate = taskExecutor === ExecutorTypeEnum.AAP_WORKFLOW_JOB_TEMPLATE
   const aapJobConfig = isAapJobTemplate ? (config as AAPJobTemplateConfig) : null
@@ -157,9 +159,6 @@ export function TaskActivityDetails(
       <SynStepBody>
         <SynDetailList>
           {renderCondition(dataWithMetadata.condition)}
-          {taskExecutor === ExecutorTypeEnum.SCRIPT && (
-            <>{renderText('Language', (config as { language: string }).language)}</>
-          )}
           {taskExecutor === ExecutorTypeEnum.HTTP_REQUEST && (
             <>
               {renderText('Method', (config as { method: string }).method)}
@@ -179,7 +178,7 @@ export function TaskActivityDetails(
           {taskExecutor === ExecutorTypeEnum.AGENTIC && (
             <AgenticStepDetails config={config as AgenticConfig} toolsText={toolsText} />
           )}
-          {taskExecutor !== ExecutorTypeEnum.SCRIPT && renderJson(props.data, props.showJson)}
+          {!isScriptExecutor && renderJson(props.data, props.showJson)}
         </SynDetailList>
       </SynStepBody>
     </>

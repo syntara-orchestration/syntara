@@ -164,14 +164,15 @@ class TestWorkflowSchemaReferenceIntegrity:
     def test_node_schemas_reference_valid_settings_tiers(self) -> None:
         """All node schemas must reference a valid settings tier.
 
-        This verifies that individual node schemas (script, approval, etc.) use
+        This verifies that individual node schemas (Python, Bash, approval, etc.) use
         the correct settings tier and don't reference non-existent definitions.
         """
         schemas = _load_workflow_schemas()
 
         # Check all executor schemas
         executor_files = [
-            ("executors/script.schema.json", "nodeSettingsNoRetry"),
+            ("executors/script_python.schema.json", "nodeSettingsNoRetry"),
+            ("executors/script_bash.schema.json", "nodeSettingsNoRetry"),
             ("executors/agentic.schema.json", "nodeSettingsNoRetry"),
             ("executors/http_request.schema.json", "nodeSettingsFull"),
             ("executors/aap_job_template.schema.json", "nodeSettingsFull"),

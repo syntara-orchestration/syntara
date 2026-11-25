@@ -10,33 +10,28 @@ nodes:
     type: parallel
 
   - id: task_a
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       code: echo "Task A"
 
   - id: task_b
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       code: echo "Task B"
 
   - id: task_c
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       code: echo "Task C"
 
   - id: task_d
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       code: echo "Task D"
 
   - id: task_e
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       code: echo "Task E"
 
   - id: join_majority

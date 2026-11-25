@@ -115,8 +115,8 @@ def test_script_timeout_setting_affects_execution(
                     {
                         "id": "slow_script",
                         "name": "Slow Script",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "sleep 10 && echo done"},
+                        "type": "script_bash",
+                        "parameters": {"code": "sleep 10 && echo done"},
                     }
                 ],
                 "edges": [{"from": "trigger", "to": "slow_script"}],
@@ -168,8 +168,8 @@ def test_max_loop_iterations_setting_affects_execution(
                     {
                         "id": "body",
                         "name": "Body",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo iteration"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo iteration"},
                     },
                 ],
                 "edges": [

@@ -1,5 +1,6 @@
 """Tests for integrations/lib/url_validation.validate_integration_url_no_ssrf()."""
 
+import os
 from unittest.mock import patch
 
 import pytest
@@ -151,3 +152,72 @@ class TestValidateConfigurationNoSsrf:
         # allow_http=True: the same URL is accepted, proving the flag reached the validator.
         allowed = type("C", (), {"base_url": f"http://{_PUBLIC_IP}", "allow_http": True})()
         validate_integration_configuration_no_ssrf(allowed)
+
+
+class TestInClusterKubernetesApiAutoAllow:
+    """The in-cluster Kubernetes API is auto-allowed when running inside a cluster."""
+
+    def test_in_cluster_api_accepted_when_running_in_cluster(self) -> None:
+        """The API Service resolving to a private ClusterIP is accepted in-cluster."""
+        with (
+            patch.dict(os.environ, {"KUBERNETES_SERVICE_HOST": "10.96.0.1"}),
+            patch(_PATCH_GETADDRINFO, return_value=_mock_getaddrinfo("10.96.0.1")),
+        ):
+            validate_integration_url_no_ssrf("https://kubernetes.default.svc")
+
+    def test_in_cluster_api_short_form_accepted(self) -> None:
+        """The search-path short form of the API Service is accepted too."""
+        with (
+            patch.dict(os.environ, {"KUBERNETES_SERVICE_HOST": "10.96.0.1"}),
+            patch(_PATCH_GETADDRINFO, return_value=_mock_getaddrinfo("10.96.0.1")),
+        ):
+            validate_integration_url_no_ssrf("https://kubernetes.default")
+
+    def test_in_cluster_api_fqdn_still_rejected(self) -> None:
+        r"""The ".svc.cluster.local" FQDN is rejected even in-cluster.
+
+        The SSRF engine blocks every hostname ending in ".svc.cluster.local" as
+        Kubernetes-internal DNS, unconditionally — no allowlist can override it —
+        so the auto-allow deliberately does not include that spelling.
+        """
+        with (
+            patch.dict(os.environ, {"KUBERNETES_SERVICE_HOST": "10.96.0.1"}),
+            patch(_PATCH_GETADDRINFO, return_value=_mock_getaddrinfo("10.96.0.1")),
+            pytest.raises(ValueError, match="SSRF blocked"),
+        ):
+            validate_integration_url_no_ssrf("https://kubernetes.default.svc.cluster.local")
+
+    def test_in_cluster_api_rejected_outside_a_cluster(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Outside a cluster the auto-allow is inert and the allowlist opt-in still applies."""
+        monkeypatch.delenv("KUBERNETES_SERVICE_HOST", raising=False)
+        with (
+            patch(_PATCH_GETADDRINFO, return_value=_mock_getaddrinfo("10.96.0.1")),
+            pytest.raises(ValueError, match="SSRF blocked"),
+        ):
+            validate_integration_url_no_ssrf("https://kubernetes.default.svc")
+
+    def test_auto_allow_covers_only_the_api_service(self) -> None:
+        """Other in-cluster service DNS is still rejected while running in-cluster."""
+        with (
+            patch.dict(os.environ, {"KUBERNETES_SERVICE_HOST": "10.96.0.1"}),
+            patch(_PATCH_GETADDRINFO, return_value=_mock_getaddrinfo("10.96.0.2")),
+            pytest.raises(ValueError, match="SSRF blocked"),
+        ):
+            validate_integration_url_no_ssrf("https://myao-backend.default.svc")
+
+    def test_auto_allow_still_blocks_cloud_metadata(self) -> None:
+        """Cloud metadata stays blocked with the in-cluster auto-allow active."""
+        with (
+            patch.dict(os.environ, {"KUBERNETES_SERVICE_HOST": "10.96.0.1"}),
+            pytest.raises(ValueError, match="SSRF blocked"),
+        ):
+            validate_integration_url_no_ssrf("http://169.254.169.254", allow_http=True)
+
+    def test_in_cluster_api_accepted_combined_with_configured_allowlist(self) -> None:
+        """The auto-allow merges with, not replaces, the configured allowlist."""
+        with (
+            patch.dict(os.environ, {"KUBERNETES_SERVICE_HOST": "10.96.0.1"}),
+            patch(_PATCH_GETADDRINFO, return_value=_mock_getaddrinfo("10.96.0.1")),
+            patch(_PATCH_GET_SETTINGS, return_value=_settings(["aap.internal.corp"])),
+        ):
+            validate_integration_url_no_ssrf("https://kubernetes.default.svc")

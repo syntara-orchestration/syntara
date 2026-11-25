@@ -717,6 +717,26 @@ class TestActivityEventProcessing:
 
         assert self.metadata.pending_activity_updates[1]["status"] == ActivityStatus.CANCELLED
 
+    def test_process_activity_failed_for_cancelled_execution_plane_work(self) -> None:
+        """Execution Plane cancellation is terminal but should not appear as a failure."""
+        self.metadata.pending_activity_updates[1] = {
+            "activity_id": "test-activity",
+            "status": ActivityStatus.RUNNING,
+            "completed_at": None,
+            "error_details": None,
+        }
+        event = self._create_mock_event(
+            EventType.EVENT_TYPE_ACTIVITY_TASK_FAILED,
+            event_id=3,
+            scheduled_event_id=1,
+            failure_message="Execution Plane work was cancelled before execution",
+            failure_type="ExecutionPlaneWorkCancelled",
+        )
+
+        self.service._process_activity_failed(event, self.metadata)
+
+        assert self.metadata.pending_activity_updates[1]["status"] == ActivityStatus.CANCELLED
+
     @pytest.mark.parametrize(
         ("event_type", "expected_status", "expected_error", "failure_message"),
         [
@@ -791,7 +811,7 @@ class TestActivityEventProcessing:
     def test_process_activity_completed_sets_completed_for_non_approval_nodes(self) -> None:
         """Test that non-approval activities still get COMPLETED status."""
         self.metadata.activity_definitions_map = {
-            "script-node": {"id": "script-node", "type": "script", "parameters": {}},
+            "script-node": {"id": "script-node", "type": "script_python", "parameters": {}},
         }
         self.metadata.pending_activity_updates[1] = {
             "activity_id": "script-node",
@@ -1140,7 +1160,7 @@ class TestControlNodeSyncTrigger:
     async def test_no_sync_skipped_for_script_node(self) -> None:
         """Completing a non-control node (script) does NOT sync skipped nodes."""
         metadata = create_test_metadata(
-            activity_definitions_map={"script_node": {"type": NodeType.SCRIPT}},
+            activity_definitions_map={"script_node": {"type": NodeType.SCRIPT_PYTHON}},
             pending_activity_updates={1: {"activity_id": "script_node", "status": ActivityStatus.RUNNING}},
         )
         event = self._create_completed_event()
@@ -1738,7 +1758,7 @@ class TestIsAgenticActivity:
         ("activity_def", "expected"),
         [
             ({"type": "agentic"}, True),
-            ({"type": "script"}, False),
+            ({"type": "script_python"}, False),
             ({"type": "aap_job_template"}, False),
             ({}, False),
         ],
@@ -1761,13 +1781,13 @@ class TestExtractTriggerActivityType:
             ({"trigger-1": {"type": "eda_trigger"}}, "eda_trigger"),
             (
                 {
-                    "node-1": {"type": "script"},
+                    "node-1": {"type": "script_python"},
                     "trigger-1": {"type": "manual_trigger"},
                     "node-2": {"type": "condition"},
                 },
                 "manual_trigger",
             ),
-            ({"node-1": {"type": "script"}, "node-2": {"type": "agentic"}}, None),
+            ({"node-1": {"type": "script_python"}, "node-2": {"type": "agentic"}}, None),
             ({}, None),
             ({"node-1": {"type": 123}}, None),
             ({"node-1": {"name": "test"}}, None),
@@ -2028,7 +2048,7 @@ class TestLoopIterationSync:
         activity.output_data = None
         activity.updated_at = None
         activity.iteration = None
-        activity.node_type = NodeType.SCRIPT
+        activity.node_type = NodeType.SCRIPT_PYTHON
         return activity
 
     def _mock_session_with_activities(self, activities: list[Mock]) -> Mock:
@@ -2433,7 +2453,7 @@ class TestGetOrCreateIterationRecord:
         activity.activity_name = activity_name
         activity.status = status
         activity.iteration = iteration
-        activity.node_type = NodeType.SCRIPT
+        activity.node_type = NodeType.SCRIPT_PYTHON
         return activity
 
     def test_returns_none_when_original_not_found(self) -> None:
@@ -3267,7 +3287,7 @@ class TestSyncNodesToTerminalStatus:
         mock_session.__aexit__ = AsyncMock(return_value=None)
         self.mock_session_factory.return_value = mock_session
 
-        node_def = {"id": "node-A", "type": "script"}
+        node_def = {"id": "node-A", "type": "script_python"}
         metadata = self._create_metadata()
         metadata.activity_definitions_map = {"node-A": node_def}
 
@@ -3277,7 +3297,7 @@ class TestSyncNodesToTerminalStatus:
         record = mock_session.add.call_args[0][0]
         assert record.activity_name == "node-A"
         assert record.status == ActivityStatus.SKIPPED
-        assert record.node_type == node_def.get("type", "script")
+        assert record.node_type == node_def.get("type", "internal_activity")
         assert record.temporal_activity_id.startswith("pre-resolved-")
         assert record.started_at is not None
         assert record.completed_at is not None
@@ -3447,7 +3467,7 @@ class TestSyntheticActivityStarted:
         """Test that a synthetic STARTED event transitions PENDING to RUNNING."""
         metadata = create_test_metadata(
             execution_id=self.execution_id,
-            activity_definitions_map={"my-activity": {"type": "script"}},
+            activity_definitions_map={"my-activity": {"type": "script_python"}},
             pending_activity_updates={
                 5: {
                     "activity_id": "my-activity",
@@ -4368,7 +4388,7 @@ class TestMonitorExecutionIntegration:
         """Test that SyntheticActivityStarted events are processed by the consumer."""
         metadata = create_test_metadata(
             execution_id=self.execution_id,
-            activity_definitions_map={"my-activity": {"type": "script"}},
+            activity_definitions_map={"my-activity": {"type": "script_python"}},
             pending_activity_updates={
                 5: {
                     "activity_id": "my-activity",
@@ -4887,7 +4907,7 @@ class TestUpdateNonTerminalActivitiesOnCancel:
             id=uuid4(),
             execution_id=execution_id,
             activity_name="pending_activity",
-            node_type="script",
+            node_type="script_python",
             temporal_activity_id="temporal-pending",
             status=ActivityStatus.PENDING,
         )
@@ -4896,7 +4916,7 @@ class TestUpdateNonTerminalActivitiesOnCancel:
             id=uuid4(),
             execution_id=execution_id,
             activity_name="running_activity",
-            node_type="script",
+            node_type="script_python",
             temporal_activity_id="temporal-running",
             status=ActivityStatus.RUNNING,
             started_at=datetime.now(UTC),
@@ -4916,7 +4936,7 @@ class TestUpdateNonTerminalActivitiesOnCancel:
             id=uuid4(),
             execution_id=execution_id,
             activity_name="completed_activity",
-            node_type="script",
+            node_type="script_python",
             temporal_activity_id="temporal-completed",
             status=ActivityStatus.COMPLETED,
             started_at=datetime.now(UTC),
@@ -4968,7 +4988,7 @@ class TestUpdateNonTerminalActivitiesOnCancel:
             id=uuid4(),
             execution_id=execution_id,
             activity_name="retrying_activity",
-            node_type="script",
+            node_type="script_python",
             temporal_activity_id="temporal-retrying",
             status=ActivityStatus.RETRYING,
             started_at=datetime.now(UTC),
@@ -5008,7 +5028,7 @@ class TestUpdateNonTerminalActivitiesOnCancel:
             id=uuid4(),
             execution_id=execution_id,
             activity_name="completed_activity",
-            node_type="script",
+            node_type="script_python",
             temporal_activity_id="temporal-completed",
             status=ActivityStatus.COMPLETED,
             started_at=datetime.now(UTC),
@@ -5019,7 +5039,7 @@ class TestUpdateNonTerminalActivitiesOnCancel:
             id=uuid4(),
             execution_id=execution_id,
             activity_name="failed_activity",
-            node_type="script",
+            node_type="script_python",
             temporal_activity_id="temporal-failed",
             status=ActivityStatus.FAILED,
             started_at=datetime.now(UTC),
@@ -5059,7 +5079,7 @@ class TestUpdateNonTerminalActivitiesOnCancel:
             id=uuid4(),
             execution_id=execution_id,
             activity_name="pending_1",
-            node_type="script",
+            node_type="script_python",
             temporal_activity_id="temporal-pending-1",
             status=ActivityStatus.PENDING,
         )
@@ -5068,7 +5088,7 @@ class TestUpdateNonTerminalActivitiesOnCancel:
             id=uuid4(),
             execution_id=execution_id,
             activity_name="pending_2",
-            node_type="script",
+            node_type="script_python",
             temporal_activity_id="temporal-pending-2",
             status=ActivityStatus.PENDING,
         )
@@ -5434,7 +5454,7 @@ class TestUpdateApprovalPendingFlag:
         """Flag should be True if any approval is WAITING among multiple activities."""
         execution = self._make_execution(approval_pending=False)
         activities = [
-            self._make_activity(NodeType.SCRIPT, ActivityStatus.COMPLETED),
+            self._make_activity(NodeType.SCRIPT_PYTHON, ActivityStatus.COMPLETED),
             self._make_activity(NodeType.APPROVAL, ActivityStatus.WAITING),
             self._make_activity(NodeType.WAIT, ActivityStatus.WAITING),
         ]
@@ -5461,7 +5481,7 @@ class TestUpdateApprovalPendingFlag:
         """Non-approval node types in WAITING status should not set flag."""
         execution = self._make_execution(approval_pending=False)
         activity = Mock(spec=ActivityExecution)
-        activity.node_type = "script"
+        activity.node_type = "script_python"
         activity.status = ActivityStatus.WAITING
 
         result = self.service._update_approval_pending_flag(execution, [activity])
@@ -6104,7 +6124,7 @@ class TestNonTerminalIoQuerySkip:
         existing = Mock(spec=ActivityExecution)
         existing.activity_name = "script_1"
         existing.status = ActivityStatus.RUNNING  # already past first event
-        existing.node_type = NodeType.SCRIPT
+        existing.node_type = NodeType.SCRIPT_PYTHON
         existing.started_at = None
         existing.completed_at = None
         existing.input_data = {"host": "server-1"}  # input already fetched on the first event
@@ -6144,7 +6164,7 @@ class TestNonTerminalIoQuerySkip:
         existing = Mock(spec=ActivityExecution)
         existing.activity_name = "script_1"
         existing.status = ActivityStatus.PENDING  # initial DB status, input not yet stored
-        existing.node_type = NodeType.SCRIPT
+        existing.node_type = NodeType.SCRIPT_PYTHON
         existing.started_at = None
         existing.completed_at = None
         existing.input_data = {}  # empty → first event
@@ -6187,7 +6207,7 @@ class TestNonTerminalIoQuerySkip:
         existing = Mock(spec=ActivityExecution)
         existing.activity_name = "script_1"
         existing.status = ActivityStatus.RUNNING  # pre-terminal DB status
-        existing.node_type = NodeType.SCRIPT
+        existing.node_type = NodeType.SCRIPT_PYTHON
         existing.started_at = datetime(2025, 1, 20, 10, 0, 0, tzinfo=UTC)
         existing.completed_at = None
         existing.input_data = {}

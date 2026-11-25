@@ -25,7 +25,7 @@ const sampleWorkflow = {
   id: 'wf-1',
   triggers: [{ id: 'trig-1', type: 'manual_trigger' }],
   workflow: {
-    activities: [{ id: 'task-1', type: 'script', name: 'Task', parameters: {} }],
+    activities: [{ id: 'task-1', type: 'script_python', name: 'Task', parameters: {} }],
   },
 }
 

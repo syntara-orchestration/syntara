@@ -22,7 +22,7 @@ def test_resolve_retry_policy_inline_fallbacks_match_catalog_defaults() -> None:
     catalog entries. If a catalog default is changed without updating the inline
     fallback (or vice versa), this test fails.
     """
-    node = ActivityNode(node_id="n", node_type="script", parameters={})
+    node = ActivityNode(node_id="n", node_type="script_python", parameters={})
 
     result_inline = resolve_retry_policy(node, {})
     result_catalog = resolve_retry_policy(node, _catalog_defaults())
@@ -36,14 +36,14 @@ def test_resolve_retry_policy_inline_fallbacks_match_catalog_defaults() -> None:
 
 def test_resolve_max_output_bytes_from_catalog() -> None:
     """Catalog value (KB) is converted to bytes."""
-    node = ActivityNode(node_id="n", node_type="script", parameters={})
+    node = ActivityNode(node_id="n", node_type="script_python", parameters={})
     result = resolve_max_output_bytes(node, {"workflow_engine.script_max_output_kb": 512})
     assert result == 512 * 1024
 
 
 def test_resolve_max_output_bytes_fallback() -> None:
     """Default is used when no catalog value is present."""
-    node = ActivityNode(node_id="n", node_type="script", parameters={})
+    node = ActivityNode(node_id="n", node_type="script_python", parameters={})
     result = resolve_max_output_bytes(node, {})
     assert result == DEFAULT_MAX_OUTPUT_BYTES
 

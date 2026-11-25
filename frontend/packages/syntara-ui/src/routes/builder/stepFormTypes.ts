@@ -1,4 +1,6 @@
-import type { MissedSchedulePolicy, NodeSettings } from '@syntara/contracts'
+import { ExecutorTypeEnum, type MissedSchedulePolicy, type NodeSettings } from '@syntara/contracts'
+
+import type { ScriptAffinity } from './utils/scriptExecutionProfile'
 
 export type TriggerFormData = {
   name?: string
@@ -17,9 +19,8 @@ export type TriggerFormData = {
 
 export type ActionFormData = {
   name: string
-  executor: 'script' | 'http_request'
-  // Allow legacy or custom values to round-trip existing data.
-  language?: string
+  executor:
+    typeof ExecutorTypeEnum.SCRIPT_PYTHON | typeof ExecutorTypeEnum.SCRIPT_BASH | typeof ExecutorTypeEnum.HTTP_REQUEST
   code?: string
   method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
   url?: string
@@ -28,5 +29,9 @@ export type ActionFormData = {
   parameters?: string
   requiresApproval?: boolean
   credential_id?: string
+  /** Script Execution tab: none lets EP place; required_target pins a target. */
+  affinity?: ScriptAffinity
+  /** Required when affinity is required_target. */
+  execution_target_id?: string
   settings?: NodeSettings
 }

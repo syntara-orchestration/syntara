@@ -17,9 +17,9 @@ function createLargeWorkflowDefinition(name: string): V2WorkflowDefinition {
     triggers: [{ id: 'trigger_1', type: 'manual_trigger', name: 'Manual trigger', parameters: {} }],
     nodes: Array.from({ length: IMPORTED_STEP_COUNT }, (_, index) => ({
       id: `node_${index + 1}`,
-      type: 'script',
+      type: 'script_python',
       name: `Imported step ${index + 1}`,
-      parameters: { language: 'python', code: `print(${index + 1})` },
+      parameters: { code: `print(${index + 1})` },
     })),
     edges: Array.from({ length: IMPORTED_STEP_COUNT }, (_, index) => ({
       from: index === 0 ? 'trigger_1' : `node_${index}`,
@@ -52,14 +52,14 @@ test('large workflow remains usable across semantic zoom after adding a step', a
   // zoom level with many nodes, so assert by role rather than visible text.
   const terminalImportedStep = app
     .locator('.react-flow')
-    .getByRole('button', { name: `Imported step ${IMPORTED_STEP_COUNT}, Script` })
+    .getByRole('button', { name: `Imported step ${IMPORTED_STEP_COUNT}, Python Script` })
   await expect(terminalImportedStep, 'the imported 60-step workflow should be on the canvas').toBeAttached({
     timeout: 15_000,
   })
 
   const panel = await clickAddConnectedStep(app)
   await panel.getByRole('button', { name: 'Action', exact: true }).click()
-  await panel.getByRole('button', { name: 'Script', exact: true }).click()
+  await panel.getByRole('button', { name: 'Python Script', exact: true }).click()
   await app.getByRole('textbox', { name: 'Name', exact: true }).fill('Step added after import')
   await fillCodeEditor(app, { value: 'print("added")' })
   await app.getByRole('button', { name: 'Create', exact: true }).click()
@@ -69,7 +69,7 @@ test('large workflow remains usable across semantic zoom after adding a step', a
   // past the threshold they render a full card with a heading instead — hence the two locators below.
   const addedStepSemanticZoomButton = app
     .locator('.react-flow')
-    .getByRole('button', { name: 'Step added after import, Script' })
+    .getByRole('button', { name: 'Step added after import, Python Script' })
   const addedStepHeading = app.locator('.react-flow').getByRole('heading', { name: 'Step added after import' })
   await expect(addedStepSemanticZoomButton, 'the large imported workflow should start in semantic zoom').toBeVisible()
 

@@ -10,9 +10,8 @@ triggers:
 nodes:
   - id: failing_task
     name: Failing Task
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       code: |
         echo "Attempting task..."
         echo "ERROR: Something went wrong" >&2

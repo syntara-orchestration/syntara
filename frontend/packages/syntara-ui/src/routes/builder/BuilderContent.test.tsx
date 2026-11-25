@@ -182,10 +182,10 @@ describe('BuilderContent', () => {
           triggers: [{ id: 'manual_trigger', type: 'manual_trigger', parameters: {} }],
           nodes: [
             {
-              type: 'script' as const,
+              type: 'script_python' as const,
               id: 'task-1',
               name: 'Task 1',
-              parameters: { language: 'python', code: '' },
+              parameters: { code: '' },
             },
           ],
           edges: [],
@@ -216,10 +216,10 @@ describe('BuilderContent', () => {
           ],
           nodes: [
             {
-              type: 'script' as const,
+              type: 'script_python' as const,
               id: 'task-1',
               name: 'Task 1',
-              parameters: { language: 'python', code: 'print("hello")' },
+              parameters: { code: 'print("hello")' },
             },
           ],
           edges: [
@@ -1403,10 +1403,10 @@ describe('BuilderContent', () => {
             triggers: [{ id: 'manual_trigger', type: 'manual_trigger', parameters: {} }],
             nodes: [
               {
-                type: 'script' as const,
+                type: 'script_python' as const,
                 id: 'task-1',
                 name: 'Task 1',
-                parameters: { language: 'python', code: '' },
+                parameters: { code: '' },
               },
             ],
             edges: [],
@@ -1435,10 +1435,10 @@ describe('BuilderContent', () => {
             triggers: [{ id: 'manual_trigger', type: 'manual_trigger', parameters: {} }],
             nodes: [
               {
-                type: 'script' as const,
+                type: 'script_python' as const,
                 id: 'branch-task-1',
                 name: 'Branch Task',
-                parameters: { language: 'python', code: '' },
+                parameters: { code: '' },
               },
             ],
             edges: [],
@@ -1763,10 +1763,10 @@ describe('BuilderContent', () => {
             triggers: [],
             nodes: [
               {
-                type: 'script' as const,
+                type: 'script_python' as const,
                 id: 'task-1',
                 name: 'Task 1',
-                parameters: { language: 'python', code: '' },
+                parameters: { code: '' },
               },
             ],
             edges: [],
@@ -2179,10 +2179,10 @@ describe('BuilderContent', () => {
                 parameters: { condition: 'true' },
               },
               {
-                type: 'script' as const,
+                type: 'script_python' as const,
                 id: 'task-inner',
                 name: 'Inner Task',
-                parameters: { language: 'python', code: '' },
+                parameters: { code: '' },
               },
             ],
             edges: [{ from: 'cond-1', to: 'task-inner', from_port: 'true' }],
@@ -2560,7 +2560,11 @@ describe('BuilderContent', () => {
             schema_version: '2.0.0' as const,
             triggers: [{ id: 'webhook_trigger_1', type: 'webhook', parameters: {} as Record<string, never> }],
             nodes: [
-              { id: 'task-1', type: 'script', parameters: { code: 'print("hello")' } as Record<string, unknown> },
+              {
+                id: 'task-1',
+                type: 'script_python',
+                parameters: { code: 'print("hello")' } as Record<string, unknown>,
+              },
             ],
             edges: [{ from: 'webhook_trigger_1', to: 'task-1' }],
             $defs: {},
@@ -2653,7 +2657,7 @@ describe('BuilderContent', () => {
             triggers: [{ id: 'trigger-1', type: 'manual_trigger', parameters: {} as Record<string, never> }],
             nodes: [
               { id: 'cond-1', type: 'condition', parameters: { condition: 'true' } as Record<string, unknown> },
-              { id: 'task-true', type: 'script', parameters: { code: '' } as Record<string, unknown> },
+              { id: 'task-true', type: 'script_python', parameters: { code: '' } as Record<string, unknown> },
             ],
             edges: [
               { from: 'trigger-1', to: 'cond-1' },
@@ -2703,8 +2707,8 @@ describe('BuilderContent', () => {
             schema_version: '2.0.0' as const,
             triggers: [],
             nodes: [
-              { id: 'task-1', type: 'script', parameters: { code: '' } as Record<string, unknown> },
-              { id: 'task-2', type: 'script', parameters: { code: '' } as Record<string, unknown> },
+              { id: 'task-1', type: 'script_python', parameters: { code: '' } as Record<string, unknown> },
+              { id: 'task-2', type: 'script_python', parameters: { code: '' } as Record<string, unknown> },
             ],
             edges: [
               { from: 'task-1', to: 'task-2' }, // No to_port
@@ -2753,7 +2757,7 @@ describe('BuilderContent', () => {
             triggers: [],
             nodes: [
               { id: 'loop-1', type: 'loop', parameters: { type: 'for_each', items: '[]' } as Record<string, unknown> },
-              { id: 'loop-body', type: 'script', parameters: { code: '' } as Record<string, unknown> },
+              { id: 'loop-body', type: 'script_python', parameters: { code: '' } as Record<string, unknown> },
             ],
             edges: [
               { from: 'loop-1', to: 'loop-body', from_port: 'iterate' }, // v2 name

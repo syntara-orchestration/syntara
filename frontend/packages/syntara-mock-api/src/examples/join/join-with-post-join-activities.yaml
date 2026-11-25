@@ -10,27 +10,24 @@ nodes:
     type: parallel
 
   - id: fetch_data_a
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       code: |
         echo "Fetching data A"
         sleep 0.1
         echo '{"source": "A", "count": 10}'
 
   - id: fetch_data_b
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       code: |
         echo "Fetching data B"
         sleep 0.3
         echo '{"source": "B", "count": 20}'
 
   - id: fetch_data_c
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       code: |
         echo "Fetching data C"
         sleep 0.1
@@ -48,9 +45,8 @@ nodes:
 
   - id: process_aggregated_data
     name: Process Aggregated Data
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       code: |
         echo "Processing aggregated data from all sources"
         echo "All parallel tasks have completed"
@@ -58,9 +54,8 @@ nodes:
 
   - id: send_notification
     name: Send Completion Notification
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       code: |
         echo "Notification: All data fetching and aggregation complete"
         echo "Ready for next stage"

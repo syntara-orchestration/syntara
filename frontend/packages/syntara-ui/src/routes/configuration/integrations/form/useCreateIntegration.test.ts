@@ -30,10 +30,21 @@ vi.mock('../useProjectAssignmentSync', () => ({
 }))
 
 const mockInvalidateQueries = vi.fn().mockResolvedValue(undefined)
-const mockQueryClient = { invalidateQueries: mockInvalidateQueries }
+const mockFetchQuery = vi.fn().mockResolvedValue(false)
+const mockQueryClient = { invalidateQueries: mockInvalidateQueries, fetchQuery: mockFetchQuery }
 vi.mock('@tanstack/react-query', async () => {
   const actual = await vi.importActual('@tanstack/react-query')
   return { ...actual, useQueryClient: () => mockQueryClient }
+})
+
+vi.mock('./useOpenShiftIntegrationExists', async () => {
+  const actual = await vi.importActual<typeof import('./useOpenShiftIntegrationExists')>(
+    './useOpenShiftIntegrationExists'
+  )
+  return {
+    ...actual,
+    fetchOpenShiftIntegrationExists: vi.fn().mockResolvedValue(false),
+  }
 })
 
 function createTestFormData(overrides?: Partial<IntegrationFormData>): IntegrationFormData {
@@ -60,6 +71,8 @@ describe('useCreateIntegration', () => {
     mockSyncAssignments.mockClear().mockResolvedValue({ added: [], removed: [], errors: [] })
     mockHandleError.mockClear()
     mockHandleError.mockReturnValue(vi.fn())
+    mockInvalidateQueries.mockClear()
+    mockFetchQuery.mockClear().mockResolvedValue(false)
   })
 
   it('creates integration with correct body', async () => {
@@ -101,6 +114,21 @@ describe('useCreateIntegration', () => {
     expect(vi.mocked(tanstackRouter.navigate)).toHaveBeenCalledWith(
       expect.objectContaining({ to: '/configuration/integrations' })
     )
+  })
+
+  it('invalidates the openshift existence query after create', async () => {
+    const formData = createTestFormData()
+    const { result } = renderHook(() => useCreateIntegration({ handleError: mockHandleError }))
+
+    act(() => {
+      result.current(formData)
+    })
+
+    await waitFor(() => {
+      expect(mockInvalidateQueries).toHaveBeenCalledWith({
+        queryKey: ['openshift-integration-exists'],
+      })
+    })
   })
 
   it('handles creation error without navigating', async () => {
@@ -313,5 +341,89 @@ describe('useCreateIntegration', () => {
         expect.objectContaining({ title: 'Integration created with warnings', variant: 'warning' })
       )
     })
+  })
+
+  it('blocks openshift create when an execution plane integration already exists', async () => {
+    mockFetchQuery.mockResolvedValueOnce(true)
+    const formData = createTestFormData({
+      integration_type: 'openshift',
+      configuration: {
+        integration_type: 'openshift',
+        base_url: 'https://api.cluster.example.com:6443',
+        allow_http: false,
+        insecure_skip_tls_verify: false,
+        ca_certificate: null,
+      },
+    })
+    const { result } = renderHook(() => useCreateIntegration({ handleError: mockHandleError }))
+
+    act(() => {
+      result.current(formData)
+    })
+
+    await waitFor(() => {
+      expect(mockShowAlert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: 'Unable to create integration',
+          description: 'Only one Execution plane infrastructure integration is supported.',
+          variant: 'danger',
+        })
+      )
+    })
+    expect(mockCreateMutation).not.toHaveBeenCalled()
+    expect(vi.mocked(tanstackRouter.navigate)).not.toHaveBeenCalled()
+  })
+
+  it('blocks openshift create when the existence lookup fails', async () => {
+    mockFetchQuery.mockRejectedValueOnce(new Error('network'))
+    const formData = createTestFormData({
+      integration_type: 'openshift',
+      configuration: {
+        integration_type: 'openshift',
+        base_url: 'https://api.cluster.example.com:6443',
+        allow_http: false,
+        insecure_skip_tls_verify: false,
+        ca_certificate: null,
+      },
+    })
+    const { result } = renderHook(() => useCreateIntegration({ handleError: mockHandleError }))
+
+    act(() => {
+      result.current(formData)
+    })
+
+    await waitFor(() => {
+      expect(mockShowAlert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: 'Unable to create integration',
+          variant: 'danger',
+        })
+      )
+    })
+    expect(mockCreateMutation).not.toHaveBeenCalled()
+  })
+
+  it('rechecks openshift existence before create when none exists', async () => {
+    mockFetchQuery.mockResolvedValueOnce(false)
+    const formData = createTestFormData({
+      integration_type: 'openshift',
+      configuration: {
+        integration_type: 'openshift',
+        base_url: 'https://api.cluster.example.com:6443',
+        allow_http: false,
+        insecure_skip_tls_verify: false,
+        ca_certificate: null,
+      },
+    })
+    const { result } = renderHook(() => useCreateIntegration({ handleError: mockHandleError }))
+
+    act(() => {
+      result.current(formData)
+    })
+
+    await waitFor(() => {
+      expect(mockCreateMutation).toHaveBeenCalledOnce()
+    })
+    expect(mockFetchQuery).toHaveBeenCalledWith(expect.objectContaining({ queryKey: ['openshift-integration-exists'] }))
   })
 })

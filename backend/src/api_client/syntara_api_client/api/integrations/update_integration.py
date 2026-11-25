@@ -80,6 +80,16 @@ def _parse_response(
 
         return response_500
 
+    if response.status_code == 502:
+        response_502 = ErrorData.from_dict(response.json())
+
+        return response_502
+
+    if response.status_code == 503:
+        response_503 = ErrorData.from_dict(response.json())
+
+        return response_503
+
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
     else:
@@ -108,6 +118,10 @@ def sync_detailed(
     """Update integration
 
      Update an integration.
+
+    OpenShift updates to cluster-synchronized fields require Execution Plane acceptance
+    before persistence. A protected default cluster returns 409; unavailability returns
+    503. Both failures leave the integration unchanged.
 
     Args:
         integration_id (UUID):
@@ -143,6 +157,10 @@ def sync(
 
      Update an integration.
 
+    OpenShift updates to cluster-synchronized fields require Execution Plane acceptance
+    before persistence. A protected default cluster returns 409; unavailability returns
+    503. Both failures leave the integration unchanged.
+
     Args:
         integration_id (UUID):
         body (IntegrationUpdate): Schema for partially updating an integration (user-facing).
@@ -171,6 +189,10 @@ async def asyncio_detailed(
     """Update integration
 
      Update an integration.
+
+    OpenShift updates to cluster-synchronized fields require Execution Plane acceptance
+    before persistence. A protected default cluster returns 409; unavailability returns
+    503. Both failures leave the integration unchanged.
 
     Args:
         integration_id (UUID):
@@ -203,6 +225,10 @@ async def asyncio(
     """Update integration
 
      Update an integration.
+
+    OpenShift updates to cluster-synchronized fields require Execution Plane acceptance
+    before persistence. A protected default cluster returns 409; unavailability returns
+    503. Both failures leave the integration unchanged.
 
     Args:
         integration_id (UUID):

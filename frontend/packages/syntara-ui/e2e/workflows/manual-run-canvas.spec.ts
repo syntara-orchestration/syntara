@@ -38,9 +38,7 @@ test.skip('clicking Run and confirming opens the live run details panel', async 
     app,
     name: workflowName,
     triggers: [{ id: 'trigger_1', type: 'manual_trigger', name: 'Manual trigger', parameters: {} }],
-    nodes: [
-      { id: 'action_1', type: 'script', name: 'Test step', parameters: { language: 'python', code: "print('hi')" } },
-    ],
+    nodes: [{ id: 'action_1', type: 'script_python', name: 'Test step', parameters: { code: "print('hi')" } }],
     edges: [{ from: 'trigger_1', to: 'action_1' }],
   })
   try {
@@ -70,9 +68,9 @@ test.skip('step status badges show success after execution completes', async ({ 
     nodes: [
       {
         id: 'action_1',
-        type: 'script',
+        type: 'script_python',
         name: 'Test action',
-        parameters: { language: 'python', code: "print('hi')" },
+        parameters: { code: "print('hi')" },
       },
     ],
     edges: [{ from: 'trigger_1', to: 'action_1' }],
@@ -100,9 +98,9 @@ test.skip('failed steps show an error status badge', async ({ app }) => {
     nodes: [
       {
         id: 'action_1',
-        type: 'script',
+        type: 'script_python',
         name: 'Failing action',
-        parameters: { language: 'python', code: 'raise Exception("fail")' },
+        parameters: { code: 'raise Exception("fail")' },
       },
     ],
     edges: [{ from: 'trigger_1', to: 'action_1' }],

@@ -40,7 +40,7 @@ describe('activitiesReferenceTrigger', () => {
 
   it('returns false when parameters have no trigger references', () => {
     const activities = [
-      { parameters: { code: 'echo hello', language: 'bash' } },
+      { parameters: { code: 'echo hello' } },
       { parameters: { url: 'https://example.com', method: 'GET' } },
     ]
     expect(activitiesReferenceTrigger(activities, ['trigger_manual_0'])).toBe(false)

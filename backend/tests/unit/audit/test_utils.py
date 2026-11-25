@@ -1,6 +1,8 @@
 """Unit tests for audit utilities."""
 
 import itertools
+from collections.abc import Callable
+from contextlib import AbstractContextManager
 from uuid import UUID, uuid4
 
 import pytest
@@ -93,6 +95,15 @@ class TestEscalateActorType:
     ) -> None:
         """Service principal returns SERVICE, all others return USER."""
         assert escalate_actor_type(actor_id) == expected
+
+    def test_escalates_configured_execution_plane_callback_identity(
+        self,
+        override_settings: Callable[..., AbstractContextManager[object]],
+    ) -> None:
+        """The configured EP callback identity is a service principal."""
+        certificate_cn = "execution-plane.k8s.serviceaccount"
+        with override_settings(ep_callback_service_cn=certificate_cn):
+            assert escalate_actor_type(service_principal_id(certificate_cn)) == PrincipalType.SERVICE
 
 
 class TestResolveActorType:

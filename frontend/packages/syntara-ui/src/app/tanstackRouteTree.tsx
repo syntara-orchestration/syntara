@@ -4,6 +4,7 @@ import { approvalsRoutes } from './routes/approvals'
 import { authenticationRoutes } from './routes/authentication'
 import { builderRoutes } from './routes/builder'
 import { configurationRoutes } from './routes/configuration'
+import { executionPlaneRoutes } from './routes/execution-plane'
 import { executionsRoutes } from './routes/executions'
 import { featureFlagDemoRoutes } from './routes/feature-flag-demo'
 import { myProfileRoutes } from './routes/my-profile'
@@ -17,6 +18,7 @@ export const buildTanStackRouteTree = () =>
     ...executionsRoutes,
     ...featureFlagDemoRoutes,
     ...approvalsRoutes,
+    ...executionPlaneRoutes,
     ...configurationRoutes,
     ...settingsRoutes,
     ...authenticationRoutes,

@@ -1,0 +1,162 @@
+"""Use real AO state to scope cancellation and require EP acknowledgment before owner deletion."""
+
+from unittest.mock import AsyncMock, Mock
+from uuid import UUID, uuid4, uuid5
+
+import pytest
+from execution_plane_client.commands.bulk_work import WorkItemSelector
+from sqlmodel import select
+
+from syntara.execution_plane.reconciliation import reconcile_work_item_cancellations
+from syntara.projects.service import ProjectService
+from syntara.workflows.models.activity_execution import ActivityExecution, ActivityStatus
+from syntara.workflows.models.execution import Execution, ExecutionStatus
+from syntara.workflows.services.workflow_service import WorkflowService
+
+pytestmark = pytest.mark.integration
+
+
+async def _seed_activities(session, execution) -> UUID:
+    base_id = uuid5(execution.id, "script-node")
+    for item_id, name, node_type, iteration in (
+        (base_id, "script-node", "script_python", None),
+        (uuid4(), "script-node[1]", "script_bash", 1),
+        (uuid5(execution.id, "http-node"), "http-node", "http_request", None),
+        (uuid4(), "unrelated-node", "script_python", None),
+    ):
+        session.add(
+            ActivityExecution(
+                id=item_id,
+                execution_id=execution.id,
+                activity_name=name,
+                temporal_activity_id=name,
+                node_type=node_type,
+                iteration=iteration,
+                status=ActivityStatus.COMPLETED,
+                retry_count=0,
+            )
+        )
+    await session.commit()
+    return base_id
+
+
+@pytest.mark.parametrize("status", [ExecutionStatus.CANCELLED, ExecutionStatus.RUNNING, ExecutionStatus.COMPLETED])
+async def test_reconciliation_only_cancels_work_for_cancelled_executions(test_db_session, test_execution, status):
+    item_id = await _seed_activities(test_db_session, test_execution)
+    test_execution.status = status
+    await test_db_session.commit()
+    client = AsyncMock()
+    client.list_work_items.return_value = {"resources": [{"id": str(item_id)}, {"id": str(uuid4())}], "next": None}
+
+    assert await reconcile_work_item_cancellations(test_db_session, client) == int(status is ExecutionStatus.CANCELLED)
+    if status is ExecutionStatus.CANCELLED:
+        client.cancel_work_items.assert_awaited_once_with(selector=WorkItemSelector(work_item_ids=[item_id]))
+    else:
+        client.cancel_work_items.assert_not_awaited()
+    client.delete_work_item.assert_not_awaited()
+
+
+@pytest.mark.parametrize("scope", ["project", "workflow"])
+async def test_owner_deletion_requires_ep_ack_before_commit(
+    test_db_session,
+    test_execution,
+    test_user,
+    monkeypatch,
+    scope,
+):
+    item_id = await _seed_activities(test_db_session, test_execution)
+    owner_id = test_execution.project_id if scope == "project" else test_execution.workflow_id
+    test_execution.status = ExecutionStatus.CANCELLED
+    await test_db_session.commit()
+    execution_id = test_execution.id
+    committed = False
+    original_commit = test_db_session.commit
+
+    async def commit() -> None:
+        nonlocal committed
+        await original_commit()
+        committed = True
+
+    async def schedule(**kwargs: object) -> None:
+        assert committed is False
+        assert kwargs == {"owner_field": f"{scope}_id", "owner_id": owner_id}
+
+    scheduled = AsyncMock(side_effect=schedule)
+    monkeypatch.setattr(test_db_session, "commit", commit)
+    schedule_module = (
+        "syntara.projects.service" if scope == "project" else "syntara.workflows.services.workflow_service"
+    )
+    monkeypatch.setattr(f"{schedule_module}.delete_execution_plane_work_items", scheduled)
+    if scope == "project":
+        service = ProjectService(test_db_session, test_user)
+        monkeypatch.setattr(service, "_cleanup_temporal_schedules", AsyncMock())
+        monkeypatch.setattr(service, "_cleanup_file_storage", AsyncMock())
+        await service.delete_project(test_execution.project_id)
+    else:
+        service = WorkflowService(test_db_session, test_user)
+        monkeypatch.setattr(service, "_schedule_trigger_deletion", Mock())
+        await service.delete_workflow(test_execution.workflow_id)
+    scheduled.assert_awaited_once_with(owner_field=f"{scope}_id", owner_id=owner_id)
+    assert (await test_db_session.exec(select(Execution.id).where(Execution.id == execution_id))).first() is None
+    assert (
+        await test_db_session.exec(select(ActivityExecution.id).where(ActivityExecution.id == item_id))
+    ).first() is None
+
+
+@pytest.mark.parametrize("scope", ["project", "workflow"])
+async def test_failed_commit_can_follow_acknowledged_ep_deletion(
+    test_db_session, test_execution, test_user, monkeypatch, scope
+):
+    await _seed_activities(test_db_session, test_execution)
+    test_execution.status = ExecutionStatus.CANCELLED
+    await test_db_session.commit()
+    scheduled = AsyncMock()
+    schedule_module = (
+        "syntara.projects.service" if scope == "project" else "syntara.workflows.services.workflow_service"
+    )
+    monkeypatch.setattr(f"{schedule_module}.delete_execution_plane_work_items", scheduled)
+    monkeypatch.setattr(test_db_session, "commit", AsyncMock(side_effect=RuntimeError("commit failed")))
+    if scope == "project":
+        service = ProjectService(test_db_session, test_user)
+        monkeypatch.setattr(service, "_cleanup_temporal_schedules", AsyncMock())
+        monkeypatch.setattr(service, "_cleanup_file_storage", AsyncMock())
+        operation = service.delete_project(test_execution.project_id)
+    else:
+        service = WorkflowService(test_db_session, test_user)
+        operation = service.delete_workflow(test_execution.workflow_id)
+    with pytest.raises(RuntimeError, match="commit failed"):
+        await operation
+    scheduled.assert_awaited_once()
+    await test_db_session.rollback()
+    # The fixture's teardown may commit after the test; restore its original method.
+    monkeypatch.undo()
+
+
+@pytest.mark.parametrize("scope", ["project", "workflow"])
+async def test_ep_failure_retains_owner_and_executions(test_db_session, test_execution, test_user, monkeypatch, scope):
+    from syntara.authz.models.project import Project
+    from syntara.execution_plane.exceptions import ExecutionPlaneDeletionError
+    from syntara.workflows.models.workflow import Workflow
+
+    test_execution.status = ExecutionStatus.CANCELLED
+    await test_db_session.commit()
+    execution_id = test_execution.id
+    owner_id = test_execution.project_id if scope == "project" else test_execution.workflow_id
+    module = "syntara.projects.service" if scope == "project" else "syntara.workflows.services.workflow_service"
+    monkeypatch.setattr(
+        f"{module}.delete_execution_plane_work_items", AsyncMock(side_effect=ExecutionPlaneDeletionError("offline"))
+    )
+    commit = AsyncMock(wraps=test_db_session.commit)
+    monkeypatch.setattr(test_db_session, "commit", commit)
+    if scope == "project":
+        service = ProjectService(test_db_session, test_user)
+        operation = service.delete_project(owner_id)
+    else:
+        service = WorkflowService(test_db_session, test_user)
+        operation = service.delete_workflow(owner_id)
+    with pytest.raises(ExecutionPlaneDeletionError):
+        await operation
+    commit.assert_not_awaited()
+    await test_db_session.rollback()
+    assert await test_db_session.get(Execution, execution_id) is not None
+    assert await test_db_session.get(Project if scope == "project" else Workflow, owner_id) is not None

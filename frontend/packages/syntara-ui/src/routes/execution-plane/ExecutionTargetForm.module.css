@@ -1,0 +1,7 @@
+.panelBody {
+  padding: var(--pf-t--global--spacer--xl);
+}
+
+.formStack {
+  max-width: var(--syntara-form-max-width);
+}

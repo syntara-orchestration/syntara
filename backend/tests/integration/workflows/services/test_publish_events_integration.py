@@ -64,9 +64,8 @@ class _PublishEventsTestBase:
                 {
                     "id": "task1",
                     "name": "Task 1",
-                    "type": "script",
+                    "type": "script_python",
                     "parameters": {
-                        "language": "python",
                         "code": "print('hello')",
                     },
                 }

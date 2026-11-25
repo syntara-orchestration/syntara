@@ -15,9 +15,8 @@ nodes:
       indexVariable: idx
 
   - id: count_task
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       code: |
         echo "Count loop iteration"
 edges:

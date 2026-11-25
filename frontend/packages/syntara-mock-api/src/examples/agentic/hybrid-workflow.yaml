@@ -13,9 +13,8 @@ triggers:
 
 nodes:
   - id: prepare_data
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       code: |
         echo "Preparing data for analysis..."
         echo '{"status": "ready", "timestamp": "'$(date -u +%Y-%m-%dT%H:%M:%SZ)'"}'
@@ -36,9 +35,8 @@ nodes:
         3. Recommendations
 
   - id: generate_report
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       environment:
         INPUT_ANALYSIS: ${analyze_with_ai.output}
       code: |

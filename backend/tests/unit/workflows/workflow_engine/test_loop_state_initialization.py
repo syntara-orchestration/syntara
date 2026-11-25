@@ -168,7 +168,7 @@ class TestPreResolvedLoopStateInit:
     @pytest.mark.asyncio
     async def test_non_loop_pre_resolved_does_not_init_loop_state(self) -> None:
         """Pre-resolved non-loop nodes should not touch loop state."""
-        node = ActivityNode(node_id="script_1", node_type="script", parameters={})
+        node = ActivityNode(node_id="script_1", node_type="script_python", parameters={})
         wf = _make_workflow(pre_resolved_outputs={"script_1": {"output": {"result": "ok"}}})
         await wf._execute_node(node, MagicMock())
         assert "script_1" not in wf.loop_state

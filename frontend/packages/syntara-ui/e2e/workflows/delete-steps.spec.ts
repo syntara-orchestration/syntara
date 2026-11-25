@@ -14,7 +14,7 @@ import {
   deleteWorkflow,
   closeStepEditorPanel,
   createWorkflowWithTrigger,
-  addScriptStep,
+  addPythonScriptStep,
   verifyStepVisible,
   triggerLayout,
   expectCanvasStepTitleVisible,
@@ -29,9 +29,9 @@ test('delete a middle step removes the step and its connected edges', async ({ a
     await expectCanvasStepTitleVisible(app, 'Manual trigger')
 
     // Add three connected steps: Manual trigger → Step A → Step B → Step C
-    await addScriptStep(app, 'Step A', 'print("A")')
-    await addScriptStep(app, 'Step B', 'print("B")')
-    await addScriptStep(app, 'Step C', 'print("C")')
+    await addPythonScriptStep(app, 'Step A', 'print("A")')
+    await addPythonScriptStep(app, 'Step B', 'print("B")')
+    await addPythonScriptStep(app, 'Step C', 'print("C")')
 
     // Layout to position steps
     await triggerLayout(app)
@@ -110,7 +110,7 @@ for (const { position, steps, deleteStep, remainingSteps } of deletePositionCase
 
       // Add steps
       for (const stepName of steps) {
-        await addScriptStep(app, stepName, `print("${stepName}")`)
+        await addPythonScriptStep(app, stepName, `print("${stepName}")`)
       }
 
       await triggerLayout(app)

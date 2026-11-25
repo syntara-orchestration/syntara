@@ -29,7 +29,7 @@ describe('getStepTypeColor', () => {
   it('returns actionScript color for task with script type', () => {
     expect(
       getStepTypeColor(FlowNodeType.TASK, {
-        type: ExecutorTypeEnum.SCRIPT,
+        type: ExecutorTypeEnum.SCRIPT_PYTHON,
         id: 'test',
         parameters: {},
       } as Parameters<typeof getStepTypeColor>[1])
@@ -108,7 +108,7 @@ describe('getAddStepPanelColor', () => {
 
   it('returns actionScript color for action and action subtypes', () => {
     expect(getAddStepPanelColor(RegistryStepId.ACTION)).toBe(STEP_TYPE_COLORS.actionScript)
-    expect(getAddStepPanelColor(RegistryStepId.ACTION_SCRIPT)).toBe(STEP_TYPE_COLORS.actionScript)
+    expect(getAddStepPanelColor(RegistryStepId.ACTION_SCRIPT_PYTHON)).toBe(STEP_TYPE_COLORS.actionScript)
     expect(getAddStepPanelColor(RegistryStepId.ACTION_API)).toBe(STEP_TYPE_COLORS.actionScript)
   })
 

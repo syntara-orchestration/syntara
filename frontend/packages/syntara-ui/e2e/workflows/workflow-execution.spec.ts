@@ -34,15 +34,15 @@ test.describe.skip('Test Single Step from Canvas', () => {
       nodes: [
         {
           id: 'hello_node',
-          type: 'script',
+          type: 'script_python',
           name: 'Say Hello',
-          parameters: { language: 'python', code: 'print("hello", end="")' },
+          parameters: { code: 'print("hello", end="")' },
         },
         {
           id: 'goodbye_node',
-          type: 'script',
+          type: 'script_python',
           name: 'Say Goodbye',
-          parameters: { language: 'python', code: 'print("${hello_node.stdout} and goodbye")' },
+          parameters: { code: 'print("${hello_node.stdout} and goodbye")' },
         },
       ],
       edges: [
@@ -106,15 +106,15 @@ test.skip('running execution displays real-time per-step status on the canvas', 
     nodes: [
       {
         id: 'hello_node',
-        type: 'script',
+        type: 'script_python',
         name: 'Say Hello',
-        parameters: { language: 'python', code: 'import time\ntime.sleep(1)\nprint("hello")' },
+        parameters: { code: 'import time\ntime.sleep(1)\nprint("hello")' },
       },
       {
         id: 'goodbye_node',
-        type: 'script',
+        type: 'script_python',
         name: 'Say Goodbye',
-        parameters: { language: 'python', code: 'import time\ntime.sleep(3)\nprint("goodbye")' },
+        parameters: { code: 'import time\ntime.sleep(3)\nprint("goodbye")' },
       },
     ],
     edges: [
@@ -151,9 +151,9 @@ test.skip('failed step details including error messages are displayed', async ({
     nodes: [
       {
         id: 'failing_node',
-        type: 'script',
+        type: 'script_python',
         name: 'Failing Node',
-        parameters: { language: 'python', code: 'raise Exception("Node configured to fail.")' },
+        parameters: { code: 'raise Exception("Node configured to fail.")' },
       },
     ],
     edges: [{ from: 'trigger_manual', to: 'failing_node' }],

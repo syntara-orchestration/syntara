@@ -13,7 +13,7 @@ import type { IntegrationsAPI } from '@syntara/contracts'
 import { IntegrationTypeEnum } from '@syntara/contracts'
 import { useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useParams } from '@tanstack/react-router'
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, type ReactElement } from 'react'
 import { useWatch, type UseFormSetValue } from 'react-hook-form'
 
 import { AppRoute } from '../../../app/AppRoute'
@@ -37,10 +37,12 @@ import { detachPromise } from '../../../utils/detachPromise'
 import { useDocLink } from '../../../utils/docs/useDocLink'
 import { CredentialSelector } from '../../builder/components/CredentialSelector'
 
+import { CaCertificateField } from './CaCertificateField'
 import styles from './EditIntegrationForm.module.css'
 import type { EditIntegrationFormValues, IntegrationRead } from './editIntegrationFormSchema'
 import { buildConfiguration, buildEditSchema, editIntegrationSchema } from './editIntegrationFormSchema'
 import { EditSecurityFields } from './EditSecurityFields'
+import { ExecutionPlaneScopeField } from './form/ExecutionPlaneScopeField'
 import { ScopeFields } from './form/ScopeFields'
 import { integrationHelp } from './integrationFieldHelp'
 import {
@@ -62,6 +64,72 @@ const CREDENTIAL_DESCRIPTION: Record<string, string> = {
     'This credential is used to verify the connection to this integration and perform periodic health checks. Workflow credentials are configured separately in the workflow builder.',
   [IntegrationTypeEnum.ANSIBLE_AUTOMATION_PLATFORM]:
     'This credential is used to verify the connection to the Ansible Automation Platform. Workflow credentials are configured separately in the workflow builder.',
+  [IntegrationTypeEnum.OPENSHIFT]:
+    'Use a service account token to authenticate to the cluster API. Credentials are stored encrypted in the platform credential store.',
+}
+
+type CredentialSectionCopy = {
+  title: string
+  description: string
+  fieldLabel: string
+  labelHelp: ReactElement
+}
+
+function getCredentialSectionCopy(integrationType: string): CredentialSectionCopy {
+  if (integrationType === IntegrationTypeEnum.OPENSHIFT) {
+    return {
+      title: 'Authentication',
+      description: CREDENTIAL_DESCRIPTION[IntegrationTypeEnum.OPENSHIFT],
+      fieldLabel: 'Service account token',
+      labelHelp: integrationHelp.serviceAccountToken,
+    }
+  }
+  return {
+    title: 'Connection credential',
+    description: CREDENTIAL_DESCRIPTION[integrationType] ?? CREDENTIAL_DESCRIPTION[IntegrationTypeEnum.MCP_SERVER],
+    fieldLabel: 'Health check credential',
+    labelHelp: integrationHelp.healthCheckCredential,
+  }
+}
+
+type EditDetailsFieldCopy = {
+  nameLabel: string
+  nameLabelHelp: ReactElement
+  baseUrlLabel: string
+  baseUrlLabelHelp: ReactElement
+}
+
+function getEditDetailsFieldCopy(integrationType: string, isLLM: boolean): EditDetailsFieldCopy {
+  if (integrationType === IntegrationTypeEnum.OPENSHIFT) {
+    return {
+      nameLabel: 'Connection name',
+      nameLabelHelp: integrationHelp.executionPlaneConnectionName,
+      baseUrlLabel: 'API endpoint',
+      baseUrlLabelHelp: integrationHelp.executionPlaneApiEndpoint,
+    }
+  }
+  if (isLLM) {
+    return {
+      nameLabel: 'Name',
+      nameLabelHelp: integrationHelp.name,
+      baseUrlLabel: 'API URL',
+      baseUrlLabelHelp: integrationHelp.apiUrl,
+    }
+  }
+  if (integrationType === IntegrationTypeEnum.ANSIBLE_AUTOMATION_PLATFORM) {
+    return {
+      nameLabel: 'Server name / ID',
+      nameLabelHelp: integrationHelp.serverName,
+      baseUrlLabel: 'API URL',
+      baseUrlLabelHelp: integrationHelp.aapUrl,
+    }
+  }
+  return {
+    nameLabel: 'Server name / ID',
+    nameLabelHelp: integrationHelp.serverName,
+    baseUrlLabel: 'API URL',
+    baseUrlLabelHelp: integrationHelp.apiUrl,
+  }
 }
 
 type FormFieldsProps = Readonly<{
@@ -81,14 +149,14 @@ function EditIntegrationFormFields({
   setValue,
   onTestConnection,
 }: FormFieldsProps) {
-  const isCredentialRequired = CREDENTIAL_REQUIRED_TYPES.has(integration.integration_type ?? '')
+  const integrationType = integration.integration_type ?? IntegrationTypeEnum.MCP_SERVER
+  const isCredentialRequired = CREDENTIAL_REQUIRED_TYPES.has(integrationType)
   const isTestDisabled = (isCredentialRequired && !credentialId) || isTesting
-  const isAnsibleAutomationPlatform = integration.integration_type === IntegrationTypeEnum.ANSIBLE_AUTOMATION_PLATFORM
+  const isOpenShift = integrationType === IntegrationTypeEnum.OPENSHIFT
   const isLLM = isLLMProvider(integration)
   const hideBaseUrl = isLLM && PROVIDERS_HIDING_BASE_URL.has(getProviderHint(integration))
-
-  const credentialDescription =
-    CREDENTIAL_DESCRIPTION[integration.integration_type ?? ''] ?? CREDENTIAL_DESCRIPTION[IntegrationTypeEnum.MCP_SERVER]
+  const credentialCopy = getCredentialSectionCopy(integrationType)
+  const { nameLabel, nameLabelHelp, baseUrlLabel, baseUrlLabelHelp } = getEditDetailsFieldCopy(integrationType, isLLM)
 
   return (
     <>
@@ -97,9 +165,8 @@ function EditIntegrationFormFields({
       </Title>
 
       <DescriptionList isCompact isHorizontal>
-        <SynDetail label="Integration type">
-          {INTEGRATION_TYPE_LABELS[integration.integration_type ?? ''] ?? integration.integration_type ?? ''}
-        </SynDetail>
+        <SynDetail label="Integration type">{INTEGRATION_TYPE_LABELS[integrationType] ?? integrationType}</SynDetail>
+        {isOpenShift && <SynDetail label="Infrastructure type">OpenShift</SynDetail>}
         {isLLM && (
           <SynDetail label="Provider type">
             {PROVIDER_HINT_LABELS[getProviderHint(integration)] ?? getProviderHint(integration)}
@@ -109,58 +176,72 @@ function EditIntegrationFormFields({
 
       <SynTextField<EditIntegrationFormValues, 'name'>
         name="name"
-        label={isLLM ? 'Name' : 'Server name / ID'}
+        label={nameLabel}
         fieldId="edit-name"
         isRequired
-        labelHelp={isLLM ? integrationHelp.name : integrationHelp.serverName}
+        labelHelp={nameLabelHelp}
       />
 
-      <SynTextAreaField<EditIntegrationFormValues, 'description'>
-        name="description"
-        label="Description"
-        fieldId="edit-description"
-        resizeOrientation="vertical"
-      />
+      {!isOpenShift && (
+        <SynTextAreaField<EditIntegrationFormValues, 'description'>
+          name="description"
+          label="Description"
+          fieldId="edit-description"
+          resizeOrientation="vertical"
+        />
+      )}
 
       {!hideBaseUrl && (
         <SynTextField<EditIntegrationFormValues, 'base_url'>
           name="base_url"
-          label="API URL"
+          label={baseUrlLabel}
           fieldId="edit-base-url"
           isRequired={!isLLM}
-          labelHelp={isAnsibleAutomationPlatform ? integrationHelp.aapUrl : integrationHelp.apiUrl}
+          labelHelp={baseUrlLabelHelp}
         />
       )}
 
-      <EditSecurityFields />
+      {isOpenShift ? (
+        <CaCertificateField<EditIntegrationFormValues, 'ca_certificate'>
+          name="ca_certificate"
+          fieldId="edit-ca-certificate"
+          isRequired
+        />
+      ) : (
+        <EditSecurityFields />
+      )}
 
-      <ScopeFields<EditIntegrationFormValues>
-        scope={scope}
-        scopeName="scope"
-        projectIdsName="project_ids"
-        idPrefix="edit-integration"
-        onScopeChange={(newScope) => {
-          if (newScope === 'global') setValue('project_ids', [])
-        }}
-      />
+      {isOpenShift ? (
+        <ExecutionPlaneScopeField fieldId="edit-integration-scope" />
+      ) : (
+        <ScopeFields<EditIntegrationFormValues>
+          scope={scope}
+          scopeName="scope"
+          projectIdsName="project_ids"
+          idPrefix="edit-integration"
+          onScopeChange={(newScope) => {
+            if (newScope === 'global') setValue('project_ids', [])
+          }}
+        />
+      )}
 
       <Divider />
 
       <div>
         <Title headingLevel="h2" size="lg" className={styles.credentialHeading}>
-          Connection credential
+          {credentialCopy.title}
         </Title>
         <Content component={ContentVariants.p} className={styles.credentialDescription}>
-          {credentialDescription}
+          {credentialCopy.description}
         </Content>
       </div>
 
       <SynFormField<EditIntegrationFormValues, 'management_credential_id'>
         name="management_credential_id"
-        label="Health check credential"
+        label={credentialCopy.fieldLabel}
         fieldId="edit-credential-select"
         isRequired={isCredentialRequired}
-        labelHelp={integrationHelp.healthCheckCredential}
+        labelHelp={credentialCopy.labelHelp}
         hideFormGroupLabel
         hideFooter
       >
@@ -168,15 +249,13 @@ function EditIntegrationFormFields({
           <CredentialSelector
             value={field.value ?? undefined}
             onChange={(id) => setValue('management_credential_id', id ?? null)}
-            compatibleTypeNames={
-              CREDENTIAL_TYPES_BY_INTEGRATION[integration.integration_type ?? IntegrationTypeEnum.MCP_SERVER]
-            }
-            label="Health check credential"
+            compatibleTypeNames={CREDENTIAL_TYPES_BY_INTEGRATION[integrationType]}
+            label={credentialCopy.fieldLabel}
             fieldId="edit-credential-select"
             isRequired={isCredentialRequired}
             allowCreate
-            placeholder="Select a credential"
-            labelHelp={integrationHelp.healthCheckCredential}
+            placeholder={isOpenShift ? 'Select or create a credential' : 'Select a credential'}
+            labelHelp={credentialCopy.labelHelp}
           />
         )}
       </SynFormField>
@@ -225,12 +304,15 @@ export function EditIntegrationForm() {
     params: { path: { integration_id: integrationId ?? '' } },
   })
   const integration = query.data
+  const isOpenShiftIntegration = integration?.integration_type === IntegrationTypeEnum.OPENSHIFT
+  // OpenShift is always global in the UI/submit path, even if a bad record has scope: project.
+  const isProjectScoped = !isOpenShiftIntegration && integration?.scope === 'project'
 
   const assignmentsQuery = integrationsClient.useQuery(
     'get',
     '/integrations/{integration_id}/projects',
     { params: { path: { integration_id: integrationId ?? '' } } },
-    { enabled: integration?.scope === 'project' }
+    { enabled: isProjectScoped }
   )
   const initialProjectIds = useMemo(
     () => assignmentsQuery.data?.resources?.map((a) => a.project_id) ?? [],
@@ -252,27 +334,31 @@ export function EditIntegrationForm() {
   }, [integration])
 
   useEffect(() => {
-    const projectIds = integration?.scope === 'project' ? initialProjectIds : []
-    initialProjectIdsRef.current = projectIds
-  }, [integration, initialProjectIds])
+    initialProjectIdsRef.current = isProjectScoped ? initialProjectIds : []
+  }, [isProjectScoped, initialProjectIds])
 
   const formValues = useMemo<EditIntegrationFormValues | undefined>(() => {
     if (!integration) return undefined
     const config = integration.configuration
-    const projectIds = integration.scope === 'project' ? initialProjectIds : []
+    const isOpenShift = integration.integration_type === IntegrationTypeEnum.OPENSHIFT
+    // OpenShift always requires HTTPS + TLS verification — coerce like scope:global.
+    const scope = isOpenShift ? 'global' : ((integration.scope as 'global' | 'project') ?? 'global')
+    const projectIds = isProjectScoped ? initialProjectIds : []
+    const allowHttp = 'allow_http' in config ? Boolean(config.allow_http) : false
+    const skipTls = 'insecure_skip_tls_verify' in config ? Boolean(config.insecure_skip_tls_verify) : false
     return {
       name: integration.name ?? '',
       description: integration.description ?? '',
       integration_type: integration.integration_type ?? IntegrationTypeEnum.MCP_SERVER,
       base_url: 'base_url' in config ? String(config.base_url ?? '') : '',
-      allow_http: 'allow_http' in config ? Boolean(config.allow_http) : false,
-      insecure_skip_tls_verify: 'insecure_skip_tls_verify' in config ? Boolean(config.insecure_skip_tls_verify) : false,
+      allow_http: isOpenShift ? false : allowHttp,
+      insecure_skip_tls_verify: isOpenShift ? false : skipTls,
       ca_certificate: 'ca_certificate' in config ? (config.ca_certificate ?? null) : null,
-      scope: (integration.scope as 'global' | 'project') ?? 'global',
+      scope,
       project_ids: projectIds,
       management_credential_id: integration.management_credential_id ?? null,
     }
-  }, [integration, initialProjectIds])
+  }, [integration, isProjectScoped, initialProjectIds])
 
   const form = useSynForm({
     schema,
@@ -387,7 +473,7 @@ export function EditIntegrationForm() {
     )
   }
 
-  if (!integration || (integration.scope === 'project' && assignmentsQuery.isPending)) return null
+  if (!integration || (isProjectScoped && assignmentsQuery.isPending)) return null
 
   return (
     <SynPage>

@@ -72,6 +72,7 @@ dependencies = [
     "uuid-utils>=0.9.0",
     "pypdf>=6.19.0",
     "nh3>=0.2.21",
+    "execution-plane-client>=0.1.28,<0.2.0",
 ]
 
 [project.optional-dependencies]
@@ -154,6 +155,7 @@ Issues = "https://github.com/syntara-orchestration/syntara/issues"
 # Hatchling configuration for multiple modules
 [tool.hatch.build.targets.wheel]
 packages = ["src/syntara"]
+include = ["src/syntara/execution_plane/registry/manifests/*.yaml"]
 
 [tool.hatch.build.targets.sdist]
 only-include = [
@@ -184,7 +186,7 @@ ignore = [
 "src/syntara/core/models/base/resource.py" = ["A005"]  # Allow module name shadowing stdlib
 "tools/**/*.py" = ["T201", "INP001", "PLC0415", "ARG001", "ANN401", "TRY003", "EM102"]  # CLI tools: print, deferred imports, unused args
 "scripts/**/*.py" = ["T201", "INP001", "D103"]  # Standalone scripts: print, no package, no docstrings
-"tests/**/*.py" = [
+"**/tests/**/*.py" = [
     "S101",     # Allow assert statements in tests
     "ANN001",   # Don't require type annotations for test function arguments (fixtures)
     "ANN201",   # Don't require return type annotations for test functions
@@ -223,6 +225,9 @@ ignore = [
 [tool.pyrefly]
 python-version = "3.12.0"
 project-includes = ["src"]
+# Editable installs are otherwise inferred as third-party directories and skipped.
+disable-project-excludes-heuristics = true
+project-excludes = ["**/__pycache__", "**/node_modules", ".venv/**", "src/api_client", "src/cli", "test-sdk/src"]
 
 # SQLModel/SQLAlchemy stubs cause false positives for these rules.
 # unbound-name and bad-return have a few false positives in existing code

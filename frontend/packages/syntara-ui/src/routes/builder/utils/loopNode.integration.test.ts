@@ -5,7 +5,7 @@ import { useWorkflowStore } from '../../../stores/useWorkflowStore'
 /**
  * Integration tests for loop node functionality.
  * Tests the complete flow of loop node creation, edge generation, and positioning.
- * Updated to use v2 activity shapes (type: 'loop' with config, type: 'script' with config).
+ * Updated to use v2 activity shapes (type: 'loop' with config, type: 'script_python' with config).
  */
 describe('Loop Node Integration Tests', () => {
   beforeEach(() => {
@@ -39,10 +39,10 @@ describe('Loop Node Integration Tests', () => {
       }
 
       const genericActivity = {
-        type: 'script' as const,
+        type: 'script_python' as const,
         id: genericId,
         name: '',
-        parameters: { language: 'python' as const, code: '' },
+        parameters: { code: '' },
         metadata: { __isGeneric: true },
       }
 
@@ -143,16 +143,16 @@ describe('Loop Node Integration Tests', () => {
         parameters: { type: 'for_each' as const, items: 'input.items' },
       }
       const task1 = {
-        type: 'script' as const,
+        type: 'script_python' as const,
         id: task1Id,
         name: 'Task 1',
-        parameters: { language: 'python' as const, code: '' },
+        parameters: { code: '' },
       }
       const task2 = {
-        type: 'script' as const,
+        type: 'script_python' as const,
         id: task2Id,
         name: 'Task 2',
-        parameters: { language: 'python' as const, code: '' },
+        parameters: { code: '' },
       }
 
       const edges = [
@@ -266,10 +266,10 @@ describe('Loop Node Integration Tests', () => {
         parameters: { type: 'for_each' as const, items: 'input.items' },
       }
       const genericActivity = {
-        type: 'script' as const,
+        type: 'script_python' as const,
         id: 'task_1',
         name: '',
-        parameters: { language: 'python' as const, code: '' },
+        parameters: { code: '' },
       }
 
       const edges = [
@@ -303,22 +303,22 @@ describe('Loop Node Integration Tests', () => {
         parameters: { type: 'for_each' as const, items: 'input.items' },
       }
       const task1 = {
-        type: 'script' as const,
+        type: 'script_python' as const,
         id: task1Id,
         name: 'Task 1',
-        parameters: { language: 'python' as const, code: '' },
+        parameters: { code: '' },
       }
       const task2 = {
-        type: 'script' as const,
+        type: 'script_python' as const,
         id: task2Id,
         name: 'Task 2',
-        parameters: { language: 'python' as const, code: '' },
+        parameters: { code: '' },
       }
       const task3 = {
-        type: 'script' as const,
+        type: 'script_python' as const,
         id: task3Id,
         name: 'Task 3',
-        parameters: { language: 'python' as const, code: '' },
+        parameters: { code: '' },
       }
 
       const initialEdges = [

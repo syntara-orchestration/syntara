@@ -168,9 +168,9 @@ simple_wf() {
         description: ("Sample workflow: " + $name),
         triggers: [{id: "trigger_manual", type: "manual_trigger"}],
         nodes: [{
-            id: "step1", type: "script",
+            id: "step1", type: "script_python",
             name: ("Run " + $name),
-            config: {language: "python", code: ("print(\"Running " + $name + "\")"), timeout: 300}
+            parameters: {code: ("print(\"Running " + $name + "\")")}
         }],
         edges: [{from: "trigger_manual", to: "step1"}]
     }')
@@ -200,14 +200,14 @@ approval_wf() {
         description: $desc,
         triggers: [{id: "trigger_manual", type: "manual_trigger"}],
         nodes: [
-            {id: "prepare", type: "script", name: "Prepare",
-             config: {language: "python", code: ("print(\"Preparing " + $name + "...\")"), timeout: 300}},
+            {id: "prepare", type: "script_python", name: "Prepare",
+             parameters: {code: ("print(\"Preparing " + $name + "...\")")}},
             {id: "review", type: "approval", name: "Review and approve",
              config: {timeout: 3600}},
-            {id: "execute", type: "script", name: "Execute",
-             config: {language: "python", code: ("print(\"Executing " + $name + "\")"), timeout: 600}},
-            {id: "rollback", type: "script", name: "Handle rejection",
-             config: {language: "python", code: ("print(\"" + $name + " rejected\")"), timeout: 60}}
+            {id: "execute", type: "script_python", name: "Execute",
+             parameters: {code: ("print(\"Executing " + $name + "\")")}},
+            {id: "rollback", type: "script_python", name: "Handle rejection",
+             parameters: {code: ("print(\"" + $name + " rejected\")")}}
         ],
         edges: [
             {from: "trigger_manual", to: "prepare"},

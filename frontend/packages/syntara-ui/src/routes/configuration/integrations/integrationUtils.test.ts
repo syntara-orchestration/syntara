@@ -7,6 +7,7 @@ import {
   getProviderHint,
   getResourceNoun,
   getTotalResourceCount,
+  isExecutionPlaneInfrastructure,
   isLLMProvider,
 } from './integrationUtils'
 
@@ -56,6 +57,33 @@ describe('integrationUtils', () => {
 
     it('returns false for ansible_automation_platform integration', () => {
       expect(isLLMProvider(buildIntegration({ integration_type: 'ansible_automation_platform' }))).toBe(false)
+    })
+  })
+
+  describe('isExecutionPlaneInfrastructure', () => {
+    it('returns true for openshift integration', () => {
+      expect(
+        isExecutionPlaneInfrastructure(
+          buildIntegration({
+            integration_type: 'openshift',
+            configuration: { integration_type: 'openshift', base_url: 'https://api.openshift.example.com' },
+          })
+        )
+      ).toBe(true)
+    })
+
+    it('returns false for mcp_server integration', () => {
+      expect(isExecutionPlaneInfrastructure(buildIntegration())).toBe(false)
+    })
+
+    it('returns false for llm_provider integration', () => {
+      expect(isExecutionPlaneInfrastructure(buildLLMIntegration())).toBe(false)
+    })
+
+    it('returns false for ansible_automation_platform integration', () => {
+      expect(
+        isExecutionPlaneInfrastructure(buildIntegration({ integration_type: 'ansible_automation_platform' }))
+      ).toBe(false)
     })
   })
 

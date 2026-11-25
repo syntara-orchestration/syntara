@@ -510,6 +510,74 @@ describe('IntegrationDetail', () => {
 
       expect(screen.getByRole('button', { name: 'Integration actions' })).toBeInTheDocument()
     })
+
+    it('hides the enable switch for OpenShift integrations', () => {
+      setupDefaultMocks({
+        integration: {
+          name: 'OpenShift Cluster',
+          integration_type: 'openshift',
+          configuration: {
+            integration_type: 'openshift',
+            base_url: 'https://api.openshift.example.com',
+          },
+        },
+      })
+      render(<IntegrationDetail />, { wrapper })
+
+      expect(screen.queryByRole('switch')).not.toBeInTheDocument()
+    })
+  })
+
+  describe('Execution plane State field', () => {
+    it('shows enabled state for OpenShift integrations with the same label and tooltip', async () => {
+      setupDefaultMocks({
+        integration: {
+          name: 'OpenShift Cluster',
+          integration_type: 'openshift',
+          enabled: true,
+          configuration: {
+            integration_type: 'openshift',
+            base_url: 'https://api.openshift.example.com',
+          },
+        },
+      })
+      const user = userEvent.setup()
+      render(<IntegrationDetail />, { wrapper })
+
+      expect(screen.getByText('State')).toBeInTheDocument()
+      expect(screen.getByText('Enabled')).toBeInTheDocument()
+
+      await user.hover(screen.getByText('Enabled'))
+      expect(
+        await screen.findByText(
+          /Execution plane infrastructure must stay enabled so execution targets can use the cluster/
+        )
+      ).toBeInTheDocument()
+    })
+
+    it('shows Disabled when the OpenShift integration is disabled', () => {
+      setupDefaultMocks({
+        integration: {
+          name: 'OpenShift Cluster',
+          integration_type: 'openshift',
+          enabled: false,
+          configuration: {
+            integration_type: 'openshift',
+            base_url: 'https://api.openshift.example.com',
+          },
+        },
+      })
+      render(<IntegrationDetail />, { wrapper })
+
+      expect(screen.getByText('State')).toBeInTheDocument()
+      expect(screen.getByText('Disabled')).toBeInTheDocument()
+    })
+
+    it('does not show State for non-OpenShift integrations', () => {
+      render(<IntegrationDetail />, { wrapper })
+
+      expect(screen.queryByText('State')).not.toBeInTheDocument()
+    })
   })
 
   describe('Kebab menu', () => {
@@ -523,6 +591,60 @@ describe('IntegrationDetail', () => {
     })
 
     it('shows Delete integration menu item', async () => {
+      const user = userEvent.setup()
+      render(<IntegrationDetail />, { wrapper })
+
+      await user.click(screen.getByRole('button', { name: 'Integration actions' }))
+
+      expect(await screen.findByRole('menuitem', { name: /delete integration/i })).toBeInTheDocument()
+    })
+
+    it('hides Delete for execution plane infrastructure integrations', async () => {
+      setupDefaultMocks({
+        integration: {
+          name: 'OpenShift Cluster',
+          integration_type: 'openshift',
+          configuration: {
+            integration_type: 'openshift',
+            base_url: 'https://api.openshift.example.com',
+          },
+        },
+      })
+      const user = userEvent.setup()
+      render(<IntegrationDetail />, { wrapper })
+
+      await user.click(screen.getByRole('button', { name: 'Integration actions' }))
+
+      expect(await screen.findByRole('menuitem', { name: /validate integration/i })).toBeInTheDocument()
+      expect(screen.queryByRole('menuitem', { name: /delete integration/i })).not.toBeInTheDocument()
+    })
+
+    it.each([
+      {
+        name: 'LLM Provider',
+        integration_type: 'llm_provider' as const,
+        configuration: {
+          integration_type: 'llm_provider' as const,
+          provider_hint: 'openai' as const,
+          base_url: 'https://api.openai.com/v1',
+        },
+      },
+      {
+        name: 'Ansible Automation Platform',
+        integration_type: 'ansible_automation_platform' as const,
+        configuration: {
+          integration_type: 'ansible_automation_platform' as const,
+          base_url: 'https://gateway.example.com',
+        },
+      },
+    ])('shows Delete for $name integrations', async ({ name, integration_type, configuration }) => {
+      setupDefaultMocks({
+        integration: {
+          name,
+          integration_type,
+          configuration,
+        },
+      })
       const user = userEvent.setup()
       render(<IntegrationDetail />, { wrapper })
 

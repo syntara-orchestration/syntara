@@ -28,6 +28,7 @@ import { useAlerts } from '../../../../providers/alerts/AlertContext'
 import { getErrorMessage } from '../../../../utils/apiErrors'
 import { detachPromise } from '../../../../utils/detachPromise'
 import { useDocLink } from '../../../../utils/docs/useDocLink'
+import { CA_CERTIFICATE_REQUIRED_MESSAGE } from '../caCertificate'
 import { CREDENTIAL_REQUIRED_TYPES } from '../integrationFilters'
 
 import { CredentialStep } from './CredentialStep'
@@ -41,6 +42,7 @@ import {
   type IntegrationFormData,
 } from './integrationFormSchema'
 import { useCreateIntegration } from './useCreateIntegration'
+import { useOpenShiftIntegrationExists } from './useOpenShiftIntegrationExists'
 import styles from './WizardSteps.module.css'
 
 type DiscoverResult = IntegrationsAPI.components['schemas']['DiscoverResult']
@@ -303,18 +305,31 @@ export function IntegrationForm() {
   const [isDetailsStepValid, setIsDetailsStepValid] = useState(false)
   const { showAlert } = useAlerts()
   const isLLM = integrationTypeValue === IntegrationTypeEnum.LLM_PROVIDER
+  const isOpenShift = integrationTypeValue === IntegrationTypeEnum.OPENSHIFT
   const isCredentialRequired = CREDENTIAL_REQUIRED_TYPES.has(integrationTypeValue)
+  const { exists: openShiftExists, isUnavailable: isOpenShiftUnavailable } = useOpenShiftIntegrationExists()
 
   const onTypeChange = useCallback(
     (newType: string) => {
       setValue('configuration', getDefaultConfiguration(newType), { shouldValidate: false })
       setValue('integration_type', newType as IntegrationFormData['integration_type'])
       setValue('management_credential_id', null)
+      if (newType === IntegrationTypeEnum.OPENSHIFT) {
+        setValue('scope', 'global')
+        setValue('project_ids', [])
+      }
       resetTestState()
       setIsDetailsStepValid(false)
     },
     [setValue, resetTestState]
   )
+
+  // If a singleton appears after the user already selected EP (e.g. race with another
+  // create), clear the selection so a disabled menu option is not left as the value.
+  // Adjust during render (not an effect) per React "adjusting state when props change".
+  if (isOpenShift && openShiftExists) {
+    onTypeChange(IntegrationTypeEnum.MCP_SERVER)
+  }
 
   const onSubmit = handleSubmit(
     (formData) => {
@@ -337,6 +352,9 @@ export function IntegrationForm() {
       if (errors.name) messages.push(errors.name.message ?? 'Name is invalid')
       if (errors.configuration && 'base_url' in errors.configuration && errors.configuration.base_url) {
         messages.push(errors.configuration.base_url.message ?? 'Base URL is invalid')
+      }
+      if (errors.configuration && 'ca_certificate' in errors.configuration && errors.configuration.ca_certificate) {
+        messages.push(errors.configuration.ca_certificate.message ?? CA_CERTIFICATE_REQUIRED_MESSAGE)
       }
       if (messages.length > 0) {
         showAlert({
@@ -371,10 +389,19 @@ export function IntegrationForm() {
               }
             >
               <WizardStep name="Integration details" id="integration-details">
-                <IntegrationDetailsStep setValue={setValue} onTypeChange={onTypeChange} />
+                <IntegrationDetailsStep
+                  setValue={setValue}
+                  onTypeChange={onTypeChange}
+                  openShiftExists={openShiftExists}
+                  isOpenShiftUnavailable={isOpenShiftUnavailable}
+                />
               </WizardStep>
 
-              <WizardStep name="Connection credential" id="credential" navItem={{ isDisabled: !isDetailsStepValid }}>
+              <WizardStep
+                name={isOpenShift ? 'Authentication' : 'Connection credential'}
+                id="credential"
+                navItem={{ isDisabled: !isDetailsStepValid }}
+              >
                 <CredentialStep
                   setValue={setValue}
                   credentialId={credentialId}

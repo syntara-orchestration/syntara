@@ -1,4 +1,5 @@
-import { render, fireEvent, screen, waitFor } from '@testing-library/react'
+import { ExecutorTypeEnum } from '@syntara/contracts'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
@@ -7,11 +8,14 @@ import { credentialsClient } from '../../../client'
 import { SynForm } from '../../../components/forms/SynForm'
 import { useSynForm } from '../../../hooks/useSynForm'
 import { useAllProjects, useSelectableProjects } from '../../access/useAllProjects'
+import { useExecutionTargetPermissions } from '../../execution-plane/useExecutionTargetPermissions'
 import { useAllCredentials } from '../components/useAllCredentials'
+import { ScriptAffinityEnum } from '../utils/scriptExecutionProfile'
 
 import { actionFormSchema } from './actionFormSchema'
 import { ActionStepForm, HttpUrlField } from './ActionStepForm'
 import { renderWithHeader } from './test-utils/renderWithHeader'
+import { useAllEnabledExecutionTargets } from './useAllEnabledExecutionTargets'
 
 // Mock credentialsClient used by CredentialSelector (now only for /credential_types
 // and the single-credential read-only lookup — the credentials list comes from useAllCredentials)
@@ -35,19 +39,39 @@ vi.mock('../../access/useAllProjects', () => ({
   useSelectableProjects: vi.fn(),
 }))
 
+vi.mock('../../execution-plane/useExecutionTargetPermissions', () => ({
+  useExecutionTargetPermissions: vi.fn(),
+}))
+
+vi.mock('./useAllEnabledExecutionTargets', () => ({
+  useAllEnabledExecutionTargets: vi.fn(),
+}))
+
+const allowedExecutionTargetPermissions = {
+  canRead: true,
+  canCreate: true,
+  canUpdate: true,
+  canDelete: true,
+  isLoading: false,
+  tooltips: { read: '', create: '', update: '', enable: '', delete: '' },
+}
+
 // Mock ExpandableCodeEditor to use a simple textarea for testing
 vi.mock('../components/ExpandableCodeEditor', () => ({
   ExpandableCodeEditor: ({
     code,
     onCodeChange,
     ariaLabel,
+    language,
   }: {
     code: string
     onCodeChange: (code: string) => void
     ariaLabel?: string
+    language: string
   }) => (
     <textarea
       data-testid="code-editor"
+      data-language={language}
       value={code}
       onChange={(e) => onCodeChange(e.target.value)}
       aria-label={ariaLabel}
@@ -79,33 +103,34 @@ describe('ActionStepForm', () => {
     })
     vi.mocked(useAllProjects).mockReturnValue({ projects: [], isLoading: false, error: null, refetch: vi.fn() })
     vi.mocked(useSelectableProjects).mockReturnValue({ projects: [], isLoading: false, error: null, refetch: vi.fn() })
+    vi.mocked(useExecutionTargetPermissions).mockReturnValue(allowedExecutionTargetPermissions)
+    vi.mocked(useAllEnabledExecutionTargets).mockReturnValue({
+      targets: [],
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    })
   })
 
   it('renders script fields by default and hides the action type selector', () => {
     renderWithHeader(<ActionStepForm onSubmit={mockOnSubmit} />)
 
     expect(screen.queryByLabelText(/Action type/i)).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Language' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Language' })).not.toBeInTheDocument()
     expect(screen.getByLabelText(/Script code editor/i)).toBeInTheDocument()
+    expect(screen.getByTestId('code-editor')).toHaveAttribute('data-language', 'python')
     expect(screen.queryByRole('textbox', { name: 'URL' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'HTTP Method' })).not.toBeInTheDocument()
   })
 
-  it('submits form even with empty script (permissive schema)', async () => {
-    const user = userEvent.setup()
+  it('requires code for script nodes', async () => {
     renderWithHeader(<ActionStepForm onSubmit={mockOnSubmit} />)
 
-    await user.type(screen.getByPlaceholderText(/Enter activity name/i), 'Test Script')
     fireEvent.submit(screen.getByTestId('action-step-form'))
 
-    await waitFor(() => {
-      expect(mockOnSubmit).toHaveBeenCalledWith(
-        expect.objectContaining({
-          name: 'Test Script',
-          executor: 'script',
-        })
-      )
-    })
+    expect(await screen.findByText('Script code is required')).toBeInTheDocument()
+    expect(mockOnSubmit).not.toHaveBeenCalled()
   })
 
   it('renders API fields when initialData sets executor to api', () => {
@@ -124,8 +149,7 @@ describe('ActionStepForm', () => {
         onSubmit={mockOnSubmit}
         initialData={{
           name: 'Existing Script',
-          executor: 'script',
-          language: 'bash',
+          executor: ExecutorTypeEnum.SCRIPT_BASH,
           code: 'echo "hello"',
           parameters: '{"param": "value"}',
         }}
@@ -135,7 +159,8 @@ describe('ActionStepForm', () => {
     expect(screen.getByDisplayValue('Existing Script')).toBeInTheDocument()
     expect(screen.getByDisplayValue('echo "hello"')).toBeInTheDocument()
     expect(screen.getByDisplayValue('{"param": "value"}')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Language' })).toHaveTextContent('Bash')
+    expect(screen.queryByRole('button', { name: 'Language' })).not.toBeInTheDocument()
+    expect(screen.getByTestId('code-editor')).toHaveAttribute('data-language', 'bash')
   })
 
   it('populates form with initial data for API executor', () => {
@@ -159,6 +184,41 @@ describe('ActionStepForm', () => {
     expect(screen.getByDisplayValue('header')).toBeInTheDocument()
     expect(screen.getByDisplayValue('{"data": "test"}')).toBeInTheDocument()
   })
+
+  it.each([ExecutorTypeEnum.SCRIPT_PYTHON, ExecutorTypeEnum.SCRIPT_BASH])(
+    'saves execution placement for %s nodes',
+    async (executor) => {
+      const user = userEvent.setup()
+      const targetId = '550e8400-e29b-41d4-a716-446655440000'
+      vi.mocked(useAllEnabledExecutionTargets).mockReturnValue({
+        targets: [{ id: targetId, name: 'Build worker' }] as never,
+        isLoading: false,
+        isError: false,
+        error: null,
+        refetch: vi.fn(),
+      })
+      renderWithHeader(<ActionStepForm onSubmit={mockOnSubmit} initialData={{ executor }} />)
+
+      await user.click(screen.getByRole('tab', { name: 'Execution' }))
+      await user.click(screen.getByRole('button', { name: 'Affinity' }))
+      await user.click(screen.getByRole('option', { name: /Required target/i }))
+      await user.click(screen.getByRole('button', { name: 'Execution target' }))
+      await user.click(screen.getByRole('option', { name: 'Build worker' }))
+      await user.click(screen.getByRole('tab', { name: 'Parameters' }))
+      await user.type(screen.getByPlaceholderText(/Enter your code/i), 'print("ready")')
+      fireEvent.submit(screen.getByTestId('action-step-form'))
+
+      await waitFor(() => {
+        expect(mockOnSubmit).toHaveBeenCalledWith(
+          expect.objectContaining({
+            executor,
+            affinity: ScriptAffinityEnum.REQUIRED_TARGET,
+            execution_target_id: targetId,
+          })
+        )
+      })
+    }
+  )
 
   it('passes projectId to CredentialSelector for HTTP request executor', () => {
     const useAllCredentialsMock = vi.mocked(useAllCredentials)
@@ -188,8 +248,7 @@ describe('ActionStepForm', () => {
       expect(mockOnSubmit).toHaveBeenCalledWith(
         expect.objectContaining({
           name: '',
-          executor: 'script',
-          language: 'python',
+          executor: ExecutorTypeEnum.SCRIPT_PYTHON,
           code: 'print("hello")',
         })
       )
@@ -217,22 +276,21 @@ describe('ActionStepForm', () => {
     })
   })
 
-  it('allows changing language for script executor', async () => {
+  it('submits Bash nodes as a distinct executor with no language parameter', async () => {
     const user = userEvent.setup()
-    renderWithHeader(<ActionStepForm onSubmit={mockOnSubmit} />)
+    renderWithHeader(
+      <ActionStepForm onSubmit={mockOnSubmit} initialData={{ executor: ExecutorTypeEnum.SCRIPT_BASH }} />
+    )
 
-    await user.click(screen.getByRole('button', { name: 'Language' }))
-    await user.click(screen.getByRole('option', { name: 'Bash' }))
     await user.type(screen.getByPlaceholderText(/Enter your code/i), 'echo "test"')
     fireEvent.submit(screen.getByTestId('action-step-form'))
 
     await waitFor(() => {
       expect(mockOnSubmit).toHaveBeenCalledWith(
-        expect.objectContaining({
-          language: 'bash',
-        })
+        expect.objectContaining({ executor: ExecutorTypeEnum.SCRIPT_BASH, code: 'echo "test"' })
       )
     })
+    expect(mockOnSubmit.mock.calls[0][0]).not.toHaveProperty('language')
   })
 
   it('includes parameters in submission when provided', async () => {
@@ -310,17 +368,13 @@ describe('ActionStepForm', () => {
     expect(parametersField).toHaveValue('${trigger.tier}')
   })
 
-  it('shows Developer Preview label for script executor', () => {
-    renderWithHeader(<ActionStepForm onSubmit={mockOnSubmit} initialData={{ executor: 'script' }} />)
-
-    expect(screen.getByText('Developer Preview')).toBeInTheDocument()
-  })
-
-  it('does not show Developer Preview label for HTTP request executor', () => {
-    renderWithHeader(<ActionStepForm onSubmit={mockOnSubmit} initialData={{ executor: 'http_request' }} />)
-
-    expect(screen.queryByText('Developer Preview')).not.toBeInTheDocument()
-  })
+  it.each([ExecutorTypeEnum.SCRIPT_PYTHON, ExecutorTypeEnum.SCRIPT_BASH])(
+    'does not show Developer Preview label for %s executor',
+    (executor) => {
+      renderWithHeader(<ActionStepForm onSubmit={mockOnSubmit} initialData={{ executor }} />)
+      expect(screen.queryByText('Developer Preview')).not.toBeInTheDocument()
+    }
+  )
 
   describe('Secret URL credential — URL field locking', () => {
     const mockSecretUrlType = {
@@ -628,7 +682,9 @@ describe('ActionStepForm', () => {
   describe('retry policy visibility', () => {
     it('hides retry policy for script executor', async () => {
       const user = userEvent.setup()
-      renderWithHeader(<ActionStepForm onSubmit={mockOnSubmit} initialData={{ executor: 'script' }} />)
+      renderWithHeader(
+        <ActionStepForm onSubmit={mockOnSubmit} initialData={{ executor: ExecutorTypeEnum.SCRIPT_PYTHON }} />
+      )
 
       await user.click(screen.getByRole('tab', { name: 'Settings' }))
 
@@ -644,12 +700,12 @@ describe('ActionStepForm', () => {
       expect(screen.getByRole('switch', { name: 'Override retry policy' })).toBeInTheDocument()
     })
 
-    it('strips retry_policy from submitted data when executor is script', async () => {
+    it('omits script settings that contain only the unsupported retry policy', async () => {
       renderWithHeader(
         <ActionStepForm
           onSubmit={mockOnSubmit}
           initialData={{
-            executor: 'script',
+            executor: ExecutorTypeEnum.SCRIPT_PYTHON,
             code: 'print("hello")',
             settings: { retry_policy: { max_retries: 3, initial_interval: 10 } },
           }}
@@ -661,8 +717,8 @@ describe('ActionStepForm', () => {
       await waitFor(() => {
         expect(mockOnSubmit).toHaveBeenCalledWith(
           expect.objectContaining({
-            executor: 'script',
-            settings: expect.objectContaining({ retry_policy: undefined }) as unknown,
+            executor: ExecutorTypeEnum.SCRIPT_PYTHON,
+            settings: undefined,
           })
         )
       })

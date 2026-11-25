@@ -10,9 +10,8 @@ triggers:
 nodes:
   - id: initialize_counter
     name: Initialize Counter
-    type: script
+    type: script_python
     parameters:
-      language: python
       code: |
         import json
         print(json.dumps({"counter": 0}))
@@ -26,9 +25,8 @@ nodes:
       maxIterations: 10
 
   - id: loop_task
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       code: |
         echo "Loop iteration executed"
 edges:

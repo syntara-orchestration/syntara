@@ -56,8 +56,8 @@ def _reject_only_workflow(name: str) -> WorkflowDefinition:
                 {
                     "id": "approved_action",
                     "name": "Approved Action",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": 'echo "approved path"'},
+                    "type": "script_bash",
+                    "parameters": {"code": 'echo "approved path"'},
                 },
             ],
             "edges": [
@@ -90,14 +90,14 @@ def _branched_workflow(name: str) -> WorkflowDefinition:
                 {
                     "id": "approved_action",
                     "name": "Approved Action",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": 'echo "approved path"'},
+                    "type": "script_bash",
+                    "parameters": {"code": 'echo "approved path"'},
                 },
                 {
                     "id": "rejected_handler",
                     "name": "Rejection Handler",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": 'echo "rejected path"'},
+                    "type": "script_bash",
+                    "parameters": {"code": 'echo "rejected path"'},
                 },
             ],
             "edges": [

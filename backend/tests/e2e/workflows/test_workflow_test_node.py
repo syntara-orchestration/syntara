@@ -57,18 +57,16 @@ class TestWorkflowTestNode:
                             {
                                 "id": "node_a",
                                 "name": "Node A",
-                                "type": "script",
+                                "type": "script_bash",
                                 "parameters": {
-                                    "language": "bash",
                                     "code": 'echo "node a output"',
                                 },
                             },
                             {
                                 "id": "node_b",
                                 "name": "Node B",
-                                "type": "script",
+                                "type": "script_bash",
                                 "parameters": {
-                                    "language": "bash",
                                     "code": 'echo "${node_a.stdout}"',
                                 },
                             },

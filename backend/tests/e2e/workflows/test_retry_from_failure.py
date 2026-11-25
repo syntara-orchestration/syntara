@@ -53,10 +53,10 @@ _TERMINAL_ACTIVITY_STATUSES = frozenset({"completed", "failed", "skipped", "canc
 
 
 def _script_node(node_id: str, code: str, *, environment: dict[str, str] | None = None) -> dict[str, Any]:
-    parameters: dict[str, Any] = {"language": "python", "code": code}
+    parameters: dict[str, Any] = {"code": code}
     if environment is not None:
         parameters["environment"] = environment
-    return {"id": node_id, "name": node_id, "type": "script", "parameters": parameters}
+    return {"id": node_id, "name": node_id, "type": "script_python", "parameters": parameters}
 
 
 def _id_list(value: object) -> list[str]:

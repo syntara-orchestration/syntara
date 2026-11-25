@@ -1,4 +1,4 @@
-import { TriggerTypeEnum } from '@syntara/contracts'
+import { ActivityTypeEnum, TriggerTypeEnum } from '@syntara/contracts'
 import { describe, expect, it } from 'vitest'
 
 import { useWorkflowStore } from '../../stores/useWorkflowStore'
@@ -82,34 +82,33 @@ describe('Builder Workflow Store Helpers', () => {
     })
   })
 
-  describe('createScriptActivity', () => {
+  describe('createPythonScriptActivity', () => {
     it('creates python script activity', async () => {
-      const { createScriptActivity } = await import('../../stores/useWorkflowStore')
-      const activity = createScriptActivity({
+      const { createPythonScriptActivity } = await import('../../stores/useWorkflowStore')
+      const activity = createPythonScriptActivity({
         id: 'task-1',
         name: 'My Script',
-        language: 'python',
         code: 'print("Hello")',
       })
 
-      expect(activity.type).toBe('script')
+      expect(activity.type).toBe(ActivityTypeEnum.SCRIPT_PYTHON)
       expect(activity.id).toBe('task-1')
       expect(activity.name).toBe('My Script')
-      expect(activity.parameters.language).toBe('python')
       expect(activity.parameters.code).toBe('print("Hello")')
+      expect(activity.parameters).not.toHaveProperty('language')
     })
 
-    it('creates javascript script activity', async () => {
-      const { createScriptActivity } = await import('../../stores/useWorkflowStore')
-      const activity = createScriptActivity({
+    it('creates Bash script activity', async () => {
+      const { createBashScriptActivity } = await import('../../stores/useWorkflowStore')
+      const activity = createBashScriptActivity({
         id: 'task-2',
-        name: 'JS Script',
-        language: 'javascript',
-        code: 'console.log("Hi")',
+        name: 'Bash Script',
+        code: 'echo "Hi"',
       })
 
-      expect(activity.parameters.language).toBe('javascript')
-      expect(activity.parameters.code).toBe('console.log("Hi")')
+      expect(activity.type).toBe(ActivityTypeEnum.SCRIPT_BASH)
+      expect(activity.parameters.code).toBe('echo "Hi"')
+      expect(activity.parameters).not.toHaveProperty('language')
     })
   })
 
@@ -248,7 +247,7 @@ describe('Builder Workflow Store Helpers', () => {
 
     it('adds activity to workflow', async () => {
       const store = useWorkflowStore
-      const { createScriptActivity } = await import('../../stores/useWorkflowStore')
+      const { createPythonScriptActivity } = await import('../../stores/useWorkflowStore')
 
       store.getState().setWorkflow({
         schema_version: '2.0.0' as const,
@@ -256,10 +255,9 @@ describe('Builder Workflow Store Helpers', () => {
         workflow: { activities: [] },
       })
 
-      const activity = createScriptActivity({
+      const activity = createPythonScriptActivity({
         id: 'task-1',
         name: 'Test Task',
-        language: 'python',
         code: 'print("test")',
       })
       store.getState().addActivity(activity)
@@ -273,10 +271,10 @@ describe('Builder Workflow Store Helpers', () => {
 
     it('removes activity from workflow', async () => {
       const store = useWorkflowStore
-      const { createScriptActivity } = await import('../../stores/useWorkflowStore')
+      const { createPythonScriptActivity } = await import('../../stores/useWorkflowStore')
 
-      const activity1 = createScriptActivity({ id: 'task-1', name: 'Task 1', language: 'python', code: 'print("1")' })
-      const activity2 = createScriptActivity({ id: 'task-2', name: 'Task 2', language: 'python', code: 'print("2")' })
+      const activity1 = createPythonScriptActivity({ id: 'task-1', name: 'Task 1', code: 'print("1")' })
+      const activity2 = createPythonScriptActivity({ id: 'task-2', name: 'Task 2', code: 'print("2")' })
 
       store.getState().setWorkflow({
         schema_version: '2.0.0' as const,
@@ -295,12 +293,11 @@ describe('Builder Workflow Store Helpers', () => {
 
     it('updates activity in workflow', async () => {
       const store = useWorkflowStore
-      const { createScriptActivity } = await import('../../stores/useWorkflowStore')
+      const { createPythonScriptActivity } = await import('../../stores/useWorkflowStore')
 
-      const activity = createScriptActivity({
+      const activity = createPythonScriptActivity({
         id: 'task-1',
         name: 'Original Name',
-        language: 'python',
         code: 'print("test")',
       })
 

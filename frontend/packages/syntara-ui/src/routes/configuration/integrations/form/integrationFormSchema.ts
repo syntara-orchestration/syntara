@@ -1,6 +1,7 @@
 import { IntegrationTypeEnum, LLMProviderHintEnum } from '@syntara/contracts'
 import { z } from 'zod'
 
+import { addRequiredCaCertificateIssue } from '../caCertificate'
 import { PROVIDERS_REQUIRING_BASE_URL } from '../integrationFilters'
 
 const securityFields = {
@@ -100,13 +101,36 @@ const llmProviderSchema = z.object({
     }),
 })
 
+const openshiftSchema = z.object({
+  ...sharedFields,
+  integration_type: z.literal(IntegrationTypeEnum.OPENSHIFT),
+  configuration: z
+    .object({
+      integration_type: z.literal(IntegrationTypeEnum.OPENSHIFT),
+      base_url: z.string().min(1, 'API endpoint is required').url('API endpoint must be a valid URL'),
+      insecure_skip_tls_verify: z.boolean().refine((val) => !val, { message: 'OpenShift requires TLS verification' }),
+      allow_http: z.boolean().refine((val) => !val, { message: 'OpenShift requires HTTPS' }),
+      ca_certificate: z.string().optional().nullable(),
+    })
+    .superRefine((data, ctx) => {
+      if (!isAllowedScheme(data.base_url, data.allow_http)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: data.allow_http ? 'Must be an HTTP or HTTPS URL' : 'Must be an HTTPS URL',
+          path: ['base_url'],
+        })
+      }
+      addRequiredCaCertificateIssue(data.ca_certificate, ctx)
+    }),
+})
+
 /**
  * Zod schema for the integration create form.
  * Discriminated union on integration_type — each type has its own configuration shape.
  * Backend 422 errors are still applied via useFormMutationErrorHandler.
  */
 export const integrationFormSchema = z
-  .discriminatedUnion('integration_type', [mcpServerSchema, aapSchema, llmProviderSchema])
+  .discriminatedUnion('integration_type', [mcpServerSchema, aapSchema, llmProviderSchema, openshiftSchema])
   .superRefine((data, ctx) => {
     if (data.scope === 'project' && data.project_ids.length === 0) {
       ctx.addIssue({
@@ -136,6 +160,8 @@ export function getStep1Fields(integrationType: string, scope?: string): string[
       return [...shared, 'configuration.base_url']
     case IntegrationTypeEnum.LLM_PROVIDER:
       return [...shared, 'configuration.provider_hint', 'configuration.base_url']
+    case IntegrationTypeEnum.OPENSHIFT:
+      return [...shared, 'configuration.base_url', 'configuration.ca_certificate']
     default:
       return shared
   }
@@ -156,6 +182,14 @@ export function getDefaultConfiguration(integrationType: string): IntegrationFor
         base_url: '',
         ...SECURITY_DEFAULTS,
       }
+    case IntegrationTypeEnum.OPENSHIFT:
+      return {
+        integration_type: 'openshift' as const,
+        base_url: '',
+        insecure_skip_tls_verify: false,
+        allow_http: false,
+        ca_certificate: null,
+      }
     default:
       return { integration_type: 'mcp_server' as const, base_url: '', ...SECURITY_DEFAULTS }
   }
@@ -165,6 +199,7 @@ export const INTEGRATION_TYPE_OPTIONS = [
   { value: IntegrationTypeEnum.MCP_SERVER, label: 'MCP Server' },
   { value: IntegrationTypeEnum.ANSIBLE_AUTOMATION_PLATFORM, label: 'Ansible Automation Platform' },
   { value: IntegrationTypeEnum.LLM_PROVIDER, label: 'LLM Provider' },
+  { value: IntegrationTypeEnum.OPENSHIFT, label: 'Execution plane infrastructure' },
 ] as const
 
 export const PROVIDER_HINT_OPTIONS = [

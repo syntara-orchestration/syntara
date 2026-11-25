@@ -1,6 +1,8 @@
 import { IntegrationTypeEnum, LLMProviderHintEnum } from '@syntara/contracts'
 import { describe, expect, it } from 'vitest'
 
+import { CA_CERTIFICATE_REQUIRED_MESSAGE } from '../caCertificate'
+
 import { integrationFormSchema, getStep1Fields, getDefaultConfiguration } from './integrationFormSchema'
 
 const securityDefaults = {
@@ -34,6 +36,17 @@ const validLlmBase = {
     ...securityDefaults,
   },
   management_credential_id: 'cred-llm-123',
+  scope: 'global' as const,
+}
+
+const validOpenShiftBase = {
+  integration_type: 'openshift' as const,
+  configuration: {
+    integration_type: 'openshift' as const,
+    base_url: 'https://api.example.com:6443',
+    ...securityDefaults,
+    ca_certificate: '-----BEGIN CERTIFICATE-----\n...',
+  },
   scope: 'global' as const,
 }
 
@@ -229,6 +242,108 @@ describe('integrationFormSchema', () => {
     })
   })
 
+  describe('OpenShift', () => {
+    it('accepts valid OpenShift form data', () => {
+      const result = integrationFormSchema.safeParse({
+        ...validOpenShiftBase,
+        name: 'Prod Cluster',
+        description: 'West region',
+      })
+      expect(result.success).toBe(true)
+      if (result.success) {
+        expect(result.data.name).toBe('Prod Cluster')
+        expect(result.data.configuration).toHaveProperty('base_url', 'https://api.example.com:6443')
+      }
+    })
+
+    it('rejects empty cluster URL', () => {
+      const result = integrationFormSchema.safeParse({
+        ...validOpenShiftBase,
+        name: 'Cluster',
+        configuration: {
+          integration_type: 'openshift' as const,
+          base_url: '',
+          ...securityDefaults,
+        },
+      })
+      expect(result.success).toBe(false)
+      if (!result.success) {
+        expect(result.error.issues.some((i) => i.message === 'API endpoint is required')).toBe(true)
+      }
+    })
+
+    it('rejects allow_http=true', () => {
+      const result = integrationFormSchema.safeParse({
+        ...validOpenShiftBase,
+        name: 'Cluster',
+        configuration: {
+          integration_type: 'openshift' as const,
+          base_url: 'https://api.example.com:6443',
+          ...securityDefaults,
+          allow_http: true,
+        },
+      })
+      expect(result.success).toBe(false)
+      if (!result.success) {
+        expect(result.error.issues.some((i) => i.message === 'OpenShift requires HTTPS')).toBe(true)
+      }
+    })
+
+    it('rejects insecure_skip_tls_verify=true', () => {
+      const result = integrationFormSchema.safeParse({
+        ...validOpenShiftBase,
+        name: 'Cluster',
+        configuration: {
+          integration_type: 'openshift' as const,
+          base_url: 'https://api.example.com:6443',
+          ...securityDefaults,
+          insecure_skip_tls_verify: true,
+        },
+      })
+      expect(result.success).toBe(false)
+      if (!result.success) {
+        expect(result.error.issues.some((i) => i.message === 'OpenShift requires TLS verification')).toBe(true)
+      }
+    })
+
+    it('rejects non-HTTPS cluster URL', () => {
+      const result = integrationFormSchema.safeParse({
+        ...validOpenShiftBase,
+        name: 'Cluster',
+        configuration: {
+          integration_type: 'openshift' as const,
+          base_url: 'http://api.example.com:6443',
+          ...securityDefaults,
+          ca_certificate: '-----BEGIN CERTIFICATE-----\n...',
+        },
+      })
+      expect(result.success).toBe(false)
+      if (!result.success) {
+        expect(result.error.issues.some((i) => i.message === 'Must be an HTTPS URL')).toBe(true)
+      }
+    })
+
+    it.each([
+      ['null', null],
+      ['empty', ''],
+      ['whitespace', '   '],
+    ])('rejects a %s CA certificate', (_label, caCertificate) => {
+      const result = integrationFormSchema.safeParse({
+        ...validOpenShiftBase,
+        name: 'Cluster',
+        configuration: {
+          ...validOpenShiftBase.configuration,
+          ca_certificate: caCertificate,
+        },
+      })
+      expect(result.success).toBe(false)
+      if (!result.success) {
+        expect(result.error.issues.some((i) => i.message === CA_CERTIFICATE_REQUIRED_MESSAGE)).toBe(true)
+        expect(result.error.issues.some((i) => i.path.join('.') === 'configuration.ca_certificate')).toBe(true)
+      }
+    })
+  })
+
   describe('LLM provider validation', () => {
     it('accepts valid LLM provider form data', () => {
       const result = integrationFormSchema.safeParse({
@@ -346,6 +461,13 @@ describe('integrationFormSchema', () => {
       expect(fields).toContain('configuration.base_url')
     })
 
+    it('returns name, base_url, and CA certificate for OpenShift', () => {
+      const fields = getStep1Fields(IntegrationTypeEnum.OPENSHIFT)
+      expect(fields).toContain('name')
+      expect(fields).toContain('configuration.base_url')
+      expect(fields).toContain('configuration.ca_certificate')
+    })
+
     it('references valid schema paths that are required for MCP', () => {
       const result = integrationFormSchema.safeParse({
         ...validMcpBase,
@@ -425,6 +547,16 @@ describe('integrationFormSchema', () => {
         },
       ],
       [IntegrationTypeEnum.MCP_SERVER, { integration_type: 'mcp_server', base_url: '', ...expectedSecurityDefaults }],
+      [
+        IntegrationTypeEnum.OPENSHIFT,
+        {
+          integration_type: 'openshift',
+          base_url: '',
+          insecure_skip_tls_verify: false,
+          allow_http: false,
+          ca_certificate: null,
+        },
+      ],
     ])('returns correct defaults for %s', (integrationType, expected) => {
       expect(getDefaultConfiguration(integrationType)).toEqual(expected)
     })

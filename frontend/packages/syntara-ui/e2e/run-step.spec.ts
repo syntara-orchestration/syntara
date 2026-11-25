@@ -48,15 +48,15 @@ async function createTwoStepWorkflowViaApi(app: Page, workflowName: string): Pro
     nodes: [
       {
         id: 'action_1',
-        type: 'script',
+        type: 'script_python',
         name: 'First action',
-        parameters: { language: 'python', code: 'print("first")' },
+        parameters: { code: 'print("first")' },
       },
       {
         id: 'action_2',
-        type: 'script',
+        type: 'script_python',
         name: 'Second action',
-        parameters: { language: 'python', code: 'print("second")' },
+        parameters: { code: 'print("second")' },
       },
     ],
     edges: [

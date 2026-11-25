@@ -117,6 +117,10 @@ BUILTIN_POLICIES: list[PolicyInfo] = [
     # executions
     PolicyInfo("execution", "read", roles=("admin", "auditor")),
     PolicyInfo("execution", "run", roles=("admin",)),
+    # internal service callbacks
+    PolicyInfo("execution-plane-callback", "complete", roles=("execution-plane-callback",)),
+    PolicyInfo("execution-plane-callback", "resolve-credential-cluster", roles=("execution-plane-callback",)),
+    PolicyInfo("execution-plane-callback", "resolve-credential-workload", roles=("execution-plane-callback",)),
     # approvals
     PolicyInfo("approval", "read", roles=("admin", "auditor")),
     PolicyInfo("approval", "decide", roles=("admin",)),
@@ -211,6 +215,12 @@ BUILTIN_POLICIES: list[PolicyInfo] = [
     PolicyInfo("policy", "read", scope="project", roles=("project-admin", "project-user", "project-auditor")),
     PolicyInfo("policy", "update", scope="project", roles=("project-admin",)),
     PolicyInfo("policy", "delete", scope="project", roles=("project-admin",)),
+    # execution plane
+    PolicyInfo("execution_target", "read", roles=("admin", "auditor")),
+    PolicyInfo("execution_target", "create", roles=("admin",)),
+    PolicyInfo("execution_target", "update", roles=("admin",)),
+    PolicyInfo("execution_target", "delete", roles=("admin",)),
+    PolicyInfo("work_item", "read", roles=("admin", "auditor")),
     # -- files --
     PolicyInfo("files", "upload", roles=("admin", "user")),
     PolicyInfo("files", "download", roles=("admin", "user")),
@@ -251,6 +261,7 @@ BUILTIN_ROLES: list[RoleInfo] = [
         scope="project",
     ),
     RoleInfo("project-auditor", "Read-only access within a project", scope="project"),
+    RoleInfo("execution-plane-callback", "Execute Execution Plane callback commands"),
     RoleInfo(
         "authenticated",
         "Default permissions granted to all authenticated users",

@@ -452,7 +452,7 @@ class TestExecutionTimeEdgeCases:
     async def test_script_node_skips_validation(
         self, test_db_session: AsyncSession, test_user: User, test_project_id: UUID
     ) -> None:
-        refs: dict[str, Any] = {"language": "python", "script": "pass"}
+        refs: dict[str, Any] = {"code": "pass"}
         await _validate_node(test_db_session, "script", "node-1", refs, str(test_project_id))
 
     async def test_empty_project_id_skips_scope_but_checks_existence(

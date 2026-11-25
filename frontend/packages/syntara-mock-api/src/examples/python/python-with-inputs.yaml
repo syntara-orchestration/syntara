@@ -21,9 +21,8 @@ triggers:
 
 nodes:
   - id: calculator
-    type: script
+    type: script_python
     parameters:
-      language: python
       environment:
         APP_NAME: CalculatorService
         DEBUG_MODE: 'true'
@@ -49,9 +48,8 @@ nodes:
         print(json.dumps({"result": result, "app": app_name}))
 
   - id: print_result
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       environment:
         LOG_LEVEL: INFO
         INPUT_RESULT: ${calculator.stdout_json.result}
