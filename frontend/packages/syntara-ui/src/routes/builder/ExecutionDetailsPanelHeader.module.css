@@ -1,0 +1,15 @@
+.viewModeNav {
+  flex-shrink: 0;
+}
+
+/*
+ * Horizontal subnav: PF shows a brand accent bar under the current item; QoL uses filled link only.
+ */
+.viewModeNav :global(.pf-v6-c-nav.pf-m-horizontal.pf-m-subnav) {
+  --pf-v6-c-nav__item--current--accent--ScaleY: 0;
+}
+
+.viewModeNav
+  :global(.pf-v6-c-nav.pf-m-horizontal.pf-m-subnav .pf-v6-c-nav__link.pf-m-current:not(:hover, :focus-visible)) {
+  background-color: var(--pf-t--global--background--color--action--plain--clicked);
+}

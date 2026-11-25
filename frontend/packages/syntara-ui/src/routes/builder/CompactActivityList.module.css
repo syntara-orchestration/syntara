@@ -1,19 +1,76 @@
+.list {
+  --pf-v6-c-data-list__item-row--PaddingInlineStart: var(--pf-t--global--spacer--md);
+  --pf-v6-c-data-list__item-row--PaddingInlineEnd: var(--pf-t--global--spacer--md);
+  --pf-v6-c-data-list__item-row--xl--PaddingInlineStart: var(--pf-t--global--spacer--md);
+  --pf-v6-c-data-list__item-row--xl--PaddingInlineEnd: var(--pf-t--global--spacer--md);
+  margin: 0;
+  height: 100%;
+  overflow-y: auto;
+}
+
+/*
+ * PF data-list __item-content defaults to CSS grid with full-width cells, which
+ * prevents title + status from sharing one row. Use a simple column flex stack here.
+ */
+.list :global(.pf-v6-c-data-list__item-content) {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.list :global(.pf-v6-c-data-list__cell) {
+  flex: 1 1 auto;
+  grid-column: unset;
+  width: 100%;
+  max-width: 100%;
+}
+
+.rowMainCell {
+  min-width: 0;
+}
+
+.titleRow {
+  --pf-v6-c-content--MarginBlockEnd: 0;
+  --pf-v6-c-content--MarginBlockStart: 0;
+  --pf-v6-c-content--small--MarginBlockEnd: 0;
+  --pf-v6-c-content--small--MarginBlockStart: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: auto auto;
+  column-gap: var(--pf-t--global--spacer--sm);
+  row-gap: var(--pf-t--global--spacer--gap--text-to-text);
+  align-items: start;
+  width: 100%;
+  min-width: 0;
+}
+
+.primaryLine {
+  grid-column: 1;
+  grid-row: 1;
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.list :global(.pf-v6-c-data-list__cell) .primaryLine {
+  white-space: normal;
+}
+
 .subtleText {
+  grid-column: 1;
+  grid-row: 2;
   color: var(--pf-t--global--text--color--subtle);
   margin: 0;
 }
 
-.nameCell {
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
 .statusCell {
-  vertical-align: top;
+  grid-column: 2;
+  grid-row: 1;
+  justify-self: end;
   white-space: nowrap;
-  width: auto;
 }
 
-.clickableRow {
-  cursor: pointer;
+/* PF Content applies block margins that collapse into a large gap above the timestamp. */
+.list :global(.pf-v6-c-data-list__cell) :global(.pf-v6-c-content) {
+  margin-block: 0;
 }
