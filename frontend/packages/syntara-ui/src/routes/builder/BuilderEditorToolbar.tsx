@@ -142,6 +142,7 @@ type BuilderEditorToolbarProps = Readonly<{
   onUnpublish: () => void
   onDuplicate: () => void
   onPendingImport: (data: PendingImportData) => void
+  getImportRefusal?: (data: PendingImportData) => string | null
   triggers?: { id: string; name?: string }[]
   builderPermissions: BuilderPermissions
   isStepEditorOpen?: boolean
@@ -171,6 +172,7 @@ export function BuilderEditorToolbar({
   onUnpublish,
   onDuplicate,
   onPendingImport,
+  getImportRefusal,
   triggers,
   builderPermissions,
   isStepEditorOpen,
@@ -183,6 +185,7 @@ export function BuilderEditorToolbar({
       workflowName,
       workflowDescription,
       onPendingImport,
+      getImportRefusal,
       canEdit: builderPermissions.canEdit,
     })
 

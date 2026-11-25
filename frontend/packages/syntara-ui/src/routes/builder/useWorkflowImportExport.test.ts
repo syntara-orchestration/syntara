@@ -322,6 +322,42 @@ describe('useWorkflowImportExport', () => {
       expect(mockMarkDirty).toHaveBeenCalled()
       expect(mockOnPendingImport).not.toHaveBeenCalled()
     })
+
+    it('refuses a blocked import on a new workflow and leaves the canvas untouched', async () => {
+      const definition = { name: 'Imported', description: 'A workflow', triggers: [], nodes: [], edges: [] }
+      mockValidateFileSize.mockReturnValue(undefined)
+      mockParseWorkflowFile.mockReturnValue(definition)
+      mockLoadDefinition.mockReturnValue({ workflowDef: {}, edges: [], nodePositions: {} })
+      mockGetState.mockReturnValue({ replaceWorkflowContent: mockReplaceWorkflowContent })
+      const getImportRefusal = vi.fn(() => "You don't have permission to write Script steps.")
+
+      const file = new File([JSON.stringify(definition)], 'test.json', { type: 'application/json' })
+      const { result } = renderHook(() =>
+        useWorkflowImportExport({
+          dispatch: mockDispatch,
+          markDirty: mockMarkDirty,
+          isNew: true,
+          workflowName: 'wf',
+          workflowDescription: '',
+          onPendingImport: mockOnPendingImport,
+          getImportRefusal,
+        })
+      )
+
+      act(() => result.current.handleImportFile(createFileChangeEvent(file)))
+
+      await waitFor(() => {
+        expect(mockShowError).toHaveBeenCalledWith({
+          title: 'Cannot import into this workflow',
+          description: "You don't have permission to write Script steps.",
+        })
+      })
+      expect(getImportRefusal).toHaveBeenCalledWith(expect.objectContaining({ name: 'Imported' }))
+      expect(mockReplaceWorkflowContent).not.toHaveBeenCalled()
+      expect(mockDispatch).not.toHaveBeenCalled()
+      expect(mockMarkDirty).not.toHaveBeenCalled()
+      expect(mockOnPendingImport).not.toHaveBeenCalled()
+    })
   })
 
   it('returns a ref for the file input', () => {

@@ -121,6 +121,7 @@ export function BuilderContent(props: BuilderContentProps) {
                     onUnpublish={authoring.onUnpublish}
                     onDuplicate={duplication.handleDuplicateWorkflow}
                     onPendingImport={setPendingImport}
+                    getImportRefusal={workspace.getImportRefusal}
                     isLiveRunActive={workspace.isLiveRunActive}
                     executionId={state.mostRecentExecutionId}
                     executionStatus={workspace.mostRecentExecution?.status}
