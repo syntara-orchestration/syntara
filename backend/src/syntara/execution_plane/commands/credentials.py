@@ -12,8 +12,6 @@ from execution_plane_client.commands.results import (
 from execution_plane_client.errors import ProtocolConflict
 from execution_plane_client.handlers import HandlingResult
 from execution_plane_client.protocol import MessageEnvelope, ResourceReference
-from pydantic import ValidationError
-from sqlalchemy.orm import selectinload
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -22,20 +20,24 @@ from syntara.core.lib.encryption import EncryptionError
 from syntara.core.services.secret_service import create_secret_service
 from syntara.credentials.audit.credential import CredentialClusterResolvedEvent, CredentialWorkloadResolvedEvent
 from syntara.credentials.lib.injector_resolver import InjectorResolver
+from syntara.execution_plane.commands.activity_resolution import (
+    ResolutionChain,
+    RuntimeContextResolutionStrategy,
+    TemporalHistoryResolutionStrategy,
+    WorkItemResolutionStrategy,
+)
 from syntara.execution_plane.commands.context import AOCommandContext
 from syntara.execution_plane.commands.errors import CommandResourceNotFoundError, CommandResourceStateError
 from syntara.execution_plane.registry.repository import (
     execution_plane_plugin_credential_recipe_ids,
     get_execution_plane_plugin_by_node_type,
 )
-from syntara.execution_plane.utils import execution_plane_work_item_id
 from syntara.integrations.exceptions import IntegrationCredentialNotFoundError
 from syntara.integrations.lib.credential_resolver import fetch_credential_with_type
 from syntara.integrations.models.integration import Integration, IntegrationType
 from syntara.workflow_core.models import NodeType
-from syntara.workflows.models.activity_execution import TERMINAL_ACTIVITY_STATUSES, ActivityExecution
-from syntara.workflows.models.execution import Execution
-from syntara.workflows.models.workflow_definition import WorkflowDefinition, WorkflowNode
+from syntara.workflows.models.activity_execution import TERMINAL_ACTIVITY_STATUSES
+from syntara.workflows.models.workflow_definition import WorkflowNode
 
 if TYPE_CHECKING:
     from syntara.workflow_core.models import CredentialBinding
@@ -100,29 +102,15 @@ class CredentialResolveClusterCommandHandler:
 class CredentialResolveWorkloadCommandHandler:
     """Resolve one credential for the active work item identified by work_item_id."""
 
-    async def _load_activity(self, session: AsyncSession, work_item_id: UUID) -> ActivityExecution | None:
-        """Load the activity and its execution/workflow version in one query."""
-        result = await session.exec(
-            select(ActivityExecution)
-            .where(col(ActivityExecution.id) == work_item_id)
-            .options(
-                selectinload(ActivityExecution.execution).selectinload(Execution.workflow_version),  # type: ignore[arg-type]
-            )
+    def __init__(self) -> None:
+        """Instantiate the standard activity resolution chain."""
+        self._resolution_chain = ResolutionChain(
+            [
+                WorkItemResolutionStrategy(),
+                RuntimeContextResolutionStrategy(),
+                TemporalHistoryResolutionStrategy(),
+            ]
         )
-        return result.one_or_none()
-
-    def _node_for_activity(self, activity: ActivityExecution) -> WorkflowNode:
-        """Return the workflow node whose deterministic UUID matches the activity."""
-        execution = activity.execution
-        workflow_version = execution.workflow_version
-        try:
-            definition = WorkflowDefinition.model_validate(workflow_version.workflow_definition)
-        except ValidationError as error:
-            raise CommandResourceStateError from error
-        for node in definition.nodes:
-            if execution_plane_work_item_id(execution.id, node.id) == activity.id:
-                return node
-        raise CommandResourceStateError
 
     def _binding_matches(self, node: WorkflowNode, payload: CredentialResolveWorkload) -> bool:
         """Check whether the requested recipe and reference are bound to the node."""
@@ -178,20 +166,25 @@ class CredentialResolveWorkloadCommandHandler:
         if not isinstance(payload, CredentialResolveWorkload):
             raise ProtocolConflict
         work_item_id = payload.work_item_id
-        activity = await self._load_activity(context.session, work_item_id)
-        if activity is None:
+        resolution = await self._resolution_chain.resolve(
+            context,
+            work_item_id,
+            payload.runtime_context,
+        )
+        if resolution is None:
             raise CommandResourceNotFoundError
-        if activity.status in TERMINAL_ACTIVITY_STATUSES:
+        if resolution.activity is not None and resolution.activity.status in TERMINAL_ACTIVITY_STATUSES:
             raise CommandResourceStateError
-        node = self._node_for_activity(activity)
-        if not self._binding_matches(node, payload):
+        if resolution.node is None:
             raise CommandResourceStateError
-        if not await self._recipe_is_plugin_reachable(context.session, node, payload.credential_recipe_id):
+        if not self._binding_matches(resolution.node, payload):
+            raise CommandResourceStateError
+        if not await self._recipe_is_plugin_reachable(context.session, resolution.node, payload.credential_recipe_id):
             raise CommandResourceStateError
         credential = await self._resolve_credential_document(
             context.session,
             payload.credential_ref,
-            activity.execution.project_id,
+            resolution.execution.project_id,
         )
         AuditEventDispatcher.dispatch(
             CredentialWorkloadResolvedEvent(

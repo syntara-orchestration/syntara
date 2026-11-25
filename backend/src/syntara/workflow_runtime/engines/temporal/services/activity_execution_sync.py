@@ -399,7 +399,13 @@ class ActivityExecutionSyncMixin:
         # For body children whose original record already reached terminal status,
         # create a separate per-iteration record instead of overwriting
         if is_body_iteration and existing and existing.status in TERMINAL_ACTIVITY_STATUSES:
-            existing, is_new = self._get_or_create_iteration_record(activity_id, existing_activities, metadata, session)
+            existing, is_new = self._get_or_create_iteration_record(
+                activity_id,
+                existing_activities,
+                metadata,
+                session,
+                temporal_activity_id=activity_data.get("_history_activity_id"),
+            )
             if existing is None:
                 return None
 
@@ -543,6 +549,7 @@ class ActivityExecutionSyncMixin:
         existing_activities: dict[str, ActivityExecution],
         metadata: ExecutionMonitorMetadata,
         session: AsyncSession,
+        temporal_activity_id: str | None = None,
     ) -> tuple[ActivityExecution | None, bool]:
         """Get or create a per-iteration ActivityExecution record for a loop body child.
 
@@ -555,6 +562,7 @@ class ActivityExecutionSyncMixin:
             existing_activities: Map of activity_name to existing records (mutated on create)
             metadata: Monitoring metadata (activity_index_map is mutated on create)
             session: Database session for adding new records
+            temporal_activity_id: Full Temporal activity ID for this occurrence
 
         Returns:
             Tuple of (activity_record, is_new). is_new is True when a new record was created.
@@ -592,7 +600,7 @@ class ActivityExecutionSyncMixin:
             execution_id=metadata.execution_id,
             activity_name=composite_key,
             node_type=original.node_type,
-            temporal_activity_id=composite_key,
+            temporal_activity_id=temporal_activity_id or composite_key,
             status=ActivityStatus.PENDING,
             started_at=None,
             completed_at=None,

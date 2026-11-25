@@ -255,6 +255,38 @@ class TestExecuteExecutorNodeHeartbeatTimeout:
             assert kwargs["heartbeat_timeout"] is None, f"{node_type} must not get a heartbeat timeout"
 
 
+class TestExecuteExecutorNodeLoopIdentity:
+    """Executor activities must use their full loop-iteration identity."""
+
+    @pytest.mark.asyncio
+    async def test_executor_inside_nested_loops_uses_full_iteration_chain(self) -> None:
+        wf = _make_workflow()
+        wf.loop_body_map = {"body": "inner_loop", "inner_loop": "outer_loop"}
+        wf.node_control_data = {"outer_loop": {"current_index": 1}, "inner_loop": {"current_index": 2}}
+        node = ActivityNode("body", NodeType.SCRIPT_PYTHON, {})
+
+        with (
+            patch(
+                "syntara.workflow_runtime.engines.temporal.dynamic_workflow.workflow.execute_activity",
+                new=AsyncMock(return_value={"output": {}}),
+            ) as mock_exec,
+            patch(
+                "syntara.workflow_runtime.engines.temporal.dynamic_workflow.resolve_retry_policy",
+                return_value=None,
+            ),
+        ):
+            await wf._execute_executor_node(
+                node=node,
+                node_type=NodeType.SCRIPT_PYTHON,
+                resolved_parameters={},
+                outputs=None,
+                timeout_seconds=30,
+            )
+
+        assert mock_exec.await_args is not None
+        assert mock_exec.await_args.kwargs["activity_id"] == "body_iter_1_iter_2"
+
+
 class TestMarkDownstreamEdgeCases:
     """Additional edge cases for downstream skipping."""
 

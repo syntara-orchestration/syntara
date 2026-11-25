@@ -30,7 +30,7 @@ from typing import TYPE_CHECKING, Any
 from temporalio import workflow
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping, Sequence
+    from collections.abc import Iterable, Mapping, Sequence
 
 LOOP_ITERATION_UNIQUE_IDS_PATCH = "loop-iteration-unique-ids"
 
@@ -52,6 +52,67 @@ def use_unique_loop_iteration_ids() -> bool:
 def strip_loop_iteration_suffixes(activity_id: str) -> str:
     """Return the canvas node ID, removing every trailing ``_iter_N`` suffix."""
     return _LOOP_ITER_CHAIN_RE.sub("", activity_id)
+
+
+def resolve_loop_iteration_canvas_id(
+    activity_id: str,
+    canvas_node_ids: Iterable[str],
+    loop_body_node_ids: Iterable[str] = (),
+) -> str | None:
+    """Resolve a Temporal activity ID to its canvas node using known node IDs.
+
+    Node IDs may themselves contain ``_iter_N``. Matching the longest known
+    canvas-node prefix ensures ``approval_iter_0_iter_1`` resolves to
+    ``approval_iter_0`` when that canvas node exists, rather than ``approval``.
+
+    An exact canvas-node match is rejected when the same string can also be
+    generated as an iteration of a known loop-body node. Such a collision is
+    ambiguous and must not silently select either node.
+    """
+    known_ids = tuple(canvas_node_ids)
+    matches = [
+        node_id
+        for node_id in known_ids
+        if activity_id.startswith(node_id) and _is_iteration_suffix(activity_id[len(node_id) :])
+    ]
+    if activity_id in known_ids:
+        if any(node_id != activity_id and node_id in loop_body_node_ids for node_id in matches):
+            return None
+        return activity_id
+    return max(matches, key=len) if matches else None
+
+
+def extract_loop_body_node_ids(definition: Mapping[str, Any]) -> set[str]:
+    """Return node IDs reachable from loop iterate edges before feedback."""
+    loop_ids = {
+        node.get("id")
+        for node in [*definition.get("nodes", []), *definition.get("triggers", [])]
+        if node.get("type") == "loop" and node.get("id")
+    }
+    edges = definition.get("edges", [])
+    body_ids: set[str] = set()
+
+    for loop_id in loop_ids:
+        queue = [
+            edge["to"]
+            for edge in edges
+            if edge.get("from") == loop_id and edge.get("from_port") == "iterate" and edge.get("to") != loop_id
+        ]
+        visited: set[str] = set()
+        while queue:
+            node_id = queue.pop(0)
+            if node_id in visited or node_id == loop_id:
+                continue
+            visited.add(node_id)
+            is_nested_loop = node_id in loop_ids
+            if not is_nested_loop:
+                body_ids.add(node_id)
+            next_edges = [edge for edge in edges if edge.get("from") == node_id]
+            if is_nested_loop:
+                next_edges = [edge for edge in next_edges if edge.get("from_port") in ("iterate", "complete")]
+            queue.extend(edge["to"] for edge in next_edges if edge.get("to") != loop_id)
+
+    return body_ids
 
 
 def innermost_iteration_index(activity_id: str) -> int | None:
@@ -105,6 +166,17 @@ def approval_temporal_activity_id(
     New executions use the loop-index chain. Pre-patch in-flight executions
     keep the canvas node ID so replay matches history.
     """
+    if not use_unique_loop_iteration_ids():
+        return node_id
+    return join_loop_iteration_id(node_id, loop_index_chain(node_id, loop_body_map, node_control_data))
+
+
+def loop_body_temporal_activity_id(
+    node_id: str,
+    loop_body_map: Mapping[str, str],
+    node_control_data: Mapping[str, Mapping[str, Any]],
+) -> str:
+    """Temporal activity ID for any node scheduled inside one or more loops."""
     if not use_unique_loop_iteration_ids():
         return node_id
     return join_loop_iteration_id(node_id, loop_index_chain(node_id, loop_body_map, node_control_data))

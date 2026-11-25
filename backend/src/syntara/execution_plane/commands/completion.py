@@ -1,7 +1,7 @@
 """Completion command handling for work dispatched to Execution Plane."""
 
 from collections.abc import Mapping
-from typing import Any, cast
+from typing import Any
 from uuid import UUID
 
 import structlog
@@ -12,26 +12,37 @@ from execution_plane_client.handlers import HandlingResult
 from execution_plane_client.protocol import MessageEnvelope, ResourceReference
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import ValidationError as JsonSchemaValidationError
-from sqlmodel import col, select
 from temporalio.exceptions import ApplicationError
 
+from syntara.execution_plane.commands.activity_resolution import (
+    ResolutionChain,
+    RuntimeContextResolutionStrategy,
+    TemporalHistoryResolutionStrategy,
+    WorkItemResolutionStrategy,
+)
 from syntara.execution_plane.commands.context import AOCommandContext
 from syntara.execution_plane.commands.errors import CommandDependencyUnavailableError, CommandResourceNotFoundError
 from syntara.execution_plane.registry.repository import (
     execution_plane_plugin_output_schema,
     get_execution_plane_plugin_by_node_type,
 )
-from syntara.execution_plane.utils import execution_plane_work_item_id
 from syntara.workflow_core.models import NodeType
-from syntara.workflow_runtime.engines.temporal.utils.loop_iteration_ids import strip_loop_iteration_suffixes
-from syntara.workflows.models.activity_execution import ActivityExecution
-from syntara.workflows.models.execution import Execution
 
 logger = structlog.stdlib.get_logger(__name__)
 
 
 class CompletionCommandHandler:
     """Deliver a completion command to its originating Temporal activity."""
+
+    def __init__(self) -> None:
+        """Prepare the callback activity resolution chain."""
+        self._resolution_chain = ResolutionChain(
+            [
+                WorkItemResolutionStrategy(),
+                RuntimeContextResolutionStrategy(),
+                TemporalHistoryResolutionStrategy(),
+            ]
+        )
 
     @staticmethod
     async def _output_validation_error(
@@ -100,25 +111,12 @@ class CompletionCommandHandler:
         runtime_context: Mapping[str, object] | None,
     ) -> bool:
         """Complete or fail the async activity named by a work-item UUID."""
-        row = (
-            await context.session.exec(
-                select(
-                    Execution.temporal_workflow_id, ActivityExecution.temporal_activity_id, ActivityExecution.node_type
-                )
-                .join(Execution, col(ActivityExecution.execution_id) == col(Execution.id))
-                .where(col(ActivityExecution.id) == work_id)
-            )
-        ).first()
-        if row is None:
-            row = await self._correlate_activity_from_runtime_context(
-                context=context,
-                work_id=work_id,
-                runtime_context=runtime_context,
-            )
-        if row is None:
+        resolution = await self._resolution_chain.resolve(context, work_id, runtime_context)
+        if resolution is None:
             return False
-        temporal_workflow_id, temporal_activity_id, raw_node_type = row
-        node_type = NodeType(raw_node_type)
+        temporal_workflow_id = resolution.execution.temporal_workflow_id
+        temporal_activity_id = resolution.temporal_activity_id
+        node_type = resolution.node_type
         temporal_service = context.temporal_service
         if temporal_service is None:
             raise CommandDependencyUnavailableError
@@ -152,44 +150,6 @@ class CompletionCommandHandler:
                 error=self._failure_error(status, result),
             )
         return True
-
-    @staticmethod
-    async def _correlate_activity_from_runtime_context(
-        *,
-        context: AOCommandContext,
-        work_id: UUID,
-        runtime_context: Mapping[str, object] | None,
-    ) -> tuple[str, str, NodeType] | None:
-        """Resolve loop-body work whose canvas row uses a different primary key."""
-        execution_id = runtime_context.get("execution_id") if runtime_context else None
-        temporal_activity_id = runtime_context.get("temporal_activity_id") if runtime_context else None
-        if not isinstance(execution_id, str) or not isinstance(temporal_activity_id, str):
-            return None
-        try:
-            execution_uuid = UUID(execution_id)
-        except ValueError:
-            return None
-        if work_id != execution_plane_work_item_id(execution_uuid, temporal_activity_id):
-            return None
-
-        base_activity_id = strip_loop_iteration_suffixes(temporal_activity_id)
-        row = (
-            await context.session.exec(
-                select(
-                    Execution.temporal_workflow_id,
-                    ActivityExecution.temporal_activity_id,
-                    ActivityExecution.node_type,
-                )
-                .join(Execution, col(ActivityExecution.execution_id) == col(Execution.id))
-                .where(
-                    col(ActivityExecution.execution_id) == execution_uuid,
-                    col(ActivityExecution.activity_name) == base_activity_id,
-                )
-            )
-        ).first()
-        if row is None:
-            return None
-        return cast("tuple[str, str, NodeType]", (row[0], temporal_activity_id, row[2]))
 
     async def handle(
         self, message: MessageEnvelope, payload: CommandPayload, context: AOCommandContext

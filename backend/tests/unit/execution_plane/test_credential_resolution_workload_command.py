@@ -10,6 +10,7 @@ from uuid import UUID, uuid4
 import httpx
 import pytest
 from execution_plane_client.commands.credentials import CredentialResolveCluster, CredentialResolveWorkload
+from execution_plane_client.commands.results import CredentialResolveWorkloadCommandResult
 from execution_plane_client.errors import ProtocolConflict
 from fastapi import FastAPI, Request, Response
 
@@ -22,6 +23,12 @@ from syntara.core.models.principal import service_principal_id
 from syntara.credentials.audit.credential import CredentialWorkloadResolvedEvent
 from syntara.execution_plane import bridge
 from syntara.execution_plane.commands import credentials as command_credentials
+from syntara.execution_plane.commands.activity_resolution import (
+    ActivityResolution,
+    ResolutionChain,
+    TemporalHistoryResolutionStrategy,
+    resolution_for_activity,
+)
 from syntara.execution_plane.commands.context import AOCommandContext
 from syntara.execution_plane.commands.errors import CommandResourceStateError
 from syntara.execution_plane.utils import execution_plane_work_item_id
@@ -29,11 +36,11 @@ from syntara.integrations.exceptions import IntegrationCredentialNotFoundError
 from syntara.workflow_core.models import ConditionNodeParameters, NodeType
 from syntara.workflows.models.activity_execution import ActivityExecution, ActivityStatus
 from syntara.workflows.models.execution import Execution
-from syntara.workflows.models.workflow_definition import ConditionNode
+from syntara.workflows.models.workflow_definition import ConditionNode, WorkflowDefinition
 from syntara.workflows.models.workflow_version import WorkflowVersion
 
 if TYPE_CHECKING:
-    from collections.abc import Awaitable, Callable
+    from collections.abc import Awaitable, Callable, Mapping
 
     from execution_plane_client.protocol import MessageEnvelope
 
@@ -61,15 +68,18 @@ def callback(monkeypatch: pytest.MonkeyPatch) -> tuple[FastAPI, AsyncMock]:
 
 def workload_command(
     *,
+    work_item_id: UUID | None = None,
     credential_ref: UUID | None = None,
     credential_recipe_id: str = "acme.echo.api-token",
+    runtime_context: Mapping[str, object] | None = None,
 ) -> tuple[MessageEnvelope, CredentialResolveWorkload]:
     message = CredentialResolveWorkload(
-        work_item_id=uuid4(),
+        work_item_id=work_item_id or uuid4(),
         attempt_id="attempt",
         credential_ref=credential_ref or uuid4(),
         credential_recipe_id=credential_recipe_id,
         step_revision_id="step-revision",
+        runtime_context=dict(runtime_context or {}),
     ).to_message(
         source_id="execution-plane",
         destination_id="syntara-orchestration",
@@ -145,6 +155,85 @@ def _allow_plugin_recipe(monkeypatch: pytest.MonkeyPatch, recipe_id: str = "acme
     )
 
 
+def _use_resolution_chain(
+    monkeypatch: pytest.MonkeyPatch,
+    activity: ActivityExecution | None,
+    *,
+    temporal_activity_id: str | None = None,
+) -> None:
+    """Replace the handler's resolution chain with a deterministic result."""
+    resolution = (
+        resolution_for_activity(activity, temporal_activity_id=temporal_activity_id) if activity is not None else None
+    )
+
+    async def resolve(
+        _self: object,
+        _context: object,
+        _work_item_id: object,
+        _runtime_context: object,
+    ) -> ActivityResolution | None:
+        return resolution
+
+    monkeypatch.setattr(ResolutionChain, "resolve", resolve)
+
+
+def loop_activity(
+    *,
+    execution_id: UUID,
+    temporal_activity_id: str,
+    status: ActivityStatus = ActivityStatus.RUNNING,
+    credential_ref: UUID | None = None,
+    credential_recipe_id: str = "acme.echo.api-token",
+    node_type: str = "approval",
+) -> ActivityExecution:
+    execution = Execution(
+        id=execution_id,
+        workflow_id=uuid4(),
+        workflow_version_id=uuid4(),
+        project_id=uuid4(),
+        temporal_workflow_id="workflow",
+    )
+    definition = {
+        "schema_version": "2.0.0",
+        "name": "workflow",
+        "triggers": [{"id": "trigger", "type": "manual"}],
+        "nodes": [
+            {
+                "id": "approval",
+                "type": node_type,
+                "parameters": {
+                    "code": "true",
+                    "credential_bindings": [
+                        {
+                            "credential_recipe_id": credential_recipe_id,
+                            "credential_ref": str(credential_ref or uuid4()),
+                        }
+                    ],
+                },
+            }
+        ],
+        "edges": [],
+    }
+    version = WorkflowVersion(
+        id=execution.workflow_version_id,
+        workflow_id=execution.workflow_id,
+        version=1,
+        schema_version="2.0.0",
+        workflow_definition=definition,
+    )
+    execution.workflow_version = version
+    result = ActivityExecution(
+        id=execution_plane_work_item_id(execution.id, "approval"),
+        execution_id=execution.id,
+        activity_name="approval",
+        node_type="approval",
+        temporal_activity_id=temporal_activity_id,
+        status=status,
+    )
+    result.execution = execution
+    return result
+
+
 @pytest.fixture
 def command_context() -> AOCommandContext:
     return AOCommandContext(session=AsyncMock(), temporal_service=None)
@@ -160,10 +249,6 @@ async def test_workload_credential_command_resolves_bound_generic_node(
     _allow_plugin_recipe(monkeypatch)
     resolved: dict[str, object] = {}
 
-    async def load_activity(_handler: object, _session: AsyncMock, work_item_id: object) -> ActivityExecution:
-        assert work_item_id == UUID(str(message.command.payload["work_item_id"]))
-        return row
-
     async def resolve_document(
         _handler: object,
         _session: AsyncMock,
@@ -173,7 +258,7 @@ async def test_workload_credential_command_resolves_bound_generic_node(
         resolved["credential_ref"] = credential_ref
         return {"token": "resolved-token"}
 
-    monkeypatch.setattr(command_credentials.CredentialResolveWorkloadCommandHandler, "_load_activity", load_activity)
+    _use_resolution_chain(monkeypatch, row)
     monkeypatch.setattr(
         command_credentials.CredentialResolveWorkloadCommandHandler, "_resolve_credential_document", resolve_document
     )
@@ -220,11 +305,7 @@ async def test_workload_credential_command_uses_workload_specific_permission(
     _allow_plugin_recipe(monkeypatch)
     monkeypatch.setattr(AuditEventDispatcher, "dispatch", MagicMock())
     message, payload = workload_command()
-    monkeypatch.setattr(
-        command_credentials.CredentialResolveWorkloadCommandHandler,
-        "_load_activity",
-        AsyncMock(return_value=activity(credential_ref=payload.credential_ref)),
-    )
+    _use_resolution_chain(monkeypatch, activity(credential_ref=payload.credential_ref))
     monkeypatch.setattr(
         command_credentials.CredentialResolveWorkloadCommandHandler,
         "_resolve_credential_document",
@@ -266,11 +347,7 @@ async def test_workload_credential_command_rejects_missing_activity(
 ) -> None:
     app, _ = callback
     message, _ = workload_command()
-
-    async def load_activity(_handler: object, _session: AsyncMock, _work_item_id: object) -> ActivityExecution | None:
-        return None
-
-    monkeypatch.setattr(command_credentials.CredentialResolveWorkloadCommandHandler, "_load_activity", load_activity)
+    _use_resolution_chain(monkeypatch, None)
 
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://ao") as client:
         response = await client.post("/api/execution_plane/v1/commands", json=message.model_dump(mode="json"))
@@ -285,10 +362,10 @@ async def test_workload_credential_command_rejects_terminal_activity(
     app, _ = callback
     message, payload = workload_command(credential_ref=uuid4())
 
-    async def load_activity(_handler: object, _session: AsyncMock, _work_item_id: object) -> ActivityExecution:
-        return activity(status=ActivityStatus.COMPLETED, credential_ref=payload.credential_ref)
-
-    monkeypatch.setattr(command_credentials.CredentialResolveWorkloadCommandHandler, "_load_activity", load_activity)
+    _use_resolution_chain(
+        monkeypatch,
+        activity(status=ActivityStatus.COMPLETED, credential_ref=payload.credential_ref),
+    )
 
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://ao") as client:
         response = await client.post("/api/execution_plane/v1/commands", json=message.model_dump(mode="json"))
@@ -307,10 +384,7 @@ async def test_workload_credential_command_rejects_unbound_recipe_or_reference(
     row_recipe_id = "other.recipe" if field == "credential_recipe_id" else payload.credential_recipe_id
     row = activity(credential_ref=row_credential_ref, credential_recipe_id=row_recipe_id)
 
-    async def load_activity(_handler: object, _session: AsyncMock, _work_item_id: object) -> ActivityExecution:
-        return row
-
-    monkeypatch.setattr(command_credentials.CredentialResolveWorkloadCommandHandler, "_load_activity", load_activity)
+    _use_resolution_chain(monkeypatch, row)
 
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://ao") as client:
         response = await client.post("/api/execution_plane/v1/commands", json=message.model_dump(mode="json"))
@@ -329,10 +403,7 @@ async def test_workload_credential_command_rejects_recipe_unreachable_from_plugi
     row.node_type = NodeType.SCRIPT_PYTHON
     resolve_document = AsyncMock()
 
-    async def load_activity(_handler: object, _session: AsyncMock, _work_item_id: object) -> ActivityExecution:
-        return row
-
-    monkeypatch.setattr(command_credentials.CredentialResolveWorkloadCommandHandler, "_load_activity", load_activity)
+    _use_resolution_chain(monkeypatch, row)
     monkeypatch.setattr(handler, "_resolve_credential_document", resolve_document)
     monkeypatch.setattr(
         command_credentials,
@@ -351,49 +422,321 @@ async def test_workload_credential_command_rejects_recipe_unreachable_from_plugi
     resolve_document.assert_not_called()
 
 
+async def test_workload_credential_command_resolves_loop_body_work(
+    callback: tuple[FastAPI, AsyncMock], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    app, _ = callback
+    execution_id = uuid4()
+    temporal_activity_id = "approval_iter_0"
+    work_item_id = execution_plane_work_item_id(execution_id, temporal_activity_id)
+    message, payload = workload_command(
+        work_item_id=work_item_id,
+        credential_ref=uuid4(),
+        runtime_context={
+            "execution_id": str(execution_id),
+            "temporal_activity_id": temporal_activity_id,
+        },
+    )
+    row = loop_activity(
+        execution_id=execution_id,
+        temporal_activity_id=temporal_activity_id,
+        credential_ref=payload.credential_ref,
+    )
+
+    _use_resolution_chain(monkeypatch, row, temporal_activity_id=temporal_activity_id)
+    _allow_plugin_recipe(monkeypatch)
+    monkeypatch.setattr(
+        command_credentials.CredentialResolveWorkloadCommandHandler,
+        "_resolve_credential_document",
+        AsyncMock(return_value={"token": "resolved-token"}),
+    )
+
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://ao") as client:
+        response = await client.post("/api/execution_plane/v1/commands", json=message.model_dump(mode="json"))
+
+    assert response.status_code == 200, response.text
+    assert response.json()["result"]["credential"] == {"token": "resolved-token"}
+
+
 @pytest.mark.asyncio
-async def test_load_activity_returns_the_matching_row() -> None:
-    handler = command_credentials.CredentialResolveWorkloadCommandHandler()
+async def test_workload_credential_command_resolves_later_loop_iteration(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A later callback resolves its active per-iteration row, not iteration zero."""
+    execution_id = uuid4()
+    temporal_activity_id = "approval_iter_1"
+    work_item_id = execution_plane_work_item_id(execution_id, temporal_activity_id)
+    message, payload = workload_command(
+        work_item_id=work_item_id,
+        credential_ref=uuid4(),
+        runtime_context={
+            "execution_id": str(execution_id),
+            "temporal_activity_id": temporal_activity_id,
+        },
+    )
+    row = loop_activity(
+        execution_id=execution_id,
+        temporal_activity_id=temporal_activity_id,
+        credential_ref=payload.credential_ref,
+    )
+    _use_resolution_chain(monkeypatch, row, temporal_activity_id=temporal_activity_id)
+    monkeypatch.setattr(
+        command_credentials.CredentialResolveWorkloadCommandHandler,
+        "_resolve_credential_document",
+        AsyncMock(return_value={"token": "resolved-token"}),
+    )
+    _allow_plugin_recipe(monkeypatch)
+
+    handling = await command_credentials.CredentialResolveWorkloadCommandHandler().handle(
+        message,
+        payload,
+        AOCommandContext(AsyncMock(), AsyncMock()),
+    )
+
+    assert isinstance(handling.result, CredentialResolveWorkloadCommandResult)
+    assert handling.result.credential == {"token": "resolved-token"}
+
+
+@pytest.mark.asyncio
+async def test_workload_credential_command_rejects_loop_context_that_does_not_correlate(
+    callback: tuple[FastAPI, AsyncMock], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    app, _ = callback
+    execution_id = uuid4()
+    temporal_activity_id = "approval_iter_0"
+    message, _payload = workload_command(
+        runtime_context={
+            "execution_id": str(execution_id),
+            "temporal_activity_id": temporal_activity_id,
+        },
+    )
+
+    _use_resolution_chain(monkeypatch, None)
+
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://ao") as client:
+        response = await client.post("/api/execution_plane/v1/commands", json=message.model_dump(mode="json"))
+
+    assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_temporal_history_strategy_resolves_loop_work_before_row_persistence() -> None:
+    """Resolve an activity before the synchronizer has persisted its row."""
+    execution_id = uuid4()
+    temporal_activity_id = "approval_iter_1_iter_0"
+    work_item_id = execution_plane_work_item_id(execution_id, temporal_activity_id)
+    expected = loop_activity(
+        execution_id=execution_id,
+        temporal_activity_id=temporal_activity_id,
+        node_type="script_bash",
+    )
+    execution_result = MagicMock()
+    execution_result.one_or_none.return_value = expected.execution
     session = AsyncMock()
-    result = MagicMock()
-    expected = object()
-    result.one_or_none.return_value = expected
-    session.exec.return_value = result
+    session.exec.return_value = execution_result
 
-    loaded = await handler._load_activity(session, uuid4())
+    scheduled_event = MagicMock()
+    scheduled_event.event_id = 42
+    scheduled_attrs = scheduled_event.activity_task_scheduled_event_attributes
+    scheduled_attrs.activity_id = temporal_activity_id
+    scheduled_attrs.activity_type.name = "execute_bash_script_activity"
+    history = MagicMock()
+    history.events = [scheduled_event]
+    handle = AsyncMock()
+    handle.fetch_history.return_value = history
+    temporal_client = MagicMock()
+    temporal_client.get_workflow_handle.return_value = handle
+    temporal_service = MagicMock(temporal_client=temporal_client)
 
-    assert loaded is expected
-    session.exec.assert_awaited_once()
-    result.one_or_none.assert_called_once_with()
+    resolution = await TemporalHistoryResolutionStrategy().resolve(
+        AOCommandContext(session, temporal_service),
+        work_item_id,
+        {
+            "execution_id": str(execution_id),
+            "temporal_activity_id": temporal_activity_id,
+        },
+    )
+
+    assert resolution is not None
+    assert resolution.node is not None
+    assert resolution.execution is expected.execution
+    assert resolution.node.id == "approval"
+    assert resolution.temporal_activity_id == temporal_activity_id
+    assert resolution.activity is None
+    temporal_client.get_workflow_handle.assert_called_once_with(expected.execution.temporal_workflow_id)
+    handle.fetch_history.assert_awaited_once()
 
 
-def test_node_lookup_rejects_invalid_workflow_definitions() -> None:
+@pytest.mark.asyncio
+async def test_workload_credential_command_uses_history_when_later_iteration_row_is_not_synced(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    execution_id = uuid4()
+    temporal_activity_id = "approval_iter_1"
+    work_item_id = execution_plane_work_item_id(execution_id, temporal_activity_id)
+    message, payload = workload_command(
+        work_item_id=work_item_id,
+        credential_ref=uuid4(),
+        runtime_context={
+            "execution_id": str(execution_id),
+            "temporal_activity_id": temporal_activity_id,
+        },
+    )
+
+    iteration_zero = loop_activity(
+        execution_id=execution_id,
+        temporal_activity_id="approval",
+        status=ActivityStatus.COMPLETED,
+        credential_ref=payload.credential_ref,
+        node_type="script_bash",
+    )
+
+    def query_result(value: object | None) -> MagicMock:
+        result = MagicMock()
+        result.one_or_none.return_value = value
+        return result
+
+    session = AsyncMock()
+    session.exec.side_effect = [
+        query_result(None),
+        query_result(iteration_zero.execution),
+        query_result(None),
+        query_result(iteration_zero),
+        query_result(iteration_zero.execution),
+    ]
+
+    scheduled_event = MagicMock()
+    attrs = scheduled_event.activity_task_scheduled_event_attributes
+    attrs.activity_id = temporal_activity_id
+    attrs.activity_type.name = "execute_bash_script_activity"
+    history = MagicMock()
+    history.events = [scheduled_event]
+    workflow_handle = AsyncMock()
+    workflow_handle.fetch_history.return_value = history
+    temporal_client = MagicMock()
+    temporal_client.get_workflow_handle.return_value = workflow_handle
+    temporal_service = MagicMock(temporal_client=temporal_client)
+
     handler = command_credentials.CredentialResolveWorkloadCommandHandler()
-    row = activity(workflow_definition={"schema_version": "invalid"})
+    monkeypatch.setattr(
+        handler,
+        "_resolve_credential_document",
+        AsyncMock(return_value={"token": "resolved-token"}),
+    )
+    _allow_plugin_recipe(monkeypatch)
 
-    with pytest.raises(CommandResourceStateError):
-        handler._node_for_activity(row)
+    handling = await handler.handle(
+        message,
+        payload,
+        AOCommandContext(session, temporal_service),
+    )
+
+    assert isinstance(handling.result, CredentialResolveWorkloadCommandResult)
+    assert handling.result.credential == {"token": "resolved-token"}
+    workflow_handle.fetch_history.assert_awaited_once()
 
 
-def test_node_lookup_rejects_activities_without_matching_nodes() -> None:
+@pytest.mark.asyncio
+async def test_workload_credential_command_uses_injected_resolution_chain(monkeypatch: pytest.MonkeyPatch) -> None:
+    message, payload = workload_command(credential_ref=uuid4())
+    row = activity(credential_ref=payload.credential_ref)
+    definition = WorkflowDefinition.model_validate(row.execution.workflow_version.workflow_definition)
+    node = next(candidate for candidate in definition.nodes if candidate.id == "approval")
+    expected = ActivityResolution(
+        execution=row.execution,
+        node=node,
+        node_type=row.node_type,
+        temporal_activity_id=row.temporal_activity_id,
+        activity=row,
+    )
+    calls: list[tuple[object, object, object]] = []
+
+    class RecordingStrategy:
+        async def resolve(
+            self,
+            context: object,
+            work_item_id: object,
+            runtime_context: object,
+        ) -> ActivityResolution | None:
+            calls.append((context, work_item_id, runtime_context))
+            return expected
+
+    monkeypatch.setattr(
+        command_credentials.CredentialResolveWorkloadCommandHandler,
+        "_resolve_credential_document",
+        AsyncMock(return_value={"token": "resolved-token"}),
+    )
+    _allow_plugin_recipe(monkeypatch)
+    context = AOCommandContext(AsyncMock(), AsyncMock())
     handler = command_credentials.CredentialResolveWorkloadCommandHandler()
-    definition: dict[str, object] = {
-        "schema_version": "2.0.0",
-        "name": "workflow",
-        "triggers": [{"id": "trigger", "type": "manual"}],
-        "nodes": [
-            {
-                "id": "other-node",
-                "type": "approval",
-                "parameters": {"credential_bindings": []},
-            }
-        ],
-        "edges": [],
-    }
-    row = activity(workflow_definition=definition)
+    handler._resolution_chain = ResolutionChain([RecordingStrategy()])
 
-    with pytest.raises(CommandResourceStateError):
-        handler._node_for_activity(row)
+    handling = await handler.handle(message, payload, context)
+
+    assert isinstance(handling.result, CredentialResolveWorkloadCommandResult)
+    assert handling.result.credential == {"token": "resolved-token"}
+    assert calls == [(context, payload.work_item_id, payload.runtime_context)]
+
+
+@pytest.mark.asyncio
+async def test_workload_credential_command_rejects_terminal_loop_body_work(
+    callback: tuple[FastAPI, AsyncMock], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    app, _ = callback
+    execution_id = uuid4()
+    temporal_activity_id = "approval_iter_0"
+    work_item_id = execution_plane_work_item_id(execution_id, temporal_activity_id)
+    message, payload = workload_command(
+        work_item_id=work_item_id,
+        credential_ref=uuid4(),
+        runtime_context={
+            "execution_id": str(execution_id),
+            "temporal_activity_id": temporal_activity_id,
+        },
+    )
+    row = loop_activity(
+        execution_id=execution_id,
+        temporal_activity_id=temporal_activity_id,
+        status=ActivityStatus.COMPLETED,
+        credential_ref=payload.credential_ref,
+    )
+
+    _use_resolution_chain(monkeypatch, row, temporal_activity_id=temporal_activity_id)
+
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://ao") as client:
+        response = await client.post("/api/execution_plane/v1/commands", json=message.model_dump(mode="json"))
+
+    assert response.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_workload_credential_command_rejects_unbound_loop_body_work(
+    callback: tuple[FastAPI, AsyncMock], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    app, _ = callback
+    execution_id = uuid4()
+    temporal_activity_id = "approval_iter_0"
+    work_item_id = execution_plane_work_item_id(execution_id, temporal_activity_id)
+    message, _payload = workload_command(
+        work_item_id=work_item_id,
+        credential_ref=uuid4(),
+        runtime_context={
+            "execution_id": str(execution_id),
+            "temporal_activity_id": temporal_activity_id,
+        },
+    )
+    row = loop_activity(
+        execution_id=execution_id,
+        temporal_activity_id=temporal_activity_id,
+        credential_ref=uuid4(),
+    )
+
+    _use_resolution_chain(monkeypatch, row, temporal_activity_id=temporal_activity_id)
+
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://ao") as client:
+        response = await client.post("/api/execution_plane/v1/commands", json=message.model_dump(mode="json"))
+
+    assert response.status_code == 409
 
 
 def test_binding_match_rejects_nodes_without_credential_bindings() -> None:
