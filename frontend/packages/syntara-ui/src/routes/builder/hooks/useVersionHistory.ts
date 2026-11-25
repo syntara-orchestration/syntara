@@ -5,6 +5,7 @@ import { useCallback, useMemo, useState } from 'react'
 import { workflowClient } from '../../../client'
 import type { PaginationFooterProps } from '../../../components/table/PaginationFooter'
 import { useCursorPagination } from '../../../hooks/useCursorPagination'
+import { useTriggerRemovalPublishConfirm } from '../../../hooks/useTriggerRemovalPublishConfirm'
 import { useAlerts, type AlertMessage } from '../../../providers/alerts'
 import { getErrorMessage } from '../../../utils/apiErrors'
 import { detachPromise } from '../../../utils/detachPromise'
@@ -12,6 +13,7 @@ import { downloadVersionExport } from '../../../utils/downloadWorkflowExport'
 
 import { buildWorkflowVersionsQuery } from './buildWorkflowVersionsQuery'
 import { useOutputContractReview } from './useOutputContractReview'
+import { isWorkflowQuery } from './usePublishWorkflow'
 import { resolvePublishedVersionName } from './versionHistoryHelpers'
 
 export type VersionStatus = 'draft' | 'published' | 'previously_published'
@@ -106,6 +108,7 @@ export function useVersionHistory({ workflowId, isNew, onVersionUpdated }: UseVe
 
   const restoreMutation = workflowClient.useMutation('post', '/workflows/{workflow_id}/versions/{version}/restore')
   const publishMutation = workflowClient.useMutation('post', '/workflows/{workflow_id}/versions/{version}/publish')
+  const { guardPublishError, triggerRemovalConfirmDialog } = useTriggerRemovalPublishConfirm()
   const updateMetadataMutation = workflowClient.useMutation('patch', '/workflows/{workflow_id}/versions/{version}')
   const [pendingPublish, setPendingPublish] = useState<PendingVersionPublish | null>(null)
 
@@ -128,39 +131,48 @@ export function useVersionHistory({ workflowId, isNew, onVersionUpdated }: UseVe
   )
 
   const publishVersionNow = useCallback(
-    (pending: PendingVersionPublish) => {
-      publishMutation.mutate(
-        {
-          params: { path: { workflow_id: workflowId ?? '', version: pending.version } },
-          body: {
-            name: pending.publishName ?? null,
-            change_description: pending.changeDescription ?? null,
+    (pending: PendingVersionPublish, confirm = false) => {
+      // `attempt` is hoisted, so onError can retry with confirm=true after a trigger-removal 409
+      // without capturing the memoized callback (which React Compiler disallows).
+      function attempt(useConfirm: boolean) {
+        publishMutation.mutate(
+          {
+            params: {
+              path: { workflow_id: workflowId ?? '', version: pending.version },
+              query: { confirm: useConfirm },
+            },
+            body: {
+              name: pending.publishName ?? null,
+              change_description: pending.changeDescription ?? null,
+            },
           },
-        },
-        {
-          onSuccess: (data) => {
-            showSuccess({ title: 'Version published' })
-            if (data?.current_version != null) {
-              onVersionUpdated?.(data.current_version)
-            }
-            detachPromise(versionsQuery.refetch())
-            detachPromise(
-              queryClient.invalidateQueries({
-                predicate: (q) =>
-                  q.queryKey[0] === 'get' &&
-                  typeof q.queryKey[1] === 'string' &&
-                  q.queryKey[1].startsWith('/workflows'),
-              })
-            )
-          },
-          onError: (error: unknown) => {
-            showError({ title: 'Failed to publish version', description: getErrorMessage(error) })
-          },
-          onSettled: pending.onSettled,
-        }
-      )
+          {
+            onSuccess: (data) => {
+              showSuccess({ title: 'Version published' })
+              if (data?.current_version != null) onVersionUpdated?.(data.current_version)
+              detachPromise(versionsQuery.refetch())
+              detachPromise(queryClient.invalidateQueries({ predicate: isWorkflowQuery }))
+            },
+            onError: (error: unknown) => {
+              if (guardPublishError(error, () => attempt(true))) return
+              showError({ title: 'Failed to publish version', description: getErrorMessage(error) })
+            },
+            onSettled: pending.onSettled,
+          }
+        )
+      }
+      attempt(confirm)
     },
-    [workflowId, publishMutation, versionsQuery, queryClient, showSuccess, showError, onVersionUpdated]
+    [
+      workflowId,
+      publishMutation,
+      versionsQuery,
+      queryClient,
+      showSuccess,
+      showError,
+      onVersionUpdated,
+      guardPublishError,
+    ]
   )
 
   const publishVersion = useCallback(
@@ -174,13 +186,7 @@ export function useVersionHistory({ workflowId, isNew, onVersionUpdated }: UseVe
         })
         return
       }
-      const pending: PendingVersionPublish = {
-        version,
-        publishName,
-        changeDescription,
-        workflowDefinition,
-        onSettled,
-      }
+      const pending: PendingVersionPublish = { version, publishName, changeDescription, workflowDefinition, onSettled }
       clearOutputContractReview()
       setPendingPublish(pending)
       detachPromise(
@@ -189,9 +195,8 @@ export function useVersionHistory({ workflowId, isNew, onVersionUpdated }: UseVe
           showError({ title: 'Failed to check output contract changes', description: getErrorMessage(error) })
         }).then((response) => {
           if (!response) return
-          if (response.has_breaking_changes || (response.has_contract_changes && response.parent_workflows?.length)) {
+          if (response.has_breaking_changes || (response.has_contract_changes && response.parent_workflows?.length))
             return
-          }
           setPendingPublish(null)
           publishVersionNow(pending)
         })
@@ -256,5 +261,6 @@ export function useVersionHistory({ workflowId, isNew, onVersionUpdated }: UseVe
     updateVersionMetadata,
     updateMetadataMutation,
     paginationFooterProps,
+    triggerRemovalConfirmDialog,
   }
 }

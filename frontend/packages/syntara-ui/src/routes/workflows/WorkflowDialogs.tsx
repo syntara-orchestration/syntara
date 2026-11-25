@@ -168,6 +168,7 @@ export function WorkflowDialogs({
       <WorkflowDeleteDialog
         isOpen={deleteDialog.isOpen}
         workflowName={deleteDialog.item?.name ?? ''}
+        workflowId={deleteDialog.item?.id}
         onClose={deleteDialog.close}
         onConfirm={() => {
           if (deleteDialog.item) {

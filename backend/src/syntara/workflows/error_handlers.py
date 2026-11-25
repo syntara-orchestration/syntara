@@ -8,10 +8,17 @@ from typing import TYPE_CHECKING
 import structlog
 from fastapi import Request, status
 from fastapi.responses import JSONResponse
+from pydantic import Field as PydanticField
 from temporalio.service import RPCError
 
 from syntara.audit.dispatcher import AuditEventDispatcher
-from syntara.core.error_handlers import PROBLEM_TYPES, create_problem_details_response
+from syntara.core.error_handlers import (
+    PROBLEM_TYPES,
+    create_problem_details_response,
+    create_problem_details_response_from_model,
+    truncate_problem_instance,
+)
+from syntara.core.models.error import ErrorData
 from syntara.workflows.audit.webhook_auth import WebhookAuthFailureEvent
 from syntara.workflows.workflow_engine.models.workflow_definition import NodeType
 
@@ -38,7 +45,9 @@ if TYPE_CHECKING:
         WorkflowNameConflictError,
         WorkflowNotFoundError,
         WorkflowNotPublishedError,
+        WorkflowPublishTriggerRemovalConfirmationError,
         WorkflowPublishValidationError,
+        WorkflowReferencedByPublishedParentsError,
         WorkflowValidationError,
         WorkflowVersionConflictError,
         WorkflowVersionNotFoundError,
@@ -48,6 +57,35 @@ if TYPE_CHECKING:
 logger = structlog.stdlib.get_logger(__name__)
 
 _PROBLEM_JSON_MEDIA_TYPE = "application/problem+json"
+
+
+class WorkflowReferencedConfirmationProblem(ErrorData):
+    """Typed RFC 9457 problem body for the delete-confirmation 409.
+
+    Extends the base problem with the count of referencing published parents; their identities are
+    never disclosed, since the caller may lack read access to them. Mirrors
+    ``WorkflowReferencedConfirmationProblem`` in the OpenAPI spec so generated clients type the field.
+    """
+
+    referencing_count: int | None = PydanticField(
+        default=None,
+        ge=1,
+        description="Distinct published parents that reference this workflow and would be affected by deletion.",
+    )
+
+
+class WorkflowPublishTriggerRemovalConfirmationProblem(ErrorData):
+    """Typed RFC 9457 problem body for the publish trigger-removal 409.
+
+    Extends the base problem with the count of affected published parents (identities are never
+    disclosed). Mirrors ``WorkflowPublishTriggerRemovalConfirmationProblem`` in the OpenAPI spec.
+    """
+
+    affected_count: int | None = PydanticField(
+        default=None,
+        ge=1,
+        description="Distinct published parents that invoke a Subworkflow Trigger removed by this publish.",
+    )
 
 
 def build_validation_problem_response(
@@ -344,6 +382,56 @@ def workflow_has_active_executions_handler(request: Request, exc: "WorkflowHasAc
         retryable=True,
         instance=str(request.url),
     )
+
+
+def workflow_referenced_delete_handler(
+    request: Request, exc: "WorkflowReferencedByPublishedParentsError"
+) -> JSONResponse:
+    """Handle WorkflowReferencedByPublishedParentsError with RFC 9457 format (HTTP 409).
+
+    The body exposes only the count of referencing published parents -- never their identities,
+    since the caller may lack read access to them.
+    """
+    logger.warning(
+        "Workflow deletion requires confirmation: referenced by published parents",
+        workflow_id=str(exc.workflow_id),
+        referencing_count=exc.referencing_count,
+    )
+    problem = WorkflowReferencedConfirmationProblem(
+        type=PROBLEM_TYPES["resource_conflict"],
+        title="Workflow Deletion Requires Confirmation",
+        detail=str(exc),
+        code="WORKFLOW_REFERENCED_CONFIRMATION_REQUIRED",
+        retryable=False,
+        instance=truncate_problem_instance(str(request.url)),
+        referencing_count=exc.referencing_count,
+    )
+    return create_problem_details_response_from_model(problem, status_code=status.HTTP_409_CONFLICT)
+
+
+def workflow_publish_trigger_removal_handler(
+    request: Request, exc: "WorkflowPublishTriggerRemovalConfirmationError"
+) -> JSONResponse:
+    """Handle WorkflowPublishTriggerRemovalConfirmationError with RFC 9457 format (HTTP 409).
+
+    The body exposes only the distinct count of affected published parents -- never their
+    identities, since the caller may lack read access to them.
+    """
+    logger.warning(
+        "Publish requires confirmation: removes a Subworkflow Trigger invoked by published parents",
+        workflow_id=str(exc.workflow_id),
+        affected_count=exc.affected_count,
+    )
+    problem = WorkflowPublishTriggerRemovalConfirmationProblem(
+        type=PROBLEM_TYPES["resource_conflict"],
+        title="Publish Requires Confirmation",
+        detail=str(exc),
+        code="WORKFLOW_PUBLISH_TRIGGER_REMOVAL_CONFIRMATION_REQUIRED",
+        retryable=False,
+        instance=truncate_problem_instance(str(request.url)),
+        affected_count=exc.affected_count,
+    )
+    return create_problem_details_response_from_model(problem, status_code=status.HTTP_409_CONFLICT)
 
 
 # ============================================================================

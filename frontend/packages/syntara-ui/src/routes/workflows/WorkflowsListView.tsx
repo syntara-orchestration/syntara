@@ -8,6 +8,7 @@ import type { FilterConfig, FilterFieldDefinition } from '../../types/filters'
 import type { ProjectRead } from '../access/types'
 
 import type { ProjectRowActionCallbacks } from './projectRowActions'
+import { WorkflowUsedByCountsContext } from './useWorkflowUsedBy'
 import type { WorkflowRowActionCallbacks } from './workflowRowActions'
 import { FlatWorkflowsTableBody, GroupedWorkflowsTableBody } from './WorkflowsTableBody'
 import { workflowStateColumnInfo } from './workflowStateColumnInfo'
@@ -40,7 +41,10 @@ export type WorkflowsListViewProps = Readonly<{
   projectActionCallbacks?: ProjectRowActionCallbacks
   tabKey?: string
   tabLabel?: string
+  usedByCountsById?: Map<string, number>
 }>
+
+const EMPTY_USED_BY_COUNTS: ReadonlyMap<string, number> = new Map()
 
 export function WorkflowsListView({
   isPending,
@@ -66,78 +70,82 @@ export function WorkflowsListView({
   projectActionCallbacks,
   tabKey,
   tabLabel,
+  usedByCountsById,
 }: WorkflowsListViewProps) {
   const isEmpty = sortedWorkflows.length === 0
 
   return (
-    <SynListPanelView
-      tabKey={tabKey}
-      tabLabel={tabLabel}
-      isPending={isPending}
-      isFetching={isFetching}
-      error={error}
-      errorTitle="Error loading workflows"
-      onRetry={onRetry}
-      isEmpty={isEmpty}
-      hasActiveFilters={hasActiveFilters}
-      onClearAllFilters={onClearAllFilters}
-      noDataState={
-        <SynEmptyStateNoData
-          title="No workflows yet"
-          description="Create your first workflow to get started."
-          buttonText="Create workflow"
-          addData={onCreateWorkflow}
-        />
-      }
-      toolbar={
-        !isEmpty || hasActiveFilters ? (
-          <SynListPanelToolbar
-            filters={filters}
-            filterDefinitions={filterFieldDefinitions}
-            onFilterChange={onFilterChange}
-            clearAllFilters={onClearAllFilters}
+    <WorkflowUsedByCountsContext.Provider value={usedByCountsById ?? (EMPTY_USED_BY_COUNTS as Map<string, number>)}>
+      <SynListPanelView
+        tabKey={tabKey}
+        tabLabel={tabLabel}
+        isPending={isPending}
+        isFetching={isFetching}
+        error={error}
+        errorTitle="Error loading workflows"
+        onRetry={onRetry}
+        isEmpty={isEmpty}
+        hasActiveFilters={hasActiveFilters}
+        onClearAllFilters={onClearAllFilters}
+        noDataState={
+          <SynEmptyStateNoData
+            title="No workflows yet"
+            description="Create your first workflow to get started."
+            buttonText="Create workflow"
+            addData={onCreateWorkflow}
           />
-        ) : undefined
-      }
-      body={
-        <SynListPanelTable caption="Workflows table" footer={footer}>
-          <Thead>
-            <Tr>
-              <Th width={35} sort={getSortParams('name')}>
-                Name
-              </Th>
-              <Th width={20} sort={getSortParams('created_at')}>
-                Created at
-              </Th>
-              <Th width={20} sort={getSortParams('updated_at')}>
-                Updated at
-              </Th>
-              <Th width={15} sort={getSortParams('is_enabled')} info={workflowStateColumnInfo}>
-                State
-              </Th>
-              {showRowActions && <Th width={10} screenReaderText="Actions" />}
-            </Tr>
-          </Thead>
-          {isAllProjects && groupedWorkflows ? (
-            <GroupedWorkflowsTableBody
-              groupedWorkflows={groupedWorkflows}
-              collapsedProjects={collapsedProjects}
-              onToggleProject={onToggleProject}
-              isWorkflowProjectBuiltin={isWorkflowProjectBuiltin}
-              rowActionCallbacks={rowActionCallbacks}
-              showRowActions={showRowActions}
-              projectActionCallbacks={projectActionCallbacks}
+        }
+        toolbar={
+          !isEmpty || hasActiveFilters ? (
+            <SynListPanelToolbar
+              filters={filters}
+              filterDefinitions={filterFieldDefinitions}
+              onFilterChange={onFilterChange}
+              clearAllFilters={onClearAllFilters}
             />
-          ) : (
-            <FlatWorkflowsTableBody
-              workflows={sortedWorkflows}
-              isWorkflowProjectBuiltin={isWorkflowProjectBuiltin}
-              rowActionCallbacks={rowActionCallbacks}
-              showRowActions={showRowActions}
-            />
-          )}
-        </SynListPanelTable>
-      }
-    />
+          ) : undefined
+        }
+        body={
+          <SynListPanelTable caption="Workflows table" footer={footer}>
+            <Thead>
+              <Tr>
+                <Th width={35} sort={getSortParams('name')}>
+                  Name
+                </Th>
+                <Th width={20} sort={getSortParams('created_at')}>
+                  Created at
+                </Th>
+                <Th width={20} sort={getSortParams('updated_at')}>
+                  Updated at
+                </Th>
+                <Th width={10}>Used by</Th>
+                <Th width={15} sort={getSortParams('is_enabled')} info={workflowStateColumnInfo}>
+                  State
+                </Th>
+                {showRowActions && <Th width={10} screenReaderText="Actions" />}
+              </Tr>
+            </Thead>
+            {isAllProjects && groupedWorkflows ? (
+              <GroupedWorkflowsTableBody
+                groupedWorkflows={groupedWorkflows}
+                collapsedProjects={collapsedProjects}
+                onToggleProject={onToggleProject}
+                isWorkflowProjectBuiltin={isWorkflowProjectBuiltin}
+                rowActionCallbacks={rowActionCallbacks}
+                showRowActions={showRowActions}
+                projectActionCallbacks={projectActionCallbacks}
+              />
+            ) : (
+              <FlatWorkflowsTableBody
+                workflows={sortedWorkflows}
+                isWorkflowProjectBuiltin={isWorkflowProjectBuiltin}
+                rowActionCallbacks={rowActionCallbacks}
+                showRowActions={showRowActions}
+              />
+            )}
+          </SynListPanelTable>
+        }
+      />
+    </WorkflowUsedByCountsContext.Provider>
   )
 }

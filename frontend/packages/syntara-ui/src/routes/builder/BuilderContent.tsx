@@ -278,6 +278,7 @@ export function BuilderContent(props: BuilderContentProps) {
     confirmPublish,
     cancelBreakingChangeWarning,
     reviewOutputContract,
+    triggerRemovalConfirmDialog: publishTriggerRemovalDialog,
   } = usePublishWorkflow({
     workflowId,
     currentVersion,
@@ -349,6 +350,7 @@ export function BuilderContent(props: BuilderContentProps) {
     handleToggleDetails,
     handleToggleHistory,
     handleToggleVersionHistory: baseHandleToggleVersionHistory,
+    referencedDeleteConfirmDialog,
   } = useBuilderToolbarHandlers({
     workflow: workflow,
     workflowName,
@@ -787,6 +789,7 @@ export function BuilderContent(props: BuilderContentProps) {
                       tooltip: builderPermissions.tooltips.edit,
                     }}
                   />
+                  {versionPanel.triggerRemovalConfirmDialog}
 
                   <NodeEditorAutoSubmitContext.Provider value={autoSubmitRef}>
                     <NodeEditorOverlay
@@ -848,6 +851,8 @@ export function BuilderContent(props: BuilderContentProps) {
               bodyText="Opening the duplicated workflow will exit the editor view and will permanently delete all recent unsaved progress on your current workflow. Please save your work before leaving."
               buttonLabel="Open without saving"
             />
+            {publishTriggerRemovalDialog}
+            {referencedDeleteConfirmDialog}
           </SynPage>
         </VersionViewProvider>
       </SynStepExpandedAllContext.Provider>

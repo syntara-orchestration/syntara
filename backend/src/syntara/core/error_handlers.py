@@ -165,6 +165,21 @@ def apply_rfc9457_media_types(spec: dict[str, Any]) -> None:
 
 if TYPE_CHECKING:
     from syntara.core.exceptions import SafeValueError
+    from syntara.core.models.error import ErrorData
+
+
+def truncate_problem_detail(detail: str) -> str:
+    """Truncate a problem ``detail`` to the ErrorData max length (concatenated errors can exceed it)."""
+    if len(detail) > _DETAIL_MAX_LEN:
+        return detail[: _DETAIL_MAX_LEN - 3] + "..."
+    return detail
+
+
+def truncate_problem_instance(instance: str | None) -> str | None:
+    """Truncate a problem ``instance`` URI to the ErrorData max length (request URLs/query strings can be long)."""
+    if instance and len(instance) > _INSTANCE_MAX_LEN:
+        return instance[:_INSTANCE_MAX_LEN]
+    return instance
 
 
 def create_problem_details_response(
@@ -194,13 +209,8 @@ def create_problem_details_response(
     """
     from syntara.core.models.error import ErrorData  # noqa: PLC0415
 
-    # Truncate instance URI to fit ErrorData max_length (OIDC callbacks can have very long query strings)
-    if instance and len(instance) > _INSTANCE_MAX_LEN:
-        instance = instance[:_INSTANCE_MAX_LEN]
-
-    # Truncate detail to fit ErrorData max_length (concatenated validation errors can exceed it)
-    if len(detail) > _DETAIL_MAX_LEN:
-        detail = detail[: _DETAIL_MAX_LEN - 3] + "..."
+    instance = truncate_problem_instance(instance)
+    detail = truncate_problem_detail(detail)
 
     error_data = ErrorData(
         type=problem_type,
@@ -213,9 +223,23 @@ def create_problem_details_response(
 
     logger.debug("Created ErrorData", error_data=error_data.to_dict())
 
+    # Delegate the final serialization so create_problem_details_response and
+    # create_problem_details_response_from_model emit byte-identical problem+json responses.
+    return create_problem_details_response_from_model(error_data, status_code=status_code)
+
+
+def create_problem_details_response_from_model(problem: "ErrorData", *, status_code: int) -> JSONResponse:
+    """Serialize a prebuilt ``ErrorData`` (or subclass) to an RFC 9457 problem+json response.
+
+    Companion to :func:`create_problem_details_response` for problem bodies that extend the base
+    ErrorData with typed extension members (for example the Used-By confirmation 409s, which add a
+    count). The caller builds the typed model so the extension fields are declared and validated;
+    this helper serializes it, and ``to_dict`` (``model_dump(exclude_none=True)``) carries the
+    subclass fields onto the wire alongside the standard problem members.
+    """
     return JSONResponse(
         status_code=status_code,
-        content=error_data.to_dict(),
+        content=problem.to_dict(),
         media_type="application/problem+json",
     )
 
