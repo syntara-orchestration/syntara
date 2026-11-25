@@ -1,5 +1,6 @@
 """Credential-reference resolution for Execution Plane commands."""
 
+from collections.abc import Mapping
 from typing import TYPE_CHECKING
 from uuid import UUID
 
@@ -25,6 +26,7 @@ from syntara.execution_plane.commands.errors import CommandResourceNotFoundError
 from syntara.execution_plane.utils import execution_plane_work_item_id
 from syntara.integrations.exceptions import IntegrationCredentialNotFoundError
 from syntara.integrations.lib.credential_resolver import fetch_credential_with_type
+from syntara.workflow_runtime.engines.temporal.utils.loop_iteration_ids import strip_loop_iteration_suffixes
 from syntara.workflows.models.activity_execution import TERMINAL_ACTIVITY_STATUSES, ActivityExecution
 from syntara.workflows.models.execution import Execution
 from syntara.workflows.models.workflow_definition import WorkflowDefinition, WorkflowNode
@@ -77,6 +79,39 @@ class CredentialResolveWorkloadCommandHandler:
         result = await session.exec(
             select(ActivityExecution)
             .where(col(ActivityExecution.id) == work_item_id)
+            .options(
+                selectinload(ActivityExecution.execution).selectinload(Execution.workflow_version),  # type: ignore[arg-type]
+            )
+        )
+        return result.one_or_none()
+
+    async def _load_activity_from_runtime_context(
+        self,
+        session: AsyncSession,
+        work_item_id: UUID,
+        runtime_context: Mapping[str, object] | None,
+    ) -> ActivityExecution | None:
+        """Resolve loop-body work whose canvas row uses a different primary key."""
+        if runtime_context is None:
+            return None
+        execution_id = runtime_context.get("execution_id")
+        temporal_activity_id = runtime_context.get("temporal_activity_id")
+        if not isinstance(execution_id, str) or not isinstance(temporal_activity_id, str):
+            return None
+        try:
+            execution_uuid = UUID(execution_id)
+        except ValueError:
+            return None
+        if work_item_id != execution_plane_work_item_id(execution_uuid, temporal_activity_id):
+            return None
+
+        base_activity_id = strip_loop_iteration_suffixes(temporal_activity_id)
+        result = await session.exec(
+            select(ActivityExecution)
+            .where(
+                col(ActivityExecution.execution_id) == execution_uuid,
+                col(ActivityExecution.activity_name) == base_activity_id,
+            )
             .options(
                 selectinload(ActivityExecution.execution).selectinload(Execution.workflow_version),  # type: ignore[arg-type]
             )
@@ -141,6 +176,12 @@ class CredentialResolveWorkloadCommandHandler:
             raise ProtocolConflict
         work_item_id = payload.work_item_id
         activity = await self._load_activity(context.session, work_item_id)
+        if activity is None:
+            activity = await self._load_activity_from_runtime_context(
+                context.session,
+                work_item_id,
+                payload.runtime_context,
+            )
         if activity is None:
             raise CommandResourceNotFoundError
         if activity.status in TERMINAL_ACTIVITY_STATUSES:

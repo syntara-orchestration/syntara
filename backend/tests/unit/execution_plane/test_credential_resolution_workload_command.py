@@ -31,7 +31,7 @@ from syntara.workflows.models.workflow_definition import ConditionNode
 from syntara.workflows.models.workflow_version import WorkflowVersion
 
 if TYPE_CHECKING:
-    from collections.abc import Awaitable, Callable
+    from collections.abc import Awaitable, Callable, Mapping
 
     from execution_plane_client.protocol import MessageEnvelope
 
@@ -59,15 +59,18 @@ def callback(monkeypatch: pytest.MonkeyPatch) -> tuple[FastAPI, AsyncMock]:
 
 def workload_command(
     *,
+    work_item_id: UUID | None = None,
     credential_ref: UUID | None = None,
     credential_recipe_id: str = "acme.echo.api-token",
+    runtime_context: Mapping[str, object] | None = None,
 ) -> tuple[MessageEnvelope, CredentialResolveWorkload]:
     message = CredentialResolveWorkload(
-        work_item_id=uuid4(),
+        work_item_id=work_item_id or uuid4(),
         attempt_id="attempt",
         credential_ref=credential_ref or uuid4(),
         credential_recipe_id=credential_recipe_id,
         step_revision_id="step-revision",
+        runtime_context=dict(runtime_context or {}),
     ).to_message(
         source_id="execution-plane",
         destination_id="syntara-orchestration",
@@ -124,6 +127,61 @@ def activity(
         activity_name="approval",
         node_type="approval",
         temporal_activity_id="activity",
+        status=status,
+    )
+    result.execution = execution
+    return result
+
+
+def loop_activity(
+    *,
+    execution_id: UUID,
+    temporal_activity_id: str,
+    status: ActivityStatus = ActivityStatus.RUNNING,
+    credential_ref: UUID | None = None,
+    credential_recipe_id: str = "acme.echo.api-token",
+) -> ActivityExecution:
+    execution = Execution(
+        id=execution_id,
+        workflow_id=uuid4(),
+        workflow_version_id=uuid4(),
+        project_id=uuid4(),
+        temporal_workflow_id="workflow",
+    )
+    definition = {
+        "schema_version": "2.0.0",
+        "name": "workflow",
+        "triggers": [{"id": "trigger", "type": "manual"}],
+        "nodes": [
+            {
+                "id": "approval",
+                "type": "approval",
+                "parameters": {
+                    "credential_bindings": [
+                        {
+                            "credential_recipe_id": credential_recipe_id,
+                            "credential_ref": str(credential_ref or uuid4()),
+                        }
+                    ]
+                },
+            }
+        ],
+        "edges": [],
+    }
+    version = WorkflowVersion(
+        id=execution.workflow_version_id,
+        workflow_id=execution.workflow_id,
+        version=1,
+        schema_version="2.0.0",
+        workflow_definition=definition,
+    )
+    execution.workflow_version = version
+    result = ActivityExecution(
+        id=execution_plane_work_item_id(execution.id, "approval"),
+        execution_id=execution.id,
+        activity_name="approval",
+        node_type="approval",
+        temporal_activity_id=temporal_activity_id,
         status=status,
     )
     result.execution = execution
@@ -292,6 +350,189 @@ async def test_workload_credential_command_rejects_unbound_recipe_or_reference(
 
 
 @pytest.mark.asyncio
+async def test_workload_credential_command_resolves_loop_body_work(
+    callback: tuple[FastAPI, AsyncMock], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    app, _ = callback
+    execution_id = uuid4()
+    temporal_activity_id = "approval_iter_0"
+    work_item_id = execution_plane_work_item_id(execution_id, temporal_activity_id)
+    message, payload = workload_command(
+        work_item_id=work_item_id,
+        credential_ref=uuid4(),
+        runtime_context={
+            "execution_id": str(execution_id),
+            "temporal_activity_id": temporal_activity_id,
+        },
+    )
+    row = loop_activity(
+        execution_id=execution_id,
+        temporal_activity_id=temporal_activity_id,
+        credential_ref=payload.credential_ref,
+    )
+
+    async def load_activity(_handler: object, _session: AsyncMock, _work_item_id: object) -> ActivityExecution | None:
+        return None
+
+    async def load_activity_from_runtime_context(
+        _handler: object,
+        _session: AsyncMock,
+        _work_item_id: object,
+        _runtime_context: Mapping[str, object] | None,
+    ) -> ActivityExecution | None:
+        return row
+
+    monkeypatch.setattr(command_credentials.CredentialResolveWorkloadCommandHandler, "_load_activity", load_activity)
+    monkeypatch.setattr(
+        command_credentials.CredentialResolveWorkloadCommandHandler,
+        "_load_activity_from_runtime_context",
+        load_activity_from_runtime_context,
+    )
+    monkeypatch.setattr(
+        command_credentials.CredentialResolveWorkloadCommandHandler,
+        "_resolve_credential_document",
+        AsyncMock(return_value={"token": "resolved-token"}),
+    )
+
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://ao") as client:
+        response = await client.post("/api/execution_plane/v1/commands", json=message.model_dump(mode="json"))
+
+    assert response.status_code == 200, response.text
+    assert response.json()["result"]["credential"] == {"token": "resolved-token"}
+
+
+@pytest.mark.asyncio
+async def test_workload_credential_command_rejects_loop_context_that_does_not_correlate(
+    callback: tuple[FastAPI, AsyncMock], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    app, _ = callback
+    execution_id = uuid4()
+    temporal_activity_id = "approval_iter_0"
+    message, _payload = workload_command(
+        runtime_context={
+            "execution_id": str(execution_id),
+            "temporal_activity_id": temporal_activity_id,
+        },
+    )
+
+    async def load_activity(_handler: object, _session: AsyncMock, _work_item_id: object) -> ActivityExecution | None:
+        return None
+
+    async def load_activity_from_runtime_context(
+        _handler: object,
+        _session: AsyncMock,
+        _work_item_id: object,
+        _runtime_context: Mapping[str, object] | None,
+    ) -> ActivityExecution | None:
+        return None
+
+    monkeypatch.setattr(command_credentials.CredentialResolveWorkloadCommandHandler, "_load_activity", load_activity)
+    monkeypatch.setattr(
+        command_credentials.CredentialResolveWorkloadCommandHandler,
+        "_load_activity_from_runtime_context",
+        load_activity_from_runtime_context,
+    )
+
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://ao") as client:
+        response = await client.post("/api/execution_plane/v1/commands", json=message.model_dump(mode="json"))
+
+    assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_workload_credential_command_rejects_terminal_loop_body_work(
+    callback: tuple[FastAPI, AsyncMock], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    app, _ = callback
+    execution_id = uuid4()
+    temporal_activity_id = "approval_iter_0"
+    work_item_id = execution_plane_work_item_id(execution_id, temporal_activity_id)
+    message, payload = workload_command(
+        work_item_id=work_item_id,
+        credential_ref=uuid4(),
+        runtime_context={
+            "execution_id": str(execution_id),
+            "temporal_activity_id": temporal_activity_id,
+        },
+    )
+    row = loop_activity(
+        execution_id=execution_id,
+        temporal_activity_id=temporal_activity_id,
+        status=ActivityStatus.COMPLETED,
+        credential_ref=payload.credential_ref,
+    )
+
+    async def load_activity(_handler: object, _session: AsyncMock, _work_item_id: object) -> ActivityExecution | None:
+        return None
+
+    async def load_activity_from_runtime_context(
+        _handler: object,
+        _session: AsyncMock,
+        _work_item_id: object,
+        _runtime_context: Mapping[str, object] | None,
+    ) -> ActivityExecution | None:
+        return row
+
+    monkeypatch.setattr(command_credentials.CredentialResolveWorkloadCommandHandler, "_load_activity", load_activity)
+    monkeypatch.setattr(
+        command_credentials.CredentialResolveWorkloadCommandHandler,
+        "_load_activity_from_runtime_context",
+        load_activity_from_runtime_context,
+    )
+
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://ao") as client:
+        response = await client.post("/api/execution_plane/v1/commands", json=message.model_dump(mode="json"))
+
+    assert response.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_workload_credential_command_rejects_unbound_loop_body_work(
+    callback: tuple[FastAPI, AsyncMock], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    app, _ = callback
+    execution_id = uuid4()
+    temporal_activity_id = "approval_iter_0"
+    work_item_id = execution_plane_work_item_id(execution_id, temporal_activity_id)
+    message, _payload = workload_command(
+        work_item_id=work_item_id,
+        credential_ref=uuid4(),
+        runtime_context={
+            "execution_id": str(execution_id),
+            "temporal_activity_id": temporal_activity_id,
+        },
+    )
+    row = loop_activity(
+        execution_id=execution_id,
+        temporal_activity_id=temporal_activity_id,
+        credential_ref=uuid4(),
+    )
+
+    async def load_activity(_handler: object, _session: AsyncMock, _work_item_id: object) -> ActivityExecution | None:
+        return None
+
+    async def load_activity_from_runtime_context(
+        _handler: object,
+        _session: AsyncMock,
+        _work_item_id: object,
+        _runtime_context: Mapping[str, object] | None,
+    ) -> ActivityExecution | None:
+        return row
+
+    monkeypatch.setattr(command_credentials.CredentialResolveWorkloadCommandHandler, "_load_activity", load_activity)
+    monkeypatch.setattr(
+        command_credentials.CredentialResolveWorkloadCommandHandler,
+        "_load_activity_from_runtime_context",
+        load_activity_from_runtime_context,
+    )
+
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://ao") as client:
+        response = await client.post("/api/execution_plane/v1/commands", json=message.model_dump(mode="json"))
+
+    assert response.status_code == 409
+
+
+@pytest.mark.asyncio
 async def test_load_activity_returns_the_matching_row() -> None:
     handler = command_credentials.CredentialResolveWorkloadCommandHandler()
     session = AsyncMock()
@@ -305,6 +546,68 @@ async def test_load_activity_returns_the_matching_row() -> None:
     assert loaded is expected
     session.exec.assert_awaited_once()
     result.one_or_none.assert_called_once_with()
+
+
+@pytest.mark.asyncio
+async def test_load_activity_from_runtime_context_returns_the_matching_row() -> None:
+    handler = command_credentials.CredentialResolveWorkloadCommandHandler()
+    session = AsyncMock()
+    result = MagicMock()
+    expected = object()
+    result.one_or_none.return_value = expected
+    session.exec.return_value = result
+    execution_id = uuid4()
+    temporal_activity_id = "approval_iter_1_iter_0"
+    work_item_id = execution_plane_work_item_id(execution_id, temporal_activity_id)
+
+    loaded = await handler._load_activity_from_runtime_context(
+        session,
+        work_item_id,
+        {
+            "execution_id": str(execution_id),
+            "temporal_activity_id": temporal_activity_id,
+        },
+    )
+
+    assert loaded is expected
+    session.exec.assert_awaited_once()
+    result.one_or_none.assert_called_once_with()
+
+
+@pytest.mark.asyncio
+async def test_load_activity_from_runtime_context_rejects_mismatched_work_item() -> None:
+    handler = command_credentials.CredentialResolveWorkloadCommandHandler()
+    session = AsyncMock()
+    execution_id = uuid4()
+    temporal_activity_id = "approval_iter_0"
+
+    loaded = await handler._load_activity_from_runtime_context(
+        session,
+        uuid4(),
+        {
+            "execution_id": str(execution_id),
+            "temporal_activity_id": temporal_activity_id,
+        },
+    )
+
+    assert loaded is None
+    session.exec.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("execution_id", ["", "not-a-uuid"])
+async def test_load_activity_from_runtime_context_rejects_invalid_execution_ids(execution_id: str) -> None:
+    handler = command_credentials.CredentialResolveWorkloadCommandHandler()
+    session = AsyncMock()
+
+    loaded = await handler._load_activity_from_runtime_context(
+        session,
+        uuid4(),
+        {"execution_id": execution_id, "temporal_activity_id": "approval_iter_0"},
+    )
+
+    assert loaded is None
+    session.exec.assert_not_awaited()
 
 
 def test_node_lookup_rejects_invalid_workflow_definitions() -> None:
