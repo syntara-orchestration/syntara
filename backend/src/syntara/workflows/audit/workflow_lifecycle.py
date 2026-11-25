@@ -45,6 +45,7 @@ class WorkflowLifecycleEvent:
     version: int | None = field(default=None)
     project_id: UUID | None = field(default=None)
     error_type: str | None = field(default=None)
+    referencing_parent_ids: list[UUID] | None = field(default=None)
 
 
 class WorkflowLifecycleHandler(AuditEventHandler[WorkflowLifecycleEvent]):
@@ -65,6 +66,11 @@ class WorkflowLifecycleHandler(AuditEventHandler[WorkflowLifecycleEvent]):
             data.project_id = str(event.project_id)
         if is_error:
             data.error_type = event.error_type
+        if event.referencing_parent_ids:
+            # Internal audit record of which published parents referenced a deleted workflow.
+            # Unfiltered by visibility on purpose; this is the audit log, not a public API response.
+            data.referencing_parent_ids = [str(parent_id) for parent_id in event.referencing_parent_ids]
+            data.referencing_parent_count = len(event.referencing_parent_ids)
 
         return AuditEvent(
             event_category=EventCategory.USER_ACTION,

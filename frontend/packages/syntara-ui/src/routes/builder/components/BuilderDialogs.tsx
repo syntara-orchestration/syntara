@@ -216,6 +216,7 @@ export function BuilderDialogs({
       <WorkflowDeleteDialog
         isOpen={deleteDialogOpen}
         workflowName={workflowName}
+        workflowId={workflowId ?? undefined}
         onClose={() => dispatch({ type: 'SET_DELETE_DIALOG', payload: false })}
         onConfirm={handleDeleteWorkflow}
         confirmLoading={isDeleting}
