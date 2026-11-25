@@ -1,10 +1,11 @@
-import { Flex, FlexItem, Truncate } from '@patternfly/react-core'
+import { Button, Content, Flex, FlexItem, Truncate } from '@patternfly/react-core'
 import { RhUiCaretDownIcon, RhUiCaretRightIcon } from '@patternfly/react-icons'
 import { Tbody, Td, Tr } from '@patternfly/react-table'
 import type { WorkflowAPI } from '@syntara/contracts'
 import { useState } from 'react'
 
 import groupedTableStyles from '../../components/groupedTable.module.css'
+import { SynLabel } from '../../components/labels/SynLabel'
 import type { KebabAction } from '../../components/SynKebabMenu'
 import { SynKebabMenu } from '../../components/SynKebabMenu'
 import { LinkCell } from '../../components/table/LinkCell'
@@ -15,11 +16,37 @@ import { useProjectPermissions } from '../access-management/useProjectPermission
 
 import { buildProjectRowActions, type ProjectRowActionCallbacks } from './projectRowActions'
 import { useWorkflowPermissions } from './useWorkflowPermissions'
+import { useWorkflowUsedByCountsContext } from './useWorkflowUsedBy'
 import { buildWorkflowRowActions, type WorkflowRowActionCallbacks } from './workflowRowActions'
+import { WorkflowUsedByModal } from './WorkflowUsedByModal'
 
 type Workflow = WorkflowAPI.components['schemas']['WorkflowRead']
 
 export type RowAction = KebabAction
+
+/**
+ * "Used by" cell: a plain number for zero / unknown counts, and a clickable gray count that opens
+ * the Used-By drill-down modal when one or more published workflows use this workflow. Using a
+ * click-opened modal (rather than a hover popover with a semantic list) keeps the parent list
+ * reachable for assistive technology and scalable to many parents.
+ */
+function UsedByCell({ workflowId, count }: { readonly workflowId: string; readonly count: number | undefined }) {
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  if (count === undefined) return <Content component="small">—</Content>
+  if (count === 0) return <Content component="small">0</Content>
+  return (
+    <>
+      <Button
+        variant="plain"
+        onClick={() => setIsModalOpen(true)}
+        aria-label={`Used by ${count} published workflows. View list.`}
+      >
+        <SynLabel color="grey">{`${count} workflow${count === 1 ? '' : 's'}`}</SynLabel>
+      </Button>
+      {isModalOpen && <WorkflowUsedByModal isOpen onClose={() => setIsModalOpen(false)} workflowId={workflowId} />}
+    </>
+  )
+}
 
 type WorkflowRowProps = {
   workflow: Workflow
@@ -35,6 +62,8 @@ function WorkflowRow({
   showRowActions = true,
 }: Readonly<WorkflowRowProps>) {
   const [rowChecksEnabled, setRowChecksEnabled] = useState(false)
+  const usedByCounts = useWorkflowUsedByCountsContext()
+  const usedByCount = usedByCounts.get(workflow.id)
   const permissions = useWorkflowPermissions({
     resourceProject: workflow.project_id,
     enabled: showRowActions && rowChecksEnabled,
@@ -57,7 +86,10 @@ function WorkflowRow({
       <Td dataLabel="Updated at">
         <UserTimestamp user={workflow.updated_by} timestamp={workflow.updated_at} inline />
       </Td>
-      <Td dataLabel="Status">
+      <Td dataLabel="Used by">
+        <UsedByCell workflowId={workflow.id} count={usedByCount} />
+      </Td>
+      <Td dataLabel="State">
         <WorkflowPublishStatusBadge
           publishedVersionId={workflow.published_version_id}
           hasUnpublishedChanges={
@@ -118,7 +150,7 @@ function ProjectGroupSection({
     ? buildProjectRowActions(project, permissions, projectActionCallbacks)
     : []
   const hasProjectActions = projectActions.length > 0
-  const totalColumns = 4 + (showRowActions ? 1 : 0)
+  const totalColumns = 5 + (showRowActions ? 1 : 0)
   const headerColSpan = hasProjectActions ? totalColumns - 1 : totalColumns
 
   return (
@@ -170,7 +202,7 @@ export function GroupedWorkflowsTableBody({
   rowActionCallbacks,
   showRowActions = true,
   projectActionCallbacks,
-}: Readonly<GroupedWorkflowsTableBodyProps>) {
+}: GroupedWorkflowsTableBodyProps) {
   return (
     <>
       {[...groupedWorkflows.entries()].map(([projectId, { project, workflows }]) => (

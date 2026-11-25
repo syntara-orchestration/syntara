@@ -246,7 +246,7 @@ describe('BuilderContent - Delete Workflow', () => {
     await screen.findByText('Delete workflow?')
     await user.click(
       screen.getByRole('checkbox', {
-        name: /I understand this workflow will be deleted and any in-progress runs will stop immediately/,
+        name: /I understand this workflow will be deleted/,
       })
     )
     await user.click(screen.getByRole('button', { name: 'Delete workflow' }))
@@ -255,7 +255,7 @@ describe('BuilderContent - Delete Workflow', () => {
     await waitFor(() => {
       expect(mockDeleteMutate).toHaveBeenCalledWith(
         expect.objectContaining({
-          params: { path: { workflow_id: 'workflow-1' } },
+          params: { path: { workflow_id: 'workflow-1' }, query: { confirm: false } },
         }),
         expect.any(Object)
       )
@@ -292,7 +292,7 @@ describe('BuilderContent - Delete Workflow', () => {
     await screen.findByText('Delete workflow?')
     await user.click(
       screen.getByRole('checkbox', {
-        name: /I understand this workflow will be deleted and any in-progress runs will stop immediately/,
+        name: /I understand this workflow will be deleted/,
       })
     )
     await user.click(screen.getByRole('button', { name: 'Delete workflow' }))
@@ -302,6 +302,120 @@ describe('BuilderContent - Delete Workflow', () => {
       expect(mockDeleteMutate).toHaveBeenCalled()
       expect(screen.getByText('Failed to delete workflow')).toBeInTheDocument()
       expect(screen.getByText(/Failed to delete workflow ".+":/)).toBeInTheDocument()
+    })
+  })
+
+  it('referenced 409 -> explicit confirmation -> confirmed retry deletes and navigates', async () => {
+    const user = userEvent.setup()
+    const confirmCalls: boolean[] = []
+    const mockDeleteMutate = vi.fn(
+      (
+        params: { params?: { query?: { confirm?: boolean } } },
+        callbacks?: {
+          onSuccess?: (d: unknown, v: unknown, c: unknown) => void
+          onError?: (e: unknown, v: unknown, c: unknown) => void
+        }
+      ) => {
+        const confirm = params?.params?.query?.confirm === true
+        confirmCalls.push(confirm)
+        if (!confirm) {
+          callbacks?.onError?.(
+            { cause: { code: 'WORKFLOW_REFERENCED_CONFIRMATION_REQUIRED', referencing_count: 2 } },
+            params,
+            undefined
+          )
+          return
+        }
+        callbacks?.onSuccess?.(undefined, params, undefined)
+      }
+    )
+    vi.mocked(workflowClient.useMutation).mockImplementation((method) =>
+      method === 'delete' ? createMockMutation(mockDeleteMutate) : createMockMutation()
+    )
+
+    // Used-By defaults to 0 dependencies here, proving a stale/zero Used-By cannot bypass the gate.
+    await renderBuilder({ workflow: mockWorkflow, isNew: false, workflowId: 'workflow-1' })
+
+    await user.click(screen.getByLabelText('Workflow actions'))
+    await user.click(await screen.findByText('Delete workflow'))
+    await screen.findByText('Delete workflow?')
+    await user.click(screen.getByRole('checkbox', { name: /I understand this workflow will be deleted/ }))
+    await user.click(screen.getByRole('button', { name: 'Delete workflow' }))
+
+    // The unconfirmed delete hit the backend gate; the dependency dialog opens using the 409 count (2),
+    // not the stale Used-By (0). Closing the original dialog did not suppress it.
+    await screen.findByText('Delete and break dependent workflows?')
+    expect(screen.getByText(/by 2 published workflow\(s\)/)).toBeInTheDocument()
+    expect(screen.queryByText('Delete workflow?')).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Delete anyway' }))
+
+    await waitFor(() => {
+      expect(confirmCalls).toEqual([false, true])
+      expect(routerTestState.navigate).toHaveBeenCalledWith({ to: '/workflows' })
+    })
+  })
+
+  it('a failed Used-By lookup cannot bypass backend confirmation', async () => {
+    const user = userEvent.setup()
+    const confirmCalls: boolean[] = []
+    const mockDeleteMutate = vi.fn(
+      (
+        params: { params?: { query?: { confirm?: boolean } } },
+        callbacks?: {
+          onSuccess?: (d: unknown, v: unknown, c: unknown) => void
+          onError?: (e: unknown, v: unknown, c: unknown) => void
+        }
+      ) => {
+        const confirm = params?.params?.query?.confirm === true
+        confirmCalls.push(confirm)
+        if (!confirm) {
+          callbacks?.onError?.(
+            { cause: { code: 'WORKFLOW_REFERENCED_CONFIRMATION_REQUIRED', referencing_count: 2 } },
+            params,
+            undefined
+          )
+          return
+        }
+        callbacks?.onSuccess?.(undefined, params, undefined)
+      }
+    )
+    vi.mocked(workflowClient.useMutation).mockImplementation((method) =>
+      method === 'delete' ? createMockMutation(mockDeleteMutate) : createMockMutation()
+    )
+    // Used-By lookup fails (isError) -> the delete must still be gated by the backend 409.
+    vi.mocked(workflowClient.useQuery).mockImplementation((method, path) => {
+      if (method === 'get' && path === '/workflows/{workflow_id}/used_by') {
+        return {
+          data: undefined,
+          isPending: false,
+          isError: true,
+          error: { message: 'lookup failed' },
+          refetch: vi.fn(),
+        }
+      }
+      if (method === 'get' && path === '/workflows') {
+        return { data: { resources: [] }, isPending: false, isError: false, error: null, refetch: vi.fn() }
+      }
+      return { data: undefined, isPending: false, isError: false, error: null, refetch: vi.fn() }
+    })
+
+    await renderBuilder({ workflow: mockWorkflow, isNew: false, workflowId: 'workflow-1' })
+
+    await user.click(screen.getByLabelText('Workflow actions'))
+    await user.click(await screen.findByText('Delete workflow'))
+    await screen.findByText('Delete workflow?')
+    await user.click(screen.getByRole('checkbox', { name: /I understand this workflow will be deleted/ }))
+    await user.click(screen.getByRole('button', { name: 'Delete workflow' }))
+
+    // Even though Used-By failed to load, deletion went out unconfirmed and the 409 gate engaged.
+    await screen.findByText('Delete and break dependent workflows?')
+    expect(screen.getByText(/by 2 published workflow\(s\)/)).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Delete anyway' }))
+    await waitFor(() => {
+      expect(confirmCalls).toEqual([false, true])
+      expect(routerTestState.navigate).toHaveBeenCalledWith({ to: '/workflows' })
     })
   })
 
