@@ -412,6 +412,14 @@ class ActivitySyncService(
             fresh_execution.updated_at = datetime.now(UTC)
             await session.commit()
 
+            await self._dispatch_subworkflow_invocation_telemetry(
+                session,
+                fresh_execution,
+                status,
+                completed_at,
+                request_id=None,
+            )
+
         await self._publish_snapshot(execution.id, "final_snapshot")
         logger.info("Reconciled stale execution", execution_id=execution.id, new_status=status.value)
         return "reconciled"

@@ -14,8 +14,10 @@ from temporalio.client import WorkflowExecutionStatus, WorkflowQueryRejectedErro
 from temporalio.service import RPCError, RPCStatusCode
 
 from syntara.core.exceptions import SafeValueError
+from syntara.workflows.audit.sub_workflow_invocation import SubWorkflowInvocationCompletedEvent
 from syntara.workflows.models.activity_execution import ActivityExecution, ActivityStatus
 from syntara.workflows.models.execution import Execution, ExecutionStatus
+from syntara.workflows.models.workflow import Workflow
 from syntara.workflows.workflow_engine.activities.internal import register_activity_monitoring
 from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName, NodeType
 from syntara.workflows.workflow_engine.services.activity_sync_service import (
@@ -5256,6 +5258,67 @@ class TestReconcileStaleExecutions:
 
         assert execution.status == ExecutionStatus.COMPLETED
         mock_session.commit.assert_awaited()
+
+    @pytest.mark.asyncio
+    async def test_reconciled_subworkflow_child_dispatches_invocation_telemetry(self) -> None:
+        """Startup reconciliation emits the same invocation telemetry as live monitoring."""
+        service, mock_session, mock_client = self._make_service()
+        child_execution = self._make_stale_execution()
+        parent_execution_id = uuid4()
+        parent_workflow_id = uuid4()
+        child_workflow_id = uuid4()
+        started_at = datetime(2026, 1, 1, tzinfo=UTC)
+        completed_at = datetime(2026, 1, 1, 0, 5, tzinfo=UTC)
+        child_execution.workflow_id = child_workflow_id
+        child_execution.execution_metadata = {
+            "parent_execution_id": str(parent_execution_id),
+            "parent_node_id": "invoke_child",
+            "workflow_name": "Child workflow",
+            "subworkflow_invocation_started_at": started_at.isoformat(),
+            "workflow_started_at": started_at.isoformat(),
+        }
+
+        parent_execution = Mock(spec=Execution)
+        parent_execution.workflow_id = parent_workflow_id
+        parent_workflow = Mock(spec=Workflow)
+        parent_workflow.name = "Parent workflow"
+        mock_session.get = AsyncMock(side_effect=[parent_execution, parent_workflow])
+
+        mock_result_list = Mock()
+        mock_result_list.all.return_value = [child_execution]
+        mock_result_single = Mock()
+        mock_result_single.one_or_none.return_value = child_execution
+        mock_session.exec = AsyncMock(side_effect=[mock_result_list, mock_result_single])
+
+        mock_event = Mock()
+        mock_event.event_type = EventType.EVENT_TYPE_WORKFLOW_EXECUTION_COMPLETED
+        mock_event.event_time = completed_at
+        mock_event.workflow_execution_completed_event_attributes = None
+        mock_client.get_workflow_handle = Mock(
+            return_value=self._make_temporal_handle("COMPLETED", events=[mock_event]),
+        )
+        telemetry_registry = Mock()
+        telemetry_registry.is_initialized.return_value = True
+
+        with (
+            patch(
+                "syntara.workflows.workflow_engine.services.activity_execution_state.get_telemetry_registry",
+                return_value=telemetry_registry,
+            ),
+            patch.object(service, "_dispatch_audit_event") as dispatch_event,
+            patch.object(service, "_publish_snapshot", new_callable=AsyncMock),
+        ):
+            await service.reconcile_stale_executions()
+
+        dispatch_event.assert_called_once()
+        invocation_event = dispatch_event.call_args.args[0]
+        assert isinstance(invocation_event, SubWorkflowInvocationCompletedEvent)
+        assert invocation_event.parent_execution_id == parent_execution_id
+        assert invocation_event.parent_workflow_id == parent_workflow_id
+        assert invocation_event.parent_node_id == "invoke_child"
+        assert invocation_event.child_execution_id == child_execution.id
+        assert invocation_event.child_workflow_id == child_workflow_id
+        assert invocation_event.occurred_at == completed_at
 
     @pytest.mark.asyncio
     async def test_completed_at_before_created_at_is_adjusted(self) -> None:
