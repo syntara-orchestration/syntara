@@ -21,6 +21,7 @@ import styles from './ExecutionDetail.module.css'
 import { useRunDetailsPanelExpand } from './hooks/useRunDetailsPanelExpand'
 import { getRetryDetailSelection } from './retryDetailSelection'
 import { RetryFromFailureSidePanel } from './RetryFromFailureSidePanel'
+import type { RunDetailsPanelExpandControl } from './RunDetailsPanelExpandButton'
 import { useRetryInputOverrides } from './useRetryInputOverrides'
 
 type Execution = ExecutionsAPI.components['schemas']['ExecutionRead']
@@ -86,9 +87,9 @@ type ExecutionDetailContentLayoutProps = Readonly<{
   retryInputOverrides?: ReturnType<typeof useRetryInputOverrides>['state']
   panelHeight: number
   panelHeightPercent: number
-  onResize: (deltaY: number) => void
   isPanelExpanded: boolean
-  panelExpandControl?: ReturnType<typeof useRunDetailsPanelExpand>['panelExpandControl']
+  panelExpandControl?: RunDetailsPanelExpandControl
+  onResize: (deltaY: number) => void
 }>
 
 function ExecutionDetailContentLayout({
@@ -115,9 +116,9 @@ function ExecutionDetailContentLayout({
   retryInputOverrides,
   panelHeight,
   panelHeightPercent,
-  onResize,
   isPanelExpanded,
   panelExpandControl,
+  onResize,
 }: ExecutionDetailContentLayoutProps) {
   const isStale = useExecutionStore((state) => state.isStale)
   const isComplete = useExecutionStore((state) => state.isComplete)
@@ -190,9 +191,9 @@ function ExecutionDetailContentLayout({
               selectedNodeId={retryDetailNodeId}
               selectedNodeName={retryDetailNodeName}
               onNodeSelect={onStepSelect}
+              panelExpandControl={panelExpandControl}
               retryMode={retryMode}
               retryInputOverrides={retryInputOverrides}
-              panelExpandControl={panelExpandControl}
             />
           </SynPanelStackItem>
         </SynPanelStack>
@@ -360,9 +361,9 @@ export function ExecutionDetailContent(props: ExecutionDetailContentProps) {
       retryInputOverrides={retryPanelOpen ? retryInputOverridesState : undefined}
       panelHeight={panelHeight}
       panelHeightPercent={panelHeightPercent}
-      onResize={handleResize}
       isPanelExpanded={isPanelExpanded}
       panelExpandControl={panelExpandControl}
+      onResize={handleResize}
     />
   )
 }

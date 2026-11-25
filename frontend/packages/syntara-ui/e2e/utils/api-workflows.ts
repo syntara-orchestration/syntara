@@ -13,12 +13,14 @@ export async function createWorkflowViaApi({
   app,
   name,
   triggers,
+  projectId,
   nodes = [],
   edges = [],
 }: {
   app: Page
   name: string
   triggers: WorkflowStepDef[]
+  projectId?: string
   nodes?: WorkflowStepDef[]
   edges?: WorkflowEdgeDef[]
 }): Promise<{
@@ -29,7 +31,7 @@ export async function createWorkflowViaApi({
 }> {
   const token = await getAuthToken(app)
   if (!token) throw new Error('createWorkflowViaApi: could not obtain auth token')
-  const project = await ensureProject(app)
+  const project = projectId ? { id: projectId } : await ensureProject(app)
   if (!project) throw new Error('createWorkflowViaApi: could not ensure project')
   const resp = await apiRequest(app, 'post', '/workflows', {
     token,

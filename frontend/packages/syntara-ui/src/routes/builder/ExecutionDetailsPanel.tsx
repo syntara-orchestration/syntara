@@ -479,8 +479,8 @@ export function ExecutionDetailsPanel({
         onRowClick={handleRowClick}
         headerLabel={headerLabel}
         onClosePanel={onClosePanel}
-        panelExpandControl={panelExpandControl}
         replayBaselineAt={replayBaselineAt}
+        panelExpandControl={panelExpandControl}
         retryMode={retryMode}
         retryInputOverrides={retryInputOverrides}
       />
@@ -506,8 +506,8 @@ export function ExecutionDetailsPanel({
       selectedNodeId={effectiveKey}
       headerLabel={headerLabel}
       onClosePanel={onClosePanel}
-      panelExpandControl={panelExpandControl}
       replayBaselineAt={replayBaselineAt}
+      panelExpandControl={panelExpandControl}
     />
   )
 }

@@ -9,7 +9,13 @@
 
 import AxeBuilder from '@axe-core/playwright'
 
-import { cleanupPersona, createPersona, loginAsUser, PERSONA_ACTIONS, type Persona } from '../authorization/fixtures'
+import {
+  cleanupProjectPersona,
+  createProjectPersona,
+  loginAsUser,
+  loginAsUserApi,
+  type ProjectPersona,
+} from '../authorization/fixtures'
 import { test, expect, toAppUrl, type Page } from '../fixtures'
 import { WCAG_TAGS } from '../fixtures/accessibility'
 import { layoutCanvas } from '../helpers/canvas-interaction'
@@ -17,9 +23,10 @@ import { buildUniqueName, fillCodeEditor } from '../helpers/workflows'
 import { isSkipWebServerForPlaywrightTests } from '../playwrightWebServerEnv'
 import {
   apiRequest,
+  createProjectViaApi,
   createWorkflowViaApi,
+  deleteProjectViaApi,
   deleteWorkflowViaApi,
-  ensureProject,
   getAuthToken,
   pollExecutionStatus,
 } from '../utils/api'
@@ -34,10 +41,11 @@ type WorkflowRun = {
 
 const workflowIds = new Set<string>()
 const executionIds = new Set<string>()
+let testProjectId: string | null = null
 let failedRun: WorkflowRun | null = null
 let completedRun: WorkflowRun | null = null
 let multipleFailureRun: WorkflowRun | null = null
-let noEditPersona: Persona | null = null
+let noEditPersona: ProjectPersona | null = null
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -65,9 +73,33 @@ function requireRun(run: WorkflowRun | null, label: string): WorkflowRun {
   return run
 }
 
-function requirePersona(persona: Persona | null): Persona {
+function requirePersona(persona: ProjectPersona | null): ProjectPersona {
   if (!persona) throw new Error('No-edit persona was not created in beforeAll')
   return persona
+}
+
+async function canPerformProjectAction(
+  app: Page,
+  token: string,
+  check: { resourceType: string; action: string; projectId: string }
+): Promise<boolean> {
+  const response = await apiRequest(app, 'post', '/authz/can_i', {
+    token,
+    data: {
+      resource_type: check.resourceType,
+      action: check.action,
+      resource_project: check.projectId,
+    },
+  })
+  if (!response.ok()) {
+    const body = await response.text().catch(() => '(unreadable)')
+    throw new Error(`POST /authz/can_i returned ${response.status()}: ${body}`)
+  }
+  const body: unknown = await response.json()
+  if (!isRecord(body) || typeof body['allowed'] !== 'boolean') {
+    throw new Error('POST /authz/can_i did not return a boolean allowed value')
+  }
+  return body['allowed']
 }
 
 function nodeParameters(definition: unknown, nodeId: string): Record<string, unknown> {
@@ -85,6 +117,7 @@ async function createRun(
   app: Page,
   options: {
     name: string
+    projectId: string
     nodes: Array<{ id: string; type: string; name: string; parameters: Record<string, unknown> }>
     edges: Array<{ from: string; to: string }>
     expectedStatus: 'failed' | 'completed'
@@ -93,6 +126,7 @@ async function createRun(
   const { id: workflowId } = await createWorkflowViaApi({
     app,
     name: options.name,
+    projectId: options.projectId,
     triggers: [{ id: 'trigger_manual', type: 'manual_trigger', name: 'Manual trigger', parameters: {} }],
     nodes: options.nodes,
     edges: options.edges,
@@ -221,11 +255,12 @@ test.describe('Retry from failure — real backend', () => {
   test.beforeAll(async ({ browser }) => {
     const page = await browser.newPage()
     try {
-      const project = await ensureProject(page)
-      if (!project) throw new Error('Could not ensure project for retry-from-failure tests')
+      const project = await createProjectViaApi(page, buildUniqueName('e2e-retry-from-failure-project'))
+      testProjectId = project.id
 
       failedRun = await createRun(page, {
         name: buildUniqueName('e2e-retry-failure'),
+        projectId: project.id,
         nodes: [
           {
             id: 'step1',
@@ -256,6 +291,7 @@ test.describe('Retry from failure — real backend', () => {
 
       completedRun = await createRun(page, {
         name: buildUniqueName('e2e-retry-completed'),
+        projectId: project.id,
         nodes: [
           {
             id: 'completed_step',
@@ -270,6 +306,7 @@ test.describe('Retry from failure — real backend', () => {
 
       multipleFailureRun = await createRun(page, {
         name: buildUniqueName('e2e-retry-parallel-failures'),
+        projectId: project.id,
         nodes: [
           {
             id: 'branch_a',
@@ -291,7 +328,46 @@ test.describe('Retry from failure — real backend', () => {
         expectedStatus: 'failed',
       })
 
-      noEditPersona = await createPersona(page, buildUniqueName('e2e-retry-no-edit'), PERSONA_ACTIONS.executionOperator)
+      noEditPersona = await createProjectPersona(page, project.id, buildUniqueName('e2e-retry-no-edit'), [
+        'workflow:read:project',
+        'execution:run:project',
+        'execution:read:project',
+        'project:read:project',
+      ])
+
+      const operatorToken = await loginAsUserApi(page, noEditPersona.username, noEditPersona.password)
+      expect(
+        await canPerformProjectAction(page, operatorToken, {
+          resourceType: 'workflow',
+          action: 'read',
+          projectId: project.id,
+        }),
+        'the test operator must be able to read the workflow'
+      ).toBe(true)
+      expect(
+        await canPerformProjectAction(page, operatorToken, {
+          resourceType: 'execution',
+          action: 'read',
+          projectId: project.id,
+        }),
+        'the test operator must be able to read the execution'
+      ).toBe(true)
+      expect(
+        await canPerformProjectAction(page, operatorToken, {
+          resourceType: 'execution',
+          action: 'run',
+          projectId: project.id,
+        }),
+        'the test operator must be able to retry executions'
+      ).toBe(true)
+      expect(
+        await canPerformProjectAction(page, operatorToken, {
+          resourceType: 'workflow',
+          action: 'update',
+          projectId: project.id,
+        }),
+        'the test operator must not be able to update workflows'
+      ).toBe(false)
     } finally {
       await page.close()
     }
@@ -307,7 +383,8 @@ test.describe('Retry from failure — real backend', () => {
       for (const workflowId of workflowIds) {
         await deleteWorkflowViaApi(page, workflowId)
       }
-      if (noEditPersona) await cleanupPersona(page, noEditPersona)
+      if (noEditPersona) await cleanupProjectPersona(page, noEditPersona)
+      if (testProjectId) await deleteProjectViaApi(page, testProjectId)
     } finally {
       await page.close()
     }
