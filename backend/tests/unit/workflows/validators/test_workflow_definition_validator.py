@@ -7,6 +7,7 @@ import pytest
 from syntara.core.exceptions import SafeValueError
 from syntara.workflows.models.validation_finding import (
     ValidationCategory,
+    ValidationResult,
     ValidationSeverity,
 )
 from syntara.workflows.validators.workflow_definition import WorkflowValidator, _best_branch_messages
@@ -26,6 +27,25 @@ def _valid_definition() -> dict[str, Any]:
         "nodes": [{"id": "n1", "type": "script", "parameters": {"language": "python", "code": "print(1)"}}],
         "edges": [{"from": "t1", "to": "n1"}],
     }
+
+
+_AGENTIC_CREDENTIAL_ID = "550e8400-e29b-41d4-a716-446655440000"
+
+
+def _agentic_node_definition(parameters: dict[str, Any]) -> dict[str, Any]:
+    definition = _valid_definition()
+    definition["nodes"] = [{"id": "n1", "type": "agentic", "parameters": parameters}]
+    return definition
+
+
+def _assert_agentic_credential_finding(result: ValidationResult) -> None:
+    assert result.is_valid is False
+    assert any(
+        finding.severity == ValidationSeverity.error
+        and finding.node_id == "n1"
+        and (finding.field_path == "parameters.credential_id" or "credential" in finding.message.lower())
+        for finding in result.findings
+    ), result.findings
 
 
 class TestValidWorkflowDefinition:
@@ -420,6 +440,41 @@ class TestCollectFindings:
         assert result.error_count == 0
         assert result.warning_count == 0
         assert result.findings == []
+
+    @pytest.mark.parametrize(
+        "parameters",
+        [
+            {"prompt": "Summarize the workflow input."},
+            {"prompt": "Summarize the workflow input.", "credential_id": ""},
+            {"prompt": "Summarize the workflow input.", "credential_id": None},
+        ],
+        ids=["missing", "empty", "null"],
+    )
+    def test_agentic_node_without_llm_credential_reports_error(
+        self,
+        validator: WorkflowValidator,
+        parameters: dict[str, Any],
+    ) -> None:
+        """Task Agent save validation rejects missing, empty, and null LLM credentials."""
+        result = validator.collect_findings(_agentic_node_definition(parameters))
+        _assert_agentic_credential_finding(result)
+
+    def test_agentic_node_with_llm_credential_passes_schema_validation(self, validator: WorkflowValidator) -> None:
+        parameters = {
+            "prompt": "Summarize the workflow input.",
+            "credential_id": _AGENTIC_CREDENTIAL_ID,
+        }
+        result = validator.collect_findings(_agentic_node_definition(parameters))
+        credential_findings = [f for f in result.findings if f.node_id == "n1" and "credential" in f.message.lower()]
+        assert credential_findings == []
+
+    def test_validate_workflow_definition_rejects_agentic_without_credential(
+        self,
+        validator: WorkflowValidator,
+    ) -> None:
+        definition = _agentic_node_definition({"prompt": "Summarize the workflow input."})
+        with pytest.raises(SafeValueError, match="schema validation failed"):
+            validator.validate_workflow_definition(definition)
 
     def test_orphaned_node_finding(self, validator: WorkflowValidator) -> None:
         definition: dict[str, Any] = {
