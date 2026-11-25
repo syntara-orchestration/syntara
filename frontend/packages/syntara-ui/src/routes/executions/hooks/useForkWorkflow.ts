@@ -24,7 +24,7 @@ type UseForkWorkflowOptions = {
 }
 
 /** Alert title when the fork is refused because of step-type write permissions. */
-export const FORK_DENIED_TITLE = 'Cannot fork workflow'
+const FORK_DENIED_TITLE = 'Cannot fork workflow'
 
 type PendingFork = BlockedFork & { kinds: string[] }
 
