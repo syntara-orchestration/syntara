@@ -4,7 +4,6 @@ import {
   createBasicWorkflowViaApi,
   openWorkflowInBuilder,
   publishWorkflowViaApi,
-  triggerLayout,
   verifyNodeVisible,
 } from './helpers/workflows'
 import { createWorkflowViaApi, deleteWorkflowViaApi } from './utils/api'
@@ -14,8 +13,6 @@ import { createWorkflowViaApi, deleteWorkflowViaApi } from './utils/api'
  * include a sub-workflow reference is embedded into another workflow. The copied steps —
  * including the preserved sub-workflow reference — must land on the target canvas, and the
  * dialog must surface that the copy keeps calling the same child workflow.
- *
- * Requested on PR #1417 review (alinabuzachis).
  */
 test.describe('Embed published workflow', () => {
   test('embeds a published source whose steps include a sub-workflow reference', async ({ app }) => {
@@ -96,7 +93,9 @@ test.describe('Embed published workflow', () => {
 
       // Pick the published source.
       await dialog.getByRole('button', { name: 'Select a published workflow' }).click()
-      await dialog.getByRole('option', { name: new RegExp(sourceName) }).click()
+      // PatternFly renders the select menu in a portal outside the dialog, so locate the
+      // option at page level rather than scoping it to the dialog.
+      await app.getByRole('option', { name: new RegExp(sourceName) }).click()
 
       // Preview: the copy summary plus the sub-workflow reference note (the source has a
       // sub_workflow step, so the copy keeps calling the same child workflow). The trigger
@@ -109,11 +108,27 @@ test.describe('Embed published workflow', () => {
       await dialog.getByRole('button', { name: 'Embed workflow' }).click()
       await expect(dialog).not.toBeVisible({ timeout: 10_000 })
 
-      // Fit the canvas so the embedded steps (placed clear of the existing node) are in view.
-      await triggerLayout(app)
+      // The copied steps are visible immediately — BEFORE any Reset layout. A layout reset would
+      // separate the cards and hide the placement regression this assertion is here to catch.
       await verifyNodeVisible(app, 'Source prep')
       await verifyNodeVisible(app, 'Call child')
       await verifyNodeVisible(app, 'Target step')
+
+      // The two copied cards must not land on top of each other (the stacking bug).
+      const node = (name: string) =>
+        app.locator('[role="group"][aria-roledescription="node"]').filter({ hasText: name })
+      const sourceBox = await node('Source prep').boundingBox()
+      const childBox = await node('Call child').boundingBox()
+      expect(sourceBox).not.toBeNull()
+      expect(childBox).not.toBeNull()
+      const overlaps =
+        !!sourceBox &&
+        !!childBox &&
+        sourceBox.x < childBox.x + childBox.width &&
+        sourceBox.x + sourceBox.width > childBox.x &&
+        sourceBox.y < childBox.y + childBox.height &&
+        sourceBox.y + sourceBox.height > childBox.y
+      expect(overlaps).toBe(false)
     } finally {
       // Delete the source first so the child is no longer referenced, then the child and target.
       if (sourceId) await deleteWorkflowViaApi(app, sourceId)

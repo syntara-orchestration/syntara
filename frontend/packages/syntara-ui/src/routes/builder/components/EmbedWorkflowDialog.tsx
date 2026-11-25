@@ -97,6 +97,7 @@ function EmbedPreviewBody({
           <Alert
             variant="danger"
             isInline
+            component="h2"
             title="Embedding is blocked: this workflow references credentials or integrations."
           >
             <Content component="p">
@@ -117,6 +118,7 @@ function EmbedPreviewBody({
           <Alert
             variant="danger"
             isInline
+            component="h2"
             title="Embedding is blocked: this workflow references the workflow you're editing."
           >
             <Content component="p">
@@ -128,7 +130,12 @@ function EmbedPreviewBody({
       )}
       {preview.danglingExpressionRefs.length > 0 && (
         <StackItem>
-          <Alert variant="warning" isInline title="Some expressions reference steps that are not copied.">
+          <Alert
+            variant="warning"
+            isInline
+            component="h2"
+            title="Some expressions reference steps that are not copied."
+          >
             Review the copied steps after embedding; references to excluded trigger steps will need updating.
           </Alert>
         </StackItem>

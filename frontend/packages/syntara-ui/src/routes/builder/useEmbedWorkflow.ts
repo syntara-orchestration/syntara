@@ -30,8 +30,8 @@ const GENERATED_COLS = 4
  * - Copied nodes that carry source coordinates keep their relative layout and are shifted
  *   as a block (D3: keep coordinates, move right of the farthest-right existing step).
  * - Copied nodes with NO source coordinates (e.g. a source saved without canvas positions)
- *   are given a generated grid position so they never collapse onto a single point — the
- *   stacking bug Ana reported. They sit below any coordinate-bearing block.
+ *   are given a generated grid position so they never collapse onto a single point (the
+ *   stacking bug). They sit below any coordinate-bearing block.
  * - When there are no existing nodes and every copied node already has a coordinate, the
  *   source layout is kept verbatim (nothing to sit beside).
  */

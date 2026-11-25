@@ -392,6 +392,38 @@ def _validate_target_workflow(
     return findings
 
 
+def validate_self_referencing_subworkflows(definition: Mapping[str, Any], workflow_id: UUID) -> list[ValidationFinding]:
+    """Reject ``sub_workflow`` steps that directly target the workflow being published.
+
+    A step whose ``workflow_id`` equals the publishing workflow's own id makes the workflow
+    invoke itself -- a direct loop. The offending step is named so the author can fix it. Only the
+    direct self-reference is covered here; indirect/transitive cycles are out of scope.
+    """
+    own_id = str(workflow_id)
+    findings: list[ValidationFinding] = []
+    for node in definition.get("nodes", []):
+        if not isinstance(node, dict) or node.get("type") != NodeType.SUB_WORKFLOW:
+            continue
+        parameters = node.get("parameters")
+        referenced = str(parameters.get("workflow_id") or "") if isinstance(parameters, dict) else ""
+        if referenced and referenced == own_id:
+            node_id = node.get("id")
+            step_name = node.get("name") or node_id or "a sub-workflow step"
+            findings.append(
+                ValidationFinding(
+                    severity=ValidationSeverity.error,
+                    category=ValidationCategory.cycle_detected,
+                    message=(
+                        f'Sub-workflow step "{step_name}" references the workflow it belongs to, which '
+                        f"would make the workflow call itself. Point it at a different published workflow "
+                        f"before publishing."
+                    ),
+                    node_id=node_id if isinstance(node_id, str) else None,
+                )
+            )
+    return findings
+
+
 async def validate_subworkflow_project_references(
     session: AsyncSession,
     workflow_definition: dict[str, Any],

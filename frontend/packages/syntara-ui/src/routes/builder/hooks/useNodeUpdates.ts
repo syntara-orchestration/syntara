@@ -1,6 +1,8 @@
 import { useEffect, useRef } from 'react'
 
 import { FlowNodeType } from '../../../constants'
+import { useWorkflowStore } from '../../../stores/useWorkflowStore'
+import { toPositionKey } from '../../../utils/triggerNodeIds'
 import type { NodeType } from '../../workflows/canvas/nodes/NodeType'
 import type { EdgeType } from '../utils/workflowToGraph'
 
@@ -8,7 +10,12 @@ import type { EdgeType } from '../utils/workflowToGraph'
  * Merges initialNodes with prevNodes, preserving position and measured dimensions
  * for existing nodes and keeping nodes not in initialNodes (e.g. placeholders).
  */
-export function mergeNodesPreservingPositions(prevNodes: NodeType[], initialNodes: NodeType[]): NodeType[] {
+export function mergeNodesPreservingPositions(
+  prevNodes: NodeType[],
+  initialNodes: NodeType[],
+  storedPositions?: Record<string, { x: number; y: number }>,
+  triggers: Array<{ id: string }> = []
+): NodeType[] {
   const prevNodeMap = new Map(prevNodes.map((n) => [n.id, n]))
   const initialNodeIds = new Set(initialNodes.map((n) => n.id))
   const updatedNodes = initialNodes.map((newNode) => {
@@ -24,7 +31,11 @@ export function mergeNodesPreservingPositions(prevNodes: NodeType[], initialNode
       }
       return merged
     }
-    return newNode
+    // A brand-new node adopts its stored position when one exists (e.g. an embedded group whose
+    // layout is written to the store before the nodes render). Without this, a batch of new nodes
+    // falls through to the (0,0) placement that stacks them on one point.
+    const stored = storedPositions?.[toPositionKey(newNode.id, triggers)]
+    return stored ? { ...newNode, position: stored } : newNode
   })
   const preservedNodes = prevNodes.filter((node) => !initialNodeIds.has(node.id))
   return [...updatedNodes, ...preservedNodes]
@@ -132,9 +143,13 @@ export function useNodeUpdates({
       // Notify parent of new nodes
       onNewNodesAdded?.(newNodeIds)
 
-      // Merge new nodes with existing positioned nodes, filtering stale nodes when deletions also occurred
+      // Merge new nodes with existing positioned nodes, filtering stale nodes when deletions also occurred.
+      // Embedded groups write their layout to the store before the nodes render, so pass stored
+      // positions through for new nodes to adopt (see mergeNodesPreservingPositions).
+      const { nodePositions, currentWorkflow } = useWorkflowStore.getState()
+      const storedTriggers = currentWorkflow?.triggers ?? []
       setNodes((prevNodes) => {
-        const merged = mergeNodesPreservingPositions(prevNodes, initialNodes)
+        const merged = mergeNodesPreservingPositions(prevNodes, initialNodes, nodePositions, storedTriggers)
         if (hasDeletedNodes) {
           const validNodeIds = new Set(initialNodes.map((n) => n.id))
           return merged.filter(

@@ -32,6 +32,20 @@ describe('mergeNodesPreservingPositions', () => {
     expect((node2 as { position: { x: number; y: number } }).position).toEqual({ x: 10, y: 20 })
   })
 
+  it('applies a stored position to a brand-new node (embedded group placement)', () => {
+    const prevNodes = [{ id: 'node-1', data: {}, position: { x: 0, y: 0 } }] as never[]
+    const initialNodes = [
+      { id: 'node-1', data: {} },
+      { id: 'copied', data: {}, position: { x: 0, y: 0 } },
+    ] as never[]
+
+    const result = mergeNodesPreservingPositions(prevNodes, initialNodes, { copied: { x: 640, y: 120 } })
+
+    const copied = result.find((n) => (n as { id: string }).id === 'copied')
+    // Without a stored position the node would keep (0,0) and stack; with one it adopts it.
+    expect((copied as { position: { x: number; y: number } }).position).toEqual({ x: 640, y: 120 })
+  })
+
   it('preserves non-initial nodes (like placeholder nodes)', () => {
     const prevNodes = [
       { id: 'node-1', data: {}, position: { x: 0, y: 0 } },
