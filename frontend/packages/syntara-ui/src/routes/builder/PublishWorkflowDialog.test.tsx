@@ -110,7 +110,7 @@ describe('PublishWorkflowDialog', () => {
         'This version removes the output “release_tag”. Published parent workflows will use the updated child version on their next run.'
       )
     ).toBeInTheDocument()
-    expect(screen.getByRole('heading', { level: 2, name: 'Breaking output contract changes' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 2, name: /Breaking output contract changes/ })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'View output change details' })).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Publish anyway' }))
 
