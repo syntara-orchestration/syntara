@@ -23,7 +23,7 @@ import { ENCRYPTED_SENTINEL } from '../credentialConstants'
 import styles from './CredentialFormModal.module.css'
 import type { CredentialFormData } from './credentialFormSchema'
 
-const MASKED_SECRET_PLACEHOLDER = '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022'
+const STORED_VALUE_MASK = '\u2022'.repeat(8)
 
 export type FieldDefinition = {
   id: string
@@ -260,7 +260,7 @@ function SecretField({
           value: displayValue,
           onChange: (_event: React.FormEvent, val: string) => updateSecretValue(val, onValueChange),
           validated,
-          placeholder: isEncryptedPlaceholder ? MASKED_SECRET_PLACEHOLDER : fieldPlaceholder,
+          placeholder: isEncryptedPlaceholder ? STORED_VALUE_MASK : fieldPlaceholder,
           'aria-label': field.label,
         }
         return (
