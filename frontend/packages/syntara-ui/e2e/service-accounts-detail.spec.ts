@@ -73,7 +73,8 @@ test.describe('UI-5: Service Account Detail — View and Edit', () => {
     await modal.getByRole('button', { name: 'Save service account' }).click()
 
     await expect(app.getByText('Service account updated')).toBeVisible()
-    await expect(app.getByRole('heading', { level: 1, name: newName })).toBeVisible()
+    await expect(modal).not.toBeVisible({ timeout: 15_000 })
+    await expect(app.getByTestId('page-header').getByRole('heading', { level: 1, name: newName })).toBeVisible()
 
     // Update sa.name so afterAll cleanup still works (cleanup uses ID, not name)
     sa = { ...sa, name: newName }

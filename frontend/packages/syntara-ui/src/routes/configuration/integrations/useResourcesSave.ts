@@ -4,7 +4,7 @@ import { useCallback, useRef, useState } from 'react'
 
 import { integrationsClient } from '../../../client'
 import { useDirtyFormGuard } from '../../../hooks/useDirtyFormGuard'
-import { useAlerts } from '../../../providers/alerts'
+import { useAlerts } from '../../../providers/alerts/AlertContext'
 import { getErrorMessage } from '../../../utils/apiErrors'
 import { detachPromise } from '../../../utils/detachPromise'
 

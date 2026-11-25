@@ -25,8 +25,8 @@ import {
   RhUiTrashIcon,
 } from '@patternfly/react-icons'
 import { type IdentityProvidersAPI } from '@syntara/contracts'
-import { useNavigate, useParams } from '@tanstack/react-router'
-import { useState, type ReactNode } from 'react'
+import { Outlet, useNavigate, useParams } from '@tanstack/react-router'
+import { createContext, use, useMemo, useState, type ReactNode } from 'react'
 
 import { AppRoute } from '../../../../app/AppRoute'
 import {
@@ -40,9 +40,10 @@ import { IconLabel } from '../../../../components/IconLabel'
 import { SynPage, SynPageBody } from '../../../../components/layout/SynPage'
 import { SynPageHeader } from '../../../../components/layout/SynPageHeader'
 import { SynPanel } from '../../../../components/layout/SynPanel'
-import { SynListPanel, SynListPanelTabs } from '../../../../components/panels/list/SynListPanel'
+import { SynListPanel, SynListPanelTabs, SynListPanelView } from '../../../../components/panels/list/SynListPanel'
 import { ProviderIcon } from '../../../../components/ProviderIcon'
 import { useQueryState } from '../../../../components/states/useQueryState'
+import { SynDetailEditLink } from '../../../../components/SynDetailEditLink'
 import type { KebabAction } from '../../../../components/SynKebabMenu'
 import { SynKebabMenu } from '../../../../components/SynKebabMenu'
 import { SynPageTitle } from '../../../../components/SynPageTitle'
@@ -50,8 +51,7 @@ import { DateCell } from '../../../../components/table/DateCell'
 import { useDeleteAction } from '../../../../hooks/useDeleteAction'
 import { useDialogState } from '../../../../hooks/useDialogState'
 import { useMutationErrorHandler } from '../../../../hooks/useMutationErrorHandler'
-import { useUrlTab } from '../../../../hooks/useUrlTab'
-import { useAlerts } from '../../../../providers/alerts'
+import { useAlerts } from '../../../../providers/alerts/AlertContext'
 import { getErrorStatus } from '../../../../utils/apiErrors'
 import { detachPromise } from '../../../../utils/detachPromise'
 import { useDocLink } from '../../../../utils/docs/useDocLink'
@@ -157,8 +157,9 @@ function ProviderDetailsContent({ provider }: Readonly<{ provider: ProviderData 
   )
 }
 
-type TabContentProps = {
-  activeTab: string
+const GROUP_MAPPING_TAB = 'group-mapping' as const
+
+type IdentityProviderDetailRouteContextValue = {
   provider: ProviderData
   providerId: string
   providerConfig?: ProviderConfig
@@ -166,22 +167,60 @@ type TabContentProps = {
   readOnly: boolean
 }
 
-function TabContent({
-  activeTab,
-  provider,
-  providerId,
-  providerConfig,
-  groupMappingConfig,
-  readOnly,
-}: Readonly<TabContentProps>) {
-  if (activeTab === GROUP_MAPPING_TAB && providerConfig) {
-    return <GroupMappingTab providerId={providerId} groupMapping={groupMappingConfig} readOnly={readOnly} />
-  }
-  return <ProviderDetailsContent provider={provider} />
+const IdentityProviderDetailRouteContext = createContext<IdentityProviderDetailRouteContextValue | null>(null)
+
+function useIdentityProviderDetailRouteContext() {
+  const context = use(IdentityProviderDetailRouteContext)
+  if (!context) throw new Error('Identity provider tab routes must be rendered inside IdentityProviderDetail')
+  return context
 }
 
-const GROUP_MAPPING_TAB = 'group-mapping' as const
-type TabKey = 'details' | typeof GROUP_MAPPING_TAB
+const noop = () => {}
+
+export function IdentityProviderDetailsTabRoute() {
+  const { provider } = useIdentityProviderDetailRouteContext()
+
+  return (
+    <SynListPanelView
+      tabKey="details"
+      tabLabel="Details"
+      isPending={false}
+      error={null}
+      isEmpty={false}
+      hasActiveFilters={false}
+      onRetry={noop}
+      onClearAllFilters={noop}
+      body={<ProviderDetailsContent provider={provider} />}
+    />
+  )
+}
+
+export function IdentityProviderGroupMappingTabRoute() {
+  const { provider, providerId, providerConfig, groupMappingConfig, readOnly } = useIdentityProviderDetailRouteContext()
+  const body = providerConfig ? (
+    <GroupMappingTab providerId={providerId} groupMapping={groupMappingConfig} readOnly={readOnly} />
+  ) : (
+    <ProviderDetailsContent provider={provider} />
+  )
+
+  return (
+    <SynListPanelView
+      tabKey={GROUP_MAPPING_TAB}
+      tabLabel="Group mapping"
+      isPending={false}
+      error={null}
+      isEmpty={false}
+      hasActiveFilters={false}
+      onRetry={noop}
+      onClearAllFilters={noop}
+      body={body}
+    />
+  )
+}
+
+export function IdentityProviderUnknownTabRoute() {
+  return <IdentityProviderDetailsTabRoute />
+}
 
 function IdentityProviderDetailEarlyLayout({ children }: Readonly<{ children: ReactNode }>) {
   return (
@@ -222,13 +261,13 @@ function IdentityProviderDetailToolbar({
   isEnabled,
   kebabActions,
   onToggle,
-  onEdit,
+  editTo,
 }: Readonly<{
   permissions: ReturnType<typeof useIdentityProviderPermissions>
   isEnabled: boolean
   kebabActions: KebabAction[]
   onToggle: () => void
-  onEdit: () => void
+  editTo: string
 }>) {
   return (
     <>
@@ -242,14 +281,9 @@ function IdentityProviderDetailToolbar({
         />
       </DisabledWithTooltip>
       <DisabledWithTooltip isDisabled={!permissions.canUpdate} content={permissions.tooltips.update}>
-        <Button
-          variant="primary"
-          icon={<RhUiEditIcon />}
-          isAriaDisabled={!permissions.canUpdate}
-          onClick={permissions.canUpdate ? onEdit : undefined}
-        >
+        <SynDetailEditLink to={editTo} isAriaDisabled={!permissions.canUpdate}>
           Edit provider
-        </Button>
+        </SynDetailEditLink>
       </DisabledWithTooltip>
       <SynKebabMenu actions={kebabActions} aria-label="Identity provider actions" />
     </>
@@ -305,8 +339,6 @@ export function IdentityProviderDetail() {
     providerId ?? ''
   )
 
-  const [activeTab] = useUrlTab<TabKey>(idpDetailBasePath)
-
   const providerQuery = identityProvidersClient.useQuery(
     'get',
     '/identity_providers/{provider_id}',
@@ -320,14 +352,27 @@ export function IdentityProviderDetail() {
   )
 
   const navigateBack = () => detachPromise(navigate({ to: AppRoute.SystemAdministration.Authentication.Root }))
-  const navigateEdit = () =>
-    detachPromise(
-      navigate({
-        to: AppRoute.SystemAdministration.Authentication.EditIdentityProvider.replace(':providerId', providerId ?? ''),
-      })
-    )
+  const editProviderPath = AppRoute.SystemAdministration.Authentication.EditIdentityProvider.replace(
+    ':providerId',
+    providerId ?? ''
+  )
 
   const providerData = providerQuery.data
+  const config = providerData?.configuration
+  const groupMappingConfig = useMemo(() => buildGroupMappingConfig(config), [config])
+  const detailRouteContextValue = useMemo<IdentityProviderDetailRouteContextValue | null>(
+    () =>
+      providerData
+        ? {
+            provider: providerData,
+            providerId: providerId ?? '',
+            providerConfig: config,
+            groupMappingConfig,
+            readOnly: !canUpdate,
+          }
+        : null,
+    [providerData, providerId, config, groupMappingConfig, canUpdate]
+  )
   const refetchProvider = providerQuery.refetch
 
   const {
@@ -414,14 +459,12 @@ export function IdentityProviderDetail() {
     return <IdentityProviderDetailEarlyLayout>{queryState}</IdentityProviderDetailEarlyLayout>
   }
 
-  if (!providerData) return null
+  if (!providerData || !detailRouteContextValue) return null
 
   const idpDetailCrumbs = breadcrumbsIdentityProviderDetail(providerData.name ?? 'Identity provider')
 
-  const config = providerData.configuration
   const idpType = config?.idp_type
   const idpTypeLabel = identityProviderTypeDisplayLabel(idpType)
-  const groupMappingConfig = buildGroupMappingConfig(config)
   const mappingCount = identityProviderDetailMappingCount(groupMappingConfig)
 
   return (
@@ -449,21 +492,16 @@ export function IdentityProviderDetail() {
             isEnabled={providerData.enabled ?? false}
             kebabActions={kebabActions}
             onToggle={() => handleToggle(providerData)}
-            onEdit={navigateEdit}
+            editTo={editProviderPath}
           />
         }
       />
       <SynPageBody>
         <SynListPanel>
           <IdentityProviderDetailTabStrip basePath={idpDetailBasePath} mappingCount={mappingCount} />
-          <TabContent
-            activeTab={activeTab}
-            provider={providerData}
-            providerId={providerId ?? ''}
-            providerConfig={config}
-            groupMappingConfig={groupMappingConfig}
-            readOnly={!canUpdate}
-          />
+          <IdentityProviderDetailRouteContext.Provider value={detailRouteContextValue}>
+            <Outlet />
+          </IdentityProviderDetailRouteContext.Provider>
         </SynListPanel>
       </SynPageBody>
       <IdentityProviderDeleteDialog

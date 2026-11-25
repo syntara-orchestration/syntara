@@ -18,7 +18,7 @@ import { SynForm } from '../../components/forms/SynForm'
 import { SynTextField } from '../../components/forms/SynTextField'
 import { useProjectSelector } from '../../hooks/useProjectSelector'
 import { useSynForm } from '../../hooks/useSynForm'
-import { useAlerts } from '../../providers/alerts'
+import { useAlerts } from '../../providers/alerts/AlertContext'
 import { detachPromise } from '../../utils/detachPromise'
 import {
   MAX_WORKFLOW_IMPORT_FILE_SIZE_BYTES,

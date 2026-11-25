@@ -1,7 +1,7 @@
 import { EdgeHandleEnum } from '@syntara/contracts'
 import type { ReactFlowInstance, Node } from '@xyflow/react'
 
-import { FlowNodeType } from '../../../constants'
+import { FlowNodeType } from '../../../constants/nodeTypes'
 import { generateUUID } from '../../../utils/generateUUID'
 import type { OnAddNodeFromEdge } from '../types'
 

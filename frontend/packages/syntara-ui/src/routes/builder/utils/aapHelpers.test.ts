@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
-import type { AAPJobTemplateFormData } from '../node-forms/aapJobTemplateSchema'
-import type { AAPWorkflowTemplateFormData } from '../node-forms/aapWorkflowTemplateSchema'
+import type { AAPJobTemplateFormData } from '../step-forms/aapJobTemplateSchema'
+import type { AAPWorkflowTemplateFormData } from '../step-forms/aapWorkflowTemplateSchema'
 
 import {
   buildAAPConfig,

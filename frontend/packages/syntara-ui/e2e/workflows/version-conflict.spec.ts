@@ -15,13 +15,13 @@
 
 import { type Page, test, expect, toAppUrl } from '../fixtures'
 import { createWorkflowViaApi, deleteWorkflowViaApi, simulateConcurrentSave } from '../helpers/workflow-versions'
-import { buildUniqueName, deleteWorkflow, addScriptNode } from '../helpers/workflows'
+import { buildUniqueName, deleteWorkflow, addScriptStep } from '../helpers/workflows'
 
 async function openBuilderAndMakeChange(app: Page, workflowId: string) {
   await app.goto(toAppUrl(`/workflow-builder/${workflowId}`))
   await expect(app.getByPlaceholder('Workflow name')).toBeVisible({ timeout: 15_000 })
 
-  await addScriptNode(app, 'Local Change', 'print("local")')
+  await addScriptStep(app, 'Local Change', 'print("local")')
 }
 
 test.describe('Concurrent Edit Conflict Detection @pr-check', () => {

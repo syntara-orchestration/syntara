@@ -8,10 +8,10 @@
 
 1. [The Big Picture](#the-big-picture)
 2. [How Data Flows](#how-data-flows)
-3. [Store State Structure](#store-state-structure)
-4. [Common Operations](#common-operations)
-5. [Best Practices](#best-practices)
-6. [Testing](#testing)
+3. [Store Architecture](#store-architecture)
+4. [Using the Store](#using-the-store)
+5. [Common Pitfalls & Solutions](#common-pitfalls-solutions)
+6. [Testing Components with Store](#testing-components-with-store)
 
 ---
 
@@ -782,7 +782,8 @@ packages/syntara-ui/src/lib/websocket/store.ts
 **Usage pattern:**
 
 ```tsx
-import { useWebSocket, WebSocketChannel } from '../../lib/websocket'
+import { useWebSocket } from '../../lib/websocket/hooks'
+import { WebSocketChannel } from '../../lib/websocket/channels'
 
 function ChatComponent() {
   const { connectionState, isConnected, sendRaw } = useWebSocket(WebSocketChannel.Chat, {

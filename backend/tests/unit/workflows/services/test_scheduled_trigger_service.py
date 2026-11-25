@@ -967,6 +967,14 @@ class TestListWorkflowSchedulesOptimized:
         client.list_schedules.assert_called_once_with()
 
 
+def _unmapped_search_attribute_error() -> RPCError:
+    return RPCError(
+        "Namespace default has no mapping defined for search attribute OrchestratorWorkflowId",
+        RPCStatusCode.INVALID_ARGUMENT,
+        b"",
+    )
+
+
 class TestCreateScheduleWithSearchAttributes:
     """Tests for _create_or_update_schedule with search attributes."""
 
@@ -1028,6 +1036,58 @@ class TestCreateScheduleWithSearchAttributes:
 
         call_kwargs = client.create_schedule.call_args[1]
         assert call_kwargs["search_attributes"] is None
+
+    async def test_create_retries_until_search_attribute_mapping_propagates(self) -> None:
+        """Should retry create_schedule while a just-registered attribute is not yet resolvable."""
+        client = _make_mock_client(search_attr_available=True)
+        client.create_schedule = AsyncMock(side_effect=[_unmapped_search_attribute_error(), None])
+        service = ScheduledTriggerService(temporal_client=client)
+        definition = _make_workflow_definition(triggers=[_make_scheduled_trigger("trigger_1")])
+
+        with patch("syntara.workflows.services.scheduled_trigger_service.asyncio.sleep", new=AsyncMock()) as mock_sleep:
+            count = await service.sync_scheduled_triggers(
+                workflow_id="wf-123",
+                workflow_definition=definition,
+            )
+
+        assert count == 1
+        assert client.create_schedule.await_count == 2
+        mock_sleep.assert_awaited_once()
+
+    async def test_create_gives_up_when_search_attribute_mapping_never_propagates(self) -> None:
+        """Should surface a sync error once the propagation budget is spent."""
+        client = _make_mock_client(search_attr_available=True)
+        client.create_schedule = AsyncMock(side_effect=_unmapped_search_attribute_error())
+        service = ScheduledTriggerService(temporal_client=client)
+        definition = _make_workflow_definition(triggers=[_make_scheduled_trigger("trigger_1")])
+
+        with (
+            patch.object(_mod, "_SEARCH_ATTR_PROPAGATION_TIMEOUT_SECONDS", 0.0),
+            pytest.raises(ScheduledTriggerSyncError),
+        ):
+            await service.sync_scheduled_triggers(
+                workflow_id="wf-123",
+                workflow_definition=definition,
+            )
+
+        client.create_schedule.assert_awaited_once()
+
+    async def test_create_does_not_retry_other_invalid_argument_errors(self) -> None:
+        """Should fail immediately on INVALID_ARGUMENT errors unrelated to the search attribute."""
+        client = _make_mock_client(search_attr_available=True)
+        client.create_schedule = AsyncMock(
+            side_effect=RPCError("invalid schedule spec", RPCStatusCode.INVALID_ARGUMENT, b""),
+        )
+        service = ScheduledTriggerService(temporal_client=client)
+        definition = _make_workflow_definition(triggers=[_make_scheduled_trigger("trigger_1")])
+
+        with pytest.raises(ScheduledTriggerSyncError):
+            await service.sync_scheduled_triggers(
+                workflow_id="wf-123",
+                workflow_definition=definition,
+            )
+
+        client.create_schedule.assert_awaited_once()
 
 
 class TestGetSharedClient:

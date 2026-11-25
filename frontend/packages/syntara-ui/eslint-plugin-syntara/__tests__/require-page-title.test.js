@@ -30,6 +30,15 @@ ruleTester.run('syntara/require-page-title', rule, {
         }
       `,
     },
+    // Locally named default export with a title
+    {
+      code: `
+        function MyPage() {
+          return <title>My Page | Syntara</title>
+        }
+        export { MyPage as default }
+      `,
+    },
     // Page component with a raw <title> element — also accepted
     {
       code: `
@@ -96,6 +105,16 @@ ruleTester.run('syntara/require-page-title', rule, {
           </div>
         )
         export default MyPage
+      `,
+      errors: [{ messageId: 'missingTitle' }],
+    },
+    // Locally named default export missing a title
+    {
+      code: `
+        function MyPage() {
+          return <h1>My Page</h1>
+        }
+        export { MyPage as default }
       `,
       errors: [{ messageId: 'missingTitle' }],
     },

@@ -1,12 +1,69 @@
-import type { Activity } from '@syntara/contracts'
+import { ActivityTypeEnum, EdgeHandleEnum, type Activity } from '@syntara/contracts'
 
 import type { EdgeConnection } from '../../../types/edge'
 import { getUpstreamNodeIds } from '../../edgeHelpers'
 import type { ValidationContext, ValidationError } from '../types'
 
-// Keep in sync with BUILTIN_SCOPES in backend/src/syntara/workflows/validators/template_expressions.py
-const KNOWN_NAMESPACES = new Set(['trigger', 'workflow_context'])
+// Keep in sync with BUILTIN_SCOPES in backend/src/syntara/workflows/validators/template_expressions.py.
+// The loop scope is handled separately because it is only valid in loop bodies.
+const KNOWN_NAMESPACES = new Set(['trigger', 'workflow_context', 'loop'])
 const VARIABLE_REF_PATTERN = /\$\{([^}]+)\}/g
+
+type LoopBodyGraph = {
+  adjacency: Map<string, string[]>
+  feedbackEdges: Set<string>
+  iterateSuccessorsByLoop: Map<string, string[]>
+}
+
+function buildLoopBodyGraph(edges: EdgeConnection[], loopNodeIds: Set<string>): LoopBodyGraph {
+  const adjacency = new Map<string, string[]>()
+  const feedbackEdges = new Set<string>()
+  const iterateSuccessorsByLoop = new Map<string, string[]>()
+
+  for (const edge of edges) {
+    if (edge.targetHandle === EdgeHandleEnum.END) {
+      feedbackEdges.add(`${edge.source}->${edge.target}`)
+      continue
+    }
+    adjacency.set(edge.source, [...(adjacency.get(edge.source) ?? []), edge.target])
+    if (loopNodeIds.has(edge.source) && edge.sourceHandle === EdgeHandleEnum.LOOP) {
+      iterateSuccessorsByLoop.set(edge.source, [...(iterateSuccessorsByLoop.get(edge.source) ?? []), edge.target])
+    }
+  }
+
+  return { adjacency, feedbackEdges, iterateSuccessorsByLoop }
+}
+
+function collectLoopBody(loopId: string, seeds: string[], graph: LoopBodyGraph, loopBodyNodeIds: Set<string>): void {
+  const queue = [...seeds]
+  while (queue.length > 0) {
+    const nodeId = queue.shift()
+    if (nodeId === undefined || loopBodyNodeIds.has(nodeId) || nodeId === loopId) continue
+    loopBodyNodeIds.add(nodeId)
+    for (const successor of graph.adjacency.get(nodeId) ?? []) {
+      if (!graph.feedbackEdges.has(`${nodeId}->${successor}`)) queue.push(successor)
+    }
+  }
+}
+
+/**
+ * Identifies nodes inside a loop body, mirroring the backend's
+ * `_identify_loop_body_nodes` in template_expressions.py: walks edges from each
+ * loop node's `loop` (iterate) handle via BFS, stopping at feedback edges back
+ * to the loop (`targetHandle === EdgeHandleEnum.END`).
+ */
+function identifyLoopBodyNodeIds(activities: Activity[], edges: EdgeConnection[]): Set<string> {
+  const loopNodeIds = new Set(activities.filter((a) => a.type === ActivityTypeEnum.LOOP).map((a) => a.id))
+  if (loopNodeIds.size === 0) return new Set()
+
+  const graph = buildLoopBodyGraph(edges, loopNodeIds)
+  const loopBodyNodeIds = new Set<string>()
+  for (const [loopId, seeds] of graph.iterateSuccessorsByLoop) {
+    collectLoopBody(loopId, seeds, graph, loopBodyNodeIds)
+  }
+
+  return loopBodyNodeIds
+}
 
 type VariableReference = {
   namespace: string
@@ -112,6 +169,7 @@ type RefContext = {
   schemaSuggestion: string
   referenceTargetIds: Set<string>
   upstreamIds: Set<string>
+  loopBodyIds: Set<string>
 }
 
 function validateRef(ref: VariableReference, activity: Activity, ctx: RefContext): ValidationError | null {
@@ -123,6 +181,18 @@ function validateRef(ref: VariableReference, activity: Activity, ctx: RefContext
       namespace: ref.namespace,
       suggestionText: ctx.schemaSuggestion,
     })
+  if (ref.namespace === 'loop') {
+    if (ctx.loopBodyIds.has(activity.id)) return null
+
+    return {
+      id: `var-ref-loop-${activity.id}`,
+      severity: 'error',
+      rule: 'variable-references',
+      message: `Step "${activity.name ?? activity.id}" references \${${ref.fullRef}} but loop scope is only available inside a loop body`,
+      nodeId: activity.id,
+      suggestion: 'Move the step into a loop body before referencing loop.item or loop.index',
+    }
+  }
   if (KNOWN_NAMESPACES.has(ref.namespace)) return null
   return checkNodeReference(ref, activity, ctx.referenceTargetIds, ctx.upstreamIds)
 }
@@ -140,15 +210,19 @@ export function validateVariableReferences(
   const schemaFields = getWorkflowInputNames(context?.triggers)
   const available = [...schemaFields].sort((a, b) => a.localeCompare(b)).join(', ')
   const schemaSuggestion = available ? `Available fields: ${available}` : 'Define fields in the trigger configuration'
+  const loopBodyIds = identifyLoopBodyNodeIds(activities, edges)
 
   for (const activity of activities) {
     const paramStrings = collectStringValues(activity.parameters)
     const refs = paramStrings.flatMap(extractVariableReferences)
     if (refs.length === 0) continue
 
-    const needsUpstream = refs.some((ref) => !KNOWN_NAMESPACES.has(ref.namespace))
+    const inLoopBody = loopBodyIds.has(activity.id)
+    const needsUpstream = refs.some(
+      (ref) => !KNOWN_NAMESPACES.has(ref.namespace) && !(ref.namespace === 'loop' && inLoopBody)
+    )
     const upstreamIds = needsUpstream ? getUpstreamNodeIds(activity.id, edges) : new Set<string>()
-    const ctx: RefContext = { schemaFields, schemaSuggestion, referenceTargetIds, upstreamIds }
+    const ctx: RefContext = { schemaFields, schemaSuggestion, referenceTargetIds, upstreamIds, loopBodyIds }
 
     for (const ref of refs) {
       const error = validateRef(ref, activity, ctx)

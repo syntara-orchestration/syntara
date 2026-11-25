@@ -1,0 +1,57 @@
+.breadcrumb {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.breadcrumb :global(.pf-v6-c-breadcrumb__list) {
+  flex-wrap: nowrap;
+  width: 100%;
+  min-width: 0;
+}
+
+/* Parent crumbs shrink and ellipsize so a long linked segment cannot push the trail off-screen. */
+.breadcrumb :global(.pf-v6-c-breadcrumb__item:not(:last-child)) {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: min(30vw, 12rem);
+  overflow: hidden;
+}
+
+/* Current page: take remaining space but cap width so ellipsis appears before the page title. */
+.breadcrumb :global(.pf-v6-c-breadcrumb__item:last-child) {
+  min-width: 0;
+  flex: 1 1 0%;
+  max-width: min(40vw, 16rem);
+  overflow: hidden;
+}
+
+.breadcrumb :global(.pf-v6-c-breadcrumb__item) :global(.pf-v6-c-truncate) {
+  min-width: 0;
+  max-width: 100%;
+}
+
+/*
+ * PatternFly Truncate defaults to min-width 6ch on the root and __start span.
+ * Short labels (e.g. "Users") then leave empty space before the next chevron.
+ * Variables on .truncatedLabel inherit into __start/__end; keep max-width for ellipsis.
+ */
+.truncatedLabel {
+  --pf-v6-c-truncate--MinWidth: 0;
+  --pf-v6-c-truncate__start--MinWidth: 0;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.truncatedLabel :global(.pf-v6-c-truncate__start),
+.truncatedLabel :global(.pf-v6-c-truncate__end) {
+  min-width: 0;
+}
+
+.segmentLink {
+  min-width: 0;
+  max-width: 100%;
+  display: inline-block;
+  vertical-align: bottom;
+}

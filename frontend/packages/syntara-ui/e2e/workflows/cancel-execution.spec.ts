@@ -21,9 +21,8 @@ import {
   ensureProject,
   getAuthToken,
   pollExecutionStatus,
+  TERMINAL_STATUSES,
 } from '../utils/api'
-
-const TERMINAL_STATUSES = ['completed', 'failed', 'cancelled']
 
 let sleepWorkflowId: string | null = null
 let runningExecutionId: string | null = null
