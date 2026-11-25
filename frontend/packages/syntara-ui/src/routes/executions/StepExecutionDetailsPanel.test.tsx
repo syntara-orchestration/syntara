@@ -88,6 +88,57 @@ describe('StepExecutionDetailsPanel', () => {
     expect(screen.getByText(/"VM provisioned successfully"/)).toBeInTheDocument()
   })
 
+  describe('pane layout', () => {
+    it('expanding parameters hides the output pane', async () => {
+      const user = userEvent.setup()
+      render(<StepExecutionDetailsPanel {...defaultProps} />, { wrapper })
+
+      await user.click(screen.getByRole('button', { name: 'Expand parameters panel' }))
+
+      expect(screen.getByText('Parameters')).toBeInTheDocument()
+      expect(screen.queryByText('Output')).not.toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Restore parameters panel layout', pressed: true })).toBeInTheDocument()
+    })
+
+    it('expanding output hides the parameters pane', async () => {
+      const user = userEvent.setup()
+      render(<StepExecutionDetailsPanel {...defaultProps} />, { wrapper })
+
+      await user.click(screen.getByRole('button', { name: 'Expand output panel' }))
+
+      expect(screen.getByText('Output')).toBeInTheDocument()
+      expect(screen.queryByText('Parameters')).not.toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Restore output panel layout', pressed: true })).toBeInTheDocument()
+    })
+
+    it('restores split layout from an expanded parameters pane', async () => {
+      const user = userEvent.setup()
+      render(<StepExecutionDetailsPanel {...defaultProps} />, { wrapper })
+
+      await user.click(screen.getByRole('button', { name: 'Expand parameters panel' }))
+      await user.click(screen.getByRole('button', { name: 'Restore parameters panel layout' }))
+
+      expect(screen.getByText('Parameters')).toBeInTheDocument()
+      expect(screen.getByText('Output')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Expand parameters panel' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Expand output panel' })).toBeInTheDocument()
+    })
+
+    it('resets to split layout when stepId changes', async () => {
+      const user = userEvent.setup()
+      const { rerender } = render(<StepExecutionDetailsPanel {...defaultProps} />, { wrapper })
+
+      await user.click(screen.getByRole('button', { name: 'Expand parameters panel' }))
+      expect(screen.queryByText('Output')).not.toBeInTheDocument()
+
+      rerender(<StepExecutionDetailsPanel {...defaultProps} stepId="provision_disk" stepName="Provision disk" />)
+
+      expect(screen.getByText('Parameters')).toBeInTheDocument()
+      expect(screen.getByText('Output')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Expand parameters panel' })).toBeInTheDocument()
+    })
+  })
+
   it('renders schema view when switching to Schema', async () => {
     const user = userEvent.setup()
     render(<StepExecutionDetailsPanel {...defaultProps} />, { wrapper })
