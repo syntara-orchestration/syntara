@@ -15,8 +15,12 @@ describe('executionRefetchInterval', () => {
     expect(executionRefetchInterval({ state: { data: { status: 'running' } } })).toBe(3000)
   })
 
-  it('returns false when status is paused (uses WebSocket instead)', () => {
+  it('returns false when status is paused and the live stream is healthy', () => {
     expect(executionRefetchInterval({ state: { data: { status: 'paused' } } })).toBe(false)
+  })
+
+  it('returns 3000 when status is paused and the live stream is stale', () => {
+    expect(executionRefetchInterval({ state: { data: { status: 'paused' } } }, true)).toBe(3000)
   })
 
   it('returns false when status is completed', () => {

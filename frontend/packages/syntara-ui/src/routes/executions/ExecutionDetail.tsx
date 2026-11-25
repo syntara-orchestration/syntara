@@ -294,6 +294,8 @@ export default function ExecutionDetail() {
 
   useResetOnExecutionChange(executionId)
 
+  const isStreamStale = useExecutionStore((state) => state.isStale)
+
   const executionQuery = executionsClient.useQuery(
     'get',
     '/executions/{execution_id}',
@@ -306,10 +308,11 @@ export default function ExecutionDetail() {
       },
       enabled: !!executionId,
     },
-    { refetchInterval: executionRefetchInterval }
+    { refetchInterval: (query) => executionRefetchInterval(query, isStreamStale) }
   )
 
-  const execution = useExecutionWithLiveStatus(executionQuery.data)
+  const executionWithLiveStatus = useExecutionWithLiveStatus(executionQuery.data)
+  const execution = isStreamStale ? executionQuery.data : executionWithLiveStatus
 
   useExecutionStreaming(executionId, execution)
 
