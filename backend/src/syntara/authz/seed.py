@@ -279,7 +279,7 @@ async def _seed_assignments_and_admin(
     else:
         # Resync the password hash to the currently mounted secret. A prior
         # failed deployment may have seeded the admin user with a password
-        # from a K8s secret that no longer exists after redeploy (AAP-89793).
+        # from a K8s secret that no longer exists after redeploy.
         current_password_hash = _read_admin_password_hash()
         if current_password_hash is not None and admin_user.password_hash != current_password_hash:
             admin_user.password_hash = current_password_hash
@@ -287,7 +287,7 @@ async def _seed_assignments_and_admin(
                 "Resynced bootstrap admin password from current secret",
                 user_id=str(admin_user.id),
             )
-        # Existing installs seeded before AAP-87627 had email=NULL in JWTs.
+        # Existing installs seeded before the placeholder email had email=NULL in JWTs.
         if admin_user.email is None and await try_set_bootstrap_admin_email(session, admin_user):
             logger.info(
                 "Backfilled bootstrap admin email placeholder",

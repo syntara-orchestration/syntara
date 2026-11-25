@@ -1,4 +1,4 @@
-"""Tests for bootstrap admin email seeding (AAP-87627)."""
+"""Tests for bootstrap admin email seeding."""
 
 from __future__ import annotations
 
@@ -138,7 +138,7 @@ async def test_seed_preserves_existing_admin_email() -> None:
 
 @pytest.mark.asyncio
 async def test_seed_resyncs_password_for_existing_admin_from_current_secret() -> None:
-    """Redeploy must sync the admin password to the current secret file (AAP-89793).
+    """Redeploy must sync the admin password to the current secret file.
 
     Reproduces the reported bug: when the admin user already exists in the
     database (e.g. left over from a prior failed deployment whose seeding
@@ -155,11 +155,11 @@ async def test_seed_resyncs_password_for_existing_admin_from_current_secret() ->
         email="admin@example.com",
         is_enabled=True,
         is_builtin=True,
-        password_hash="stale-hash-from-failed-deployment",
+        password_hash="stale-hash-from-failed-deployment",  # noqa: S106
     )
     session = _mock_seed_session(admin=admin)
 
-    current_secret_hash = "hash-of-current-deployments-secret"
+    current_secret_hash = "hash-of-current-deployments-secret"  # noqa: S105
     with patch("syntara.authz.seed._read_admin_password_hash", return_value=current_secret_hash):
         await _run_seed(session)
 
