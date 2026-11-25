@@ -105,7 +105,7 @@ describe('usePublishWorkflow', () => {
 
     expect(mockPublishMutate).toHaveBeenCalledWith(
       {
-        params: { path: { workflow_id: 'wf-123', version: 3 } },
+        params: { path: { workflow_id: 'wf-123', version: 3 }, query: { confirm: false } },
         body: { name: 'v1.0', change_description: null },
       },
       expect.objectContaining({

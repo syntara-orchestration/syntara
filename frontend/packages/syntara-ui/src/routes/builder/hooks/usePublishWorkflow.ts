@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useCallback, useState } from 'react'
 
 import { workflowClient } from '../../../client'
+import { useTriggerRemovalPublishConfirm } from '../../../hooks/useTriggerRemovalPublishConfirm'
 import { useAlerts } from '../../../providers/alerts'
 import { useWorkflowStore } from '../../../stores/useWorkflowStore'
 import { extractVersionConflictInfo, getErrorMessage, isWorkflowVersionConflictError } from '../../../utils/apiErrors'
@@ -12,7 +13,7 @@ import type { ConflictInfo } from '../VersionConflictDialog'
 
 import { useOutputContractReview } from './useOutputContractReview'
 
-function isWorkflowQuery(query: Query): boolean {
+export function isWorkflowQuery(query: Query): boolean {
   return (
     query.queryKey[0] === 'get' && typeof query.queryKey[1] === 'string' && query.queryKey[1].startsWith('/workflows')
   )
@@ -42,6 +43,13 @@ type PendingPublish = {
   version: number
   expectedVersion?: number
   workflowDefinition?: Record<string, unknown>
+  /**
+   * Trigger-removal confirmation computed at publish() time (from the publish form). Carried here so
+   * a publish routed through the output-contract-change dialog keeps it: confirmPublish passes it to
+   * publishNow instead of defaulting to false, so one informed confirmation covers both the contract
+   * change and the trigger removal rather than surfacing a second trigger-removal dialog afterwards.
+   */
+  confirm?: boolean
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -69,6 +77,7 @@ export function usePublishWorkflow({
 }: UsePublishWorkflowOptions) {
   const queryClient = useQueryClient()
   const { showSuccess, showError, showWarning } = useAlerts()
+  const { guardPublishError, triggerRemovalConfirmDialog } = useTriggerRemovalPublishConfirm()
   const {
     breakingChanges,
     contractChanges,
@@ -96,40 +105,61 @@ export function usePublishWorkflow({
   )
 
   const publishNow = useCallback(
-    (pending: PendingPublish) => {
-      publishMutation(
-        {
-          params: { path: { workflow_id: workflowId ?? '', version: pending.version } },
-          body: {
-            name: pending.publishName ?? null,
-            change_description: pending.description ?? null,
-            ...(pending.workflowDefinition ? { workflow_definition: pending.workflowDefinition } : {}),
-            ...(pending.expectedVersion != null ? { expected_version: pending.expectedVersion } : {}),
+    (pending: PendingPublish, confirm = false) => {
+      // `attempt` is hoisted, so onError can retry with confirm=true after a trigger-removal 409
+      // without capturing the memoized callback (which React Compiler disallows).
+      function attempt(useConfirm: boolean) {
+        publishMutation(
+          {
+            params: {
+              path: { workflow_id: workflowId ?? '', version: pending.version },
+              query: { confirm: useConfirm },
+            },
+            body: {
+              name: pending.publishName ?? null,
+              change_description: pending.description ?? null,
+              ...(pending.workflowDefinition ? { workflow_definition: pending.workflowDefinition } : {}),
+              ...(pending.expectedVersion != null ? { expected_version: pending.expectedVersion } : {}),
+            },
           },
-        },
-        {
-          onSuccess: (data) => {
-            if (data.warning) {
-              showWarning({ title: 'Workflow published with warnings', description: data.warning })
-            } else {
-              showSuccess({ title: 'Workflow published' })
-            }
-            if (useWorkflowStore.getState().isDirty) useWorkflowStore.getState().markClean()
-            if (data?.current_version != null) onVersionUpdated?.(data.current_version)
-            detachPromise(queryClient.invalidateQueries({ predicate: isWorkflowQuery }))
-          },
-          onError: (error: unknown) => {
-            if (isWorkflowVersionConflictError(error) && onConflict) {
-              onConflict(extractVersionConflictInfo(error))
-              return
-            }
-            showError({ title: 'Failed to publish workflow', description: getErrorMessage(error) })
-          },
-          onSettled: pending.onSettled,
-        }
-      )
+          {
+            onSuccess: (data) => {
+              if (data.warning) {
+                showWarning({ title: 'Workflow published with warnings', description: data.warning })
+              } else {
+                showSuccess({ title: 'Workflow published' })
+              }
+              if (useWorkflowStore.getState().isDirty) useWorkflowStore.getState().markClean()
+              if (data?.current_version != null) onVersionUpdated?.(data.current_version)
+              detachPromise(queryClient.invalidateQueries({ predicate: isWorkflowQuery }))
+            },
+            onError: (error: unknown) => {
+              if (isWorkflowVersionConflictError(error) && onConflict) {
+                onConflict(extractVersionConflictInfo(error))
+                return
+              }
+              // Trigger-removal fallback: on a 409 that publishing would remove a Subworkflow Trigger a
+              // published parent uses, confirm and retry with confirm=true.
+              if (guardPublishError(error, () => attempt(true))) return
+              showError({ title: 'Failed to publish workflow', description: getErrorMessage(error) })
+            },
+            onSettled: pending.onSettled,
+          }
+        )
+      }
+      attempt(confirm)
     },
-    [workflowId, publishMutation, showWarning, showSuccess, onVersionUpdated, queryClient, onConflict, showError]
+    [
+      workflowId,
+      publishMutation,
+      showWarning,
+      showSuccess,
+      onVersionUpdated,
+      queryClient,
+      onConflict,
+      showError,
+      guardPublishError,
+    ]
   )
 
   const publish = useCallback(
@@ -137,23 +167,25 @@ export function usePublishWorkflow({
       publishName?: string,
       description?: string,
       onSettled?: () => void,
-      callOptions?: { expectedVersionOverride?: number; versionOverride?: number }
+      callOptions?: { expectedVersionOverride?: number; versionOverride?: number; confirm?: boolean }
     ) => {
       const versionToPublish = callOptions?.versionOverride ?? currentVersion
       if (!workflowId || versionToPublish == null) return
 
       const workflowDefinition = getCurrentWorkflowDefinition(workflowName, workflowDescription)
       const expectedVersion = callOptions?.expectedVersionOverride ?? optionsExpectedVersion
+      const confirm = callOptions?.confirm ?? false
       const pending: PendingPublish = {
         publishName,
         description,
         onSettled,
         version: versionToPublish,
         workflowDefinition,
+        confirm,
         ...(expectedVersion != null ? { expectedVersion } : {}),
       }
       if (!workflowDefinition) {
-        publishNow(pending)
+        publishNow(pending, confirm)
         return
       }
       clearContractReview()
@@ -168,7 +200,7 @@ export function usePublishWorkflow({
             return
           }
           setPendingPublish(null)
-          publishNow(pending)
+          publishNow(pending, confirm)
         })
       )
     },
@@ -189,7 +221,9 @@ export function usePublishWorkflow({
     const pending = pendingPublish
     clearContractReview()
     setPendingPublish(null)
-    publishNow(pending)
+    // Preserve the trigger-removal confirm computed at publish() time so confirming the
+    // output-contract change also covers a trigger removal the user already acknowledged.
+    publishNow(pending, pending.confirm ?? false)
   }, [pendingPublish, clearContractReview, publishNow])
 
   const cancelBreakingChangeWarning = useCallback(() => {
@@ -207,6 +241,7 @@ export function usePublishWorkflow({
     confirmPublish,
     cancelBreakingChangeWarning,
     reviewOutputContract,
+    triggerRemovalConfirmDialog,
   }
 }
 

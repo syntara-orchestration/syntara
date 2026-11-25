@@ -27,6 +27,9 @@ vi.mock('../../../client', () => ({
   executionsClient: {
     useQuery: vi.fn(() => ({ data: undefined, isLoading: false })),
   },
+  workflowClient: {
+    useQuery: vi.fn(() => ({ data: undefined, isLoading: false, error: null })),
+  },
   authMiddleware: { onRequest: vi.fn() },
   interfaceTagMiddleware: { onRequest: vi.fn() },
 }))
