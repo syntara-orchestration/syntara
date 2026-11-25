@@ -473,12 +473,14 @@ describe('TriggerStepForm Component', () => {
       expect(screen.queryByLabelText('Schedule expression')).not.toBeInTheDocument()
     })
 
-    it('shows EDA webhook activation alert', () => {
+    it('shows EDA activation alert with rulebook and job template guidance', () => {
       renderWithHeader(
         <TriggerStepForm onSubmit={mockOnSubmit} initialData={{ triggerType: TriggerTypeEnum.EDA_TRIGGER }} />
       )
 
       expect(screen.getByText('EDA activation')).toBeInTheDocument()
+      expect(screen.getByText(/configure a rulebook activation to run a job template/i)).toBeInTheDocument()
+      expect(screen.getByText(/playbook sends the event payload to this endpoint/i)).toBeInTheDocument()
     })
 
     it('auto-generates a valid webhook path for new EDA triggers', () => {
@@ -565,9 +567,7 @@ describe('TriggerStepForm Component', () => {
       expect(results).toHaveNoViolations()
     })
 
-    it('tells users to configure a job template rather than an EDA rulebook for the endpoint URL', async () => {
-      // Until an EDA action plugin exists, rulebooks cannot POST directly to this endpoint —
-      // only a job template invoking it can, so the help text must not mention rulebooks.
+    it('describes the EDA integration flow in the endpoint URL help', async () => {
       const user = userEvent.setup()
       renderWithHeader(
         <TriggerStepForm onSubmit={mockOnSubmit} initialData={{ triggerType: TriggerTypeEnum.EDA_TRIGGER }} />
@@ -576,8 +576,9 @@ describe('TriggerStepForm Component', () => {
       await user.click(screen.getByRole('button', { name: 'Endpoint URL help' }))
 
       const helpDialog = screen.getByRole('dialog', { name: 'Endpoint URL help' })
-      expect(within(helpDialog).queryByText(/rulebook/i)).not.toBeInTheDocument()
-      expect(within(helpDialog).getByText(/job template/i)).toBeInTheDocument()
+      expect(within(helpDialog).getByText(/rulebook activation runs a job template/i)).toBeInTheDocument()
+      expect(within(helpDialog).getByText(/playbook sends a POST request with the event payload/i)).toBeInTheDocument()
+      expect(within(helpDialog).queryByText(/rulebook to send a POST/i)).not.toBeInTheDocument()
     })
   })
 })

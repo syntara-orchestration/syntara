@@ -22,8 +22,9 @@ export function EdaFields() {
       <StackItem>
         <Alert variant="info" isInline title="EDA activation" component="h4">
           <Content component={ContentVariants.p}>
-            This trigger will only take effect once the workflow is published. Copy the endpoint URL into your EDA
-            rulebook configuration.
+            This trigger will only take effect once the workflow is published. In Event-Driven Ansible, configure a
+            rulebook activation to run a job template when a rule matches an event. The job template&apos;s playbook
+            sends the event payload to this endpoint.
           </Content>
         </Alert>
       </StackItem>
@@ -47,7 +48,7 @@ export function EdaFields() {
         urlLabel={
           <FormLabelWithHelp
             label="Endpoint URL"
-            helpText="Your EDA webhook endpoint. Configure a job template to send a POST request to this URL. Click the copy icon to capture the full URL."
+            helpText="This is your Event-Driven Ansible webhook endpoint. When a rule matches an event, the rulebook activation runs a job template whose playbook sends a POST request with the event payload to this URL. Click the copy icon to copy the full URL."
           />
         }
       />
