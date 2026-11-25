@@ -468,6 +468,47 @@ export function getValidationFieldErrors(error: unknown): ApiValidationFieldErro
   return out
 }
 
+/** A finding inside a publish-validation (409) problem response's `validation_result`. */
+type PublishValidationFinding = { message?: unknown; severity?: unknown }
+
+/** Locate the `validation_result.findings` array across the common error wrappers. */
+function extractPublishValidationFindings(error: unknown): PublishValidationFinding[] | undefined {
+  if (!error || typeof error !== 'object') return undefined
+  const err = error as ApiError
+  const candidates: unknown[] = [error, err.cause, err.data]
+  for (const candidate of candidates) {
+    if (!candidate || typeof candidate !== 'object') continue
+    const result = (candidate as { validation_result?: unknown }).validation_result
+    const findings = result && typeof result === 'object' ? (result as { findings?: unknown }).findings : undefined
+    if (Array.isArray(findings) && findings.length > 0) return findings as PublishValidationFinding[]
+  }
+  return undefined
+}
+
+/**
+ * Builds a user-facing message from a publish-validation (409) response's findings, so the toast
+ * names the offending step(s) instead of a generic 'validation errors or warnings'. Blocking
+ * errors are surfaced before warnings and the list is capped to stay readable. Returns null when
+ * no findings are present, so callers fall back to the generic message.
+ */
+export function getPublishValidationMessage(error: unknown): string | null {
+  const findings = extractPublishValidationFindings(error)
+  if (!findings) return null
+  const messages = findings
+    .map((finding) =>
+      typeof finding.message === 'string' && finding.message
+        ? { message: finding.message, isError: finding.severity === 'error' }
+        : null
+    )
+    .filter((entry): entry is { message: string; isError: boolean } => entry !== null)
+  if (messages.length === 0) return null
+  // Blocking errors first, then warnings; de-duplicate and keep the toast short.
+  const ordered = [...messages].sort((a, b) => Number(b.isError) - Number(a.isError))
+  const unique = [...new Set(ordered.map((entry) => entry.message))]
+  const shown = unique.slice(0, 3).join(' ')
+  return sanitizeUserFacingErrorText(unique.length > 3 ? `${shown} (+${unique.length - 3} more)` : shown)
+}
+
 /**
  * Extracts the RFC 9457 error code from an API error.
  *

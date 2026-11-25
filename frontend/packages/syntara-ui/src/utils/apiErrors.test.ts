@@ -5,6 +5,7 @@ import {
   getErrorMessage,
   getErrorStatus,
   getErrorTitle,
+  getPublishValidationMessage,
   getValidationFieldErrors,
   isAdminConfigurationError,
   isConflictError,
@@ -445,6 +446,49 @@ describe('apiErrors', () => {
         expect(error.current_version).toBe(5)
         expect(error.created_by_username).toBe('alice')
       }
+    })
+  })
+
+  describe('getPublishValidationMessage', () => {
+    it('names the offending step from publish-validation findings', () => {
+      const error = {
+        detail: 'Cannot publish a workflow version with validation errors or warnings',
+        validation_result: {
+          findings: [
+            { message: 'Sub-workflow step "Sub-workflow" references the workflow it belongs to.', severity: 'error' },
+          ],
+        },
+      }
+      expect(getPublishValidationMessage(error)).toBe(
+        'Sub-workflow step "Sub-workflow" references the workflow it belongs to.'
+      )
+    })
+
+    it('reads findings wrapped under cause (openapi-fetch)', () => {
+      const error = {
+        cause: { validation_result: { findings: [{ message: 'Step X is invalid', severity: 'error' }] } },
+      }
+      expect(getPublishValidationMessage(error)).toBe('Step X is invalid')
+    })
+
+    it('surfaces blocking errors before warnings and caps the list', () => {
+      const error = {
+        validation_result: {
+          findings: [
+            { message: 'warn one', severity: 'warning' },
+            { message: 'err one', severity: 'error' },
+            { message: 'err two', severity: 'error' },
+            { message: 'err three', severity: 'error' },
+          ],
+        },
+      }
+      expect(getPublishValidationMessage(error)).toBe('err one err two err three (+1 more)')
+    })
+
+    it('returns null when there are no findings, so callers use the generic message', () => {
+      expect(getPublishValidationMessage({ detail: 'something else' })).toBeNull()
+      expect(getPublishValidationMessage({ validation_result: { findings: [] } })).toBeNull()
+      expect(getPublishValidationMessage(null)).toBeNull()
     })
   })
 })
