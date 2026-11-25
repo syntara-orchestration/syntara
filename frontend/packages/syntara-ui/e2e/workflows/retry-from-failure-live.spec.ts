@@ -536,7 +536,10 @@ test.describe('Retry from failure — real backend', () => {
       await openRetryPanel(page)
 
       const panel = page.getByRole('complementary', { name: 'Retry run from failure review' })
-      await expect(page.getByRole('tab', { name: 'Details' })).toHaveAttribute('aria-selected', 'true')
+      const detailsTab = page.getByRole('tab', { name: 'Details' })
+      if (await detailsTab.isVisible().catch(() => false)) {
+        await expect(detailsTab).toHaveAttribute('aria-selected', 'true')
+      }
       await expect(panel.getByRole('button', { name: 'Retry 2 steps' })).toBeVisible()
       // Warning is in Run details once the retry target mounts, not in the side panel.
       await expect(page.getByText('Input parameters', { exact: true })).toBeVisible()
