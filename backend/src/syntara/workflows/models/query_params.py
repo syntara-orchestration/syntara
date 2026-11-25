@@ -43,10 +43,11 @@ class WorkflowUsedByListParams(SQLModel):
     )
     trigger_node_ids: list[str] | None = PydanticField(
         default=None,
+        max_length=50,
         description=(
             "When set, only parents whose published definition invokes one of these child "
-            "Subworkflow Trigger nodes are returned. Repeat the parameter for multiple triggers; "
-            "the result counts each affected parent once."
+            "Subworkflow Trigger nodes are returned (max 50). Repeat the parameter for multiple "
+            "triggers; the result counts each affected parent once."
         ),
         json_schema_extra={"x-query-param": True},
     )

@@ -100,7 +100,7 @@ async def test_delete_referenced_requires_confirmation(
     assert body["code"] == "WORKFLOW_REFERENCED_CONFIRMATION_REQUIRED"
     assert body["referencing_count"] == 1
     assert resp.headers["content-type"].startswith("application/problem+json")
-    # Conforms to the specialized schema (detects a missing/renamed count field or wrong code).
+    # Parses as the confirmation model (count present as a positive int).
     WorkflowReferencedConfirmationProblem.model_validate(body)
     # The referencing parent's identity must not leak in the confirmation response.
     assert str(parent) not in resp.text
@@ -153,8 +153,8 @@ async def test_delete_blocked_by_active_executions_is_generic_409(
 ) -> None:
     """An active-executions 409 is a generic conflict with no referencing_count.
 
-    Exercises the ErrorData branch of the delete 409 ``anyOf``: the specialized confirmation schema
-    must not claim unrelated conflicts.
+    The delete 409 is a single model (WorkflowReferencedConfirmationProblem) whose count is
+    optional, so a generic conflict validates against it while simply omitting referencing_count.
     """
     project_id = UUID(str(test_project_id))
     wf = await _publish(
@@ -183,4 +183,4 @@ async def test_delete_blocked_by_active_executions_is_generic_409(
     assert resp.headers["content-type"].startswith("application/problem+json")
     body = resp.json()
     assert body["code"] == "ACTIVE_EXECUTIONS_BLOCK_DELETION"
-    assert "referencing_count" not in body  # generic branch, not the specialized confirmation schema
+    assert "referencing_count" not in body  # generic conflict: the optional count is omitted

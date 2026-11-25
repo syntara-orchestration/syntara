@@ -20,7 +20,6 @@ from syntara.authz.dependencies import PermissionChecker, VisibilityFilter
 from syntara.authz.engine import VisibilityResult
 from syntara.core.database.session import get_db
 from syntara.core.models import User
-from syntara.core.models.error import ErrorData
 from syntara.core.syntara_router import NO_PERMISSION, SyntaraRouter
 from syntara.workflows.error_handlers import (
     WorkflowPublishTriggerRemovalConfirmationProblem,
@@ -457,7 +456,7 @@ async def update_workflow(
     response_description="Workflow deleted",
     responses={
         status.HTTP_409_CONFLICT: {
-            "model": WorkflowReferencedConfirmationProblem | ErrorData,
+            "model": WorkflowReferencedConfirmationProblem,
             "description": (
                 "Conflict. When the workflow is referenced by published parents the body is a "
                 "WorkflowReferencedConfirmationProblem (carrying referencing_count); resend with "
@@ -716,7 +715,7 @@ async def check_subworkflow_output_contract_changes(
     response_description="Published workflow version",
     responses={
         status.HTTP_409_CONFLICT: {
-            "model": WorkflowPublishTriggerRemovalConfirmationProblem | ErrorData,
+            "model": WorkflowPublishTriggerRemovalConfirmationProblem,
             "description": (
                 "Conflict. When publishing removes a Subworkflow Trigger invoked by published "
                 "parents the body is a WorkflowPublishTriggerRemovalConfirmationProblem (carrying "

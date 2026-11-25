@@ -3,7 +3,7 @@
 This module provides error handling for workflow and execution-specific exceptions.
 """
 
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING
 
 import structlog
 from fastapi import Request, status
@@ -67,10 +67,8 @@ class WorkflowReferencedConfirmationProblem(ErrorData):
     ``WorkflowReferencedConfirmationProblem`` in the OpenAPI spec so generated clients type the field.
     """
 
-    code: Literal["WORKFLOW_REFERENCED_CONFIRMATION_REQUIRED"] = PydanticField(
-        description="Machine-readable error code; fixed for this problem type.",
-    )
-    referencing_count: int = PydanticField(
+    referencing_count: int | None = PydanticField(
+        default=None,
         ge=1,
         description="Distinct published parents that reference this workflow and would be affected by deletion.",
     )
@@ -83,10 +81,8 @@ class WorkflowPublishTriggerRemovalConfirmationProblem(ErrorData):
     disclosed). Mirrors ``WorkflowPublishTriggerRemovalConfirmationProblem`` in the OpenAPI spec.
     """
 
-    code: Literal["WORKFLOW_PUBLISH_TRIGGER_REMOVAL_CONFIRMATION_REQUIRED"] = PydanticField(
-        description="Machine-readable error code; fixed for this problem type.",
-    )
-    affected_count: int = PydanticField(
+    affected_count: int | None = PydanticField(
+        default=None,
         ge=1,
         description="Distinct published parents that invoke a Subworkflow Trigger removed by this publish.",
     )

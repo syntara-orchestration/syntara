@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any, Literal, TypeVar, cast
+from typing import Any, TypeVar, cast
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
@@ -20,32 +20,29 @@ class WorkflowReferencedConfirmationProblem:
     ``WorkflowReferencedConfirmationProblem`` in the OpenAPI spec so generated clients type the field.
 
         Attributes:
-            code (Literal['WORKFLOW_REFERENCED_CONFIRMATION_REQUIRED']): Machine-readable error code; fixed for this problem
-                type.
+            code (str): Machine-readable error code for programmatic handling
             detail (str): Human-readable explanation specific to this occurrence
-            referencing_count (int): Distinct published parents that reference this workflow and would be affected by
-                deletion.
             retryable (bool): Whether this error can be retried by creating a new invocation
             title (str): Short, human-readable summary of the problem
             type_ (str): URI reference identifying the problem type
             instance (None | str | Unset): Optional URI reference identifying the specific occurrence
+            referencing_count (int | None | Unset): Distinct published parents that reference this workflow and would be
+                affected by deletion.
     """
 
-    code: Literal["WORKFLOW_REFERENCED_CONFIRMATION_REQUIRED"]
+    code: str
     detail: str
-    referencing_count: int
     retryable: bool
     title: str
     type_: str
     instance: None | str | Unset = UNSET
+    referencing_count: int | None | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         code = self.code
 
         detail = self.detail
-
-        referencing_count = self.referencing_count
 
         retryable = self.retryable
 
@@ -59,13 +56,18 @@ class WorkflowReferencedConfirmationProblem:
         else:
             instance = self.instance
 
+        referencing_count: int | None | Unset
+        if isinstance(self.referencing_count, Unset):
+            referencing_count = UNSET
+        else:
+            referencing_count = self.referencing_count
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
             {
                 "code": code,
                 "detail": detail,
-                "referencing_count": referencing_count,
                 "retryable": retryable,
                 "title": title,
                 "type": type_,
@@ -73,19 +75,17 @@ class WorkflowReferencedConfirmationProblem:
         )
         if instance is not UNSET:
             field_dict["instance"] = instance
+        if referencing_count is not UNSET:
+            field_dict["referencing_count"] = referencing_count
 
         return field_dict
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         d = dict(src_dict)
-        code = cast(Literal["WORKFLOW_REFERENCED_CONFIRMATION_REQUIRED"], d.pop("code"))
-        if code != "WORKFLOW_REFERENCED_CONFIRMATION_REQUIRED":
-            raise ValueError(f"code must match const 'WORKFLOW_REFERENCED_CONFIRMATION_REQUIRED', got '{code}'")
+        code = d.pop("code")
 
         detail = d.pop("detail")
-
-        referencing_count = d.pop("referencing_count")
 
         retryable = d.pop("retryable")
 
@@ -102,14 +102,23 @@ class WorkflowReferencedConfirmationProblem:
 
         instance = _parse_instance(d.pop("instance", UNSET))
 
+        def _parse_referencing_count(data: object) -> int | None | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(int | None | Unset, data)
+
+        referencing_count = _parse_referencing_count(d.pop("referencing_count", UNSET))
+
         workflow_referenced_confirmation_problem = cls(
             code=code,
             detail=detail,
-            referencing_count=referencing_count,
             retryable=retryable,
             title=title,
             type_=type_,
             instance=instance,
+            referencing_count=referencing_count,
         )
 
         workflow_referenced_confirmation_problem.additional_properties = d

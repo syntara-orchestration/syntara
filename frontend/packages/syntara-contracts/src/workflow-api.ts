@@ -937,10 +937,10 @@ export interface components {
     WorkflowReferencedConfirmationProblem: {
       /**
        * Code
-       * @description Machine-readable error code; fixed for this problem type.
-       * @constant
+       * @description Machine-readable error code for programmatic handling
+       * @example RATE_LIMIT_EXCEEDED
        */
-      code: 'WORKFLOW_REFERENCED_CONFIRMATION_REQUIRED'
+      code: string
       /**
        * Detail
        * @description Human-readable explanation specific to this occurrence
@@ -957,7 +957,7 @@ export interface components {
        * Referencing Count
        * @description Distinct published parents that reference this workflow and would be affected by deletion.
        */
-      referencing_count: number
+      referencing_count?: number | null
       /**
        * Retryable
        * @description Whether this error can be retried by creating a new invocation
@@ -1005,13 +1005,13 @@ export interface components {
        * Affected Count
        * @description Distinct published parents that invoke a Subworkflow Trigger removed by this publish.
        */
-      affected_count: number
+      affected_count?: number | null
       /**
        * Code
-       * @description Machine-readable error code; fixed for this problem type.
-       * @constant
+       * @description Machine-readable error code for programmatic handling
+       * @example RATE_LIMIT_EXCEEDED
        */
-      code: 'WORKFLOW_PUBLISH_TRIGGER_REMOVAL_CONFIRMATION_REQUIRED'
+      code: string
       /**
        * Detail
        * @description Human-readable explanation specific to this occurrence
@@ -3175,8 +3175,7 @@ export interface operations {
           [name: string]: unknown
         }
         content: {
-          'application/problem+json':
-            components['schemas']['WorkflowReferencedConfirmationProblem'] | components['schemas']['ErrorData']
+          'application/problem+json': components['schemas']['WorkflowReferencedConfirmationProblem']
         }
       }
       422: components['responses']['ValidationError']
@@ -3493,9 +3492,7 @@ export interface operations {
           [name: string]: unknown
         }
         content: {
-          'application/problem+json':
-            | components['schemas']['WorkflowPublishTriggerRemovalConfirmationProblem']
-            | components['schemas']['ErrorData']
+          'application/problem+json': components['schemas']['WorkflowPublishTriggerRemovalConfirmationProblem']
         }
       }
       422: components['responses']['ValidationError']

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any, Literal, TypeVar, cast
+from typing import Any, TypeVar, cast
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
@@ -19,28 +19,26 @@ class WorkflowPublishTriggerRemovalConfirmationProblem:
     disclosed). Mirrors ``WorkflowPublishTriggerRemovalConfirmationProblem`` in the OpenAPI spec.
 
         Attributes:
-            affected_count (int): Distinct published parents that invoke a Subworkflow Trigger removed by this publish.
-            code (Literal['WORKFLOW_PUBLISH_TRIGGER_REMOVAL_CONFIRMATION_REQUIRED']): Machine-readable error code; fixed for
-                this problem type.
+            code (str): Machine-readable error code for programmatic handling
             detail (str): Human-readable explanation specific to this occurrence
             retryable (bool): Whether this error can be retried by creating a new invocation
             title (str): Short, human-readable summary of the problem
             type_ (str): URI reference identifying the problem type
+            affected_count (int | None | Unset): Distinct published parents that invoke a Subworkflow Trigger removed by
+                this publish.
             instance (None | str | Unset): Optional URI reference identifying the specific occurrence
     """
 
-    affected_count: int
-    code: Literal["WORKFLOW_PUBLISH_TRIGGER_REMOVAL_CONFIRMATION_REQUIRED"]
+    code: str
     detail: str
     retryable: bool
     title: str
     type_: str
+    affected_count: int | None | Unset = UNSET
     instance: None | str | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        affected_count = self.affected_count
-
         code = self.code
 
         detail = self.detail
@@ -50,6 +48,12 @@ class WorkflowPublishTriggerRemovalConfirmationProblem:
         title = self.title
 
         type_ = self.type_
+
+        affected_count: int | None | Unset
+        if isinstance(self.affected_count, Unset):
+            affected_count = UNSET
+        else:
+            affected_count = self.affected_count
 
         instance: None | str | Unset
         if isinstance(self.instance, Unset):
@@ -61,7 +65,6 @@ class WorkflowPublishTriggerRemovalConfirmationProblem:
         field_dict.update(self.additional_properties)
         field_dict.update(
             {
-                "affected_count": affected_count,
                 "code": code,
                 "detail": detail,
                 "retryable": retryable,
@@ -69,6 +72,8 @@ class WorkflowPublishTriggerRemovalConfirmationProblem:
                 "type": type_,
             }
         )
+        if affected_count is not UNSET:
+            field_dict["affected_count"] = affected_count
         if instance is not UNSET:
             field_dict["instance"] = instance
 
@@ -77,13 +82,7 @@ class WorkflowPublishTriggerRemovalConfirmationProblem:
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         d = dict(src_dict)
-        affected_count = d.pop("affected_count")
-
-        code = cast(Literal["WORKFLOW_PUBLISH_TRIGGER_REMOVAL_CONFIRMATION_REQUIRED"], d.pop("code"))
-        if code != "WORKFLOW_PUBLISH_TRIGGER_REMOVAL_CONFIRMATION_REQUIRED":
-            raise ValueError(
-                f"code must match const 'WORKFLOW_PUBLISH_TRIGGER_REMOVAL_CONFIRMATION_REQUIRED', got '{code}'"
-            )
+        code = d.pop("code")
 
         detail = d.pop("detail")
 
@@ -92,6 +91,15 @@ class WorkflowPublishTriggerRemovalConfirmationProblem:
         title = d.pop("title")
 
         type_ = d.pop("type")
+
+        def _parse_affected_count(data: object) -> int | None | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(int | None | Unset, data)
+
+        affected_count = _parse_affected_count(d.pop("affected_count", UNSET))
 
         def _parse_instance(data: object) -> None | str | Unset:
             if data is None:
@@ -103,12 +111,12 @@ class WorkflowPublishTriggerRemovalConfirmationProblem:
         instance = _parse_instance(d.pop("instance", UNSET))
 
         workflow_publish_trigger_removal_confirmation_problem = cls(
-            affected_count=affected_count,
             code=code,
             detail=detail,
             retryable=retryable,
             title=title,
             type_=type_,
+            affected_count=affected_count,
             instance=instance,
         )
 

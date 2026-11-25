@@ -26132,10 +26132,7 @@ paths:
           content:
             application/problem+json:
               schema:
-                anyOf:
-                  - $ref: '#/components/schemas/WorkflowReferencedConfirmationProblem'
-                  - $ref: '#/components/schemas/ErrorData'
-                title: Response 409 Delete Workflow
+                $ref: '#/components/schemas/WorkflowReferencedConfirmationProblem'
         '422':
           description: Validation Error
           content:
@@ -26775,6 +26772,7 @@ paths:
               - type: array
                 items:
                   type: string
+                maxItems: 50
               - type: 'null'
             x-query-param: true
             title: Trigger Node Ids
@@ -27242,10 +27240,7 @@ paths:
           content:
             application/problem+json:
               schema:
-                anyOf:
-                  - $ref: '#/components/schemas/WorkflowPublishTriggerRemovalConfirmationProblem'
-                  - $ref: '#/components/schemas/ErrorData'
-                title: Response 409 Publish Workflow Version
+                $ref: '#/components/schemas/WorkflowPublishTriggerRemovalConfirmationProblem'
         '422':
           description: Validation Error
           content:
@@ -36631,8 +36626,11 @@ components:
           type: https://api.example.com/errors/timeout-error
       properties:
         code:
-          const: WORKFLOW_REFERENCED_CONFIRMATION_REQUIRED
-          description: Machine-readable error code; fixed for this problem type.
+          description: Machine-readable error code for programmatic handling
+          examples:
+            - RATE_LIMIT_EXCEEDED
+          maxLength: 100
+          minLength: 1
           title: Code
           type: string
         detail:
@@ -36653,10 +36651,12 @@ components:
             - /invocations/550e8400-e29b-41d4-a716-446655440000
           title: Instance
         referencing_count:
+          anyOf:
+            - minimum: 1.0
+              type: integer
+            - type: 'null'
           description: Distinct published parents that reference this workflow and would be affected by deletion.
-          minimum: 1.0
           title: Referencing Count
-          type: integer
         retryable:
           description: Whether this error can be retried by creating a new invocation
           examples:
@@ -36685,7 +36685,6 @@ components:
         - detail
         - code
         - retryable
-        - referencing_count
       title: WorkflowReferencedConfirmationProblem
       type: object
     WorkflowPublishTriggerRemovalConfirmationProblem:
@@ -36709,13 +36708,18 @@ components:
           type: https://api.example.com/errors/timeout-error
       properties:
         affected_count:
+          anyOf:
+            - minimum: 1.0
+              type: integer
+            - type: 'null'
           description: Distinct published parents that invoke a Subworkflow Trigger removed by this publish.
-          minimum: 1.0
           title: Affected Count
-          type: integer
         code:
-          const: WORKFLOW_PUBLISH_TRIGGER_REMOVAL_CONFIRMATION_REQUIRED
-          description: Machine-readable error code; fixed for this problem type.
+          description: Machine-readable error code for programmatic handling
+          examples:
+            - RATE_LIMIT_EXCEEDED
+          maxLength: 100
+          minLength: 1
           title: Code
           type: string
         detail:
@@ -36763,7 +36767,6 @@ components:
         - detail
         - code
         - retryable
-        - affected_count
       title: WorkflowPublishTriggerRemovalConfirmationProblem
       type: object
     WorkflowUsedByResponse:

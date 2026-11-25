@@ -37022,15 +37022,7 @@
             "content": {
               "application/problem+json": {
                 "schema": {
-                  "anyOf": [
-                    {
-                      "$ref": "#/components/schemas/WorkflowReferencedConfirmationProblem"
-                    },
-                    {
-                      "$ref": "#/components/schemas/ErrorData"
-                    }
-                  ],
-                  "title": "Response 409 Delete Workflow"
+                  "$ref": "#/components/schemas/WorkflowReferencedConfirmationProblem"
                 }
               }
             }
@@ -37966,7 +37958,8 @@
                   "type": "array",
                   "items": {
                     "type": "string"
-                  }
+                  },
+                  "maxItems": 50
                 },
                 {
                   "type": "null"
@@ -38643,15 +38636,7 @@
             "content": {
               "application/problem+json": {
                 "schema": {
-                  "anyOf": [
-                    {
-                      "$ref": "#/components/schemas/WorkflowPublishTriggerRemovalConfirmationProblem"
-                    },
-                    {
-                      "$ref": "#/components/schemas/ErrorData"
-                    }
-                  ],
-                  "title": "Response 409 Publish Workflow Version"
+                  "$ref": "#/components/schemas/WorkflowPublishTriggerRemovalConfirmationProblem"
                 }
               }
             }
@@ -52362,8 +52347,12 @@
         ],
         "properties": {
           "code": {
-            "const": "WORKFLOW_REFERENCED_CONFIRMATION_REQUIRED",
-            "description": "Machine-readable error code; fixed for this problem type.",
+            "description": "Machine-readable error code for programmatic handling",
+            "examples": [
+              "RATE_LIMIT_EXCEEDED"
+            ],
+            "maxLength": 100,
+            "minLength": 1,
             "title": "Code",
             "type": "string"
           },
@@ -52394,10 +52383,17 @@
             "title": "Instance"
           },
           "referencing_count": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "description": "Distinct published parents that reference this workflow and would be affected by deletion.",
-            "minimum": 1.0,
-            "title": "Referencing Count",
-            "type": "integer"
+            "title": "Referencing Count"
           },
           "retryable": {
             "description": "Whether this error can be retried by creating a new invocation",
@@ -52433,8 +52429,7 @@
           "title",
           "detail",
           "code",
-          "retryable",
-          "referencing_count"
+          "retryable"
         ],
         "title": "WorkflowReferencedConfirmationProblem",
         "type": "object"
@@ -52461,14 +52456,25 @@
         ],
         "properties": {
           "affected_count": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "description": "Distinct published parents that invoke a Subworkflow Trigger removed by this publish.",
-            "minimum": 1.0,
-            "title": "Affected Count",
-            "type": "integer"
+            "title": "Affected Count"
           },
           "code": {
-            "const": "WORKFLOW_PUBLISH_TRIGGER_REMOVAL_CONFIRMATION_REQUIRED",
-            "description": "Machine-readable error code; fixed for this problem type.",
+            "description": "Machine-readable error code for programmatic handling",
+            "examples": [
+              "RATE_LIMIT_EXCEEDED"
+            ],
+            "maxLength": 100,
+            "minLength": 1,
             "title": "Code",
             "type": "string"
           },
@@ -52532,8 +52538,7 @@
           "title",
           "detail",
           "code",
-          "retryable",
-          "affected_count"
+          "retryable"
         ],
         "title": "WorkflowPublishTriggerRemovalConfirmationProblem",
         "type": "object"

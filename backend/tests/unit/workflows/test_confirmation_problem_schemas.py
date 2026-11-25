@@ -7,6 +7,11 @@ Two independent checks are kept distinct:
   ``jsonschema``) accepts/rejects the same bodies, independent of the Pydantic models.
 
 A consistency test pins the two representations together so they cannot silently drift.
+
+Per Helen's review on PR #1318, each confirmation model is the *single* model for every 409 the
+endpoint returns: ``code`` is inherited from ``ErrorData`` (any 409 code validates) and the count
+is optional, so generic 409 bodies (active executions, version conflict) validate against the same
+schema. Only an out-of-range count (< 1) is rejected.
 """
 
 from __future__ import annotations
@@ -62,17 +67,20 @@ class TestOpenAPISchemaConformance:
         Draft202012Validator.check_schema(schema)
         Draft202012Validator(schema).validate({**_base_body(_REF_CODE), "referencing_count": 2})
 
+    def test_generic_referenced_body_conforms(self) -> None:
+        """A generic 409 (any code, no count) validates against the single model (count is optional)."""
+        schema = _published_schema("WorkflowReferencedConfirmationProblem")
+        Draft202012Validator(schema).validate(_base_body("ACTIVE_EXECUTIONS_BLOCK_DELETION"))
+
     @pytest.mark.parametrize(
         "body",
         [
-            _base_body(_REF_CODE),
             {**_base_body(_REF_CODE), "referencing_count": 0},
             {**_base_body(_REF_CODE), "referencing_count": -1},
-            {**_base_body("SOMETHING_ELSE"), "referencing_count": 2},
-            {**_base_body(_REF_CODE), "affected_count": 2},
         ],
     )
     def test_malformed_referenced_body_rejected(self, body: dict[str, Any]) -> None:
+        """Only an out-of-range count is rejected now; code is generic and the count is optional."""
         schema = _published_schema("WorkflowReferencedConfirmationProblem")
         with pytest.raises(jsonschema.ValidationError):
             Draft202012Validator(schema).validate(body)
@@ -81,13 +89,16 @@ class TestOpenAPISchemaConformance:
         schema = _published_schema("WorkflowPublishTriggerRemovalConfirmationProblem")
         Draft202012Validator(schema).validate({**_base_body(_PUB_CODE), "affected_count": 1})
 
+    def test_generic_publish_body_conforms(self) -> None:
+        """A generic 409 (any code, no count) validates against the single model (count is optional)."""
+        schema = _published_schema("WorkflowPublishTriggerRemovalConfirmationProblem")
+        Draft202012Validator(schema).validate(_base_body("WORKFLOW_VERSION_CONFLICT"))
+
     @pytest.mark.parametrize(
         "body",
         [
-            _base_body(_PUB_CODE),
             {**_base_body(_PUB_CODE), "affected_count": 0},
             {**_base_body(_PUB_CODE), "affected_count": -3},
-            {**_base_body("SOMETHING_ELSE"), "affected_count": 1},
         ],
     )
     def test_malformed_publish_body_rejected(self, body: dict[str, Any]) -> None:
@@ -95,60 +106,74 @@ class TestOpenAPISchemaConformance:
         with pytest.raises(jsonschema.ValidationError):
             Draft202012Validator(schema).validate(body)
 
-    def test_generic_conflict_matches_errordata_not_specialized(self) -> None:
-        """An unrelated 409 body (no count) conforms to the generic ErrorData branch, not the specialized schema."""
+    def test_generic_conflict_conforms_to_both_shapes(self) -> None:
+        """A generic 409 body (no count) validates against both ErrorData and the single 409 model."""
         shared = yaml.safe_load(_SHARED.read_text())
         error_data = shared["components"]["schemas"]["ErrorData"]
         generic = _base_body("ACTIVE_EXECUTIONS_BLOCK_DELETION")
         Draft202012Validator(error_data).validate(generic)
-        with pytest.raises(jsonschema.ValidationError):
-            Draft202012Validator(_published_schema("WorkflowReferencedConfirmationProblem")).validate(generic)
+        Draft202012Validator(_published_schema("WorkflowReferencedConfirmationProblem")).validate(generic)
 
 
 class TestModelConformance:
-    """Negative Pydantic model validation (distinct from the OpenAPI conformance above)."""
+    """Pydantic model validation (distinct from the OpenAPI conformance above)."""
 
     @pytest.mark.parametrize(
         "body",
         [
-            _base_body(_REF_CODE),
             {**_base_body(_REF_CODE), "referencing_count": 0},
             {**_base_body(_REF_CODE), "referencing_count": -1},
-            {**_base_body("WRONG_CODE"), "referencing_count": 2},
         ],
     )
-    def test_referenced_model_rejects_malformed(self, body: dict[str, Any]) -> None:
+    def test_referenced_model_rejects_out_of_range_count(self, body: dict[str, Any]) -> None:
         with pytest.raises(ValidationError):
             WorkflowReferencedConfirmationProblem.model_validate(body)
 
+    def test_referenced_model_accepts_generic_body(self) -> None:
+        """A generic 409 body (any code, no count) is accepted by the single model."""
+        WorkflowReferencedConfirmationProblem.model_validate(_base_body("ACTIVE_EXECUTIONS_BLOCK_DELETION"))
+
     @pytest.mark.parametrize(
         "body",
         [
-            _base_body(_PUB_CODE),
             {**_base_body(_PUB_CODE), "affected_count": 0},
-            {**_base_body("WRONG_CODE"), "affected_count": 1},
+            {**_base_body(_PUB_CODE), "affected_count": -3},
         ],
     )
-    def test_publish_model_rejects_malformed(self, body: dict[str, Any]) -> None:
+    def test_publish_model_rejects_out_of_range_count(self, body: dict[str, Any]) -> None:
         with pytest.raises(ValidationError):
             WorkflowPublishTriggerRemovalConfirmationProblem.model_validate(body)
+
+    def test_publish_model_accepts_generic_body(self) -> None:
+        WorkflowPublishTriggerRemovalConfirmationProblem.model_validate(_base_body("WORKFLOW_VERSION_CONFLICT"))
 
 
 class TestModelOpenAPIConsistency:
     """Pin the Pydantic models and the published OpenAPI schemas together so they cannot drift."""
 
+    @staticmethod
+    def _int_branch_minimum(prop: dict[str, Any]) -> float | None:
+        for branch in prop.get("anyOf", []):
+            if branch.get("type") == "integer":
+                return branch.get("minimum")
+        return None
+
     def test_referenced_constraints_match(self) -> None:
         subspec = yaml.safe_load(_SUBSPEC.read_text())
         schema = subspec["components"]["schemas"]["WorkflowReferencedConfirmationProblem"]
-        assert schema["properties"]["code"]["const"] == _REF_CODE
-        assert "referencing_count" in schema["required"]
-        assert schema["properties"]["referencing_count"]["minimum"] == 1
-        assert WorkflowReferencedConfirmationProblem.model_fields["referencing_count"].is_required()
+        # code is inherited from ErrorData (generic string), not a fixed literal/const.
+        assert "const" not in schema["properties"]["code"]
+        assert schema["properties"]["code"]["type"] == "string"
+        # the count is optional (not required) and nullable, with the >=1 bound on the int branch.
+        assert "referencing_count" not in schema.get("required", [])
+        assert self._int_branch_minimum(schema["properties"]["referencing_count"]) == 1
+        assert not WorkflowReferencedConfirmationProblem.model_fields["referencing_count"].is_required()
 
     def test_publish_constraints_match(self) -> None:
         subspec = yaml.safe_load(_SUBSPEC.read_text())
         schema = subspec["components"]["schemas"]["WorkflowPublishTriggerRemovalConfirmationProblem"]
-        assert schema["properties"]["code"]["const"] == _PUB_CODE
-        assert "affected_count" in schema["required"]
-        assert schema["properties"]["affected_count"]["minimum"] == 1
-        assert WorkflowPublishTriggerRemovalConfirmationProblem.model_fields["affected_count"].is_required()
+        assert "const" not in schema["properties"]["code"]
+        assert schema["properties"]["code"]["type"] == "string"
+        assert "affected_count" not in schema.get("required", [])
+        assert self._int_branch_minimum(schema["properties"]["affected_count"]) == 1
+        assert not WorkflowPublishTriggerRemovalConfirmationProblem.model_fields["affected_count"].is_required()

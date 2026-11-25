@@ -128,7 +128,7 @@ async def test_publish_removing_referenced_trigger_requires_confirmation(
     assert body["code"] == "WORKFLOW_PUBLISH_TRIGGER_REMOVAL_CONFIRMATION_REQUIRED"
     assert body["affected_count"] == 1
     assert resp.headers["content-type"].startswith("application/problem+json")
-    # Conforms to the specialized schema (detects a missing/renamed count field or wrong code).
+    # Parses as the confirmation model (count present as a positive int).
     WorkflowPublishTriggerRemovalConfirmationProblem.model_validate(body)
     assert str(parent) not in resp.text
     assert parent_name not in resp.text

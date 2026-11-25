@@ -49,7 +49,7 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> ErrorData | ErrorData | WorkflowPublishTriggerRemovalConfirmationProblem | PublishWorkflowVersionResponse | None:
+) -> ErrorData | PublishWorkflowVersionResponse | WorkflowPublishTriggerRemovalConfirmationProblem | None:
     if response.status_code == 200:
         response_200 = PublishWorkflowVersionResponse.from_dict(response.json())
 
@@ -76,23 +76,7 @@ def _parse_response(
         return response_404
 
     if response.status_code == 409:
-
-        def _parse_response_409(data: object) -> ErrorData | WorkflowPublishTriggerRemovalConfirmationProblem:
-            try:
-                if not isinstance(data, dict):
-                    raise TypeError()
-                response_409_type_0 = WorkflowPublishTriggerRemovalConfirmationProblem.from_dict(data)
-
-                return response_409_type_0
-            except (TypeError, ValueError, AttributeError, KeyError):
-                pass
-            if not isinstance(data, dict):
-                raise TypeError()
-            response_409_type_1 = ErrorData.from_dict(data)
-
-            return response_409_type_1
-
-        response_409 = _parse_response_409(response.json())
+        response_409 = WorkflowPublishTriggerRemovalConfirmationProblem.from_dict(response.json())
 
         return response_409
 
@@ -119,9 +103,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[
-    ErrorData | ErrorData | WorkflowPublishTriggerRemovalConfirmationProblem | PublishWorkflowVersionResponse
-]:
+) -> Response[ErrorData | PublishWorkflowVersionResponse | WorkflowPublishTriggerRemovalConfirmationProblem]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
@@ -140,9 +122,7 @@ def sync_detailed(
     body: PublishVersionRequest,
     confirm: bool | Unset = False,
     additional_params: dict[str, Any] | None = None,
-) -> Response[
-    ErrorData | ErrorData | WorkflowPublishTriggerRemovalConfirmationProblem | PublishWorkflowVersionResponse
-]:
+) -> Response[ErrorData | PublishWorkflowVersionResponse | WorkflowPublishTriggerRemovalConfirmationProblem]:
     """Publish workflow version
 
      Publish a specific workflow version.
@@ -161,7 +141,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[ErrorData | ErrorData | WorkflowPublishTriggerRemovalConfirmationProblem | PublishWorkflowVersionResponse]
+        Response[ErrorData | PublishWorkflowVersionResponse | WorkflowPublishTriggerRemovalConfirmationProblem]
     """
 
     kwargs = _get_kwargs(
@@ -182,7 +162,7 @@ def sync(
     client: AuthenticatedClient,
     body: PublishVersionRequest,
     confirm: bool | Unset = False,
-) -> ErrorData | ErrorData | WorkflowPublishTriggerRemovalConfirmationProblem | PublishWorkflowVersionResponse | None:
+) -> ErrorData | PublishWorkflowVersionResponse | WorkflowPublishTriggerRemovalConfirmationProblem | None:
     """Publish workflow version
 
      Publish a specific workflow version.
@@ -201,7 +181,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        ErrorData | ErrorData | WorkflowPublishTriggerRemovalConfirmationProblem | PublishWorkflowVersionResponse
+        ErrorData | PublishWorkflowVersionResponse | WorkflowPublishTriggerRemovalConfirmationProblem
     """
 
     return sync_detailed(
@@ -220,9 +200,7 @@ async def asyncio_detailed(
     client: AuthenticatedClient,
     body: PublishVersionRequest,
     confirm: bool | Unset = False,
-) -> Response[
-    ErrorData | ErrorData | WorkflowPublishTriggerRemovalConfirmationProblem | PublishWorkflowVersionResponse
-]:
+) -> Response[ErrorData | PublishWorkflowVersionResponse | WorkflowPublishTriggerRemovalConfirmationProblem]:
     """Publish workflow version
 
      Publish a specific workflow version.
@@ -241,7 +219,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[ErrorData | ErrorData | WorkflowPublishTriggerRemovalConfirmationProblem | PublishWorkflowVersionResponse]
+        Response[ErrorData | PublishWorkflowVersionResponse | WorkflowPublishTriggerRemovalConfirmationProblem]
     """
 
     kwargs = _get_kwargs(
@@ -263,7 +241,7 @@ async def asyncio(
     client: AuthenticatedClient,
     body: PublishVersionRequest,
     confirm: bool | Unset = False,
-) -> ErrorData | ErrorData | WorkflowPublishTriggerRemovalConfirmationProblem | PublishWorkflowVersionResponse | None:
+) -> ErrorData | PublishWorkflowVersionResponse | WorkflowPublishTriggerRemovalConfirmationProblem | None:
     """Publish workflow version
 
      Publish a specific workflow version.
@@ -282,7 +260,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        ErrorData | ErrorData | WorkflowPublishTriggerRemovalConfirmationProblem | PublishWorkflowVersionResponse
+        ErrorData | PublishWorkflowVersionResponse | WorkflowPublishTriggerRemovalConfirmationProblem
     """
 
     return (

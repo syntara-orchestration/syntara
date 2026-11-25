@@ -33,7 +33,7 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Any | ErrorData | ErrorData | WorkflowReferencedConfirmationProblem | None:
+) -> Any | ErrorData | WorkflowReferencedConfirmationProblem | None:
     if response.status_code == 204:
         response_204 = cast(Any, None)
         return response_204
@@ -59,23 +59,7 @@ def _parse_response(
         return response_404
 
     if response.status_code == 409:
-
-        def _parse_response_409(data: object) -> ErrorData | WorkflowReferencedConfirmationProblem:
-            try:
-                if not isinstance(data, dict):
-                    raise TypeError()
-                response_409_type_0 = WorkflowReferencedConfirmationProblem.from_dict(data)
-
-                return response_409_type_0
-            except (TypeError, ValueError, AttributeError, KeyError):
-                pass
-            if not isinstance(data, dict):
-                raise TypeError()
-            response_409_type_1 = ErrorData.from_dict(data)
-
-            return response_409_type_1
-
-        response_409 = _parse_response_409(response.json())
+        response_409 = WorkflowReferencedConfirmationProblem.from_dict(response.json())
 
         return response_409
 
@@ -102,7 +86,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[Any | ErrorData | ErrorData | WorkflowReferencedConfirmationProblem]:
+) -> Response[Any | ErrorData | WorkflowReferencedConfirmationProblem]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
@@ -119,7 +103,7 @@ def sync_detailed(
     client: AuthenticatedClient,
     confirm: bool | Unset = False,
     additional_params: dict[str, Any] | None = None,
-) -> Response[Any | ErrorData | ErrorData | WorkflowReferencedConfirmationProblem]:
+) -> Response[Any | ErrorData | WorkflowReferencedConfirmationProblem]:
     """Delete workflow
 
      Permanently delete a workflow and cascade-delete all its versions and executions.
@@ -136,7 +120,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Any | ErrorData | ErrorData | WorkflowReferencedConfirmationProblem]
+        Response[Any | ErrorData | WorkflowReferencedConfirmationProblem]
     """
 
     kwargs = _get_kwargs(workflow_id=workflow_id, confirm=confirm, additional_params=additional_params)
@@ -153,7 +137,7 @@ def sync(
     *,
     client: AuthenticatedClient,
     confirm: bool | Unset = False,
-) -> Any | ErrorData | ErrorData | WorkflowReferencedConfirmationProblem | None:
+) -> Any | ErrorData | WorkflowReferencedConfirmationProblem | None:
     """Delete workflow
 
      Permanently delete a workflow and cascade-delete all its versions and executions.
@@ -170,7 +154,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Any | ErrorData | ErrorData | WorkflowReferencedConfirmationProblem
+        Any | ErrorData | WorkflowReferencedConfirmationProblem
     """
 
     return sync_detailed(
@@ -185,7 +169,7 @@ async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
     confirm: bool | Unset = False,
-) -> Response[Any | ErrorData | ErrorData | WorkflowReferencedConfirmationProblem]:
+) -> Response[Any | ErrorData | WorkflowReferencedConfirmationProblem]:
     """Delete workflow
 
      Permanently delete a workflow and cascade-delete all its versions and executions.
@@ -202,7 +186,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Any | ErrorData | ErrorData | WorkflowReferencedConfirmationProblem]
+        Response[Any | ErrorData | WorkflowReferencedConfirmationProblem]
     """
 
     kwargs = _get_kwargs(
@@ -220,7 +204,7 @@ async def asyncio(
     *,
     client: AuthenticatedClient,
     confirm: bool | Unset = False,
-) -> Any | ErrorData | ErrorData | WorkflowReferencedConfirmationProblem | None:
+) -> Any | ErrorData | WorkflowReferencedConfirmationProblem | None:
     """Delete workflow
 
      Permanently delete a workflow and cascade-delete all its versions and executions.
@@ -237,7 +221,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Any | ErrorData | ErrorData | WorkflowReferencedConfirmationProblem
+        Any | ErrorData | WorkflowReferencedConfirmationProblem
     """
 
     return (
