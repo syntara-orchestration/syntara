@@ -11,7 +11,7 @@ info:
     replacing the V1 tree-based activity model. Key concepts:
 
     - **Triggers**: Entry points that initiate workflow execution (e.g., manual_trigger)
-    - **Nodes**: Execution units (script, http_request, agentic, aap_job_template, approval)
+    - **Nodes**: Execution units (script_python, script_bash, http_request, agentic, aap_job_template, approval)
       and control flow (condition, loop, converge)
     - **Edges**: Directed connections between nodes with optional port-based routing
       (e.g., condition true/false, loop iterate/complete)
@@ -1033,8 +1033,10 @@ components:
       $ref: ./shared-schemas.yaml#/components/schemas/HTTPRequestNode
     AgenticNode:
       $ref: ./shared-schemas.yaml#/components/schemas/AgenticNode
-    ScriptNode:
-      $ref: ./shared-schemas.yaml#/components/schemas/ScriptNode
+    PythonScriptNode:
+      $ref: ./shared-schemas.yaml#/components/schemas/PythonScriptNode
+    BashScriptNode:
+      $ref: ./shared-schemas.yaml#/components/schemas/BashScriptNode
     ApprovalNode:
       $ref: ./shared-schemas.yaml#/components/schemas/ApprovalNode
     ConditionNode:
@@ -1058,8 +1060,14 @@ components:
       $ref: ./shared-schemas.yaml#/components/schemas/AgenticExecutorParameters
     IntegrationConnectionConfig:
       $ref: ./shared-schemas.yaml#/components/schemas/IntegrationConnectionConfig
-    ScriptExecutorParameters:
-      $ref: ./shared-schemas.yaml#/components/schemas/ScriptExecutorParameters
+    CredentialBinding:
+      $ref: ./shared-schemas.yaml#/components/schemas/CredentialBinding
+    ExecutionTargetProfile:
+      $ref: ./shared-schemas.yaml#/components/schemas/ExecutionTargetProfile
+    PythonScriptExecutorParameters:
+      $ref: ./shared-schemas.yaml#/components/schemas/PythonScriptExecutorParameters
+    BashScriptExecutorParameters:
+      $ref: ./shared-schemas.yaml#/components/schemas/BashScriptExecutorParameters
     ApprovalNodeParameters:
       $ref: ./shared-schemas.yaml#/components/schemas/ApprovalNodeParameters
     ConditionNodeParameters:
@@ -1092,8 +1100,6 @@ components:
       $ref: ./shared-schemas.yaml#/components/schemas/RetryPolicyParameters
     HTTPMethod:
       $ref: ./shared-schemas.yaml#/components/schemas/HTTPMethod
-    ScriptLanguage:
-      $ref: ./shared-schemas.yaml#/components/schemas/ScriptLanguage
     ConvergeStrategy:
       $ref: ./shared-schemas.yaml#/components/schemas/ConvergeStrategy
     AAPVerbosity:

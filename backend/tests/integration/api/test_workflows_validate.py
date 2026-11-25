@@ -28,7 +28,7 @@ async def test_validate_valid_definition(jwt_client: AsyncClient) -> None:
             name="test-workflow",
             description="A test workflow",
             activity_id="task1",
-            activity_type="script",
+            activity_type="script_python",
         ),
     }
 
@@ -77,8 +77,8 @@ async def test_validate_invalid_edge_reference(jwt_client: AsyncClient) -> None:
                 {
                     "id": "node1",
                     "name": "Node 1",
-                    "type": "script",
-                    "parameters": {"language": "python", "code": "print('hi')"},
+                    "type": "script_python",
+                    "parameters": {"code": "print('hi')"},
                 },
             ],
             "edges": [{"from": "trigger1", "to": "nonexistent_node"}],
@@ -112,14 +112,14 @@ async def test_validate_cycle_detection(jwt_client: AsyncClient) -> None:
                 {
                     "id": "node_a",
                     "name": "Node A",
-                    "type": "script",
-                    "parameters": {"language": "python", "code": "pass"},
+                    "type": "script_python",
+                    "parameters": {"code": "pass"},
                 },
                 {
                     "id": "node_b",
                     "name": "Node B",
-                    "type": "script",
-                    "parameters": {"language": "python", "code": "pass"},
+                    "type": "script_python",
+                    "parameters": {"code": "pass"},
                 },
             ],
             "edges": [
@@ -222,14 +222,14 @@ async def test_validate_orphaned_node_error(jwt_client: AsyncClient) -> None:
                 {
                     "id": "connected_node",
                     "name": "Connected",
-                    "type": "script",
-                    "parameters": {"language": "python", "code": "pass"},
+                    "type": "script_python",
+                    "parameters": {"code": "pass"},
                 },
                 {
                     "id": "orphaned_node",
                     "name": "Orphaned",
-                    "type": "script",
-                    "parameters": {"language": "python", "code": "pass"},
+                    "type": "script_python",
+                    "parameters": {"code": "pass"},
                 },
             ],
             "edges": [{"from": "trigger1", "to": "connected_node"}],
@@ -260,8 +260,8 @@ async def test_validate_converge_no_predecessors(jwt_client: AsyncClient) -> Non
                 {
                     "id": "task_a",
                     "name": "Task A",
-                    "type": "script",
-                    "parameters": {"language": "python", "code": "pass"},
+                    "type": "script_python",
+                    "parameters": {"code": "pass"},
                 },
                 {"id": "conv", "name": "Converge", "type": "converge", "parameters": {}},
             ],
@@ -293,8 +293,8 @@ async def test_validate_converge_single_predecessor_error(jwt_client: AsyncClien
                 {
                     "id": "task_a",
                     "name": "Task A",
-                    "type": "script",
-                    "parameters": {"language": "python", "code": "pass"},
+                    "type": "script_python",
+                    "parameters": {"code": "pass"},
                 },
                 {"id": "conv", "name": "Converge", "type": "converge", "parameters": {}},
             ],
@@ -330,14 +330,14 @@ async def test_validate_converge_n_required_exceeds_branches(jwt_client: AsyncCl
                 {
                     "id": "task_a",
                     "name": "Task A",
-                    "type": "script",
-                    "parameters": {"language": "python", "code": "pass"},
+                    "type": "script_python",
+                    "parameters": {"code": "pass"},
                 },
                 {
                     "id": "task_b",
                     "name": "Task B",
-                    "type": "script",
-                    "parameters": {"language": "python", "code": "pass"},
+                    "type": "script_python",
+                    "parameters": {"code": "pass"},
                 },
                 {
                     "id": "conv",
@@ -379,14 +379,14 @@ async def test_validate_converge_valid(jwt_client: AsyncClient) -> None:
                 {
                     "id": "task_a",
                     "name": "Task A",
-                    "type": "script",
-                    "parameters": {"language": "python", "code": "pass"},
+                    "type": "script_python",
+                    "parameters": {"code": "pass"},
                 },
                 {
                     "id": "task_b",
                     "name": "Task B",
-                    "type": "script",
-                    "parameters": {"language": "python", "code": "pass"},
+                    "type": "script_python",
+                    "parameters": {"code": "pass"},
                 },
                 {
                     "id": "conv",
@@ -439,8 +439,8 @@ async def test_validate_invalid_iana_timezone(jwt_client: AsyncClient) -> None:
                 {
                     "id": "n1",
                     "name": "Node 1",
-                    "type": "script",
-                    "parameters": {"language": "python", "code": "pass"},
+                    "type": "script_python",
+                    "parameters": {"code": "pass"},
                 }
             ],
             "edges": [{"from": "sched_1", "to": "n1"}],
@@ -488,8 +488,8 @@ async def test_validate_invalid_iso8601_interval(jwt_client: AsyncClient) -> Non
                 {
                     "id": "n1",
                     "name": "Node 1",
-                    "type": "script",
-                    "parameters": {"language": "python", "code": "pass"},
+                    "type": "script_python",
+                    "parameters": {"code": "pass"},
                 }
             ],
             "edges": [{"from": "sched_1", "to": "n1"}],
@@ -579,8 +579,8 @@ async def test_validate_webhook_empty_service_accounts_rejected(jwt_client: Asyn
                 {
                     "id": "log_payload",
                     "name": "Log incident",
-                    "type": "script",
-                    "parameters": {"language": "python", "code": "print('hi')"},
+                    "type": "script_python",
+                    "parameters": {"code": "print('hi')"},
                 },
             ],
             "edges": [{"from": "snow_trigger", "to": "log_payload"}],

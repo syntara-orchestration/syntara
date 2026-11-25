@@ -24,14 +24,14 @@
 import { test, expect, toAppUrl } from './fixtures'
 import {
   addManualTrigger,
-  addScriptStep,
+  addPythonScriptStep,
   addHttpRequestStep,
   addAgenticStep,
   addAapStep,
   addApprovalStepWithBranch,
   addConditionStepWithBranch,
   addLoopStepWithBody,
-  addScriptStepOnHandle,
+  addPythonScriptStepOnHandle,
   createLlmIntegration,
   deleteLlmIntegration,
 } from './helpers/v2-steps'
@@ -112,7 +112,7 @@ test.describe('V2 Workflow Schema Migration', () => {
 
     // Build a minimal workflow: manual trigger → script
     await addManualTrigger(app)
-    await addScriptStep(app, 'Validate input', 'print("validating")')
+    await addPythonScriptStep(app, 'Validate input', 'print("validating")')
 
     // Intercept the POST /workflows request (select project first to avoid name reset)
     const saveRequestPromise = app.waitForRequest(isWorkflowCreateRequest)
@@ -134,9 +134,9 @@ test.describe('V2 Workflow Schema Migration', () => {
     expect(def.triggers[0]).toHaveProperty('id')
     expect(def.triggers[0]).toHaveProperty('parameters')
 
-    // Script node: v2 uses type "script" directly (not v1 task wrapper)
+    // Python script node: v2 uses a direct executor type (not a v1 task wrapper)
     expect(def.nodes).toHaveLength(1)
-    expect(def.nodes[0].type).toBe('script')
+    expect(def.nodes[0].type).toBe('script_python')
     expect(def.nodes[0]).toHaveProperty('id')
     expect(def.nodes[0]).toHaveProperty('parameters')
     expect(def.nodes[0]).not.toHaveProperty('task') // no v1 task wrapper
@@ -166,7 +166,7 @@ test.describe('V2 Workflow Schema Migration', () => {
       // Manual trigger + all 5 executor types
       // Note: Approval node must have a branch completed to be valid
       await addManualTrigger(app, 'Start workflow')
-      await addScriptStep(app, 'Run script', 'echo "hello"')
+      await addPythonScriptStep(app, 'Run script', 'echo "hello"')
       await addHttpRequestStep(app, 'Fetch data', 'https://api.example.com/data')
       await addAgenticStep(app, 'AI analysis', 'Analyze the fetched data', llmIntegrationName)
       await addAapStep(app, 'Deploy with Ansible')
@@ -194,7 +194,7 @@ test.describe('V2 Workflow Schema Migration', () => {
 
       // All 5 executor node types must be present
       const nodeTypes = def.nodes.map((n) => n.type)
-      expect(nodeTypes).toContain('script')
+      expect(nodeTypes).toContain('script_python')
       expect(nodeTypes).toContain('http_request')
       expect(nodeTypes).toContain('agentic')
       expect(nodeTypes).toContain('aap_job_template')
@@ -240,7 +240,7 @@ test.describe('V2 Workflow Schema Migration', () => {
       await addLoopStepWithBody(app, 'Iterate items')
       await addConvergeStep(app, 'Merge branches', 'done')
       // Attach the unused false stub last, when it is the unique remaining branch port.
-      await addScriptStepOnHandle(app, 'false', 'Check condition - false action', 'print("condition is false")')
+      await addPythonScriptStepOnHandle(app, 'false', 'Check condition - false action', 'print("condition is false")')
 
       const saveRequestPromise = app.waitForRequest(isWorkflowCreateRequest)
       await selectProjectIfRequired(app)
@@ -307,9 +307,9 @@ test.describe('V2 Workflow Schema Migration', () => {
       nodes: [
         {
           id: 'node_1',
-          type: 'script',
+          type: 'script_python',
           name: 'Validate input',
-          parameters: { language: 'python', code: 'print("validating")' },
+          parameters: { code: 'print("validating")' },
         },
         {
           id: 'node_2',
@@ -324,9 +324,9 @@ test.describe('V2 Workflow Schema Migration', () => {
         { id: 'node_7', type: 'loop', name: 'Process items', parameters: { list: '{{ items }}' } },
         {
           id: 'node_7_body',
-          type: 'script',
+          type: 'script_python',
           name: 'Process items - loop body',
-          parameters: { language: 'python', code: 'print("processing item")' },
+          parameters: { code: 'print("processing item")' },
         },
         { id: 'node_8', type: 'converge', name: 'Merge results', parameters: { strategy: 'all' } },
       ],
@@ -385,7 +385,7 @@ test.describe('V2 Workflow Schema Migration', () => {
 
     // Create and save a simple workflow (select project first to avoid name reset)
     await addManualTrigger(app)
-    await addScriptStep(app, 'Test script', 'print("test")')
+    await addPythonScriptStep(app, 'Test script', 'print("test")')
     await selectProjectIfRequired(app)
     await app.getByPlaceholder('Workflow name').fill(workflowName)
     await clickSaveAndWait(app)
@@ -428,7 +428,7 @@ test.describe('V2 Workflow Schema Migration', () => {
 
     // Verify specific v2 node types are preserved
     expect(def.triggers[0].type).toBe('manual_trigger')
-    expect(def.nodes[0].type).toBe('script')
+    expect(def.nodes[0].type).toBe('script_python')
     expect(def.nodes[0]).not.toHaveProperty('task')
   })
 
@@ -443,13 +443,13 @@ test.describe('V2 Workflow Schema Migration', () => {
     try {
       // Create a simple workflow
       await addManualTrigger(app)
-      await addScriptStep(app, 'Original script', 'print("original")')
+      await addPythonScriptStep(app, 'Original script', 'print("original")')
       await selectProjectIfRequired(app)
       await app.getByPlaceholder('Workflow name').fill(workflowName)
       await clickSaveAndWait(app)
 
       // Add a second node (edit the workflow)
-      await addScriptStep(app, 'Added script', 'print("added")')
+      await addPythonScriptStep(app, 'Added script', 'print("added")')
 
       // Re-save and capture the PATCH payload
       const patchPromise = app.waitForRequest((req) => req.url().includes('/workflows/') && req.method() === 'PATCH')

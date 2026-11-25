@@ -96,8 +96,8 @@ def test_converge_replay_compares_every_predecessor_by_identity() -> None:
     graph = MagicMock()
     graph.get_predecessors.return_value = ["branch_a", "branch_b"]
     nodes = {
-        "branch_a": ActivityNode("branch_a", NodeType.SCRIPT, {}),
-        "branch_b": ActivityNode("branch_b", NodeType.SCRIPT, {}),
+        "branch_a": ActivityNode("branch_a", NodeType.SCRIPT_PYTHON, {}),
+        "branch_b": ActivityNode("branch_b", NodeType.SCRIPT_PYTHON, {}),
     }
     graph.get_node.side_effect = nodes.__getitem__
     wf._retry_restorable_cache = set(nodes)
@@ -774,7 +774,7 @@ def _chain_graph(*, cof_nodes: set[str] | None = None) -> WorkflowGraph:
     backend = InMemoryGraphBackend()
     backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
     for node_id in ("step_1", "step_2", "step_3"):
-        raw: dict[str, Any] = {"id": node_id, "type": "script", "parameters": {}}
+        raw: dict[str, Any] = {"id": node_id, "type": "script_python", "parameters": {}}
         if node_id in cof_nodes:
             raw["settings"] = {"continue_on_failure": True}
         backend.add_node(node_id, raw)

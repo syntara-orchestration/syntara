@@ -46,7 +46,7 @@ def _make_workflow(stop_after_nodes: set[str] | None = None) -> OrchestratorWork
     return wf
 
 
-def _node(node_id: str, node_type: str = "script") -> dict[str, Any]:
+def _node(node_id: str, node_type: str = "script_python") -> dict[str, Any]:
     return {"id": node_id, "type": node_type, "parameters": {}}
 
 

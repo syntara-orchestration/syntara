@@ -18,7 +18,7 @@ describe('validateBranchConnections', () => {
   it('returns no errors when required branch is connected', () => {
     const activities: Activity[] = [
       makeCondition({ id: 'C1', name: 'Condition 1' }),
-      { type: 'script', id: 'T1', name: 'Task 1', parameters: { language: 'python', code: '' } },
+      { type: 'script_python', id: 'T1', name: 'Task 1', parameters: { code: '' } },
     ]
     const edges: EdgeConnection[] = [
       { id: 'C1-T1', source: 'C1', target: 'T1', sourceHandle: 'true', targetHandle: 'target' },
@@ -31,7 +31,7 @@ describe('validateBranchConnections', () => {
   it('detects missing required branch connection', () => {
     const activities: Activity[] = [
       makeCondition({ id: 'C1', name: 'Condition 1' }),
-      { type: 'script', id: 'T1', name: 'Task 1', parameters: { language: 'python', code: '' } },
+      { type: 'script_python', id: 'T1', name: 'Task 1', parameters: { code: '' } },
     ]
     const edges: EdgeConnection[] = [
       { id: 'C1-T1', source: 'C1', target: 'T1', sourceHandle: 'false', targetHandle: 'target' },
@@ -92,7 +92,7 @@ describe('validateBranchConnections', () => {
   it('only validates nodes matching the filter', () => {
     const activities: Activity[] = [
       makeCondition({ id: 'C1', name: 'Condition 1' }),
-      { type: 'script', id: 'T1', name: 'Task 1', parameters: { language: 'python', code: '' } },
+      { type: 'script_python', id: 'T1', name: 'Task 1', parameters: { code: '' } },
     ]
     const edges: EdgeConnection[] = []
 
@@ -113,7 +113,7 @@ describe('validateBranchConnections', () => {
 
     const activities: Activity[] = [
       { type: 'approval', id: 'approval-1', name: 'Approval Task', parameters: {} },
-      { type: 'script', id: 'regular-task', name: 'Regular Task', parameters: { language: 'python', code: '' } },
+      { type: 'script_python', id: 'regular-task', name: 'Regular Task', parameters: { code: '' } },
     ]
     const edges: EdgeConnection[] = []
 
@@ -142,7 +142,7 @@ describe('validateBranchConnections', () => {
   it('correctly identifies edges from the node', () => {
     const activities: Activity[] = [
       makeCondition({ id: 'C1', name: 'Condition 1' }),
-      { type: 'script', id: 'T1', name: 'Task 1', parameters: { language: 'python', code: '' } },
+      { type: 'script_python', id: 'T1', name: 'Task 1', parameters: { code: '' } },
     ]
     const edges: EdgeConnection[] = [
       { id: 'T1-C1', source: 'T1', target: 'C1', sourceHandle: 'source', targetHandle: 'target' },

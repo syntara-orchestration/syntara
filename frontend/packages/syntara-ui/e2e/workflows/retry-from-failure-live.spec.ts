@@ -237,7 +237,7 @@ async function expectWorkflowParameterUnchanged(app: Page, workflowId: string): 
   if (!isRecord(body) || !isRecord(body['version'])) {
     throw new Error('Workflow response did not contain its current version')
   }
-  expect(nodeParameters(body['version']['workflow_definition'], 'step2')['code']).toBe('exit 1')
+  expect(nodeParameters(body['version']['workflow_definition'], 'step2')['code']).toBe('raise SystemExit(1)')
 }
 
 async function expectRetryPanelHasNoA11yViolations(page: Page): Promise<void> {
@@ -264,21 +264,21 @@ test.describe('Retry from failure — real backend', () => {
         nodes: [
           {
             id: 'step1',
-            type: 'script',
+            type: 'script_python',
             name: 'First Step',
-            parameters: { language: 'bash', code: 'echo first-step' },
+            parameters: { code: "print('first-step')" },
           },
           {
             id: 'step2',
-            type: 'script',
+            type: 'script_python',
             name: 'Second Step',
-            parameters: { language: 'bash', code: 'exit 1' },
+            parameters: { code: 'raise SystemExit(1)' },
           },
           {
             id: 'step3',
-            type: 'script',
+            type: 'script_python',
             name: 'Third Step',
-            parameters: { language: 'bash', code: 'echo downstream-step' },
+            parameters: { code: "print('downstream-step')" },
           },
         ],
         edges: [
@@ -295,9 +295,9 @@ test.describe('Retry from failure — real backend', () => {
         nodes: [
           {
             id: 'completed_step',
-            type: 'script',
+            type: 'script_python',
             name: 'Completed Step',
-            parameters: { language: 'bash', code: 'echo completed' },
+            parameters: { code: "print('completed')" },
           },
         ],
         edges: [{ from: 'trigger_manual', to: 'completed_step' }],
@@ -310,15 +310,15 @@ test.describe('Retry from failure — real backend', () => {
         nodes: [
           {
             id: 'branch_a',
-            type: 'script',
+            type: 'script_python',
             name: 'Branch A',
-            parameters: { language: 'bash', code: 'exit 1' },
+            parameters: { code: 'raise SystemExit(1)' },
           },
           {
             id: 'branch_b',
-            type: 'script',
+            type: 'script_python',
             name: 'Branch B',
-            parameters: { language: 'bash', code: 'exit 1' },
+            parameters: { code: 'raise SystemExit(1)' },
           },
         ],
         edges: [
@@ -474,19 +474,19 @@ test.describe('Retry from failure — real backend', () => {
     await selectFailedStepInDetails(app, 'Second Step')
     await openRetryPanel(app)
 
-    await expect(app.getByText(/"code": "exit 1"/, { exact: false })).toBeVisible()
+    await expect(app.getByText(/"code": "raise SystemExit\(1\)"/, { exact: false })).toBeVisible()
     await app.getByRole('button', { name: 'Edit parameters for retry' }).click()
     await expect(app.getByTestId('inline-code-editor').locator('.view-lines')).toBeVisible()
     await fillCodeEditor(app, {
-      value: '{"code":"echo retry-recovered"}',
+      value: '{"code":"print(\'retry-recovered\')"}',
       label: 'Input parameters for Second Step',
     })
-    await expect(app.getByTestId('inline-code-editor').locator('.view-lines')).toContainText('echo retry-recovered')
+    await expect(app.getByTestId('inline-code-editor').locator('.view-lines')).toContainText('retry-recovered')
     const retryButton = app.getByRole('button', { name: 'Retry 2 steps' })
     await expect(retryButton).toBeDisabled()
     await app.getByRole('button', { name: 'Save parameters for retry' }).click()
     await expect(app.getByText('Edited for retry')).toBeVisible()
-    await expect(app.getByText(/"code": "echo retry-recovered"/, { exact: false })).toBeVisible()
+    await expect(app.getByText(/"code": "print\('retry-recovered'\)"/, { exact: false })).toBeVisible()
     await expect(retryButton).toBeEnabled()
 
     const retryResponsePromise = app.waitForResponse(
@@ -501,7 +501,7 @@ test.describe('Retry from failure — real backend', () => {
     if (!isRecord(payload) || !isRecord(payload['input_parameter_overrides'])) {
       throw new Error('Retry request did not include input_parameter_overrides')
     }
-    expect(payload['input_parameter_overrides']['step2']).toEqual({ code: 'echo retry-recovered' })
+    expect(payload['input_parameter_overrides']['step2']).toEqual({ code: "print('retry-recovered')" })
     expect(retryBody['retried_from_execution_id']).toBe(run.executionId)
 
     await expect(app.getByText('Retry started')).toBeVisible()

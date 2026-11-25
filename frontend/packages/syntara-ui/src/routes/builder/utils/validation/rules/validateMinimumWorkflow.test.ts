@@ -8,7 +8,7 @@ import { validateMinimumWorkflow } from './validateMinimumWorkflow'
 describe('validateMinimumWorkflow', () => {
   it('should pass validation when workflow has triggers, activities, and edges', () => {
     const activities: Activity[] = [
-      { type: 'script', id: 'task-1', name: 'Task 1', parameters: { language: 'python', code: 'print("hello")' } },
+      { type: 'script_python', id: 'task-1', name: 'Task 1', parameters: { code: 'print("hello")' } },
     ]
     const edges: EdgeConnection[] = [
       { id: 'trigger-1-task-1', source: 'trigger-1', target: 'task-1', sourceHandle: 'source', targetHandle: 'target' },
@@ -22,7 +22,7 @@ describe('validateMinimumWorkflow', () => {
 
   it('should fail when workflow has no triggers', () => {
     const activities: Activity[] = [
-      { type: 'script', id: 'task-1', name: 'Task 1', parameters: { language: 'python', code: 'print("hello")' } },
+      { type: 'script_python', id: 'task-1', name: 'Task 1', parameters: { code: 'print("hello")' } },
     ]
     const edges: EdgeConnection[] = [
       { id: 'trigger-1-task-1', source: 'trigger-1', target: 'task-1', sourceHandle: 'source', targetHandle: 'target' },
@@ -41,7 +41,7 @@ describe('validateMinimumWorkflow', () => {
 
   it('should fail when workflow has empty triggers array', () => {
     const activities: Activity[] = [
-      { type: 'script', id: 'task-1', name: 'Task 1', parameters: { language: 'python', code: 'print("hello")' } },
+      { type: 'script_python', id: 'task-1', name: 'Task 1', parameters: { code: 'print("hello")' } },
     ]
     const edges: EdgeConnection[] = [
       { id: 'trigger-1-task-1', source: 'trigger-1', target: 'task-1', sourceHandle: 'source', targetHandle: 'target' },
@@ -75,7 +75,7 @@ describe('validateMinimumWorkflow', () => {
 
   it('should fail when workflow has no edges connecting triggers and activities', () => {
     const activities: Activity[] = [
-      { type: 'script', id: 'task-1', name: 'Task 1', parameters: { language: 'python', code: 'print("hello")' } },
+      { type: 'script_python', id: 'task-1', name: 'Task 1', parameters: { code: 'print("hello")' } },
     ]
     const edges: EdgeConnection[] = []
     const triggers = [{ type: 'manual', id: 'trigger-1' }]

@@ -18,6 +18,7 @@ import pytest
 
 from syntara.workflow_core.graph import WorkflowGraph
 from syntara.workflow_core.graph_backend import InMemoryGraphBackend
+from syntara.workflow_core.models import NodeType
 from syntara.workflow_core.utils.namespace_resolver import NamespaceResolver
 from syntara.workflow_runtime.engines.temporal.dynamic_workflow import OrchestratorWorkflow
 from tests.unit.workflows.workflow_engine.conftest import init_workflow_runtime
@@ -61,6 +62,7 @@ def _make_workflow(
     wf._timeout_tasks = {}
     wf._timed_out_converge_nodes = set()
     wf._detached_nodes = set()
+    wf._active_ep_nodes = set()
     wf._cof_failed_nodes = set()
     wf._converge_branch_nodes = {}
     wf._has_unhandled_failure = False
@@ -75,8 +77,8 @@ def _build_linear_graph() -> WorkflowGraph:
     """Build: trigger -> node_a -> node_b (linear chain)."""
     backend = InMemoryGraphBackend()
     backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
-    backend.add_node("node_a", {"id": "node_a", "type": "script", "parameters": {"lang": "python"}})
-    backend.add_node("node_b", {"id": "node_b", "type": "script", "parameters": {"lang": "python"}})
+    backend.add_node("node_a", {"id": "node_a", "type": "script_python", "parameters": {"lang": "python"}})
+    backend.add_node("node_b", {"id": "node_b", "type": "script_python", "parameters": {"lang": "python"}})
     backend.add_edge("trigger", "node_a", None)
     backend.add_edge("node_a", "node_b", None)
     return WorkflowGraph(backend)
@@ -86,8 +88,8 @@ def _build_fanout_graph() -> WorkflowGraph:
     """Build: trigger -> node_a + node_b (concurrent fan-out)."""
     backend = InMemoryGraphBackend()
     backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
-    backend.add_node("node_a", {"id": "node_a", "type": "script", "parameters": {}})
-    backend.add_node("node_b", {"id": "node_b", "type": "script", "parameters": {}})
+    backend.add_node("node_a", {"id": "node_a", "type": "script_python", "parameters": {}})
+    backend.add_node("node_b", {"id": "node_b", "type": "script_python", "parameters": {}})
     backend.add_edge("trigger", "node_a", None)
     backend.add_edge("trigger", "node_b", None)
     return WorkflowGraph(backend)
@@ -97,8 +99,8 @@ def _build_fanin_graph(converge_outputs: dict[str, str] | None = None) -> Workfl
     """Build: trigger -> node_a + node_b -> converge_node -> node_c."""
     backend = InMemoryGraphBackend()
     backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
-    backend.add_node("node_a", {"id": "node_a", "type": "script", "parameters": {}})
-    backend.add_node("node_b", {"id": "node_b", "type": "script", "parameters": {}})
+    backend.add_node("node_a", {"id": "node_a", "type": "script_python", "parameters": {}})
+    backend.add_node("node_b", {"id": "node_b", "type": "script_python", "parameters": {}})
     backend.add_node(
         "converge_node",
         {
@@ -108,7 +110,7 @@ def _build_fanin_graph(converge_outputs: dict[str, str] | None = None) -> Workfl
             "outputs": converge_outputs,
         },
     )
-    backend.add_node("node_c", {"id": "node_c", "type": "script", "parameters": {}})
+    backend.add_node("node_c", {"id": "node_c", "type": "script_python", "parameters": {}})
     backend.add_edge("trigger", "node_a", None)
     backend.add_edge("trigger", "node_b", None)
     backend.add_edge("node_a", "converge_node", None)
@@ -121,11 +123,11 @@ def _build_three_branch_converge_graph(config: dict[str, Any]) -> WorkflowGraph:
     """Build: trigger -> [node_a, node_b, node_c] -> converge_node -> node_d."""
     backend = InMemoryGraphBackend()
     backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
-    backend.add_node("node_a", {"id": "node_a", "type": "script", "parameters": {}})
-    backend.add_node("node_b", {"id": "node_b", "type": "script", "parameters": {}})
-    backend.add_node("node_c", {"id": "node_c", "type": "script", "parameters": {}})
+    backend.add_node("node_a", {"id": "node_a", "type": "script_python", "parameters": {}})
+    backend.add_node("node_b", {"id": "node_b", "type": "script_python", "parameters": {}})
+    backend.add_node("node_c", {"id": "node_c", "type": "script_python", "parameters": {}})
     backend.add_node("converge_node", {"id": "converge_node", "type": "converge", "parameters": config})
-    backend.add_node("node_d", {"id": "node_d", "type": "script", "parameters": {}})
+    backend.add_node("node_d", {"id": "node_d", "type": "script_python", "parameters": {}})
     backend.add_edge("trigger", "node_a", None)
     backend.add_edge("trigger", "node_b", None)
     backend.add_edge("trigger", "node_c", None)
@@ -140,11 +142,11 @@ def _build_intermediate_converge_graph(config: dict[str, Any] | None = None) -> 
     """Build: trigger -> [node_a, node_b]; node_a -> node_x -> converge_node; node_b -> converge_node -> node_c."""
     backend = InMemoryGraphBackend()
     backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
-    backend.add_node("node_a", {"id": "node_a", "type": "script", "parameters": {}})
-    backend.add_node("node_b", {"id": "node_b", "type": "script", "parameters": {}})
-    backend.add_node("node_x", {"id": "node_x", "type": "script", "parameters": {}})
+    backend.add_node("node_a", {"id": "node_a", "type": "script_python", "parameters": {}})
+    backend.add_node("node_b", {"id": "node_b", "type": "script_python", "parameters": {}})
+    backend.add_node("node_x", {"id": "node_x", "type": "script_python", "parameters": {}})
     backend.add_node("converge_node", {"id": "converge_node", "type": "converge", "parameters": config or {}})
-    backend.add_node("node_c", {"id": "node_c", "type": "script", "parameters": {}})
+    backend.add_node("node_c", {"id": "node_c", "type": "script_python", "parameters": {}})
     backend.add_edge("trigger", "node_a", None)
     backend.add_edge("trigger", "node_b", None)
     backend.add_edge("node_a", "node_x", None)
@@ -158,13 +160,13 @@ def _build_chained_converge_graph() -> WorkflowGraph:
     """Build chained converge: [A, B] -> conv1 -> Y -> conv2 <- C -> D."""
     backend = InMemoryGraphBackend()
     backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
-    backend.add_node("node_a", {"id": "node_a", "type": "script", "parameters": {}})
-    backend.add_node("node_b", {"id": "node_b", "type": "script", "parameters": {}})
+    backend.add_node("node_a", {"id": "node_a", "type": "script_python", "parameters": {}})
+    backend.add_node("node_b", {"id": "node_b", "type": "script_python", "parameters": {}})
     backend.add_node("conv1", {"id": "conv1", "type": "converge", "parameters": {}})
-    backend.add_node("node_y", {"id": "node_y", "type": "script", "parameters": {}})
-    backend.add_node("node_c", {"id": "node_c", "type": "script", "parameters": {}})
+    backend.add_node("node_y", {"id": "node_y", "type": "script_python", "parameters": {}})
+    backend.add_node("node_c", {"id": "node_c", "type": "script_python", "parameters": {}})
     backend.add_node("conv2", {"id": "conv2", "type": "converge", "parameters": {}})
-    backend.add_node("node_d", {"id": "node_d", "type": "script", "parameters": {}})
+    backend.add_node("node_d", {"id": "node_d", "type": "script_python", "parameters": {}})
     backend.add_edge("trigger", "node_a", None)
     backend.add_edge("trigger", "node_b", None)
     backend.add_edge("trigger", "node_c", None)
@@ -181,12 +183,12 @@ def _build_multi_intermediate_converge_graph() -> WorkflowGraph:
     """Build: A -> X -> Y -> converge <- B -> C (two intermediates)."""
     backend = InMemoryGraphBackend()
     backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
-    backend.add_node("node_a", {"id": "node_a", "type": "script", "parameters": {}})
-    backend.add_node("node_b", {"id": "node_b", "type": "script", "parameters": {}})
-    backend.add_node("node_x", {"id": "node_x", "type": "script", "parameters": {}})
-    backend.add_node("node_y", {"id": "node_y", "type": "script", "parameters": {}})
+    backend.add_node("node_a", {"id": "node_a", "type": "script_python", "parameters": {}})
+    backend.add_node("node_b", {"id": "node_b", "type": "script_python", "parameters": {}})
+    backend.add_node("node_x", {"id": "node_x", "type": "script_python", "parameters": {}})
+    backend.add_node("node_y", {"id": "node_y", "type": "script_python", "parameters": {}})
     backend.add_node("converge_node", {"id": "converge_node", "type": "converge", "parameters": {}})
-    backend.add_node("node_c", {"id": "node_c", "type": "script", "parameters": {}})
+    backend.add_node("node_c", {"id": "node_c", "type": "script_python", "parameters": {}})
     backend.add_edge("trigger", "node_a", None)
     backend.add_edge("trigger", "node_b", None)
     backend.add_edge("node_a", "node_x", None)
@@ -231,6 +233,27 @@ class TestLinearExecution:
         _run_schedule_successors(wf, "trigger", graph, pending)
 
         assert "node_a" in pending
+
+    def test_schedule_successors_tracks_execution_plane_capable_nodes(self) -> None:
+        """Only node types with configured EP images are tracked for cancellation."""
+        wf = _make_workflow()
+        backend = InMemoryGraphBackend()
+        backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
+        backend.add_node("node_a", {"id": "node_a", "type": "script_python", "parameters": {}})
+        backend.add_node("node_b", {"id": "node_b", "type": "http_request", "parameters": {}})
+        backend.add_edge("trigger", "node_a", None)
+        backend.add_edge("trigger", "node_b", None)
+        graph = WorkflowGraph(backend)
+        wf.resolver.set_namespace("trigger", {})
+        pending: dict[str, asyncio.Task[Any]] = {}
+
+        with patch(
+            "syntara.workflow_runtime.engines.temporal.dynamic_workflow._EXECUTION_PLANE_SUPPORTED_NODE_TYPES",
+            frozenset({NodeType.HTTP_REQUEST}),
+        ):
+            _run_schedule_successors(wf, "trigger", graph, pending)
+
+        assert wf._active_ep_nodes == {"node_b"}
 
     def test_schedule_successors_chains_to_next_node(self) -> None:
         """After node_a completes, node_b should be scheduled."""
@@ -494,8 +517,8 @@ class TestFanInConverge:
         wf = _make_workflow()
         backend = InMemoryGraphBackend()
         backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
-        backend.add_node("node_a", {"id": "node_a", "type": "script", "parameters": {}})
-        backend.add_node("node_b", {"id": "node_b", "type": "script", "parameters": {}})
+        backend.add_node("node_a", {"id": "node_a", "type": "script_python", "parameters": {}})
+        backend.add_node("node_b", {"id": "node_b", "type": "script_python", "parameters": {}})
         backend.add_node(
             "converge_node",
             {
@@ -505,7 +528,7 @@ class TestFanInConverge:
                 "settings": {"continue_on_failure": True},
             },
         )
-        backend.add_node("node_c", {"id": "node_c", "type": "script", "parameters": {}})
+        backend.add_node("node_c", {"id": "node_c", "type": "script_python", "parameters": {}})
         backend.add_edge("trigger", "node_a")
         backend.add_edge("trigger", "node_b")
         backend.add_edge("node_a", "converge_node")
@@ -587,11 +610,11 @@ class TestFanInConverge:
         wf = _make_workflow()
         backend = InMemoryGraphBackend()
         backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
-        backend.add_node("fork", {"id": "fork", "type": "script", "parameters": {}})
-        backend.add_node("a", {"id": "a", "type": "script", "parameters": {}})
-        backend.add_node("b", {"id": "b", "type": "script", "parameters": {}})
-        backend.add_node("c", {"id": "c", "type": "script", "parameters": {}})
-        backend.add_node("d", {"id": "d", "type": "script", "parameters": {}})
+        backend.add_node("fork", {"id": "fork", "type": "script_python", "parameters": {}})
+        backend.add_node("a", {"id": "a", "type": "script_python", "parameters": {}})
+        backend.add_node("b", {"id": "b", "type": "script_python", "parameters": {}})
+        backend.add_node("c", {"id": "c", "type": "script_python", "parameters": {}})
+        backend.add_node("d", {"id": "d", "type": "script_python", "parameters": {}})
         backend.add_node("conv", {"id": "conv", "type": "converge", "parameters": {}})
         backend.add_edge("trigger", "fork")
         backend.add_edge("fork", "a")
@@ -613,10 +636,10 @@ class TestFanInConverge:
         wf = _make_workflow()
         backend = InMemoryGraphBackend()
         backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
-        backend.add_node("setup", {"id": "setup", "type": "script", "parameters": {}})
-        backend.add_node("fork", {"id": "fork", "type": "script", "parameters": {}})
-        backend.add_node("a", {"id": "a", "type": "script", "parameters": {}})
-        backend.add_node("b", {"id": "b", "type": "script", "parameters": {}})
+        backend.add_node("setup", {"id": "setup", "type": "script_python", "parameters": {}})
+        backend.add_node("fork", {"id": "fork", "type": "script_python", "parameters": {}})
+        backend.add_node("a", {"id": "a", "type": "script_python", "parameters": {}})
+        backend.add_node("b", {"id": "b", "type": "script_python", "parameters": {}})
         backend.add_node("conv", {"id": "conv", "type": "converge", "parameters": {}})
         backend.add_edge("trigger", "setup")
         backend.add_edge("setup", "fork")
@@ -639,7 +662,7 @@ class TestFanInConverge:
         wf = _make_workflow()
         backend = InMemoryGraphBackend()
         backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
-        backend.add_node("a", {"id": "a", "type": "script", "parameters": {}})
+        backend.add_node("a", {"id": "a", "type": "script_python", "parameters": {}})
         backend.add_node("conv", {"id": "conv", "type": "converge", "parameters": {}})
         backend.add_edge("trigger", "a")
         backend.add_edge("a", "conv")
@@ -656,11 +679,11 @@ class TestFanInConverge:
         wf = _make_workflow()
         backend = InMemoryGraphBackend()
         backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
-        backend.add_node("fork1", {"id": "fork1", "type": "script", "parameters": {}})
-        backend.add_node("fork2", {"id": "fork2", "type": "script", "parameters": {}})
-        backend.add_node("a", {"id": "a", "type": "script", "parameters": {}})
-        backend.add_node("b", {"id": "b", "type": "script", "parameters": {}})
-        backend.add_node("c", {"id": "c", "type": "script", "parameters": {}})
+        backend.add_node("fork1", {"id": "fork1", "type": "script_python", "parameters": {}})
+        backend.add_node("fork2", {"id": "fork2", "type": "script_python", "parameters": {}})
+        backend.add_node("a", {"id": "a", "type": "script_python", "parameters": {}})
+        backend.add_node("b", {"id": "b", "type": "script_python", "parameters": {}})
+        backend.add_node("c", {"id": "c", "type": "script_python", "parameters": {}})
         backend.add_node("conv", {"id": "conv", "type": "converge", "parameters": {}})
         backend.add_edge("trigger", "fork1")
         backend.add_edge("fork1", "fork2")
@@ -889,7 +912,6 @@ class TestFanInConverge:
     def test_fail_converge_node_preserves_valid_output_mapping(self) -> None:
         """Converge failure fallback keeps mapped aliases for recovery steps."""
         wf = _make_workflow()
-        graph = _build_fanin_graph()
         graph = _build_fanin_graph({"branches": "${result.branch_count}"})
 
         wf._fail_converge_node("converge_node", "timed out", graph, pending_tasks=None)
@@ -901,8 +923,8 @@ class TestFanInConverge:
         wf = _make_workflow()
         backend = InMemoryGraphBackend()
         backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
-        backend.add_node("node_a", {"id": "node_a", "type": "script", "parameters": {}})
-        backend.add_node("node_b", {"id": "node_b", "type": "script", "parameters": {}})
+        backend.add_node("node_a", {"id": "node_a", "type": "script_python", "parameters": {}})
+        backend.add_node("node_b", {"id": "node_b", "type": "script_python", "parameters": {}})
         backend.add_node(
             "converge_node",
             {
@@ -912,7 +934,7 @@ class TestFanInConverge:
                 "settings": {"continue_on_failure": True},
             },
         )
-        backend.add_node("node_c", {"id": "node_c", "type": "script", "parameters": {}})
+        backend.add_node("node_c", {"id": "node_c", "type": "script_python", "parameters": {}})
         backend.add_edge("trigger", "node_a")
         backend.add_edge("trigger", "node_b")
         backend.add_edge("node_a", "converge_node")
@@ -967,10 +989,10 @@ class TestConvergeAnyStrategy:
         """Build fan-in graph with custom converge config set in the backend."""
         backend = InMemoryGraphBackend()
         backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
-        backend.add_node("node_a", {"id": "node_a", "type": "script", "parameters": {}})
-        backend.add_node("node_b", {"id": "node_b", "type": "script", "parameters": {}})
+        backend.add_node("node_a", {"id": "node_a", "type": "script_python", "parameters": {}})
+        backend.add_node("node_b", {"id": "node_b", "type": "script_python", "parameters": {}})
         backend.add_node("converge_node", {"id": "converge_node", "type": "converge", "parameters": config})
-        backend.add_node("node_c", {"id": "node_c", "type": "script", "parameters": {}})
+        backend.add_node("node_c", {"id": "node_c", "type": "script_python", "parameters": {}})
         backend.add_edge("trigger", "node_a", None)
         backend.add_edge("trigger", "node_b", None)
         backend.add_edge("node_a", "converge_node", None)
@@ -1011,16 +1033,73 @@ class TestConvergeAnyStrategy:
         wf = _make_workflow(skipped_nodes={"node_a"})
         mock_task = MagicMock()
         pending: dict[str, asyncio.Task[Any]] = {"node_a": mock_task, "node_b": MagicMock()}
-        wf._cancel_skipped_pending_tasks(pending)
+        result = asyncio.run(wf._cancel_skipped_pending_tasks(pending))
+
+        assert result is None
         mock_task.cancel.assert_called_once()
         assert "node_a" not in pending
         assert "node_b" in pending
 
+    @pytest.mark.asyncio
+    async def test_cancel_skipped_pending_tasks_cancels_execution_plane_work(self) -> None:
+        wf = _make_workflow(skipped_nodes={"node_a"})
+        wf._active_ep_nodes = {"node_a"}
+        mock_task = MagicMock()
+        pending: dict[str, asyncio.Task[Any]] = {"node_a": mock_task}
+
+        with patch.object(
+            wf,
+            "_cancel_execution_plane_work_nodes",
+            new_callable=AsyncMock,
+        ) as mock_cancel_work:
+            await wf._cancel_skipped_pending_tasks(pending, reason="branch skipped")
+
+        mock_cancel_work.assert_awaited_once_with(["node_a"], reason="branch skipped")
+        mock_task.cancel.assert_called_once()
+        assert "node_a" not in pending
+
     def test_cancel_skipped_pending_tasks_noop_when_none_skipped(self) -> None:
         wf = _make_workflow()
         pending: dict[str, asyncio.Task[Any]] = {"node_a": MagicMock()}
-        wf._cancel_skipped_pending_tasks(pending)
+        asyncio.run(wf._cancel_skipped_pending_tasks(pending))
         assert "node_a" in pending
+
+    @pytest.mark.asyncio
+    async def test_remove_detached_tasks_cancels_execution_plane_work(self) -> None:
+        wf = _make_workflow()
+        wf._detached_nodes = {"node_b"}
+        wf._active_ep_nodes = {"node_b"}
+        pending: dict[str, asyncio.Task[Any]] = {"node_b": MagicMock()}
+
+        with patch.object(
+            wf,
+            "_cancel_execution_plane_work_nodes",
+            new_callable=AsyncMock,
+        ) as mock_cancel_work:
+            await wf._remove_detached_tasks(pending, reason="converge detached")
+
+        mock_cancel_work.assert_awaited_once_with(["node_b"], reason="converge detached")
+        assert "node_b" not in pending
+
+    @pytest.mark.asyncio
+    @pytest.mark.usefixtures("_mock_temporal_workflow")
+    async def test_cancel_execution_plane_work_nodes_executes_activity_and_clears_active(self) -> None:
+        wf = _make_workflow()
+        wf.execution_id = "11111111-2222-3333-4444-555555555555"
+        wf._active_ep_nodes = {"node_a", "node_b"}
+        with patch(
+            "syntara.workflow_runtime.engines.temporal.dynamic_workflow.workflow.execute_activity",
+            new=AsyncMock(return_value={}),
+        ) as mock_execute_activity:
+            await wf._cancel_execution_plane_work_nodes(["node_a", "other"], reason="Workflow cancelled")
+
+        assert mock_execute_activity.await_args is not None
+        assert mock_execute_activity.await_args.kwargs["args"] == [
+            "11111111-2222-3333-4444-555555555555",
+            ["node_a"],
+            "Workflow cancelled",
+        ]
+        assert wf._active_ep_nodes == {"node_b"}
 
     def test_skip_incomplete_predecessors_marks_and_propagates(self) -> None:
         graph = _build_fanin_graph()
@@ -1050,14 +1129,14 @@ class TestConvergeAnyStrategy:
         """
         backend = InMemoryGraphBackend()
         backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
-        backend.add_node("node_a", {"id": "node_a", "type": "script", "parameters": {}})
-        backend.add_node("node_b", {"id": "node_b", "type": "script", "parameters": {}})
+        backend.add_node("node_a", {"id": "node_a", "type": "script_python", "parameters": {}})
+        backend.add_node("node_b", {"id": "node_b", "type": "script_python", "parameters": {}})
         backend.add_node(
             "converge_node",
             {"id": "converge_node", "type": "converge", "parameters": {"strategy": "any", "n_required": 1}},
         )
-        backend.add_node("node_c", {"id": "node_c", "type": "script", "parameters": {}})
-        backend.add_node("node_d", {"id": "node_d", "type": "script", "parameters": {}})
+        backend.add_node("node_c", {"id": "node_c", "type": "script_python", "parameters": {}})
+        backend.add_node("node_d", {"id": "node_d", "type": "script_python", "parameters": {}})
         backend.add_edge("trigger", "node_a", None)
         backend.add_edge("trigger", "node_b", None)
         backend.add_edge("node_a", "converge_node", None)
@@ -1084,15 +1163,15 @@ class TestConvergeAnyStrategy:
         """
         backend = InMemoryGraphBackend()
         backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
-        backend.add_node("node_a", {"id": "node_a", "type": "script", "parameters": {}})
-        backend.add_node("node_b", {"id": "node_b", "type": "script", "parameters": {}})
+        backend.add_node("node_a", {"id": "node_a", "type": "script_python", "parameters": {}})
+        backend.add_node("node_b", {"id": "node_b", "type": "script_python", "parameters": {}})
         backend.add_node(
             "converge_node",
             {"id": "converge_node", "type": "converge", "parameters": {"strategy": "any", "n_required": 1}},
         )
-        backend.add_node("node_c", {"id": "node_c", "type": "script", "parameters": {}})
-        backend.add_node("node_d", {"id": "node_d", "type": "script", "parameters": {}})
-        backend.add_node("node_e", {"id": "node_e", "type": "script", "parameters": {}})
+        backend.add_node("node_c", {"id": "node_c", "type": "script_python", "parameters": {}})
+        backend.add_node("node_d", {"id": "node_d", "type": "script_python", "parameters": {}})
+        backend.add_node("node_e", {"id": "node_e", "type": "script_python", "parameters": {}})
         backend.add_edge("trigger", "node_a", None)
         backend.add_edge("trigger", "node_b", None)
         backend.add_edge("node_a", "converge_node", None)
@@ -1121,14 +1200,14 @@ class TestConvergeAnyStrategy:
         """
         backend = InMemoryGraphBackend()
         backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
-        backend.add_node("node_a", {"id": "node_a", "type": "script", "parameters": {}})
-        backend.add_node("node_b", {"id": "node_b", "type": "script", "parameters": {}})
+        backend.add_node("node_a", {"id": "node_a", "type": "script_python", "parameters": {}})
+        backend.add_node("node_b", {"id": "node_b", "type": "script_python", "parameters": {}})
         backend.add_node(
             "converge_node",
             {"id": "converge_node", "type": "converge", "parameters": {"strategy": "any", "n_required": 1}},
         )
-        backend.add_node("node_c", {"id": "node_c", "type": "script", "parameters": {}})
-        backend.add_node("node_d", {"id": "node_d", "type": "script", "parameters": {}})
+        backend.add_node("node_c", {"id": "node_c", "type": "script_python", "parameters": {}})
+        backend.add_node("node_d", {"id": "node_d", "type": "script_python", "parameters": {}})
         backend.add_edge("trigger", "node_a", None)
         backend.add_edge("trigger", "node_b", None)
         backend.add_edge("node_a", "converge_node", None)
@@ -1549,7 +1628,12 @@ class TestErrorHandlingDownstreamSkipping:
     def test_mark_downstream_as_skipped_no_boundary_cascades_fully(self) -> None:
         """Without a boundary, the skip cascades to every reachable downstream node."""
         backend = InMemoryGraphBackend()
-        for nid, ntype in [("trigger", "manual_trigger"), ("a", "script"), ("b", "script"), ("c", "script")]:
+        for nid, ntype in [
+            ("trigger", "manual_trigger"),
+            ("a", "script_python"),
+            ("b", "script_python"),
+            ("c", "script_python"),
+        ]:
             backend.add_node(nid, {"id": nid, "type": ntype, "parameters": {}})
         backend.add_edge("trigger", "a", None)
         backend.add_edge("a", "b", None)
@@ -1571,9 +1655,9 @@ class TestErrorHandlingDownstreamSkipping:
         backend = InMemoryGraphBackend()
         for nid, ntype in [
             ("trigger", "manual_trigger"),
-            ("a", "script"),
-            ("b", "script"),
-            ("side", "script"),
+            ("a", "script_python"),
+            ("b", "script_python"),
+            ("side", "script_python"),
         ]:
             backend.add_node(nid, {"id": nid, "type": ntype, "parameters": {}})
         backend.add_edge("trigger", "a", None)
@@ -1597,9 +1681,9 @@ class TestErrorHandlingDownstreamSkipping:
         backend = InMemoryGraphBackend()
         for nid, ntype in [
             ("trigger", "manual_trigger"),
-            ("a", "script"),
-            ("b", "script"),
-            ("other", "script"),
+            ("a", "script_python"),
+            ("b", "script_python"),
+            ("other", "script_python"),
         ]:
             backend.add_node(nid, {"id": nid, "type": ntype, "parameters": {}})
         backend.add_edge("trigger", "a", None)
@@ -1728,15 +1812,15 @@ class TestConvergeIntermediateFailure:
         """ANY strategy: A -> X -> converge, B + C -> converge.  A fails, B + C running -> waits."""
         backend = InMemoryGraphBackend()
         backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
-        backend.add_node("node_a", {"id": "node_a", "type": "script", "parameters": {}})
-        backend.add_node("node_b", {"id": "node_b", "type": "script", "parameters": {}})
-        backend.add_node("node_c", {"id": "node_c", "type": "script", "parameters": {}})
-        backend.add_node("node_x", {"id": "node_x", "type": "script", "parameters": {}})
+        backend.add_node("node_a", {"id": "node_a", "type": "script_python", "parameters": {}})
+        backend.add_node("node_b", {"id": "node_b", "type": "script_python", "parameters": {}})
+        backend.add_node("node_c", {"id": "node_c", "type": "script_python", "parameters": {}})
+        backend.add_node("node_x", {"id": "node_x", "type": "script_python", "parameters": {}})
         backend.add_node(
             "converge_node",
             {"id": "converge_node", "type": "converge", "parameters": {"strategy": "any", "n_required": 2}},
         )
-        backend.add_node("node_d", {"id": "node_d", "type": "script", "parameters": {}})
+        backend.add_node("node_d", {"id": "node_d", "type": "script_python", "parameters": {}})
         backend.add_edge("trigger", "node_a", None)
         backend.add_edge("trigger", "node_b", None)
         backend.add_edge("trigger", "node_c", None)

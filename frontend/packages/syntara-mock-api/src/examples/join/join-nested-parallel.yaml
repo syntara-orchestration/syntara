@@ -10,30 +10,26 @@ nodes:
     type: parallel
 
   - id: branch1a
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       code: echo "Branch 1A"
 
   - id: branch1b
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       code: echo "Branch 1B"
 
   - id: group2
     type: parallel
 
   - id: branch2a
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       code: echo "Branch 2A"
 
   - id: branch2b
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       code: echo "Branch 2B"
 
   - id: join_groups

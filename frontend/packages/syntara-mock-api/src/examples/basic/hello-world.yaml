@@ -7,9 +7,8 @@ triggers:
     type: manual_trigger
 nodes:
   - id: say_hello
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       environment:
         GREETING: Hello
         WORLD_NAME: World
@@ -18,9 +17,8 @@ nodes:
         echo "Current time: $(date)"
 
   - id: say_goodbye
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       environment:
         FAREWELL: Goodbye
       code: |

@@ -69,7 +69,7 @@ test.describe('Approval Workflow Creation', () => {
 
       // Panel opens on the approved branch — use it directly without re-opening
       await expect(addStepPanel(app)).toHaveCount(1)
-      await selectCategoryAndStepType(app, 'Action', 'Script')
+      await selectCategoryAndStepType(app, 'Action', 'Python Script')
 
       const nameInput = app.getByRole('textbox', { name: 'Name', exact: true })
       await expect(nameInput).toBeVisible({ timeout: 10_000 })
@@ -94,7 +94,7 @@ test.describe('Approval Workflow Creation', () => {
 
         // Panel opens on the rejected branch — use it directly
         await expect(addStepPanel(app)).toHaveCount(1)
-        await selectCategoryAndStepType(app, 'Action', 'Script')
+        await selectCategoryAndStepType(app, 'Action', 'Python Script')
 
         const rollbackNameInput = app.getByRole('textbox', { name: 'Name', exact: true })
         await expect(rollbackNameInput).toBeVisible({ timeout: 10_000 })

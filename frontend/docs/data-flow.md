@@ -337,11 +337,11 @@ With the v2 API, the backend and builder share the same flat format. No nestedâ†
 ```typescript
 {
   schema_version: '2.0.0',
-  triggers: [{ id: 'manual_trigger', type: 'manual_trigger', config: {} }],
+  triggers: [{ id: 'manual_trigger', type: 'manual_trigger', parameters: {} }],
   nodes: [
-    { id: 'condition1', type: 'condition', config: { expression: '...' } },
-    { id: 'task1', type: 'script', config: { language: 'python', code: '...' } },
-    { id: 'task2', type: 'script', config: { ... } },
+    { id: 'condition1', type: 'condition', parameters: { condition: '...' } },
+    { id: 'task1', type: 'script_python', parameters: { code: '...' } },
+    { id: 'task2', type: 'script_bash', parameters: { code: '...' } },
   ],
   edges: [
     { from: 'manual_trigger', to: 'condition1' },

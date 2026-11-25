@@ -1,4 +1,5 @@
 import type { IntegrationsAPI } from '@syntara/contracts'
+import { useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
 
 import { AppRoute } from '../../../app/AppRoute'
@@ -8,10 +9,14 @@ import { useAlerts } from '../../../providers/alerts/AlertContext'
 import { getErrorMessage } from '../../../utils/apiErrors'
 import { detachPromise } from '../../../utils/detachPromise'
 
+import { OPENSHIFT_INTEGRATION_EXISTS_QUERY_KEY } from './form/useOpenShiftIntegrationExists'
+import { isExecutionPlaneInfrastructure } from './integrationUtils'
+
 type IntegrationRead = IntegrationsAPI.components['schemas']['IntegrationRead']
 
 export function useIntegrationActions(refetch: () => Promise<unknown>) {
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const { showAlert } = useAlerts()
 
   const validateDialog = useDialogState<IntegrationRead>()
@@ -71,6 +76,7 @@ export function useIntegrationActions(refetch: () => Promise<unknown>) {
             variant: 'success',
             autoDismiss: true,
           })
+          detachPromise(queryClient.invalidateQueries({ queryKey: OPENSHIFT_INTEGRATION_EXISTS_QUERY_KEY }))
           detachPromise(refetch())
           detachPromise(navigate({ to: AppRoute.Configuration.Integrations.Root }))
         },
@@ -89,6 +95,8 @@ export function useIntegrationActions(refetch: () => Promise<unknown>) {
 
   function handleToggleEnabled(integration: IntegrationRead) {
     if (!integration.id) return
+    // MVP: Execution plane infrastructure cannot be disabled in the UI.
+    if (isExecutionPlaneInfrastructure(integration)) return
 
     if (integration.enabled) {
       disableDialog.open(integration)

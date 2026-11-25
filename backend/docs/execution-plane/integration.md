@@ -1,0 +1,174 @@
+# Syntara and Execution Plane integration
+
+AO owns user authentication, authorization, the public API, Temporal workflow
+dispatch, and integration records. EP is a separately deployed service that
+owns accepted work, cluster and target state, execution attempts, result
+persistence, and completion delivery. AO calls EP through its authenticated
+versioned HTTP API. AO does not import EP persistence code, connect to the EP
+database, or run EP workers in its Temporal processes.
+
+For the first deployment, AO and EP may use the existing PostgreSQL server, but
+EP uses a distinct database with EP-owned runtime and migration roles. Neither
+service's runtime role can connect to the other service database.
+
+## Execution-target API
+
+AO exposes `/api/execution_plane/v1`; target resources are EP `ExecutionTarget` records.
+
+| Method and path | Success |
+| --- | --- |
+| `GET /execution_targets` | 200 cursor page |
+| `GET /execution_targets/{target_id}` | 200 target |
+| `POST /execution_targets` | 201 target with `Location` |
+| `PATCH /execution_targets/{target_id}` | 200 target |
+| `DELETE /execution_targets/{target_id}` | 202 `{id, accepted: true}` |
+
+### Permissions
+
+Syntara enforces user permissions before calling EP with its privileged service
+identity. All facade permissions are system-scoped; project membership does not
+grant access to this inventory. Administrators receive all five permissions,
+auditors receive both read permissions, and custom system roles can grant each
+permission independently using the corresponding built-in `:any` policy.
+
+| Operation | Permission |
+| --- | --- |
+| List/get targets, target health, target usage | `execution_target:read` |
+| Create target | `execution_target:create` |
+| Update target (including enabled/default state) | `execution_target:update` |
+| Delete target | `execution_target:delete` |
+| List work items | `work_item:read` |
+
+Target usage exposes only an aggregate workload count under target-read access;
+reading work-item records requires the separate work-item permission. Health
+probes use target-read permission even though Syntara dispatches an EP command.
+EP's service-token scopes are independent of these user-facing permissions.
+
+The facade integration suite uses the existing PostgreSQL/Rego fixtures and
+mocks only EP HTTP responses. The live role-grant/revocation case is
+`tests/e2e/authz/test_execution_plane_permissions.py`; run it with
+`make -C backend test-e2e-ep E2E_TARGET=authz/test_execution_plane_permissions.py`.
+Against an existing deployment, set `APP_BASE_URL` and `EP_API_URL` and use
+`test-e2e` with the same target. The deployment must have an execution target.
+
+### Target payloads
+
+`POST` and `PATCH` accept `name`, `placement`, `labels`, and `is_default`, mapped
+to the corresponding EP `ExecutionTarget` fields. AO supplies `cluster_id` and
+`endpoint` from the installed cluster and sets `backend_type="vanilla_k8s"` on create.
+The current placement type is `KubernetesPlacement`, with `namespace`,
+`node_selectors`, and `tolerations`. `POST` requires `name` and `placement.namespace`;
+a `PATCH` containing `placement` also requires `placement.namespace`.
+`PATCH` leaves omitted fields unchanged. Supplied `labels` replace user labels;
+`labels: {}` clears them. Empty `node_selectors` or `tolerations` lists clear those lists.
+`is_default=true` promotes the target. Deleting or demoting the current default
+returns 409 until another target is promoted.
+Integration writes save cluster configuration directly through EP commands;
+execution-target placement remains independently managed.
+See [read-query semantics](read-query-contract.md) and the generated EP OpenAPI for field schemas.
+
+## Work and completion
+
+AO validates a script node, selects its digest-pinned image, persists an
+encrypted request binding with the Temporal task token, and submits a versioned
+invocation to EP over HTTP. It retries a lost or unavailable submission with
+the same request ID and frozen payload. EP's API stores the request in its own
+database; EP's worker dispatches it independently.
+
+The cold-start EP backend allocates a one-attempt Kubernetes Job and talks to
+the SDK node runtime only over gRPC, tunneled through the authenticated
+Kubernetes API port-forward. The gRPC protocol carries invocation data,
+progress, errors, stdout/stderr fields, and final output. EP does not create a
+workload input Secret, read Pod logs, use `exec`, or connect directly to
+Temporal. The Job/Pod lifecycle is an implementation detail of this cold-start
+backend; a future worker manager can attach to an existing worker without
+changing WorkItem semantics.
+
+EP commits results to a durable outbox and delivers them to AO by authenticated
+callback. AO deduplicates callbacks in its inbox and bridges the result to the
+original Temporal activity. If a callback is missing, AO can reconcile a
+terminal EP result through the status API. An uncertain gRPC outcome becomes
+`reconciliation_required`: EP does not rerun that attempt, emits the state to
+AO, and AO fails the activity with `WorkloadOutcomeUnknownError` while
+preserving EP's WorkItem for operator investigation.
+
+AO cancellation is persisted and delivered to EP by stable request ID. EP
+forwards cooperative cancellation over gRPC and only reports confirmed
+cancellation after the cold-start worker has stopped. A result received during
+the cancellation race wins.
+
+`reconcile_work_item_cancellations` compares live EP work against existing
+cancelled AO executions and retries cancellation independently for each item.
+It uses existing execution/activity records; it does not create retry records.
+A coordinated periodic worker runs in the Temporal worker process when EP is
+configured. It waits 30 minutes before its first pass and between completed passes.
+Set `APP_EP_CANCELLATION_RECONCILIATION_INTERVAL_SECONDS` to override the default
+1800-second interval. PostgreSQL advisory locking prevents overlapping passes
+across worker replicas; failed cycles are retried on the next interval.
+
+After project or workflow deletion commits, a background task pages through EP
+WorkItems filtered by `runtime_context[project_id]` or `runtime_context[workflow_id]`
+and sends `work.delete` for each match. EP persists deletion intent, cancels active
+work, and removes its record after resource cleanup. EP request failures are logged without undoing
+AO deletion. There is no AO deletion reconciler; broader execution cleanup,
+including deletion by an age threshold, is separate planned work.
+
+## Integration configuration
+
+OpenShift updates to cluster-synchronized fields require EP acceptance before AO
+commits. Conflicts return 409, unavailability returns 503, and invalid responses
+return 502. Failed updates roll back the patch and emit a failure audit event.
+Creation and project-assignment changes use best-effort, post-commit delivery.
+
+The Temporal worker reconciles committed configuration every five minutes via
+`APP_EP_CLUSTER_RECONCILIATION_INTERVAL_SECONDS` (default `300`). Reconciliation
+runs share an advisory lock; each delivery holds the Integration row lock through
+submission. Each integration gets one bounded attempt, with failures isolated.
+If AO commit fails after EP acceptance, reconciliation reapplies committed state.
+Timeouts can leave EP outcomes unknown; semantic conflicts require intervention.
+
+Run `automation-orchestrator-admin reconcile-clusters [--integration-id UUID]`
+for one manual pass; failures or a skipped busy pass produce a nonzero exit code.
+Cluster registration upserts by the shared Integration/Cluster UUID. Deletion is
+explicit and subject to EP protections; reconciliation does not delete orphans.
+
+Work completion is independent of this configuration lifecycle; see
+[activity binding status progression](activity-binding-status.md).
+
+## Combined-service smoke evidence
+
+On 6 October 2026, the current AO and EP migration branches were run together
+against separate AO and EP databases on one PostgreSQL server and a local Kind
+cluster. The enabled script-node workflow completed through the AO API, EP API,
+EP worker, Kubernetes Job, SDK gRPC transport, durable EP completion event,
+authenticated AO callback, and Temporal activity. The persisted EP result had
+`stdout = "gate test\n"`, an empty `stderr`, exit code `0`, and completed
+resource cleanup. The EP callback received AO's `202 Accepted` response. The
+focused PostgreSQL persistence tests and EP unit suite also passed.
+
+The smoke test found and fixed two integration blockers: the dispatcher Role
+needed `get` on `pods/portforward` (the API-server connect request is GET), and
+HTTPX skipped loading EP's client certificate when its CA was configured as a
+string path. EP now builds an SSL context with the CA and client certificate
+loaded together. The Role's narrow permission set was checked: port-forward
+access succeeds, while Pod logs and exec remain denied.
+
+A separate HTTP executor smoke run in the EP Kind demo runbook submitted the
+SDK HTTP executor image directly to EP and verified a successful
+HTTP response over the Job/gRPC path and completed cleanup. It used the current
+first-release WorkItem contract and did not run AO's native `http_request`
+activity or the AO-to-EP callback path.
+
+This is evidence for the happy path, not full release qualification. The local
+Kind cluster uses kindnet, which does not enforce NetworkPolicies. A separate
+Calico Kind attempt could not start because its containerd exhausted available
+inotify watchers, and the current OpenShift login was unauthorized. Therefore
+actual allowed-versus-blocked network traffic remains unverified and must be
+tested on an enforcing CNI, preferably the target OpenShift environment. The
+callback outage/restart, cancellation, startup failure, ambiguous Execute,
+database-role isolation, and migration-upgrade scenarios in the EP Kind demo
+runbook also remain release checks.
+
+The merged monorepo Kind/Konflux harnesses that run Alembic from AO, write EP
+tables directly, or connect EP to Temporal are not retained as validation for
+this service boundary.

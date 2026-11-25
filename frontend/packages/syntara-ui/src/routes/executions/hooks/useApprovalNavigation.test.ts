@@ -16,7 +16,7 @@ const mockApprovals: Approval[] = [
     next_step_approved: {
       id: 'approved-step',
       name: 'Approved Step',
-      type: 'script',
+      type: 'script_python',
     },
     workflow_context: {
       workflow_name: 'Test Workflow',
@@ -35,7 +35,7 @@ const mockApprovals: Approval[] = [
     next_step_approved: {
       id: 'approved-step',
       name: 'Approved Step',
-      type: 'script',
+      type: 'script_python',
     },
     workflow_context: {
       workflow_name: 'Test Workflow',
@@ -54,7 +54,7 @@ const mockApprovals: Approval[] = [
     next_step_approved: {
       id: 'approved-step',
       name: 'Approved Step',
-      type: 'script',
+      type: 'script_python',
     },
     workflow_context: {
       workflow_name: 'Test Workflow',

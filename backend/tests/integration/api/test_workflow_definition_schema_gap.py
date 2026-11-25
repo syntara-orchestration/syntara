@@ -39,7 +39,7 @@ async def test_node_missing_config(jwt_client: AsyncClient) -> None:
     """Node without config violates node_base required fields."""
     payload = _base_payload("node-missing-config")
     payload["workflow_definition"]["nodes"] = [
-        {"id": "n1", "type": "script"},
+        {"id": "n1", "type": "script_python"},
     ]
 
     response = await jwt_client.post("/api/v1/workflows", json=payload)
@@ -52,7 +52,7 @@ async def test_node_missing_id(jwt_client: AsyncClient) -> None:
     """Node without id violates node_base required fields."""
     payload = _base_payload("node-missing-id")
     payload["workflow_definition"]["nodes"] = [
-        {"type": "script", "parameters": {"language": "python", "code": "x"}},
+        {"type": "script_python", "parameters": {"code": "x"}},
     ]
 
     response = await jwt_client.post("/api/v1/workflows", json=payload)
@@ -65,7 +65,7 @@ async def test_invalid_node_id_pattern(jwt_client: AsyncClient) -> None:
     """Node ID starting with digit violates pattern ^[a-zA-Z_][a-zA-Z0-9_]*$."""
     payload = _base_payload("invalid-node-id")
     payload["workflow_definition"]["nodes"] = [
-        {"id": "123-starts-with-digit!", "type": "script", "parameters": {"language": "python", "code": "x"}},
+        {"id": "123-starts-with-digit!", "type": "script_python", "parameters": {"code": "x"}},
     ]
 
     response = await jwt_client.post("/api/v1/workflows", json=payload)

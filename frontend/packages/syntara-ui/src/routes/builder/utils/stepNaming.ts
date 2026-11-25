@@ -1,3 +1,5 @@
+import { ExecutorTypeEnum } from '@syntara/contracts'
+
 import { RegistryStepId } from '../../../constants/registryStepIds'
 import { useWorkflowStore } from '../../../stores/useWorkflowStore'
 import { generateUUID } from '../../../utils/generateUUID'
@@ -93,8 +95,9 @@ export function getDefaultStepBaseName({
 
   if (stepTypeId === RegistryStepId.ACTION) {
     const executor = initialData?.executor as string | undefined
-    if (executor === 'http_request') return 'REST API'
-    if (executor === 'script') return 'Script'
+    if (executor === ExecutorTypeEnum.HTTP_REQUEST) return 'REST API'
+    if (executor === ExecutorTypeEnum.SCRIPT_BASH) return 'Bash Script'
+    if (executor === ExecutorTypeEnum.SCRIPT_PYTHON) return 'Python Script'
   }
 
   if (stepSubtypeId) {

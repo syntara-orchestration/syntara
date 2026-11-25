@@ -9,9 +9,7 @@ import {
   Skeleton,
   Stack,
   StackItem,
-  Switch,
   Tab,
-  Tooltip,
 } from '@patternfly/react-core'
 import { RhUiCheckCircleIcon, RhUiTrashIcon, RhUiWarningIcon } from '@patternfly/react-icons'
 import type { IntegrationsAPI } from '@syntara/contracts'
@@ -41,8 +39,10 @@ import { useUrlTab } from '../../../hooks/useUrlTab'
 import { detachPromise } from '../../../utils/detachPromise'
 import { useDocLink } from '../../../utils/docs/useDocLink'
 
+import { ExecutionPlaneEnabledState } from './ExecutionPlaneEnabledState'
 import styles from './IntegrationDetail.module.css'
 import { IntegrationDialogs } from './IntegrationDialogs'
+import { IntegrationEnabledSwitch } from './IntegrationEnabledSwitch'
 import { INTEGRATION_TYPE_LABELS, PROVIDER_HINT_LABELS } from './integrationFilters'
 import {
   getBaseUrl,
@@ -50,6 +50,7 @@ import {
   getProviderHint,
   getResourceNoun,
   getTotalResourceCount,
+  isExecutionPlaneInfrastructure,
   isLLMProvider,
 } from './integrationUtils'
 import { ResourcesTabContent } from './ResourcesTabContent'
@@ -112,6 +113,11 @@ function IntegrationDetailsTab({
               errorMessage={integration.validation_error}
             />
           </SynDetail>
+          {isExecutionPlaneInfrastructure(integration) && (
+            <SynDetail label="State">
+              <ExecutionPlaneEnabledState enabled={integration.enabled} />
+            </SynDetail>
+          )}
           <SynDetail label="Last checked">
             <DateCell dateString={integration.last_validated_at} />
           </SynDetail>
@@ -172,23 +178,14 @@ function IntegrationToolbar({
 }>) {
   return (
     <>
-      {permissions.isLoading || !permissions.canUpdate ? (
-        <Tooltip content={permissions.tooltips.enable}>
-          <Switch
-            id="integration-enabled-toggle"
-            label={integration.enabled ? 'Enabled' : 'Disabled'}
-            isChecked={integration.enabled ?? true}
-            isDisabled
-            aria-label={`Toggle ${integration.name}`}
-          />
-        </Tooltip>
-      ) : (
-        <Switch
-          id="integration-enabled-toggle"
-          label={integration.enabled ? 'Enabled' : 'Disabled'}
-          isChecked={integration.enabled ?? true}
-          onChange={onToggleEnabled}
-          aria-label={`Toggle ${integration.name}`}
+      {!isExecutionPlaneInfrastructure(integration) && (
+        <IntegrationEnabledSwitch
+          integration={integration}
+          switchId="integration-enabled-toggle"
+          canUpdate={permissions.canUpdate}
+          isPermissionsLoading={permissions.isLoading}
+          updateDeniedTooltip={permissions.tooltips.enable}
+          onToggle={onToggleEnabled}
         />
       )}
       <DisabledWithTooltip isDisabled={!permissions.canUpdate} content={permissions.tooltips.update}>
@@ -207,7 +204,7 @@ function buildKebabActions(
   deleteDialog: { open: (item: IntegrationRead) => void },
   permissions: IntegrationPermissions
 ): KebabAction[] {
-  return [
+  const actions: KebabAction[] = [
     {
       key: 'validate',
       title: <IconLabel icon={<RhUiCheckCircleIcon />}>Validate integration</IconLabel>,
@@ -219,20 +216,23 @@ function buildKebabActions(
           }
         : undefined,
     },
-    { key: 'separator', isSeparator: true },
-    {
-      key: 'delete',
-      title: <IconLabel icon={<RhUiTrashIcon />}>Delete integration</IconLabel>,
-      isDanger: true,
-      isAriaDisabled: !permissions.canDelete,
-      tooltipProps: permissions.canDelete ? undefined : { content: permissions.tooltips.delete },
-      onClick: permissions.canDelete
-        ? () => {
-            if (integration) deleteDialog.open(integration)
-          }
-        : undefined,
-    },
   ]
+
+  if (integration && !isExecutionPlaneInfrastructure(integration)) {
+    actions.push(
+      { key: 'separator', isSeparator: true },
+      {
+        key: 'delete',
+        title: <IconLabel icon={<RhUiTrashIcon />}>Delete integration</IconLabel>,
+        isDanger: true,
+        isAriaDisabled: !permissions.canDelete,
+        tooltipProps: permissions.canDelete ? undefined : { content: permissions.tooltips.delete },
+        onClick: permissions.canDelete ? () => deleteDialog.open(integration) : undefined,
+      }
+    )
+  }
+
+  return actions
 }
 
 function ResourcesFooter({

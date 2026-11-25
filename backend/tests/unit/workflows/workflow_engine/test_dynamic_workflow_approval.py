@@ -69,6 +69,7 @@ def _make_workflow(
     wf._timeout_tasks = {}
     wf._timed_out_converge_nodes = set()
     wf._detached_nodes = set()
+    wf._active_ep_nodes = set()
     wf._converge_branch_nodes = {}
     wf._secret_values = set()
     init_workflow_runtime(wf)
@@ -97,7 +98,7 @@ def _build_approval_graph(*, with_predecessor: bool = True, with_successor: bool
     if with_predecessor:
         backend.add_node(
             "scan",
-            {"id": "scan", "type": "script", "name": "Security Scan", "parameters": {}},
+            {"id": "scan", "type": "script_python", "name": "Security Scan", "parameters": {}},
         )
         backend.add_edge("trigger", "scan", None)
         backend.add_edge("scan", "approval", None)
@@ -107,7 +108,7 @@ def _build_approval_graph(*, with_predecessor: bool = True, with_successor: bool
     if with_successor:
         backend.add_node(
             "deploy",
-            {"id": "deploy", "type": "script", "name": "Deploy to Prod", "parameters": {}},
+            {"id": "deploy", "type": "script_python", "name": "Deploy to Prod", "parameters": {}},
         )
         backend.add_edge("approval", "deploy", {"from_port": "approved"})
 
@@ -142,7 +143,7 @@ class TestGetPreviousStepContext:
         assert result is not None
         assert result["id"] == "scan"
         assert result["name"] == "Security Scan"
-        assert result["type"] == "script"
+        assert result["type"] == "script_python"
         assert result["output"] == {"vulnerabilities": 0, "passed": True}
 
     def test_uses_node_id_when_name_missing(self) -> None:
@@ -330,7 +331,7 @@ class TestPrepareApprovalArgs:
         next_step = args[3]
         assert next_step["id"] == "deploy"
         assert next_step["name"] == "Deploy to Prod"
-        assert next_step["type"] == "script"
+        assert next_step["type"] == "script_python"
 
     @pytest.mark.asyncio
     async def test_raises_when_no_approved_successor(self) -> None:
@@ -484,7 +485,7 @@ class TestPrepareApprovalArgs:
         backend = InMemoryGraphBackend()
         backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
         backend.add_node("my_approval", {"id": "my_approval", "type": "approval", "parameters": {}})
-        backend.add_node("next", {"id": "next", "type": "script", "name": "Next Step", "parameters": {}})
+        backend.add_node("next", {"id": "next", "type": "script_python", "name": "Next Step", "parameters": {}})
         backend.add_edge("trigger", "my_approval", None)
         backend.add_edge("my_approval", "next", {"from_port": "approved"})
         graph = WorkflowGraph(backend)
@@ -1034,7 +1035,7 @@ class TestExpireRemainingApprovals:
         """Detached nodes that aren't approval-type are not passed to the fail-activity call."""
         wf = _make_workflow(execution_id="exec-789")
         graph = _build_approval_graph(with_predecessor=True, with_successor=False)
-        wf._detached_nodes = {"scan"}  # a "script" typed node, not an approval
+        wf._detached_nodes = {"scan"}  # a Python script node, not an approval
         mock_execute_activity = AsyncMock(return_value={"expired_count": 0})
         mock_execute_local_activity = AsyncMock(return_value=None)
 

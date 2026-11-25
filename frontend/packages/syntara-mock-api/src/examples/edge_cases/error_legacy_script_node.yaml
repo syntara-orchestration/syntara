@@ -1,0 +1,17 @@
+---
+schema_version: "2.0.0"
+name: error-legacy-script-node
+description: Test that the removed generic script node type is rejected
+
+triggers:
+  - id: trigger_manual
+    type: manual_trigger
+
+nodes:
+  - id: legacy_script
+    name: Removed Generic Script Node
+    type: script
+    parameters:
+      code: |
+        print("This should fail")
+edges: []

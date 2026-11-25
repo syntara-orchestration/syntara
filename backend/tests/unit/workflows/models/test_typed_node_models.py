@@ -137,13 +137,21 @@ class TestWorkflowNodeDiscriminatedUnion:
             }
         )
 
-    def test_script_node(self) -> None:
+    def test_bash_script_node(self) -> None:
         wf = self._make_workflow(
             [
-                {"id": "n1", "type": "script", "parameters": {"language": "bash", "code": "echo hi"}},
+                {"id": "n1", "type": "script_bash", "parameters": {"code": "echo hi"}},
             ]
         )
-        assert type(wf.nodes[0]).__name__ == "ScriptNode"
+        assert type(wf.nodes[0]).__name__ == "BashScriptNode"
+
+    def test_python_script_node(self) -> None:
+        wf = self._make_workflow(
+            [
+                {"id": "n1", "type": "script_python", "parameters": {"code": "print('hi')"}},
+            ]
+        )
+        assert type(wf.nodes[0]).__name__ == "PythonScriptNode"
 
     def test_switch_node(self) -> None:
         wf = self._make_workflow(
@@ -247,7 +255,7 @@ class TestModelDumpExcludeDefaults:
                 "schema_version": "2.0.0",
                 "name": "test",
                 "triggers": [{"id": "trigger", "type": "manual_trigger", "parameters": {}}],
-                "nodes": [{"id": "n1", "type": "script", "parameters": {"language": "bash", "code": "echo"}}],
+                "nodes": [{"id": "n1", "type": "script_bash", "parameters": {"code": "echo"}}],
                 "edges": [],
             }
         )
@@ -267,9 +275,9 @@ class TestModelDumpExcludeDefaults:
                 "nodes": [
                     {
                         "id": "n1",
-                        "type": "script",
+                        "type": "script_bash",
                         "name": "My Script",
-                        "parameters": {"language": "bash", "code": "echo"},
+                        "parameters": {"code": "echo"},
                         "settings": {"timeout": 5},
                     }
                 ],
@@ -320,8 +328,8 @@ class TestWorkflowNodeBaseFields:
                 "nodes": [
                     {
                         "id": "n1",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo"},
                         "position": {"x": 100.0, "y": 200.0},
                     }
                 ],
@@ -340,8 +348,8 @@ class TestWorkflowNodeBaseFields:
                 "nodes": [
                     {
                         "id": "n1",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo"},
                         "outputs": {"result": "${result.stdout}"},
                     }
                 ],
@@ -355,7 +363,7 @@ class TestRoundTrip:
     """Test that validate → dump → validate produces identical results (no data loss)."""
 
     _NODE_FIXTURES: ClassVar[list[dict[str, Any]]] = [
-        {"id": "n1", "type": "script", "name": "S", "parameters": {"language": "bash", "code": "echo"}},
+        {"id": "n1", "type": "script_bash", "name": "S", "parameters": {"code": "echo"}},
         {"id": "n2", "type": "http_request", "parameters": {"method": "GET", "url": "http://x.com"}},
         {"id": "n3", "type": "agentic", "parameters": {"prompt": "do"}},
         {"id": "n4", "type": "condition", "parameters": {"condition": "1==1"}},

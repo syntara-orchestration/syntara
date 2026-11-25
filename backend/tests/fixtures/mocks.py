@@ -36,3 +36,14 @@ def mock_token_calculator() -> Mock:
 def mock_compressor() -> AsyncMock:
     """Create a mock CompressorService for testing."""
     return AsyncMock()
+
+
+@pytest.fixture
+def ep_deletion_acknowledged(monkeypatch):
+    """Isolate unrelated deletion tests from EP; lifecycle tests exercise failure ordering."""
+    from syntara.execution_plane import deletion
+
+    client = AsyncMock()
+    client.__aenter__.return_value = client
+    monkeypatch.setattr(deletion, "ExecutionPlaneHttpClient", lambda: client)
+    return client.delete_work_items

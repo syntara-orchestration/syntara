@@ -13,6 +13,7 @@ from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
     from ..models.agentic_executor_parameters_response_schema_type_0 import AgenticExecutorParametersResponseSchemaType0
+    from ..models.credential_binding import CredentialBinding
     from ..models.integration_connection_config import IntegrationConnectionConfig
 
 
@@ -28,6 +29,8 @@ class AgenticExecutorParameters:
         agent (None | str | Unset):
         llm_model_id (None | str | Unset): UUID of the LLMModel record identifying the provider integration and model.
         credential_id (None | str | Unset): Syntara credential UUID for LLM provider authentication
+        credential_bindings (list[CredentialBinding] | Unset): Host-side recipe-to-credential bindings for Execution
+            Plane dispatch.
         file_ids (list[str] | Unset): File IDs for agent context
         response_schema (AgenticExecutorParametersResponseSchemaType0 | None | str | Unset): JSON Schema for structured
             output. When defined, agent output conforms to this schema.
@@ -43,6 +46,7 @@ class AgenticExecutorParameters:
     agent: None | str | Unset = UNSET
     llm_model_id: None | str | Unset = UNSET
     credential_id: None | str | Unset = UNSET
+    credential_bindings: list[CredentialBinding] | Unset = UNSET
     file_ids: list[str] | Unset = UNSET
     response_schema: AgenticExecutorParametersResponseSchemaType0 | None | str | Unset = UNSET
     integration_connections: list[IntegrationConnectionConfig] | None | Unset = UNSET
@@ -74,6 +78,13 @@ class AgenticExecutorParameters:
             credential_id = UNSET
         else:
             credential_id = self.credential_id
+
+        credential_bindings: list[dict[str, Any]] | Unset = UNSET
+        if not isinstance(self.credential_bindings, Unset):
+            credential_bindings = []
+            for credential_bindings_item_data in self.credential_bindings:
+                credential_bindings_item = credential_bindings_item_data.to_dict()
+                credential_bindings.append(credential_bindings_item)
 
         file_ids: list[str] | Unset = UNSET
         if not isinstance(self.file_ids, Unset):
@@ -124,6 +135,8 @@ class AgenticExecutorParameters:
             field_dict["llm_model_id"] = llm_model_id
         if credential_id is not UNSET:
             field_dict["credential_id"] = credential_id
+        if credential_bindings is not UNSET:
+            field_dict["credential_bindings"] = credential_bindings
         if file_ids is not UNSET:
             field_dict["file_ids"] = file_ids
         if response_schema is not UNSET:
@@ -142,6 +155,7 @@ class AgenticExecutorParameters:
         from ..models.agentic_executor_parameters_response_schema_type_0 import (
             AgenticExecutorParametersResponseSchemaType0,
         )
+        from ..models.credential_binding import CredentialBinding
         from ..models.integration_connection_config import IntegrationConnectionConfig
 
         d = dict(src_dict)
@@ -173,6 +187,15 @@ class AgenticExecutorParameters:
             return cast(None | str | Unset, data)
 
         credential_id = _parse_credential_id(d.pop("credential_id", UNSET))
+
+        _credential_bindings = d.pop("credential_bindings", UNSET)
+        credential_bindings: list[CredentialBinding] | Unset = UNSET
+        if _credential_bindings is not UNSET:
+            credential_bindings = []
+            for credential_bindings_item_data in _credential_bindings:
+                credential_bindings_item = CredentialBinding.from_dict(credential_bindings_item_data)
+
+                credential_bindings.append(credential_bindings_item)
 
         file_ids = cast(list[str], d.pop("file_ids", UNSET))
 
@@ -243,6 +266,7 @@ class AgenticExecutorParameters:
             agent=agent,
             llm_model_id=llm_model_id,
             credential_id=credential_id,
+            credential_bindings=credential_bindings,
             file_ids=file_ids,
             response_schema=response_schema,
             integration_connections=integration_connections,

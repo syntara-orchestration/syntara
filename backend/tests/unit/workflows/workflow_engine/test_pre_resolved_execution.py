@@ -54,11 +54,13 @@ def _make_workflow(
     wf._timeout_tasks = {}
     wf._timed_out_converge_nodes = set()
     wf._detached_nodes = set()
+    wf._active_ep_nodes = set()
     wf._converge_branch_nodes = {}
     init_workflow_runtime(wf)
     wf.pre_resolved_outputs = pre_resolved_outputs if pre_resolved_outputs is not None else {}
     wf.stop_after_nodes = stop_after_nodes if stop_after_nodes is not None else set()
     wf.execution_id = "test-exec-id"
+    wf._project_id = ""
     wf.request_id = None
     return wf
 
@@ -67,9 +69,9 @@ def _build_linear_graph() -> WorkflowGraph:
     """Build: trigger -> node_a -> node_b -> node_c (linear chain)."""
     backend = InMemoryGraphBackend()
     backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
-    backend.add_node("node_a", {"id": "node_a", "type": "script", "parameters": {"command": "echo A"}})
-    backend.add_node("node_b", {"id": "node_b", "type": "script", "parameters": {"command": "echo B"}})
-    backend.add_node("node_c", {"id": "node_c", "type": "script", "parameters": {"command": "echo C"}})
+    backend.add_node("node_a", {"id": "node_a", "type": "script_python", "parameters": {"command": "echo A"}})
+    backend.add_node("node_b", {"id": "node_b", "type": "script_python", "parameters": {"command": "echo B"}})
+    backend.add_node("node_c", {"id": "node_c", "type": "script_python", "parameters": {"command": "echo C"}})
     backend.add_edge("trigger", "node_a", None)
     backend.add_edge("node_a", "node_b", None)
     backend.add_edge("node_b", "node_c", None)
@@ -81,8 +83,8 @@ def _build_condition_graph() -> WorkflowGraph:
     backend = InMemoryGraphBackend()
     backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
     backend.add_node("cond", {"id": "cond", "type": "condition", "parameters": {"condition": "true"}})
-    backend.add_node("node_a", {"id": "node_a", "type": "script", "parameters": {"command": "echo A"}})
-    backend.add_node("node_b", {"id": "node_b", "type": "script", "parameters": {"command": "echo B"}})
+    backend.add_node("node_a", {"id": "node_a", "type": "script_python", "parameters": {"command": "echo A"}})
+    backend.add_node("node_b", {"id": "node_b", "type": "script_python", "parameters": {"command": "echo B"}})
     backend.add_edge("trigger", "cond", None)
     backend.add_edge("cond", "node_a", {"from_port": "true"})
     backend.add_edge("cond", "node_b", {"from_port": "false"})

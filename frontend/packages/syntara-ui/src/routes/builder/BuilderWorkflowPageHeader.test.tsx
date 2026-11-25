@@ -12,7 +12,7 @@ import styles from './BuilderWorkflowPageHeader.module.css'
 const mockWorkflowStoreState = vi.hoisted(() => ({
   isDirty: false,
   currentWorkflow: {
-    workflow: { activities: [{ id: 'n1', type: 'script', name: 'Step', parameters: {} }] },
+    workflow: { activities: [{ id: 'n1', type: 'script_python', name: 'Step', parameters: {} }] },
   },
 }))
 

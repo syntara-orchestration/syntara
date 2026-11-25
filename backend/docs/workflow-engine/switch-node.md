@@ -132,33 +132,29 @@ nodes:
 
   - id: handle_approved
     name: Process approval
-    type: script
+    type: script_python
     config:
-      language: python
       code: |
         print("Request approved — proceeding with fulfillment")
 
   - id: handle_rejected
     name: Process rejection
-    type: script
+    type: script_python
     config:
-      language: python
       code: |
         print("Request rejected — notifying requester")
 
   - id: handle_escalated
     name: Process escalation
-    type: script
+    type: script_python
     config:
-      language: python
       code: |
         print("Request escalated — routing to manager")
 
   - id: handle_unknown
     name: Handle unknown status
-    type: script
+    type: script_python
     config:
-      language: python
       code: |
         print("Unknown status — logging for review")
 

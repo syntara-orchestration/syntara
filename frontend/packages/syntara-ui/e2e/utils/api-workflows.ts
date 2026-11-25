@@ -111,9 +111,9 @@ export async function createBasicWorkflowViaApi(
           nodes: [
             {
               id: 'action_1',
-              type: 'script',
+              type: 'script_python',
               name: actionName,
-              parameters: { language: 'python', code: 'print("hello")' },
+              parameters: { code: 'print("hello")' },
             },
           ],
           edges: [{ from: 'trigger_1', to: 'action_1' }],
@@ -135,9 +135,9 @@ export async function createBasicWorkflowViaApi(
     nodes: [
       {
         id: 'action_1',
-        type: 'script',
+        type: 'script_python',
         name: actionName,
-        parameters: { language: 'python', code: 'print("hello")' },
+        parameters: { code: 'print("hello")' },
       },
     ],
     edges: [{ from: 'trigger_1', to: 'action_1' }],

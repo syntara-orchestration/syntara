@@ -9,6 +9,7 @@ import { integrationsClient } from '../../../client'
 import { AlertProvider } from '../../../providers/alerts/AlertProvider'
 
 import { EditIntegrationForm } from './EditIntegrationForm'
+import { EXECUTION_PLANE_SCOPE_HELP } from './integrationFieldHelpText'
 
 vi.mock('../../../client', () => ({
   integrationsClient: {
@@ -123,6 +124,33 @@ const mockAapIntegration = {
     ca_certificate: null,
   },
   management_credential_id: null,
+  last_validated_at: '2026-01-01T00:00:00Z',
+  validation_error: null,
+  refresh_status: 'available',
+  last_refreshed_at: '2026-01-01T00:00:00Z',
+  refresh_error: null,
+  created_at: '2026-01-01T00:00:00Z',
+  updated_at: '2026-01-01T00:00:00Z',
+  created_by: { id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', name: 'user-1', type: 'user' },
+  labels: {},
+}
+
+const mockOpenShiftIntegration = {
+  id: 'int-openshift-1',
+  name: 'EP Control Plane',
+  description: 'Execution plane infrastructure',
+  integration_type: 'openshift',
+  enabled: true,
+  validation_status: 'available',
+  scope: 'global',
+  configuration: {
+    integration_type: 'openshift',
+    base_url: 'https://ep-control-plane:6443',
+    allow_http: false,
+    insecure_skip_tls_verify: false,
+    ca_certificate: '-----BEGIN CERTIFICATE-----\n...',
+  },
+  management_credential_id: 'cred-existing',
   last_validated_at: '2026-01-01T00:00:00Z',
   validation_error: null,
   refresh_status: 'available',
@@ -771,6 +799,162 @@ describe('EditIntegrationForm', () => {
       render(<EditIntegrationForm />, { wrapper })
 
       expect(screen.getByRole('textbox', { name: /api url/i })).toHaveValue('')
+    })
+  })
+
+  describe('Execution plane infrastructure (OpenShift)', () => {
+    beforeEach(() => {
+      setupMocks({ integration: mockOpenShiftIntegration })
+    })
+
+    it('uses execution plane field labels and help for OpenShift fields', () => {
+      render(<EditIntegrationForm />, { wrapper })
+
+      expect(screen.getByRole('textbox', { name: /connection name/i })).toBeInTheDocument()
+      expect(screen.getByRole('textbox', { name: /api endpoint/i })).toBeInTheDocument()
+      expect(screen.queryByRole('textbox', { name: /^api url$/i })).not.toBeInTheDocument()
+      expect(screen.queryByRole('textbox', { name: /server name/i })).not.toBeInTheDocument()
+      expect(screen.getByText('OpenShift')).toBeInTheDocument()
+    })
+
+    it('hides Description field for OpenShift', () => {
+      render(<EditIntegrationForm />, { wrapper })
+
+      expect(screen.queryByRole('textbox', { name: /^description$/i })).not.toBeInTheDocument()
+    })
+
+    it('shows a required CA certificate outside Security', async () => {
+      const user = userEvent.setup()
+      const { patchMutate } = setupMutationMocks()
+      render(<EditIntegrationForm />, { wrapper })
+
+      const certificate = screen.getByRole('textbox', { name: /ca certificate/i })
+      const apiEndpoint = screen.getByRole('textbox', { name: /api endpoint/i })
+
+      expect(certificate).toBeRequired()
+      expect(certificate).toHaveValue('-----BEGIN CERTIFICATE-----\n...')
+      expect(screen.getByText(/PEM-encoded CA certificate/)).toBeInTheDocument()
+      expect(screen.queryByText('Security')).not.toBeInTheDocument()
+      expect(screen.queryByRole('checkbox', { name: /allow http connections/i })).not.toBeInTheDocument()
+      expect(apiEndpoint.compareDocumentPosition(certificate) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+
+      await user.clear(certificate)
+      await user.click(screen.getByRole('button', { name: 'Save integration' }))
+
+      expect(await screen.findByText('CA certificate is required')).toBeInTheDocument()
+      expect(patchMutate).not.toHaveBeenCalled()
+    })
+
+    it('shows Authentication section with service account token credential', () => {
+      render(<EditIntegrationForm />, { wrapper })
+
+      expect(screen.getByText('Authentication')).toBeInTheDocument()
+      expect(screen.getByText(/service account token to authenticate/i)).toBeInTheDocument()
+      expect(screen.getByRole('textbox', { name: /service account token/i })).toBeInTheDocument()
+      expect(screen.queryByText('Connection credential')).not.toBeInTheDocument()
+      expect(screen.queryByRole('textbox', { name: /health check credential/i })).not.toBeInTheDocument()
+    })
+
+    it('shows locked Global scope text with execution-plane helper text', () => {
+      render(<EditIntegrationForm />, { wrapper })
+
+      expect(screen.queryByRole('switch', { name: /integration scope/i })).not.toBeInTheDocument()
+      expect(screen.getByText('Global')).toBeInTheDocument()
+      expect(screen.getByText(EXECUTION_PLANE_SCOPE_HELP)).toBeInTheDocument()
+    })
+
+    it('PATCHes scope global when the record incorrectly has scope project', async () => {
+      setupMocks({
+        integration: {
+          ...mockOpenShiftIntegration,
+          scope: 'project',
+        },
+        projectAssignments: {
+          resources: [{ project_id: 'p-001', project_name: 'default' }],
+        },
+      })
+      const { patchMutate } = setupMutationMocks()
+      const user = userEvent.setup()
+      render(<EditIntegrationForm />, { wrapper })
+
+      expect(screen.getByText('Global')).toBeInTheDocument()
+      expect(screen.queryByRole('switch', { name: /integration scope/i })).not.toBeInTheDocument()
+
+      await user.click(screen.getByRole('button', { name: 'Save integration' }))
+
+      await waitFor(() => {
+        expect(patchMutate).toHaveBeenCalledWith(
+          expect.objectContaining({
+            body: expect.objectContaining({
+              scope: 'global',
+            }) as Record<string, unknown>,
+          })
+        )
+      })
+      expect(mockSyncAssignments).not.toHaveBeenCalled()
+    })
+
+    it('PATCHes allow_http and insecure_skip_tls_verify false when record has them true', async () => {
+      setupMocks({
+        integration: {
+          ...mockOpenShiftIntegration,
+          configuration: {
+            ...mockOpenShiftIntegration.configuration,
+            allow_http: true,
+            insecure_skip_tls_verify: true,
+          },
+        },
+      })
+      const { patchMutate } = setupMutationMocks()
+      const user = userEvent.setup()
+      render(<EditIntegrationForm />, { wrapper })
+
+      await user.click(screen.getByRole('button', { name: 'Save integration' }))
+
+      await waitFor(() => {
+        expect(patchMutate).toHaveBeenCalledWith(
+          expect.objectContaining({
+            body: expect.objectContaining({
+              configuration: expect.objectContaining({
+                allow_http: false,
+                insecure_skip_tls_verify: false,
+              }) as Record<string, unknown>,
+            }) as Record<string, unknown>,
+          })
+        )
+      })
+    })
+
+    it('calls discover with matching openshift integration_type values on test connection', async () => {
+      const { discoverMutate } = setupMutationMocks()
+      const user = userEvent.setup()
+      render(<EditIntegrationForm />, { wrapper })
+
+      await user.click(screen.getByRole('button', { name: 'Test connection' }))
+
+      expect(discoverMutate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          body: {
+            integration_type: 'openshift',
+            configuration: {
+              integration_type: 'openshift',
+              base_url: 'https://ep-control-plane:6443',
+              allow_http: false,
+              insecure_skip_tls_verify: false,
+              ca_certificate: '-----BEGIN CERTIFICATE-----\n...',
+            },
+            credential_id: 'cred-existing',
+          },
+        }),
+        expect.any(Object)
+      )
+    })
+
+    it('has no accessibility violations', async () => {
+      const { container } = render(<EditIntegrationForm />, { wrapper })
+
+      expect(screen.getByText('Global')).toBeInTheDocument()
+      expect(await axe(container)).toHaveNoViolations()
     })
   })
 

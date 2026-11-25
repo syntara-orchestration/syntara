@@ -47,8 +47,8 @@ def _workflow_definition_with_scheduled_trigger(trigger_id: str = "t_sched") -> 
             {
                 "id": "noop",
                 "name": "noop",
-                "type": "script",
-                "parameters": {"language": "bash", "code": "true"},
+                "type": "script_bash",
+                "parameters": {"code": "true"},
             },
         ],
         "edges": [{"from": trigger_id, "to": "noop"}],
@@ -143,8 +143,8 @@ async def test_reconciliation_query_excludes_manual_only_workflows(
             {
                 "id": "noop",
                 "name": "noop",
-                "type": "script",
-                "parameters": {"language": "bash", "code": "true"},
+                "type": "script_bash",
+                "parameters": {"code": "true"},
             },
         ],
         "edges": [{"from": "t_manual", "to": "noop"}],

@@ -10,15 +10,13 @@ nodes:
     type: fork
 
   - id: branch1a
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       code: echo "Branch 1A"
 
   - id: branch1b
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       code: echo "Branch 1B"
 
   - id: group1_join
@@ -28,15 +26,13 @@ nodes:
     type: fork
 
   - id: branch2a
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       code: echo "Branch 2A"
 
   - id: branch2b
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       code: echo "Branch 2B"
 
   - id: group2_join

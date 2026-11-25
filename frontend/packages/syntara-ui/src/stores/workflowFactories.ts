@@ -1,5 +1,13 @@
-import { ActivityTypeEnum, EdgeHandleEnum, type Activity, type NodeSettings } from '@syntara/contracts'
+import {
+  ActivityTypeEnum,
+  EdgeHandleEnum,
+  type Activity,
+  type BashScriptActivity,
+  type NodeSettings,
+  type PythonScriptActivity,
+} from '@syntara/contracts'
 
+import { buildScriptExecutionProfile, type ScriptAffinity } from '../routes/builder/utils/scriptExecutionProfile'
 import { PROTOTYPE_POLLUTION_KEYS, safeJSONReviver } from '../utils/jsonSafeParse'
 import { parseJsonEnvironment } from '../utils/parseJsonEnvironment'
 
@@ -32,28 +40,48 @@ function copyDefinedValues(source: Record<string, unknown>, target: Record<strin
 export type CreateScriptActivityOptions = {
   id: string
   name: string
-  language?: string
-  code?: string
-  credentialId?: string
+  code: string
   environment?: string
+  affinity?: ScriptAffinity
+  executionTargetId?: string
   settings?: NodeSettings
 }
 
-/** Create a script node (v2). */
-export function createScriptActivity(options: CreateScriptActivityOptions): Activity {
-  const { id, name, language, code, credentialId, environment, settings } = options
+function createScriptParameters(
+  code: string,
+  environment?: string,
+  affinity?: ScriptAffinity,
+  executionTargetId?: string
+) {
   const parsedEnvironment = parseJsonEnvironment(environment)
+  const executionProfile = buildScriptExecutionProfile(affinity, executionTargetId)
+  return {
+    code,
+    ...(parsedEnvironment && { environment: parsedEnvironment }),
+    ...(executionProfile && { execution_profile: executionProfile }),
+  }
+}
 
+/** Create a Python script node. */
+export function createPythonScriptActivity(options: CreateScriptActivityOptions): PythonScriptActivity {
+  const { id, name, code, environment, affinity, executionTargetId, settings } = options
   return {
     id,
-    type: ActivityTypeEnum.SCRIPT,
+    type: ActivityTypeEnum.SCRIPT_PYTHON,
     name,
-    parameters: {
-      ...(language !== undefined && { language }),
-      ...(code !== undefined && { code }),
-      ...(credentialId && { credential_id: credentialId }),
-      ...(parsedEnvironment && { environment: parsedEnvironment }),
-    },
+    parameters: createScriptParameters(code, environment, affinity, executionTargetId),
+    ...(settings && { settings }),
+  }
+}
+
+/** Create a Bash script node. */
+export function createBashScriptActivity(options: CreateScriptActivityOptions): BashScriptActivity {
+  const { id, name, code, environment, affinity, executionTargetId, settings } = options
+  return {
+    id,
+    type: ActivityTypeEnum.SCRIPT_BASH,
+    name,
+    parameters: createScriptParameters(code, environment, affinity, executionTargetId),
     ...(settings && { settings }),
   }
 }

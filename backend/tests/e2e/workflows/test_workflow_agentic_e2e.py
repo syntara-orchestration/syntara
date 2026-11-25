@@ -446,9 +446,8 @@ def test_agentic_input_from_upstream_node(
                 {
                     "id": "prep",
                     "name": "Prep Data",
-                    "type": "script",
+                    "type": "script_python",
                     "parameters": {
-                        "language": "python",
                         "code": 'import json; print(json.dumps({"name": "alice"}))',
                     },
                 },
@@ -523,9 +522,8 @@ def test_agentic_output_consumed_by_downstream(
                 {
                     "id": "echo",
                     "name": "Echo Result",
-                    "type": "script",
+                    "type": "script_bash",
                     "parameters": {
-                        "language": "bash",
                         "code": 'echo "Agent said: ${agent.result}"',
                     },
                 },
@@ -830,8 +828,8 @@ def test_agentic_in_condition_true_branch(
                 {
                     "id": "false_branch",
                     "name": "False Branch",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": 'echo "should not run"'},
+                    "type": "script_bash",
+                    "parameters": {"code": 'echo "should not run"'},
                 },
             ],
             "edges": [
@@ -902,8 +900,8 @@ def test_agentic_parallel_paths_converge(
                 {
                     "id": "final",
                     "name": "Final Step",
-                    "type": "script",
-                    "parameters": {"language": "bash", "code": 'echo "Both agents completed"'},
+                    "type": "script_bash",
+                    "parameters": {"code": 'echo "Both agents completed"'},
                 },
             ],
             "edges": [

@@ -128,7 +128,7 @@ async function installStableApprovalActivityStatuses(app: Page, executionId: str
       id: `act-${executionId}-staging`,
       execution_id: executionId,
       activity_name: 'staging_tests',
-      node_type: 'script',
+      node_type: 'script_python',
       temporal_activity_id: `tmp-${executionId}-staging`,
       input_data: {},
       output_data: {},
@@ -219,9 +219,9 @@ test.describe('Execution Details — Activity Filtering', { tag: '@pr-check' }, 
           nodes: [
             {
               id: 'check_temperature',
-              type: 'script',
+              type: 'script_python',
               name: 'Check Temperature',
-              parameters: { language: 'python', code: 'print(42)' },
+              parameters: { code: 'print(42)' },
             },
             {
               id: 'temperature_routing',
@@ -231,9 +231,9 @@ test.describe('Execution Details — Activity Filtering', { tag: '@pr-check' }, 
             },
             {
               id: 'hot_weather',
-              type: 'script',
+              type: 'script_python',
               name: 'Hot Weather Action',
-              parameters: { language: 'python', code: 'print("hot")' },
+              parameters: { code: 'print("hot")' },
             },
           ],
           edges: [
@@ -320,7 +320,7 @@ test.describe('Execution Details — Activity Filtering', { tag: '@pr-check' }, 
 
       await switchFieldSelector(app, 'Keyword', 'Type')
       await filterToolbar.getByRole('button', { name: 'Filter by type' }).click()
-      await app.getByRole('option', { name: 'Script' }).click()
+      await app.getByRole('option', { name: 'Python Script' }).click()
 
       await expect(app.getByRole('row', { name: /Check Temperature/ })).toBeVisible()
       await expect(rows).toHaveCount(1)
@@ -328,7 +328,7 @@ test.describe('Execution Details — Activity Filtering', { tag: '@pr-check' }, 
       const keywordChipGroup = filterToolbar.getByRole('list', { name: 'Keyword' })
       const typeChipGroup = filterToolbar.getByRole('list', { name: 'Type' })
       await expect(keywordChipGroup.getByText('Check')).toBeVisible()
-      await expect(typeChipGroup.getByText('Script')).toBeVisible()
+      await expect(typeChipGroup.getByText('Python Script')).toBeVisible()
     })
 
     test('empty state when no activities match filter', async ({ app }) => {
@@ -384,9 +384,9 @@ test.describe('Execution Details — Activity Filtering', { tag: '@pr-check' }, 
           nodes: [
             {
               id: 'staging_tests',
-              type: 'script',
+              type: 'script_python',
               name: 'Staging Tests',
-              parameters: { language: 'python', code: 'print("ok")' },
+              parameters: { code: 'print("ok")' },
             },
             {
               id: 'approval_gate',

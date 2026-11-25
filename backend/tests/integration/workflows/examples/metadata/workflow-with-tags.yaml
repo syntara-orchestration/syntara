@@ -16,9 +16,8 @@ triggers:
 nodes:
   - id: process_data
     name: Process Data
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       code: |
         echo "Processing data with tags: data-processing, production, critical"
         echo "Owner: data-engineering-team"

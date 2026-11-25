@@ -5,8 +5,9 @@ converge strategies, expression resolution, continue-on-failure) work correctly
 when dispatched through a real Temporal test server.
 
 These complement the 210+ unit tests (which mock Temporal) and the E2E tests
-(which require the full API stack). This tier uses WorkflowEnvironment with
-time-skipping for fast, deterministic, infrastructure-free testing.
+(which require the full API stack). This tier uses a Temporal test server and PostgreSQL testcontainer, with the
+execution-plane worker running real scripts. Automatic time skipping is disabled
+while external execution-plane work is in progress.
 
 Story: AAP-74236 — E2E Testing for V2 Schema
 """
@@ -21,18 +22,23 @@ from temporalio.worker import Worker
 
 from syntara.workflow_runtime.engines.temporal.activities.condition import condition
 from syntara.workflow_runtime.engines.temporal.activities.converge import converge
+from syntara.workflow_runtime.engines.temporal.activities.ep.ep_dispatch_activity import (
+    execute_bash_script_activity,
+    execute_python_script_activity,
+)
 from syntara.workflow_runtime.engines.temporal.activities.loop import loop
 from syntara.workflow_runtime.engines.temporal.activities.manual_trigger import manual_trigger
 from syntara.workflow_runtime.engines.temporal.activities.runtime_settings_activity import (
     fetch_workflow_runtime_settings,
 )
-from syntara.workflow_runtime.engines.temporal.activities.script_activity import execute_script_activity
 from syntara.workflow_runtime.engines.temporal.activities.switch import switch
 from syntara.workflow_runtime.engines.temporal.dynamic_workflow import OrchestratorWorkflow
 from syntara.workflow_runtime.engines.temporal.services.temporal_execution_service import TemporalExecutionService
+from syntara.workflows.models.execution import Execution
 
 _V2_ACTIVITIES: Sequence[Callable[..., Any]] = [
-    execute_script_activity,
+    execute_python_script_activity,
+    execute_bash_script_activity,
     manual_trigger,
     condition,
     converge,
@@ -51,6 +57,7 @@ _WORKFLOW_RESULT_TIMEOUT = 30
 
 async def _run_workflow(
     temporal_env: WorkflowEnvironment,
+    test_execution: Execution,
     task_queue: str,
     workflow_def: dict[str, Any],
 ) -> dict[str, Any]:
@@ -71,10 +78,16 @@ async def _run_workflow(
             task_queue=task_queue,
         )
         start = await svc.start_workflow(
+            execution_id=str(test_execution.id),
             workflow_def=workflow_def,
             workflow_name="v2-pattern-test",
             trigger_node_id="trigger",
             include_node_results=True,
+            workflow_metadata={
+                "workflow_context": {
+                    "workflow": {"project_id": str(test_execution.project_id), "id": str(test_execution.workflow_id)}
+                }
+            },
         )
         handle = temporal_env.client.get_workflow_handle(start.temporal_workflow_id)
         raw: dict[str, Any] = await asyncio.wait_for(handle.result(), timeout=_WORKFLOW_RESULT_TIMEOUT)
@@ -86,10 +99,11 @@ async def _run_workflow(
 class TestConditionRouting:
     """Verify condition node evaluates expressions and routes to the correct branch."""
 
-    async def test_condition_true_branch(self, temporal_env: WorkflowEnvironment) -> None:
+    async def test_condition_true_branch(self, temporal_env: WorkflowEnvironment, test_execution: Execution) -> None:
         """When condition evaluates to true, the true-branch script runs and the false-branch is skipped."""
         result = await _run_workflow(
             temporal_env,
+            test_execution,
             "v2-cond-true",
             {
                 "schema_version": "2.0.0",
@@ -102,13 +116,13 @@ class TestConditionRouting:
                     },
                     {
                         "id": "on_true",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo true_path"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo true_path"},
                     },
                     {
                         "id": "on_false",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo false_path"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo false_path"},
                     },
                 ],
                 "edges": [
@@ -119,14 +133,15 @@ class TestConditionRouting:
             },
         )
 
-        assert result["status"] == "completed"
+        assert result["status"] == "completed", f"Unexpected workflow result: {result!r}"
         assert "on_true" in result["completed_activities"]
         assert "on_false" not in result["completed_activities"]
 
-    async def test_condition_false_branch(self, temporal_env: WorkflowEnvironment) -> None:
+    async def test_condition_false_branch(self, temporal_env: WorkflowEnvironment, test_execution: Execution) -> None:
         """When condition evaluates to false, the false-branch script runs."""
         result = await _run_workflow(
             temporal_env,
+            test_execution,
             "v2-cond-false",
             {
                 "schema_version": "2.0.0",
@@ -139,13 +154,13 @@ class TestConditionRouting:
                     },
                     {
                         "id": "on_true",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo true_path"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo true_path"},
                     },
                     {
                         "id": "on_false",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo false_path"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo false_path"},
                     },
                 ],
                 "edges": [
@@ -156,7 +171,7 @@ class TestConditionRouting:
             },
         )
 
-        assert result["status"] == "completed"
+        assert result["status"] == "completed", f"Unexpected workflow result: {result!r}"
         assert "on_false" in result["completed_activities"]
         assert "on_true" not in result["completed_activities"]
 
@@ -166,10 +181,11 @@ class TestConditionRouting:
 class TestLoopExecution:
     """Verify loop nodes iterate correctly through Temporal."""
 
-    async def test_for_each_loop(self, temporal_env: WorkflowEnvironment) -> None:
+    async def test_for_each_loop(self, temporal_env: WorkflowEnvironment, test_execution: Execution) -> None:
         """for_each loop iterates over items list and executes body for each item."""
         result = await _run_workflow(
             temporal_env,
+            test_execution,
             "v2-foreach",
             {
                 "schema_version": "2.0.0",
@@ -182,13 +198,13 @@ class TestLoopExecution:
                     },
                     {
                         "id": "body",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo iteration"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo iteration"},
                     },
                     {
                         "id": "after_loop",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo done"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo done"},
                     },
                 ],
                 "edges": [
@@ -199,17 +215,18 @@ class TestLoopExecution:
             },
         )
 
-        assert result["status"] == "completed"
+        assert result["status"] == "completed", f"Unexpected workflow result: {result!r}"
         assert "after_loop" in result["completed_activities"]
         assert "body" in result["completed_activities"]
 
         loop_output = result["activity_outputs"].get("loop_node", {})
         assert loop_output.get("iteration_count") == 3
 
-    async def test_do_while_loop(self, temporal_env: WorkflowEnvironment) -> None:
+    async def test_do_while_loop(self, temporal_env: WorkflowEnvironment, test_execution: Execution) -> None:
         """do_while loop executes body at least once, then checks condition."""
         result = await _run_workflow(
             temporal_env,
+            test_execution,
             "v2-dowhile",
             {
                 "schema_version": "2.0.0",
@@ -226,13 +243,13 @@ class TestLoopExecution:
                     },
                     {
                         "id": "body",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo iteration"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo iteration"},
                     },
                     {
                         "id": "after_loop",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo done"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo done"},
                     },
                 ],
                 "edges": [
@@ -243,7 +260,7 @@ class TestLoopExecution:
             },
         )
 
-        assert result["status"] == "completed"
+        assert result["status"] == "completed", f"Unexpected workflow result: {result!r}"
         assert "body" in result["completed_activities"]
         assert "after_loop" in result["completed_activities"]
 
@@ -256,10 +273,13 @@ class TestLoopExecution:
 class TestSwitchRouting:
     """Verify switch node evaluates cases and routes to the matching port."""
 
-    async def test_switch_routes_to_matching_case(self, temporal_env: WorkflowEnvironment) -> None:
+    async def test_switch_routes_to_matching_case(
+        self, temporal_env: WorkflowEnvironment, test_execution: Execution
+    ) -> None:
         """Switch evaluates cases in order and routes to the first match."""
         result = await _run_workflow(
             temporal_env,
+            test_execution,
             "v2-switch",
             {
                 "schema_version": "2.0.0",
@@ -278,18 +298,18 @@ class TestSwitchRouting:
                     },
                     {
                         "id": "branch_a",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo A"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo A"},
                     },
                     {
                         "id": "branch_b",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo B"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo B"},
                     },
                     {
                         "id": "branch_default",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo default"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo default"},
                     },
                 ],
                 "edges": [
@@ -301,15 +321,16 @@ class TestSwitchRouting:
             },
         )
 
-        assert result["status"] == "completed"
+        assert result["status"] == "completed", f"Unexpected workflow result: {result!r}"
         assert "branch_b" in result["completed_activities"]
         assert "branch_a" not in result["completed_activities"]
         assert "branch_default" not in result["completed_activities"]
 
-    async def test_switch_routes_to_default(self, temporal_env: WorkflowEnvironment) -> None:
+    async def test_switch_routes_to_default(self, temporal_env: WorkflowEnvironment, test_execution: Execution) -> None:
         """Switch falls through to default port when no case matches."""
         result = await _run_workflow(
             temporal_env,
+            test_execution,
             "v2-switch-default",
             {
                 "schema_version": "2.0.0",
@@ -327,13 +348,13 @@ class TestSwitchRouting:
                     },
                     {
                         "id": "branch_a",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo A"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo A"},
                     },
                     {
                         "id": "branch_default",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo default"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo default"},
                     },
                 ],
                 "edges": [
@@ -344,7 +365,7 @@ class TestSwitchRouting:
             },
         )
 
-        assert result["status"] == "completed"
+        assert result["status"] == "completed", f"Unexpected workflow result: {result!r}"
         assert "branch_default" in result["completed_activities"]
         assert "branch_a" not in result["completed_activities"]
 
@@ -354,10 +375,13 @@ class TestSwitchRouting:
 class TestConvergeStrategies:
     """Verify converge node strategies work through real Temporal execution."""
 
-    async def test_converge_all_waits_for_both_branches(self, temporal_env: WorkflowEnvironment) -> None:
+    async def test_converge_all_waits_for_both_branches(
+        self, temporal_env: WorkflowEnvironment, test_execution: Execution
+    ) -> None:
         """Converge with default 'all' strategy waits for every branch to complete."""
         result = await _run_workflow(
             temporal_env,
+            test_execution,
             "v2-converge-all",
             {
                 "schema_version": "2.0.0",
@@ -365,13 +389,13 @@ class TestConvergeStrategies:
                 "nodes": [
                     {
                         "id": "branch_a",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo A"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo A"},
                     },
                     {
                         "id": "branch_b",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo B"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo B"},
                     },
                     {
                         "id": "join",
@@ -380,8 +404,8 @@ class TestConvergeStrategies:
                     },
                     {
                         "id": "final",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo done"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo done"},
                     },
                 ],
                 "edges": [
@@ -394,17 +418,20 @@ class TestConvergeStrategies:
             },
         )
 
-        assert result["status"] == "completed"
+        assert result["status"] == "completed", f"Unexpected workflow result: {result!r}"
         completed = result["completed_activities"]
         assert "branch_a" in completed
         assert "branch_b" in completed
         assert "join" in completed
         assert "final" in completed
 
-    async def test_converge_any_fires_after_n_required(self, temporal_env: WorkflowEnvironment) -> None:
+    async def test_converge_any_fires_after_n_required(
+        self, temporal_env: WorkflowEnvironment, test_execution: Execution
+    ) -> None:
         """Converge with 'any' strategy and n_required=1 fires after the first branch completes."""
         result = await _run_workflow(
             temporal_env,
+            test_execution,
             "v2-converge-any",
             {
                 "schema_version": "2.0.0",
@@ -412,13 +439,13 @@ class TestConvergeStrategies:
                 "nodes": [
                     {
                         "id": "branch_a",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo A"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo A"},
                     },
                     {
                         "id": "branch_b",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo B"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo B"},
                     },
                     {
                         "id": "join",
@@ -427,8 +454,8 @@ class TestConvergeStrategies:
                     },
                     {
                         "id": "final",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo done"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo done"},
                     },
                 ],
                 "edges": [
@@ -441,12 +468,12 @@ class TestConvergeStrategies:
             },
         )
 
-        assert result["status"] == "completed"
+        assert result["status"] == "completed", f"Unexpected workflow result: {result!r}"
         assert "join" in result["completed_activities"]
         assert "final" in result["completed_activities"]
 
     async def test_converge_any_off_section_node_does_not_cause_engine_error(
-        self, temporal_env: WorkflowEnvironment
+        self, temporal_env: WorkflowEnvironment, test_execution: Execution
     ) -> None:
         """Converge ANY must not crash the engine when a predecessor has off-section successors.
 
@@ -466,6 +493,7 @@ class TestConvergeStrategies:
         """
         result = await _run_workflow(
             temporal_env,
+            test_execution,
             "v2-converge-any-off-section",
             {
                 "schema_version": "2.0.0",
@@ -473,13 +501,13 @@ class TestConvergeStrategies:
                 "nodes": [
                     {
                         "id": "branch_a",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo A"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo A"},
                     },
                     {
                         "id": "branch_b",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo B"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo B"},
                     },
                     {
                         "id": "join",
@@ -488,13 +516,13 @@ class TestConvergeStrategies:
                     },
                     {
                         "id": "side_action",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo side"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo side"},
                     },
                     {
                         "id": "final",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo done"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo done"},
                     },
                 ],
                 "edges": [
@@ -512,7 +540,7 @@ class TestConvergeStrategies:
         # on whether branch_b completes before or after converge fires — that race is
         # timing-dependent and not what this test verifies. The engine must not crash
         # and must not report side_action as failed regardless of outcome.
-        assert result["status"] == "completed"
+        assert result["status"] == "completed", f"Unexpected workflow result: {result!r}"
         assert "join" in result["completed_activities"]
         assert "final" in result["completed_activities"]
         assert "side_action" not in result.get("failed_activities", {})
@@ -523,10 +551,13 @@ class TestConvergeStrategies:
 class TestExpressionResolution:
     """Verify template expressions resolve upstream node outputs at runtime."""
 
-    async def test_downstream_node_receives_upstream_output(self, temporal_env: WorkflowEnvironment) -> None:
+    async def test_downstream_node_receives_upstream_output(
+        self, temporal_env: WorkflowEnvironment, test_execution: Execution
+    ) -> None:
         """Script B references ${script_a.stdout} and receives the resolved value."""
         result = await _run_workflow(
             temporal_env,
+            test_execution,
             "v2-expr-resolve",
             {
                 "schema_version": "2.0.0",
@@ -534,14 +565,13 @@ class TestExpressionResolution:
                 "nodes": [
                     {
                         "id": "script_a",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo hello_from_a"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo hello_from_a"},
                     },
                     {
                         "id": "script_b",
-                        "type": "script",
+                        "type": "script_bash",
                         "parameters": {
-                            "language": "bash",
                             "code": "echo received: ${script_a.stdout}",
                         },
                     },
@@ -553,7 +583,7 @@ class TestExpressionResolution:
             },
         )
 
-        assert result["status"] == "completed"
+        assert result["status"] == "completed", f"Unexpected workflow result: {result!r}"
         assert "script_a" in result["completed_activities"]
         assert "script_b" in result["completed_activities"]
 
@@ -566,10 +596,13 @@ class TestExpressionResolution:
 class TestContinueOnFailure:
     """Verify continue_on_failure allows downstream execution after a node failure."""
 
-    async def test_continue_on_failure_executes_next_node(self, temporal_env: WorkflowEnvironment) -> None:
+    async def test_continue_on_failure_executes_next_node(
+        self, temporal_env: WorkflowEnvironment, test_execution: Execution
+    ) -> None:
         """When continue_on_failure is true, a failing node does not block downstream."""
         result = await _run_workflow(
             temporal_env,
+            test_execution,
             "v2-cof",
             {
                 "schema_version": "2.0.0",
@@ -577,14 +610,14 @@ class TestContinueOnFailure:
                 "nodes": [
                     {
                         "id": "failing_node",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "exit 1"},
+                        "type": "script_bash",
+                        "parameters": {"code": "exit 1"},
                         "settings": {"continue_on_failure": True},
                     },
                     {
                         "id": "next_node",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo survived"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo survived"},
                     },
                 ],
                 "edges": [
@@ -594,7 +627,7 @@ class TestContinueOnFailure:
             },
         )
 
-        assert result["status"] == "completed_with_errors"
+        assert result["status"] == "completed_with_errors", f"Unexpected workflow result: {result!r}"
         assert "failing_node" in result["failed_activities"]
         assert "next_node" in result["completed_activities"]
 
@@ -604,7 +637,9 @@ class TestContinueOnFailure:
 class TestLoopConvergeInteraction:
     """Verify converge waits for a loop predecessor to finish all iterations."""
 
-    async def test_loop_and_parallel_branch_converge_all(self, temporal_env: WorkflowEnvironment) -> None:
+    async def test_loop_and_parallel_branch_converge_all(
+        self, temporal_env: WorkflowEnvironment, test_execution: Execution
+    ) -> None:
         """Converge ALL waits for a for_each loop to complete all iterations before firing.
 
         Graph:
@@ -614,6 +649,7 @@ class TestLoopConvergeInteraction:
         """
         result = await _run_workflow(
             temporal_env,
+            test_execution,
             "v2-loop-converge-all",
             {
                 "schema_version": "2.0.0",
@@ -626,13 +662,13 @@ class TestLoopConvergeInteraction:
                     },
                     {
                         "id": "body",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo iteration"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo iteration"},
                     },
                     {
                         "id": "branch_b",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo parallel"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo parallel"},
                     },
                     {
                         "id": "join",
@@ -641,8 +677,8 @@ class TestLoopConvergeInteraction:
                     },
                     {
                         "id": "final",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo done"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo done"},
                     },
                 ],
                 "edges": [
@@ -657,7 +693,7 @@ class TestLoopConvergeInteraction:
             },
         )
 
-        assert result["status"] == "completed"
+        assert result["status"] == "completed", f"Unexpected workflow result: {result!r}"
         completed = result["completed_activities"]
         assert "loop_node" in completed
         assert "body" in completed
@@ -668,7 +704,7 @@ class TestLoopConvergeInteraction:
         loop_output = result["activity_outputs"].get("loop_node", {})
         assert loop_output.get("iteration_count") == 3
 
-    async def test_loop_converge_any(self, temporal_env: WorkflowEnvironment) -> None:
+    async def test_loop_converge_any(self, temporal_env: WorkflowEnvironment, test_execution: Execution) -> None:
         """Converge ANY with n_required=2 waits for both a loop and a parallel branch.
 
         The loop must fully complete (not just finish one iteration) before it
@@ -681,6 +717,7 @@ class TestLoopConvergeInteraction:
         """
         result = await _run_workflow(
             temporal_env,
+            test_execution,
             "v2-loop-converge-any",
             {
                 "schema_version": "2.0.0",
@@ -693,13 +730,13 @@ class TestLoopConvergeInteraction:
                     },
                     {
                         "id": "body",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo step"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo step"},
                     },
                     {
                         "id": "branch_b",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo fast"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo fast"},
                     },
                     {
                         "id": "join",
@@ -708,8 +745,8 @@ class TestLoopConvergeInteraction:
                     },
                     {
                         "id": "final",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo done"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo done"},
                     },
                 ],
                 "edges": [
@@ -724,14 +761,16 @@ class TestLoopConvergeInteraction:
             },
         )
 
-        assert result["status"] == "completed"
+        assert result["status"] == "completed", f"Unexpected workflow result: {result!r}"
         completed = result["completed_activities"]
         assert "loop_node" in completed
         assert "branch_b" in completed
         assert "join" in completed
         assert "final" in completed
 
-    async def test_converge_any_fires_without_waiting_for_loop(self, temporal_env: WorkflowEnvironment) -> None:
+    async def test_converge_any_fires_without_waiting_for_loop(
+        self, temporal_env: WorkflowEnvironment, test_execution: Execution
+    ) -> None:
         """Converge ANY n_required=1 fires as soon as the fast branch completes.
 
         The loop is still iterating when the fast branch finishes, but the
@@ -745,6 +784,7 @@ class TestLoopConvergeInteraction:
         """
         result = await _run_workflow(
             temporal_env,
+            test_execution,
             "v2-loop-converge-any-n1",
             {
                 "schema_version": "2.0.0",
@@ -757,13 +797,13 @@ class TestLoopConvergeInteraction:
                     },
                     {
                         "id": "body",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo step"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo step"},
                     },
                     {
                         "id": "fast_branch",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo fast"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo fast"},
                     },
                     {
                         "id": "join",
@@ -772,8 +812,8 @@ class TestLoopConvergeInteraction:
                     },
                     {
                         "id": "final",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo done"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo done"},
                     },
                 ],
                 "edges": [
@@ -788,13 +828,15 @@ class TestLoopConvergeInteraction:
             },
         )
 
-        assert result["status"] == "completed"
+        assert result["status"] == "completed", f"Unexpected workflow result: {result!r}"
         completed = result["completed_activities"]
         assert "fast_branch" in completed
         assert "join" in completed
         assert "final" in completed
 
-    async def test_empty_for_each_loop_converges(self, temporal_env: WorkflowEnvironment) -> None:
+    async def test_empty_for_each_loop_converges(
+        self, temporal_env: WorkflowEnvironment, test_execution: Execution
+    ) -> None:
         """A for_each loop over an empty list completes immediately and satisfies converge.
 
         With items=[], the loop activity returns next_port="complete" on its
@@ -807,6 +849,7 @@ class TestLoopConvergeInteraction:
         """
         result = await _run_workflow(
             temporal_env,
+            test_execution,
             "v2-empty-loop-converge",
             {
                 "schema_version": "2.0.0",
@@ -819,13 +862,13 @@ class TestLoopConvergeInteraction:
                     },
                     {
                         "id": "body",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo never"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo never"},
                     },
                     {
                         "id": "branch_b",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo fast"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo fast"},
                     },
                     {
                         "id": "join",
@@ -834,8 +877,8 @@ class TestLoopConvergeInteraction:
                     },
                     {
                         "id": "final",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo done"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo done"},
                     },
                 ],
                 "edges": [
@@ -850,7 +893,7 @@ class TestLoopConvergeInteraction:
             },
         )
 
-        assert result["status"] == "completed"
+        assert result["status"] == "completed", f"Unexpected workflow result: {result!r}"
         completed = result["completed_activities"]
         assert "loop_node" in completed
         assert "branch_b" in completed
@@ -861,7 +904,9 @@ class TestLoopConvergeInteraction:
         loop_output = result["activity_outputs"].get("loop_node", {})
         assert loop_output.get("iteration_count") == 0
 
-    async def test_loop_body_failure_blocks_converge(self, temporal_env: WorkflowEnvironment) -> None:
+    async def test_loop_body_failure_blocks_converge(
+        self, temporal_env: WorkflowEnvironment, test_execution: Execution
+    ) -> None:
         """When a loop body fails (no CoF), the loop fails and converge ALL does not fire.
 
         Graph:
@@ -871,6 +916,7 @@ class TestLoopConvergeInteraction:
         """
         result = await _run_workflow(
             temporal_env,
+            test_execution,
             "v2-loop-fail-converge",
             {
                 "schema_version": "2.0.0",
@@ -883,13 +929,13 @@ class TestLoopConvergeInteraction:
                     },
                     {
                         "id": "failing_body",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "exit 1"},
+                        "type": "script_bash",
+                        "parameters": {"code": "exit 1"},
                     },
                     {
                         "id": "branch_b",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo ok"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo ok"},
                     },
                     {
                         "id": "join",
@@ -898,8 +944,8 @@ class TestLoopConvergeInteraction:
                     },
                     {
                         "id": "final",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo done"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo done"},
                     },
                 ],
                 "edges": [
@@ -914,7 +960,7 @@ class TestLoopConvergeInteraction:
             },
         )
 
-        assert result["status"] == "failed"
+        assert result["status"] == "failed", f"Unexpected workflow result: {result!r}"
         assert "failing_body" in result.get("failed_activities", {})
         assert "loop_node" in result.get("failed_activities", {})
         assert "final" not in result.get("completed_activities", [])
@@ -925,10 +971,13 @@ class TestLoopConvergeInteraction:
 class TestMixedPatterns:
     """Verify combined execution patterns work together through Temporal."""
 
-    async def test_condition_then_parallel_converge(self, temporal_env: WorkflowEnvironment) -> None:
+    async def test_condition_then_parallel_converge(
+        self, temporal_env: WorkflowEnvironment, test_execution: Execution
+    ) -> None:
         """Condition routes to true branch which fans out to parallel nodes, then converges."""
         result = await _run_workflow(
             temporal_env,
+            test_execution,
             "v2-mixed",
             {
                 "schema_version": "2.0.0",
@@ -941,13 +990,13 @@ class TestMixedPatterns:
                     },
                     {
                         "id": "para_a",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo A"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo A"},
                     },
                     {
                         "id": "para_b",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo B"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo B"},
                     },
                     {
                         "id": "join",
@@ -956,13 +1005,13 @@ class TestMixedPatterns:
                     },
                     {
                         "id": "final",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo done"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo done"},
                     },
                     {
                         "id": "skipped_branch",
-                        "type": "script",
-                        "parameters": {"language": "bash", "code": "echo never"},
+                        "type": "script_bash",
+                        "parameters": {"code": "echo never"},
                     },
                 ],
                 "edges": [
@@ -977,7 +1026,7 @@ class TestMixedPatterns:
             },
         )
 
-        assert result["status"] == "completed"
+        assert result["status"] == "completed", f"Unexpected workflow result: {result!r}"
         completed = result["completed_activities"]
         assert "cond" in completed
         assert "para_a" in completed

@@ -74,7 +74,7 @@ def check_orphaned_directories(
         (errors, warnings) tuple
 
     """
-    errors = []
+    errors: list[str] = []
     warnings = []
 
     if skip_validation:
@@ -101,7 +101,7 @@ def check_root_level_test_files(
         List of error messages (empty if no violations)
 
     """
-    errors = []
+    errors: list[str] = []
 
     # Skip if test directory doesn't exist
     if not test_path.exists():
@@ -179,7 +179,7 @@ def verify_test_structure(repo_root: Path) -> tuple[bool, list[str], list[str]]:
         (success, errors, warnings) tuple
 
     """
-    errors = []
+    errors: list[str] = []
     warnings = []
 
     src_dir = repo_root / "src" / "syntara"

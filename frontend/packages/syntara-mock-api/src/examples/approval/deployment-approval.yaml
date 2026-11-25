@@ -22,9 +22,8 @@ triggers:
 nodes:
   - id: staging_tests
     name: Staging Tests
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       environment:
         INPUT_VERSION: ${trigger.version}
       code: |
@@ -45,9 +44,8 @@ nodes:
 
   - id: deploy_to_prod
     name: Deploy to Production
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       environment:
         INPUT_VERSION: ${trigger.version}
         INPUT_ENV: ${trigger.environment}
@@ -57,9 +55,8 @@ nodes:
 
   - id: rollback_staging
     name: Rollback Staging
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       code: |
         echo "Approval rejected — rolling back staging environment"
 

@@ -23,8 +23,8 @@ function state(id: string, overrides: Partial<ActivityState> = {}): [string, Act
 }
 
 const order: ActivityOrderItem[] = [
-  { id: 'task-1', name: 'Fetch Data', type: ActivityTypeEnum.SCRIPT },
-  { id: 'task-2', type: ActivityTypeEnum.SCRIPT },
+  { id: 'task-1', name: 'Fetch Data', type: ActivityTypeEnum.SCRIPT_PYTHON },
+  { id: 'task-2', type: ActivityTypeEnum.SCRIPT_PYTHON },
 ]
 
 const states = new Map([
@@ -119,7 +119,7 @@ describe('CompactActivityList', () => {
     render(
       <CompactActivityList
         activityStates={new Map([state('task-1', { status: 'failed', startedAt: '2024-01-01T00:00:00Z' })])}
-        activityOrder={[{ id: 'task-1', name: 'Script', type: ActivityTypeEnum.SCRIPT }]}
+        activityOrder={[{ id: 'task-1', name: 'Script', type: ActivityTypeEnum.SCRIPT_PYTHON }]}
         replayBaselineAt="2024-01-02T00:00:00Z"
       />
     )

@@ -48,6 +48,25 @@ vi.mock('../../../access/useAllProjects', () => {
   return { useAllProjects: projectsMock, useSelectableProjects: projectsMock }
 })
 
+const { mockUseOpenShiftIntegrationExists } = vi.hoisted(() => ({
+  mockUseOpenShiftIntegrationExists: vi.fn(() => ({
+    exists: false,
+    isLoading: false,
+    isError: false,
+    isUnavailable: false,
+    refetch: vi.fn(),
+  })),
+}))
+
+vi.mock('./useOpenShiftIntegrationExists', () => ({
+  useOpenShiftIntegrationExists: () =>
+    mockUseOpenShiftIntegrationExists() as ReturnType<
+      typeof import('./useOpenShiftIntegrationExists').useOpenShiftIntegrationExists
+    >,
+  fetchOpenShiftIntegrationExists: vi.fn().mockResolvedValue(false),
+  OPENSHIFT_INTEGRATION_EXISTS_QUERY_KEY: ['openshift-integration-exists'],
+}))
+
 vi.mock('../../../builder/components/CredentialSelector', () => ({
   CredentialSelector: ({
     label,
@@ -109,6 +128,13 @@ function mockMutations(discoverMutate?: Mock, createMutate?: Mock) {
 describe('IntegrationForm', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockUseOpenShiftIntegrationExists.mockReturnValue({
+      exists: false,
+      isLoading: false,
+      isError: false,
+      isUnavailable: false,
+      refetch: vi.fn(),
+    })
   })
 
   it('uses configureIntegration documentation key', () => {
@@ -467,6 +493,57 @@ describe('IntegrationForm', () => {
       await waitFor(() => {
         expect(screen.getByText('Unable to save integration')).toBeInTheDocument()
       })
+    })
+  })
+
+  describe('Execution plane infrastructure singleton', () => {
+    it('clears an EP selection when an openshift integration appears', async () => {
+      const user = userEvent.setup()
+      const { rerender } = render(<IntegrationForm />, { wrapper })
+
+      await user.click(screen.getByRole('button', { name: 'MCP Server' }))
+      await user.click(screen.getByRole('option', { name: /Execution plane infrastructure/i }))
+      expect(screen.getByRole('textbox', { name: /connection name/i })).toBeInTheDocument()
+
+      mockUseOpenShiftIntegrationExists.mockReturnValue({
+        exists: true,
+        isLoading: false,
+        isError: false,
+        isUnavailable: true,
+        refetch: vi.fn(),
+      })
+      rerender(<IntegrationForm />)
+
+      await waitFor(() => {
+        expect(screen.queryByRole('textbox', { name: /connection name/i })).not.toBeInTheDocument()
+      })
+      expect(screen.getByRole('button', { name: 'MCP Server' })).toBeInTheDocument()
+    })
+
+    it('requires a CA certificate before leaving integration details', async () => {
+      const user = userEvent.setup()
+      render(<IntegrationForm />, { wrapper })
+
+      await user.click(screen.getByRole('button', { name: 'MCP Server' }))
+      await user.click(screen.getByRole('option', { name: /Execution plane infrastructure/i }))
+
+      const certificate = screen.getByRole('textbox', { name: /ca certificate/i })
+      expect(certificate).toBeRequired()
+      expect(screen.queryByText('Security')).not.toBeInTheDocument()
+
+      await user.type(screen.getByRole('textbox', { name: /connection name/i }), 'ocp-prod')
+      await user.click(screen.getByRole('textbox', { name: /api endpoint/i }))
+      await user.paste('https://api.cluster.example.com:6443')
+      await user.click(screen.getByRole('button', { name: 'Next' }))
+
+      expect(await screen.findByText('CA certificate is required')).toBeInTheDocument()
+      expect(screen.queryByRole('heading', { name: 'Authentication' })).not.toBeInTheDocument()
+
+      await user.click(certificate)
+      await user.paste('-----BEGIN CERTIFICATE-----\nMIIB')
+      await user.click(screen.getByRole('button', { name: 'Next' }))
+
+      expect(await screen.findByRole('heading', { name: 'Authentication' })).toBeInTheDocument()
     })
   })
 

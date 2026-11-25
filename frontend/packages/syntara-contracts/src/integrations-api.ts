@@ -52,6 +52,10 @@ export interface paths {
     /**
      * Update integration
      * @description Update an integration.
+     *
+     *     OpenShift updates to cluster-synchronized fields require Execution Plane acceptance
+     *     before persistence. A protected default cluster returns 409; unavailability returns
+     *     503. Both failures leave the integration unchanged.
      */
     patch: operations['update_integration']
     trace?: never
@@ -310,7 +314,7 @@ export interface components {
      * @description Type of external integration.
      * @enum {string}
      */
-    IntegrationType: 'mcp_server' | 'llm_provider' | 'ansible_automation_platform'
+    IntegrationType: 'mcp_server' | 'llm_provider' | 'ansible_automation_platform' | 'openshift'
     /**
      * IntegrationStatus
      * @description Validation status of an integration.
@@ -381,6 +385,7 @@ export interface components {
         | components['schemas']['MCPServerConfigurationInput']
         | components['schemas']['LLMProviderConfiguration']
         | components['schemas']['AAPConfiguration']
+        | components['schemas']['OpenShiftConfiguration']
       /**
        * Management Credential Id
        * @description Optional credential for admin operations
@@ -503,6 +508,7 @@ export interface components {
             | components['schemas']['MCPServerConfigurationInput']
             | components['schemas']['LLMProviderConfiguration']
             | components['schemas']['AAPConfiguration']
+            | components['schemas']['OpenShiftConfiguration']
           )
         | null
       /**
@@ -540,6 +546,7 @@ export interface components {
         | components['schemas']['MCPServerConfigurationInput']
         | components['schemas']['LLMProviderConfiguration']
         | components['schemas']['AAPConfiguration']
+        | components['schemas']['OpenShiftConfiguration']
       /**
        * Credential Id
        * @description Credential to use for the connection test
@@ -576,6 +583,7 @@ export interface components {
         | components['schemas']['MCPServerConfigurationInput']
         | components['schemas']['LLMProviderConfiguration']
         | components['schemas']['AAPConfiguration']
+        | components['schemas']['OpenShiftConfiguration']
       /** Last Validated At */
       last_validated_at?: string | null
       /** Management Credential Id */
@@ -709,6 +717,40 @@ export interface components {
        * AAP URL
        * Format: uri
        * @description URL of the Ansible Automation Platform
+       */
+      base_url: string
+      /**
+       * Allow Http
+       * @description Allow HTTP (unencrypted) connections. Loopback addresses are always permitted over HTTP.
+       * @default false
+       */
+      allow_http?: boolean
+      /**
+       * Insecure Skip Tls Verify
+       * @description Disable TLS certificate verification for connections to this integration.
+       * @default false
+       */
+      insecure_skip_tls_verify?: boolean
+      /**
+       * Ca Certificate
+       * @description PEM-encoded CA certificate to trust for this integration's TLS connections.
+       */
+      ca_certificate?: string | null
+    }
+    /**
+     * OpenShiftConfiguration
+     * @description Non-secret connection settings for an OpenShift cluster.
+     */
+    OpenShiftConfiguration: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      integration_type: 'openshift'
+      /**
+       * Base Url
+       * Format: uri
+       * @description OpenShift Kubernetes API URL
        */
       base_url: string
       /**
@@ -1722,6 +1764,24 @@ export interface operations {
       422: components['responses']['ValidationError']
       429: components['responses']['RateLimitError']
       500: components['responses']['InternalServerError']
+      /** @description Execution Plane rejected the command or returned an invalid response */
+      502: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/problem+json': components['schemas']['ErrorData']
+        }
+      }
+      /** @description Execution Plane unavailable; the integration update was not saved */
+      503: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/problem+json': components['schemas']['ErrorData']
+        }
+      }
     }
   }
   discover_integration_connection: {

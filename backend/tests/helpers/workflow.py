@@ -7,7 +7,7 @@ def create_minimal_workflow_definition(
     name: str = "test-workflow",
     description: str = "Test workflow description",
     activity_id: str = "test_activity",
-    activity_type: str = "script",
+    activity_type: str = "script_python",
 ) -> dict[str, Any]:
     """Create a minimal valid V2 workflow definition for testing.
 
@@ -18,7 +18,7 @@ def create_minimal_workflow_definition(
         name: Workflow name
         description: Workflow description
         activity_id: Activity ID for the node
-        activity_type: V2 node type (script, http_request, agentic, aap_job_template,
+        activity_type: V2 node type (script_python, script_bash, http_request, agentic, aap_job_template,
                        condition, loop, converge, approval)
 
     Returns:
@@ -32,8 +32,9 @@ def create_minimal_workflow_definition(
         "type": activity_type,
     }
 
-    if activity_type == "script":
-        node["parameters"] = {"language": "python", "code": "print('hello')"}
+    if activity_type in {"script_python", "script_bash"}:
+        code = "echo hello" if activity_type == "script_bash" else "print('hello')"
+        node["parameters"] = {"code": code}
     elif "parameters" not in node:
         node["parameters"] = {}
 

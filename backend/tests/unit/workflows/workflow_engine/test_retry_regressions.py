@@ -45,10 +45,10 @@ def _loop_body_graph() -> WorkflowGraph:
     backend = InMemoryGraphBackend()
     _add(backend, "trigger", "manual_trigger")
     _add(backend, "loop_1", "loop")
-    _add(backend, "body_a", "script")
-    _add(backend, "body_b", "script")
-    _add(backend, "body_c", "script")
-    _add(backend, "step_2", "script")
+    _add(backend, "body_a", "script_python")
+    _add(backend, "body_b", "script_python")
+    _add(backend, "body_c", "script_python")
+    _add(backend, "step_2", "script_python")
     _plain(backend, "trigger", "loop_1")
     backend.add_edge("loop_1", "body_a", {"from_port": "iterate"})
     _plain(backend, "body_a", "body_b")
@@ -66,10 +66,10 @@ def _diamond_graph() -> WorkflowGraph:
     """
     backend = InMemoryGraphBackend()
     _add(backend, "split", "condition")
-    _add(backend, "fail_b", "script")
-    _add(backend, "ok_c", "script")
-    _add(backend, "join", "script")
-    _add(backend, "tail", "script")
+    _add(backend, "fail_b", "script_python")
+    _add(backend, "ok_c", "script_python")
+    _add(backend, "join", "script_python")
+    _add(backend, "tail", "script_python")
     backend.add_edge("split", "fail_b", {"from_port": "true"})
     backend.add_edge("split", "ok_c", {"from_port": "false"})
     _plain(backend, "fail_b", "join")
@@ -118,6 +118,7 @@ def _wf(retry_context: dict[str, Any] | None = None) -> OrchestratorWorkflow:
     wf._retry_source_statuses = {}
     wf._loop_bodies = {}
     wf._active_loop_iteration = {}
+    wf._active_ep_nodes = set()
     return wf
 
 
@@ -167,8 +168,8 @@ async def test_restored_skipped_node_uses_supported_structured_logger_arguments(
 
 def _converge_graph() -> WorkflowGraph:
     backend = InMemoryGraphBackend()
-    _add(backend, "b1", "script")
-    _add(backend, "b2", "script")
+    _add(backend, "b1", "script_python")
+    _add(backend, "b2", "script_python")
     _add(backend, "join", "converge", {"strategy": "any", "n_required": 2})
     _plain(backend, "b1", "join")
     _plain(backend, "b2", "join")
@@ -187,7 +188,7 @@ async def test_restored_predecessor_counts_toward_converge_gate(mock_wf: MagicMo
     # replay for it; that is what _prepare_retry would have loaded beforehand.
     wf._retry_source_statuses = {"b1": "completed"}
     mock_wf.execute_activity = AsyncMock(return_value={"b1": {"v": 1}})
-    node = ActivityNode(node_id="b1", node_type="script", parameters={})
+    node = ActivityNode(node_id="b1", node_type="script_python", parameters={})
     graph = _converge_graph()
     result = await wf._restore_node_state(node, graph)
     from .conftest import complete_supplied_node
@@ -210,7 +211,7 @@ async def test_converge_is_not_skipped_when_a_predecessor_was_restored(mock_wf: 
     # replay for it; that is what _prepare_retry would have loaded beforehand.
     wf._retry_source_statuses = {"b1": "completed"}
     mock_wf.execute_activity = AsyncMock(return_value={"b1": {"v": 1}})
-    node = ActivityNode(node_id="b1", node_type="script", parameters={})
+    node = ActivityNode(node_id="b1", node_type="script_python", parameters={})
     graph = _converge_graph()
     result = await wf._restore_node_state(node, graph)
     from .conftest import complete_supplied_node
@@ -256,8 +257,8 @@ def test_plain_run_converge_behaviour_is_unchanged() -> None:
 def _one_of_two_converge_graph() -> WorkflowGraph:
     """Build b1, b2 -> join, where join is a 1-of-2 (ANY, n_required=1) gate."""
     backend = InMemoryGraphBackend()
-    _add(backend, "b1", "script")
-    _add(backend, "b2", "script")
+    _add(backend, "b1", "script_python")
+    _add(backend, "b2", "script_python")
     _add(backend, "join", "converge", {"strategy": "any", "n_required": 1})
     _plain(backend, "b1", "join")
     _plain(backend, "b2", "join")
@@ -338,8 +339,8 @@ def test_sibling_branch_of_the_retry_point_is_retained() -> None:
 def test_unrelated_upstream_node_is_still_restorable() -> None:
     """The fix must not over-reach: a node upstream of the retry point still restores."""
     backend = InMemoryGraphBackend()
-    _add(backend, "prep", "script")
-    _add(backend, "boom", "script")
+    _add(backend, "prep", "script_python")
+    _add(backend, "boom", "script_python")
     _plain(backend, "prep", "boom")
     graph = WorkflowGraph(backend)
     wf = _wf(_retry("boom"))
@@ -416,9 +417,9 @@ def _unselected_branch_with_exclusive_child() -> WorkflowGraph:
     to skip it even when the source run recorded a result.
     """
     backend = InMemoryGraphBackend()
-    _add(backend, "east", "script")
-    _add(backend, "east_post", "script")
-    _add(backend, "west", "script")
+    _add(backend, "east", "script_python")
+    _add(backend, "east_post", "script_python")
+    _add(backend, "west", "script_python")
     _add(backend, "join", "converge", {"strategy": "all"})
     _plain(backend, "east", "east_post")
     _plain(backend, "east_post", "join")
@@ -533,8 +534,8 @@ class TestNoOverwrittenFailureNamespaceEntry:
 def _two_branch_converge_graph(parameters: dict[str, Any] | None = None) -> WorkflowGraph:
     """Build b1, b2 -> join, where join is a converge with the given parameters."""
     backend = InMemoryGraphBackend()
-    _add(backend, "b1", "script")
-    _add(backend, "b2", "script")
+    _add(backend, "b1", "script_python")
+    _add(backend, "b2", "script_python")
     _add(backend, "join", "converge", parameters or {})
     _plain(backend, "b1", "join")
     _plain(backend, "b2", "join")
@@ -784,9 +785,9 @@ def _bfs_converge_graph() -> WorkflowGraph:
     only reachable through BFS over a skipped/failed intermediate.
     """
     backend = InMemoryGraphBackend()
-    _add(backend, "fail_a", "script")
-    _add(backend, "mid", "script")
-    _add(backend, "b2", "script")
+    _add(backend, "fail_a", "script_python")
+    _add(backend, "mid", "script_python")
+    _add(backend, "b2", "script_python")
     _add(backend, "join", "converge", {})
     _plain(backend, "fail_a", "mid")
     _plain(backend, "mid", "join")
@@ -878,7 +879,7 @@ def test_retry_converge_gate_failure_reports_an_unmet_all_quorum() -> None:
 def _three_branch_converge_graph() -> WorkflowGraph:
     backend = InMemoryGraphBackend()
     for b in ("b1", "b2", "b3"):
-        _add(backend, b, "script")
+        _add(backend, b, "script_python")
         _plain(backend, b, "join")
     _add(backend, "join", "converge", {})
     return WorkflowGraph(backend)

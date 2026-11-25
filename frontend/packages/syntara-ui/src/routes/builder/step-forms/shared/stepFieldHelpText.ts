@@ -19,14 +19,15 @@ export const SETTINGS_MAX_INTERVAL_HELP = 'The maximum delay, in seconds, betwee
 export const SETTINGS_BACKOFF_HELP =
   'The multiplier applied to the retry interval after each attempt. Use 1.0 for a fixed interval, or greater than 1.0 for exponential backoff.'
 
-export const SCRIPT_LANGUAGE_HELP =
-  'Select the scripting language for this step. Python and Bash are supported. The script runs in a sandboxed environment with access to workflow context variables.'
-
 export const SCRIPT_CODE_HELP =
   'Enter the script code to execute. Access input data through the context object. The script must return a value that downstream steps can reference.'
 
 export const SCRIPT_ENV_VARS_HELP =
   "Define input variables as key-value pairs that are passed to the script's execution context. Use expressions like ${previous_step.result} to pass data from earlier steps."
+
+export const SCRIPT_AFFINITY_HELP = 'Routing rules that direct work to execution targets.'
+
+export const SCRIPT_EXECUTION_TARGET_HELP = 'Pin this node to a specific execution target.'
 
 export const HTTP_METHOD_HELP =
   'Select the HTTP method for the request: GET retrieves data; POST creates data; PUT replaces data; PATCH updates data partially; DELETE removes data.'

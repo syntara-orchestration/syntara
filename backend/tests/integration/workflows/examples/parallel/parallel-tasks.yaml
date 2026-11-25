@@ -10,27 +10,24 @@ triggers:
 nodes:
   - id: task_1
     name: Task 1
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       code: |
         sleep 1
         echo "Task 1 complete"
 
   - id: task_2
     name: Task 2
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       code: |
         sleep 1
         echo "Task 2 complete"
 
   - id: task_3
     name: Task 3
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       code: |
         sleep 1
         echo "Task 3 complete"

@@ -26,9 +26,8 @@ nodes:
 
   - id: process_item
     name: Process Item
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       environment:
         INPUT_ITEM: ${loop.item}
       code: |

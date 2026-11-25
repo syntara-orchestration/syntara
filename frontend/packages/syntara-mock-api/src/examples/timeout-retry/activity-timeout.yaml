@@ -10,9 +10,8 @@ triggers:
 nodes:
   - id: slow_task
     name: Slow Task
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       code: |
         sleep 10
         echo "This should not complete"

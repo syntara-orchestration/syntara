@@ -4,6 +4,7 @@ import { generateUUID } from '../../../utils/generateUUID'
 import { PROTOTYPE_POLLUTION_KEYS, safeJSONReviver } from '../../../utils/jsonSafeParse'
 import { parseJsonEnvironment } from '../../../utils/parseJsonEnvironment'
 import type { ActionFormData as RegistryActionFormData } from '../stepFormTypes'
+import { buildScriptExecutionProfile, parseScriptExecutionFormFields } from '../utils/scriptExecutionProfile'
 
 export { safeJSONReviver }
 
@@ -29,11 +30,22 @@ export function buildRegistryActionInitialData(
   parameters: Record<string, unknown>,
   taskData: TaskActivity
 ): Partial<RegistryActionFormData> {
+  let formExecutor: RegistryActionFormData['executor'] = ExecutorTypeEnum.HTTP_REQUEST
+  if (executor === ExecutorTypeEnum.SCRIPT_PYTHON) {
+    formExecutor = ExecutorTypeEnum.SCRIPT_PYTHON
+  } else if (executor === ExecutorTypeEnum.SCRIPT_BASH) {
+    formExecutor = ExecutorTypeEnum.SCRIPT_BASH
+  }
+  const isScript = executor === ExecutorTypeEnum.SCRIPT_PYTHON || executor === ExecutorTypeEnum.SCRIPT_BASH
+  const executionFields = isScript ? parseScriptExecutionFormFields(parameters) : undefined
+
   return {
     name: taskData.name,
-    executor: executor === ExecutorTypeEnum.SCRIPT ? ExecutorTypeEnum.SCRIPT : ExecutorTypeEnum.HTTP_REQUEST,
-    language: executor === ExecutorTypeEnum.SCRIPT ? (parameters.language as string | undefined) : undefined,
-    code: executor === ExecutorTypeEnum.SCRIPT ? (parameters.code as string | undefined) : undefined,
+    executor: formExecutor,
+    code:
+      executor === ExecutorTypeEnum.SCRIPT_PYTHON || executor === ExecutorTypeEnum.SCRIPT_BASH
+        ? (parameters.code as string | undefined)
+        : undefined,
     method:
       executor === ExecutorTypeEnum.HTTP_REQUEST
         ? (parameters.method as 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | undefined)
@@ -54,39 +66,52 @@ export function buildRegistryActionInitialData(
       return typeof parameters.body === 'string' ? parameters.body : JSON.stringify(parameters.body, null, 2)
     })(),
     credential_id: (parameters as { credential_id?: string }).credential_id ?? undefined,
-    parameters:
-      executor === ExecutorTypeEnum.SCRIPT && parameters.environment
-        ? JSON.stringify(parameters.environment, null, 2)
-        : undefined,
+    parameters: isScript && parameters.environment ? JSON.stringify(parameters.environment, null, 2) : undefined,
+    ...executionFields,
+    settings: taskData.settings,
   }
 }
 
 export function buildRegistryActivityUpdate(taskData: TaskActivity, data: RegistryActionFormData): Activity {
   const apiHeaders = data.executor === ExecutorTypeEnum.HTTP_REQUEST ? headersEntriesToRecord(data.headers) : undefined
 
-  const scriptEnv = data.executor === ExecutorTypeEnum.SCRIPT ? parseJsonEnvironment(data.parameters) : undefined
+  const isPythonScript = data.executor === ExecutorTypeEnum.SCRIPT_PYTHON
+  const isBashScript = data.executor === ExecutorTypeEnum.SCRIPT_BASH
+  const isScript = isPythonScript || isBashScript
+  const scriptEnv = isScript ? parseJsonEnvironment(data.parameters) : undefined
+  const existingScriptConfig =
+    taskData.type === ExecutorTypeEnum.SCRIPT_PYTHON || taskData.type === ExecutorTypeEnum.SCRIPT_BASH
+      ? taskData.parameters
+      : undefined
+  const scriptParameters = { ...existingScriptConfig, code: data.code ?? '' }
+  const executionProfile = isScript ? buildScriptExecutionProfile(data.affinity, data.execution_target_id) : undefined
+  if (scriptEnv) {
+    scriptParameters.environment = scriptEnv
+  } else {
+    delete scriptParameters.environment
+  }
+  if (executionProfile) {
+    scriptParameters.execution_profile = executionProfile
+  } else {
+    delete scriptParameters.execution_profile
+  }
 
   return {
     ...taskData,
     name: data.name,
-    type: data.executor === ExecutorTypeEnum.SCRIPT ? ExecutorTypeEnum.SCRIPT : ExecutorTypeEnum.HTTP_REQUEST,
-    parameters:
-      data.executor === ExecutorTypeEnum.SCRIPT
-        ? {
-            language: data.language ?? 'python',
-            code: data.code ?? '',
-            ...(data.credential_id && { credential_id: data.credential_id }),
-            ...(scriptEnv && { environment: scriptEnv }),
-          }
-        : {
-            method: data.method,
-            url: data.url ?? '',
-            ...(apiHeaders && { headers: apiHeaders }),
-            ...(data.body && {
-              body: parseHttpBodyField(data.body),
-            }),
-            ...(data.credential_id && { credential_id: data.credential_id }),
-          },
+    type: data.executor,
+    settings: data.settings,
+    parameters: isScript
+      ? scriptParameters
+      : {
+          method: data.method,
+          url: data.url ?? '',
+          ...(apiHeaders && { headers: apiHeaders }),
+          ...(data.body && {
+            body: parseHttpBodyField(data.body),
+          }),
+          ...(data.credential_id && { credential_id: data.credential_id }),
+        },
   }
 }
 

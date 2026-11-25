@@ -10,15 +10,13 @@ nodes:
     type: parallel
 
   - id: fast_task
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       code: echo "Fast task"
 
   - id: slow_task
-    type: script
+    type: script_bash
     parameters:
-      language: bash
       code: sleep 0.1 && echo "Slow task"
 
   - id: join_any

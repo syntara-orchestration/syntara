@@ -680,8 +680,8 @@ class TestCredentialWorkflows:
                     {
                         "id": "step_3",
                         "name": "Process Data",
-                        "type": "script",
-                        "parameters": {"language": "python", "code": "print('done')"},
+                        "type": "script_python",
+                        "parameters": {"code": "print('done')"},
                     },
                 ],
                 "edges": [

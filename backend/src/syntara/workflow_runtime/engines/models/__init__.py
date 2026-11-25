@@ -10,10 +10,9 @@ from syntara.workflow_core.models import (
     ActivityTerminalStatus,
     AgenticExecutorParameters,
     APIExecutorParameters,
+    CredentialBinding,
     IntegrationConnectionConfig,
     NodeType,
-    ScriptExecutorParameters,
-    ScriptLanguage,
     WorkflowTerminalStatus,
 )
 
@@ -27,10 +26,9 @@ __all__ = [
     "ActivityTerminalStatus",
     "AgenticExecutorParameters",
     "ApprovalResult",
+    "CredentialBinding",
     "IntegrationConnectionConfig",
     "NodeType",
-    "ScriptExecutorParameters",
-    "ScriptLanguage",
     "WorkflowResultResponse",
     "WorkflowStartResponse",
     "WorkflowStatusResponse",

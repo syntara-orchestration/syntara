@@ -131,9 +131,9 @@ async function probeExecutionEngine(
           nodes: [
             {
               id: 'n1',
-              type: 'script',
+              type: 'script_python',
               name: 'Probe script',
-              parameters: { language: 'python', code: 'print("probe")' },
+              parameters: { code: 'print("probe")' },
             },
           ],
           edges: [{ from: 't1', to: 'n1' }],

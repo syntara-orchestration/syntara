@@ -31,6 +31,16 @@ class IntegrationNameConflictError(IntegrationError):
         super().__init__(f"Integration with name '{name}' already exists")
 
 
+@fastapi_exception(handler="syntara.integrations.error_handlers.integration_type_conflict_handler")
+class IntegrationTypeConflictError(IntegrationError):
+    """Exception raised when an integration type already exists."""
+
+    def __init__(self, integration_type: str) -> None:
+        """Initialize exception with integration type."""
+        self.integration_type = integration_type
+        super().__init__(f"An integration of type '{integration_type}' already exists")
+
+
 @fastapi_exception(handler="syntara.integrations.error_handlers.integration_credential_required_handler")
 class IntegrationCredentialRequiredError(IntegrationError):
     """Exception raised when credential is required but missing for an integration type."""
@@ -122,3 +132,14 @@ class IntegrationRefreshNotSupportedError(IntegrationError):
         super().__init__(
             f"Resource refresh is not supported for integration {integration_id} (type: {integration_type})."
         )
+
+
+@fastapi_exception(handler="syntara.integrations.error_handlers.integration_cluster_sync_handler")
+class IntegrationClusterSyncError(IntegrationError):
+    """An immediate cluster update failed before AO persistence."""
+
+    def __init__(self, status_code: int, code: str, message: str) -> None:
+        """Expose a safe domain error while retaining the upstream cause."""
+        self.status_code = status_code
+        self.code = code
+        super().__init__(message)

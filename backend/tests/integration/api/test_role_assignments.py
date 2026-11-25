@@ -34,6 +34,16 @@ GROUPS_URL = "/api/v1/groups"
 
 
 @pytest.mark.asyncio
+async def test_list_role_assignments_includes_internal_service_principals(admin_client: AsyncClient) -> None:
+    """GET /role_assignments returns seeded internal service principal assignments."""
+    response = await admin_client.get("/api/v1/role_assignments")
+
+    assert response.status_code == 200
+    principal_types = {resource["principal_type"] for resource in response.json()["resources"]}
+    assert "service" in principal_types
+
+
+@pytest.mark.asyncio
 async def test_create_user_role_assignment(
     admin_client: AsyncClient,
     test_db_session: AsyncSession,

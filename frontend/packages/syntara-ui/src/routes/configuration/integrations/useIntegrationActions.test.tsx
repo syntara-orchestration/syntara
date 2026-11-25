@@ -8,6 +8,7 @@ import { integrationsClient } from '../../../client'
 import { AlertProvider } from '../../../providers/alerts/AlertProvider'
 import { routerTestState } from '../../../test/setup'
 
+import { OPENSHIFT_INTEGRATION_EXISTS_QUERY_KEY } from './form/useOpenShiftIntegrationExists'
 import { useIntegrationActions } from './useIntegrationActions'
 
 vi.mock('../../../client', () => ({
@@ -143,6 +144,7 @@ describe('useIntegrationActions', () => {
         callbacks.onSuccess?.()
         callbacks.onSettled?.()
       })
+      const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries')
 
       const { result } = renderHook(() => useIntegrationActions(mockRefetch), { wrapper })
 
@@ -150,6 +152,7 @@ describe('useIntegrationActions', () => {
       act(() => result.current.handleDelete())
 
       expect(mockMutate).toHaveBeenCalled()
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: OPENSHIFT_INTEGRATION_EXISTS_QUERY_KEY })
       expect(routerTestState.navigate).toHaveBeenCalled()
     })
   })
@@ -170,6 +173,25 @@ describe('useIntegrationActions', () => {
       act(() => result.current.handleToggleEnabled(disabledIntegration))
 
       expect(mockMutate).toHaveBeenCalledWith(expect.objectContaining({ body: { enabled: true } }), expect.any(Object))
+    })
+
+    it('does nothing for execution plane infrastructure integrations', () => {
+      const openShiftIntegration: IntegrationRead = {
+        ...mockIntegration,
+        id: 'openshift-1',
+        name: 'OpenShift Cluster',
+        integration_type: 'openshift',
+        configuration: {
+          integration_type: 'openshift',
+          base_url: 'https://api.openshift.example.com',
+        },
+      }
+      const { result } = renderHook(() => useIntegrationActions(mockRefetch), { wrapper })
+
+      act(() => result.current.handleToggleEnabled(openShiftIntegration))
+
+      expect(result.current.disableDialog.isOpen).toBe(false)
+      expect(mockMutate).not.toHaveBeenCalled()
     })
   })
 

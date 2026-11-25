@@ -401,7 +401,7 @@ class TestFailedStepTypes:
 
         failed_script = Mock(spec=ActivityExecution)
         failed_script.status = ActivityStatus.FAILED
-        failed_script.node_type = NodeType.SCRIPT
+        failed_script.node_type = NodeType.SCRIPT_PYTHON
 
         result = Mock()
         result.all.return_value = [unknown_type, failed_script]
@@ -410,14 +410,14 @@ class TestFailedStepTypes:
 
         step_types = await ExecutionService._get_failed_step_types(session, uuid4())
 
-        assert step_types == ["script"]
+        assert step_types == ["script_python"]
 
     @pytest.mark.asyncio
     async def test_uses_failed_activity_node_types(self) -> None:
         failed_script = Mock(spec=ActivityExecution)
         failed_script.status = ActivityStatus.FAILED
         failed_script.activity_name = "workflow-node-id"
-        failed_script.node_type = NodeType.SCRIPT
+        failed_script.node_type = NodeType.SCRIPT_PYTHON
 
         failed_http = Mock(spec=ActivityExecution)
         failed_http.status = ActivityStatus.FAILED
@@ -431,7 +431,7 @@ class TestFailedStepTypes:
 
         step_types = await ExecutionService._get_failed_step_types(session, uuid4())
 
-        assert step_types == ["http_request", "script"]
+        assert step_types == ["http_request", "script_python"]
 
     @pytest.mark.asyncio
     async def test_bounds_normalized_failed_activity_node_types(self) -> None:
@@ -559,7 +559,7 @@ class TestRetryMetadata:
                     service,
                     "_get_failed_step_types",
                     new_callable=AsyncMock,
-                    return_value=["http_request", "script"],
+                    return_value=["http_request", "script_python"],
                 ),
                 patch(
                     "syntara.workflows.services.execution_service.AuditEventDispatcher.dispatch",
@@ -579,7 +579,7 @@ class TestRetryMetadata:
         assert event.source_execution_id == source.id
         assert event.retry_kind == "from_failure"
         assert event.node_count == 3
-        assert event.failed_step_types == ["http_request", "script"]
+        assert event.failed_step_types == ["http_request", "script_python"]
         assert event.request_id == request_id
 
 

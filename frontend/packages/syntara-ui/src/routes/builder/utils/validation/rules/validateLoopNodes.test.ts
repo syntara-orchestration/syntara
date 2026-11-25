@@ -11,7 +11,7 @@ import { validateLoopNodes } from './validateLoopNodes'
 describe('validateLoopNodes', () => {
   it('returns no errors for workflow without loop nodes', () => {
     const activities: Activity[] = [
-      { type: 'script', id: 'task-1', name: 'Normal Task', parameters: { language: 'python', code: 'print("hello")' } },
+      { type: 'script_python', id: 'task-1', name: 'Normal Task', parameters: { code: 'print("hello")' } },
       {
         type: 'condition',
         id: 'condition-1',

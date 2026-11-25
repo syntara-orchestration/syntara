@@ -23,7 +23,8 @@ BUILTIN_SCOPES: frozenset[str] = frozenset(
 )
 
 _SKIP_FIELDS_BY_NODE_TYPE: dict[str, frozenset[str]] = {
-    "script": frozenset({"code"}),
+    "script_python": frozenset({"code"}),
+    "script_bash": frozenset({"code"}),
 }
 
 

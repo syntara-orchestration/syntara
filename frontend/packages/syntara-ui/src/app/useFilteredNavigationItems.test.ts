@@ -52,6 +52,7 @@ function setPermissions(overrides: Record<string, boolean>) {
       'role-assignment:assign': true,
       'service_account:read': true,
       'approval:read': true,
+      'execution_target:read': true,
       ...overrides,
     },
     isLoading: false,
@@ -114,6 +115,29 @@ describe('useFilteredNavigationItems', () => {
     expect(findItem(result.current, 'Approvals')).toBeUndefined()
     expect(findItem(result.current, 'Workflows')).toBeDefined()
     expect(findItem(result.current, 'Workflow Runs')).toBeDefined()
+  })
+
+  it('excludes Execution Plane when execution_target:read is denied', () => {
+    setPermissions({ 'execution_target:read': false })
+    const { result } = renderHook(() => useFilteredNavigationItems())
+
+    expect(findItem(result.current, 'Execution Plane')).toBeUndefined()
+    expect(findItem(result.current, 'Approvals')).toBeDefined()
+    expect(findItem(result.current, 'Configuration')).toBeDefined()
+  })
+
+  it('includes Execution Plane between Approvals and Configuration when granted', () => {
+    setPermissions({ 'execution_target:read': true })
+    const { result } = renderHook(() => useFilteredNavigationItems())
+
+    const labels = result.current.filter((item) => !item.hidden).map((item) => item.label)
+    const approvalsIdx = labels.indexOf('Approvals')
+    const executionPlaneIdx = labels.indexOf('Execution Plane')
+    const configurationIdx = labels.indexOf('Configuration')
+
+    expect(executionPlaneIdx).toBeGreaterThan(-1)
+    expect(executionPlaneIdx).toBeGreaterThan(approvalsIdx)
+    expect(executionPlaneIdx).toBeLessThan(configurationIdx)
   })
 
   it('excludes Identity Providers when identity-provider:read is denied', () => {

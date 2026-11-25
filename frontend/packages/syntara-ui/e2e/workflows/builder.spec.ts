@@ -9,13 +9,14 @@
 
 import { EXPRESSION_MODE_LABELS } from '../../src/components/expressions/expressionBuilderLabels'
 import { test, expect } from '../fixtures'
+import { addBashScriptStep } from '../helpers/v2-steps'
 import {
   buildUniqueName,
   deleteWorkflow,
   clickAddConnectedStep,
   closeStepEditorPanel,
   createWorkflowWithTrigger,
-  addScriptStep,
+  addPythonScriptStep,
   verifyStepVisible,
   expectCanvasStepTitleVisible,
   waitForUIReady,
@@ -42,12 +43,15 @@ test('catalog panel shows available step types organized by category', async ({ 
     await expect(panel.getByRole('button', { name: 'AAP Execution', exact: true })).toBeVisible()
     await expect(panel.getByRole('button', { name: 'Approval', exact: true })).toBeVisible()
     await expect(panel.getByRole('button', { name: 'Logic', exact: true })).toBeVisible()
+    await panel.getByRole('button', { name: 'Action', exact: true }).click()
+    await expect(panel.getByRole('button', { name: 'Python Script', exact: true })).toBeVisible()
+    await expect(panel.getByRole('button', { name: 'Bash Script', exact: true })).toBeVisible()
   } finally {
     await deleteWorkflow(app, workflowName)
   }
 })
 
-test('user can add a Script action step to the canvas', async ({ app }) => {
+test('user can add a Python Script action step to the canvas', async ({ app }) => {
   const workflowName = buildUniqueName('e2e-builder')
   await createWorkflowWithTrigger(app, workflowName)
 
@@ -55,8 +59,23 @@ test('user can add a Script action step to the canvas', async ({ app }) => {
     await closeStepEditorPanel(app)
     await expectCanvasStepTitleVisible(app, 'Manual trigger')
 
-    await addScriptStep(app, 'Python Hello World', 'print("Hello, World!")')
+    await addPythonScriptStep(app, 'Python Hello World', 'print("Hello, World!")')
     await verifyStepVisible(app, 'Python Hello World')
+  } finally {
+    await deleteWorkflow(app, workflowName)
+  }
+})
+
+test('user can add a Bash Script action step to the canvas', async ({ app }) => {
+  const workflowName = buildUniqueName('e2e-builder-bash')
+  await createWorkflowWithTrigger(app, workflowName)
+
+  try {
+    await closeStepEditorPanel(app)
+    await expectCanvasStepTitleVisible(app, 'Manual trigger')
+
+    await addBashScriptStep(app, 'Bash Hello World', 'printf "Hello, World!\\n"')
+    await verifyStepVisible(app, 'Bash Hello World')
   } finally {
     await deleteWorkflow(app, workflowName)
   }
@@ -233,7 +252,7 @@ test('multiple steps can be added sequentially', async ({ app }) => {
     await expectCanvasStepTitleVisible(app, 'Manual trigger')
 
     // Add first step - Script action
-    await addScriptStep(app, 'Script Step 1', 'print("node1")')
+    await addPythonScriptStep(app, 'Script Step 1', 'print("node1")')
 
     // Wait for UI to stabilize after first node
     await waitForUIReady(app)
@@ -377,7 +396,7 @@ test('added steps are visible and interactive on the canvas', async ({ app }) =>
     await closeStepEditorPanel(app)
     await expectCanvasStepTitleVisible(app, 'Manual trigger')
 
-    await addScriptStep(app, 'Interactive Node', 'print("interactive")')
+    await addPythonScriptStep(app, 'Interactive Node', 'print("interactive")')
 
     await verifyStepVisible(app, 'Interactive Node')
 
@@ -396,7 +415,7 @@ test('nodes are positioned on the canvas after layout', async ({ app }) => {
     await expectCanvasStepTitleVisible(app, 'Manual trigger')
 
     // Add a node
-    await addScriptStep(app, 'Positioned Node', 'print("positioned")')
+    await addPythonScriptStep(app, 'Positioned Node', 'print("positioned")')
     await verifyStepVisible(app, 'Positioned Node')
 
     await triggerLayout(app)
@@ -453,10 +472,10 @@ test('two nodes can be connected with an edge', async ({ app }) => {
     await expectCanvasStepTitleVisible(app, 'Manual trigger')
 
     // Add two nodes using "Add connected step" - this creates edges via the UI
-    await addScriptStep(app, 'First Node', 'print("first")')
-    await addScriptStep(app, 'Second Node', 'print("second")')
+    await addPythonScriptStep(app, 'First Node', 'print("first")')
+    await addPythonScriptStep(app, 'Second Node', 'print("second")')
 
-    // Edge existence is proven implicitly: addScriptStep uses clickAddConnectedStep,
+    // Edge existence is proven implicitly: addPythonScriptStep uses clickAddConnectedStep,
     // which can only succeed by clicking an edge overlay button — so reaching this
     // point means both edges were created.
     await verifyStepVisible(app, 'First Node')
@@ -476,10 +495,10 @@ test('edge is visually distinguishable on canvas', async ({ app }) => {
 
     // Add two nodes - these will auto-connect:
     // Manual trigger -> Source Node -> Target Node
-    await addScriptStep(app, 'Source Node', 'print("source")')
-    await addScriptStep(app, 'Target Node', 'print("target")')
+    await addPythonScriptStep(app, 'Source Node', 'print("source")')
+    await addPythonScriptStep(app, 'Target Node', 'print("target")')
 
-    // Edge existence is proven implicitly by addScriptStep succeeding (it clicks an
+    // Edge existence is proven implicitly by addPythonScriptStep succeeding (it clicks an
     // edge overlay button). The "edge follows connection path" test verifies SVG path data.
   } finally {
     await deleteWorkflow(app, workflowName)
@@ -498,14 +517,14 @@ test('multiple edges can be created sequentially', async ({ app }) => {
     await expectCanvasStepTitleVisible(app, 'Manual trigger')
 
     // Add three steps
-    await addScriptStep(app, 'Step 1', 'print("1")')
-    await addScriptStep(app, 'Step 2', 'print("2")')
-    await addScriptStep(app, 'Step 3', 'print("3")')
+    await addPythonScriptStep(app, 'Step 1', 'print("1")')
+    await addPythonScriptStep(app, 'Step 2', 'print("2")')
+    await addPythonScriptStep(app, 'Step 3', 'print("3")')
 
     // Layout to position nodes
     await triggerLayout(app)
 
-    // Verify all steps are visible — three successful addScriptStep calls prove
+    // Verify all steps are visible — three successful addPythonScriptStep calls prove
     // three edges were sequentially created (each call clicks an edge overlay button).
     await verifyStepVisible(app, 'Step 1')
     await verifyStepVisible(app, 'Step 2')
@@ -524,8 +543,8 @@ test('edge follows connection path between nodes', async ({ app }) => {
     await expectCanvasStepTitleVisible(app, 'Manual trigger')
 
     // Add two nodes - auto-connected: Manual trigger -> Start Node -> End Node
-    await addScriptStep(app, 'Start Node', 'print("start")')
-    await addScriptStep(app, 'End Node', 'print("end")')
+    await addPythonScriptStep(app, 'Start Node', 'print("start")')
+    await addPythonScriptStep(app, 'End Node', 'print("end")')
 
     // Verify edge path exists and has SVG path data.
     // ReactFlow edge paths are SVG <path> elements with no accessible role — use the DOM API directly.
@@ -551,14 +570,14 @@ test('connected nodes form a workflow DAG', async ({ app }) => {
     await expectCanvasStepTitleVisible(app, 'Manual trigger')
 
     // Add nodes that will form a linear DAG: Manual Trigger -> Script 1 -> Script 2
-    await addScriptStep(app, 'Processing Step', 'print("processing")')
-    await addScriptStep(app, 'Final Step', 'print("final")')
+    await addPythonScriptStep(app, 'Processing Step', 'print("processing")')
+    await addPythonScriptStep(app, 'Final Step', 'print("final")')
 
     // Layout to visualize the DAG
     await triggerLayout(app)
 
     // Verify all DAG nodes are present and visible after layout.
-    // DAG structure (trigger→processing→final) is proven by addScriptStep succeeding
+    // DAG structure (trigger→processing→final) is proven by addPythonScriptStep succeeding
     // for each node — each call clicks an edge overlay button that only exists on a connected edge.
     await verifyStepVisible(app, 'Manual trigger')
     await verifyStepVisible(app, 'Processing Step')

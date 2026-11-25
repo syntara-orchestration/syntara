@@ -48,6 +48,8 @@ def init_workflow_runtime(wf: OrchestratorWorkflow) -> None:
         wf.node_control_data = {}
     if not hasattr(wf, "_cof_failed_nodes"):
         wf._cof_failed_nodes = set()
+    if not hasattr(wf, "_active_ep_nodes"):
+        wf._active_ep_nodes = set()
     wf._retry_replay_candidates = set()
     wf._restored_node_timestamps = {}
     wf._restored_node_statuses = {}

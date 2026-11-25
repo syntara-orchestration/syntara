@@ -73,12 +73,12 @@ describe('getRetryPlanPoints', () => {
           ['node-b', 'Loop Step'],
         ]),
         new Map([
-          ['node-a', 'script'],
+          ['node-a', 'script_python'],
           ['node-b', 'loop'],
         ])
       )
     ).toEqual([
-      { id: 'node-a', name: 'First Step', typeLabel: 'Script', stepCount: 4, sanitizedFailedNodeNames: [] },
+      { id: 'node-a', name: 'First Step', typeLabel: 'Python Script', stepCount: 4, sanitizedFailedNodeNames: [] },
       {
         id: 'node-b#iter-2',
         name: 'Loop Step (Iteration 3)',
@@ -100,13 +100,13 @@ describe('getRetryPlanPoints', () => {
           ['fetch-inventory', 'Fetch inventory'],
           ['process-inventory', 'Process inventory'],
         ]),
-        new Map([['fetch-inventory', 'script']])
+        new Map([['fetch-inventory', 'script_python']])
       )
     ).toEqual([
       {
         id: 'fetch-inventory',
         name: 'Fetch inventory',
-        typeLabel: 'Script',
+        typeLabel: 'Python Script',
         stepCount: undefined,
         sanitizedFailedNodeNames: ['Process inventory'],
       },

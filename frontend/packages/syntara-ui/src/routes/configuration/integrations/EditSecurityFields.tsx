@@ -1,13 +1,12 @@
-import { Checkbox, ExpandableSection, HelperText, HelperTextItem, TextArea } from '@patternfly/react-core'
+import { Checkbox, ExpandableSection, HelperText, HelperTextItem } from '@patternfly/react-core'
 import { useState } from 'react'
 import { useFormContext, useFormState, useWatch } from 'react-hook-form'
 
 import { SynFormField } from '../../../components/forms/SynFormField'
 
+import { CaCertificateField } from './CaCertificateField'
 import styles from './EditIntegrationForm.module.css'
 import type { EditIntegrationFormValues } from './editIntegrationFormSchema'
-
-const CA_CERT_HINT = "PEM-encoded CA certificate to trust for this integration's TLS connections."
 
 export function EditSecurityFields() {
   const { control } = useFormContext<EditIntegrationFormValues>()
@@ -70,27 +69,10 @@ export function EditSecurityFields() {
           )}
         </SynFormField>
         {!skipTlsVerify && (
-          <SynFormField<EditIntegrationFormValues, 'ca_certificate'>
+          <CaCertificateField<EditIntegrationFormValues, 'ca_certificate'>
             name="ca_certificate"
-            label="CA certificate"
             fieldId="edit-ca-certificate"
-            hint={CA_CERT_HINT}
-          >
-            {({ field, fieldState }) => (
-              <TextArea
-                id="edit-ca-certificate"
-                placeholder={'-----BEGIN CERTIFICATE-----\n\n-----END CERTIFICATE-----'}
-                aria-label="CA certificate"
-                resizeOrientation="vertical"
-                rows={4}
-                validated={fieldState.error ? 'error' : 'default'}
-                value={field.value ?? ''}
-                onChange={(_event, value) => field.onChange(value || null)}
-                onBlur={field.onBlur}
-                name={field.name}
-              />
-            )}
-          </SynFormField>
+          />
         )}
       </div>
     </ExpandableSection>

@@ -108,7 +108,7 @@ async def eda_workflow(
             }
         ],
         "nodes": [
-            {"id": "n1", "type": "script", "parameters": {"language": "python", "code": "pass"}},
+            {"id": "n1", "type": "script_python", "parameters": {"code": "pass"}},
         ],
         "edges": [{"from": "eda_trigger_1", "to": "n1"}],
     }
@@ -157,7 +157,7 @@ async def eda_workflow_with_schema(
             }
         ],
         "nodes": [
-            {"id": "n1", "type": "script", "parameters": {"language": "python", "code": "pass"}},
+            {"id": "n1", "type": "script_python", "parameters": {"code": "pass"}},
         ],
         "edges": [{"from": "eda_trigger_validated", "to": "n1"}],
     }
@@ -450,7 +450,7 @@ class TestCrossTypePathIsolation:
                     },
                 ],
                 "nodes": [
-                    {"id": "n1", "type": "script", "parameters": {"language": "python", "code": "pass"}},
+                    {"id": "n1", "type": "script_python", "parameters": {"code": "pass"}},
                 ],
                 "edges": [{"from": "wh_1", "to": "n1"}],
             },
@@ -473,7 +473,7 @@ class TestCrossTypePathIsolation:
                     },
                 ],
                 "nodes": [
-                    {"id": "n1", "type": "script", "parameters": {"language": "python", "code": "pass"}},
+                    {"id": "n1", "type": "script_python", "parameters": {"code": "pass"}},
                 ],
                 "edges": [{"from": "eda_1", "to": "n1"}],
             },

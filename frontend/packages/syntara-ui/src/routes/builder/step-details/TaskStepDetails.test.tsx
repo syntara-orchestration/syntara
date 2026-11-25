@@ -30,13 +30,16 @@ vi.mock('../step-forms/ActionStepForm', () => ({
     onSubmit,
     onCancel,
     submitButtonText,
+    initialData,
   }: {
     onSubmit: (data: Record<string, unknown>) => void
     onCancel: () => void
     submitButtonText?: string
+    initialData?: Record<string, unknown>
   }) => (
     <div data-testid="action-step-form">
-      <button onClick={() => onSubmit({ name: 'Updated Task', executor: 'script' })} data-testid="submit-button">
+      <pre data-testid="action-initial-data">{JSON.stringify(initialData)}</pre>
+      <button onClick={() => onSubmit({ name: 'Updated Task', executor: 'script_python' })} data-testid="submit-button">
         {submitButtonText ?? 'Add step'}
       </button>
       <button
@@ -284,11 +287,10 @@ describe('TaskStepDetails Component', () => {
 
   it('renders ActionStepForm for script task', () => {
     const taskData = {
-      type: 'script' as const,
+      type: 'script_python' as const,
       id: 'task-1',
       name: 'Script Task',
       parameters: {
-        language: 'python' as const,
         code: 'print("hello")',
       },
     }
@@ -448,11 +450,10 @@ describe('TaskStepDetails Component', () => {
   it('calls updateActivity on successful form submission', async () => {
     const user = userEvent.setup()
     const taskData = {
-      type: 'script' as const,
+      type: 'script_python' as const,
       id: 'task-1',
       name: 'Original Task',
       parameters: {
-        language: 'python' as const,
         code: 'print("original")',
       },
     }
@@ -520,11 +521,10 @@ describe('TaskStepDetails Component', () => {
 
   it('renders form with initial data', () => {
     const taskData = {
-      type: 'script' as const,
+      type: 'script_python' as const,
       id: 'task-1',
       name: 'Task',
       parameters: {
-        language: 'python' as const,
         code: 'print("test")',
       },
     }
@@ -697,11 +697,10 @@ describe('TaskStepDetails Component', () => {
       throw new Error('The update failed')
     })
     const taskData = {
-      type: 'script' as const,
+      type: 'script_python' as const,
       id: 'task-1',
       name: 'Task',
       parameters: {
-        language: 'python' as const,
         code: 'print("test")',
       },
     }
@@ -793,7 +792,7 @@ describe('TaskStepDetails Component', () => {
 
   it('handles undefined config gracefully', () => {
     const taskData = {
-      type: 'script' as const,
+      type: 'script_python' as const,
       id: 'task-no-config',
       name: 'Task without config',
       // config is undefined
@@ -804,21 +803,24 @@ describe('TaskStepDetails Component', () => {
     expect(screen.getByTestId('action-step-form')).toBeInTheDocument()
   })
 
-  it('handles script task with credential_id in snake_case', () => {
+  it('loads Bash script settings and backend-specific parameters', () => {
     const taskData = {
-      type: 'script' as const,
-      id: 'task-script-cred',
-      name: 'Script with Credential',
+      type: 'script_bash' as const,
+      id: 'task-script-settings',
+      name: 'Bash Script',
       parameters: {
-        language: 'python' as const,
-        code: 'print("test")',
-        credential_id: 'cred-456',
+        code: 'echo test',
+        execution_profile: { type: 'execution_target' as const, execution_target_id: 'target-1' },
+        credential_bindings: [{ credential_recipe_id: 'registry/pull', credential_ref: 'credential-1' }],
       },
     }
 
-    renderTaskStepDetails(taskData, 'task-script-cred')
+    renderTaskStepDetails(taskData, 'task-script-settings')
 
     expect(screen.getByTestId('action-step-form')).toBeInTheDocument()
+    expect(screen.getByTestId('action-initial-data')).toHaveTextContent('"executor":"script_bash"')
+    expect(screen.getByTestId('action-initial-data')).toHaveTextContent('"code":"echo test"')
+    expect(screen.getByTestId('action-initial-data').textContent).not.toContain('language')
   })
 
   it('handles AAP task with camelCase legacy fields', () => {

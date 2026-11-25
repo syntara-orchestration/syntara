@@ -79,7 +79,7 @@ def _build_parallel_graph(branch_ids: list[str]) -> WorkflowGraph:
     backend = InMemoryGraphBackend()
     backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
     for bid in branch_ids:
-        backend.add_node(bid, {"id": bid, "type": "script", "parameters": {}})
+        backend.add_node(bid, {"id": bid, "type": "script_python", "parameters": {}})
         backend.add_edge("trigger", bid, None)
     return WorkflowGraph(backend)
 
@@ -95,7 +95,7 @@ def _build_shared_branch_graph() -> WorkflowGraph:
     """
     backend = InMemoryGraphBackend()
     backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
-    backend.add_node("shared_node", {"id": "shared_node", "type": "script", "parameters": {}})
+    backend.add_node("shared_node", {"id": "shared_node", "type": "script_python", "parameters": {}})
     backend.add_node("conv_alpha", {"id": "conv_alpha", "type": "converge", "parameters": {}})
     backend.add_node("conv_beta", {"id": "conv_beta", "type": "converge", "parameters": {}})
     backend.add_edge("trigger", "shared_node", None)
@@ -113,11 +113,11 @@ def _build_two_converge_graph() -> WorkflowGraph:
     backend = InMemoryGraphBackend()
     backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
     for nid in ("a0", "a1", "b0", "b1"):
-        backend.add_node(nid, {"id": nid, "type": "script", "parameters": {}})
+        backend.add_node(nid, {"id": nid, "type": "script_python", "parameters": {}})
     backend.add_node("conv_alpha", {"id": "conv_alpha", "type": "converge", "parameters": {}})
     backend.add_node("conv_beta", {"id": "conv_beta", "type": "converge", "parameters": {}})
-    backend.add_node("final_alpha", {"id": "final_alpha", "type": "script", "parameters": {}})
-    backend.add_node("final_beta", {"id": "final_beta", "type": "script", "parameters": {}})
+    backend.add_node("final_alpha", {"id": "final_alpha", "type": "script_python", "parameters": {}})
+    backend.add_node("final_beta", {"id": "final_beta", "type": "script_python", "parameters": {}})
     backend.add_edge("trigger", "a0", None)
     backend.add_edge("trigger", "a1", None)
     backend.add_edge("trigger", "b0", None)
@@ -221,7 +221,7 @@ class TestTimedOutConvergeOrdering:
         converge_ids = ["conv_e", "conv_c", "conv_a", "conv_b", "conv_d"]
         for cid in converge_ids:
             branch = f"branch_{cid}"
-            backend.add_node(branch, {"id": branch, "type": "script", "parameters": {}})
+            backend.add_node(branch, {"id": branch, "type": "script_python", "parameters": {}})
             backend.add_node(cid, {"id": cid, "type": "converge", "parameters": {}})
             backend.add_edge("trigger", branch, None)
             backend.add_edge(branch, cid, None)
@@ -268,7 +268,7 @@ class TestConvergeTimeoutCreationOrder:
         converge_ids = ["conv_e", "conv_c", "conv_a", "conv_b", "conv_d"]
         backend = InMemoryGraphBackend()
         backend.add_node("trigger", {"id": "trigger", "type": "manual_trigger", "parameters": {}})
-        backend.add_node("shared_node", {"id": "shared_node", "type": "script", "parameters": {}})
+        backend.add_node("shared_node", {"id": "shared_node", "type": "script_python", "parameters": {}})
         for cid in converge_ids:
             backend.add_node(cid, {"id": cid, "type": "converge", "parameters": {}})
             backend.add_edge("shared_node", cid, None)

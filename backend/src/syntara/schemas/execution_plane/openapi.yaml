@@ -1,0 +1,1055 @@
+---
+openapi: 3.1.0
+info:
+  title: Execution Plane API
+  description: Execution Plane operator endpoints — manage execution targets and observe work items.
+  version: 0.3.1
+paths:
+  /api/execution_plane/v1/execution_targets:
+    post:
+      tags:
+        - Execution Plane
+      summary: Create execution target
+      description: Create a Kubernetes target on the installed cluster through EP commands.
+      operationId: create_execution_target
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExecutionTargetCreate'
+      responses:
+        '201':
+          description: Created execution target
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExecutionTargetRead'
+          headers:
+            Location:
+              description: AO target detail path
+              schema:
+                type: string
+        '404':
+          description: Execution target or installed cluster not found
+        '409':
+          description: Cluster not ready or protected target lifecycle conflict
+        '502':
+          description: Invalid Execution Plane response
+        '503':
+          description: Execution Plane unavailable
+        '422':
+          description: Validation Error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      x-app-permission:
+        resource: execution_target
+        action: create
+    get:
+      tags:
+        - Execution Plane
+      summary: List execution targets
+      description: Retrieve registered execution targets. Filters use field=value or field[operator]=value; labels[key]=value matches a label and an empty value tests key existence. EP validates fields and operators. Keep filters, sort, and limit unchanged when following opaque cursors.
+      operationId: list_execution_targets
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            maximum: 100
+            exclusiveMinimum: 0
+            default: 20
+            title: Limit
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+              - type: 'null'
+            title: Cursor
+        - name: sort
+          in: query
+          required: false
+          schema:
+            type: string
+            pattern: ^-?[a-z][a-z0-9_]*$
+            description: Sort field; prefix with '-' for descending order.
+            default: created_at
+            title: Sort
+          description: Sort field; prefix with '-' for descending order.
+        - name: include_total
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: false
+            title: Include Total
+        - name: id
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+              - type: 'null'
+            description: Filter by id
+            title: Id
+          description: Filter by id
+        - name: cluster_id
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+              - type: 'null'
+            description: Filter by cluster_id
+            title: Cluster Id
+          description: Filter by cluster_id
+        - name: name
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+              - type: 'null'
+            description: Filter by name
+            title: Name
+          description: Filter by name
+        - name: backend_type
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+              - type: 'null'
+            description: Filter by backend_type
+            title: Backend Type
+          description: Filter by backend_type
+        - name: endpoint
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+              - type: 'null'
+            description: Filter by endpoint
+            title: Endpoint
+          description: Filter by endpoint
+        - name: status
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+              - type: 'null'
+            description: Filter by status
+            title: Status
+          description: Filter by status
+        - name: enabled
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+              - type: 'null'
+            description: Filter by enabled
+            title: Enabled
+          description: Filter by enabled
+        - name: is_default
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+              - type: 'null'
+            description: Filter by is_default
+            title: Is Default
+          description: Filter by is_default
+        - name: status_message
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+              - type: 'null'
+            description: Filter by status_message
+            title: Status Message
+          description: Filter by status_message
+        - name: created_at
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+              - type: 'null'
+            description: Filter by created_at
+            title: Created At
+          description: Filter by created_at
+        - name: last_ran_at
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+              - type: 'null'
+            description: Filter by last_ran_at
+            title: Last Ran At
+          description: Filter by last_ran_at
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResourcesResponse_ExecutionTargetRead_'
+        '502':
+          description: Invalid Execution Plane response
+        '503':
+          description: Execution Plane unavailable
+        '422':
+          description: Validation Error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      x-app-permission:
+        resource: execution_target
+        action: read
+  /api/execution_plane/v1/execution_targets/{target_id}:
+    get:
+      tags:
+        - Execution Plane
+      summary: Get execution target
+      description: Read the authoritative EP target by its physical UUID.
+      operationId: get_execution_target
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: target_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+            title: Target Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExecutionTargetRead'
+        '404':
+          description: Execution target or installed cluster not found
+        '409':
+          description: Cluster not ready or protected target lifecycle conflict
+        '502':
+          description: Invalid Execution Plane response
+        '503':
+          description: Execution Plane unavailable
+        '422':
+          description: Validation Error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      x-app-permission:
+        resource: execution_target
+        action: read
+    patch:
+      tags:
+        - Execution Plane
+      summary: Update execution target
+      description: Patch target placement, routing labels, name, enabled state, or default selection through EP.
+      operationId: update_execution_target
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: target_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+            title: Target Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExecutionTargetUpdate'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExecutionTargetRead'
+        '404':
+          description: Execution target or installed cluster not found
+        '409':
+          description: Cluster not ready or protected target lifecycle conflict
+        '502':
+          description: Invalid Execution Plane response
+        '503':
+          description: Execution Plane unavailable
+        '422':
+          description: Validation Error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      x-app-permission:
+        resource: execution_target
+        action: update
+    delete:
+      tags:
+        - Execution Plane
+      summary: Delete execution target
+      description: Begin draining a target; promote another target before deleting the default.
+      operationId: delete_execution_target
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: target_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+            title: Target Id
+      responses:
+        '202':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExecutionTargetDeleteAccepted'
+        '404':
+          description: Execution target or installed cluster not found
+        '409':
+          description: Cluster not ready or protected target lifecycle conflict
+        '502':
+          description: Invalid Execution Plane response
+        '503':
+          description: Execution Plane unavailable
+        '422':
+          description: Validation Error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      x-app-permission:
+        resource: execution_target
+        action: delete
+  /api/execution_plane/v1/execution_targets/{target_id}/health:
+    get:
+      tags:
+        - Execution Plane
+      summary: Get execution target health
+      description: Dispatch a target health command and return EP's shallow typed result.
+      operationId: get_execution_target_health
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: target_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+            title: Target Id
+      responses:
+        '200':
+          description: On-demand execution target health
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExecutionTargetHealthResult'
+        '404':
+          description: Execution target or installed cluster not found
+        '409':
+          description: Cluster not ready or protected target lifecycle conflict
+        '502':
+          description: Invalid Execution Plane response
+        '503':
+          description: Execution Plane unavailable
+        '422':
+          description: Validation Error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      x-app-permission:
+        resource: execution_target
+        action: read
+  /api/execution_plane/v1/execution_targets/{target_id}/usage:
+    get:
+      tags:
+        - Execution Plane
+      summary: Get execution target usage
+      description: Count assigned workloads that EP considers blocking for target deletion.
+      operationId: get_execution_target_usage
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: target_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+            title: Target Id
+      responses:
+        '200':
+          description: Execution target workload usage
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExecutionTargetUsageRead'
+        '404':
+          description: Execution target or installed cluster not found
+        '409':
+          description: Cluster not ready or protected target lifecycle conflict
+        '502':
+          description: Invalid Execution Plane response
+        '503':
+          description: Execution Plane unavailable
+        '422':
+          description: Validation Error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      x-app-permission:
+        resource: execution_target
+        action: read
+  /api/execution_plane/v1/work_items:
+    get:
+      tags:
+        - Execution Plane
+      summary: List work items
+      description: Retrieve work items. Filters use field=value or field[operator]=value; comma-separated values within one field/operator use OR and different fields/operators use AND. runtime_context[key]=value matches exact JSON strings; empty values check key existence. Context keys are literal top-level keys, commas are literal, and multiple keys use AND. EP validates fields and operators. Keep filters, sort, and limit unchanged when following opaque cursors.
+      operationId: list_work_items
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            maximum: 100
+            exclusiveMinimum: 0
+            default: 20
+            title: Limit
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+              - type: 'null'
+            title: Cursor
+        - name: sort
+          in: query
+          required: false
+          schema:
+            type: string
+            pattern: ^-?[a-z][a-z0-9_]*$
+            description: Sort field; prefix with '-' for descending order.
+            default: -created_at
+            title: Sort
+          description: Sort field; prefix with '-' for descending order.
+        - name: include_total
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: false
+            title: Include Total
+        - name: id
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+              - type: 'null'
+            description: Filter by id
+            title: Id
+          description: Filter by id
+        - name: execution_target_id
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+              - type: 'null'
+            description: Filter by execution_target_id
+            title: Execution Target Id
+          description: Filter by execution_target_id
+        - name: status
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+              - type: 'null'
+            description: Filter by status
+            title: Status
+          description: Filter by status
+        - name: created_at
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+              - type: 'null'
+            description: Filter by created_at
+            title: Created At
+          description: Filter by created_at
+        - name: claimed_at
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+              - type: 'null'
+            description: Filter by claimed_at
+            title: Claimed At
+          description: Filter by claimed_at
+        - name: completed_at
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+              - type: 'null'
+            description: Filter by completed_at
+            title: Completed At
+          description: Filter by completed_at
+        - name: resource_cleanup_status
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+              - type: 'null'
+            description: Filter by resource_cleanup_status
+            title: Resource Cleanup Status
+          description: Filter by resource_cleanup_status
+        - name: resource_cleanup_error
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+              - type: 'null'
+            description: Filter by resource_cleanup_error
+            title: Resource Cleanup Error
+          description: Filter by resource_cleanup_error
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResourcesResponse_WorkItemRead_'
+        '502':
+          description: Invalid Execution Plane response
+        '503':
+          description: Execution Plane unavailable
+        '422':
+          description: Validation Error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      x-app-permission:
+        resource: work_item
+        action: read
+components:
+  schemas:
+    BackendType:
+      type: string
+      enum:
+        - kubernetes
+        - openshell
+      title: BackendType
+      description: Supported execution target backends.
+    ExecutionTargetCreate:
+      properties:
+        name:
+          type: string
+          maxLength: 255
+          minLength: 1
+          title: Name
+        placement:
+          $ref: '#/components/schemas/KubernetesTargetPlacement'
+          description: Namespace and pod scheduling rules for this target. Updates require namespace; omitted scheduling lists retain their stored values. The placement type cannot be changed.
+        labels:
+          additionalProperties:
+            type: string
+          type: object
+          title: Labels
+          description: User labels matched by work.execute selectors when routing workloads. Updates replace user labels; {} clears them. EP retains its reserved identity labels.
+        is_default:
+          type: boolean
+          title: Is Default
+          description: Promote this target to the cluster default, replacing the previous default. The target and cluster must be active and enabled. To demote a default, promote another target rather than setting this field to false.
+          default: false
+      additionalProperties: false
+      type: object
+      required:
+        - name
+        - placement
+      title: ExecutionTargetCreate
+      description: A Kubernetes target on the single cluster registered at installation.
+    ExecutionTargetDeleteAccepted:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+        accepted:
+          type: boolean
+          const: true
+          title: Accepted
+          description: Confirms that EP accepted the deletion request, not that draining or physical removal has finished.
+          default: true
+      type: object
+      required:
+        - id
+      title: ExecutionTargetDeleteAccepted
+      description: EP accepted deletion; draining and physical removal happen independently.
+    ExecutionTargetHealthResult:
+      properties:
+        healthy:
+          type: boolean
+          title: Healthy
+          description: 'Whether the namespace probe succeeded. For Kubernetes this checks namespace readability, not workload execution. Check skipped first: a skipped probe also returns true.'
+        message:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Message
+        skipped:
+          type: boolean
+          title: Skipped
+          description: True when no health check ran because the backend, endpoint, or cluster/target lifecycle is outside probe scope; healthy then does not establish readiness.
+          default: false
+      additionalProperties: false
+      type: object
+      required:
+        - healthy
+      title: ExecutionTargetHealthResult
+      description: Shallow view of an EP on-demand target health probe.
+    ExecutionTargetRead:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+          description: Execution target unique identifier
+        cluster_id:
+          type: string
+          format: uuid
+          title: Cluster Id
+          description: Parent cluster identifier
+        name:
+          type: string
+          title: Name
+          description: Execution target name
+        backend_type:
+          $ref: '#/components/schemas/BackendType'
+          description: Backend execution platform type
+        endpoint:
+          type: string
+          title: Endpoint
+          description: Execution target API endpoint URL
+        placement:
+          oneOf:
+            - $ref: '#/components/schemas/KubernetesPlacement'
+            - $ref: '#/components/schemas/RHELPlacement'
+          title: Placement
+          description: Platform-specific placement configuration
+          discriminator:
+            propertyName: type
+            mapping:
+              kubernetes: '#/components/schemas/KubernetesPlacement'
+              rhel: '#/components/schemas/RHELPlacement'
+        status:
+          $ref: '#/components/schemas/TargetStatus'
+          description: Execution target lifecycle status
+        enabled:
+          type: boolean
+          title: Enabled
+          description: Whether the target is enabled for use
+        is_default:
+          type: boolean
+          title: Is Default
+          description: Whether this is the default target for the cluster
+        status_message:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Status Message
+          description: Human-readable status message or error details
+        labels:
+          additionalProperties:
+            type: string
+          type: object
+          title: Labels
+          description: Key-value labels for the target
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+          description: Creation timestamp
+        last_ran_at:
+          anyOf:
+            - type: string
+              format: date-time
+            - type: 'null'
+          title: Last Ran At
+          description: Last execution timestamp
+      type: object
+      required:
+        - id
+        - cluster_id
+        - name
+        - backend_type
+        - endpoint
+        - placement
+        - status
+        - enabled
+        - is_default
+        - labels
+        - created_at
+      title: ExecutionTargetRead
+      description: Safe execution-target representation without management credentials.
+    ExecutionTargetUpdate:
+      properties:
+        name:
+          type: string
+          maxLength: 255
+          minLength: 1
+          title: Name
+        placement:
+          $ref: '#/components/schemas/KubernetesTargetPlacement'
+          title: Placement
+          description: Namespace and pod scheduling rules for this target. Updates require namespace; omitted scheduling lists retain their stored values. The placement type cannot be changed.
+        labels:
+          additionalProperties:
+            type: string
+          type: object
+          title: Labels
+          description: User labels matched by work.execute selectors when routing workloads. Updates replace user labels; {} clears them. EP retains its reserved identity labels.
+        is_default:
+          type: boolean
+          title: Is Default
+          description: Promote this target to the cluster default, replacing the previous default. The target and cluster must be active and enabled. To demote a default, promote another target rather than setting this field to false.
+        enabled:
+          type: boolean
+          title: Enabled
+          description: Whether the scheduler may assign new workloads to this target; disabling it does not request cancellation of work already assigned.
+      additionalProperties: false
+      type: object
+      minProperties: 1
+      title: ExecutionTargetUpdate
+      description: Patch mutable target fields; placement requires a namespace.
+    ExecutionTargetUsageRead:
+      properties:
+        target_id:
+          type: string
+          format: uuid
+          title: Target Id
+        active_workload_count:
+          type: integer
+          minimum: 0.0
+          title: Active Workload Count
+          description: Number of assigned work items in claimed, dispatched, running, or reconciliation_required state. These states block safe deletion; pending and terminal items are excluded.
+      type: object
+      required:
+        - target_id
+        - active_workload_count
+      title: ExecutionTargetUsageRead
+      description: Current workloads that make an execution target unsafe to delete.
+    HTTPValidationError:
+      properties:
+        detail:
+          items:
+            $ref: '#/components/schemas/ValidationError'
+          type: array
+          title: Detail
+      type: object
+      title: HTTPValidationError
+    KubernetesPlacement:
+      properties:
+        type:
+          type: string
+          const: kubernetes
+          title: Type
+          default: kubernetes
+        namespace:
+          type: string
+          maxLength: 63
+          minLength: 1
+          pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+          title: Namespace
+          description: Kubernetes namespace reserved for execution workloads
+        node_selectors:
+          items:
+            type: string
+          type: array
+          title: Node Selectors
+          description: Pod nodeSelector entries in key=value form. Nodes must match every entry; an empty list imposes no label restriction. On update, omission preserves the stored list and [] clears it.
+        tolerations:
+          items:
+            type: string
+          type: array
+          title: Tolerations
+          description: Pod taints to tolerate, using key=value:effect (Equal) or key:effect (Exists). Effect may be NoSchedule, PreferNoSchedule, or NoExecute; omitting it matches all effects. An empty key with Exists matches all keys. On update, omission preserves the list and [] clears it.
+      type: object
+      required:
+        - namespace
+      title: KubernetesPlacement
+      description: Metadata required to place workers on Kubernetes.
+    KubernetesTargetPlacement:
+      properties:
+        type:
+          type: string
+          const: kubernetes
+          title: Type
+          default: kubernetes
+        namespace:
+          type: string
+          maxLength: 63
+          minLength: 1
+          pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+          title: Namespace
+          description: Existing Kubernetes namespace in which EP creates workload pods and checks target health.
+        node_selectors:
+          items:
+            type: string
+          type: array
+          title: Node Selectors
+          description: Pod nodeSelector entries in key=value form. Nodes must match every entry; an empty list imposes no label restriction. On update, omission preserves the stored list and [] clears it.
+        tolerations:
+          items:
+            type: string
+          type: array
+          title: Tolerations
+          description: Pod taints to tolerate, using key=value:effect (Equal) or key:effect (Exists). Effect may be NoSchedule, PreferNoSchedule, or NoExecute; omitting it matches all effects. An empty key with Exists matches all keys. On update, omission preserves the list and [] clears it.
+      additionalProperties: false
+      type: object
+      required:
+        - namespace
+      title: KubernetesTargetPlacement
+      description: Validated Kubernetes placement for target-management writes.
+    RHELPlacement:
+      properties:
+        type:
+          type: string
+          const: rhel
+          title: Type
+          default: rhel
+      type: object
+      title: RHELPlacement
+      description: Placeholder for RHEL-specific execution-target metadata.
+    ResourcesResponse_ExecutionTargetRead_:
+      properties:
+        resources:
+          items:
+            $ref: '#/components/schemas/ExecutionTargetRead'
+          type: array
+          title: Resources
+        next:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Next
+        prev:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Prev
+        total:
+          anyOf:
+            - type: integer
+            - type: 'null'
+          title: Total
+      type: object
+      required:
+        - resources
+      title: ResourcesResponse[ExecutionTargetRead]
+    ResourcesResponse_WorkItemRead_:
+      properties:
+        resources:
+          items:
+            $ref: '#/components/schemas/WorkItemRead'
+          type: array
+          title: Resources
+        next:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Next
+        prev:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Prev
+        total:
+          anyOf:
+            - type: integer
+            - type: 'null'
+          title: Total
+      type: object
+      required:
+        - resources
+      title: ResourcesResponse[WorkItemRead]
+    TargetStatus:
+      type: string
+      enum:
+        - registering
+        - validating
+        - bootstrapping
+        - active
+        - degraded
+        - draining
+        - failed
+      title: TargetStatus
+      description: Lifecycle states of an execution target.
+    ValidationError:
+      properties:
+        loc:
+          items:
+            anyOf:
+              - type: string
+              - type: integer
+          type: array
+          title: Location
+        msg:
+          type: string
+          title: Message
+        type:
+          type: string
+          title: Error Type
+        input:
+          title: Input
+        ctx:
+          type: object
+          title: Context
+      type: object
+      required:
+        - loc
+        - msg
+        - type
+      title: ValidationError
+    WorkItemRead:
+      properties:
+        id:
+          type: string
+          format: uuid
+          title: Id
+          description: Primary key of this EP work item, equal to work.execute.payload.work_item_id supplied at creation. Use it to read or cancel this item and correlate completion or credential callbacks. Syntara uses ActivityExecution.id; runtime_context.execution_id identifies its containing execution.
+        runtime_context:
+          additionalProperties: true
+          type: object
+          title: Runtime Context
+          description: Optional caller-defined JSON object, defaulting to {}. Stored once, unencrypted, on the work item and passed to the plugin as context.runtime_context; also returned in work-item reads and completion notifications. Do not include secrets. Syntara supplies project_id (Project.id), workflow_id (Workflow.id), and execution_id (the containing Execution.id); EP does not require these keys. These values do not authorize access, select placement, identify the work item, or control its lifecycle. List filters runtime_context[key]=value match exact JSON strings at literal top-level keys; an empty value checks key existence and multiple keys use AND.
+        status:
+          $ref: '#/components/schemas/WorkItemStatus'
+          description: Work item lifecycle status
+        cancellation_requested:
+          type: boolean
+          title: Cancellation Requested
+          description: 'Whether cancellation intent has been persisted. A true value does not confirm that execution has stopped: status remains dispatched or running until an outcome is known. A result may win the cancellation race. This flag remains true after completion and is also set by deletion.'
+          default: false
+        deletion_requested:
+          type: boolean
+          title: Deletion Requested
+          description: Whether deletion intent has been persisted. Always implies cancellation_requested=true. Active work is cancelled asynchronously, and the record remains readable until resource cleanup is confirmed and the record is removed. This flag does not change an existing terminal outcome or confirm that deletion has completed.
+          default: false
+        result:
+          anyOf:
+            - additionalProperties: true
+              type: object
+            - type: 'null'
+          title: Result
+          description: Work execution result payload
+        result_omitted:
+          type: boolean
+          title: Result Omitted
+          description: Whether result was omitted due to size
+          default: false
+        result_size_bytes:
+          anyOf:
+            - type: integer
+            - type: 'null'
+          title: Result Size Bytes
+          description: Size of the result in bytes
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+          description: Creation timestamp
+        claimed_at:
+          anyOf:
+            - type: string
+              format: date-time
+            - type: 'null'
+          title: Claimed At
+          description: Claim timestamp
+        completed_at:
+          anyOf:
+            - type: string
+              format: date-time
+            - type: 'null'
+          title: Completed At
+          description: Completion timestamp
+        resource_cleanup_status:
+          type: string
+          title: Resource Cleanup Status
+          description: Resource cleanup status
+        resource_cleanup_error:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Resource Cleanup Error
+          description: Resource cleanup error details
+      type: object
+      required:
+        - id
+        - status
+        - created_at
+        - resource_cleanup_status
+      title: WorkItemRead
+      description: Safe work-item representation; excludes credentials and persistence internals.
+    WorkItemStatus:
+      type: string
+      enum:
+        - pending
+        - claimed
+        - dispatched
+        - running
+        - reconciliation_required
+        - completed
+        - failed
+        - cancelled
+      title: WorkItemStatus
+      description: Lifecycle states of a dispatched work item.
+  securitySchemes:
+    bearerAuth:
+      type: http
+      description: JWT token authentication
+      scheme: bearer
+      bearerFormat: JWT

@@ -43,7 +43,7 @@ async def test_list_execution_activities_returns_persisted_data(
         ActivityExecution(
             execution_id=test_execution.id,
             activity_name=f"activity_{i}",
-            node_type="script",
+            node_type="script_python",
             temporal_activity_id=f"temporal-{i}",
             status=ActivityStatus.COMPLETED,
             started_at=base_time + timedelta(seconds=i),
@@ -92,7 +92,7 @@ async def test_list_execution_activities_includes_all_fields(
     now = datetime.now(UTC)
     activity_def = {
         "id": "test_activity",
-        "type": "script",
+        "type": "script_python",
         "parameters": {"code": "print('test')"},
     }
 
@@ -127,7 +127,7 @@ async def test_list_execution_activities_includes_all_fields(
     assert activity_data["activity_name"] == "complete_activity"
     assert activity_data["temporal_activity_id"] == "temporal-123"
     assert activity_data["status"] == "completed"
-    assert activity_data["node_type"] == "script"
+    assert activity_data["node_type"] == "script_python"
     assert activity_data["labels"] == {"environment": "test"}
     assert activity_data["input_data"] == {"param": "value"}
     assert activity_data["output_data"] == {"result": "success"}
@@ -172,7 +172,7 @@ async def test_list_execution_activities_with_different_statuses(
         activity = ActivityExecution(
             execution_id=test_execution.id,
             activity_name=f"activity_{status.value}",
-            node_type="script",
+            node_type="script_python",
             temporal_activity_id=f"temporal-{i}",
             status=status,
         )
@@ -245,7 +245,7 @@ async def test_list_execution_activities_multiple_executions_isolated(
         activity = ActivityExecution(
             execution_id=test_execution.id,
             activity_name=f"exec1_activity_{i}",
-            node_type="script",
+            node_type="script_python",
             temporal_activity_id=f"temporal-exec1-{i}",
             status=ActivityStatus.COMPLETED,
         )
@@ -256,7 +256,7 @@ async def test_list_execution_activities_multiple_executions_isolated(
         activity = ActivityExecution(
             execution_id=execution2.id,
             activity_name=f"exec2_activity_{i}",
-            node_type="script",
+            node_type="script_python",
             temporal_activity_id=f"temporal-exec2-{i}",
             status=ActivityStatus.RUNNING,
         )
