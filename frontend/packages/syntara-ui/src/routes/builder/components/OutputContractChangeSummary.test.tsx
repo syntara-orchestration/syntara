@@ -149,4 +149,30 @@ describe('OutputContractChangeSummary', () => {
     expect(screen.getByText(/References outside your visibility scope may not be shown/)).toBeInTheDocument()
     expect(screen.queryByText(/0 visible published parent/)).not.toBeInTheDocument()
   })
+
+  it('describes root-level constraint changes without exposing the internal path sentinel', () => {
+    render(
+      <OutputContractChangeSummary
+        context="publish"
+        contractChanges={[
+          {
+            trigger_id: 'child_trigger',
+            trigger_name: 'Child trigger',
+            changes: [
+              {
+                change_type: 'constraint_change',
+                field_path: '$root',
+                description: 'Output validation constraints changed: $root',
+                is_breaking: true,
+              },
+            ],
+          },
+        ]}
+        parentWorkflows={[]}
+      />
+    )
+
+    expect(screen.getByText(/This version changes root-level validation constraints/)).toBeInTheDocument()
+    expect(screen.queryByText(/“\$root”/)).not.toBeInTheDocument()
+  })
 })

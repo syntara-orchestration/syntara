@@ -76,6 +76,7 @@ function describeOutputChange(change: OutputChangeDetail): string {
     case 'optional_output':
       return `makes the output ${outputName} optional`
     case 'constraint_change':
+      if (change.fieldPath === '$root') return 'changes root-level validation constraints'
       return `changes validation constraints for the output ${outputName}`
     case 'removed_trigger':
       return `removes the Subworkflow Trigger “${change.triggerName}”`
