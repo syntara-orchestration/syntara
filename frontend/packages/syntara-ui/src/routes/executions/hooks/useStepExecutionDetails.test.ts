@@ -6,7 +6,15 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { ActivityStatus } from '../../workflows/execution/types'
 
-import { useStepExecutionDetails } from './useStepExecutionDetails'
+import { useStepExecutionDetails, type UseStepExecutionDetailsParams } from './useStepExecutionDetails'
+
+function useStepExecutionDetailsWithDefaults(overrides: Partial<UseStepExecutionDetailsParams> = {}) {
+  return useStepExecutionDetails({
+    stepId: 'my_activity',
+    executionId: 'exec-1',
+    ...overrides,
+  })
+}
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -67,7 +75,7 @@ describe('useStepExecutionDetails', () => {
     it('returns null inputData and outputData when query has no data', () => {
       mockUseQuery.mockReturnValue({ data: undefined, isLoading: false, error: null, refetch: mockRefetch })
 
-      const { result } = renderHook(() => useStepExecutionDetails('my_activity', 'exec-1'), {
+      const { result } = renderHook(() => useStepExecutionDetailsWithDefaults(), {
         wrapper: makeWrapper(queryClient),
       })
 
@@ -78,7 +86,7 @@ describe('useStepExecutionDetails', () => {
     it('returns inputData and outputData from the first activity in the response', () => {
       mockUseQuery.mockReturnValue({ data: mockActivityResponse, isLoading: false, error: null, refetch: mockRefetch })
 
-      const { result } = renderHook(() => useStepExecutionDetails('my_activity', 'exec-1'), {
+      const { result } = renderHook(() => useStepExecutionDetailsWithDefaults(), {
         wrapper: makeWrapper(queryClient),
       })
 
@@ -89,7 +97,9 @@ describe('useStepExecutionDetails', () => {
 
   describe('enabled flag', () => {
     it('is false when executionId is null', () => {
-      renderHook(() => useStepExecutionDetails('my_activity', null), { wrapper: makeWrapper(queryClient) })
+      renderHook(() => useStepExecutionDetailsWithDefaults({ executionId: null }), {
+        wrapper: makeWrapper(queryClient),
+      })
 
       // The fourth argument to useQuery carries the { enabled } option
       expect(mockUseQuery).toHaveBeenCalledWith(
@@ -101,7 +111,7 @@ describe('useStepExecutionDetails', () => {
     })
 
     it('is false when stepId is empty string', () => {
-      renderHook(() => useStepExecutionDetails('', 'exec-1'), { wrapper: makeWrapper(queryClient) })
+      renderHook(() => useStepExecutionDetailsWithDefaults({ stepId: '' }), { wrapper: makeWrapper(queryClient) })
 
       expect(mockUseQuery).toHaveBeenCalledWith(
         'get',
@@ -112,7 +122,7 @@ describe('useStepExecutionDetails', () => {
     })
 
     it('is true when both stepId and executionId are provided', () => {
-      renderHook(() => useStepExecutionDetails('my_activity', 'exec-1'), { wrapper: makeWrapper(queryClient) })
+      renderHook(() => useStepExecutionDetailsWithDefaults(), { wrapper: makeWrapper(queryClient) })
 
       expect(mockUseQuery).toHaveBeenCalledWith(
         'get',
@@ -125,7 +135,7 @@ describe('useStepExecutionDetails', () => {
 
   describe('refetch on activityStatus change', () => {
     it('is NOT called on mount', () => {
-      renderHook(() => useStepExecutionDetails('my_activity', 'exec-1', 'running'), {
+      renderHook(() => useStepExecutionDetailsWithDefaults({ activityStatus: 'running' }), {
         wrapper: makeWrapper(queryClient),
       })
 
@@ -135,7 +145,7 @@ describe('useStepExecutionDetails', () => {
 
     it('is called when activityStatus changes from one value to another', () => {
       const { rerender } = renderHook(
-        ({ status }: { status?: ActivityStatus }) => useStepExecutionDetails('my_activity', 'exec-1', status),
+        ({ status }: { status?: ActivityStatus }) => useStepExecutionDetailsWithDefaults({ activityStatus: status }),
         {
           initialProps: { status: 'running' as ActivityStatus | undefined },
           wrapper: makeWrapper(queryClient),
@@ -151,7 +161,7 @@ describe('useStepExecutionDetails', () => {
 
     it('is NOT called when activityStatus stays the same', () => {
       const { rerender } = renderHook(
-        ({ status }: { status?: ActivityStatus }) => useStepExecutionDetails('my_activity', 'exec-1', status),
+        ({ status }: { status?: ActivityStatus }) => useStepExecutionDetailsWithDefaults({ activityStatus: status }),
         {
           initialProps: { status: 'running' as ActivityStatus | undefined },
           wrapper: makeWrapper(queryClient),
@@ -166,7 +176,7 @@ describe('useStepExecutionDetails', () => {
   })
 
   it('queries the selected loop iteration record', () => {
-    renderHook(() => useStepExecutionDetails('my_activity', 'exec-1', 'completed', 2), {
+    renderHook(() => useStepExecutionDetailsWithDefaults({ activityStatus: 'completed', iteration: 2 }), {
       wrapper: makeWrapper(queryClient),
     })
 
@@ -184,9 +194,17 @@ describe('useStepExecutionDetails', () => {
   })
 
   it('does not duplicate an iteration suffix already present in the step ID', () => {
-    renderHook(() => useStepExecutionDetails('my_activity#iter-2', 'exec-1', 'completed', 2), {
-      wrapper: makeWrapper(queryClient),
-    })
+    renderHook(
+      () =>
+        useStepExecutionDetailsWithDefaults({
+          stepId: 'my_activity#iter-2',
+          activityStatus: 'completed',
+          iteration: 2,
+        }),
+      {
+        wrapper: makeWrapper(queryClient),
+      }
+    )
 
     expect(mockUseQuery).toHaveBeenCalledWith(
       'get',
@@ -199,5 +217,24 @@ describe('useStepExecutionDetails', () => {
       }),
       expect.anything()
     )
+  })
+
+  it('uses fallbackOutputData when the activities response has no matching record', () => {
+    mockUseQuery.mockReturnValue({
+      data: { resources: [] },
+      isLoading: false,
+      error: null,
+      refetch: mockRefetch,
+    })
+
+    const { result } = renderHook(
+      () =>
+        useStepExecutionDetailsWithDefaults({
+          fallbackOutputData: { hostname: 'mock-server' },
+        }),
+      { wrapper: makeWrapper(queryClient) }
+    )
+
+    expect(result.current.outputData).toEqual({ hostname: 'mock-server' })
   })
 })
