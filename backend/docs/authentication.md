@@ -533,6 +533,8 @@ If an existing deployment still has `email=NULL` on the builtin admin, the next 
 
 If the password file is not configured or missing, the application still starts but logs a warning — the admin user will be created without a password (unable to log in locally).
 
+On every startup, if the bootstrap `admin` user already exists, seeding checks whether the stored hash still verifies against the mounted password file. When verification fails (for example after a failed deployment left a stale hash in the database), the hash is rewritten from the current secret. When verification succeeds, the row is left unchanged. The mounted secret is therefore the source of truth on each restart: a self-service password change via the API persists only until the next seed run unless the password file is updated to match (for example via `automation-orchestrator-admin reset-password` with `--password-stdin`).
+
 > **Recommended**: Run `make secrets-generate` before first startup to create the password file.
 
 ### Built-in Admin Protection

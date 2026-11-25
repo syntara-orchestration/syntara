@@ -1,4 +1,4 @@
-"""Tests for bootstrap admin email seeding (AAP-87627)."""
+"""Tests for bootstrap admin email seeding."""
 
 from __future__ import annotations
 
@@ -9,6 +9,7 @@ import pytest
 from sqlalchemy.exc import IntegrityError
 
 from syntara.auth.exceptions import AdminModifyError
+from syntara.auth.passwords import hash_password, verify_password
 from syntara.authz.seed import (
     BOOTSTRAP_ADMIN_EMAIL,
     BOOTSTRAP_ADMIN_FIRST_NAME,
@@ -134,6 +135,83 @@ async def test_seed_preserves_existing_admin_email() -> None:
     session = _mock_seed_session(admin=admin)
     await _run_seed(session)
     assert admin.email == existing_email
+
+
+_BOOTSTRAP_TEST_PASSWORD = "BootstrapResync1!"  # noqa: S105
+
+
+@pytest.mark.asyncio
+async def test_seed_resyncs_password_for_existing_admin_from_current_secret() -> None:
+    """Redeploy must sync the admin password to the current secret file.
+
+    Reproduces the reported bug: when the admin user already exists in the
+    database (e.g. left over from a prior failed deployment whose seeding
+    ran before the deployment failed), seeding leaves its password_hash
+    untouched even though a subsequent successful deployment's K8s secret
+    contains a different password. The stored hash and the current secret
+    then disagree and the operator cannot log in with the password from the
+    K8s secret.
+    """
+    stale_hash = "stale-hash-from-failed-deployment"
+    admin = User(
+        id=uuid4(),
+        username=BOOTSTRAP_ADMIN_USERNAME,
+        first_name=BOOTSTRAP_ADMIN_FIRST_NAME,
+        email="admin@example.com",
+        is_enabled=True,
+        is_builtin=True,
+        password_hash=stale_hash,
+    )
+    session = _mock_seed_session(admin=admin)
+
+    with patch("syntara.authz.seed._read_admin_password_plain", return_value=_BOOTSTRAP_TEST_PASSWORD):
+        await _run_seed(session)
+
+    assert admin.password_hash is not None
+    assert admin.password_hash != stale_hash
+    assert verify_password(_BOOTSTRAP_TEST_PASSWORD, admin.password_hash)
+
+
+@pytest.mark.asyncio
+async def test_seed_skips_password_resync_when_hash_verifies_secret() -> None:
+    """Matching secret must not rewrite the Argon2 hash on every startup."""
+    stored_hash = hash_password(_BOOTSTRAP_TEST_PASSWORD)
+    admin = User(
+        id=uuid4(),
+        username=BOOTSTRAP_ADMIN_USERNAME,
+        first_name=BOOTSTRAP_ADMIN_FIRST_NAME,
+        email="admin@example.com",
+        is_enabled=True,
+        is_builtin=True,
+        password_hash=stored_hash,
+    )
+    session = _mock_seed_session(admin=admin)
+
+    with patch("syntara.authz.seed._read_admin_password_plain", return_value=_BOOTSTRAP_TEST_PASSWORD):
+        await _run_seed(session)
+
+    assert admin.password_hash == stored_hash
+
+
+@pytest.mark.asyncio
+async def test_seed_preserves_password_when_secret_unavailable() -> None:
+    """Missing secret file must not clear an existing bootstrap admin hash."""
+    stored_hash = hash_password(_BOOTSTRAP_TEST_PASSWORD)
+    admin = User(
+        id=uuid4(),
+        username=BOOTSTRAP_ADMIN_USERNAME,
+        first_name=BOOTSTRAP_ADMIN_FIRST_NAME,
+        email="admin@example.com",
+        is_enabled=True,
+        is_builtin=True,
+        password_hash=stored_hash,
+    )
+    session = _mock_seed_session(admin=admin)
+
+    with patch("syntara.authz.seed._read_admin_password_plain", return_value=None):
+        await _run_seed(session)
+
+    assert admin.password_hash == stored_hash
 
 
 @pytest.mark.asyncio
