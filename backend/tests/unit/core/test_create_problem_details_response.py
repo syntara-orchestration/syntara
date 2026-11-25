@@ -4,8 +4,15 @@ import json
 
 import pytest
 from fastapi.responses import JSONResponse
+from pydantic import Field as PydanticField
 
-from syntara.core.error_handlers import PROBLEM_TYPES, create_problem_details_response
+from syntara.core.error_handlers import (
+    PROBLEM_TYPES,
+    create_problem_details_response,
+    create_problem_details_response_from_model,
+    truncate_problem_instance,
+)
+from syntara.core.models.error import ErrorData
 
 
 class TestCreateProblemDetailsResponse:
@@ -182,3 +189,66 @@ class TestCreateProblemDetailsResponse:
         data = json.loads(bytes(response.body).decode())
         assert data["detail"] == detail
         assert len(data["detail"]) == 2000
+
+
+class _CountProblem(ErrorData):
+    """Test-only ErrorData extension carrying a required positive count (mirrors the confirmation problems)."""
+
+    extra_count: int = PydanticField(ge=1)
+
+
+class TestCreateProblemDetailsResponseFromModel:
+    """Tests for the shared model-based problem serializer and delegation."""
+
+    def test_serializes_subclass_extension_field(self) -> None:
+        problem = _CountProblem(
+            type=PROBLEM_TYPES["resource_conflict"],
+            title="Conflict",
+            detail="x",
+            code="SOME_CONFIRMATION_REQUIRED",
+            retryable=False,
+            instance="/api/v1/x",
+            extra_count=3,
+        )
+        resp = create_problem_details_response_from_model(problem, status_code=409)
+        assert isinstance(resp, JSONResponse)
+        assert resp.status_code == 409
+        assert resp.media_type == "application/problem+json"
+        data = json.loads(bytes(resp.body).decode())
+        assert data["extra_count"] == 3
+        assert data["code"] == "SOME_CONFIRMATION_REQUIRED"
+        assert data["retryable"] is False
+
+    def test_public_helper_delegates_identically(self) -> None:
+        """create_problem_details_response must emit the same wire bytes as from_model for an equivalent model."""
+        via_public = create_problem_details_response(
+            status_code=409,
+            problem_type=PROBLEM_TYPES["resource_conflict"],
+            title="Conflict",
+            detail="boom",
+            code="CONFLICT",
+            retryable=True,
+            instance="/api/v1/thing",
+        )
+        via_model = create_problem_details_response_from_model(
+            ErrorData(
+                type=PROBLEM_TYPES["resource_conflict"],
+                title="Conflict",
+                detail="boom",
+                code="CONFLICT",
+                retryable=True,
+                instance="/api/v1/thing",
+            ),
+            status_code=409,
+        )
+        assert via_public.status_code == via_model.status_code
+        assert via_public.media_type == via_model.media_type
+        assert json.loads(bytes(via_public.body).decode()) == json.loads(bytes(via_model.body).decode())
+
+    def test_instance_truncation_helper(self) -> None:
+        long_instance = "/x?" + ("a" * 5000)
+        truncated = truncate_problem_instance(long_instance)
+        assert truncated is not None
+        assert len(truncated) == 2048
+        assert truncate_problem_instance(None) is None
+        assert truncate_problem_instance("/short") == "/short"

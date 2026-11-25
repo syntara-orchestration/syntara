@@ -3,12 +3,14 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useCallback, useState } from 'react'
 
 import { workflowClient } from '../../../client'
+import { useTriggerRemovalPublishConfirm } from '../../../hooks/useTriggerRemovalPublishConfirm'
 import { useAlerts } from '../../../providers/alerts'
 import type { AlertMessage } from '../../../providers/alerts'
 import { getErrorMessage } from '../../../utils/apiErrors'
 import { detachPromise } from '../../../utils/detachPromise'
 
 import { useOutputContractReview } from './useOutputContractReview'
+import { isWorkflowQuery } from './usePublishWorkflow'
 
 type WorkflowVersion = WorkflowAPI.components['schemas']['WorkflowVersionRead']
 
@@ -43,6 +45,7 @@ export function useVersionHistoryPublishing({
 }: UseVersionHistoryPublishingParams) {
   const queryClient = useQueryClient()
   const { showSuccess, showError } = useAlerts()
+  const { guardPublishError, triggerRemovalConfirmDialog } = useTriggerRemovalPublishConfirm()
   const {
     breakingChanges,
     contractChanges,
@@ -56,37 +59,47 @@ export function useVersionHistoryPublishing({
   const publishMutation = workflowClient.useMutation('post', '/workflows/{workflow_id}/versions/{version}/publish')
 
   const publishVersionNow = useCallback(
-    (pending: PendingVersionPublish) => {
-      publishMutation.mutate(
-        {
-          params: { path: { workflow_id: workflowId ?? '', version: pending.version } },
-          body: {
-            name: pending.publishName ?? null,
-            change_description: pending.changeDescription ?? null,
+    (pending: PendingVersionPublish, confirm = false) => {
+      // Retry only after the user confirms the trigger-removal warning.
+      function attempt(useConfirm: boolean) {
+        publishMutation.mutate(
+          {
+            params: {
+              path: { workflow_id: workflowId ?? '', version: pending.version },
+              query: { confirm: useConfirm },
+            },
+            body: {
+              name: pending.publishName ?? null,
+              change_description: pending.changeDescription ?? null,
+            },
           },
-        },
-        {
-          onSuccess: (data) => {
-            showSuccess({ title: 'Version published' })
-            if (data?.current_version != null) onVersionUpdated?.(data.current_version)
-            detachPromise(refetchVersions())
-            detachPromise(
-              queryClient.invalidateQueries({
-                predicate: (query) =>
-                  query.queryKey[0] === 'get' &&
-                  typeof query.queryKey[1] === 'string' &&
-                  query.queryKey[1].startsWith('/workflows'),
-              })
-            )
-          },
-          onError: (error: unknown) => {
-            showError({ title: 'Failed to publish version', description: getErrorMessage(error) })
-          },
-          onSettled: pending.onSettled,
-        }
-      )
+          {
+            onSuccess: (data) => {
+              showSuccess({ title: 'Version published' })
+              if (data?.current_version != null) onVersionUpdated?.(data.current_version)
+              detachPromise(refetchVersions())
+              detachPromise(queryClient.invalidateQueries({ predicate: isWorkflowQuery }))
+            },
+            onError: (error: unknown) => {
+              if (guardPublishError(error, () => attempt(true))) return
+              showError({ title: 'Failed to publish version', description: getErrorMessage(error) })
+            },
+            onSettled: pending.onSettled,
+          }
+        )
+      }
+      attempt(confirm)
     },
-    [workflowId, publishMutation, showSuccess, showError, onVersionUpdated, refetchVersions, queryClient]
+    [
+      workflowId,
+      publishMutation,
+      showSuccess,
+      showError,
+      onVersionUpdated,
+      refetchVersions,
+      queryClient,
+      guardPublishError,
+    ]
   )
 
   const reviewVersionForPublish = useCallback(
@@ -225,5 +238,6 @@ export function useVersionHistoryPublishing({
     parentWorkflows,
     confirmPublishVersion,
     cancelBreakingChangeWarning,
+    triggerRemovalConfirmDialog,
   }
 }

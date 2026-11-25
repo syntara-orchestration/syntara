@@ -192,6 +192,7 @@ export function useBuilderVersionPanel(params: UseBuilderVersionPanelParams) {
     updateVersionMetadata,
     updateMetadataMutation,
     paginationFooterProps,
+    triggerRemovalConfirmDialog,
   } = useBuilderVersionHistory({
     workflowId,
     isNew,
@@ -206,15 +207,13 @@ export function useBuilderVersionPanel(params: UseBuilderVersionPanelParams) {
     onVersionUpdated,
   })
 
-  const { refetch: refetchVersions } = versionsQuery
-
   const handleToggleVersionHistory = useCallback(() => {
     baseHandleToggleVersionHistory()
     if (!versionHistoryOpen) {
       onClearExecutionFilters()
-      detachPromise(refetchVersions())
+      detachPromise(versionsQuery.refetch())
     }
-  }, [baseHandleToggleVersionHistory, versionHistoryOpen, onClearExecutionFilters, refetchVersions])
+  }, [baseHandleToggleVersionHistory, versionHistoryOpen, onClearExecutionFilters, versionsQuery])
 
   const versionPublishDialog = useDialogState<number>()
   const editVersionDialog = useDialogState<WorkflowVersion>()
@@ -280,11 +279,10 @@ export function useBuilderVersionPanel(params: UseBuilderVersionPanelParams) {
     setPendingViewVersion(null)
   }, [pendingViewVersion, dispatch, setVersionParam])
 
-  const handleCancelSaveBeforeView = useCallback(() => {
-    setPendingViewVersion(null)
-  }, [])
+  const handleCancelSaveBeforeView = useCallback(() => setPendingViewVersion(null), [])
 
   return {
+    triggerRemovalConfirmDialog,
     isViewingVersion,
     viewedVersionDate,
     viewedVersionStatus,

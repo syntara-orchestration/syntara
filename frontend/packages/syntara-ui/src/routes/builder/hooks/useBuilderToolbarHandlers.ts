@@ -3,6 +3,7 @@ import type { ReactFlowInstance } from '@xyflow/react'
 import { useCallback, type Dispatch } from 'react'
 
 import { workflowFetchClient } from '../../../client'
+import { useReferencedDeleteConfirm } from '../../../hooks/useReferencedDeleteConfirm'
 import type { AlertMessage } from '../../../providers/alerts'
 import { useWorkflowStore } from '../../../stores/useWorkflowStore'
 import type { WorkflowDefinition } from '../../../stores/workflowStoreTypes'
@@ -60,7 +61,7 @@ type ExecuteWorkflowMutate = (
 ) => void
 
 type DeleteWorkflowMutate = (
-  variables: { params: { path: { workflow_id: string } } },
+  variables: { params: { path: { workflow_id: string }; query?: { confirm?: boolean } } },
   options?: {
     onSuccess?: () => void
     onError?: (error: unknown) => void
@@ -224,27 +225,40 @@ export function useBuilderToolbarHandlers({
     ]
   )
 
+  const { guardDeleteError, referencedDeleteConfirmDialog } = useReferencedDeleteConfirm()
+
   const handleDeleteWorkflow = useCallback(() => {
     if (!workflow?.id) return
+    const workflowId = workflow.id
 
-    deleteWorkflow(
-      { params: { path: { workflow_id: workflow.id } } },
-      {
-        onSuccess: () => {
-          showSuccess({ title: 'Workflow deleted', description: `Workflow "${workflowName}" has been deleted.` })
-          dispatch({ type: 'SET_DELETE_DIALOG', payload: false })
-          setLocation('/workflows')
-        },
-        onError: (error) => {
-          showError({
-            title: 'Failed to delete workflow',
-            description: `Failed to delete workflow "${workflowName}": ${getErrorMessage(error)}`,
-          })
-          dispatch({ type: 'SET_DELETE_DIALOG', payload: false })
-        },
-      }
-    )
-  }, [workflow, workflowName, deleteWorkflow, showSuccess, showError, setLocation, dispatch])
+    // Start unconfirmed so the referenced-by-published-parents gate is honored; retry with
+    // confirm=true only after the user explicitly confirms via guardDeleteError.
+    const doDelete = (confirm: boolean) => {
+      deleteWorkflow(
+        { params: { path: { workflow_id: workflowId }, query: { confirm } } },
+        {
+          onSuccess: () => {
+            showSuccess({ title: 'Workflow deleted', description: `Workflow "${workflowName}" has been deleted.` })
+            dispatch({ type: 'SET_DELETE_DIALOG', payload: false })
+            setLocation('/workflows')
+          },
+          onError: (error) => {
+            if (guardDeleteError(error, () => doDelete(true))) {
+              dispatch({ type: 'SET_DELETE_DIALOG', payload: false })
+              return
+            }
+            showError({
+              title: 'Failed to delete workflow',
+              description: `Failed to delete workflow "${workflowName}": ${getErrorMessage(error)}`,
+            })
+            dispatch({ type: 'SET_DELETE_DIALOG', payload: false })
+          },
+        }
+      )
+    }
+
+    doDelete(false)
+  }, [workflow, workflowName, deleteWorkflow, guardDeleteError, showSuccess, showError, setLocation, dispatch])
 
   const handleToggleDetails = useCallback(() => {
     dispatch({ type: 'TOGGLE_DETAILS' })
@@ -270,6 +284,7 @@ export function useBuilderToolbarHandlers({
     handleToggleDetails,
     handleToggleHistory,
     handleToggleVersionHistory,
+    referencedDeleteConfirmDialog,
   }
 }
 

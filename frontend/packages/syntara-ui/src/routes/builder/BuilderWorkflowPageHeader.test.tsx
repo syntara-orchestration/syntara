@@ -42,6 +42,9 @@ vi.mock('../../client', () => ({
       isPending: false,
     })),
   },
+  workflowClient: {
+    useQuery: vi.fn(() => ({ data: undefined, isLoading: false, error: null })),
+  },
 }))
 
 vi.mock('../../providers/alerts/AlertContext', () => ({

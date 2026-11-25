@@ -1,4 +1,4 @@
-import { Button, Flex, FlexItem, Icon, TextInput, TitleSizes, Tooltip } from '@patternfly/react-core'
+import { Button, Icon, TitleSizes } from '@patternfly/react-core'
 import { RhUiClockIcon, RhUiUndoIcon } from '@patternfly/react-icons'
 import type { ExecutionStatus, WorkflowAPI } from '@syntara/contracts'
 import { type Dispatch, type ReactNode } from 'react'
@@ -6,18 +6,17 @@ import { type Dispatch, type ReactNode } from 'react'
 import { DisabledWithTooltip } from '../../components/DisabledWithTooltip'
 import { SynPageHeader } from '../../components/layout/SynPageHeader'
 import { SynPageTitle } from '../../components/SynPageTitle'
-import { WorkflowPublishStatusBadge } from '../../components/WorkflowPublishStatusBadge'
 import { useDialogState } from '../../hooks/useDialogState'
 import { useDocLink } from '../../utils/docs/useDocLink'
 import { CancelExecutionButton } from '../executions/CancelExecutionButton'
 import { isExecutionCancellable } from '../executions/executionCancellable'
 
+import { BuilderEditorTitleSlot } from './BuilderEditorTitleSlot'
 import { BuilderEditorToolbar } from './BuilderEditorToolbar'
 import type { BuilderAction } from './builderReducer'
-import styles from './BuilderWorkflowPageHeader.module.css'
 import { BuilderVersionViewTitleRowAddons } from './BuilderWorkflowPageHeaderParts'
 import { builderVersionViewHasTitleRowExtras } from './builderWorkflowPageHeaderTitle'
-import { EditWorkflowDetailsPopover } from './EditWorkflowDetailsPopover'
+import { useRemovedSubworkflowTriggerIds } from './hooks/usePublishTriggerRemoval'
 import { PublishWorkflowDialog } from './PublishWorkflowDialog'
 import type { BuilderPermissions } from './useBuilderPermissions'
 import type { PendingImportData } from './useWorkflowImportExport'
@@ -153,7 +152,6 @@ function BuilderToolbarContent({
   }
 
   if (isLiveRunActive && onBackToEditor) {
-    const isCancellable = isExecutionCancellable(executionStatus)
     return (
       <>
         {hasApprovalPending && onReviewApproval && (
@@ -166,7 +164,7 @@ function BuilderToolbarContent({
             Review approval
           </Button>
         )}
-        {isCancellable && executionId && projectId && (
+        {isExecutionCancellable(executionStatus) && executionId && projectId && (
           <CancelExecutionButton executionId={executionId} projectId={projectId} />
         )}
         <Button variant="primary" onClick={onBackToEditor}>
@@ -209,83 +207,6 @@ function BuilderToolbarContent({
   )
 }
 
-function BuilderEditorTitleSlot({
-  workflowName,
-  workflowDescription,
-  isNew,
-  publishedVersionId,
-  currentVersionId,
-  isBuiltin,
-  builderPermissions,
-  ProjectSelector,
-  dispatch,
-  markDirty,
-}: Readonly<{
-  workflowName: string
-  workflowDescription: string
-  isNew: boolean
-  publishedVersionId: string | null
-  currentVersionId?: string | null
-  isBuiltin: boolean
-  builderPermissions: BuilderPermissions
-  ProjectSelector: ReactNode
-  dispatch: Dispatch<BuilderAction>
-  markDirty: () => void
-}>) {
-  return (
-    <Flex
-      className={styles.titleSlot}
-      data-testid="builder-title-slot"
-      gap={{ default: 'gapMd' }}
-      alignItems={{ default: 'alignItemsCenter' }}
-      flexWrap={{ default: 'wrap' }}
-    >
-      <FlexItem className={styles.workflowName} data-testid="builder-workflow-name">
-        <Tooltip
-          content={builderPermissions.tooltips.edit}
-          trigger={builderPermissions.canEdit ? 'manual' : 'mouseenter focus'}
-        >
-          <TextInput
-            id="workflow-name-input"
-            type="text"
-            aria-label="Workflow name"
-            value={workflowName}
-            isDisabled={!builderPermissions.canEdit}
-            onChange={(_event, value) => {
-              dispatch({ type: 'SET_WORKFLOW_NAME', payload: value })
-              markDirty()
-            }}
-            placeholder="Workflow name"
-          />
-        </Tooltip>
-      </FlexItem>
-      {builderPermissions.canEdit && (
-        <FlexItem flex={{ default: 'flexNone' }}>
-          <EditWorkflowDetailsPopover
-            name={workflowName}
-            description={workflowDescription}
-            onApply={(name, description) => {
-              const nameChanged = name !== workflowName
-              const descriptionChanged = description !== workflowDescription
-              if (nameChanged) dispatch({ type: 'SET_WORKFLOW_NAME', payload: name })
-              if (descriptionChanged) dispatch({ type: 'SET_WORKFLOW_DESCRIPTION', payload: description })
-              if (nameChanged || descriptionChanged) markDirty()
-            }}
-          />
-        </FlexItem>
-      )}
-      {!isNew && (
-        <FlexItem flex={{ default: 'flexNone' }}>
-          <WorkflowPublishStatusBadge publishedVersionId={publishedVersionId} currentVersionId={currentVersionId} />
-        </FlexItem>
-      )}
-      {(builderPermissions.canEdit || isBuiltin) && (
-        <FlexItem flex={{ default: 'flexNone' }}>{ProjectSelector}</FlexItem>
-      )}
-    </Flex>
-  )
-}
-
 /**
  * Header props are intentionally flat for this extraction; many fields mirror `BuilderContent` state.
  * Follow-up: consider grouping (e.g. `toolbarHandlers`) or builder-scoped context to trim prop drilling
@@ -309,7 +230,12 @@ export type BuilderWorkflowPageHeaderProps = Readonly<{
   breakingChanges?: WorkflowAPI.components['schemas']['TriggerBreakingChanges'][]
   contractChanges?: WorkflowAPI.components['schemas']['TriggerBreakingChanges'][]
   parentWorkflows?: WorkflowAPI.components['schemas']['WorkflowReferenceRead'][]
-  onConfirmPublish?: (publishName?: string, description?: string, onSettled?: () => void) => void
+  onConfirmPublish?: (
+    publishName?: string,
+    description?: string,
+    onSettled?: () => void,
+    callOptions?: { confirm?: boolean }
+  ) => void
   onCancelBreakingChanges?: () => void
   onReviewOutputContract?: () => void
   isLiveRunActive?: boolean
@@ -333,7 +259,12 @@ export type BuilderWorkflowPageHeaderProps = Readonly<{
   handleToggleVersionHistory: () => void
   handleToggleDetails: () => void
   handleSaveWorkflow: () => Promise<boolean>
-  onPublish: (publishName?: string, description?: string, onSettled?: () => void) => void
+  onPublish: (
+    publishName?: string,
+    description?: string,
+    onSettled?: () => void,
+    callOptions?: { confirm?: boolean }
+  ) => void
   onUnpublish: () => void
   onDuplicate: () => void
   isViewingVersion?: boolean
@@ -405,6 +336,11 @@ export function BuilderWorkflowPageHeader({
 }: BuilderWorkflowPageHeaderProps) {
   const builderDocLink = useDocLink('builder')
   const publishDialog = useDialogState<true>()
+  const {
+    removedTriggerNodeIds,
+    isLoading: triggerDiffLoading,
+    isError: triggerDiffError,
+  } = useRemovedSubworkflowTriggerIds(workflow?.id, publishDialog.isOpen)
 
   const toolbar = (
     <BuilderToolbarContent
@@ -483,6 +419,7 @@ export function BuilderWorkflowPageHeader({
             <BuilderEditorTitleSlot
               workflowName={workflowName}
               workflowDescription={workflowDescription}
+              workflowId={workflow?.id}
               isNew={isNew}
               publishedVersionId={publishedVersionId}
               currentVersionId={currentVersionId}
@@ -508,13 +445,17 @@ export function BuilderWorkflowPageHeader({
         contractChanges={contractChanges}
         parentWorkflows={parentWorkflows}
         onClose={publishDialog.close}
-        onConfirmContractChanges={(publishName, description) =>
-          onConfirmPublish?.(publishName, description, publishDialog.close)
+        onConfirmContractChanges={(publishName, description, options) =>
+          onConfirmPublish?.(publishName, description, publishDialog.close, options)
         }
         onCancelBreakingChanges={onCancelBreakingChanges}
-        onPublish={(publishName, description) => {
-          onPublish(publishName, description, publishDialog.close)
+        onPublish={(publishName, description, options) => {
+          onPublish(publishName, description, publishDialog.close, { confirm: options?.confirm })
         }}
+        workflowId={workflow?.id}
+        removedTriggerNodeIds={removedTriggerNodeIds}
+        triggerDiffLoading={triggerDiffLoading}
+        triggerDiffError={triggerDiffError}
       />
     </>
   )

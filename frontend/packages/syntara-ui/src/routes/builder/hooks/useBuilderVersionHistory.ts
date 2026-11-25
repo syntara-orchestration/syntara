@@ -97,6 +97,7 @@ export function useBuilderVersionHistory({
     updateVersionMetadata,
     updateMetadataMutation,
     paginationFooterProps,
+    triggerRemovalConfirmDialog,
   } = useVersionHistory({ workflowId, isNew, onVersionUpdated })
 
   const viewedVersionQuery = workflowClient.useQuery(
@@ -188,6 +189,7 @@ export function useBuilderVersionHistory({
 
   return {
     filteredVersions,
+    triggerRemovalConfirmDialog,
     publishedVersionName,
     statusFilter,
     setStatusFilter,

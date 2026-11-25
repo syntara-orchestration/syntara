@@ -287,6 +287,7 @@ export function WorkflowPublishDialog({ publishDialog, isPublishing, onPublishWo
       onRetryContractReview={retryContractReview}
       onClose={closeDialog}
       onPublish={publishReviewedVersion}
+      workflowId={workflow?.id}
       breakingChanges={reviewDialogState.breakingChanges}
       contractChanges={reviewDialogState.contractChanges}
       parentWorkflows={reviewDialogState.parentWorkflows}

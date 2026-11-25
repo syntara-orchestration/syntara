@@ -36,6 +36,8 @@ vi.mock('../../../providers/alerts', () => ({
 
 vi.mock('../../../utils/apiErrors', () => ({
   getErrorMessage: (e: unknown) => (e instanceof Error ? e.message : 'Unknown error'),
+  isPublishTriggerRemovalConfirmationError: () => false,
+  extractPublishTriggerRemovalAffectedCount: () => 0,
 }))
 
 const mockDownloadVersionExport = vi.fn().mockResolvedValue(undefined)
@@ -247,7 +249,7 @@ describe('useVersionHistory', () => {
 
     expect(mockMutate).toHaveBeenCalledWith(
       {
-        params: { path: { workflow_id: 'wf-1', version: 2 } },
+        params: { path: { workflow_id: 'wf-1', version: 2 }, query: { confirm: false } },
         body: { name: 'Release 1.0', change_description: 'Reviewed before opening the final action' },
       },
       expect.objectContaining({ onSuccess: expect.any(Function) as unknown })
@@ -447,7 +449,7 @@ describe('useVersionHistory', () => {
       )
       expect(mockMutate).toHaveBeenCalledWith(
         {
-          params: { path: { workflow_id: 'wf-1', version: 2 } },
+          params: { path: { workflow_id: 'wf-1', version: 2 }, query: { confirm: false } },
           body: { name: null, change_description: null },
         },
         expect.objectContaining({
@@ -470,11 +472,8 @@ describe('useVersionHistory', () => {
 
       expect(mockMutate).toHaveBeenCalledWith(
         {
-          params: { path: { workflow_id: 'wf-1', version: 2 } },
-          body: {
-            name: 'Release 1.0',
-            change_description: 'First public release',
-          },
+          params: { path: { workflow_id: 'wf-1', version: 2 }, query: { confirm: false } },
+          body: { name: 'Release 1.0', change_description: 'First public release' },
         },
         expect.objectContaining({
           onSuccess: expect.any(Function) as unknown,
