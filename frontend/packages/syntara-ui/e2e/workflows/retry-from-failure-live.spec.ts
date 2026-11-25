@@ -173,7 +173,10 @@ async function openRetryPanel(app: Page): Promise<void> {
 }
 
 async function selectFailedStepInDetails(app: Page, stepName: string): Promise<void> {
-  await app.getByRole('tab', { name: 'Details' }).click()
+  const detailsTab = app.getByRole('tab', { name: 'Details' })
+  if (await detailsTab.isVisible().catch(() => false)) {
+    await detailsTab.click()
+  }
   await app.getByRole('row', { name: new RegExp(stepName) }).click()
 }
 
