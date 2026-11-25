@@ -15,6 +15,7 @@ type UseExecutionCopyToEditorOptions = {
   executionCopy: ExecutionCopyData | undefined
   isWorkflowInitialized: boolean
   mostRecentExecutionId: string | null
+  mostRecentRunPanelOpen: boolean
   dispatch: Dispatch<BuilderAction>
   markDirty: () => void
   showSuccess: (alert: { title: string; description?: string }) => void
@@ -24,6 +25,7 @@ export function useExecutionCopyToEditor({
   executionCopy,
   isWorkflowInitialized,
   mostRecentExecutionId,
+  mostRecentRunPanelOpen,
   dispatch,
   markDirty,
   showSuccess,
@@ -50,7 +52,7 @@ export function useExecutionCopyToEditor({
   useEffect(() => {
     const copy = executionCopy ?? latchedExecutionCopyRef.current
     if (!copy || !currentWorkflow || !isWorkflowInitialized) return
-    if (mostRecentExecutionId === copy.executionId) return
+    if (mostRecentExecutionId === copy.executionId && mostRecentRunPanelOpen) return
 
     const timer = window.setTimeout(() => {
       const workflowAtApply = useWorkflowStore.getState().currentWorkflow
@@ -58,6 +60,19 @@ export function useExecutionCopyToEditor({
 
       let copiedRunActivityIds: string[] | undefined
       const contentAlreadyReplaced = contentReplacedForExecutionRef.current === copy.executionId
+      const executionAlreadyInReducer = mostRecentExecutionId === copy.executionId
+
+      if (executionAlreadyInReducer && !mostRecentRunPanelOpen) {
+        copiedRunActivityIds = collectCopiedRunActivityIds(workflowAtApply)
+        dispatch({
+          type: 'SET_MOST_RECENT_EXECUTION',
+          payload: {
+            executionId: copy.executionId,
+            copiedRunActivityIds,
+          },
+        })
+        return
+      }
 
       if (!copy.preserveWorkflow && !contentAlreadyReplaced) {
         const { workflowDef, edges, nodePositions } = parseImportedDefinition(copy.workflowDefinition)
@@ -91,7 +106,16 @@ export function useExecutionCopyToEditor({
       })
     }, 0)
     return () => window.clearTimeout(timer)
-  }, [executionCopy, currentWorkflow, isWorkflowInitialized, mostRecentExecutionId, dispatch, markDirty, showSuccess])
+  }, [
+    executionCopy,
+    currentWorkflow,
+    isWorkflowInitialized,
+    mostRecentExecutionId,
+    mostRecentRunPanelOpen,
+    dispatch,
+    markDirty,
+    showSuccess,
+  ])
 
   useEffect(() => {
     if (!reducerSynced) return

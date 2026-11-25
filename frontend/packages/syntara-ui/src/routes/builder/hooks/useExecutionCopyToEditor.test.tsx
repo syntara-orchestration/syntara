@@ -24,6 +24,7 @@ function buildOptions(overrides: Partial<Parameters<typeof useExecutionCopyToEdi
     executionCopy: undefined as ExecutionCopyData | undefined,
     isWorkflowInitialized: true,
     mostRecentExecutionId: null as string | null,
+    mostRecentRunPanelOpen: false,
     dispatch: vi.fn(),
     markDirty: vi.fn(),
     showSuccess: vi.fn(),
@@ -126,6 +127,7 @@ describe('useExecutionCopyToEditor', () => {
     const opts = buildOptions({
       executionCopy: buildExecutionCopy({ executionId: 'exec-123' }),
       mostRecentExecutionId: 'exec-123',
+      mostRecentRunPanelOpen: true,
     })
     renderHook(() => useExecutionCopyToEditor(opts))
     await waitFor(
@@ -144,9 +146,29 @@ describe('useExecutionCopyToEditor', () => {
       initialProps: opts,
     })
     await waitFor(() => expect(opts.showSuccess).toHaveBeenCalledOnce())
-    rerender({ ...opts, mostRecentExecutionId: 'exec-once' })
-    rerender({ ...opts, mostRecentExecutionId: 'exec-once' })
+    rerender({ ...opts, mostRecentExecutionId: 'exec-once', mostRecentRunPanelOpen: true })
+    rerender({ ...opts, mostRecentExecutionId: 'exec-once', mostRecentRunPanelOpen: true })
     expect(opts.showSuccess).toHaveBeenCalledOnce()
+  })
+
+  it('reopens the run panel when execution id matches but the panel was closed', async () => {
+    const dispatch = vi.fn()
+    const executionCopy = buildExecutionCopy({ executionId: 'exec-panel' })
+    const opts = buildOptions({
+      dispatch,
+      executionCopy,
+      mostRecentExecutionId: 'exec-panel',
+      mostRecentRunPanelOpen: false,
+    })
+    renderHook(() => useExecutionCopyToEditor(opts))
+    await waitFor(() =>
+      expect(dispatch).toHaveBeenCalledWith({
+        type: 'SET_MOST_RECENT_EXECUTION',
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- vitest asymmetric matcher
+        payload: expect.objectContaining({ executionId: 'exec-panel' }),
+      })
+    )
+    expect(opts.showSuccess).not.toHaveBeenCalled()
   })
 
   it('re-dispatches run panel state when INIT cleared execution id after a replace copy', async () => {

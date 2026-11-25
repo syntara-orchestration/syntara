@@ -191,6 +191,7 @@ export function BuilderContent(props: BuilderContentProps) {
     executionCopy,
     isWorkflowInitialized,
     mostRecentExecutionId,
+    mostRecentRunPanelOpen,
     dispatch,
     markDirty,
     showSuccess,
