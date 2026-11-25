@@ -51,6 +51,7 @@ async def session_app(
     test_db_engine: AsyncEngine,
     test_cache: None,
     test_session_factory: async_sessionmaker[AsyncSession],
+    script_image_policy_test_config: None,
 ) -> AsyncGenerator[FastAPI, None]:
     """Create a session-scoped app with routers discovered once per worker."""
     from syntara.api.main import app

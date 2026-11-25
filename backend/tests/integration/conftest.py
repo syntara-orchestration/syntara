@@ -11,6 +11,7 @@ across multiple database connections (e.g. API clients, concurrent sessions).
 
 import asyncio
 import contextlib
+import json
 import sys
 from collections.abc import AsyncGenerator, Generator
 from pathlib import Path
@@ -37,6 +38,7 @@ from syntara.authz.models.project import Project
 from syntara.authz.resolver import AUTHENTICATED_GROUP_NAME
 from syntara.core.models.group import Group
 from syntara.core.websocket.router import build_websocket_router
+from tests.fixtures.execution_plane import SCRIPT_BASH_TEST_IMAGE_REFERENCE, SCRIPT_PYTHON_TEST_IMAGE_REFERENCE
 
 pytest_plugins = [
     "tests.integration.fixtures.database",
@@ -56,9 +58,47 @@ _MOTO_BUCKET = "orchestrator-integration-test"
 _MOTO_REGION = "us-east-1"
 
 
+@pytest.fixture(scope="session", autouse=True)
+def script_image_policy_test_config(tmp_path_factory: pytest.TempPathFactory) -> Generator[None, None, None]:
+    """Seed integration databases with test-only digests without requiring registry credentials."""
+    from syntara.execution_plane.registry import seeder
+
+    policy_directory = tmp_path_factory.mktemp("script-image-policy")
+    key_filename = "test-cosign.pub"
+    (policy_directory / key_filename).write_text("test-only public key", encoding="utf-8")
+    policy_path = policy_directory / "policy.json"
+    policy_path.write_text(
+        json.dumps(
+            {
+                "version": 1,
+                "actions": {
+                    "syntara.script-python.script-python": {
+                        "image_reference": SCRIPT_PYTHON_TEST_IMAGE_REFERENCE,
+                        "key_file": key_filename,
+                    },
+                    "syntara.script-bash.script-bash": {
+                        "image_reference": SCRIPT_BASH_TEST_IMAGE_REFERENCE,
+                        "key_file": key_filename,
+                    },
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.MonkeyPatch.context() as monkeypatch:
+        monkeypatch.setenv("APP_SCRIPT_IMAGE_POLICY_PATH", str(policy_path))
+        monkeypatch.setenv("RELATED_IMAGE_SCRIPT_PYTHON", SCRIPT_PYTHON_TEST_IMAGE_REFERENCE)
+        monkeypatch.setenv("RELATED_IMAGE_SCRIPT_BASH", SCRIPT_BASH_TEST_IMAGE_REFERENCE)
+        # Cosign behavior is covered by policy tests; these integration tests use
+        # synthetic references and do not pull script images.
+        monkeypatch.setattr(seeder, "verify_script_image_reference", lambda *_args: None)
+        yield
+
+
 @pytest_asyncio.fixture(scope="session")
 async def test_db_template(
-    test_db_engine: AsyncEngine, test_db_admin_url: URL
+    test_db_engine: AsyncEngine, test_db_admin_url: URL, script_image_policy_test_config: None
 ) -> AsyncGenerator[tuple[URL, str, str, AsyncEngine], None]:
     """Snapshot the post-seeding database as a PostgreSQL template.
 
