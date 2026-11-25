@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
@@ -29,7 +29,7 @@ describe('CompactActivityList', () => {
 
     expect(screen.getByText('Fetch Data')).toBeInTheDocument()
     expect(screen.getByText('task-2')).toBeInTheDocument()
-    expect(screen.getByRole('grid', { name: 'Activity list' })).toHaveClass('pf-m-compact')
+    expect(screen.getByRole('list', { name: 'Activity list' })).toHaveClass('pf-m-compact')
   })
 
   it('renders status for each activity', () => {
@@ -37,6 +37,34 @@ describe('CompactActivityList', () => {
 
     expect(screen.getByText('completed')).toBeInTheDocument()
     expect(screen.getByText('failed')).toBeInTheDocument()
+  })
+
+  it('includes activity title and status in each row accessible name', () => {
+    render(<CompactActivityList activityStates={states} activityOrder={order} onRowClick={vi.fn()} />)
+
+    const list = screen.getByRole('list', { name: 'Activity list' })
+    expect(within(list).getByRole('listitem', { name: 'Fetch Data, Successful' })).toBeInTheDocument()
+    expect(within(list).getByRole('listitem', { name: 'task-2, Failed' })).toBeInTheDocument()
+  })
+
+  it('uses approval waiting label in row accessible name', () => {
+    const approvalOrder: ActivityOrderItem[] = [{ id: 'appr-1', name: 'Approve change', type: 'approval' }]
+    const approvalStates = new Map([state('appr-1', { status: 'waiting' })])
+
+    render(<CompactActivityList activityStates={approvalStates} activityOrder={approvalOrder} onRowClick={vi.fn()} />)
+
+    const list = screen.getByRole('list', { name: 'Activity list' })
+    expect(within(list).getByRole('listitem', { name: 'Approve change, Waiting for approval' })).toBeInTheDocument()
+  })
+
+  it('uses Running label in row accessible name for waiting wait nodes', () => {
+    const waitOrder: ActivityOrderItem[] = [{ id: 'wait-1', name: 'Pause', type: 'wait' }]
+    const waitStates = new Map([state('wait-1', { status: 'waiting' })])
+
+    render(<CompactActivityList activityStates={waitStates} activityOrder={waitOrder} onRowClick={vi.fn()} />)
+
+    const list = screen.getByRole('list', { name: 'Activity list' })
+    expect(within(list).getByRole('listitem', { name: 'Pause, Running' })).toBeInTheDocument()
   })
 
   it('shows time range when activity has start and end times', () => {
@@ -70,11 +98,35 @@ describe('CompactActivityList', () => {
   })
 
   it('highlights selected row', () => {
-    render(<CompactActivityList activityStates={states} activityOrder={order} selectedNodeId="task-1" />)
+    render(
+      <CompactActivityList activityStates={states} activityOrder={order} selectedNodeId="task-1" onRowClick={vi.fn()} />
+    )
 
-    const rows = screen.getAllByRole('row')
-    expect(rows[0]).toHaveClass('pf-m-selected')
-    expect(rows[1]).not.toHaveClass('pf-m-selected')
+    const items = screen.getAllByRole('listitem')
+    expect(items[0]).toHaveClass('pf-m-selected')
+    expect(items[1]).not.toHaveClass('pf-m-selected')
+  })
+
+  it('highlights only the selected loop iteration', () => {
+    const loopOrder: ActivityOrderItem[] = [
+      { id: 'task-1', name: 'Fetch Data (iter 0)' },
+      { id: 'task-1#iter-1', name: 'Fetch Data (iter 1)' },
+      { id: 'task-1#iter-2', name: 'Fetch Data (iter 2)' },
+    ]
+
+    render(
+      <CompactActivityList
+        activityStates={new Map(loopOrder.map(({ id }) => state(id)))}
+        activityOrder={loopOrder}
+        selectedNodeId="task-1#iter-1"
+        onRowClick={vi.fn()}
+      />
+    )
+
+    const items = screen.getAllByRole('listitem')
+    expect(items[0]).not.toHaveClass('pf-m-selected')
+    expect(items[1]).toHaveClass('pf-m-selected')
+    expect(items[2]).not.toHaveClass('pf-m-selected')
   })
 
   it('shows pending status when activity state is missing', () => {
@@ -85,8 +137,18 @@ describe('CompactActivityList', () => {
   })
 
   it('has no accessibility violations', async () => {
-    const { container } = render(<CompactActivityList activityStates={states} activityOrder={order} />)
+    const { container } = render(
+      <CompactActivityList activityStates={states} activityOrder={order} onRowClick={vi.fn()} />
+    )
     const results = await axe(container)
     expect(results).toHaveNoViolations()
+  })
+
+  it('uses selection when onRowClick is provided', () => {
+    render(<CompactActivityList activityStates={states} activityOrder={order} onRowClick={vi.fn()} />)
+
+    const list = screen.getByRole('list', { name: 'Activity list' })
+    const firstItem = within(list).getAllByRole('listitem')[0]
+    expect(firstItem).toHaveAttribute('tabindex', '0')
   })
 })

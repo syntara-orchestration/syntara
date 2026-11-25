@@ -1,9 +1,44 @@
 import { expect, type Page, toAppUrl } from '../fixtures'
+import { isSkipWebServerForPlaywrightTests } from '../playwrightWebServerEnv'
 import { apiRequest, createServiceAccountViaApi, deleteServiceAccountViaApi } from '../utils/api'
 
 import { buildUniqueName } from './workflows'
 
 const SERVICE_ACCOUNTS_URL = '/system-administration/access-management/service-accounts'
+
+/** Matches create form `project_id` zod `.uuid()` — mock seed uses `p-001`, which fails client validation. */
+const MOCK_DEFAULT_PROJECT_UUID = '00000000-0000-4000-8000-000000000001'
+
+async function stubUuidDefaultProjectForCreateModal(app: Page): Promise<void> {
+  await app.route(
+    (url) => url.pathname === '/api/v1/projects',
+    async (route) => {
+      if (route.request().method() !== 'GET') {
+        await route.fallback()
+        return
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          resources: [
+            {
+              id: MOCK_DEFAULT_PROJECT_UUID,
+              name: 'default',
+              description: 'Default project',
+              is_default: true,
+              is_builtin: false,
+              labels: {},
+              created_at: '2024-01-01T00:00:00Z',
+              updated_at: '2024-01-01T00:00:00Z',
+            },
+          ],
+          next_cursor: null,
+        }),
+      })
+    }
+  )
+}
 
 export { createServiceAccountViaApi, deleteServiceAccountViaApi }
 
@@ -44,6 +79,10 @@ export async function createServiceAccountViaUI(
   const name = options.name ?? buildUniqueName('sa-e2e')
   const projectName = options.projectName ?? 'default'
 
+  if (!isSkipWebServerForPlaywrightTests()) {
+    await stubUuidDefaultProjectForCreateModal(app)
+  }
+
   await goToServiceAccountsList(app)
   await app.getByRole('button', { name: 'Create service account' }).click()
 
@@ -51,8 +90,10 @@ export async function createServiceAccountViaUI(
   await expect(modal).toBeVisible()
 
   // Select project — menu is portaled to document body (PatternFly default)
-  await modal.getByRole('button', { name: 'Select a project' }).click()
+  const projectToggle = modal.getByRole('button', { name: /Select a project|^default$/ })
+  await projectToggle.click()
   await app.getByRole('option', { name: projectName, exact: true }).click()
+  await expect(modal.getByRole('button', { name: projectName, exact: true })).toBeVisible()
 
   // Fill name
   await modal.getByRole('textbox', { name: 'Name', exact: true }).fill(name)
@@ -63,10 +104,22 @@ export async function createServiceAccountViaUI(
   }
 
   // Submit
+  const createSaResponse = app.waitForResponse(
+    (resp) =>
+      resp.url().includes('/api/v1/service_accounts') && resp.request().method() === 'POST' && resp.status() === 201
+  )
+  const createCredResponse = app.waitForResponse(
+    (resp) =>
+      /\/api\/v1\/service_accounts\/[^/]+\/credentials$/.test(resp.url()) &&
+      resp.request().method() === 'POST' &&
+      resp.status() === 201
+  )
   await modal.getByRole('button', { name: 'Create service account' }).click()
+  await createSaResponse
+  await createCredResponse
 
   // Wait for credentials reveal phase
-  await expect(modal.getByText('Service account created')).toBeVisible({ timeout: 15_000 })
+  await expect(modal.getByRole('heading', { name: 'Service account created' })).toBeVisible({ timeout: 15_000 })
   await expect(modal.getByText('Save these credentials now')).toBeVisible()
 
   // Extract credentials — two readonly textbox inputs in the credential reveal phase

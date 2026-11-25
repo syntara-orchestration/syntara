@@ -1,12 +1,12 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen, within, waitFor } from '@testing-library/react'
+import { act, render, screen, within, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ReactNode } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 
 import { SynListPanel } from '../../components/panels/list/SynListPanel'
-import { AlertProvider } from '../../providers/alerts'
+import { AlertProvider } from '../../providers/alerts/AlertProvider'
 import { searchParamsMock } from '../../test/searchParamsMock'
 import { accessClient } from '../access/accessClient'
 import { useAllProjects, useSelectableProjects } from '../access/useAllProjects'
@@ -900,11 +900,13 @@ describe('RoleAssignmentsPanel', () => {
         onSettled: () => void
       }
 
-      await waitFor(() => {
+      act(() => {
         callbacks.onSettled()
       })
 
-      expect(screen.queryByText('Unassign role?')).not.toBeInTheDocument()
+      await waitFor(() => {
+        expect(screen.queryByText('Unassign role?')).not.toBeInTheDocument()
+      })
     })
 
     it('shows error alert after failed unassign', async () => {

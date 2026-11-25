@@ -49,7 +49,7 @@ def patch_mcp_provider() -> Generator[None, None, None]:
     """Base fixture that patches MCP adapter validate to avoid real MCP server connections.
 
     Only patches validate() (the lightweight ping). The discover() method is NOT patched
-    here so that it exercises the real MCPProvider code path. MCPProvider.get_base_tools()
+    here so that it exercises the real MCPProvider code path. MCPProvider._get_base_tools()
     is patched separately in mock_mcp_provider_for_testing.
     """
 
@@ -71,11 +71,12 @@ def patch_mcp_provider() -> Generator[None, None, None]:
 def mock_mcp_provider_for_testing(jwt_client: AsyncClient, patch_mcp_provider: None) -> Generator[None, None, None]:
     """Override MCP provider to use test-compatible methods without real MCP server."""
 
-    async def patched_get_base_tools(self) -> list[Any]:
-        """Patched get_base_tools that works in test environment."""
-
+    async def patched_get_base_tools(self, *, timeout_seconds: float | None = None) -> list[Any]:
+        """Patched _get_base_tools that works in test environment."""
         # For testing purposes, return mock tools instead of connecting to real MCP server
         # This avoids HTTP client context issues in test environment
+        _ = timeout_seconds
+
         @tool
         def mock_calculator(a: int, b: int) -> int:
             """Add two numbers together."""
@@ -89,8 +90,8 @@ def mock_mcp_provider_for_testing(jwt_client: AsyncClient, patch_mcp_provider: N
         # Return mock tools that simulate what an MCP provider would return
         return [mock_calculator, mock_greeter]
 
-    # Patch get_base_tools method for basic testing tools
-    with patch.object(MCPProvider, "get_base_tools", patched_get_base_tools):
+    # Patch _get_base_tools — discover/refresh call it directly via refresh_tools_with_timeout
+    with patch.object(MCPProvider, "_get_base_tools", patched_get_base_tools):
         yield
 
 
@@ -102,8 +103,9 @@ def mock_mcp_provider_with_retry_tools(
     # Global state to track tool execution attempts
     call_counts = {"retry_tool": 0, "network_tool": 0, "failing_tool": 0}
 
-    async def patched_get_base_tools(self) -> list[Any]:
-        """Patched get_base_tools with retry-capable tools."""
+    async def patched_get_base_tools(self, *, timeout_seconds: float | None = None) -> list[Any]:
+        """Patched _get_base_tools with retry-capable tools."""
+        _ = timeout_seconds
         await asyncio.sleep(0)
 
         @tool
@@ -135,8 +137,8 @@ def mock_mcp_provider_with_retry_tools(
 
         return [mock_retry_tool, mock_network_tool, mock_failing_tool]
 
-    # Patch get_base_tools method for retry testing tools
-    with patch.object(MCPProvider, "get_base_tools", patched_get_base_tools):
+    # Patch _get_base_tools — discover/refresh call it directly via refresh_tools_with_timeout
+    with patch.object(MCPProvider, "_get_base_tools", patched_get_base_tools):
         yield
 
 
@@ -161,7 +163,7 @@ async def _create_mcp_integration_and_refresh(jwt_client: AsyncClient) -> str:
 
     integration_id = create_response.json()["id"]
 
-    # Refresh integration — tool sync (populate Tool records from MCPProvider.get_base_tools)
+    # Refresh integration — tool sync (populate Tool records from MCPProvider._get_base_tools)
     refresh_response = await jwt_client.post(f"/api/v1/integrations/{integration_id}/refresh")
     assert refresh_response.status_code == 200
     assert refresh_response.json()["synced_count"] > 0

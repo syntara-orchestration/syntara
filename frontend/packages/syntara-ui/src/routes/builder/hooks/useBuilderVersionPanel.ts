@@ -2,7 +2,7 @@ import type { WorkflowAPI } from '@syntara/contracts'
 import { useCallback, useState, type Dispatch } from 'react'
 
 import { useDialogState } from '../../../hooks/useDialogState'
-import { useAlerts } from '../../../providers/alerts'
+import { useAlerts } from '../../../providers/alerts/AlertContext'
 import { useWorkflowStore } from '../../../stores/useWorkflowStore'
 import { detachPromise } from '../../../utils/detachPromise'
 import type { BuilderAction } from '../builderReducer'

@@ -1,10 +1,18 @@
 // Leave VITE_EXTENDED unset so unit tests stay on the community default title (Syntara).
 
+import { Modal } from '@patternfly/react-core'
 import '@testing-library/jest-dom/vitest'
 import 'vitest-axe/extend-expect'
 import { cleanup } from '@testing-library/react'
 import React from 'react'
 import { afterEach, beforeAll, beforeEach, afterAll, expect, vi } from 'vitest'
+
+// PF 6.7 enables modal close animations by default. The modal stays mounted for up to 300ms
+// while waiting for transitionend; happy-dom never fires that event, so synchronous
+// "modal is gone" assertions fail unless animations are disabled in tests.
+if (Modal.defaultProps) {
+  Modal.defaultProps.hasAnimations = false
+}
 
 const listeners = new Set<() => void>()
 function notifyListeners() {

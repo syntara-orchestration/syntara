@@ -109,13 +109,14 @@ function ApprovalsPage({ approvalsDocLink }: { approvalsDocLink: string | null |
 
   // Query approvals data
   const projectSelectorReady = isAllProjects || !!stableProjectId
-  const { approvalsQuery, enrichedApprovals, groupedApprovals, sortedApprovals } = useApprovalsData({
-    projectSelectorReady,
-    isAllProjects,
-    stableProjectId,
-    queryParams,
-    projects: projectsForGrouping,
-  })
+  const { approvalsQuery, listDataForPagination, enrichedApprovals, groupedApprovals, sortedApprovals } =
+    useApprovalsData({
+      projectSelectorReady,
+      isAllProjects,
+      stableProjectId,
+      queryParams,
+      projects: projectsForGrouping,
+    })
 
   const [collapsedProjects, setCollapsedProjects] = useState<Set<string>>(new Set())
 
@@ -283,7 +284,7 @@ function ApprovalsPage({ approvalsDocLink }: { approvalsDocLink: string | null |
               onToggleProject={toggleProjectCollapsed}
               selectedApprovalIds={selectedApprovalIds}
               onSelectRow={handleSelectRow}
-              footerProps={getFooterProps(approvalsQuery.data)}
+              footerProps={getFooterProps(listDataForPagination)}
               approvalPermissions={approvalPermissions}
               isLoadingPermissions={isLoadingDecideProjects}
             />

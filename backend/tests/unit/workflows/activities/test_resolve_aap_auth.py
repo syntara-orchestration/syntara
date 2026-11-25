@@ -8,7 +8,7 @@ from pydantic import SecretStr
 from temporalio.exceptions import ApplicationError
 
 from syntara.core.config.base import get_settings
-from syntara.workflows.workflow_engine.activities.aap_common import (
+from syntara.workflow_runtime.engines.temporal.activities.aap_common import (
     AAPResolvedAuth,
     resolve_aap_auth,
 )

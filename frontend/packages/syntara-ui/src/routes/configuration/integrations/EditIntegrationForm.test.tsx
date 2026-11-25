@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 
 import { integrationsClient } from '../../../client'
-import { AlertProvider } from '../../../providers/alerts'
+import { AlertProvider } from '../../../providers/alerts/AlertProvider'
 
 import { EditIntegrationForm } from './EditIntegrationForm'
 
@@ -488,13 +488,10 @@ describe('EditIntegrationForm', () => {
   })
 
   describe('Cancel', () => {
-    it('navigates to detail page when Cancel is clicked', async () => {
-      const user = userEvent.setup()
+    it('links cancel to the integration detail page', () => {
       render(<EditIntegrationForm />, { wrapper })
 
-      await user.click(screen.getByRole('button', { name: 'Cancel' }))
-
-      expect(mockNavigate).toHaveBeenCalledWith({ to: '/configuration/integrations/int-1' })
+      expect(screen.getByRole('link', { name: 'Cancel' })).toHaveAttribute('href', '/configuration/integrations/int-1')
     })
   })
 

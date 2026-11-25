@@ -46,8 +46,8 @@ class OpenRouterSettings(BaseSettings):
     """
 
     openrouter_model: str = Field(
-        default="anthropic/claude-sonnet-4",
-        description="Default OpenRouter model to use (e.g., anthropic/claude-sonnet-4, openai/gpt-4o)",
+        default="anthropic/claude-sonnet-4.5",
+        description="Default OpenRouter model to use (e.g., anthropic/claude-sonnet-4.5, openai/gpt-4o)",
     )
 
     openrouter_base_url: HttpUrl = Field(  # type: ignore[assignment]

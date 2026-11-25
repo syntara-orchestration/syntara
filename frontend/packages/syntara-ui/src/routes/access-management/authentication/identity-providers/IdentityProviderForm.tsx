@@ -19,7 +19,7 @@ import { useQueryState } from '../../../../components/states/useQueryState'
 import { SynPageTitle } from '../../../../components/SynPageTitle'
 import { useDirtyFormGuard } from '../../../../hooks/useDirtyFormGuard'
 import { useSynForm } from '../../../../hooks/useSynForm'
-import { useAlerts } from '../../../../providers/alerts'
+import { useAlerts } from '../../../../providers/alerts/AlertContext'
 import { getErrorMessage, getErrorStatus, isConflictError } from '../../../../utils/apiErrors'
 import { detachPromise } from '../../../../utils/detachPromise'
 import { useDocLink } from '../../../../utils/docs/useDocLink'
@@ -469,7 +469,7 @@ export function IdentityProviderForm({ mode }: Readonly<IdentityProviderFormProp
             submitLabel={submitLabel}
             isSaving={isSaving}
             onSubmit={normalizeAndSubmit}
-            onCancel={navigateBack}
+            cancelTo={AppRoute.SystemAdministration.Authentication.Root}
           />
         </SynPanel>
       </SynPageBody>
