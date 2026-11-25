@@ -1,7 +1,7 @@
 """Unit tests for WorkflowUsedByListParams validation.
 
-Covers Helen's non-blocking hardening on PR #1318: ``trigger_node_ids`` is capped so an unbounded
-client-supplied list cannot blow up the OR'd JSONB containment scan on the Used-By endpoint.
+``trigger_node_ids`` is capped so an unbounded client-supplied list cannot blow up the OR'd JSONB
+containment scan on the Used-By endpoint.
 """
 
 from __future__ import annotations

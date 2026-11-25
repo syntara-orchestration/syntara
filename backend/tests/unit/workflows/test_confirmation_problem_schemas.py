@@ -8,10 +8,10 @@ Two independent checks are kept distinct:
 
 A consistency test pins the two representations together so they cannot silently drift.
 
-Per Helen's review on PR #1318, each confirmation model is the *single* model for every 409 the
-endpoint returns: ``code`` is inherited from ``ErrorData`` (any 409 code validates) and the count
-is optional, so generic 409 bodies (active executions, version conflict) validate against the same
-schema. Only an out-of-range count (< 1) is rejected.
+Each confirmation model is the *single* model for every 409 the endpoint returns: ``code`` is
+inherited from ``ErrorData`` (any 409 code validates) and the count is optional, so generic 409
+bodies (active executions, version conflict) validate against the same schema. Only an
+out-of-range count (< 1) is rejected.
 """
 
 from __future__ import annotations
@@ -155,7 +155,8 @@ class TestModelOpenAPIConsistency:
     def _int_branch_minimum(prop: dict[str, Any]) -> float | None:
         for branch in prop.get("anyOf", []):
             if branch.get("type") == "integer":
-                return branch.get("minimum")
+                minimum = branch.get("minimum")
+                return minimum if isinstance(minimum, (int, float)) else None
         return None
 
     def test_referenced_constraints_match(self) -> None:
