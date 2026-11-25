@@ -1,5 +1,6 @@
-import type { ExecutionsAPI } from '@syntara/contracts'
+import { ActivityTypeEnum, type ExecutionsAPI } from '@syntara/contracts'
 
+import { capitalize } from '../../utils/capitalize'
 import type { ActivityStatus } from '../workflows/execution/types'
 
 type ExecutionStatus = ExecutionsAPI.components['schemas']['ExecutionStatus']
@@ -33,6 +34,14 @@ export const activityStatusDisplayLabels: Record<ActivityStatus, string> = {
   retrying: 'Retrying',
   skipped: 'Skipped',
   cancelled: 'Cancelled',
+}
+
+/** User-visible activity status text (badges, list row aria-labels). */
+export function getActivityStatusDisplayLabel(status: ActivityStatus, nodeType?: string): string {
+  if (nodeType === ActivityTypeEnum.WAIT && status === 'waiting') {
+    return 'Running'
+  }
+  return activityStatusDisplayLabels[status] ?? capitalize(status)
 }
 
 export const activityStatusColors: Record<ActivityStatus, string> = {
