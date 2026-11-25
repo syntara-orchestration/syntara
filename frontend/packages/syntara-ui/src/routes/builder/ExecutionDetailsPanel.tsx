@@ -112,71 +112,75 @@ function ThreePanelLayout({
         overflow: 'hidden',
       }}
     >
-      <div className={styles.header}>
-        <HeaderMetadata
-          execution={execution}
-          elapsedLabel={elapsedLabel}
-          isRunning={isRunning}
-          viewMode={viewMode}
-          onViewModeChange={onViewModeChange}
-          headerLabel={headerLabel}
-          onClosePanel={onClosePanel}
-          panelExpandControl={panelExpandControl}
-        />
-      </div>
-      <Flex
-        flexWrap={{ default: 'nowrap' }}
-        alignItems={{ default: 'alignItemsStretch' }}
-        gap={{ default: 'gapNone' }}
-        className={styles.contentFlex}
-      >
-        <FlexItem className={styles.activityList}>
-          {showFilters && (
-            <section
-              className={`${styles.filterBarWrapper} ${styles.filterBarWrapperInActivityList}`}
-              aria-label="Activity filter"
-            >
-              <FilterBar
-                fieldDefinitions={ACTIVITY_FILTER_DEFINITIONS}
-                filters={filters}
-                onFilterChange={onFilterChange}
-                isCompact
-                className={styles.filterBar}
-              />
-            </section>
-          )}
-          <Stack className={styles.activityListScrollWrapper}>
-            {activityOrder.length === 0 && hasFilteredOutActivities ? (
-              <StackItem isFilled>
-                <SynEmptyStateFilter clearAllFilters={() => onFilterChange([])} />
-              </StackItem>
-            ) : (
-              <CompactActivityList
-                activityStates={activityStates}
-                activityOrder={activityOrder}
-                onRowClick={onRowClick}
-                selectedNodeId={selectedNodeId}
-              />
-            )}
-          </Stack>
-        </FlexItem>
+      <Stack className={styles.panelStack}>
+        <StackItem className={styles.header}>
+          <HeaderMetadata
+            execution={execution}
+            elapsedLabel={elapsedLabel}
+            isRunning={isRunning}
+            viewMode={viewMode}
+            onViewModeChange={onViewModeChange}
+            headerLabel={headerLabel}
+            onClosePanel={onClosePanel}
+            panelExpandControl={panelExpandControl}
+          />
+        </StackItem>
 
-        <Divider orientation={{ default: 'vertical' }} />
+        <StackItem isFilled className={styles.contentFlex}>
+          <Flex
+            className={styles.detailsBodyRow}
+            flexWrap={{ default: 'nowrap' }}
+            alignItems={{ default: 'alignItemsStretch' }}
+            gap={{ default: 'gapNone' }}
+          >
+            <FlexItem className={styles.activityList}>
+              <Stack className={styles.activityListColumn}>
+                {showFilters && (
+                  <StackItem className={styles.activityListFilter}>
+                    <section aria-label="Activity filter">
+                      <FilterBar
+                        fieldDefinitions={ACTIVITY_FILTER_DEFINITIONS}
+                        filters={filters}
+                        onFilterChange={onFilterChange}
+                        isCompact
+                        className={styles.filterBar}
+                      />
+                    </section>
+                  </StackItem>
+                )}
+                <StackItem isFilled className={styles.activityListScrollWrapper}>
+                  {activityOrder.length === 0 && hasFilteredOutActivities ? (
+                    <SynEmptyStateFilter clearAllFilters={() => onFilterChange([])} />
+                  ) : (
+                    <CompactActivityList
+                      activityStates={activityStates}
+                      activityOrder={activityOrder}
+                      onRowClick={onRowClick}
+                      selectedNodeId={selectedNodeId}
+                    />
+                  )}
+                </StackItem>
+              </Stack>
+            </FlexItem>
 
-        <FlexItem flex={{ default: 'flex_1' }} className={styles.stepDetailsPane}>
-          {detailNodeId && displayStepName ? (
-            <StepExecutionDetailsPanel
-              stepId={detailNodeId}
-              stepName={displayStepName}
-              executionId={executionId}
-              stepState={selectedNodeState}
-              stepType={selectedNodeType}
-            />
-          ) : (
-            <NoSelectionState />
-          )}
-        </FlexItem>
-      </Flex>
+            <Divider orientation={{ default: 'vertical' }} />
+
+            <FlexItem flex={{ default: 'flex_1' }} className={styles.stepDetailsPane}>
+              {detailNodeId && displayStepName ? (
+                <StepExecutionDetailsPanel
+                  stepId={detailNodeId}
+                  stepName={displayStepName}
+                  executionId={executionId}
+                  stepState={selectedNodeState}
+                  stepType={selectedNodeType}
+                />
+              ) : (
+                <NoSelectionState />
+              )}
+            </FlexItem>
+          </Flex>
+        </StackItem>
+      </Stack>
     </SynPanel>
   )
 }
@@ -252,8 +256,8 @@ function SinglePanelLayout({
         flexShrink: 0,
       }}
     >
-      <Stack style={{ height: '100%', overflow: 'hidden', padding: 'var(--pf-t--global--spacer--md)' }}>
-        <StackItem style={{ flexShrink: 0, paddingBottom: 'var(--pf-t--global--spacer--md)' }}>
+      <Stack className={styles.panelStack}>
+        <StackItem className={styles.header}>
           <HeaderMetadata
             execution={execution}
             elapsedLabel={elapsedLabel}
@@ -280,28 +284,30 @@ function SinglePanelLayout({
           </StackItem>
         )}
 
-        {execution.status === 'failed' && resolvedError && (
-          <StackItem style={{ flexShrink: 0, paddingBottom: 'var(--pf-t--global--spacer--sm)' }}>
-            <Alert variant="danger" isInline isPlain title="Execution failed">
-              {resolvedError}
-            </Alert>
-          </StackItem>
-        )}
+        <StackItem isFilled className={styles.overviewBody}>
+          {execution.status === 'failed' && resolvedError && (
+            <div className={styles.overviewError}>
+              <Alert variant="danger" isInline isPlain title="Execution failed">
+                {resolvedError}
+              </Alert>
+            </div>
+          )}
 
-        {activityOrder.length === 0 && hasFilteredOutActivities ? (
-          <StackItem isFilled style={{ minHeight: 0 }}>
+          {activityOrder.length === 0 && hasFilteredOutActivities ? (
             <SynEmptyStateFilter clearAllFilters={() => onFilterChange([])} />
-          </StackItem>
-        ) : (
-          <ExecutionActivityTable
-            activityStates={activityStates}
-            activityOrder={activityOrder}
-            now={now}
-            executionError={resolvedError}
-            onRowClick={onRowClick}
-            selectedNodeId={selectedNodeId}
-          />
-        )}
+          ) : (
+            <div className={styles.overviewTable}>
+              <ExecutionActivityTable
+                activityStates={activityStates}
+                activityOrder={activityOrder}
+                now={now}
+                executionError={resolvedError}
+                onRowClick={onRowClick}
+                selectedNodeId={selectedNodeId}
+              />
+            </div>
+          )}
+        </StackItem>
       </Stack>
     </SynPanel>
   )
