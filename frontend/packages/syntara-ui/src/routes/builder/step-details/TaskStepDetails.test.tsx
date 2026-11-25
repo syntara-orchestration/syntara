@@ -497,7 +497,7 @@ describe('TaskStepDetails Component', () => {
     expect(mockUpdateActivity).toHaveBeenCalledWith('task-aap', expect.objectContaining({ name: 'Updated AAP Task' }))
   })
 
-  // AAP-95765: enabling "Use input variables" on a JT node and saving strips job_template_id
+  // Enabling "Use input variables" on a JT node and saving strips job_template_id
   // from the stored config (see buildExpressionModeActivity). Re-opening the node and disabling
   // the toggle again never restores job_template_id, so the save below should still succeed
   // (the JT must be referenced correctly) instead of failing with a "positive integer" error.
@@ -514,7 +514,7 @@ describe('TaskStepDetails Component', () => {
       },
     }
 
-    renderTaskNodeDetails(taskData, 'task-aap')
+    renderTaskStepDetails(taskData, 'task-aap')
 
     await user.click(screen.getByTestId('aap-submit-disable-input-vars-button'))
 
