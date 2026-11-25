@@ -49,6 +49,7 @@ vi.mock('../../hooks/useNodeKindsQuery', () => ({
 
 const scriptDeny = { kind: 'script', label: 'Script' } as const
 const blockedMessage = stepTypeBlockedMessage(scriptDeny)
+const scriptImportRefusal = "You don't have permission to write Script steps."
 
 function kind(overrides: Partial<NodeKind> & { kind: string }): NodeKind {
   return { category: 'action', can_write: true, blocked_by: null, ...overrides }
@@ -147,7 +148,7 @@ describe('importRefusal', () => {
   const verdicts = { nodeKindByKind: verdictsByKind, failClosedMessage: null }
 
   it('refuses a definition containing a blocked activity', () => {
-    expect(importRefusal(pendingImport(['http_request', 'script']), verdicts)).toBe(blockedMessage)
+    expect(importRefusal(pendingImport(['http_request', 'script']), verdicts)).toBe(scriptImportRefusal)
   })
 
   it('refuses a definition containing a blocked trigger', () => {
@@ -157,8 +158,51 @@ describe('importRefusal', () => {
       failClosedMessage: null,
     }
     expect(importRefusal(pendingImport([], ['manual_trigger']), blockedTrigger)).toBe(
-      stepTypeBlockedMessage(triggerDeny)
+      "You don't have permission to write Manual trigger steps."
     )
+  })
+
+  it('names every blocked step type once, in the order they first appear', () => {
+    const approvalDeny = { kind: 'approval', label: 'Approval' } as const
+    const emailDeny = { kind: 'email', label: 'Email' } as const
+    const manyBlocked = {
+      nodeKindByKind: registry(
+        kind({ kind: 'script', can_write: false, blocked_by: scriptDeny }),
+        kind({ kind: 'approval', can_write: false, blocked_by: approvalDeny }),
+        kind({ kind: 'email', category: 'trigger', can_write: false, blocked_by: emailDeny }),
+        kind({ kind: 'http_request' })
+      ),
+      failClosedMessage: null,
+    }
+
+    expect(importRefusal(pendingImport(['script', 'http_request', 'approval', 'script']), manyBlocked)).toBe(
+      "You don't have permission to write Script and Approval steps."
+    )
+    expect(importRefusal(pendingImport(['approval', 'script', 'approval'], ['email']), manyBlocked)).toBe(
+      "You don't have permission to write Approval, Script and Email steps."
+    )
+  })
+
+  it('keeps refusing a blocked kind with no reported reason', () => {
+    const unexplained = {
+      nodeKindByKind: registry(
+        kind({ kind: 'script', can_write: false, blocked_by: scriptDeny }),
+        kind({ kind: 'approval', can_write: false, blocked_by: null })
+      ),
+      failClosedMessage: null,
+    }
+    expect(importRefusal(pendingImport(['script', 'approval']), unexplained)).toBe(
+      STEP_TYPE_PERMISSIONS_UNAVAILABLE_TOOLTIP
+    )
+  })
+
+  it('allows kinds with no verdict', () => {
+    expect(importRefusal(pendingImport(['unknown_kind']), verdicts)).toBeNull()
+  })
+
+  it('returns the fail-closed message even when blocked kinds are present', () => {
+    const failClosed = { nodeKindByKind: verdictsByKind, failClosedMessage: STEP_TYPE_PERMISSIONS_LOADING_MESSAGE }
+    expect(importRefusal(pendingImport(['script']), failClosed)).toBe(STEP_TYPE_PERMISSIONS_LOADING_MESSAGE)
   })
 
   it('allows a definition with only permitted kinds', () => {
@@ -226,7 +270,7 @@ describe('useStepTypeCanvasGuards', () => {
   it('exposes the import refusal for the builder project', () => {
     const { result } = renderGuards()
 
-    expect(result.current.getImportRefusal(pendingImport(['script']))).toBe(blockedMessage)
+    expect(result.current.getImportRefusal(pendingImport(['script']))).toBe(scriptImportRefusal)
     expect(result.current.getImportRefusal(pendingImport(['http_request']))).toBeNull()
   })
 })

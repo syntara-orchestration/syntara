@@ -34,6 +34,16 @@ export function stepTypeBlockedMessage(blockedBy: BlockedStepType): string {
   return stepTypeBlockedTooltip(blockedBy)
 }
 
+/**
+ * The same message for several blocked step types at once, so the caller sees
+ * every type in one pass: "Script", "Script and Approval", "Script, Approval and Email".
+ */
+export function stepTypesBlockedMessage(blocked: readonly BlockedStepType[]): string {
+  const labels = blocked.map(({ label }) => label)
+  const joined = labels.length > 1 ? `${labels.slice(0, -1).join(', ')} and ${labels.at(-1)}` : labels.join('')
+  return `You don't have permission to write ${joined} steps.`
+}
+
 /** Message shown when a canvas action is refused because the permissions are still loading. */
 export const STEP_TYPE_PERMISSIONS_LOADING_MESSAGE = 'Step type permissions are still loading. Try again in a moment.'
 

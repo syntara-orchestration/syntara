@@ -10,6 +10,7 @@ import {
   STEP_TYPE_PERMISSIONS_LOADING_MESSAGE,
   STEP_TYPE_PERMISSIONS_UNAVAILABLE_TOOLTIP,
   stepTypeBlockedMessage,
+  stepTypesBlockedMessage,
 } from './stepTypePaletteGating'
 import type { EdgeConnection } from './types/edge'
 import type { PendingImportData } from './useWorkflowImportExport'
@@ -37,21 +38,19 @@ export function stepTypeRefusal(kind: string, verdicts: StepTypeVerdicts): strin
   return verdict.blocked_by ? stepTypeBlockedMessage(verdict.blocked_by) : STEP_TYPE_PERMISSIONS_UNAVAILABLE_TOOLTIP
 }
 
-/** Refusal message for pasting `data` onto the canvas, or null to allow it. */
+/**
+ * Refusal message for pasting `data` onto the canvas, or null to allow it.
+ *
+ * Names every blocked step type once, in the order they first appear. A
+ * blocked kind without a reported reason still refuses, with the
+ * permissions-unavailable message.
+ */
 export function importRefusal(data: PendingImportData, verdicts: StepTypeVerdicts): string | null {
   if (verdicts.failClosedMessage) return verdicts.failClosedMessage
-  const kinds = new Set<string>()
-  for (const activity of data.workflowDef.workflow.activities ?? []) {
-    if (activity.type) kinds.add(activity.type)
-  }
-  for (const trigger of data.workflowDef.triggers ?? []) {
-    if (trigger.type) kinds.add(trigger.type)
-  }
-  for (const kind of kinds) {
-    const refusal = stepTypeRefusal(kind, verdicts)
-    if (refusal) return refusal
-  }
-  return null
+  const blocked = blockedStepTypesIn(data.workflowDef, verdicts.nodeKindByKind)
+  if (blocked.length === 0) return null
+  const unexplained = blocked.some(({ kind }) => !verdicts.nodeKindByKind.get(kind)?.blocked_by)
+  return unexplained ? STEP_TYPE_PERMISSIONS_UNAVAILABLE_TOOLTIP : stepTypesBlockedMessage(blocked)
 }
 
 /**
