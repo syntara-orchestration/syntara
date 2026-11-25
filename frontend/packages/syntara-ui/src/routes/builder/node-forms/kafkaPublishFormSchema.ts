@@ -3,6 +3,12 @@ import { z } from 'zod'
 
 import type { ActivityMetadata } from '../../../stores/workflowStoreTypes'
 
+import {
+  cloudEventsHeaderIssue,
+  isCloudEventsSource,
+  isCloudEventsText,
+  KAFKA_CLOUDEVENTS_HEADER_COUNT,
+} from './kafkaCloudEventsValidation'
 import { nodeSettingsSchema } from './shared/nodeSettingsSchema'
 
 export const KAFKA_MAX_HEADERS = 128
@@ -29,6 +35,9 @@ export const kafkaPublishParametersSchema = z
     payload: z.unknown().optional(),
     key: encodedValue.nullable().optional(),
     headers: z.union([z.array(header), z.string()]).optional(),
+    cloudevents_mode: z.boolean().optional(),
+    ce_type: z.string().nullish(),
+    ce_source: z.string().nullish(),
   })
   .transform((parameters) => ({ ...parameters, payload: parameters.payload })) satisfies z.ZodType<
   WorkflowAPI.components['schemas']['KafkaPublishParameters']
@@ -85,9 +94,26 @@ export const kafkaPublishFormSchema = z
     headers_mode: z.enum(['entries', 'template']),
     headers: z.array(z.object({ name: z.string(), ...byteFields.shape })),
     headers_template: z.string(),
+    cloudevents_mode: z.boolean().optional(),
+    ce_type: z.string().optional(),
+    ce_source: z.string().optional(),
     settings: nodeSettingsSchema,
   })
   .superRefine((data, ctx) => {
+    if (data.cloudevents_mode) {
+      if (!data.ce_type || !isCloudEventsText(data.ce_type))
+        ctx.addIssue({
+          code: 'custom',
+          path: ['ce_type'],
+          message: 'Enter a non-empty event type without control characters',
+        })
+      if (!data.ce_source || !isCloudEventsSource(data.ce_source))
+        ctx.addIssue({
+          code: 'custom',
+          path: ['ce_source'],
+          message: 'Enter an event source URI-reference or template',
+        })
+    }
     if (data.integration_id && !data.connection_ready) {
       ctx.addIssue({
         code: 'custom',
@@ -108,13 +134,17 @@ export const kafkaPublishFormSchema = z
       }
       return
     }
-    if (data.headers.length > KAFKA_MAX_HEADERS) {
+    const generatedHeaders = data.cloudevents_mode ? KAFKA_CLOUDEVENTS_HEADER_COUNT : 0
+    if (data.headers.length + generatedHeaders > KAFKA_MAX_HEADERS) {
       ctx.addIssue({
         code: 'custom',
         path: ['headers'],
-        message: 'Use at most 128 header entries, including duplicates and null values',
+        message: data.cloudevents_mode
+          ? 'Use at most 122 custom headers; CloudEvents mode adds six headers'
+          : 'Use at most 128 header entries, including duplicates and null values',
       })
     }
+    const attributeNames = new Set<string>()
     data.headers.forEach((entry, index) => {
       if (!validBytes(entry)) {
         ctx.addIssue({
@@ -122,6 +152,11 @@ export const kafkaPublishFormSchema = z
           path: ['headers', index, 'value'],
           message: 'Enter valid standard Base64 or a template',
         })
+        return
+      }
+      if (data.cloudevents_mode) {
+        const issue = cloudEventsHeaderIssue(entry, attributeNames)
+        if (issue) ctx.addIssue({ code: 'custom', path: ['headers', index, issue.field], message: issue.message })
       }
     })
   })
@@ -145,6 +180,11 @@ export function buildKafkaPublishParameters(
       data.headers_mode === 'template'
         ? data.headers_template.trim()
         : data.headers.map((entry) => ({ name: entry.name, value: buildBytes(entry) })),
+    ...(data.cloudevents_mode && {
+      cloudevents_mode: true,
+      ce_type: data.ce_type ?? '',
+      ce_source: data.ce_source ?? '',
+    }),
   }
 }
 
@@ -173,6 +213,9 @@ export function kafkaPublishInitialFields(
     key: parameters.key ?? { encoding: 'null', value: '' },
     headers_mode: typeof parameters.headers === 'string' ? 'template' : 'entries',
     headers_template: typeof parameters.headers === 'string' ? parameters.headers : '',
+    cloudevents_mode: parameters.cloudevents_mode ?? false,
+    ce_type: parameters.ce_type ?? '',
+    ce_source: parameters.ce_source ?? '',
     headers: Array.isArray(parameters.headers)
       ? parameters.headers.map((entry) => ({
           name: entry.name,

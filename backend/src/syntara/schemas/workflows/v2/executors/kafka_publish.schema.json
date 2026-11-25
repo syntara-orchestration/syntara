@@ -59,6 +59,40 @@
           }
         ],
         "title": "Headers"
+      },
+      "cloudevents_mode": {
+        "default": false,
+        "description": "Automatically add binary-mode CloudEvents headers",
+        "title": "Cloudevents Mode",
+        "type": "boolean"
+      },
+      "ce_type": {
+        "anyOf": [
+          {
+            "minLength": 1,
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "description": "Required event type when CloudEvents mode is enabled",
+        "title": "Ce Type"
+      },
+      "ce_source": {
+        "anyOf": [
+          {
+            "minLength": 1,
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "description": "Required event source URI-reference in CloudEvents mode",
+        "title": "Ce Source"
       }
     },
     "required": [
@@ -68,7 +102,35 @@
       "payload"
     ],
     "title": "KafkaPublishParameters",
-    "type": "object"
+    "type": "object",
+    "allOf": [
+      {
+        "if": {
+          "properties": {
+            "cloudevents_mode": {
+              "const": true
+            }
+          },
+          "required": [
+            "cloudevents_mode"
+          ]
+        },
+        "then": {
+          "required": [
+            "ce_type",
+            "ce_source"
+          ],
+          "properties": {
+            "ce_type": {
+              "type": "string"
+            },
+            "ce_source": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    ]
   },
   "$defs": {
     "KafkaEncodedValue": {

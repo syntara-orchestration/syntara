@@ -26,6 +26,9 @@ class KafkaPublishParameters:
         payload (Any): Required JSON value; explicit null publishes JSON null, not a tombstone
         key (KafkaEncodedValue | None | Unset):
         headers (list[KafkaPublishHeader] | str | Unset):
+        cloudevents_mode (bool | Unset): Automatically add binary-mode CloudEvents headers Default: False.
+        ce_type (None | str | Unset): Required event type when CloudEvents mode is enabled
+        ce_source (None | str | Unset): Required event source URI-reference in CloudEvents mode
     """
 
     integration_id: str
@@ -34,6 +37,9 @@ class KafkaPublishParameters:
     payload: Any
     key: KafkaEncodedValue | None | Unset = UNSET
     headers: list[KafkaPublishHeader] | str | Unset = UNSET
+    cloudevents_mode: bool | Unset = False
+    ce_type: None | str | Unset = UNSET
+    ce_source: None | str | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         from ..models.kafka_encoded_value import KafkaEncodedValue
@@ -66,6 +72,20 @@ class KafkaPublishParameters:
         else:
             headers = self.headers
 
+        cloudevents_mode = self.cloudevents_mode
+
+        ce_type: None | str | Unset
+        if isinstance(self.ce_type, Unset):
+            ce_type = UNSET
+        else:
+            ce_type = self.ce_type
+
+        ce_source: None | str | Unset
+        if isinstance(self.ce_source, Unset):
+            ce_source = UNSET
+        else:
+            ce_source = self.ce_source
+
         field_dict: dict[str, Any] = {}
 
         field_dict.update(
@@ -80,6 +100,12 @@ class KafkaPublishParameters:
             field_dict["key"] = key
         if headers is not UNSET:
             field_dict["headers"] = headers
+        if cloudevents_mode is not UNSET:
+            field_dict["cloudevents_mode"] = cloudevents_mode
+        if ce_type is not UNSET:
+            field_dict["ce_type"] = ce_type
+        if ce_source is not UNSET:
+            field_dict["ce_source"] = ce_source
 
         return field_dict
 
@@ -134,6 +160,26 @@ class KafkaPublishParameters:
 
         headers = _parse_headers(d.pop("headers", UNSET))
 
+        cloudevents_mode = d.pop("cloudevents_mode", UNSET)
+
+        def _parse_ce_type(data: object) -> None | str | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(None | str | Unset, data)
+
+        ce_type = _parse_ce_type(d.pop("ce_type", UNSET))
+
+        def _parse_ce_source(data: object) -> None | str | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(None | str | Unset, data)
+
+        ce_source = _parse_ce_source(d.pop("ce_source", UNSET))
+
         kafka_publish_parameters = cls(
             integration_id=integration_id,
             credential_id=credential_id,
@@ -141,6 +187,9 @@ class KafkaPublishParameters:
             payload=payload,
             key=key,
             headers=headers,
+            cloudevents_mode=cloudevents_mode,
+            ce_type=ce_type,
+            ce_source=ce_source,
         )
 
         return kafka_publish_parameters

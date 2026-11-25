@@ -3,7 +3,7 @@
 import asyncio
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from aiokafka import TopicPartition
@@ -13,7 +13,7 @@ from temporalio import activity
 from temporalio.client import WorkflowFailureError, WorkflowHandle
 from temporalio.exceptions import CancelledError
 from temporalio.testing import WorkflowEnvironment
-from temporalio.worker import Worker
+from temporalio.worker import Replayer, Worker
 
 from syntara.integrations.models.integration_configuration import KafkaConfiguration
 from syntara.workflows.workflow_engine.activities import kafka_publish_activity as sender
@@ -62,6 +62,43 @@ async def _check_cancellation(
     pending[0].set_result(RecordMetadata("outcomes", 0, TopicPartition("outcomes", 0), 99, 123, 0, 0))
 
 
+def _assert_cloud_event_attempts(
+    headers_seen: list[list[tuple[str, bytes | None]]], expected_attempts: int, status: str
+) -> None:
+    first = dict(headers_seen[0])
+    assert first["ce_specversion"] == b"1.0"
+    assert first["ce_type"] == b"com.example.completed"
+    assert first["ce_source"] == b"/workflows/orders"
+    assert first["content-type"] == b"application/json"
+    event_id, event_time = first["ce_id"], first["ce_time"]
+    assert event_id is not None
+    assert UUID(event_id.decode()).version == 4
+    assert event_time is not None
+    assert event_time.endswith(b"Z")
+    assert all(headers == headers_seen[0] for headers in headers_seen[:expected_attempts])
+    if status == "completed":
+        assert dict(headers_seen[-1])["ce_id"] != event_id
+
+
+def _assert_publish_result(
+    result: dict[str, Any], status: str, attempts: list[tuple[int, bytes]], resolve: AsyncMock, expected_attempts: int
+) -> None:
+    assert result["status"] == status
+    assert [attempt for attempt, _value in attempts[:expected_attempts]] == list(range(1, expected_attempts + 1))
+    assert all(value == b'{"literal":"${do.not.evaluate}"}' for _attempt, value in attempts[:expected_attempts])
+    if status == "completed":
+        assert result["activity_outputs"]["downstream"]["offset"] == "99"
+        assert attempts[-1][1] == b'"99"'
+        assert resolve.await_count == 2
+    else:
+        assert "downstream" not in result["completed_activities"]
+        assert resolve.await_count == 1
+        assert result["activity_outputs"]["publish"]["delivery_status"] == (
+            "unconfirmed" if expected_attempts > 1 else "not_sent"
+        )
+    assert "sensitive-broker-message" not in str(result)
+
+
 def _observe_activity_stop(monkeypatch: pytest.MonkeyPatch) -> asyncio.Event:
     stopped = asyncio.Event()
     original_heartbeat = sender._heartbeat
@@ -85,6 +122,7 @@ def _observe_activity_stop(monkeypatch: pytest.MonkeyPatch) -> asyncio.Event:
         (None, 3, 1, "cancelled"),
     ],
 )
+@pytest.mark.parametrize("cloudevents_mode", [False, True])
 async def test_publish_retries_and_downstream_execution(
     temporal_env: WorkflowEnvironment,
     monkeypatch: pytest.MonkeyPatch,
@@ -92,14 +130,20 @@ async def test_publish_retries_and_downstream_execution(
     max_retries: int,
     expected_attempts: int,
     status: str,
+    *,
+    cloudevents_mode: bool,
 ) -> None:
     resolve = _mock_connection(monkeypatch)
     attempts: list[tuple[int, bytes]] = []
+    headers_seen: list[list[tuple[str, bytes | None]]] = []
     pending: list[asyncio.Future[RecordMetadata]] = []
     started, stopped = asyncio.Event(), _observe_activity_stop(monkeypatch)
 
     async def send(topic: str, *, value: bytes, **kwargs: object) -> asyncio.Future[RecordMetadata]:
         attempts.append((activity.info().attempt, value))
+        headers = kwargs["headers"]
+        assert isinstance(headers, list)
+        headers_seen.append(headers)
         if len(attempts) == 1 and failure is not None:
             message = "sensitive-broker-message"
             raise failure(message)
@@ -115,12 +159,14 @@ async def test_publish_retries_and_downstream_execution(
     monkeypatch.setattr(sender, "create_kafka_publish_producer", MagicMock(return_value=producer))
     pool = KafkaPublishPool(2)
     set_kafka_publish_pool(pool)
-    parameters = {
+    parameters: dict[str, Any] = {
         "integration_id": str(uuid4()),
         "credential_id": str(uuid4()),
         "topic": "outcomes",
         "payload": "${trigger.payload}",
     }
+    if cloudevents_mode:
+        parameters.update(cloudevents_mode=True, ce_type="${trigger.event_type}", ce_source="/workflows/orders")
     definition = {
         "schema_version": "2.0.0",
         "name": "Publish execution",
@@ -155,7 +201,7 @@ async def test_publish_retries_and_downstream_execution(
                     definition,
                     str(uuid4()),
                     "trigger",
-                    {"payload": {"literal": "${do.not.evaluate}"}},
+                    {"payload": {"literal": "${do.not.evaluate}"}, "event_type": "com.example.completed"},
                     True,
                     None,
                     None,
@@ -169,20 +215,10 @@ async def test_publish_retries_and_downstream_execution(
                 await _check_cancellation(handle, started, stopped, pending, attempts)
                 return
             result = await handle.result()
-        assert result["status"] == status
-        assert [attempt for attempt, _value in attempts[:expected_attempts]] == list(range(1, expected_attempts + 1))
-        assert all(value == b'{"literal":"${do.not.evaluate}"}' for _attempt, value in attempts[:expected_attempts])
-        if status == "completed":
-            assert result["activity_outputs"]["downstream"]["offset"] == "99"
-            assert attempts[-1][1] == b'"99"'
-            assert resolve.await_count == 2  # One snapshot per invocation, not per attempt.
-        else:
-            assert "downstream" not in result["completed_activities"]
-            assert resolve.await_count == 1
-            assert result["activity_outputs"]["publish"]["delivery_status"] == (
-                "unconfirmed" if expected_attempts > 1 else "not_sent"
-            )
-        assert "sensitive-broker-message" not in str(result)
+        _assert_publish_result(result, status, attempts, resolve, expected_attempts)
+        if cloudevents_mode:
+            _assert_cloud_event_attempts(headers_seen, expected_attempts, status)
+            await Replayer(workflows=[OrchestratorWorkflow]).replay_workflow(await handle.fetch_history())
     finally:
         for future in pending:
             if not future.done():

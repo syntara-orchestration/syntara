@@ -44,6 +44,32 @@ function setup(initial: Partial<KafkaPublishFormData> = {}, readOnly = false) {
 }
 
 describe('Kafka Publish prototype message controls', () => {
+  it('keeps the message key and custom headers usable in CloudEvents mode', async () => {
+    const { user, onSubmit } = setup({
+      cloudevents_mode: true,
+      ce_type: 'com.example.completed',
+      ce_source: '/workflows/orders',
+      key: { encoding: 'utf-8', value: 'order-123' },
+    })
+
+    expect(screen.getByRole('textbox', { name: 'Message key value' })).toHaveValue('order-123')
+    expect(screen.getByRole('textbox', { name: 'Header 1 name' })).toHaveValue('same')
+    await user.click(screen.getByRole('button', { name: 'Add header' }))
+    await user.type(screen.getByRole('textbox', { name: 'Header 2 name' }), 'correlation-id')
+    expect(screen.getByRole('textbox', { name: 'Header 2 name' })).toHaveValue('correlation-id')
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() =>
+      expect(onSubmit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          cloudevents_mode: true,
+          key: { encoding: 'utf-8', value: 'order-123' },
+        }),
+        expect.anything()
+      )
+    )
+  })
+
   it.each([
     ['utf-8', 'Enter a message key value'],
     ['base64', 'Enter a Base64-encoded value'],

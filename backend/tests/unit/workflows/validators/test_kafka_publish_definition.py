@@ -5,7 +5,7 @@ from typing import Any
 import pytest
 
 from syntara.core.exceptions import SafeValueError
-from syntara.workflows.models.workflow_definition import WorkflowDefinition
+from syntara.workflows.models.workflow_definition import KafkaPublishNode, WorkflowDefinition
 from syntara.workflows.validators.workflow_definition import WorkflowValidator
 
 
@@ -121,3 +121,55 @@ def test_invalid_message_bytes_and_header_limits_gate_execution(field: str, valu
     assert any(
         f.node_id == "publish" and (f.field_path or "").startswith(f"parameters.{field}") for f in result.findings
     )
+
+
+@pytest.mark.parametrize("template", [False, True])
+def test_cloud_events_api_and_runtime_contracts_accept_complete_configuration(*, template: bool) -> None:
+    definition = _definition(
+        {
+            "integration_id": "11111111-1111-4111-8111-111111111111",
+            "credential_id": "22222222-2222-4222-8222-222222222222",
+            "topic": "outcomes",
+            "payload": None,
+            "cloudevents_mode": True,
+            "ce_type": "${trigger.event_type}" if template else "com.example.completed",
+            "ce_source": "${trigger.source}" if template else "/workflows/orders",
+        }
+    )
+
+    WorkflowValidator().validate_workflow_definition(definition)
+    model = WorkflowDefinition.model_validate(definition)
+
+    assert isinstance(model.nodes[0], KafkaPublishNode)
+    assert model.nodes[0].parameters.cloudevents_mode
+
+
+@pytest.mark.parametrize(
+    "patch",
+    [
+        {"ce_type": None},
+        {"ce_source": None},
+        {"ce_type": ""},
+        {"ce_source": "not a URI"},
+        {"headers": [{"name": "CE_ID", "value": {"encoding": "utf-8", "value": "overridden"}}]},
+        {"headers": [{"name": "x", "value": None}] * 123},
+    ],
+)
+def test_cloud_events_invalid_configuration_blocks_run_and_publish(patch: dict[str, Any]) -> None:
+    definition = _definition(
+        {
+            "integration_id": "11111111-1111-4111-8111-111111111111",
+            "credential_id": "22222222-2222-4222-8222-222222222222",
+            "topic": "outcomes",
+            "payload": None,
+            "cloudevents_mode": True,
+            "ce_type": "com.example.completed",
+            "ce_source": "/workflows/orders",
+            **patch,
+        }
+    )
+
+    result = WorkflowValidator().collect_findings(definition)
+
+    assert not result.is_valid
+    assert any(finding.node_id == "publish" for finding in result.findings)

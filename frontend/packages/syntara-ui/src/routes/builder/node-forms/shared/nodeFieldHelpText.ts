@@ -3,11 +3,16 @@
 export const KAFKA_PUBLISH_PAYLOAD_HELP =
   'Templates can replace the full payload or appear inside JSON strings. Example: {"order_id":"${trigger.payload.order_id}"}. Arrays are sent as one Kafka record.'
 
+export const KAFKA_PUBLISH_EVENT_DATA_HELP = `Enter event data only; CloudEvents metadata is configured above. ${KAFKA_PUBLISH_PAYLOAD_HELP}`
+
 export const KAFKA_PUBLISH_KEY_ENCODING_HELP =
   'Null sends no bytes. An empty UTF-8 or Base64 value sends an empty byte sequence.'
 
 export const KAFKA_PUBLISH_HEADERS_HELP =
   'Headers are sent in the order shown, and duplicate names are allowed. A null value sends no bytes; an empty value sends an empty byte sequence. You can add up to 128 headers and drag entries to reorder them.'
+
+export const KAFKA_PUBLISH_CLOUDEVENTS_HEADERS_HELP =
+  'Custom headers are sent in the order shown. Ordinary headers can repeat and use null or empty values. CloudEvents attribute headers (ce_*) must be unique and contain valid UTF-8 text. Syntara adds six headers automatically, leaving room for 122 custom entries. Managed CloudEvents headers and content-type cannot be overridden.'
 
 export const KAFKA_PUBLISH_HEADER_SOURCE_ENTRIES_HELP = "Configure each header's name, encoding, and value."
 export const KAFKA_PUBLISH_HEADER_SOURCE_TEMPLATE_HELP =

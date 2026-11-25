@@ -56,9 +56,10 @@ export function SynSwitchField<
 
   return (
     <SynFormField name={name} control={control} label={label} fieldId={resolvedFieldId} hideFormGroupLabel hint={hint}>
-      {({ field }) => (
+      {({ field, describedBy }) => (
         <Switch
           id={resolvedFieldId}
+          aria-describedby={describedBy}
           label={label}
           hasCheckIcon
           isChecked={Boolean(field.value)}

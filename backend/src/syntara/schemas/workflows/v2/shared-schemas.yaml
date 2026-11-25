@@ -2653,6 +2653,25 @@ components:
               type: array
             - type: string
           title: Headers
+        cloudevents_mode:
+          type: boolean
+          title: Cloudevents Mode
+          description: Automatically add binary-mode CloudEvents headers
+          default: false
+        ce_type:
+          anyOf:
+            - type: string
+              minLength: 1
+            - type: 'null'
+          title: Ce Type
+          description: Required event type when CloudEvents mode is enabled
+        ce_source:
+          anyOf:
+            - type: string
+              minLength: 1
+            - type: 'null'
+          title: Ce Source
+          description: Required event source URI-reference in CloudEvents mode
       additionalProperties: false
       type: object
       required:

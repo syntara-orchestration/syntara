@@ -11,8 +11,13 @@ import re
 from typing import Any, Literal
 from uuid import UUID
 
-from pydantic import Field, StrictStr, field_validator
+from pydantic import Field, StrictBool, StrictStr, field_validator, model_validator
 from sqlmodel import SQLModel
+
+from syntara.workflows.workflow_engine.models.kafka_cloudevents import (
+    KafkaPublishCloudEventContext,
+    validate_publish_cloudevents,
+)
 
 KAFKA_PUBLISH_MAX_RECORD_BYTES = 1_048_576
 KAFKA_PUBLISH_MAX_HEADERS = 128
@@ -64,6 +69,23 @@ class KafkaPublishParameters(SQLModel):
     payload: Any = Field(..., description="Required JSON value; explicit null publishes JSON null, not a tombstone")
     key: KafkaEncodedValue | None = None
     headers: list[KafkaPublishHeader] | StrictStr = Field(default_factory=list)
+    cloudevents_mode: StrictBool = Field(default=False, description="Automatically add binary-mode CloudEvents headers")
+    ce_type: StrictStr | None = Field(
+        default=None, min_length=1, description="Required event type when CloudEvents mode is enabled"
+    )
+    ce_source: StrictStr | None = Field(
+        default=None, min_length=1, description="Required event source URI-reference in CloudEvents mode"
+    )
+
+    @model_validator(mode="after")
+    def cloudevents_configuration(self) -> "KafkaPublishParameters":
+        """Keep templates editable while validating known CloudEvents attributes."""
+        if self.cloudevents_mode:
+            validate_publish_cloudevents(self.ce_type, self.ce_source, self.headers, allow_templates=True)
+        elif self.ce_type is not None or self.ce_source is not None:
+            msg = "CloudEvents attributes require CloudEvents mode"
+            raise ValueError(msg)
+        return self
 
     @field_validator("integration_id", "credential_id")
     @classmethod
@@ -109,6 +131,8 @@ def _check_json(value: Any) -> None:  # noqa: ANN401
 
 def encode_publish_message(
     parameters: KafkaPublishParameters,
+    *,
+    cloudevents: KafkaPublishCloudEventContext | None = None,
 ) -> tuple[bytes, bytes | None, list[tuple[str, bytes | None]]]:
     """Encode resolved data once, preserving JSON/native and Kafka byte semantics."""
     _check_json(parameters.payload)
@@ -125,4 +149,21 @@ def encode_publish_message(
     for header in parameters.headers:
         header.name.encode("utf-8")
         headers.append((header.name, header.value.decode() if header.value is not None else None))
+    if parameters.cloudevents_mode:
+        if cloudevents is None:
+            msg = "CloudEvents generated attributes must be frozen before publishing"
+            raise ValueError(msg)
+        attributes = validate_publish_cloudevents(
+            parameters.ce_type, parameters.ce_source, parameters.headers, context=cloudevents
+        )
+        headers.extend(
+            [
+                ("ce_type", attributes.type.encode("utf-8")),
+                ("ce_source", attributes.source.encode("utf-8")),
+                ("ce_specversion", b"1.0"),
+                ("ce_id", str(cloudevents.id).encode("utf-8")),
+                ("ce_time", cloudevents.time.encode("utf-8")),
+                ("content-type", b"application/json"),
+            ]
+        )
     return value, parameters.key.decode() if parameters.key is not None else None, headers

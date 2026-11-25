@@ -110,7 +110,7 @@ async def _publish_once(
     parameters = KafkaPublishParameters.model_validate(
         {key: value for key, value in input_config.items() if not key.startswith("_")}
     )
-    value, key, headers, size = compile_publish_message(parameters)
+    value, key, headers, size = compile_publish_message(parameters, cloudevents=input_config.get("_kafka_cloudevents"))
     config = KafkaConfiguration.model_validate(input_config["_resolved_integration"])
     await _recheck_connection(parameters, config, project_id)
     options = _producer_options(config, input_config["_resolved_credentials"]["extra_vars"])

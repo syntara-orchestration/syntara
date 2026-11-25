@@ -29,6 +29,7 @@ export const nodeHelp = {
 
   // Kafka Publish
   kafkaPublishPayload: createFieldHelp('JSON payload', T.KAFKA_PUBLISH_PAYLOAD_HELP),
+  kafkaPublishEventData: createFieldHelp('Event data (JSON)', T.KAFKA_PUBLISH_EVENT_DATA_HELP),
   kafkaPublishKeyEncoding: createFieldHelp('Message key encoding', T.KAFKA_PUBLISH_KEY_ENCODING_HELP),
   kafkaPublishHeaders: createFieldHelp('Message headers', T.KAFKA_PUBLISH_HEADERS_HELP),
   kafkaPublishHeaderSource: (

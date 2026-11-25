@@ -42,6 +42,9 @@ describe('SynSwitchField', () => {
     ))
 
     expect(screen.getByText('Turn on to allow access.')).toBeInTheDocument()
+    expect(screen.getByRole('switch', { name: 'Enable feature' })).toHaveAccessibleDescription(
+      'Turn on to allow access.'
+    )
   })
 
   it('turns the switch off when clicked again', async () => {

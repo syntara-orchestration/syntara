@@ -1675,9 +1675,16 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
             if parameters is None:
                 parameters = self._resolve_node_parameters(node)
             self.node_inputs[node.id] = copy.deepcopy(parameters)
-            compile_publish_message(KafkaPublishParameters.model_validate(parameters))
+            model = KafkaPublishParameters.model_validate(parameters)
+            cloudevents = (
+                {"id": str(workflow.uuid4()), "time": workflow.now().isoformat().replace("+00:00", "Z")}
+                if model.cloudevents_mode
+                else None
+            )
+            compile_publish_message(model, cloudevents=cloudevents)
             remaining = _publish_remaining_budget(deadline)
             prepare_args = [parameters, self._project_id, min(timeout_seconds, remaining), deadline.isoformat()]
+            prepare_args.extend([cloudevents] if cloudevents is not None else [])
             if temporal_argument_size(prepare_args) > TEMPORAL_PAYLOAD_MAX_BYTES:
                 fail_publish("kafka_arguments_too_large")
             async with asyncio.timeout(remaining):

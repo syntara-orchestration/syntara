@@ -10,8 +10,9 @@ WORKFLOWS_URL = "/api/v1/workflows"
 
 
 @pytest.mark.parametrize("payload_text", ["", '{"result":'])
+@pytest.mark.parametrize("cloudevents_mode", [False, True])
 async def test_incomplete_publish_draft_save_reopen_update_and_publish_gate(
-    jwt_client: AsyncClient, test_project_id: UUID, payload_text: str
+    jwt_client: AsyncClient, test_project_id: UUID, payload_text: str, *, cloudevents_mode: bool
 ) -> None:
     definition: dict[str, Any] = {
         "schema_version": "2.0.0",
@@ -27,6 +28,8 @@ async def test_incomplete_publish_draft_save_reopen_update_and_publish_gate(
         ],
         "edges": [{"from": "manual", "to": "publish"}],
     }
+    if cloudevents_mode:
+        definition["nodes"][0]["parameters"].update(cloudevents_mode=True, ce_source="")
     response = await jwt_client.post(
         WORKFLOWS_URL,
         json={
