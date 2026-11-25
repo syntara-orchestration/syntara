@@ -61,7 +61,7 @@ Every page must follow this structural hierarchy:
 
 **`SynListPanel`** — canonical list page implementation. Compound API: `SynListPanelView` (handles loading/error/empty/filter states), `SynListPanelToolbar` (wraps in `<fieldset disabled={isFetching}>` during refetch), `SynListPanelTable`. Use instead of manual `SynPanelContentStack` + `useQueryState` + three-state branching.
 
-**Sticky form footer** — Form Save/Cancel buttons live in `SynPanel footer={<ActionGroup>…</ActionGroup>}`, NOT in the page header. `PanelMain` scrolls while footer stays pinned. Cancel uses `variant="link"`. Applies to Create/Edit forms, Configure Integration, Settings tabs. Does NOT apply to builder step editor panels or modals.
+**Sticky form footer** — Form Save/Cancel buttons live in `SynPanel footer={<ActionGroup>…</ActionGroup>}`, NOT in the page header. `PanelMain` scrolls while footer stays pinned. Cancel uses `variant="link"`. Applies to Create/Edit forms, Configure Integration, Settings tabs. Does NOT apply to builder step editor panels or modals. Resource-discovery tabs hide Save/Cancel when empty/loading/error states replace editable content; restore the footer when resources are available. Ordinary create forms retain submit actions, and filtered-empty lists can retain pagination.
 
 ### Page Header Types
 
@@ -69,10 +69,12 @@ Every page must follow this structural hierarchy:
 - **Details page header** — Left-aligned breadcrumbs (`SynPageBreadcrumbs`) + title; toolbar left→right: Switch → Edit (primary) → kebab
 - **Form page header** — Left-aligned breadcrumbs + title; no action buttons in the header — Save and Cancel live in the `SynPanel` sticky footer
 - **Documentation link** — pass `docLink={useDocLink('key')}` to `SynPageHeader`; never hardcode doc URLs. Add keys to `docsUrls.json`.
+- **Long titles:** Keep actions at usable natural width; let the title wrap and the header reflow without squeezing switches/buttons/menus or causing page overflow. Page titles do not use the canvas card's two-line clamp.
 
 ### Breadcrumbs
 
 - Use `SynPageBreadcrumbs`; renders nothing when < 2 items; last item = current page (non-link); middle segments collapse at ≤768px. No CSS overrides. Detail-page tabs are views within the resource, not breadcrumb hierarchy: keep the resource name as the terminal crumb on every tab, and add a segment only for a distinct route such as Edit.
+- Shared breadcrumb handling ellipsizes long segments with viewport-constrained, flip-enabled full-value tooltips; short labels stay compact without minimum-width gaps before chevrons. Verify both near the minimum supported viewport; keep default PF link styling and do not copy wrapper-internal truncation overrides into pages.
 
 ### Structure Checklist
 
@@ -84,14 +86,14 @@ Every page must follow this structural hierarchy:
 
 ## Navigation
 
-Use a docked icon navigation (left sidebar) with PatternFly's flyout panels component.
+Use the shared `Compass` docked navigation with native `NavExpandable` groups for items with multiple children.
 
-- Hover on nav item (no children) → tooltip with label
-- Hover on nav item (has children) → flyout panel with sub-items
-- Click nav item (no children) → navigate to route
-- Click nav item (has children) → navigate to first enabled child route
-- Click flyout sub-item → navigate to route, **close flyout immediately**
-- Mouse leaves flyout → close after 150ms grace period
+- Hover/focus on a collapsed item → label tooltip
+- Activate a destination → navigate; activate a group → expand/collapse children without navigating
+- Open a group from the collapsed dock → expand as an overlay without changing page layout
+- Select a destination → close overlay/mobile dock; keep a persistently expanded desktop dock open
+- Support Escape/outside-click dismissal for overlays/mobile and preserve the desktop expansion preference through shared dock state
+- Hide a control's tooltip while its popout menu is open so it cannot obscure the menu
 
 ## Tabs
 
@@ -109,9 +111,8 @@ Use a docked icon navigation (left sidebar) with PatternFly's flyout panels comp
 
 ## Table Component
 
-- ALWAYS use `SynScrollableTableContainer` wrapper — this applies the standard table variant by default
-- `SynScrollableTableContainer` does not set `variant="compact"` — the default (standard) variant is used for main data tables
-- Use `variant="compact"` only for dense, supplementary tables (e.g., activity state tables inside panels) where space is constrained
+- ALWAYS use `SynScrollableTableContainer` / `SynListPanelTable` — compact density is the shared default
+- Use `isCompact={false}` only for an intentional standard-density exception; prefer this API over per-page `variant` overrides
 - ALWAYS include `<Thead>` with column headers
 - Actions column is rightmost (no column header label)
 - All row actions live inside a kebab menu (⋮) — no direct buttons in the actions column. Use `SynKebabMenu` component with `actions` array: `{ key, title, onClick, isSeparator?, isDanger?, isAriaDisabled?, tooltipProps? }`. Per-row `aria-label` must be unique (e.g., `` `Actions for ${name}` ``).
@@ -119,10 +120,12 @@ Use a docked icon navigation (left sidebar) with PatternFly's flyout panels comp
 - Action order in kebab: non-destructive first, divider, destructive last
 - On the details page header, same actions appear in a kebab; frequently used actions promoted to primary button with icon (e.g., `RhUiEditIcon` + "Edit credential")
 - Columns should be sortable if applicable
+- Sort/filter/page refetches within the same resource scope keep the table and controls mounted to preserve focus; use a full loading replacement for initial loads or scope transitions without usable data. Never retain placeholder rows across project/access scopes or advance with stale cursors/totals. Background refresh must not make the filter toolbar disappear or flash.
 - Clicking resource name navigates to details view
 - "Created"/"Modified" columns: username (linked) + date together. Date format: `MMM DD, YYYY, H:MM:SS AM/PM` — always use `DateCell` / `formatDateTime()` from `dateUtils.ts` (never `toLocaleString` or PF `Timestamp`)
 - Text-heavy columns (names, descriptions, emails, URLs) MUST use `<Truncate>` — ellipsis with tooltip on hover; `table-layout: fixed` for equal column distribution (do not opt out with `useFixedLayout={false}`)
 - Expandable rows: pass `isExpandable` to `SynScrollableTableContainer`, add expand-all/collapse-all toggle in `<Thead>` via `expand` prop, use `ExpandableRowContent` for nested detail, compact gray `Label` for list data. Hide expand toggle when row has no nested content. Use `useExpandableRowIds` for expand state. Assignment policies belong in expanded rows, not a crowded column.
+- Let PF size expansion-control columns naturally; do not assign percentage widths intended for data columns. Keep essential status/remaining-time labels readable in full without overlapping actions.
 - Footer/pagination: cursor-based via `SynScrollableTableContainer`'s `footer` prop (`TableFooterProps`)
   - Left: item count — `"5 workflows (of 100 total)"`
   - Right: Previous / Next buttons using API cursor tokens (`prev`, `next`) — no page numbers or per-page selector
@@ -131,6 +134,7 @@ Use a docked icon navigation (left sidebar) with PatternFly's flyout panels comp
 ## Form Component
 
 - Use PatternFly's Basic Form component
+- Compose with `useSynForm`, `SynForm`, and matching `Syn*` fields for shared labeling, validation, dirty state, and helper text
 - Left-aligned, one column, max-width of 600px
 - Submit buttons in `SynPanel` sticky footer (not in the page header)
 - Use typeahead for lists with 10+ options
@@ -139,9 +143,12 @@ Use a docked icon navigation (left sidebar) with PatternFly's flyout panels comp
 - Use Number Input for number fields
 - Use popover help text on form field labels
 - Use `HelperText` / `HelperTextItem` below inputs for brief contextual guidance (formats, ranges, constraints); popover is for longer descriptions; validation errors replace helper text when invalid
+- `SynTextField` links hints/errors automatically. Custom `SynFormField` controls forward `describedBy` to the input or interactive toggle's `aria-describedby`; reference only rendered helper content.
+- Put general guidance in a concise label popover, comparisons in option descriptions, and the selected option's hint below the field; do not list every option's help beneath the control
 - Use Zod + react-hook-form for validation (project standard)
 - **Dropdowns:** Never use native `<select>` or PF `FormSelect`. Use PF6 `Select` + `MenuToggle` + `SelectList` + `SelectOption`. In modals: `popperProps={{ appendTo: 'inline' }}`. Add `shouldFocusToggleOnSelect`.
 - **Human-readable validation:** Never expose regex to users. Use plain-language errors + inline hint text via `HintOrError`/`HelperText`. Use example-style placeholders (e.g., `'my-project-name'`).
+- When a parent selection clears dependent values, do not immediately show untouched dependent fields as invalid
 - **Read-only system values:** Never use disabled `TextInput` for non-editable values. Use `DescriptionList isCompact`, `ClipboardCopy`, or plain text instead.
 
 ## Typeahead Patterns
@@ -213,6 +220,7 @@ All delete variants share: Small modal, warning icon title, `confirmVariant="dan
 
 **Cascade Delete** — other records get permanently deleted too (workflow → executions, tool provider → tools)
 
+- Name all irreversible/immediate effects in both body and acknowledgement. Workflow deletion stops in-progress runs immediately and permanently deletes run history. Reuse the shared confirmation from list and builder; show impact counts only when supplied by the API.
 - Body: `"The [resource] [name in bold] will be deleted. This cannot be undone."`
 - Body 2: `"Resources that will be deleted"` as a header, then one row per resource type with its own Badge count — e.g., "Executions [12]", "Tools [3]"
 - Checkbox: `"I understand this [resource] and the resources shown above will be permanently deleted."`
@@ -322,13 +330,14 @@ All icons MUST use the **`RhUi` prefix** (e.g., `RhUiAddIcon`, `RhUiEditIcon`, `
 - **Sentence case** by default everywhere
 - **Title case** only for navigation items and page titles
 - **User-generated strings** are displayed exactly as entered — do not transform casing
+- **Actionable errors:** Explain what happened and the next step with short sentence-case titles. Distinguish missing/deleted resources, permissions, already-resolved approvals, unpublished workflows, and service unavailability; keep a safe fallback. Reuse task-specific error mappings across entry points. Failed loading is not an empty configuration; do not expose raw transport errors, payloads, internal IDs, or implementation jargon.
 
 ## Workflow Builder
 
 - Based on React Flow with PatternFly as visual wrapper
 - Canvas built left to right
-- Single click: select/expand/collapse step
-- Double click: open panel view with Input/Output info
+- Step surface/icon/title/preview clicks and Enter/Space on the step do not open the editor; use the explicit **Edit** action
+- Every step/tile and its controls are keyboard reachable with visible focus. Edit label: **Edit**; tooltip: **Edit step**; accessible name identifies the step. Expand/collapse and menu actions stay independent, do not bubble into card behavior, and preserve native PF hover/focus/hit areas.
 - Right click: same as kebab menu
 - **Toolbar hierarchy:** Primary actions visible (Add step, Run, Save, Publish); secondary in grouped kebab with `DropdownGroup` ("Views": Run history, Workflow details; "Actions": Verify, Duplicate, Export, Import, Delete with `isDanger`). Every kebab item has icon + label.
 - **Publish lifecycle:** Draft → Publish → Unpublish (replaces enable/disable). Status badges (no icons, text + color only): Draft (grey), Published (green `status="success"`), Unpublished changes (yellow `status="warning"`). Publish dialog requires version name. Unpublish via kebab with danger confirmation.
@@ -338,10 +347,12 @@ All icons MUST use the **`RhUi` prefix** (e.g., `RhUiAddIcon`, `RhUiEditIcon`, `
 - Run workflow: single trigger → plain Run button; multiple triggers → dropdown for trigger selection; confirmation dialog with "Don't show again" (stored in `localStorage` per user — skips confirmation on next run), then `RunWorkflowModal` JSON editor for mock trigger data. Use the stable title "Run workflow?" and name the workflow in the confirmation body.
 - **Schedule triggers:** Interval (`DurationInput`) and Cron (`TextInput` with 5-field validation). "Continuous" type removed. Both show "Next run" preview when valid.
 - Test step (Run step): from step kebab menu → choice dialog ("Run all previous steps" or mock data) → mock data editor (CodeEditor with JSON); upstream steps mocked as "skipped"; results in execution visualizer
+- With pins configured, blank/whitespace-only Run Step mock input shows an inline validation message and does not start a run; explain entering JSON or cancelling to keep the pin. Preserve valid JSON and allowed empty submissions without pins; this does not change editor prefill.
 - **Cancel run:** secondary destructive button (`variant="secondary"` + `isDanger`), no confirmation dialog. Visible only when status is `pending`/`running`.
 - **Canvas controls:** anchored to bottom-left corner; canvas overlays (controls, step legend, undo/redo) use `SynPanel` with `variant="raised"` for opaque + shadow
 - Legend toggle: accessible labels **Show step legend** / **Hide step legend**
-- **Canvas step styling:** workflow steps use `variant="raised"` with border-radius override to match `Card` / canvas chrome; fixed 240px width — use `overflow-wrap: anywhere` on all dynamic text (`Title`, `Content`) to prevent overflow (prefer `anywhere` over `break-word`)
+- **Canvas step styling:** workflow steps use `variant="raised"`; all step types share the 300px width (`SYN_STEP_DEFAULT_NODE_WIDTH`). Icon + compact right-aligned actions sit above a full-width title area. Clamp titles/type labels to two lines with full-value hover/focus tooltips only when truncated; use `overflow-wrap: anywhere`. Manual triggers omit redundant details below title/type.
+- **Semantic zoom:** At/below `SEMANTIC_ZOOM_MAX_SCALE` (currently 0.5), show icon tiles retaining type accents, recognizable icons, selection, execution/validation indicators, and branch connections. Hover/focus opens a readable 300px collapsed preview with the shared header/actions, matching the step's shape/padding regardless of canvas scale. Omit expanded details and expand/collapse controls; retain normal read-only/execution restrictions.
 - **Floating canvas panels:** prefer `SynPanel` with `variant="raised"` for compact controls or `opaqueFloatingFill` for large flat shells without raised chrome (see `SynPanel.tsx` JSDoc)
 - Execution view panels: use `SynPanel isFullHeight` for proper scroll — don't hand-roll flex column inline styles. On entering Details with no selection, select the first currently visible activity and synchronize the row, canvas, and detail pane; keep an existing user selection.
 - View-only views: Run view, Run history, Version history
@@ -349,6 +360,7 @@ All icons MUST use the **`RhUi` prefix** (e.g., `RhUiAddIcon`, `RhUiEditIcon`, `
 - **Two-tier validation:** Errors (`severity: 'error'`) block publish; warnings (`severity: 'warning'`) allow save. Banner variant: any error → `danger`; all warnings → `warning`. Verify-then-publish gate: Publish always verifies first; `isAriaDisabled` when errors exist or verifying.
 - **Version history panel:** Right-side `SynPanel isFullHeight` with `SimpleList` grouped by date. Each version shows name + timestamp + status badge (Published/Draft). Kebab per version: Restore, Export, Publish. Viewing a version sets canvas to read-only mode. Mutually exclusive with approval panel.
 - **Three-column step editor:** Input (flat) | Parameters (`variant="raised"`) | Output (flat). Branching steps add branch-handle dropdown in center column header. Columns use `ResizableDivider`. Resolve Documentation from the selected step type; show the external link only when a matching destination exists.
+- **Pinned preview data:** Output uses the pin before last-run data; downstream Input uses each predecessor's pin before stale execution data. Keep the pin indicator in read-only versions but hide edit/unpin controls. Input mock-editor prefill remains existing input mock → execution data → upstream pin; preview precedence is not a universal prefill rule.
 - **Step settings:** `StepFormTabsLayout` splits step forms into Parameters + Settings tabs. Settings tab: continue-on-failure (three-way select), timeout, retry via shared `StepSettingsForm`. System defaults as live placeholders from `/settings`. Hidden for Condition/Switch/triggers.
 - **Step panel navigation:** Previous/Next arrow controls on panel edges for navigating connected steps. Single target = icon button + tooltip; multiple = dropdown menu whose items include each target's type icon and display name. Uses `useAdjacentSteps`.
 - **Step disable/enable:** Activity steps (Task, Approval) get Disable/Enable kebab action (no confirmation). Disabled = dashed gray border + 50% opacity. Control flow steps only get Replace + Delete.
@@ -357,7 +369,7 @@ All icons MUST use the **`RhUi` prefix** (e.g., `RhUiAddIcon`, `RhUiEditIcon`, `
 - **Approval side panel:** Right-side panel on execution viewer for inline approval review. Mutually exclusive with history panel; auto-open on pending approval via `useAutoApprovalDetection` only when history is not open, so automatic state never replaces the user's current context. **Multi-approval navigation:** `ApprovalNavigationHeader` with prev/next arrows, "2 of 5" counter, keyboard nav support.
 - **Wait step countdown:** Live `HH:MM:SS` countdown on canvas during execution via `useWaitCountdown` (1s interval). Clears on terminal status.
 - **Import confirmation:** Modal with radio choices ("Import as new" vs "Import into current") for existing saved workflows. Direct import for new/empty. Warns about unsaved changes when `isDirty`.
-- **Run history rows:** Use `HistoryListItemLink` (real `<a>` via TanStack Router), not `Button` + `navigate`. Overlay pattern when row has nested controls (version link, kebab). `SynLink` cannot be used — it renders a Button.
+- **Run history rows:** Use `HistoryListItemLink` (real `<a>` via TanStack Router), not `Button` + `navigate`. Use caller overlay `className` for rows with sibling controls; the helper keeps its PF item-link class and has no `overlay` prop. The open run has visible current-item styling + `aria-current="page"`. Builder history navigation preserves `history=open`; general Runs entry stays closed by default. `SynLink` cannot be used — it renders a Button.
 - **Browser tab dirty indicator:** Prepend `●` to `<title>` when builder has unsaved changes (via `toPageTitle`).
 
 ## Permission Gating
@@ -434,6 +446,8 @@ Achieving full WCAG 2.1 AA and Section 508 compliance requires careful implement
 
 ### Color, Contrast, and Iconography
 
+- Color scheme (System / Light / Dark) and contrast (System / Default / High contrast / Glass) are independent; high contrast works in both light and dark. Use the shared provider and one contrast treatment at a time.
+- In System mode, increased contrast/forced colors select high contrast before reduced-transparency handling; reduced transparency selects opaque default. Explicit preferences override system selection.
 - Text and icons: 4.5:1 contrast for normal text, 3:1 for large text/UI components
 - Never convey information by color alone — include icons and descriptive text
 - Use `alt=""` or `aria-hidden="true"` for decorative images
@@ -477,6 +491,7 @@ p {
 
 - **No hard-coded border colors** — use `--pf-t--global--border--color--default` and `--pf-t--global--border--width--divider--default`. Never custom rgba hex on table/layout components.
 - **No breadcrumb CSS overrides** — PF6 default dashed underline and link colors are correct.
+- **Contrast-safe surfaces:** Use semantic tokens for visible boundaries, selection, focus, and floating backgrounds across default/high-contrast/glass in light/dark. Do not apply glass and high-contrast classes together.
 - **Compact inline form controls** — use PF spacer tokens (e.g., `--pf-t--global--spacer--4xl`) in CSS modules for explicit widths. Use `flexWrap: nowrap` + `flex: none` to prevent collapse.
 
 ### Exceptions
@@ -485,6 +500,6 @@ If a global style seems necessary, follow the PatternFly gaps process: check PF 
 
 ## Storybook
 
-- `npm run storybook` (port 5174). Preview in light + dark mode via toolbar before sign-off.
+- `npm run storybook` (port 5174). Review light/dark with default/high contrast and glass where applicable, using available Storybook controls or the running app. Include system contrast/forced-colors and reduced-transparency preferences; verify boundaries, selection, focus, and floating-panel readability before sign-off.
 - Stories reflect real app compositions, not isolated prop demos.
 - `Syn*` components with `autodocs`: `SynPage`, `SynPageHeader`, `SynPageBreadcrumbs`, `SynPanel`, `SynPanelContentStack`, `SynUrlTabs`, `SynConfirmationDialog`, `SynCodeBlock`, `SynDetail`, `SynDetailList`, `SynErrorState`, `SynLoadingState`, `SynEmptyStateNoData`, `SynEmptyStateFilter`, `SynEmptyStateServiceUnavailable`, `SynListPanel`, `SynKebabMenu`, `SynLabel`, `SynUserTag`, `SynScrollableTableContainer`.
