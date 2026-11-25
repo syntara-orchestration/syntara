@@ -1,5 +1,6 @@
 import type { OutputFieldDef } from '@syntara/contracts'
 import { fireEvent, render, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import { axe } from 'vitest-axe'
 
@@ -157,7 +158,8 @@ describe('InputSchemaPreview', () => {
     expect(setDataCalls[1][1]).toBe('${step-1.hostname}')
   })
 
-  it('builds the public dotted-path expression when dragging a nested declared output', () => {
+  it('builds the public dotted-path expression when dragging a nested declared output', async () => {
+    const user = userEvent.setup()
     const nestedOutputTree: InputSchemaPreviewNode[] = [
       {
         name: 'outputs',
@@ -188,6 +190,9 @@ describe('InputSchemaPreview', () => {
 
     const expression = '${invoke_child.outputs.release.version}'
     const setDataCalls: Array<[string, string]> = []
+    const releaseGroup = screen.getByRole('treeitem', { name: '{} release Release metadata' })
+    await user.click(within(releaseGroup).getByRole('button'))
+
     fireEvent.dragStart(screen.getByText('T version'), {
       dataTransfer: {
         setData: (format: string, value: string) => setDataCalls.push([format, value]),
