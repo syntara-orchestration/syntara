@@ -288,7 +288,7 @@ describe('useExecutionCopyToEditor', () => {
       const opts = buildOptions({ executionCopy: buildExecutionCopy() })
       const { rerender } = renderHook(
         ({ projectId }: { projectId: string | undefined }) => useExecutionCopyToEditor({ ...opts, projectId }),
-        { initialProps: { projectId: undefined } }
+        { initialProps: { projectId: undefined as string | undefined } }
       )
 
       expect(replaceSpy).not.toHaveBeenCalled()
