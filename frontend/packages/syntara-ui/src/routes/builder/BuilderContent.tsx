@@ -70,7 +70,7 @@ type WorkflowVersion = WorkflowAPI.components['schemas']['WorkflowVersionRead']
 /* eslint-disable max-lines */
 // eslint-disable-next-line max-lines-per-function, complexity
 export function BuilderContent(props: BuilderContentProps) {
-  const { workflow, isNew, workflowId, executionCopy, initialViewVersion } = props
+  const { workflow, isNew, workflowId, executionCopy, pendingCopyNavigation, initialViewVersion } = props
   const isWorkflowBuilderQolEnabled = useFeatureFlag('workflow_builder_qol')
   const navigate = useNavigate()
   const setLocation = useCallback(
@@ -185,7 +185,7 @@ export function BuilderContent(props: BuilderContentProps) {
     setWorkflow,
     setStoredEdges,
     loadWorkflowWithEdges,
-    pendingExecutionCopy: !!executionCopy,
+    pendingExecutionCopy: !!executionCopy || !!pendingCopyNavigation,
   })
   useExecutionCopyToEditor({
     executionCopy,

@@ -90,24 +90,9 @@ export default function BuilderEdit() {
     )
   }
 
-  // Copy navigation must not mount BuilderContent until workflow_definition is available.
-  // Cached execution rows from the detail page can lack definition until this query settles;
-  // mounting early runs INIT_WORKFLOW before pendingExecutionCopy and races copy-to-editor.
-  const executionPayloadMissingDefinition =
-    !!executionIdParam && !!executionQuery.data && executionQuery.data.workflow_definition == null
-
-  const awaitingExecutionCopyPayload =
-    !!executionIdParam &&
-    !executionCopy &&
-    !executionQuery.error &&
-    (executionQuery.isPending ||
-      executionQuery.isLoading ||
-      executionQuery.isFetching ||
-      executionPayloadMissingDefinition)
-
   // Use isLoading instead of isPending to distinguish initial load from refetch
   // isLoading = true only on first fetch, isPending = true on both initial and refetch
-  if (isLoading || awaitingExecutionCopyPayload) {
+  if (isLoading) {
     return (
       <SynPage>
         <SynPageTitle segments={['Loading workflow', 'Workflows']} />
@@ -128,6 +113,7 @@ export default function BuilderEdit() {
         isNew={false}
         workflowId={workflowId}
         executionCopy={executionCopy}
+        pendingCopyNavigation={!!executionIdParam}
         initialViewVersion={initialViewVersion}
       />
     </ReactFlowProvider>
