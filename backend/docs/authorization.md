@@ -391,6 +391,12 @@ was `any`. Denies override matching allows for every principal, including
 admins. Creating a policy alone does not attach it to a principal: a role and
 role assignment must make it effective.
 
+A `project` deny takes its project from the role assignment. Assigned
+globally it has no project to match, so it applies in every project, like an
+`any` deny. Assign the role to a project to limit the deny to that project.
+This applies to denies only. A `project` allow on a global assignment grants
+nothing.
+
 `can_i` accepts `resource_type: "step_type"`, `action: "write"`,
 `resource_labels: {"kind": "script"}`, and a project name or UUID in
 `resource_project`. Its response fields are unchanged. `denied_by` and

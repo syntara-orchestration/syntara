@@ -159,6 +159,69 @@ async def test_global_and_project_assignment_of_same_policy_are_distinct(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("builtin", [False, True], ids=["custom-policy", "builtin-policy"])
+async def test_project_scoped_deny_on_global_assignment_fails_closed(
+    auth_client: AsyncClient, test_db_session: AsyncSession, test_user: User, *, builtin: bool
+) -> None:
+    """A project-scoped deny assigned globally applies in every project (AAP-101796).
+
+    The statement is expanded without a project stamp, so it is evaluated like
+    an ``any`` deny: it blocks the step type in every project and is reported
+    as the denying policy.
+    """
+    db = test_db_session
+    db.add(Project(name="payments", labels={}))
+    await db.commit()
+    await _assign_policy(db, test_user, "allow-all-step-types", [_statement("allow")])
+    if builtin:
+        deny_name = "step_type:write:project:deny:script"
+        db.add(Role(name="no-scripts-role", policy_names=[deny_name], labels={}))
+        await db.flush()
+        db.add(RoleAssignment(principal_id=test_user.id, role_name="no-scripts-role"))
+        await db.commit()
+    else:
+        deny_name = "no-scripts"
+        await _assign_policy(db, test_user, deny_name, [{**_statement("deny", kind="script"), "scope": "project"}])
+
+    for resource_project in ("payments", "unassigned-project"):
+        response = await auth_client.post(
+            "/api/v1/authz/can_i",
+            json={
+                "action": "write",
+                "resource_type": "step_type",
+                "resource_labels": {"kind": "script"},
+                "resource_project": resource_project,
+            },
+        )
+        assert response.status_code == 200, response.text
+        assert response.json() == {
+            "allowed": False,
+            "denied": True,
+            "matched_policy": "",
+            "denial_reason": "policy_deny",
+            "denied_by": deny_name,
+            "denied_scope": "project",
+            "denied_project": "",
+        }
+
+    # The deny keeps its kind selector: other step types stay authorable.
+    result = await authorize(
+        db,
+        _RealEvaluator(),
+        AuthzRequest(
+            user_id=test_user.id,
+            action="write",
+            resource_type="step_type",
+            resource_id="",
+            resource_labels={"kind": "http_request"},
+            resource_project="payments",
+        ),
+    )
+    assert result.allowed is True
+    assert result.denied is False
+
+
+@pytest.mark.asyncio
 async def test_who_can_applies_default_allow_and_explicit_denial_with_pagination(
     admin_client: AsyncClient, test_db_session: AsyncSession, user_factory: Callable[..., Awaitable[User]]
 ) -> None:

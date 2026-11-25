@@ -72,6 +72,15 @@ _scope_matches(policy) if {
     input.resource.any_project == true
     policy.project != ""
 }
+# A project-scoped deny gets its project from the role assignment. On a
+# globally assigned role it has no project to compare, so it applies to every
+# project, like an "any" deny. Allow statements keep the strict comparison: a
+# project-scoped allow without a project grants nothing.
+_scope_matches(policy) if {
+    policy.effect == "deny"
+    policy.scope == "project"
+    object.get(policy, "project", "") == ""
+}
 
 # Condition matching: no conditions key means unconditional match (backward compat)
 _conditions_match(policy) if {
