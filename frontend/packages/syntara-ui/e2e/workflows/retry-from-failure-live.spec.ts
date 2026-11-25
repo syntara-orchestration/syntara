@@ -252,7 +252,9 @@ test.describe('Retry from failure — real backend', () => {
   test.skip(!isRealBackend, 'requires a real backend and Temporal worker')
   test.describe.configure({ mode: 'serial' })
 
-  test.beforeAll(async ({ browser }) => {
+  test.beforeAll(async ({ browser }, testInfo) => {
+    testInfo.setTimeout(TERMINAL_POLL_TIMEOUT_MS + 60_000)
+
     const page = await browser.newPage()
     try {
       const project = await createProjectViaApi(page, buildUniqueName('e2e-retry-from-failure-project'))
