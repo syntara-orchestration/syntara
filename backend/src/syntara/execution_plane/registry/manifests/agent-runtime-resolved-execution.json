@@ -10,7 +10,7 @@
         "output": "sha256:fed2ace7f9e7f76894bfa70fd845ae8e19917aaf89f7232084b614fd935e67ff"
       },
       "step_identity": "syntara.agent-runtime.agent-runtime",
-      "step_revision_id": "sha256:175488512f41beb168f45cd237f90a4c11cbfcd9104323f19a63c1730a9816ca"
+      "step_revision_id": "sha256:da174fe1574ab991451469fd660755878790382cb12471cb458b7a94a235b8ee"
     }
   ]
 }
