@@ -150,7 +150,7 @@ describe('useWorkflowInitialization', () => {
     expect(mockOnLayout).not.toHaveBeenCalled()
   })
 
-  // AAP-91959: Imported workflows where some nodes (e.g. AAP execution nodes
+  // Imported workflows where some nodes (e.g. AAP execution nodes
   // lacking an assigned integration) have no stored position must still trigger
   // auto-layout, otherwise those nodes default to {x:0,y:0} and overlap every
   // other node on the canvas. Checking only "are any positions stored at all"
