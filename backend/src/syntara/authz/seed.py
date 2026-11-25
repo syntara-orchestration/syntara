@@ -277,16 +277,24 @@ async def _seed_assignments_and_admin(
         await try_set_bootstrap_admin_email(session, admin_user)
         logger.info("Bootstrap admin user created", user_id=str(admin_user.id), email=admin_user.email)
     else:
-        # Resync the password hash to the currently mounted secret. A prior
-        # failed deployment may have seeded the admin user with a password
-        # from a K8s secret that no longer exists after redeploy.
-        current_password_hash = _read_admin_password_hash()
-        if current_password_hash is not None and admin_user.password_hash != current_password_hash:
-            admin_user.password_hash = current_password_hash
-            logger.info(
-                "Resynced bootstrap admin password from current secret",
-                user_id=str(admin_user.id),
-            )
+        # Align the stored hash with the mounted admin password file when it no
+        # longer verifies (e.g. stale hash left by a failed deployment). Use
+        # verify, not string equality — Argon2 salting produces a new digest on
+        # every hash() call for the same plaintext.
+        #
+        # In clustered installs the secret file is the source of truth on each
+        # startup. A self-service password change in the UI persists only until
+        # the next seed run unless the secret file was updated to match.
+        secret_password = _read_admin_password_plain()
+        if secret_password is not None:
+            from syntara.auth.passwords import hash_password  # noqa: PLC0415
+
+            if not _bootstrap_admin_password_verifies(secret_password, admin_user.password_hash):
+                admin_user.password_hash = hash_password(secret_password)
+                logger.info(
+                    "Resynced bootstrap admin password from current secret",
+                    user_id=str(admin_user.id),
+                )
         # Existing installs seeded before the placeholder email had email=NULL in JWTs.
         if admin_user.email is None and await try_set_bootstrap_admin_email(session, admin_user):
             logger.info(
@@ -302,15 +310,27 @@ async def _seed_assignments_and_admin(
     await session.commit()
 
 
-def _read_admin_password_hash() -> str | None:
-    """Read the admin password from the configured file and return its hash.
+def _bootstrap_admin_password_verifies(plain: str, stored_hash: str | None) -> bool:
+    """Return whether *stored_hash* matches the bootstrap secret plaintext."""
+    if stored_hash is None:
+        return False
+    from argon2.exceptions import InvalidHashError  # noqa: PLC0415
+
+    from syntara.auth.passwords import verify_password  # noqa: PLC0415
+
+    try:
+        return verify_password(plain, stored_hash)
+    except InvalidHashError:
+        return False
+
+
+def _read_admin_password_plain() -> str | None:
+    """Read the bootstrap admin password from the configured file.
 
     Returns ``None`` (with a warning) if the path is not configured or the
     file is empty, so that the application can still start without a
     password file — the admin user just won't be able to log in locally.
     """
-    from syntara.auth.passwords import hash_password  # noqa: PLC0415
-
     settings = get_settings()
     password_path = settings.admin_password_path
     if not password_path:
@@ -341,4 +361,14 @@ def _read_admin_password_hash() -> str | None:
             path=password_path,
         )
 
+    return password
+
+
+def _read_admin_password_hash() -> str | None:
+    """Return an Argon2 hash of the configured bootstrap admin password."""
+    from syntara.auth.passwords import hash_password  # noqa: PLC0415
+
+    password = _read_admin_password_plain()
+    if password is None:
+        return None
     return hash_password(password)
