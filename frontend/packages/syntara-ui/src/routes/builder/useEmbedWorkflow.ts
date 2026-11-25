@@ -13,68 +13,90 @@ import { useCallback } from 'react'
 import { useWorkflowStore } from '../../stores/useWorkflowStore'
 import { useWorkflowStoreActions } from '../../stores/workflowStoreSelectors'
 
+import type { EdgeConnection } from './types/edge'
 import type { CopyWorkflowGraphResult } from './utils/embed/copyWorkflowGraph'
 
-/** Horizontal gap (px) between existing nodes and the embedded graph. */
+/** Card width (px) for the pre-render layout math; mirrors the builder's default node width. */
+const NODE_WIDTH = 300
+/** Horizontal gap between consecutive ranks; mirrors the dagre engine's ranksep. */
+const RANK_GAP = 120
+/**
+ * Vertical pitch between stacked same-rank siblings. Card height varies and is unmeasured
+ * pre-render, so this assumes an expanded card (header + parameters) plus a gap, erring
+ * toward separation rather than overlap; the canvas "Reset layout" later tightens the
+ * spacing using the real measured heights.
+ */
+const SIBLING_PITCH = 340
+/** Gap between the farthest-right existing node and the embedded block. */
 const PLACEMENT_GAP = 120
-/** Grid spacing (px) used to lay out copied nodes that carry no source coordinates. */
-const GENERATED_COL_GAP = 220
-const GENERATED_ROW_GAP = 160
-const GENERATED_COLS = 4
 
 /**
- * Compute canvas positions for the copied graph, placed clear of the existing nodes
- * (to the right, top-aligned) instead of a blind fixed offset that stacks the copy on
- * top of the current canvas.
- *
- * - Copied nodes that carry source coordinates keep their relative layout and are shifted
- *   as a block (D3: keep coordinates, move right of the farthest-right existing step).
- * - Copied nodes with NO source coordinates (e.g. a source saved without canvas positions)
- *   are given a generated grid position so they never collapse onto a single point (the
- *   stacking bug). They sit below any coordinate-bearing block.
- * - When there are no existing nodes and every copied node already has a coordinate, the
- *   source layout is kept verbatim (nothing to sit beside).
+ * Rank each copied node by its longest path from a root, so a copied pipeline reads left to
+ * right as a pipeline. Self-loops are ignored, and any node left unranked by a cycle (or with
+ * no internal edges) falls back to rank 0 rather than being dropped.
  */
-function placeClearOfExisting(
+function rankCopiedNodes(copiedIds: string[], edges: EdgeConnection[]): Map<string, number> {
+  const ids = new Set(copiedIds)
+  const children = new Map<string, string[]>()
+  const indegree = new Map<string, number>()
+  for (const id of copiedIds) {
+    children.set(id, [])
+    indegree.set(id, 0)
+  }
+  for (const e of edges) {
+    // Internal edges only; skip self-loops so a node never blocks its own ranking.
+    if (!ids.has(e.source) || !ids.has(e.target) || e.source === e.target) continue
+    children.get(e.source)?.push(e.target)
+    indegree.set(e.target, (indegree.get(e.target) ?? 0) + 1)
+  }
+
+  const rank = new Map<string, number>(copiedIds.map((id) => [id, 0]))
+  const remaining = new Map(indegree)
+  // Kahn's algorithm relaxing to the longest path; nodes stuck in a cycle keep rank 0.
+  const queue = copiedIds.filter((id) => (remaining.get(id) ?? 0) === 0)
+  while (queue.length > 0) {
+    const id = queue.shift() as string
+    for (const child of children.get(id) ?? []) {
+      rank.set(child, Math.max(rank.get(child) ?? 0, (rank.get(id) ?? 0) + 1))
+      const left = (remaining.get(child) ?? 0) - 1
+      remaining.set(child, left)
+      if (left === 0) queue.push(child)
+    }
+  }
+  return rank
+}
+
+/**
+ * Lay the copied block out fresh as a left-to-right flow, placed clear of the existing nodes
+ * (to the right, top-aligned). Source coordinates are intentionally ignored: a source saved
+ * with collapsed or overlapping cards would otherwise reproduce that overlap in the copy. The
+ * layout is deterministic and needs no measured widths, so it runs synchronously inside the
+ * insert (one undo entry); the canvas "Reset layout" still applies the full dagre layout.
+ */
+function autoLayoutClearOfExisting(
   copiedIds: string[],
-  copied: Record<string, { x: number; y: number }>,
+  edges: EdgeConnection[],
   existing: Record<string, { x: number; y: number }>
 ): Record<string, { x: number; y: number }> {
-  if (copiedIds.length === 0) return copied
+  if (copiedIds.length === 0) return {}
 
+  const rank = rankCopiedNodes(copiedIds, edges)
+  const rowInRank = new Map<number, number>()
   const existingVals = Object.values(existing)
-  const known = copiedIds.filter((id) => copied[id])
-  const missing = copiedIds.filter((id) => !copied[id])
-
-  // Nothing to place beside, and every node already has a coordinate: keep as-is.
-  if (existingVals.length === 0 && missing.length === 0) return copied
-
-  const baseX = existingVals.length > 0 ? Math.max(...existingVals.map((p) => p.x)) + PLACEMENT_GAP : 0
+  // Clear the full width of the farthest-right existing node, not just its origin point.
+  const baseX = existingVals.length > 0 ? Math.max(...existingVals.map((p) => p.x)) + NODE_WIDTH + PLACEMENT_GAP : 0
   const baseY = existingVals.length > 0 ? Math.min(...existingVals.map((p) => p.y)) : 0
 
   const placed: Record<string, { x: number; y: number }> = {}
-
-  // Coordinate-bearing nodes: preserve relative layout, shifted so the block's top-left
-  // lands at the base point (only shifted when there are existing nodes to clear).
-  if (known.length > 0) {
-    const knownVals = known.map((id) => copied[id])
-    const dx = existingVals.length > 0 ? baseX - Math.min(...knownVals.map((p) => p.x)) : 0
-    const dy = existingVals.length > 0 ? baseY - Math.min(...knownVals.map((p) => p.y)) : 0
-    for (const id of known) placed[id] = { x: copied[id].x + dx, y: copied[id].y + dy }
+  for (const id of copiedIds) {
+    const r = rank.get(id) ?? 0
+    const row = rowInRank.get(r) ?? 0
+    rowInRank.set(r, row + 1)
+    placed[id] = {
+      x: baseX + r * (NODE_WIDTH + RANK_GAP),
+      y: baseY + row * SIBLING_PITCH,
+    }
   }
-
-  // Coordinate-less nodes: generated grid, below any preserved block.
-  if (missing.length > 0) {
-    const placedVals = Object.values(placed)
-    const startY = placedVals.length > 0 ? Math.max(...placedVals.map((p) => p.y)) + GENERATED_ROW_GAP : baseY
-    missing.forEach((id, i) => {
-      placed[id] = {
-        x: baseX + (i % GENERATED_COLS) * GENERATED_COL_GAP,
-        y: startY + Math.floor(i / GENERATED_COLS) * GENERATED_ROW_GAP,
-      }
-    })
-  }
-
   return placed
 }
 
@@ -91,10 +113,10 @@ export function useEmbedWorkflow() {
         activities: result.activities,
         edges: [...edges, ...result.edges],
       })
-      // Place every copied node clear of existing nodes (coordinate-less nodes get a
-      // generated layout rather than stacking), folded into the same undo entry.
+      // Lay the copied block out fresh and place it clear of existing nodes, folded into the
+      // same undo entry so insert + placement are one undoable step.
       const copiedIds = result.activities.map((a) => a.id)
-      const positions = placeClearOfExisting(copiedIds, result.positions, nodePositions)
+      const positions = autoLayoutClearOfExisting(copiedIds, result.edges, nodePositions)
       useWorkflowStore.getState().updateNodePositions(positions, { skipTracking: true })
     },
     [batchAddActivitiesAndEdges]

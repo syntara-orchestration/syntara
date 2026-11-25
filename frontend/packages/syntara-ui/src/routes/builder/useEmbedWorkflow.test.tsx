@@ -18,13 +18,13 @@ vi.mock('../../stores/workflowStoreSelectors', () => ({
 }))
 
 const makeResult = (
-  positions: Record<string, { x: number; y: number }>,
-  activityIds: string[] = Object.keys(positions)
+  activityIds: string[],
+  edges: Array<{ id: string; source: string; target: string }> = []
 ): CopyWorkflowGraphResult =>
   ({
     activities: activityIds.map((id) => ({ id })),
-    edges: [{ id: 'ce', source: 'c1', target: 'c1' }],
-    positions,
+    edges,
+    positions: {},
     idMap: new Map(),
     droppedEdgeCount: 0,
     resourceReferenceNodes: [],
@@ -38,42 +38,46 @@ describe('useEmbedWorkflow', () => {
     storeState = { edges: [{ id: 'e0' }], nodePositions: {}, updateNodePositions }
   })
 
-  it('places the copied graph clear of existing nodes (to the right with a gap)', () => {
+  it('lays the copied graph out as a left-to-right flow, clear of existing nodes', () => {
     storeState.nodePositions = { a: { x: 0, y: 0 }, b: { x: 100, y: 50 } }
     const { result } = renderHook(() => useEmbedWorkflow())
-    result.current.insertEmbeddedGraph(makeResult({ c1: { x: 0, y: 0 }, c2: { x: 50, y: 20 } }))
+    result.current.insertEmbeddedGraph(makeResult(['c1', 'c2'], [{ id: 'e1', source: 'c1', target: 'c2' }]))
 
-    // existingMaxX=100, GAP=120, copiedMinX=0 => dx=220 ; existingMinY=0, copiedMinY=0 => dy=0
+    // baseX = existingMaxX(100) + NODE_WIDTH(300) + GAP(120) = 520 ; baseY = existingMinY(0).
+    // c1 is rank 0, c2 rank 1 => c2.x = 520 + (NODE_WIDTH 300 + RANK_GAP 120) = 940, same row.
     expect(updateNodePositions).toHaveBeenCalledWith(
-      { c1: { x: 220, y: 0 }, c2: { x: 270, y: 20 } },
+      { c1: { x: 520, y: 0 }, c2: { x: 940, y: 0 } },
       { skipTracking: true }
     )
     expect(batchAddActivitiesAndEdges).toHaveBeenCalledWith({
       activities: [{ id: 'c1' }, { id: 'c2' }],
-      edges: [{ id: 'e0' }, { id: 'ce', source: 'c1', target: 'c1' }],
+      edges: [{ id: 'e0' }, { id: 'e1', source: 'c1', target: 'c2' }],
     })
   })
 
-  it('leaves positions unchanged when the canvas has no existing nodes', () => {
+  it('lays out from the origin when the canvas has no existing nodes', () => {
     storeState.nodePositions = {}
     const { result } = renderHook(() => useEmbedWorkflow())
-    const positions = { c1: { x: 5, y: 7 } }
-    result.current.insertEmbeddedGraph(makeResult(positions))
-    expect(updateNodePositions).toHaveBeenCalledWith(positions, { skipTracking: true })
+    result.current.insertEmbeddedGraph(makeResult(['c1']))
+    expect(updateNodePositions).toHaveBeenCalledWith({ c1: { x: 0, y: 0 } }, { skipTracking: true })
   })
 
-  it('generates a non-overlapping grid for copied nodes that have no source coordinates', () => {
+  it('stacks sibling (same-rank) copied nodes without overlap, clear of existing nodes', () => {
     storeState.nodePositions = { a: { x: 0, y: 0 }, b: { x: 200, y: 0 } }
     const { result } = renderHook(() => useEmbedWorkflow())
-    // No positions for the three copied nodes (source saved without canvas coordinates).
-    result.current.insertEmbeddedGraph(makeResult({}, ['n1', 'n2', 'n3']))
+    // Three nodes with no internal edges => all rank 0, stacked vertically.
+    result.current.insertEmbeddedGraph(makeResult(['n1', 'n2', 'n3']))
 
     const placed = updateNodePositions.mock.calls[0][0] as Record<string, { x: number; y: number }>
     expect(Object.keys(placed).sort()).toEqual(['n1', 'n2', 'n3'])
-    // Every node gets a distinct point (no stacking) and all sit right of the existing nodes.
     const pts = Object.values(placed)
-    const unique = new Set(pts.map((p) => `${p.x},${p.y}`))
-    expect(unique.size).toBe(3)
-    expect(pts.every((p) => p.x >= 200)).toBe(true)
+    // Distinct points (no stacking bug), all sharing the first rank's x clear of existing width.
+    expect(new Set(pts.map((p) => `${p.x},${p.y}`)).size).toBe(3)
+    expect(pts.every((p) => p.x === 200 + 300 + 120)).toBe(true)
+    // Vertical pitch must clear an expanded card (header + parameters) so stacked
+    // siblings never overlap; guards against regressing to the collapsed-height pitch.
+    const ys = pts.map((p) => p.y).sort((m, n) => m - n)
+    expect(ys[1] - ys[0]).toBeGreaterThanOrEqual(300)
+    expect(ys[2] - ys[1]).toBeGreaterThanOrEqual(300)
   })
 })
