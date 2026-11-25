@@ -13,12 +13,14 @@ async function assertWorkflowDeleteModal(modal: Locator, workflowName: string) {
   await expect(
     modal
       .locator('p')
-      .getByText(/will be deleted and any in-progress runs will stop immediately\. This action cannot be undone/)
+      .getByText(
+        /will be deleted and any in-progress runs will stop immediately\. Its run history will also be permanently deleted\. This action cannot be undone/
+      )
   ).toBeVisible()
   await expect(modal.getByText(/dependent workflows|use this one as a step/)).toHaveCount(0)
 
   const checkbox = modal.getByRole('checkbox', {
-    name: /I understand this workflow will be deleted and any in-progress runs will stop immediately/,
+    name: /I understand this workflow will be deleted and any in-progress runs will stop immediately\. I also understand its run history will be permanently deleted/,
   })
   await expect(checkbox).toBeVisible()
   await expect(checkbox).not.toBeChecked()

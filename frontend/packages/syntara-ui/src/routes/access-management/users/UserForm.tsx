@@ -7,6 +7,7 @@ import { AppRoute } from '../../../app/AppRoute'
 import { breadcrumbsCreateUser, breadcrumbsEditUser, breadcrumbsUserFormLoading } from '../../../app/breadcrumbBuilders'
 import type { AppBreadcrumbItem } from '../../../app/breadcrumbs/appBreadcrumbItem'
 import { SynForm } from '../../../components/forms/SynForm'
+import { SynFormCancelButton } from '../../../components/forms/SynFormCancelButton'
 import { SynPage, SynPageBody } from '../../../components/layout/SynPage'
 import { SynPageHeader } from '../../../components/layout/SynPageHeader'
 import { SynPanel } from '../../../components/layout/SynPanel'
@@ -253,9 +254,7 @@ export function UserForm({ mode }: Readonly<UserFormProps>) {
               >
                 {submitLabel}
               </Button>
-              <Button variant="link" onClick={navigateBack}>
-                Cancel
-              </Button>
+              <SynFormCancelButton to={AppRoute.AccessManagement.Users} />
             </ActionGroup>
           }
         />

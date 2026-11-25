@@ -9,6 +9,8 @@ import { expect, type Page } from '@playwright/test'
 
 import { AppRoute } from '../../src/app/AppRoute'
 import { toAppUrl } from '../fixtures'
+import { clickCanvasStepToOpenEditor } from '../helpers/canvas-interaction'
+import { credentialTypeOptionName } from '../helpers/credentials'
 
 import { MOCK_IDENTITY_PROVIDER_ID } from './mock-ids'
 import type { CanvasPageEntry, PageEntry } from './page-registry'
@@ -78,9 +80,9 @@ async function enterBuilderVersionViewHeaderState(page: Page, workflowId: string
 }
 
 /**
- * Opens the step editor side panel by clicking the canvas card title (PatternFly `Title` h2).
- * Prefer this over `getByTestId('rf__node-…')` + `force: true`, which often selects the card
- * without opening the editor (seed workflows may lack `name`, so the h2 shows the executor label).
+ * Opens the step editor side panel via the canvas step header Edit control.
+ * Seed workflows may show an executor label in the title h2 when `name` is empty;
+ * pass that visible title string when opening by name.
  */
 async function openStepEditorFromCanvasTitle(page: Page, title: string | RegExp) {
   const canvas = page.locator('.react-flow')
@@ -90,7 +92,17 @@ async function openStepEditorFromCanvasTitle(page: Page, title: string | RegExp)
   // timeout. Explicitly fit the whole graph into view first so every node — including
   // ones far from the trigger — is guaranteed to be on-screen and clickable.
   await page.getByRole('button', { name: 'Fit view' }).click()
-  await canvas.getByRole('heading', { name: title, level: 2 }).first().click()
+  const heading = canvas.getByRole('heading', { name: title, level: 2 }).first()
+  await expect(heading).toBeVisible({ timeout: 15_000 })
+  const node = page.locator('[role="group"][aria-roledescription="node"]').filter({ has: heading })
+  if (typeof title === 'string') {
+    await clickCanvasStepToOpenEditor(node, title)
+  } else {
+    await node
+      .getByRole('button', { name: /^Edit / })
+      .first()
+      .click({ timeout: 5_000 })
+  }
   // Do not key off the header Name field alone — with onHeaderContentChange the
   // toolbar can show a Name input without the three-panel step editor mounting,
   // which previously let --update-snapshots commit empty masked-canvas baselines.
@@ -339,7 +351,9 @@ export const builderInteractivePages: CanvasPageEntry[] = [
     },
     setup: async (page) => {
       await page.getByRole('button', { name: /Add Step/i }).click()
-      const panel = page.getByRole('region', { name: /add step|select a node/i })
+      const panel = page.getByRole('region', {
+        name: /add step|select an action step|select a trigger step|select a logic step|select an aap execution step/i,
+      })
       await expect(panel).toBeVisible()
       // panel.toBeVisible() fires when the slide-in starts — wait for a rendered child
       // so the screenshot doesn't capture a mid-animation state
@@ -348,10 +362,10 @@ export const builderInteractivePages: CanvasPageEntry[] = [
   },
   {
     section: 'workflows',
-    name: 'builder-edit-script-node-form',
+    name: 'builder-edit-script-step-form',
     path: AppRoute.WorkflowBuilder.Edit.replace(':workflowId', MOCK_CONDITION_WORKFLOW_ID),
     perceptual: true,
-    // NodeEditorOverlay covers the canvas box — masking .react-flow would erase the form.
+    // StepEditorOverlay covers the canvas box — masking .react-flow would erase the form.
     maskCanvas: false,
     waitFor: async (page) => {
       await expect(page.locator('.react-flow')).toBeVisible({ timeout: 30_000 })
@@ -362,7 +376,7 @@ export const builderInteractivePages: CanvasPageEntry[] = [
   },
   {
     section: 'workflows',
-    name: 'builder-edit-condition-node-form',
+    name: 'builder-edit-condition-step-form',
     path: AppRoute.WorkflowBuilder.Edit.replace(':workflowId', MOCK_CONDITION_WORKFLOW_ID),
     perceptual: true,
     maskCanvas: false,
@@ -375,7 +389,7 @@ export const builderInteractivePages: CanvasPageEntry[] = [
   },
   {
     section: 'workflows',
-    name: 'builder-edit-loop-node-form',
+    name: 'builder-edit-loop-step-form',
     path: AppRoute.WorkflowBuilder.Edit.replace(':workflowId', MOCK_LOOP_WORKFLOW_ID),
     perceptual: true,
     maskCanvas: false,
@@ -392,7 +406,7 @@ export const builderInteractivePages: CanvasPageEntry[] = [
   },
   {
     section: 'workflows',
-    name: 'builder-edit-agentic-node-form',
+    name: 'builder-edit-agentic-step-form',
     path: AppRoute.WorkflowBuilder.Edit.replace(':workflowId', MOCK_AGENTIC_WORKFLOW_ID),
     perceptual: true,
     maskCanvas: false,
@@ -406,7 +420,7 @@ export const builderInteractivePages: CanvasPageEntry[] = [
   },
   {
     section: 'workflows',
-    name: 'builder-edit-http-node-form',
+    name: 'builder-edit-http-step-form',
     path: AppRoute.WorkflowBuilder.Edit.replace(':workflowId', MOCK_HTTP_WORKFLOW_ID),
     perceptual: true,
     maskCanvas: false,
@@ -420,7 +434,7 @@ export const builderInteractivePages: CanvasPageEntry[] = [
   },
   {
     section: 'workflows',
-    name: 'builder-edit-converge-node-form',
+    name: 'builder-edit-converge-step-form',
     path: AppRoute.WorkflowBuilder.Edit.replace(':workflowId', MOCK_CONVERGE_WORKFLOW_ID),
     perceptual: true,
     maskCanvas: false,
@@ -433,7 +447,7 @@ export const builderInteractivePages: CanvasPageEntry[] = [
   },
   {
     section: 'workflows',
-    name: 'builder-edit-approval-node-form',
+    name: 'builder-edit-approval-step-form',
     path: AppRoute.WorkflowBuilder.Edit.replace(':workflowId', MOCK_APPROVAL_WORKFLOW_ID),
     perceptual: true,
     maskCanvas: false,
@@ -451,7 +465,7 @@ export const builderInteractivePages: CanvasPageEntry[] = [
     maskCanvas: false,
     path: AppRoute.WorkflowBuilder.New,
     waitFor: async (page) => {
-      await expect(page.getByRole('heading', { name: 'Select a trigger node' })).toBeVisible({
+      await expect(page.getByRole('heading', { name: 'Select a trigger step' })).toBeVisible({
         timeout: 30_000,
       })
     },
@@ -474,7 +488,7 @@ export const builderInteractivePages: CanvasPageEntry[] = [
     maskCanvas: false,
     path: AppRoute.WorkflowBuilder.New,
     waitFor: async (page) => {
-      await expect(page.getByRole('heading', { name: 'Select a trigger node' })).toBeVisible({
+      await expect(page.getByRole('heading', { name: 'Select a trigger step' })).toBeVisible({
         timeout: 30_000,
       })
     },
@@ -499,7 +513,7 @@ export const builderInteractivePages: CanvasPageEntry[] = [
   },
   {
     section: 'workflows',
-    name: 'builder-edit-verify-node-errors',
+    name: 'builder-edit-verify-step-errors',
     path: AppRoute.WorkflowBuilder.Edit.replace(':workflowId', MOCK_WORKFLOW_ID),
     perceptual: true,
     waitFor: async (page) => {
@@ -1178,7 +1192,7 @@ export const credentialEditPages: PageEntry[] = [
       const dialog = page.getByRole('dialog')
       await expect(dialog).toBeVisible()
       await dialog.getByRole('button', { name: 'Credential type', exact: true }).click()
-      await page.getByRole('option', { name: 'Ansible Automation Platform' }).click()
+      await page.getByRole('option', { name: credentialTypeOptionName('Ansible Automation Platform') }).click()
       await expect(dialog.getByText('Auth method')).toBeVisible()
     },
   },

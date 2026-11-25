@@ -2,7 +2,7 @@ import { EdgeHandleEnum } from '@syntara/contracts'
 import type { OnNodesDelete } from '@xyflow/react'
 import { useCallback, type Dispatch, type MutableRefObject, type SetStateAction } from 'react'
 
-import { FlowNodeType } from '../../../constants'
+import { FlowNodeType } from '../../../constants/nodeTypes'
 import { useWorkflowStore, useWorkflowStoreActions } from '../../../stores/useWorkflowStore'
 import { parseTriggerIndex } from '../../../utils/triggerNodeIds'
 import type { NodeType } from '../../workflows/canvas/nodes/NodeType'

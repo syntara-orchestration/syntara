@@ -157,7 +157,7 @@ test.describe('Page screenshots', { tag: '@local-only' }, () => {
         // comparison is 100% deterministic regardless of node positions, edge routing,
         // or fitView() floating-point output. The surrounding UI chrome (toolbar,
         // side panels, breadcrumbs) is still pixel-compared and catches real regressions.
-        // Skip the mask when maskCanvas === false (NodeEditorOverlay step/trigger forms):
+        // Skip the mask when maskCanvas === false (StepEditorOverlay step/trigger forms):
         // the overlay shares the canvas bounding box, so masking would erase the form.
         // Per-entry maxDiffPixelRatio overrides are passed through (non-canvas chrome
         // may legitimately need a looser threshold, e.g. animated edge status indicators).

@@ -6,7 +6,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { axe } from 'vitest-axe'
 
 import { authClient } from '../../../client'
-import { AlertProvider } from '../../../providers/alerts'
+import { AlertProvider } from '../../../providers/alerts/AlertProvider'
 import { routerTestState } from '../../../test/setup'
 import type { DocKey } from '../../../utils/docs/types'
 import { accessClient } from '../../access/accessClient'
@@ -164,7 +164,7 @@ describe('UserForm', () => {
       render(<UserForm mode="create" />, { wrapper })
 
       const submit = screen.getByRole('button', { name: 'Create user' })
-      const cancel = screen.getByRole('button', { name: 'Cancel' })
+      const cancel = screen.getByRole('link', { name: 'Cancel' })
       expect(cancel).toHaveClass('pf-m-link')
       expect(submit.compareDocumentPosition(cancel) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(
         Node.DOCUMENT_POSITION_FOLLOWING
@@ -182,19 +182,14 @@ describe('UserForm', () => {
       )
     })
 
-    it('renders a Cancel button that navigates back to users list', async () => {
+    it('renders a Cancel link back to the users list', () => {
       setupCreateMocks()
-      const user = userEvent.setup()
       render(<UserForm mode="create" />, { wrapper })
 
-      const cancelButton = screen.getByRole('button', { name: 'Cancel' })
-      expect(cancelButton).toBeInTheDocument()
-
-      await user.click(cancelButton)
-
-      expect(routerTestState.navigate).toHaveBeenCalledWith({
-        to: '/system-administration/access-management/users',
-      })
+      expect(screen.getByRole('link', { name: 'Cancel' })).toHaveAttribute(
+        'href',
+        '/system-administration/access-management/users'
+      )
     })
 
     it('calls createUser mutation with form data on submit', async () => {
@@ -360,7 +355,7 @@ describe('UserForm', () => {
       render(<UserForm mode="edit" />, { wrapper })
 
       const submit = screen.getByRole('button', { name: 'Save user' })
-      const cancel = screen.getByRole('button', { name: 'Cancel' })
+      const cancel = screen.getByRole('link', { name: 'Cancel' })
       expect(cancel).toHaveClass('pf-m-link')
       expect(submit.compareDocumentPosition(cancel) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(
         Node.DOCUMENT_POSITION_FOLLOWING

@@ -1,5 +1,6 @@
 import { beforeAll, afterEach, afterAll } from 'vitest'
-import { http, HttpResponse, graphql } from 'msw'
+import { http, HttpResponse } from 'msw/http'
+import { graphql } from 'msw/graphql'
 import { setupServer } from 'msw/node'
 
 /**
@@ -42,8 +43,7 @@ export const handlers = [
   }),
 
   // GitHub GraphQL API - merge queue (use operation() for anonymous queries)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  graphql.operation((): any => {
+  graphql.link('https://api.github.com/graphql').operation(() => {
     return HttpResponse.json({
       data: {
         repository: {
@@ -62,7 +62,7 @@ export const handlers = [
 export const server = setupServer(...handlers)
 
 beforeAll(() => {
-  server.listen({ onUnhandledRequest: 'error' })
+  server.listen({ onUnhandledFrame: 'error' })
   // Set up mock environment variables for all tests
   Object.assign(process.env, mockEnv)
 })

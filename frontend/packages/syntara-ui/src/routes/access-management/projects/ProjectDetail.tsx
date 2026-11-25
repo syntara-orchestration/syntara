@@ -12,8 +12,8 @@ import {
   TabTitleText,
 } from '@patternfly/react-core'
 import { RhUiEditIcon, RhUiTrashIcon } from '@patternfly/react-icons'
-import { useNavigate, useParams } from '@tanstack/react-router'
-import { useMemo, useState } from 'react'
+import { Outlet, useNavigate, useParams, useRouterState } from '@tanstack/react-router'
+import { createContext, use, useMemo, useState } from 'react'
 
 import { AppRoute } from '../../../app/AppRoute'
 import { breadcrumbsProjectDetail, breadcrumbsProjectDetailEarlyShell } from '../../../app/breadcrumbBuilders'
@@ -29,7 +29,6 @@ import { SynPageTitle } from '../../../components/SynPageTitle'
 import { DateCell } from '../../../components/table/DateCell'
 import { useDeleteAction } from '../../../hooks/useDeleteAction'
 import { useDialogState } from '../../../hooks/useDialogState'
-import { useUrlTab } from '../../../hooks/useUrlTab'
 import { detachPromise } from '../../../utils/detachPromise'
 import { useDocLink } from '../../../utils/docs/useDocLink'
 import { accessClient } from '../../access/accessClient'
@@ -46,6 +45,58 @@ import { ProjectWorkflowsTab } from './ProjectWorkflowsTab'
 import { useProjectDetailPermissions } from './useProjectDetailPermissions'
 
 const noop = () => {}
+
+type ProjectDetailRouteContextValue = {
+  project: ProjectRead
+  projectId: string
+  activeTab: ProjectTab
+  visibleTabs: ProjectTab[]
+  permissionsLoading: boolean
+}
+
+const ProjectDetailRouteContext = createContext<ProjectDetailRouteContextValue | null>(null)
+
+function useProjectDetailRouteContext() {
+  const context = use(ProjectDetailRouteContext)
+  if (!context) throw new Error('Project detail tab routes must be rendered inside ProjectDetail')
+  return context
+}
+
+export function ProjectDetailDetailsTabRoute() {
+  const { project } = useProjectDetailRouteContext()
+
+  return (
+    <SynListPanelView
+      tabKey="details"
+      tabLabel="Details"
+      isPending={false}
+      error={null}
+      isEmpty={false}
+      hasActiveFilters={false}
+      onRetry={noop}
+      onClearAllFilters={noop}
+      body={<ProjectDetailsTab project={project} />}
+    />
+  )
+}
+
+export function ProjectDetailWorkflowsTabRoute() {
+  const { project, projectId, activeTab, visibleTabs, permissionsLoading } = useProjectDetailRouteContext()
+  if (!canShowTabContent('workflows', visibleTabs, permissionsLoading, activeTab)) return null
+
+  return <ProjectWorkflowsTab projectId={projectId} isBuiltin={project.is_builtin} />
+}
+
+export function ProjectDetailAssignmentsTabRoute() {
+  const { projectId, activeTab, visibleTabs, permissionsLoading } = useProjectDetailRouteContext()
+  if (!canShowTabContent('role-assignments', visibleTabs, permissionsLoading, activeTab)) return null
+
+  return <ProjectRoleAssignmentsTab projectId={projectId} />
+}
+
+export function ProjectDetailUnknownTabRoute() {
+  return null
+}
 
 function ProjectDetailToolbar({
   permissions,
@@ -140,7 +191,14 @@ export function ProjectDetail() {
   const projectsDocLink = useDocLink('projects')
   const { projectId }: { projectId: string } = useParams({ strict: false })
   const basePath = AppRoute.AccessManagement.ProjectDetail.replace(':projectId', projectId ?? '')
-  const [activeTab] = useUrlTab<ProjectTab>(basePath)
+  const pathname = useRouterState({ select: (state) => state.location.pathname })
+  const { activeTab, activeTabSlug } = useMemo(() => {
+    const routePath = pathname.startsWith(basePath) ? pathname.slice(basePath.length) : ''
+    const activeTabSlug = routePath.split('/').find(Boolean) ?? 'details'
+    const activeTab: ProjectTab =
+      activeTabSlug === 'workflows' || activeTabSlug === 'role-assignments' ? activeTabSlug : 'details'
+    return { activeTab, activeTabSlug }
+  }, [pathname, basePath])
   const [editModalOpen, setEditModalOpen] = useState(false)
   const deleteDialog = useDialogState<ProjectRead>()
   const projectPermissions = useProjectPermissions({ resourceProject: projectId })
@@ -175,6 +233,16 @@ export function ProjectDetail() {
   })
 
   const projectData = projectQuery.data
+  const projectDetailRouteContextValue = useMemo<ProjectDetailRouteContextValue | null>(() => {
+    if (!projectData) return null
+    return {
+      project: projectData,
+      projectId: projectId ?? '',
+      activeTab,
+      visibleTabs,
+      permissionsLoading,
+    }
+  }, [projectData, projectId, activeTab, visibleTabs, permissionsLoading])
   const refetchProject = projectQuery.refetch
   const queryState = useQueryState(projectQuery, {
     title: 'Error loading project',
@@ -204,9 +272,9 @@ export function ProjectDetail() {
     )
   }
 
-  if (!projectData) return null
+  if (!projectData || !projectDetailRouteContextValue) return null
 
-  const projectCrumbs = breadcrumbsProjectDetail(projectData.name, basePath, activeTab)
+  const projectCrumbs = breadcrumbsProjectDetail(projectData.name, basePath, activeTabSlug)
 
   return (
     <SynPage>
@@ -239,27 +307,9 @@ export function ProjectDetail() {
               <Tab eventKey="role-assignments" title={<TabTitleText>Assignments</TabTitleText>} />
             )}
           </SynListPanelTabs>
-
-          {activeTab === 'details' && (
-            <SynListPanelView
-              tabKey="details"
-              tabLabel="Details"
-              isPending={false}
-              error={null}
-              isEmpty={false}
-              hasActiveFilters={false}
-              onRetry={noop}
-              onClearAllFilters={noop}
-              body={<ProjectDetailsTab project={projectData} />}
-            />
-          )}
-          {activeTab === 'workflows' && canShowTabContent('workflows', visibleTabs, permissionsLoading, activeTab) && (
-            <ProjectWorkflowsTab projectId={projectId ?? ''} isBuiltin={projectData.is_builtin} />
-          )}
-          {activeTab === 'role-assignments' &&
-            canShowTabContent('role-assignments', visibleTabs, permissionsLoading, activeTab) && (
-              <ProjectRoleAssignmentsTab projectId={projectId ?? ''} />
-            )}
+          <ProjectDetailRouteContext.Provider value={projectDetailRouteContextValue}>
+            <Outlet />
+          </ProjectDetailRouteContext.Provider>
         </SynListPanel>
       </SynPageBody>
 

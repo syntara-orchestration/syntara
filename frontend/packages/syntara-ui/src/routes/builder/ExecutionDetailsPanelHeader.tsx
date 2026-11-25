@@ -4,11 +4,11 @@ import {
   ContentVariants,
   Flex,
   FlexItem,
+  Nav,
+  NavItem,
+  NavList,
   Stack,
   StackItem,
-  Tab,
-  Tabs,
-  TabTitleText,
   Title,
   TitleSizes,
 } from '@patternfly/react-core'
@@ -19,10 +19,22 @@ import type React from 'react'
 import { ApprovalPendingBadge } from '../../components/labels/ApprovalPendingBadge'
 import { SynPanel } from '../../components/layout/SynPanel'
 import { ExecutionTimestamp } from '../../components/table/ExecutionTimestamp'
+import {
+  RunDetailsPanelExpandButton,
+  type RunDetailsPanelExpandControl,
+} from '../executions/RunDetailsPanelExpandButton'
 
+import panelStyles from './ExecutionDetailsPanel.module.css'
+import styles from './ExecutionDetailsPanelHeader.module.css'
 import { StatusLabel } from './ExecutionStatus'
 
 export type ViewMode = 'overview' | 'details'
+
+/** Inert hash targets so NavItem anchors are keyboard-focusable; selection stays in onSelect. */
+const VIEW_MODE_HREFS = {
+  overview: '#run-overview',
+  details: '#run-details',
+} as const satisfies Record<ViewMode, string>
 
 type ExecutionStatus = ExecutionsAPI.components['schemas']['ExecutionStatus']
 
@@ -40,6 +52,7 @@ type HeaderMetadataProps = {
   onViewModeChange: (mode: ViewMode) => void
   headerLabel?: string
   onClosePanel?: () => void
+  panelExpandControl?: RunDetailsPanelExpandControl
 }
 
 export function HeaderMetadata({
@@ -50,6 +63,7 @@ export function HeaderMetadata({
   onViewModeChange,
   headerLabel,
   onClosePanel,
+  panelExpandControl,
 }: Readonly<HeaderMetadataProps>) {
   const startDisplay = execution.started_at ?? execution.created_at
 
@@ -64,11 +78,36 @@ export function HeaderMetadata({
               {title}
             </Title>
           </FlexItem>
-          <FlexItem>
-            <Tabs activeKey={viewMode} onSelect={(_e, key) => onViewModeChange(key as ViewMode)} variant="secondary">
-              <Tab eventKey="overview" title={<TabTitleText>Overview</TabTitleText>} />
-              <Tab eventKey="details" title={<TabTitleText>Details</TabTitleText>} />
-            </Tabs>
+          <FlexItem className={styles.viewModeNav}>
+            <Nav
+              variant="horizontal-subnav"
+              aria-label="Run details views"
+              onSelect={(_event, selected) => {
+                const id = String(selected.itemId)
+                if (id === 'overview' || id === 'details') {
+                  onViewModeChange(id)
+                }
+              }}
+            >
+              <NavList>
+                <NavItem
+                  itemId="overview"
+                  isActive={viewMode === 'overview'}
+                  href={VIEW_MODE_HREFS.overview}
+                  preventDefault
+                >
+                  Overview
+                </NavItem>
+                <NavItem
+                  itemId="details"
+                  isActive={viewMode === 'details'}
+                  href={VIEW_MODE_HREFS.details}
+                  preventDefault
+                >
+                  Details
+                </NavItem>
+              </NavList>
+            </Nav>
           </FlexItem>
         </Flex>
       </FlexItem>
@@ -110,6 +149,11 @@ export function HeaderMetadata({
               </Flex>
             </FlexItem>
           )}
+          {panelExpandControl && (
+            <FlexItem>
+              <RunDetailsPanelExpandButton {...panelExpandControl} />
+            </FlexItem>
+          )}
           {onClosePanel && (
             <FlexItem>
               <Button
@@ -143,23 +187,26 @@ export function NoSelectionState() {
 export function LoadingErrorState({ queryState }: Readonly<{ queryState: React.ReactNode }>) {
   return (
     <SynPanel
-      style={{
-        height: '100%',
-        maxHeight: '100%',
-        width: '24rem',
-        flexShrink: 0,
-        display: 'flex',
-        flexDirection: 'column',
-      }}
+      hasNoPadding
+      isFullHeight
+      className={panelStyles.loadingErrorPanel}
+      data-testid="execution-details-query-fallback-panel"
     >
-      <Stack>
-        <StackItem style={{ padding: 'var(--pf-t--global--spacer--lg)' }}>
-          <Title headingLevel="h2" size={TitleSizes.lg}>
-            Current run details
+      <Stack className={panelStyles.loadingErrorStack}>
+        <StackItem className={panelStyles.loadingErrorHeader}>
+          <Title headingLevel="h2" size={TitleSizes.md} style={{ margin: 0 }}>
+            Run details
           </Title>
         </StackItem>
-        <StackItem isFilled style={{ padding: 'var(--pf-t--global--spacer--lg)' }}>
-          {queryState}
+        <StackItem isFilled className={panelStyles.loadingErrorBody}>
+          <Flex
+            justifyContent={{ default: 'justifyContentCenter' }}
+            alignItems={{ default: 'alignItemsCenter' }}
+            className={panelStyles.loadingErrorContent}
+            data-testid="execution-details-query-state-region"
+          >
+            {queryState}
+          </Flex>
         </StackItem>
       </Stack>
     </SynPanel>

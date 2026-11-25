@@ -18,7 +18,7 @@ import {
   StackItem,
   TextInput,
 } from '@patternfly/react-core'
-import { RhUiAddIcon, RhUiEditIcon, RhUiSyncIcon } from '@patternfly/react-icons'
+import { RhUiAddIcon, RhUiSyncIcon } from '@patternfly/react-icons'
 import { Tbody } from '@patternfly/react-table'
 import { useCallback, useMemo, useState } from 'react'
 import type { Control, FieldError, FieldErrors } from 'react-hook-form'
@@ -29,6 +29,7 @@ import { SynFormField } from '../../../../components/forms/SynFormField'
 import { SynPanelContentStack } from '../../../../components/layout/SynPanelContentStack'
 import { SynEmptyStateFilter } from '../../../../components/states/SynEmptyStateFilter'
 import { SynEmptyStateNoData } from '../../../../components/states/SynEmptyStateNoData'
+import { SynDetailEditLink } from '../../../../components/SynDetailEditLink'
 import { SynScrollableTableContainer } from '../../../../components/table/SynScrollableTableContainer'
 import { useClientPagination } from '../../../../hooks/useClientPagination'
 import type { FilterConfig, FilterFieldDefinition } from '../../../../types/filters'
@@ -222,7 +223,7 @@ export function MappingTable({
   const showAddButton = !isReadOnly && showAddMappingAction
 
   const table = (
-    <SynScrollableTableContainer caption="Group mappings" variant="compact">
+    <SynScrollableTableContainer caption="Group mappings">
       <GroupMappingTableHead showActionsColumn={showActionsColumn} />
       <Tbody>
         {rows.map((row) => {
@@ -330,15 +331,15 @@ type GroupMappingReadOnlyToolbarProps = {
   filters: FilterConfig[]
   onFilterChange: (next: FilterConfig[]) => void
   clearAllFilters: () => void
-  /** When undefined, the "Edit group mapping" button is hidden (read-only mode). */
-  onEditMapping?: () => void
+  /** When undefined, the "Edit group mapping" link is hidden (read-only mode). */
+  editMappingTo?: string
 }
 
 function GroupMappingReadOnlyToolbar({
   filters,
   onFilterChange,
   clearAllFilters,
-  onEditMapping,
+  editMappingTo,
 }: Readonly<GroupMappingReadOnlyToolbarProps>) {
   return (
     <StackItem>
@@ -350,11 +351,7 @@ function GroupMappingReadOnlyToolbar({
         showClearAll
         clearAllFilters={clearAllFilters}
         toolbarEnd={
-          onEditMapping ? (
-            <Button variant="primary" icon={<RhUiEditIcon />} onClick={onEditMapping}>
-              Edit group mapping
-            </Button>
-          ) : undefined
+          editMappingTo ? <SynDetailEditLink to={editMappingTo}>Edit group mapping</SynDetailEditLink> : undefined
         }
       />
     </StackItem>
@@ -364,11 +361,11 @@ function GroupMappingReadOnlyToolbar({
 export type ReadOnlyViewProps = {
   entries: GroupMappingEntry[]
   mappedGroups: MappedGroup[]
-  /** When undefined, the "Edit group mapping" button is hidden (read-only mode). */
-  onEditMapping?: () => void
+  /** When undefined, the "Edit group mapping" link is hidden (read-only mode). */
+  editMappingTo?: string
 }
 
-export function ReadOnlyView({ entries, mappedGroups, onEditMapping }: Readonly<ReadOnlyViewProps>) {
+export function ReadOnlyView({ entries, mappedGroups, editMappingTo }: Readonly<ReadOnlyViewProps>) {
   const [filters, setFilters] = useState<FilterConfig[]>([])
   const { paginate, getFooterProps, resetPage } = useClientPagination()
 
@@ -419,18 +416,14 @@ export function ReadOnlyView({ entries, mappedGroups, onEditMapping }: Readonly<
         filters={filters}
         onFilterChange={handleFilterChange}
         clearAllFilters={clearFiltersAndPage}
-        onEditMapping={onEditMapping}
+        editMappingTo={editMappingTo}
       />
       {filteredEntries.length === 0 ? (
         <StackItem isFilled style={READ_ONLY_EMPTY_FILTER_STATE_STYLE}>
           <SynEmptyStateFilter clearAllFilters={clearFiltersAndPage} />
         </StackItem>
       ) : (
-        <SynScrollableTableContainer
-          caption="Group mappings"
-          variant="compact"
-          footer={getFooterProps(filteredEntries.length)}
-        >
+        <SynScrollableTableContainer caption="Group mappings" footer={getFooterProps(filteredEntries.length)}>
           <GroupMappingTableHead showActionsColumn={false} />
           <Tbody>
             {paginatedEntries.map((entry, index) => (

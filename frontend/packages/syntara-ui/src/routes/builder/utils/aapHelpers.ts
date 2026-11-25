@@ -1,7 +1,7 @@
 import { createAAPJobTemplateActivity, createAAPWorkflowTemplateActivity } from '../../../stores/useWorkflowStore'
 import type { AAPJobTemplateConfig, AAPWorkflowTemplateConfig } from '../../../stores/workflowFactories'
-import type { AAPJobTemplateFormData } from '../node-forms/aapJobTemplateSchema'
-import type { AAPWorkflowTemplateFormData } from '../node-forms/aapWorkflowTemplateSchema'
+import type { AAPJobTemplateFormData } from '../step-forms/aapJobTemplateSchema'
+import type { AAPWorkflowTemplateFormData } from '../step-forms/aapWorkflowTemplateSchema'
 
 /**
  * Check whether any of the given values contain a ${...} expression placeholder.
@@ -9,6 +9,43 @@ import type { AAPWorkflowTemplateFormData } from '../node-forms/aapWorkflowTempl
  */
 export function hasExpressionValue(...values: (string | undefined)[]): boolean {
   return values.some((v) => v?.includes('${'))
+}
+
+type JobTemplateInputVariablesConfig = {
+  use_input_variables?: unknown
+  useInputVariables?: unknown
+  organization_name?: unknown
+  organization?: unknown
+  job_template_name?: unknown
+  jobTemplateName?: unknown
+  inventory_name?: unknown
+  inventoryName?: unknown
+  limit?: unknown
+  tags?: unknown
+  skip_tags?: unknown
+  skipTags?: unknown
+}
+
+function getConfigString(snakeCase: unknown, camelCase?: unknown): string | undefined {
+  const value = snakeCase ?? camelCase
+  return typeof value === 'string' ? value : undefined
+}
+
+/** Restore a job template's expression-mode state from its saved config or fields. */
+export function resolveJobTemplateUseInputVariables(config: JobTemplateInputVariablesConfig): boolean {
+  return (
+    config.use_input_variables === true ||
+    config.useInputVariables === true ||
+    // extra_vars accepts dragged expressions while the template stays selected by ID.
+    hasExpressionValue(
+      getConfigString(config.organization_name, config.organization),
+      getConfigString(config.job_template_name, config.jobTemplateName),
+      getConfigString(config.inventory_name, config.inventoryName),
+      getConfigString(config.limit),
+      getConfigString(config.tags),
+      getConfigString(config.skip_tags, config.skipTags)
+    )
+  )
 }
 
 /** True when the job template form is in input-variables (expression) mode. */

@@ -5,7 +5,7 @@ import { ReactFlowProvider } from '@xyflow/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { createManualTrigger, useWorkflowStore } from '../../stores/useWorkflowStore'
-import { TriggerNodeComponent } from '../workflows/canvas/nodes/TriggerNode'
+import { TriggerStepComponent } from '../workflows/canvas/nodes/TriggerNode'
 
 // Mock deleteElements to track calls
 const mockDeleteElements = vi.fn()
@@ -34,7 +34,7 @@ function renderWithProviders(ui: React.ReactElement) {
   )
 }
 
-// Create mock node props for TriggerNodeComponent
+// Create mock node props for TriggerStepComponent
 function createMockTriggerNodeProps(id: string, name: string, details: string | null = 'Manual') {
   return {
     id,
@@ -71,7 +71,7 @@ describe('Trigger Node Kebab Menu Delete', () => {
 
     const props = createMockTriggerNodeProps('trigger-0', 'Trigger', 'Manual')
 
-    renderWithProviders(<TriggerNodeComponent {...props} />)
+    renderWithProviders(<TriggerStepComponent {...props} />)
 
     // Verify the node renders with the correct title
     expect(screen.getByText('Trigger')).toBeInTheDocument()
@@ -94,7 +94,7 @@ describe('Trigger Node Kebab Menu Delete', () => {
 
     const props = createMockTriggerNodeProps('trigger-0', 'Trigger', 'Manual')
 
-    renderWithProviders(<TriggerNodeComponent {...props} />)
+    renderWithProviders(<TriggerStepComponent {...props} />)
 
     // Click the kebab menu button
     const menuButton = screen.getByRole('button', { name: /step actions menu/i })
@@ -121,7 +121,7 @@ describe('Trigger Node Kebab Menu Delete', () => {
 
     const props = createMockTriggerNodeProps('trigger-0', 'Trigger', 'Manual')
 
-    renderWithProviders(<TriggerNodeComponent {...props} />)
+    renderWithProviders(<TriggerStepComponent {...props} />)
 
     // Click the kebab menu button
     const menuButton = screen.getByRole('button', { name: /step actions menu/i })
@@ -156,7 +156,7 @@ describe('Trigger Node Kebab Menu Delete', () => {
 
     const props = createMockTriggerNodeProps('trigger-0', 'Trigger', 'Manual')
 
-    renderWithProviders(<TriggerNodeComponent {...props} />)
+    renderWithProviders(<TriggerStepComponent {...props} />)
 
     // Click the kebab menu button
     const menuButton = screen.getByRole('button', { name: /step actions menu/i })
@@ -198,7 +198,7 @@ describe('Trigger Node Kebab Menu Delete', () => {
         <ReactFlowProvider>
           {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions */}
           <div onClick={() => (parentClicked = true)}>
-            <TriggerNodeComponent {...props} />
+            <TriggerStepComponent {...props} />
           </div>
         </ReactFlowProvider>
       </QueryClientProvider>

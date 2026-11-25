@@ -27,7 +27,14 @@ import {
   type SeededUser,
 } from './seeds/iam'
 import { createSeedBucket } from './seeds/seed-bucket'
-import { ensureProject, getAuthToken } from './utils/api'
+import {
+  createGroupViaApi,
+  createProjectViaApi,
+  deleteGroupViaApi,
+  deleteProjectViaApi,
+  ensureProject,
+  getAuthToken,
+} from './utils/api'
 
 const ACCESS_URL = '/system-administration/access-management'
 
@@ -74,6 +81,11 @@ test.describe('Access Management — Tab Navigation', () => {
   test.beforeEach(async ({ app }) => {
     await app.goto(toAppUrl(ACCESS_URL))
     await expect(app.getByRole('heading', { level: 1, name: 'Access Management' })).toBeVisible()
+  })
+
+  test('the bare route opens the default Users tab', async ({ app }) => {
+    await expect(app).toHaveURL(toAppUrl(`${ACCESS_URL}/users`))
+    await expect(app.getByRole('tab', { name: /^Users$/i })).toHaveAttribute('aria-selected', 'true')
   })
 
   test('clicking tabs updates the URL', async ({ app }) => {
@@ -309,23 +321,120 @@ test.describe('Access Management — User Detail Tabs', () => {
 
     // Users tab filter placeholder is "Filter by username", not "Filter by name". Go by seeded ID.
     const seededUser = seededUsers.latest()
-    await app.goto(toAppUrl(`${ACCESS_URL}/users/${seededUser.id}`))
-    await expect(app).toHaveURL(new RegExp(`${ACCESS_URL}/users/${seededUser.id}`))
+    const userDetailUrl = `${ACCESS_URL}/users/${seededUser.id}`
+    await app.goto(toAppUrl(userDetailUrl))
+    await expect(app).toHaveURL(new RegExp(`${userDetailUrl}$`))
+    const detailsTab = app.getByRole('tab', { name: /Details/i })
+    await expect(detailsTab).toHaveAttribute('aria-selected', 'true')
 
-    // Click Groups sub-tab if available
+    // Click Groups sub-tab and verify its selected state and nested URL.
     const groupsTab = app.getByRole('tab', { name: /Groups/i })
-    const hasGroupsTab = (await groupsTab.count()) > 0
-    if (hasGroupsTab) {
-      await groupsTab.click()
-      await expect(app).toHaveURL(/\/groups$/)
-    }
+    await expect(groupsTab).toBeVisible()
+    await groupsTab.click()
+    await expect(app).toHaveURL(new RegExp(`${userDetailUrl}/groups$`))
+    await expect(groupsTab).toHaveAttribute('aria-selected', 'true')
+    const groupsPanel = app.getByRole('tabpanel', { name: 'Groups' })
+    await expect(groupsPanel).toBeVisible()
 
-    // Click Roles sub-tab if available
-    const rolesTab = app.getByRole('tab', { name: /Roles/i })
-    const hasRolesTab = (await rolesTab.count()) > 0
-    if (hasRolesTab) {
-      await rolesTab.click()
-      await expect(app).toHaveURL(/\/roles$/)
+    // Click Assignments sub-tab. Its visible label differs from its URL segment.
+    const assignmentsTab = app.getByRole('tab', { name: /Assignments/i })
+    await expect(assignmentsTab).toBeVisible()
+    await assignmentsTab.click()
+    await expect(app).toHaveURL(new RegExp(`${userDetailUrl}/roles$`))
+    await expect(assignmentsTab).toHaveAttribute('aria-selected', 'true')
+    const assignmentsPanel = app.getByRole('tabpanel', { name: 'Assignments' })
+    await expect(assignmentsPanel).toBeVisible()
+    await expect(app.getByRole('tabpanel')).toHaveCount(1)
+    expect(await assignmentsTab.getAttribute('aria-controls')).toBe(await assignmentsPanel.getAttribute('id'))
+
+    // Browser history restores the previous nested tab and its selection.
+    await app.goBack()
+    await expect(app).toHaveURL(new RegExp(`${userDetailUrl}/groups$`))
+    await expect(groupsTab).toHaveAttribute('aria-selected', 'true')
+
+    // A direct URL selects the matching child route.
+    await app.goto(toAppUrl(`${userDetailUrl}/roles`))
+    await expect(app).toHaveURL(new RegExp(`${userDetailUrl}/roles$`))
+    await expect(assignmentsTab).toHaveAttribute('aria-selected', 'true')
+
+    // Unknown tab segments stay within the detail layout and route to Details.
+    await app.goto(toAppUrl(`${userDetailUrl}/not-a-tab`))
+    await expect(app).toHaveURL(new RegExp(`${userDetailUrl}/details$`))
+    await expect(detailsTab).toHaveAttribute('aria-selected', 'true')
+    await app.goBack()
+    await expect(app).toHaveURL(new RegExp(`${userDetailUrl}/roles$`))
+    await expect(assignmentsTab).toHaveAttribute('aria-selected', 'true')
+  })
+})
+
+test.describe('Access Management — Nested detail tab routes', () => {
+  test('group detail deep links and browser history select the matching tab', async ({ app }) => {
+    const groupName = buildUniqueName('e2e-nested-group')
+    const groupId = await createGroupViaApi(app, { name: groupName })
+    if (!groupId) throw new Error('Failed to create a group for nested-route coverage')
+
+    const basePath = `${ACCESS_URL}/groups/${groupId}`
+    const membersPath = `${basePath}/members`
+    const assignmentsPath = `${basePath}/roles`
+
+    try {
+      await app.goto(toAppUrl(basePath))
+      await expect(app.getByRole('heading', { level: 1, name: groupName })).toBeVisible()
+      const detailsTab = app.getByRole('tab', { name: /^Details$/i })
+      await expect(detailsTab).toHaveAttribute('aria-selected', 'true')
+
+      await app.goto(toAppUrl(membersPath))
+      const membersTab = app.getByRole('tab', { name: /^Members\b/i })
+      await expect(membersTab).toHaveAttribute('aria-selected', 'true')
+
+      const assignmentsTab = app.getByRole('tab', { name: /^Assignments\b/i })
+      await assignmentsTab.click()
+      await expect(app).toHaveURL(toAppUrl(assignmentsPath))
+      await expect(assignmentsTab).toHaveAttribute('aria-selected', 'true')
+
+      await app.goBack()
+      await expect(app).toHaveURL(toAppUrl(membersPath))
+      await expect(membersTab).toHaveAttribute('aria-selected', 'true')
+
+      await app.goForward()
+      await expect(app).toHaveURL(toAppUrl(assignmentsPath))
+      await expect(assignmentsTab).toHaveAttribute('aria-selected', 'true')
+    } finally {
+      await deleteGroupViaApi(app, groupId)
+    }
+  })
+
+  test('project detail deep links and browser history select the matching tab', async ({ app }) => {
+    const projectName = buildUniqueName('e2e-nested-project')
+    const project = await createProjectViaApi(app, projectName)
+    const basePath = `${ACCESS_URL}/projects/${project.id}`
+    const workflowsPath = `${basePath}/workflows`
+    const assignmentsPath = `${basePath}/role-assignments`
+
+    try {
+      await app.goto(toAppUrl(basePath))
+      await expect(app.getByRole('heading', { level: 1, name: projectName })).toBeVisible()
+      const detailsTab = app.getByRole('tab', { name: /^Details$/i })
+      await expect(detailsTab).toHaveAttribute('aria-selected', 'true')
+
+      await app.goto(toAppUrl(workflowsPath))
+      const workflowsTab = app.getByRole('tab', { name: /^Workflows$/i })
+      await expect(workflowsTab).toHaveAttribute('aria-selected', 'true')
+
+      const assignmentsTab = app.getByRole('tab', { name: /^Assignments$/i })
+      await assignmentsTab.click()
+      await expect(app).toHaveURL(toAppUrl(assignmentsPath))
+      await expect(assignmentsTab).toHaveAttribute('aria-selected', 'true')
+
+      await app.goBack()
+      await expect(app).toHaveURL(toAppUrl(workflowsPath))
+      await expect(workflowsTab).toHaveAttribute('aria-selected', 'true')
+
+      await app.goForward()
+      await expect(app).toHaveURL(toAppUrl(assignmentsPath))
+      await expect(assignmentsTab).toHaveAttribute('aria-selected', 'true')
+    } finally {
+      await deleteProjectViaApi(app, project.id)
     }
   })
 })
