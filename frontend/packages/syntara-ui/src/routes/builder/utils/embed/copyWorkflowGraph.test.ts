@@ -87,7 +87,7 @@ describe('copyWorkflowGraph', () => {
     ])
   })
 
-  it('flags copied sub_workflow nodes so the caller can block embed (P1)', () => {
+  it('flags copied sub_workflow nodes so the caller can surface them (P1)', () => {
     const def: SourceDefinition = {
       triggers: [],
       nodes: [
@@ -97,7 +97,78 @@ describe('copyWorkflowGraph', () => {
       edges: [],
     }
     const r = copyWorkflowGraph(def)
-    expect(r.subWorkflowNodes).toEqual([{ nodeId: 'activity_2' }])
+    expect(r.subWorkflowNodes).toEqual([{ nodeId: 'activity_2', workflowId: 'wf-1' }])
+  })
+
+  it('preserves a copied sub_workflow node: target ids intact, input expressions remapped', () => {
+    const def: SourceDefinition = {
+      triggers: [],
+      nodes: [
+        { id: 'fetch', type: 'script', parameters: { cmd: 'x' } },
+        {
+          id: 'child_ref',
+          type: 'sub_workflow',
+          parameters: {
+            workflow_id: 'wf-child',
+            trigger_node_id: 'subworkflow_trigger_1',
+            input_mapping: { host: '${fetch.outputs.host}' },
+          },
+        },
+      ],
+      edges: [{ from: 'fetch', to: 'child_ref' }],
+    }
+    const r = copyWorkflowGraph(def)
+    const ref = r.activities.find((a) => a.id === 'activity_2') as {
+      type?: string
+      parameters?: { workflow_id?: string; trigger_node_id?: string; input_mapping?: Record<string, string> }
+    }
+    // reference node is copied as an ordinary activity with a fresh id
+    expect(ref.type).toBe('sub_workflow')
+    // target child + selected trigger are preserved verbatim (never remapped)
+    expect(ref.parameters?.workflow_id).toBe('wf-child')
+    expect(ref.parameters?.trigger_node_id).toBe('subworkflow_trigger_1')
+    // internal input expression is remapped to the copied node id
+    expect(ref.parameters?.input_mapping?.host).toBe('${activity_1.outputs.host}')
+    // still surfaced (informational) and introduces no credential/integration block
+    expect(r.subWorkflowNodes).toEqual([{ nodeId: 'activity_2', workflowId: 'wf-child' }])
+    expect(r.resourceReferenceNodes).toEqual([])
+  })
+
+  it('preserves multiple sub_workflow references with their distinct targets', () => {
+    const def: SourceDefinition = {
+      triggers: [],
+      nodes: [
+        { id: 'r1', type: 'sub_workflow', parameters: { workflow_id: 'wf-1', trigger_node_id: 't1' } },
+        { id: 'r2', type: 'sub_workflow', parameters: { workflow_id: 'wf-2', trigger_node_id: 't2' } },
+      ],
+      edges: [],
+    }
+    const r = copyWorkflowGraph(def)
+    expect(r.subWorkflowNodes).toEqual([
+      { nodeId: 'activity_1', workflowId: 'wf-1' },
+      { nodeId: 'activity_2', workflowId: 'wf-2' },
+    ])
+    expect(r.activities.map((a) => (a as { parameters?: { workflow_id?: string } }).parameters?.workflow_id)).toEqual([
+      'wf-1',
+      'wf-2',
+    ])
+  })
+
+  it('remaps expressions inside condition and for_each control nodes to copied ids', () => {
+    const def: SourceDefinition = {
+      triggers: [],
+      nodes: [
+        { id: 'src', type: 'script', parameters: {} },
+        { id: 'cond', type: 'condition', parameters: { condition: '${src.outputs.ok} == true' } },
+        { id: 'loop', type: 'loop', parameters: { type: 'for_each', items: '${src.outputs.items}' } },
+      ],
+      edges: [],
+    }
+    const r = copyWorkflowGraph(def)
+    const cond = r.activities.find((a) => a.id === 'activity_2') as { parameters?: { condition?: string } }
+    const loop = r.activities.find((a) => a.id === 'activity_3') as { parameters?: { items?: string } }
+    expect(cond.parameters?.condition).toBe('${activity_1.outputs.ok} == true')
+    expect(loop.parameters?.items).toBe('${activity_1.outputs.items}')
   })
 
   it('reports no sub_workflow nodes for an ordinary source', () => {

@@ -76,6 +76,7 @@ from syntara.workflows.services.webhook_trigger_service import WEBHOOK_TRIGGER_T
 from syntara.workflows.services.workflow_diff import generate_change_summary
 from syntara.workflows.validators import (
     get_system_continue_on_failure,
+    validate_self_referencing_subworkflows,
     validate_subworkflow_project_references,
     validate_workflow_references,
     workflow_validator,
@@ -1516,6 +1517,10 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
         subworkflow_findings = await validate_subworkflow_project_references(
             self.session, definition, workflow.project_id
         )
+        subworkflow_findings = [
+            *validate_self_referencing_subworkflows(definition, workflow.id),
+            *subworkflow_findings,
+        ]
         validation_result = ValidationResult.from_findings([*definition_findings, *subworkflow_findings])
         if _has_blocking_publish_findings(definition_findings, subworkflow_findings):
             raise WorkflowPublishValidationError(validation_result)

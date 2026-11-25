@@ -7,7 +7,10 @@ from syntara.settings.cache.settings_cache import get_runtime_settings
 
 from .workflow_definition import WorkflowValidator, collect_scheduled_trigger_config_findings
 from .workflow_integrations import validate_workflow_references
-from .workflow_subworkflows import validate_subworkflow_project_references
+from .workflow_subworkflows import (
+    validate_self_referencing_subworkflows,
+    validate_subworkflow_project_references,
+)
 
 # Convenience singleton instance for easy usage
 workflow_validator = WorkflowValidator()
@@ -23,6 +26,7 @@ __all__ = [
     "WorkflowValidator",
     "collect_scheduled_trigger_config_findings",
     "get_system_continue_on_failure",
+    "validate_self_referencing_subworkflows",
     "validate_subworkflow_project_references",
     "validate_workflow_references",
     "workflow_validator",

@@ -92,7 +92,7 @@ describe('EmbedWorkflowDialog', () => {
     render(<EmbedWorkflowDialog isOpen onClose={vi.fn()} projectId="project-1" currentWorkflowId="self" />)
 
     expect(screen.getByRole('button', { name: /select a published workflow/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Embed workflow' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Embed workflow' })).toHaveAttribute('aria-disabled', 'true')
   })
 
   it('surfaces an error when the project workflow list fails to load', () => {
@@ -116,7 +116,7 @@ describe('EmbedWorkflowDialog', () => {
     render(<EmbedWorkflowDialog isOpen onClose={onClose} projectId="project-1" currentWorkflowId="self" />)
 
     await selectAlpha(user)
-    expect(await screen.findByText(/connection\(s\) will be copied/i)).toBeInTheDocument()
+    expect(await screen.findByText(/will be copied/i)).toBeInTheDocument()
 
     const embed = screen.getByRole('button', { name: 'Embed workflow' })
     expect(embed).toBeEnabled()
@@ -127,21 +127,26 @@ describe('EmbedWorkflowDialog', () => {
     expect(onClose).toHaveBeenCalled()
   })
 
-  it('blocks embed and warns when the source contains a sub-workflow step', async () => {
+  it('allows embed and shows an info notice when the source contains a sub-workflow step', async () => {
     const user = userEvent.setup()
+    const onClose = vi.fn()
     withWorkflows()
     resolveDefinition({
       nodes: [{ id: 'n1', type: 'sub_workflow', parameters: { workflow_id: 'x', trigger_node_id: 'y' } }],
       edges: [],
       triggers: [],
     })
-    render(<EmbedWorkflowDialog isOpen onClose={vi.fn()} projectId="project-1" currentWorkflowId="self" />)
+    render(<EmbedWorkflowDialog isOpen onClose={onClose} projectId="project-1" currentWorkflowId="self" />)
 
     await selectAlpha(user)
-    expect(await screen.findByText(/contains a sub-workflow step/i)).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Embed workflow' })).toBeDisabled()
-    await user.click(screen.getByRole('button', { name: 'Embed workflow' }))
-    expect(mocks.insertEmbeddedGraph).not.toHaveBeenCalled()
+    // informational, not a block: the copied reference still calls the same child workflow
+    expect(await screen.findByText(/call the same child workflows/i)).toBeInTheDocument()
+    const embed = screen.getByRole('button', { name: 'Embed workflow' })
+    expect(embed).toBeEnabled()
+    await user.click(embed)
+    expect(mocks.insertEmbeddedGraph).toHaveBeenCalledTimes(1)
+    expect(mocks.showSuccess).toHaveBeenCalled()
+    expect(onClose).toHaveBeenCalled()
   })
 
   it('blocks embed and warns when the source references credentials/integrations', async () => {
@@ -156,7 +161,22 @@ describe('EmbedWorkflowDialog', () => {
 
     await selectAlpha(user)
     expect(await screen.findByText(/references credentials or integrations/i)).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Embed workflow' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Embed workflow' })).toHaveAttribute('aria-disabled', 'true')
+  })
+
+  it('blocks embed and warns when a copied step references the workflow being edited', async () => {
+    const user = userEvent.setup()
+    withWorkflows()
+    resolveDefinition({
+      nodes: [{ id: 'n1', type: 'sub_workflow', parameters: { workflow_id: 'self', trigger_node_id: 'y' } }],
+      edges: [],
+      triggers: [],
+    })
+    render(<EmbedWorkflowDialog isOpen onClose={vi.fn()} projectId="project-1" currentWorkflowId="self" />)
+
+    await selectAlpha(user)
+    expect(await screen.findByText(/references the workflow you're editing/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Embed workflow' })).toHaveAttribute('aria-disabled', 'true')
   })
 
   it('has no accessibility violations', async () => {
@@ -192,7 +212,7 @@ describe('EmbedWorkflowDialog', () => {
 
     await user.click(screen.getByRole('button', { name: 'Alpha' })) // request 1 (pending)
     await user.click(screen.getByRole('button', { name: 'Beta' })) // request 2 (resolves, supersedes)
-    expect(await screen.findByText(/connection\(s\) will be copied/i)).toBeInTheDocument()
+    expect(await screen.findByText(/will be copied/i)).toBeInTheDocument()
 
     // Alpha's late response carries a sub-workflow node; the guard must ignore it.
     await act(async () => {
@@ -209,7 +229,7 @@ describe('EmbedWorkflowDialog', () => {
       await Promise.resolve()
     })
 
-    expect(screen.queryByText(/contains a sub-workflow step/i)).not.toBeInTheDocument()
-    expect(screen.getByText(/connection\(s\) will be copied/i)).toBeInTheDocument()
+    expect(screen.queryByText(/call the same child workflows/i)).not.toBeInTheDocument()
+    expect(screen.getByText(/will be copied/i)).toBeInTheDocument()
   })
 })

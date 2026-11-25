@@ -5,7 +5,12 @@ import { useCallback, useState } from 'react'
 import { workflowClient } from '../../../client'
 import { useAlerts } from '../../../providers/alerts'
 import { useWorkflowStore } from '../../../stores/useWorkflowStore'
-import { extractVersionConflictInfo, getErrorMessage, isWorkflowVersionConflictError } from '../../../utils/apiErrors'
+import {
+  extractVersionConflictInfo,
+  getErrorMessage,
+  getPublishValidationMessage,
+  isWorkflowVersionConflictError,
+} from '../../../utils/apiErrors'
 import { detachPromise } from '../../../utils/detachPromise'
 import { buildWorkflowDefinition } from '../utils/workflowDefinitionBuilder'
 import type { ConflictInfo } from '../VersionConflictDialog'
@@ -123,7 +128,10 @@ export function usePublishWorkflow({
               onConflict(extractVersionConflictInfo(error))
               return
             }
-            showError({ title: 'Failed to publish workflow', description: getErrorMessage(error) })
+            showError({
+              title: 'Failed to publish workflow',
+              description: getPublishValidationMessage(error) ?? getErrorMessage(error),
+            })
           },
           onSettled: pending.onSettled,
         }

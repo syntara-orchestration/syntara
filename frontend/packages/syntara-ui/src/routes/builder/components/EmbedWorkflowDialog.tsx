@@ -14,6 +14,7 @@ import {
   Alert,
   Button,
   Content,
+  Form,
   FormGroup,
   List,
   ListItem,
@@ -28,6 +29,7 @@ import {
   Spinner,
   Stack,
   StackItem,
+  Tooltip,
 } from '@patternfly/react-core'
 import { useRef, useState } from 'react'
 
@@ -45,6 +47,102 @@ type EmbedWorkflowDialogProps = Readonly<{
   projectId?: string
   currentWorkflowId?: string
 }>
+
+/** The reason Embed is disabled, for the footer button's tooltip (undefined when it is enabled). */
+function getEmbedDisabledReason(state: {
+  hasPreview: boolean
+  isFetching: boolean
+  hasResourceRefs: boolean
+  hasSelfReference: boolean
+}): string | undefined {
+  if (!state.hasPreview) return 'Select a published workflow to embed.'
+  if (state.isFetching) return 'Preparing the copy…'
+  if (state.hasResourceRefs)
+    return 'Resolve the credential or integration references in the source workflow before embedding.'
+  if (state.hasSelfReference) return 'This workflow references the workflow you are editing, which would create a loop.'
+  return undefined
+}
+
+/**
+ * Preview body for the selected source: the copy summary plus any blocking (credential /
+ * integration, self-reference) or advisory (dangling expression) notices. Kept as its own
+ * component so the dialog stays within the project's function size/complexity limits.
+ */
+function EmbedPreviewBody({
+  preview,
+  selfReferenceCount,
+}: {
+  preview: CopyWorkflowGraphResult
+  selfReferenceCount: number
+}) {
+  const stepCount = preview.activities.length
+  const connectionCount = preview.edges.length
+  const resourceRefs = preview.resourceReferenceNodes
+  const hasSubWorkflowNodes = preview.subWorkflowNodes.length > 0
+
+  return (
+    <Stack hasGutter>
+      <StackItem>
+        <Content component="p">
+          <strong>{stepCount}</strong> {stepCount === 1 ? 'step' : 'steps'} and <strong>{connectionCount}</strong>{' '}
+          {connectionCount === 1 ? 'connection' : 'connections'} will be copied. Trigger steps from the source are not
+          included.
+        </Content>
+        {hasSubWorkflowNodes && (
+          <Content component="small">Copied sub-workflow steps still call the same child workflows.</Content>
+        )}
+      </StackItem>
+      {resourceRefs.length > 0 && (
+        <StackItem>
+          <Alert
+            variant="danger"
+            isInline
+            component="h2"
+            title="Embedding is blocked: this workflow references credentials or integrations."
+          >
+            <Content component="p">
+              {resourceRefs.length} copied step(s) reference project-scoped resources. Permission to use them cannot be
+              verified at copy time, so embedding is held pending the authorization review. Remove these references from
+              the source workflow, or wait for the decision, before embedding.
+            </Content>
+            <List>
+              {resourceRefs.map((n) => (
+                <ListItem key={n.nodeId}>{n.fields.join(', ')}</ListItem>
+              ))}
+            </List>
+          </Alert>
+        </StackItem>
+      )}
+      {selfReferenceCount > 0 && (
+        <StackItem>
+          <Alert
+            variant="danger"
+            isInline
+            component="h2"
+            title="Embedding is blocked: this workflow references the workflow you're editing."
+          >
+            <Content component="p">
+              {selfReferenceCount} copied step(s) reference the current workflow. Embedding them would make the workflow
+              call itself, creating a loop. Remove the self-reference from the source workflow before embedding.
+            </Content>
+          </Alert>
+        </StackItem>
+      )}
+      {preview.danglingExpressionRefs.length > 0 && (
+        <StackItem>
+          <Alert
+            variant="warning"
+            isInline
+            component="h2"
+            title="Some expressions reference steps that are not copied."
+          >
+            Review the copied steps after embedding; references to excluded trigger steps will need updating.
+          </Alert>
+        </StackItem>
+      )}
+    </Stack>
+  )
+}
 
 export function EmbedWorkflowDialog({ isOpen, onClose, projectId, currentWorkflowId }: EmbedWorkflowDialogProps) {
   const { workflows, isLoading, isError } = useEmbeddableWorkflows(projectId, currentWorkflowId)
@@ -107,8 +205,18 @@ export function EmbedWorkflowDialog({ isOpen, onClose, projectId, currentWorkflo
   }
 
   const hasResourceRefs = (preview?.resourceReferenceNodes.length ?? 0) > 0
-  const hasSubWorkflowNodes = (preview?.subWorkflowNodes.length ?? 0) > 0
-  const canEmbed = !!preview && !isFetching && !hasResourceRefs && !hasSubWorkflowNodes
+  // A copied sub_workflow step that points back at the workflow being edited would make it
+  // call itself (a loop), so Embed is blocked when the source references the current workflow.
+  const selfReferenceCount =
+    preview && currentWorkflowId ? preview.subWorkflowNodes.filter((n) => n.workflowId === currentWorkflowId).length : 0
+  const hasSelfReference = selfReferenceCount > 0
+  const canEmbed = !!preview && !isFetching && !hasResourceRefs && !hasSelfReference
+  const embedDisabledReason = getEmbedDisabledReason({
+    hasPreview: !!preview,
+    isFetching,
+    hasResourceRefs,
+    hasSelfReference,
+  })
 
   const handleEmbed = () => {
     if (!preview || !canEmbed) return
@@ -170,9 +278,11 @@ export function EmbedWorkflowDialog({ isOpen, onClose, projectId, currentWorkflo
             </Content>
           </StackItem>
           <StackItem>
-            <FormGroup label="Published workflow" isRequired fieldId="embed-workflow-select">
-              {renderPicker()}
-            </FormGroup>
+            <Form>
+              <FormGroup label="Published workflow" isRequired fieldId="embed-workflow-select">
+                {renderPicker()}
+              </FormGroup>
+            </Form>
           </StackItem>
 
           {isFetching && (
@@ -183,65 +293,23 @@ export function EmbedWorkflowDialog({ isOpen, onClose, projectId, currentWorkflo
 
           {preview && !isFetching && (
             <StackItem>
-              <Stack hasGutter>
-                <StackItem>
-                  <Content component="p">
-                    <strong>{preview.activities.length}</strong> step(s) and <strong>{preview.edges.length}</strong>{' '}
-                    connection(s) will be copied. Trigger steps from the source are not included.
-                  </Content>
-                </StackItem>
-                {hasSubWorkflowNodes && (
-                  <StackItem>
-                    <Alert
-                      variant="danger"
-                      isInline
-                      title="Embedding is blocked: this workflow contains a sub-workflow step."
-                    >
-                      <Content component="p">
-                        {preview.subWorkflowNodes.length} copied step(s) reference another workflow. Copying them would
-                        re-create a live child execution and a Used-By dependency, which Embed must not do. Remove the
-                        sub-workflow step(s) from the source workflow before embedding.
-                      </Content>
-                    </Alert>
-                  </StackItem>
-                )}
-                {hasResourceRefs && (
-                  <StackItem>
-                    <Alert
-                      variant="danger"
-                      isInline
-                      title="Embedding is blocked: this workflow references credentials or integrations."
-                    >
-                      <Content component="p">
-                        {preview.resourceReferenceNodes.length} copied step(s) reference project-scoped resources.
-                        Permission to use them cannot be verified at copy time, so embedding is held pending the
-                        authorization review. Remove these references from the source workflow, or wait for the
-                        decision, before embedding.
-                      </Content>
-                      <List>
-                        {preview.resourceReferenceNodes.map((n) => (
-                          <ListItem key={n.nodeId}>{n.fields.join(', ')}</ListItem>
-                        ))}
-                      </List>
-                    </Alert>
-                  </StackItem>
-                )}
-                {preview.danglingExpressionRefs.length > 0 && (
-                  <StackItem>
-                    <Alert variant="warning" isInline title="Some expressions reference steps that are not copied.">
-                      Review the copied steps after embedding; references to excluded trigger steps will need updating.
-                    </Alert>
-                  </StackItem>
-                )}
-              </Stack>
+              <EmbedPreviewBody preview={preview} selfReferenceCount={selfReferenceCount} />
             </StackItem>
           )}
         </Stack>
       </ModalBody>
       <ModalFooter>
-        <Button key="embed" variant="primary" onClick={handleEmbed} isDisabled={!canEmbed}>
-          Embed workflow
-        </Button>
+        {canEmbed ? (
+          <Button key="embed" variant="primary" onClick={handleEmbed}>
+            Embed workflow
+          </Button>
+        ) : (
+          <Tooltip content={embedDisabledReason ?? 'Embedding is not available.'}>
+            <Button key="embed" variant="primary" onClick={handleEmbed} isAriaDisabled>
+              Embed workflow
+            </Button>
+          </Tooltip>
+        )}
         <Button key="cancel" variant="link" onClick={handleClose}>
           Cancel
         </Button>
