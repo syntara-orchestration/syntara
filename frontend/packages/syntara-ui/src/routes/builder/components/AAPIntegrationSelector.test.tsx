@@ -457,8 +457,6 @@ describe('AAPIntegrationSelector', () => {
     expect(screen.queryByText('AAP Staging')).not.toBeInTheDocument()
   })
 
-  // AAP-91717: Adding an AAP job template node before choosing a workflow project
-  // must not surface integrations that are scoped to a specific (unselected) project.
   it('excludes project-scoped integrations when no project is selected', async () => {
     const projectOnlyIntegration = {
       id: 'int-aap-3',
