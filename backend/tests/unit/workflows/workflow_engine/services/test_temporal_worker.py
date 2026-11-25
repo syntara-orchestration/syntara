@@ -68,7 +68,7 @@ class TestTemporalWorkerServiceStart:
 
     @pytest.mark.asyncio
     async def test_start_success(self) -> None:
-        """Test successfully starting the worker service."""
+        """Initialize telemetry before recovery, then successfully start the worker."""
         service = TemporalWorkerService(
             temporal_address="test-address", namespace="test-namespace", task_queue="test-queue"
         )
@@ -82,6 +82,16 @@ class TestTemporalWorkerServiceStart:
             await asyncio.sleep(0)
 
         mock_worker.run = mock_run
+        startup_steps: list[str] = []
+        mock_sync_service = MagicMock()
+
+        async def mock_initialize_telemetry() -> None:
+            startup_steps.append("telemetry")
+
+        async def mock_reconcile_stale_executions() -> None:
+            startup_steps.append("reconcile")
+
+        mock_sync_service.reconcile_stale_executions = AsyncMock(side_effect=mock_reconcile_stale_executions)
 
         # Track if create_task was called
         create_task_called = False
@@ -99,6 +109,15 @@ class TestTemporalWorkerServiceStart:
                 new=AsyncMock(return_value=mock_client),
             ),
             patch("syntara.workflows.workflow_engine.services.temporal_worker.Worker", return_value=mock_worker),
+            patch(
+                "syntara.workflows.workflow_engine.services.temporal_worker.ActivitySyncService",
+                return_value=mock_sync_service,
+            ),
+            patch(
+                "syntara.workflows.workflow_engine.services.temporal_worker.initialize_telemetry",
+                new=AsyncMock(side_effect=mock_initialize_telemetry),
+            ),
+            patch("syntara.workflows.workflow_engine.services.temporal_worker.set_activity_sync_service"),
             patch("asyncio.create_task", side_effect=mock_create_task),
         ):
             await service.start()
@@ -111,6 +130,7 @@ class TestTemporalWorkerServiceStart:
 
             # Verify worker task was created
             assert create_task_called
+            assert startup_steps == ["telemetry", "reconcile"]
 
     @pytest.mark.asyncio
     async def test_start_with_custom_config(self) -> None:
