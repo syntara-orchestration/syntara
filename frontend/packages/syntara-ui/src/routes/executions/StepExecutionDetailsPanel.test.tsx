@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { act, render, screen } from '@testing-library/react'
+import { act, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ReactNode } from 'react'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
@@ -73,6 +73,82 @@ describe('StepExecutionDetailsPanel', () => {
     render(<StepExecutionDetailsPanel {...defaultProps} />, { wrapper })
 
     expect(screen.getByText('Successful')).toBeInTheDocument()
+  })
+
+  it('does not show retry markers beside the selected step status without a retry baseline', () => {
+    render(
+      <StepExecutionDetailsPanel
+        {...defaultProps}
+        stepState={{ ...defaultProps.stepState, status: 'failed' }}
+        stepType="script"
+      />,
+      { wrapper }
+    )
+
+    expect(screen.getByText('Failed')).toBeInTheDocument()
+    expect(screen.queryByText('Retained failure')).not.toBeInTheDocument()
+  })
+
+  it('shows retry markers in the selected step details header for a retry execution', () => {
+    render(
+      <StepExecutionDetailsPanel
+        {...defaultProps}
+        stepType="script"
+        replayBaselineAt="2024-01-01T12:00:00Z"
+        stepState={{
+          ...defaultProps.stepState,
+          startedAt: '2024-01-01T10:00:00Z',
+          completedAt: '2024-01-01T10:01:30Z',
+        }}
+      />,
+      { wrapper }
+    )
+
+    const header = screen.getByRole('group', { name: 'Step details header' })
+    expect(within(header).getByText('Successful')).toBeInTheDocument()
+    expect(within(header).getByText('Reused output')).toBeInTheDocument()
+  })
+
+  it('shows reused trigger input in the selected step details header', () => {
+    render(
+      <StepExecutionDetailsPanel
+        {...defaultProps}
+        stepType="manual_trigger"
+        replayBaselineAt="2024-01-01T12:00:00Z"
+        stepState={{
+          ...defaultProps.stepState,
+          startedAt: '2024-01-01T10:00:00Z',
+          completedAt: '2024-01-01T10:00:01Z',
+        }}
+      />,
+      { wrapper }
+    )
+
+    const header = screen.getByRole('group', { name: 'Step details header' })
+    expect(within(header).getByText('Reused trigger input')).toBeInTheDocument()
+    expect(within(header).queryByText('Reused output')).not.toBeInTheDocument()
+  })
+
+  it('shows a retained-failure marker in the selected step details header', () => {
+    render(
+      <StepExecutionDetailsPanel
+        {...defaultProps}
+        stepType="script"
+        replayBaselineAt="2024-01-01T12:00:00Z"
+        stepState={{
+          ...defaultProps.stepState,
+          status: 'failed',
+          startedAt: '2024-01-01T10:00:00Z',
+          completedAt: '2024-01-01T10:01:30Z',
+        }}
+      />,
+      { wrapper }
+    )
+
+    const header = screen.getByRole('group', { name: 'Step details header' })
+    expect(within(header).getByText('Failed')).toBeInTheDocument()
+    expect(within(header).getByText('Retained failure')).toBeInTheDocument()
+    expect(within(header).queryByText('Reused output')).not.toBeInTheDocument()
   })
 
   it('renders Input and Output panes side by side', () => {
@@ -357,15 +433,29 @@ describe('StepExecutionDetailsPanel', () => {
     expect(screen.getByText('Failed')).toBeInTheDocument()
   })
 
-  it('renders only the completion timestamp when step has both start and end times', () => {
+  it('renders timing between the step name and status on one header row', () => {
     render(<StepExecutionDetailsPanel {...defaultProps} />, { wrapper })
 
-    expect(screen.getAllByText(/Jan.*1.*2024/i)).toHaveLength(1)
-    expect(screen.queryByText(/ - /)).not.toBeInTheDocument()
-    expect(screen.queryByText(/Elapsed time:/)).not.toBeInTheDocument()
+    const header = screen.getByRole('group', { name: 'Step details header' })
+    const timing = within(header).getByRole('group', { name: 'Step timing and status' })
+    expect(within(header).getByRole('heading', { name: 'Run AAP VM' })).toBeInTheDocument()
+    expect(timing).toHaveTextContent(/Jan.*1.*2024.*-.*Jan.*1.*2024/i)
+    expect(timing).not.toHaveTextContent(/Started:|Completed:/)
+    expect(within(timing).getByText('Elapsed time: 1m 30s')).toBeInTheDocument()
+    expect(within(header).getByText('Successful')).toBeInTheDocument()
   })
 
-  it('renders only start timestamp when completion time is missing', () => {
+  it('does not show retry labels in the selected step details header without a retry baseline', () => {
+    render(<StepExecutionDetailsPanel {...defaultProps} stepType="script" />, { wrapper })
+
+    const header = screen.getByRole('group', { name: 'Step details header' })
+    expect(within(header).getByText('Successful')).toBeInTheDocument()
+    expect(within(header).queryByText('Reused output')).not.toBeInTheDocument()
+    expect(within(header).queryByText('Reused trigger input')).not.toBeInTheDocument()
+    expect(within(header).queryByText('Retained failure')).not.toBeInTheDocument()
+  })
+
+  it('renders only the start timestamp when completion time is missing', () => {
     const propsWithoutCompletedAt = {
       ...defaultProps,
       stepState: {
@@ -375,8 +465,9 @@ describe('StepExecutionDetailsPanel', () => {
     }
     render(<StepExecutionDetailsPanel {...propsWithoutCompletedAt} />, { wrapper })
 
-    expect(screen.getAllByText(/Jan.*1.*2024/i)).toHaveLength(1)
-    expect(screen.queryByText(/ - /)).not.toBeInTheDocument()
+    expect(screen.getByText(/Jan.*1.*2024/i)).toBeInTheDocument()
+    expect(screen.queryByText(/Started:|Completed:/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Elapsed time:/)).not.toBeInTheDocument()
   })
 
   it('switches between different view modes for input pane', async () => {

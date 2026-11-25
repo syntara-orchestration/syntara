@@ -3,14 +3,14 @@ import { lazy, StrictMode, Suspense } from 'react'
 import { createRoot } from 'react-dom/client'
 
 import { ErrorBoundary } from './components/ErrorBoundary'
-import { ensureDocumentColorScheme } from './providers/theme/colorScheme.js'
+import { ensureDocumentTheme } from './providers/theme/documentTheme.js'
 import { registerAllSteps } from './routes/builder/registry/steps'
 import './index.css'
 
 // Register all workflow step types (Add step panel) before app initialization
 registerAllSteps()
 
-ensureDocumentColorScheme()
+ensureDocumentTheme()
 
 const App = lazy(() => import('./app/App.js'))
 

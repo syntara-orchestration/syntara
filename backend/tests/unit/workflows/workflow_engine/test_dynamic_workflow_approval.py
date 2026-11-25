@@ -17,11 +17,11 @@ from temporalio.exceptions import ApplicationError
 
 from syntara.approvals.models import ActivitySummary, ApprovalCreateRequest, WorkflowContext
 from syntara.core.constants import FieldLimits
-from syntara.workflows.utils.namespace_resolver import NamespaceResolver
-from syntara.workflows.workflow_engine.dynamic_workflow import OrchestratorWorkflow
-from syntara.workflows.workflow_engine.graph import ActivityNode, WorkflowGraph
-from syntara.workflows.workflow_engine.graph_backend import InMemoryGraphBackend
-from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName
+from syntara.workflow_core.graph import ActivityNode, WorkflowGraph
+from syntara.workflow_core.graph_backend import InMemoryGraphBackend
+from syntara.workflow_core.models import ActivityName
+from syntara.workflow_core.utils.namespace_resolver import NamespaceResolver
+from syntara.workflow_runtime.engines.temporal.dynamic_workflow import OrchestratorWorkflow
 from tests.unit.workflows.workflow_engine.conftest import init_workflow_runtime
 
 # Value registered in ``_secret_values`` by the prompt-scrubbing tests, used to probe
@@ -40,8 +40,8 @@ def _mock_temporal_workflow() -> Generator[MagicMock]:
     """Mock the Temporal workflow module."""
     mock_logger = MagicMock()
     with (
-        patch("syntara.workflows.workflow_engine.dynamic_workflow.workflow") as mock_wf,
-        patch("syntara.workflows.workflow_engine.approval_mixin.workflow", mock_wf),
+        patch("syntara.workflow_runtime.engines.temporal.dynamic_workflow.workflow") as mock_wf,
+        patch("syntara.workflow_runtime.engines.temporal.approval_mixin.workflow", mock_wf),
     ):
         mock_wf.logger = mock_logger
         mock_wf.info.return_value = MagicMock(workflow_id="test-wf-id")
@@ -211,7 +211,7 @@ class TestPrepareApprovalArgs:
         # When no approvers configured, the resolution activity is skipped (optimization)
         # and approver IDs are set to None
         mock_execute = AsyncMock(return_value={"user_ids": [], "group_ids": []})
-        with patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_execute):
+        with patch("syntara.workflow_runtime.engines.temporal.approval_mixin.workflow.execute_activity", mock_execute):
             args = await wf._prepare_approval_args(node, graph, node.parameters)
 
         assert len(args) == _NEW_APPROVAL_ARG_COUNT
@@ -234,7 +234,7 @@ class TestPrepareApprovalArgs:
         node = ActivityNode("approval", "approval", {}, name="Review Deployment")
 
         mock_execute = AsyncMock(return_value={"user_ids": [], "group_ids": []})
-        with patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_execute):
+        with patch("syntara.workflow_runtime.engines.temporal.approval_mixin.workflow.execute_activity", mock_execute):
             args = await wf._prepare_approval_args(node, graph, node.parameters)
 
         assert args[1] == "approval"
@@ -251,7 +251,7 @@ class TestPrepareApprovalArgs:
         node = ActivityNode("approval", "approval", {}, name="Review Deployment")
 
         mock_execute = AsyncMock(return_value={"user_ids": [], "group_ids": []})
-        with patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_execute):
+        with patch("syntara.workflow_runtime.engines.temporal.approval_mixin.workflow.execute_activity", mock_execute):
             args = await wf._prepare_approval_args(node, graph, node.parameters)
 
         assert args[1] == "approval"
@@ -259,8 +259,8 @@ class TestPrepareApprovalArgs:
         assert args[11] == "approval_iter_0"
 
     @pytest.mark.asyncio
-    async def test_approval_args_always_include_loop_identity(self) -> None:
-        """The full iteration path is passed even when the prompt patch is absent."""
+    async def test_approval_args_keep_legacy_temporal_id_without_loop_patch(self) -> None:
+        """Loop path is preserved while pre-patch histories keep the canvas activity ID."""
         wf = _make_workflow()
         wf.loop_body_map["approval"] = "loop"
         wf.node_control_data["loop"] = {"current_index": 1, "next_port": "iterate"}
@@ -269,15 +269,19 @@ class TestPrepareApprovalArgs:
 
         mock_execute = AsyncMock(return_value={"user_ids": [], "group_ids": []})
         with (
-            patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_execute),
-            patch("syntara.workflows.workflow_engine.approval_mixin.workflow.patched", return_value=False),
+            patch("syntara.workflow_runtime.engines.temporal.approval_mixin.workflow.execute_activity", mock_execute),
+            patch(
+                "syntara.workflow_runtime.engines.temporal.utils.loop_iteration_ids.use_unique_loop_iteration_ids",
+                return_value=False,
+            ),
+            patch("syntara.workflow_runtime.engines.temporal.approval_mixin.workflow.patched", return_value=False),
         ):
             args = await wf._prepare_approval_args(node, graph, node.parameters)
 
         assert len(args) == 12
         assert args[1] == "approval"
         assert args[10] == [1]
-        assert args[11] == "approval_iter_1"
+        assert args[11] == "approval"
 
     @pytest.mark.asyncio
     async def test_approval_args_with_approver_config(self) -> None:
@@ -300,7 +304,7 @@ class TestPrepareApprovalArgs:
         mock_execute = AsyncMock(
             return_value={"user_ids": [alice_id, bob_id], "group_ids": [security_team_id, admins_id]}
         )
-        with patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_execute):
+        with patch("syntara.workflow_runtime.engines.temporal.approval_mixin.workflow.execute_activity", mock_execute):
             args = await wf._prepare_approval_args(node, graph, config)
 
         assert len(args) == _NEW_APPROVAL_ARG_COUNT
@@ -320,7 +324,7 @@ class TestPrepareApprovalArgs:
         node = ActivityNode("approval", "approval", {}, name="Review")
 
         mock_execute = AsyncMock(return_value={"user_ids": [], "group_ids": []})
-        with patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_execute):
+        with patch("syntara.workflow_runtime.engines.temporal.approval_mixin.workflow.execute_activity", mock_execute):
             args = await wf._prepare_approval_args(node, graph, node.parameters)
 
         next_step = args[3]
@@ -350,7 +354,7 @@ class TestPrepareApprovalArgs:
         node = ActivityNode("approval", "approval", {}, name="Review")
 
         mock_execute = AsyncMock(return_value={"user_ids": [], "group_ids": []})
-        with patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_execute):
+        with patch("syntara.workflow_runtime.engines.temporal.approval_mixin.workflow.execute_activity", mock_execute):
             args = await wf._prepare_approval_args(node, graph, node.parameters)
 
         ctx = args[4]
@@ -382,7 +386,7 @@ class TestPrepareApprovalArgs:
         node = ActivityNode("approval", "approval", {}, name="Review")
 
         mock_execute = AsyncMock(return_value={"user_ids": [], "group_ids": []})
-        with patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_execute):
+        with patch("syntara.workflow_runtime.engines.temporal.approval_mixin.workflow.execute_activity", mock_execute):
             args = await wf._prepare_approval_args(node, graph, node.parameters)
 
         ctx = args[4]
@@ -405,7 +409,7 @@ class TestPrepareApprovalArgs:
         node = ActivityNode("approval", "approval", {}, name="Review")
 
         mock_execute = AsyncMock(return_value={"user_ids": [], "group_ids": []})
-        with patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_execute):
+        with patch("syntara.workflow_runtime.engines.temporal.approval_mixin.workflow.execute_activity", mock_execute):
             args = await wf._prepare_approval_args(node, graph, node.parameters)
 
         ctx = args[4]
@@ -420,7 +424,7 @@ class TestPrepareApprovalArgs:
         node = ActivityNode("approval", "approval", {}, name="Review")
 
         mock_execute = AsyncMock(return_value={"user_ids": [], "group_ids": []})
-        with patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_execute):
+        with patch("syntara.workflow_runtime.engines.temporal.approval_mixin.workflow.execute_activity", mock_execute):
             args = await wf._prepare_approval_args(node, graph, node.parameters)
 
         ctx = args[4]
@@ -434,7 +438,7 @@ class TestPrepareApprovalArgs:
         node = ActivityNode("approval", "approval", {"decision_window": 3600}, name="Review")
 
         mock_execute = AsyncMock(return_value={"user_ids": [], "group_ids": []})
-        with patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_execute):
+        with patch("syntara.workflow_runtime.engines.temporal.approval_mixin.workflow.execute_activity", mock_execute):
             args = await wf._prepare_approval_args(node, graph, node.parameters)
 
         timeout_at = args[5]
@@ -451,7 +455,7 @@ class TestPrepareApprovalArgs:
         node = ActivityNode("approval", "approval", {}, name="Review")
 
         mock_execute = AsyncMock(return_value={"user_ids": [], "group_ids": []})
-        with patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_execute):
+        with patch("syntara.workflow_runtime.engines.temporal.approval_mixin.workflow.execute_activity", mock_execute):
             args = await wf._prepare_approval_args(node, graph, node.parameters)
 
         timeout_at = args[5]
@@ -468,7 +472,7 @@ class TestPrepareApprovalArgs:
         node = ActivityNode("approval", "approval", {}, name="Review")
 
         mock_execute = AsyncMock(return_value={"user_ids": [], "group_ids": []})
-        with patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_execute):
+        with patch("syntara.workflow_runtime.engines.temporal.approval_mixin.workflow.execute_activity", mock_execute):
             args = await wf._prepare_approval_args(node, graph, node.parameters)
 
         assert args[6] is None
@@ -488,7 +492,7 @@ class TestPrepareApprovalArgs:
         node = ActivityNode("my_approval", "approval", {})
 
         mock_execute = AsyncMock(return_value={"user_ids": [], "group_ids": []})
-        with patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_execute):
+        with patch("syntara.workflow_runtime.engines.temporal.approval_mixin.workflow.execute_activity", mock_execute):
             args = await wf._prepare_approval_args(node, graph, node.parameters)
 
         assert args[2] == "Approval for my_approval"
@@ -502,7 +506,7 @@ class TestPrepareApprovalArgs:
         node = ActivityNode("approval", "approval", {}, name="Review")
 
         mock_execute = AsyncMock(return_value={"user_ids": [], "group_ids": []})
-        with patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_execute):
+        with patch("syntara.workflow_runtime.engines.temporal.approval_mixin.workflow.execute_activity", mock_execute):
             args = await wf._prepare_approval_args(node, graph, node.parameters)
 
         ctx = args[4]
@@ -517,7 +521,7 @@ class TestPrepareApprovalArgs:
         node = ActivityNode("approval", "approval", {}, name="Review")
 
         mock_execute = AsyncMock(return_value={"user_ids": [], "group_ids": []})
-        with patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_execute):
+        with patch("syntara.workflow_runtime.engines.temporal.approval_mixin.workflow.execute_activity", mock_execute):
             args = await wf._prepare_approval_args(node, graph, node.parameters)
 
         ctx = args[4]
@@ -531,7 +535,7 @@ class TestPrepareApprovalArgs:
         node = ActivityNode("approval", "approval", {}, name="Review")
 
         mock_execute = AsyncMock(return_value={"user_ids": [], "group_ids": []})
-        with patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_execute):
+        with patch("syntara.workflow_runtime.engines.temporal.approval_mixin.workflow.execute_activity", mock_execute):
             args = await wf._prepare_approval_args(node, graph, {"prompt": "  Please review this $15,000 request.  "})
 
         assert args[_PROMPT_ARG] == "Please review this $15,000 request."
@@ -544,7 +548,7 @@ class TestPrepareApprovalArgs:
         node = ActivityNode("approval", "approval", {}, name="Review")
 
         mock_execute = AsyncMock(return_value={"user_ids": [], "group_ids": []})
-        with patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_execute):
+        with patch("syntara.workflow_runtime.engines.temporal.approval_mixin.workflow.execute_activity", mock_execute):
             empty_args = await wf._prepare_approval_args(node, graph, {"prompt": "   "})
             missing_args = await wf._prepare_approval_args(node, graph, {})
 
@@ -559,7 +563,7 @@ class TestPrepareApprovalArgs:
         node = ActivityNode("approval", "approval", {}, name="Review")
 
         mock_execute = AsyncMock(return_value={"user_ids": [], "group_ids": []})
-        with patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_execute):
+        with patch("syntara.workflow_runtime.engines.temporal.approval_mixin.workflow.execute_activity", mock_execute):
             dict_args = await wf._prepare_approval_args(node, graph, {"prompt": {}})
             list_args = await wf._prepare_approval_args(node, graph, {"prompt": []})
 
@@ -574,7 +578,7 @@ class TestPrepareApprovalArgs:
         node = ActivityNode("approval", "approval", {}, name="Review")
 
         mock_execute = AsyncMock(return_value={"user_ids": [], "group_ids": []})
-        with patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_execute):
+        with patch("syntara.workflow_runtime.engines.temporal.approval_mixin.workflow.execute_activity", mock_execute):
             true_args = await wf._prepare_approval_args(node, graph, {"prompt": True})
             false_args = await wf._prepare_approval_args(node, graph, {"prompt": False})
 
@@ -589,7 +593,7 @@ class TestPrepareApprovalArgs:
         node = ActivityNode("approval", "approval", {}, name="Review")
 
         mock_execute = AsyncMock(return_value={"user_ids": [], "group_ids": []})
-        with patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_execute):
+        with patch("syntara.workflow_runtime.engines.temporal.approval_mixin.workflow.execute_activity", mock_execute):
             number_args = await wf._prepare_approval_args(node, graph, {"prompt": 15_000})
             zero_args = await wf._prepare_approval_args(node, graph, {"prompt": 0})
             object_args = await wf._prepare_approval_args(node, graph, {"prompt": {"amount": 15000}})
@@ -610,7 +614,7 @@ class TestPrepareApprovalArgs:
         uid = UUID("00000000-0000-0000-0000-000000000001")
 
         mock_execute = AsyncMock(return_value={"user_ids": [], "group_ids": []})
-        with patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_execute):
+        with patch("syntara.workflow_runtime.engines.temporal.approval_mixin.workflow.execute_activity", mock_execute):
             object_args = await wf._prepare_approval_args(node, graph, {"prompt": {"when": dt, "id": uid}})
             scalar_args = await wf._prepare_approval_args(node, graph, {"prompt": dt})
             key_args = await wf._prepare_approval_args(node, graph, {"prompt": {dt: "x"}})
@@ -632,7 +636,7 @@ class TestPrepareApprovalArgs:
         cyclic.append(cyclic)
 
         mock_execute = AsyncMock(return_value={"user_ids": [], "group_ids": []})
-        with patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_execute):
+        with patch("syntara.workflow_runtime.engines.temporal.approval_mixin.workflow.execute_activity", mock_execute):
             args = await wf._prepare_approval_args(node, graph, {"prompt": cyclic})
 
         assert args[_PROMPT_ARG] is None
@@ -646,7 +650,7 @@ class TestPrepareApprovalArgs:
         too_long = "x" * (FieldLimits.DESCRIPTION_MAX_LENGTH + 50)
 
         mock_execute = AsyncMock(return_value={"user_ids": [], "group_ids": []})
-        with patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_execute):
+        with patch("syntara.workflow_runtime.engines.temporal.approval_mixin.workflow.execute_activity", mock_execute):
             args = await wf._prepare_approval_args(node, graph, {"prompt": too_long})
 
         truncated = too_long[: FieldLimits.DESCRIPTION_MAX_LENGTH - 1] + "…"
@@ -663,7 +667,7 @@ class TestPrepareApprovalArgs:
         oversized = {"payload": "y" * (FieldLimits.DESCRIPTION_MAX_LENGTH + 50)}
 
         mock_execute = AsyncMock(return_value={"user_ids": [], "group_ids": []})
-        with patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_execute):
+        with patch("syntara.workflow_runtime.engines.temporal.approval_mixin.workflow.execute_activity", mock_execute):
             args = await wf._prepare_approval_args(node, graph, {"prompt": oversized})
 
         assert args[_PROMPT_ARG] is None
@@ -677,8 +681,8 @@ class TestPrepareApprovalArgs:
 
         mock_execute = AsyncMock(return_value={"user_ids": [], "group_ids": []})
         with (
-            patch("syntara.workflows.workflow_engine.approval_mixin.workflow.patched", return_value=False),
-            patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_execute),
+            patch("syntara.workflow_runtime.engines.temporal.approval_mixin.workflow.patched", return_value=False),
+            patch("syntara.workflow_runtime.engines.temporal.approval_mixin.workflow.execute_activity", mock_execute),
         ):
             args = await wf._prepare_approval_args(node, graph, {"prompt": "Please review"})
 
@@ -695,7 +699,7 @@ class TestPrepareApprovalArgs:
         node = ActivityNode("approval", "approval", {}, name="Review")
 
         mock_execute = AsyncMock(return_value={"user_ids": [], "group_ids": []})
-        with patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_execute):
+        with patch("syntara.workflow_runtime.engines.temporal.approval_mixin.workflow.execute_activity", mock_execute):
             args = await wf._prepare_approval_args(
                 node,
                 graph,
@@ -724,7 +728,7 @@ class TestPrepareApprovalArgs:
         oversized = (_LEAK_PROBE + "x" * 96) * 40 + "y" * 500
 
         mock_execute = AsyncMock(return_value={"user_ids": [], "group_ids": []})
-        with patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_execute):
+        with patch("syntara.workflow_runtime.engines.temporal.approval_mixin.workflow.execute_activity", mock_execute):
             args = await wf._prepare_approval_args(node, graph, {"prompt": oversized})
 
         assert args[_PROMPT_ARG] is not None
@@ -748,7 +752,7 @@ class TestPrepareApprovalArgs:
         oversized = (_LEAK_PROBE + "x" * 96) * 40 + "y" * 500
 
         mock_execute = AsyncMock(return_value={"user_ids": [], "group_ids": []})
-        with patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_execute):
+        with patch("syntara.workflow_runtime.engines.temporal.approval_mixin.workflow.execute_activity", mock_execute):
             args = await wf._prepare_approval_args(node, graph, {"prompt": oversized})
 
         ApprovalCreateRequest(
@@ -772,7 +776,7 @@ class TestPrepareApprovalArgs:
         straddling = "p" * (FieldLimits.DESCRIPTION_MAX_LENGTH - 3) + _LEAK_PROBE + "q" * 500
 
         mock_execute = AsyncMock(return_value={"user_ids": [], "group_ids": []})
-        with patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_execute):
+        with patch("syntara.workflow_runtime.engines.temporal.approval_mixin.workflow.execute_activity", mock_execute):
             args = await wf._prepare_approval_args(node, graph, {"prompt": straddling})
 
         assert args[_PROMPT_ARG] is not None
@@ -794,7 +798,7 @@ class TestPrepareApprovalArgs:
         node = ActivityNode("approval", "approval", {}, name="Review")
 
         mock_execute = AsyncMock(return_value={"user_ids": [], "group_ids": []})
-        with patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_execute):
+        with patch("syntara.workflow_runtime.engines.temporal.approval_mixin.workflow.execute_activity", mock_execute):
             args = await wf._prepare_approval_args(
                 node,
                 graph,
@@ -823,7 +827,7 @@ class TestPrepareApprovalArgs:
         cyclic.append(cyclic)
 
         mock_execute = AsyncMock(return_value={"user_ids": [], "group_ids": []})
-        with patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_execute):
+        with patch("syntara.workflow_runtime.engines.temporal.approval_mixin.workflow.execute_activity", mock_execute):
             args = await wf._prepare_approval_args(node, graph, {"prompt": cyclic})
 
         assert args[_PROMPT_ARG] is None
@@ -845,7 +849,7 @@ class TestDispatchApprovalNode:
         # (resolution activity is skipped as an optimization)
         mock_activity = AsyncMock(return_value={"output": {"id": "apr-1", "decision": "approved"}})
 
-        with patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_activity):
+        with patch("syntara.workflow_runtime.engines.temporal.approval_mixin.workflow.execute_activity", mock_activity):
             await wf._dispatch_node_to_executor(node, {}, graph, timeout_seconds=300)
 
         # With no approvers configured, only approval creation is called (resolution is skipped)
@@ -876,7 +880,7 @@ class TestDispatchApprovalNode:
         node = graph.get_node("approval")
 
         mock_activity = AsyncMock(return_value={"output": {"id": "apr-1", "decision": "approved"}})
-        with patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_activity):
+        with patch("syntara.workflow_runtime.engines.temporal.approval_mixin.workflow.execute_activity", mock_activity):
             await wf._dispatch_node_to_executor(node, {}, graph, timeout_seconds=300)
 
         approval_call = mock_activity.call_args_list[0]
@@ -886,8 +890,8 @@ class TestDispatchApprovalNode:
         assert approval_call.kwargs["args"][11] == "approval_iter_2"
 
     @pytest.mark.asyncio
-    async def test_dispatch_always_uses_path_activity_id_and_loop_args(self) -> None:
-        """Approval dispatch always uses the canonical path ID and arguments."""
+    async def test_dispatch_keeps_legacy_activity_id_without_loop_patch(self) -> None:
+        """Pre-patch histories keep the canvas activity ID and still pass loop args."""
         wf = _make_workflow()
         wf.loop_body_map["approval"] = "loop"
         wf.node_control_data["loop"] = {"current_index": 2}
@@ -896,15 +900,21 @@ class TestDispatchApprovalNode:
 
         mock_activity = AsyncMock(return_value={"output": {"id": "apr-1", "decision": "approved"}})
         with (
-            patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_activity),
-            patch("syntara.workflows.workflow_engine.approval_mixin.workflow.patched", return_value=False),
+            patch("syntara.workflow_runtime.engines.temporal.approval_mixin.workflow.execute_activity", mock_activity),
+            patch(
+                "syntara.workflow_runtime.engines.temporal.utils.loop_iteration_ids.use_unique_loop_iteration_ids",
+                return_value=False,
+            ),
+            patch("syntara.workflow_runtime.engines.temporal.approval_mixin.workflow.patched", return_value=False),
         ):
             await wf._dispatch_node_to_executor(node, {}, graph, timeout_seconds=300)
 
         approval_call = mock_activity.call_args_list[0]
-        assert approval_call.kwargs["activity_id"] == "approval_iter_2"
+        assert approval_call.kwargs["activity_id"] == "approval"
         assert len(approval_call.kwargs["args"]) == 12
         assert approval_call.kwargs["args"][1] == "approval"
+        assert approval_call.kwargs["args"][10] == [2]
+        assert approval_call.kwargs["args"][11] == "approval"
 
     @pytest.mark.asyncio
     async def test_dispatch_sets_approved_port(self) -> None:
@@ -915,7 +925,7 @@ class TestDispatchApprovalNode:
 
         mock_activity = AsyncMock(return_value={"output": {"decision": "approved", "approval_id": "apr-1"}})
 
-        with patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_activity):
+        with patch("syntara.workflow_runtime.engines.temporal.approval_mixin.workflow.execute_activity", mock_activity):
             result = await wf._dispatch_node_to_executor(node, {}, graph, timeout_seconds=300)
 
         assert result["control"] == {"next_port": "approved"}
@@ -929,7 +939,7 @@ class TestDispatchApprovalNode:
 
         mock_activity = AsyncMock(return_value={"output": {"decision": "rejected", "approval_id": "apr-1"}})
 
-        with patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_activity):
+        with patch("syntara.workflow_runtime.engines.temporal.approval_mixin.workflow.execute_activity", mock_activity):
             result = await wf._dispatch_node_to_executor(node, {}, graph, timeout_seconds=300)
 
         assert result["control"] == {"next_port": "rejected"}
@@ -948,9 +958,9 @@ class TestExpireRemainingApprovals:
         mock_local_activity = AsyncMock(return_value=None)
 
         with (
-            patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_activity),
+            patch("syntara.workflow_runtime.engines.temporal.approval_mixin.workflow.execute_activity", mock_activity),
             patch(
-                "syntara.workflows.workflow_engine.approval_mixin.workflow.execute_local_activity",
+                "syntara.workflow_runtime.engines.temporal.approval_mixin.workflow.execute_local_activity",
                 mock_local_activity,
             ),
         ):
@@ -972,7 +982,7 @@ class TestExpireRemainingApprovals:
         graph = _build_approval_graph(with_predecessor=False, with_successor=False)
         mock_activity = AsyncMock(return_value={"expired_count": 0})
 
-        with patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_activity):
+        with patch("syntara.workflow_runtime.engines.temporal.approval_mixin.workflow.execute_activity", mock_activity):
             await wf._expire_remaining_approvals(graph)
 
         mock_activity.assert_not_called()
@@ -987,9 +997,9 @@ class TestExpireRemainingApprovals:
         mock_local_activity = AsyncMock(return_value=None)
 
         with (
-            patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_activity),
+            patch("syntara.workflow_runtime.engines.temporal.approval_mixin.workflow.execute_activity", mock_activity),
             patch(
-                "syntara.workflows.workflow_engine.approval_mixin.workflow.execute_local_activity",
+                "syntara.workflow_runtime.engines.temporal.approval_mixin.workflow.execute_local_activity",
                 mock_local_activity,
             ),
         ):
@@ -1005,9 +1015,12 @@ class TestExpireRemainingApprovals:
         mock_execute_local_activity = AsyncMock(return_value=None)
 
         with (
-            patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_execute_activity),
             patch(
-                "syntara.workflows.workflow_engine.approval_mixin.workflow.execute_local_activity",
+                "syntara.workflow_runtime.engines.temporal.approval_mixin.workflow.execute_activity",
+                mock_execute_activity,
+            ),
+            patch(
+                "syntara.workflow_runtime.engines.temporal.approval_mixin.workflow.execute_local_activity",
                 mock_execute_local_activity,
             ),
         ):
@@ -1026,9 +1039,12 @@ class TestExpireRemainingApprovals:
         mock_execute_local_activity = AsyncMock(return_value=None)
 
         with (
-            patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_execute_activity),
             patch(
-                "syntara.workflows.workflow_engine.approval_mixin.workflow.execute_local_activity",
+                "syntara.workflow_runtime.engines.temporal.approval_mixin.workflow.execute_activity",
+                mock_execute_activity,
+            ),
+            patch(
+                "syntara.workflow_runtime.engines.temporal.approval_mixin.workflow.execute_local_activity",
                 mock_execute_local_activity,
             ),
         ):
@@ -1047,7 +1063,7 @@ class TestExpireRemainingApprovals:
         mock_activity = AsyncMock(return_value={"output": {"decision": "cancelled", "decided_by": "admin"}})
 
         with (
-            patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_activity),
+            patch("syntara.workflow_runtime.engines.temporal.approval_mixin.workflow.execute_activity", mock_activity),
             pytest.raises(ApplicationError, match="invalid decision 'cancelled'") as exc_info,
         ):
             await wf._dispatch_node_to_executor(node, {}, graph, timeout_seconds=300)
@@ -1070,7 +1086,7 @@ class TestExpireRemainingApprovals:
 
         mock_activity = AsyncMock(return_value={"output": {"decision": approval_status, "approval_id": "apr-1"}})
 
-        with patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_activity):
+        with patch("syntara.workflow_runtime.engines.temporal.approval_mixin.workflow.execute_activity", mock_activity):
             result = await wf._dispatch_node_to_executor(node, {}, graph, timeout_seconds=300)
 
         assert "control" in result
@@ -1086,7 +1102,7 @@ class TestExpireRemainingApprovals:
         mock_activity = AsyncMock(return_value={"output": {"approval_id": "apr-1"}})
 
         with (
-            patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_activity),
+            patch("syntara.workflow_runtime.engines.temporal.approval_mixin.workflow.execute_activity", mock_activity),
             pytest.raises(ApplicationError, match="invalid decision 'None'") as exc_info,
         ):
             await wf._dispatch_node_to_executor(node, {}, graph, timeout_seconds=300)
@@ -1116,7 +1132,7 @@ class TestExpireRemainingApprovals:
             }
         )
 
-        with patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_activity):
+        with patch("syntara.workflow_runtime.engines.temporal.approval_mixin.workflow.execute_activity", mock_activity):
             result = await wf._dispatch_node_to_executor(node, {}, graph, timeout_seconds=300)
 
         output = result["output"]
@@ -1143,7 +1159,7 @@ class TestExpireRemainingApprovals:
             }
         )
 
-        with patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_activity):
+        with patch("syntara.workflow_runtime.engines.temporal.approval_mixin.workflow.execute_activity", mock_activity):
             result = await wf._dispatch_node_to_executor(node, {}, graph, timeout_seconds=300)
 
         output = result["output"]
@@ -1172,7 +1188,7 @@ class TestExpireRemainingApprovals:
             }
         )
 
-        with patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_activity):
+        with patch("syntara.workflow_runtime.engines.temporal.approval_mixin.workflow.execute_activity", mock_activity):
             result = await wf._dispatch_node_to_executor(node, {}, graph, timeout_seconds=300)
 
         assert len(result["output"]["decision_notes"]) == 2000
@@ -1191,8 +1207,8 @@ class TestExpireRemainingApprovals:
         )
 
         with (
-            patch("syntara.workflows.workflow_engine.dynamic_workflow.workflow") as mock_wf,
-            patch("syntara.workflows.workflow_engine.approval_mixin.workflow", mock_wf),
+            patch("syntara.workflow_runtime.engines.temporal.dynamic_workflow.workflow") as mock_wf,
+            patch("syntara.workflow_runtime.engines.temporal.approval_mixin.workflow", mock_wf),
         ):
             mock_wf.logger = MagicMock()
             mock_wf.execute_activity = mock_activity
@@ -1320,6 +1336,12 @@ class TestApprovalActivityId:
         wf.node_control_data["loop"] = {"current_index": 3}
         assert wf._approval_activity_id("approval") == "approval_iter_3"
         assert wf._loop_iteration_path("approval") == [3]
+        with patch(
+            "syntara.workflow_runtime.engines.temporal.utils.loop_iteration_ids.use_unique_loop_iteration_ids",
+            return_value=False,
+        ):
+            assert wf._approval_activity_id("approval") == "approval"
+            assert wf._loop_iteration_path("approval") == [3]
 
     @pytest.mark.asyncio
     async def test_expire_uses_canvas_node_id(self) -> None:
@@ -1329,7 +1351,7 @@ class TestApprovalActivityId:
         wf.node_control_data["loop"] = {"current_index": 1}
 
         mock_execute = AsyncMock()
-        with patch("syntara.workflows.workflow_engine.approval_mixin.workflow.execute_activity", mock_execute):
+        with patch("syntara.workflow_runtime.engines.temporal.approval_mixin.workflow.execute_activity", mock_execute):
             await wf._expire_approval_requests("approval")
 
         mock_execute.assert_called_once()

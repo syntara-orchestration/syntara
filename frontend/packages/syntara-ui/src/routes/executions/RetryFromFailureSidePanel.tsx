@@ -61,6 +61,8 @@ export function RetryFromFailureSidePanel({
 }: RetryFromFailureSidePanelProps) {
   const navigate = useNavigate()
   const scopeId = useId()
+  const unsavedInputOverridesWarningId = `${scopeId}-unsaved-input-overrides`
+  const emptySelectionWarningId = `${scopeId}-empty-selection`
   const panelRef = useRef<HTMLElement | null>(null)
   const {
     scopeMode,
@@ -91,6 +93,7 @@ export function RetryFromFailureSidePanel({
     selectedPreviewQuery
   )
   const activeIsError = scopeMode === 'all' ? defaultPreviewQuery.isError : selectedPreviewQuery.isError
+  const isEmptySelection = scopeMode === 'selected' && requestedRetryPointIds.length === 0
   const visiblePoints = getRetryPlanPoints(activePreview, activityNameMap, activityTypeMap)
   const unavailablePoints = getUnavailableRetryPlanPoints(activePreview, activityNameMap, activityTypeMap)
   const retryPlanPointIds = activePreview?.eligible ? eligibleRetryPointIds(activePreview) : requestedRetryPointIds
@@ -149,9 +152,15 @@ export function RetryFromFailureSidePanel({
   })
   const isRetryDisabled =
     !canConfirmRetryFromFailure(activePreview, activeIsLoading, activeIsError) ||
-    (scopeMode === 'selected' && requestedRetryPointIds.length === 0) ||
+    isEmptySelection ||
     hasUnsavedInputOverrides ||
     retry.isPending
+  const retryButtonDescribedBy = getRetryButtonDescribedBy({
+    hasUnsavedInputOverrides,
+    isEmptySelection,
+    unsavedInputOverridesWarningId,
+    emptySelectionWarningId,
+  })
   const submitInputParameterOverrides = pickRetryInputParameterOverrides(
     retryInputOverridePointIds,
     inputParameterOverrides
@@ -178,6 +187,7 @@ export function RetryFromFailureSidePanel({
             isRetryDisabled={isRetryDisabled}
             isRetryPending={retry.isPending}
             stepCount={activePreview?.total_step_count}
+            retryButtonDescribedBy={retryButtonDescribedBy}
           />
         }
       >
@@ -213,6 +223,7 @@ export function RetryFromFailureSidePanel({
                       selectedPointCount={requestedRetryPointIds.length}
                       scopeMode={scopeMode}
                       scopeId={scopeId}
+                      emptySelectionWarningId={emptySelectionWarningId}
                       isRetryPending={retry.isPending || hasUnsavedInputOverrides}
                       onSelectAll={setAllRetryPoints}
                       onChoosePoints={chooseRetryPoints}
@@ -226,7 +237,7 @@ export function RetryFromFailureSidePanel({
                 {hasUnsavedInputOverrides && (
                   <StackItem>
                     <HelperText>
-                      <HelperTextItem variant="warning">
+                      <HelperTextItem id={unsavedInputOverridesWarningId} variant="warning">
                         Save or cancel input changes in Run details before retrying.
                       </HelperTextItem>
                     </HelperText>
@@ -239,6 +250,23 @@ export function RetryFromFailureSidePanel({
       </SynPanel>
     </aside>
   )
+}
+
+function getRetryButtonDescribedBy({
+  hasUnsavedInputOverrides,
+  isEmptySelection,
+  unsavedInputOverridesWarningId,
+  emptySelectionWarningId,
+}: Readonly<{
+  hasUnsavedInputOverrides: boolean
+  isEmptySelection: boolean
+  unsavedInputOverridesWarningId: string
+  emptySelectionWarningId: string
+}>): string | undefined {
+  const descriptionIds: string[] = []
+  if (hasUnsavedInputOverrides) descriptionIds.push(unsavedInputOverridesWarningId)
+  if (isEmptySelection) descriptionIds.push(emptySelectionWarningId)
+  return descriptionIds.length > 0 ? descriptionIds.join(' ') : undefined
 }
 
 function useRetryScopeSelection() {
@@ -327,17 +355,17 @@ function getCurrentRetryPlanAnnouncement({
 }>): string {
   if (!shouldAnnounce) return ''
   if (scopeMode === 'selected' && selectedCount === 0) {
-    return 'Retry plan updated. Choose one or more branches to see the retry plan.'
+    return 'Retry plan updated. Choose one or more steps to see the retry plan.'
   }
   if (isLoading) return 'Updating the retry plan for this selection.'
 
-  const scopeLabel = scopeMode === 'all' ? 'All affected branches' : getSelectedScopeLabel(selectedCount)
+  const scopeLabel = scopeMode === 'all' ? 'All affected steps' : getSelectedScopeLabel(selectedCount)
   return getRetryPlanAnnouncement({ preview, isError, scopeLabel, visiblePoints })
 }
 
 function getSelectedScopeLabel(selectedCount: number): string {
-  if (selectedCount === 1) return '1 selected branch'
-  return `${selectedCount} selected branches`
+  if (selectedCount === 1) return '1 selected step'
+  return `${selectedCount} selected steps`
 }
 
 function getRetryPlanAnnouncement({
@@ -354,7 +382,7 @@ function getRetryPlanAnnouncement({
   if (isError) return 'Retry plan could not be updated. Change the selection or close and reopen this panel.'
   if (!preview) return 'Retry plan updated. The retry plan is unavailable.'
   if (!preview.eligible) {
-    return `Retry plan updated. ${preview.reason ?? 'The selected branches cannot be retried.'}`
+    return `Retry plan updated. ${preview.reason ?? 'The selected steps cannot be retried.'}`
   }
 
   const stepSummary = getRetryStepSummary(preview.total_step_count)

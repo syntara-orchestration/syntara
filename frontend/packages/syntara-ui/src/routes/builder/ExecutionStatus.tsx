@@ -1,9 +1,11 @@
+import { Stack, StackItem } from '@patternfly/react-core'
 import {
   RhUiCheckCircleIcon,
   RhUiClockIcon,
   RhUiCloseCircleIcon,
   RhUiEllipsisHorizontalFillIcon,
   RhUiHourglassIcon,
+  RhUiHistoryIcon,
   RhUiMinusCircleFillIcon,
   RhUiPauseCircleFillIcon,
   RhUiStopCircleFillIcon,
@@ -13,10 +15,11 @@ import {
 import { ActivityTypeEnum, type ExecutionsAPI } from '@syntara/contracts'
 import type React from 'react'
 
-import { ReplayedOutputBadge } from '../../components/labels/ReplayedOutputBadge'
 import { SynLabel } from '../../components/labels/SynLabel'
+import { SynReplayedOutputBadge } from '../../components/labels/SynReplayedOutputBadge'
 import { capitalize } from '../../utils/capitalize'
 
+import styles from './ExecutionStatus.module.css'
 import { activityStatusDisplayLabels, executionStatusDisplayLabels } from './executionStatusConstants'
 
 type ExecutionStatus = ExecutionsAPI.components['schemas']['ExecutionStatus']
@@ -76,36 +79,81 @@ const activityStatusIcons: Record<ActivityStatus, React.ComponentType<{ classNam
 
 /**
  * @param replayed True when this activity reused a previous run's output
- * instead of executing in this retry. Appends `ReplayedOutputBadge` next to
+ * instead of executing in this retry. Appends `SynReplayedOutputBadge` next to
  * the status label, matching the canvas treatment in `ExecutionStatusBadge`.
  */
 export function ActivityStatusLabel({
   status,
   nodeType,
   replayed = false,
-}: Readonly<{ status: ActivityStatus; nodeType?: string; replayed?: boolean }>) {
-  if (nodeType === ActivityTypeEnum.WAIT && status === 'waiting') {
-    return (
-      <SynLabel variant="outline" status="custom" icon={<RhUiSyncIcon />}>
-        Running
-      </SynLabel>
-    )
-  }
+  retainedFailure = false,
+  triggerInputReused = false,
+}: Readonly<{
+  status: ActivityStatus
+  nodeType?: string
+  replayed?: boolean
+  retainedFailure?: boolean
+  triggerInputReused?: boolean
+}>) {
+  const isRunningWait = nodeType === ActivityTypeEnum.WAIT && status === 'waiting'
 
   const IconComponent = activityStatusIcons[status] ?? RhUiEllipsisHorizontalFillIcon
   const variant = activityStatusVariant[status] ?? 'custom'
   const displayLabel = activityStatusDisplayLabels[status] ?? capitalize(status)
+  const statusLabel = isRunningWait ? (
+    <SynLabel variant="outline" status="custom" icon={<RhUiSyncIcon />}>
+      Running
+    </SynLabel>
+  ) : (
+    <SynLabel variant="outline" status={variant} icon={<IconComponent />}>
+      {displayLabel}
+    </SynLabel>
+  )
+
+  if (!retainedFailure && !replayed && !triggerInputReused) return statusLabel
 
   return (
+    <Stack className={styles.activityStatusDetails} role="group" aria-label="Activity status and retry information">
+      <StackItem>{statusLabel}</StackItem>
+      <ActivityStatusRetryMarkers
+        retainedFailure={retainedFailure}
+        replayed={replayed}
+        triggerInputReused={triggerInputReused}
+      />
+    </Stack>
+  )
+}
+
+/** Renders retry markers as StackItems so callers can control their placement. */
+function ActivityStatusRetryMarkers({
+  replayed = false,
+  retainedFailure = false,
+  triggerInputReused = false,
+}: Readonly<{
+  replayed?: boolean
+  retainedFailure?: boolean
+  triggerInputReused?: boolean
+}>) {
+  return (
     <>
-      <SynLabel variant="outline" status={variant} icon={<IconComponent />}>
-        {displayLabel}
-      </SynLabel>
+      {retainedFailure && (
+        <StackItem>
+          <SynLabel variant="outline" status="warning">
+            Retained failure
+          </SynLabel>
+        </StackItem>
+      )}
       {replayed && (
-        <>
-          {' '}
-          <ReplayedOutputBadge />
-        </>
+        <StackItem>
+          <SynReplayedOutputBadge />
+        </StackItem>
+      )}
+      {triggerInputReused && (
+        <StackItem>
+          <SynLabel variant="outline" icon={<RhUiHistoryIcon />}>
+            Reused trigger input
+          </SynLabel>
+        </StackItem>
       )}
     </>
   )

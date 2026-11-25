@@ -17,7 +17,7 @@ from pathlib import Path
 
 import pytest
 
-WORKFLOW_ENGINE = Path(__file__).resolve().parents[4] / "src/syntara/workflows/workflow_engine"
+WORKFLOW_RUNTIME = Path(__file__).resolve().parents[4] / "src/syntara/workflow_runtime/engines/temporal"
 
 #: Modules that execute inside Temporal's workflow sandbox.
 SANDBOXED_ROOTS = ("dynamic_workflow.py", "retry_mixin.py")
@@ -54,7 +54,7 @@ def _imported_modules(path: Path) -> list[str]:
 
 @pytest.mark.parametrize("filename", SANDBOXED_ROOTS)
 def test_workflow_module_does_not_import_activities(filename: str) -> None:
-    offenders = [m for m in _imported_modules(WORKFLOW_ENGINE / filename) if ".activities" in m]
+    offenders = [m for m in _imported_modules(WORKFLOW_RUNTIME / filename) if ".activities" in m]
 
     assert not offenders, (
         f"{filename} imports {offenders} from workflow code; that pulls structlog "
@@ -65,6 +65,6 @@ def test_workflow_module_does_not_import_activities(filename: str) -> None:
 
 @pytest.mark.parametrize("filename", SANDBOXED_ROOTS)
 def test_workflow_module_does_not_import_structlog(filename: str) -> None:
-    offenders = [m for m in _imported_modules(WORKFLOW_ENGINE / filename) if "structlog" in m]
+    offenders = [m for m in _imported_modules(WORKFLOW_RUNTIME / filename) if "structlog" in m]
 
     assert not offenders, f"{filename} imports {offenders}; structlog is not sandbox-safe."

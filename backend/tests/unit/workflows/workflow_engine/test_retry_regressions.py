@@ -6,16 +6,18 @@ about the definition format rather than the format itself.
 """
 
 import asyncio
+import logging
 from collections.abc import Generator
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from syntara.workflows.utils.namespace_resolver import NamespaceResolver
-from syntara.workflows.workflow_engine.dynamic_workflow import OrchestratorWorkflow
-from syntara.workflows.workflow_engine.graph import ActivityNode, WorkflowGraph
-from syntara.workflows.workflow_engine.graph_backend import InMemoryGraphBackend
+from syntara.workflow_core.graph import ActivityNode, WorkflowGraph
+from syntara.workflow_core.graph_backend import InMemoryGraphBackend
+from syntara.workflow_core.utils.namespace_resolver import NamespaceResolver
+from syntara.workflow_runtime.engines.temporal.dynamic_workflow import OrchestratorWorkflow
+from syntara.workflows.models.activity_execution import ActivityStatus
 
 # ---------------------------------------------------------------------------
 # Helpers that build realistic definitions
@@ -105,6 +107,8 @@ def _wf(retry_context: dict[str, Any] | None = None) -> OrchestratorWorkflow:
     wf.loop_body_map = {}
     wf.loop_iteration_results = {}
     wf.node_inputs = {}
+    wf.activity_input_history = {}
+    wf.activity_output_history = {}
     # A converge reads this to tell whether a loop predecessor is still iterating,
     # so it must exist even on a workflow built without __init__.
     wf.node_control_data = {}
@@ -124,8 +128,8 @@ def _retry(*eligible: str) -> dict[str, Any]:
 @pytest.fixture
 def mock_wf() -> Generator[MagicMock, None, None]:
     with (
-        patch("syntara.workflows.workflow_engine.dynamic_workflow.workflow") as patched,
-        patch("syntara.workflows.workflow_engine.retry_mixin.workflow", patched),
+        patch("syntara.workflow_runtime.engines.temporal.dynamic_workflow.workflow") as patched,
+        patch("syntara.workflow_runtime.engines.temporal.retry_mixin.workflow", patched),
     ):
         patched.logger = MagicMock()
         yield patched
@@ -144,6 +148,16 @@ def test_multi_node_body_remains_eligible_for_per_iteration_replay() -> None:
 
     # Bodies restore per iteration now, so they are eligible rather than excluded.
     assert {"body_a", "body_b", "body_c"} <= restorable
+
+
+@pytest.mark.asyncio
+async def test_restored_skipped_node_uses_supported_structured_logger_arguments() -> None:
+    """A stdlib logger must not fail a workflow task while recording a restored skip."""
+    wf = _wf()
+
+    with patch("syntara.workflow_runtime.engines.temporal.dynamic_workflow.workflow") as temporal_workflow:
+        temporal_workflow.logger = logging.getLogger("restored-skipped-node-test")
+        await wf._process_restored_terminal_task("not_run", "skipped", MagicMock(), {})
 
 
 # ---------------------------------------------------------------------------
@@ -495,7 +509,7 @@ class TestNoOverwrittenFailureNamespaceEntry:
     def test_the_namespace_comes_from_the_restored_output_builder(self) -> None:
         import inspect
 
-        from syntara.workflows.workflow_engine.dynamic_workflow import OrchestratorWorkflow
+        from syntara.workflow_runtime.engines.temporal.dynamic_workflow import OrchestratorWorkflow
 
         source = inspect.getsource(OrchestratorWorkflow._handle_node_failure)
         assignments = [line.strip() for line in source.splitlines() if line.strip().startswith("namespace_entry =")]
@@ -638,7 +652,7 @@ def test_fail_converge_does_not_detach_selected_retry_path() -> None:
     wf._timed_out_converge_nodes = set()
     pending: dict[str, asyncio.Task[Any]] = {"b2": MagicMock(spec=asyncio.Task)}
 
-    with patch("syntara.workflows.workflow_engine.converge_mixin.workflow") as patched:
+    with patch("syntara.workflow_runtime.engines.temporal.converge_mixin.workflow") as patched:
         patched.logger = MagicMock()
         wf._fail_converge_node("join", "gate failed", graph, pending)
 
@@ -877,11 +891,12 @@ def test_metadata_match_rejects_a_non_dict_source_converge() -> None:
     assert wf._retry_converge_metadata_matches({}, preds, {p: p for p in preds}, {"converge": None}, graph) is False
 
 
-def test_metadata_match_rejects_a_non_terminal_source_converge() -> None:
+@pytest.mark.parametrize("status", [ActivityStatus.RUNNING.value, ActivityStatus.CANCELLED.value])
+def test_metadata_match_rejects_source_converge_without_reusable_result(status: str) -> None:
     wf = _wf()
     graph = _two_branch_converge_graph()
     preds = graph.get_predecessors("join")
-    source = {"converge": {"status": "running"}, "predecessors": {}}
+    source = {"converge": {"status": status}, "predecessors": {}}
     assert wf._retry_converge_metadata_matches({}, preds, {p: p for p in preds}, source, graph) is False
 
 

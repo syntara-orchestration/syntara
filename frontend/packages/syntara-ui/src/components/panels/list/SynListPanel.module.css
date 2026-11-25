@@ -3,6 +3,12 @@
   display: contents;
 }
 
+.tabsWithPanel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
 .toolbarFieldset {
   display: block;
   border: none;

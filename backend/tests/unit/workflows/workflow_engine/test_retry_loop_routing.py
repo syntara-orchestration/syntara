@@ -5,22 +5,23 @@ re-deriving the loop's decision. That is what makes it correct under
 ``continue_on_failure``, where a failed body node does not mean the loop exited.
 """
 
+import asyncio
 from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from temporalio.exceptions import ApplicationError
 
-from syntara.workflows.utils.namespace_resolver import NamespaceResolver
-from syntara.workflows.workflow_engine.dynamic_workflow import OrchestratorWorkflow
-from syntara.workflows.workflow_engine.graph import ActivityNode, WorkflowGraph
-from syntara.workflows.workflow_engine.models.workflow_definition import (
+from syntara.workflow_core.graph import ActivityNode, WorkflowGraph
+from syntara.workflow_core.models import (
     DoWhileLoopState,
     ForEachLoopState,
     LoopType,
     NodeSettingsNoRetry,
 )
-from syntara.workflows.workflow_engine.utils.loop_iteration_ids import retry_loop_record_activity_id
+from syntara.workflow_core.utils.namespace_resolver import NamespaceResolver
+from syntara.workflow_runtime.engines.temporal.dynamic_workflow import OrchestratorWorkflow
+from syntara.workflow_runtime.engines.temporal.utils.loop_iteration_ids import retry_loop_record_activity_id
 
 _TEST_GRAPHS: dict[int, MagicMock] = {}
 
@@ -38,6 +39,8 @@ def _wf(
     wf.skipped_nodes = set()
     wf.failed_nodes = {}
     wf.node_inputs = {}
+    wf.activity_input_history = {}
+    wf.activity_output_history = {}
     wf.node_control_data = {}
     wf.loop_state = {}
     wf.loop_body_map = {}
@@ -94,8 +97,8 @@ async def _replay_loop(
 def patched_workflow():
     """The loop control calls the module-level workflow API, so patch that."""
     with (
-        patch("syntara.workflows.workflow_engine.dynamic_workflow.workflow") as patched,
-        patch("syntara.workflows.workflow_engine.retry_mixin.workflow", patched),
+        patch("syntara.workflow_runtime.engines.temporal.dynamic_workflow.workflow") as patched,
+        patch("syntara.workflow_runtime.engines.temporal.retry_mixin.workflow", patched),
     ):
         patched.execute_activity = AsyncMock()
         yield patched
@@ -139,7 +142,7 @@ async def test_the_iteration_being_replayed_is_recorded_for_its_body(patched_wor
     await _probe(wf, patched_workflow, reached=True)
 
     assert wf._active_loop_iteration["loop_1"] == 1
-    from syntara.workflows.workflow_engine.graph import ActivityNode
+    from syntara.workflow_core.graph import ActivityNode
 
     wf.loop_body_map = {"body_a": "loop_1"}
     wf.node_control_data = {"loop_1": {"current_index": 1}}
@@ -183,7 +186,7 @@ async def test_body_occurrence_switches_enclosing_loop_to_live_mode(patched_work
     assert result is not None
     patched_workflow.execute_activity.assert_awaited_once()
 
-    from syntara.workflows.workflow_engine.graph import ActivityNode
+    from syntara.workflow_core.graph import ActivityNode
 
     wf.node_control_data["loop_1"] = {"current_index": 2}
     wf._enter_live_retry_mode_at_selected_node(ActivityNode(node_id="body_a", node_type="script", parameters={}))
@@ -223,7 +226,7 @@ async def test_continue_on_failure_restarts_at_lowest_failed_iteration(patched_w
     assert result["control"]["next_port"] == "iterate"
     assert wf._active_loop_iteration["loop_1"] == 2
 
-    from syntara.workflows.workflow_engine.graph import ActivityNode
+    from syntara.workflow_core.graph import ActivityNode
 
     selected_node = ActivityNode(node_id="body_a", node_type="script", parameters={})
     assert wf._enter_live_retry_mode_at_selected_node(selected_node)
@@ -257,6 +260,49 @@ async def test_nested_loop_replays_before_inner_failed_iteration(patched_workflo
     assert result is not None
     assert result["control"]["next_port"] == "iterate"
     patched_workflow.execute_activity.assert_awaited_once()
+
+
+def test_nested_loop_feedback_preserves_parent_for_retry_path(patched_workflow) -> None:
+    wf = _wf(retry_points=["body_a"], bodies={"outer": {"inner", "body_a"}, "inner": {"body_a"}})
+    wf.loop_body_map = {"inner": "outer", "body_a": "inner"}
+    wf.node_control_data = {"outer": {"current_index": 0}, "inner": {"current_index": 1}}
+    wf._retry_selected_failure_paths = {"body_a": [[0, 1]]}
+
+    # The body's feedback edge returns to the inner controller. It must not
+    # overwrite the controller's existing membership in the outer loop.
+    wf._track_loop_body("inner", "body_a", is_loop_iterate=False)
+
+    assert wf.loop_body_map["inner"] == "outer"
+    assert wf._loop_ancestor_chain("body_a") == ["outer", "inner"]
+    assert wf._enter_live_retry_mode_at_selected_node(ActivityNode(node_id="body_a", node_type="script", parameters={}))
+    assert wf._retry_live_loop_ids == {"outer", "inner"}
+
+
+def test_root_loop_feedback_keeps_controller_entry(patched_workflow) -> None:
+    wf = _wf(retry_points=["body_a"], bodies={"loop": {"body_a"}})
+    wf.loop_body_map = {"body_a": "loop"}
+
+    wf._track_loop_body("loop", "body_a", is_loop_iterate=False)
+
+    assert wf.loop_body_map["loop"] == "loop"
+
+
+@pytest.mark.asyncio
+async def test_pending_nested_controller_prevents_duplicate_loop_schedule(patched_workflow) -> None:
+    wf = _wf(retry_points=["body_a"], bodies={"inner": {"body_a"}})
+    wf.loop_body_map = {"body_a": "inner"}
+    wf.resolver.set_namespace("body_a", {"status": "completed"})
+    graph = MagicMock()
+    pending_controller = asyncio.create_task(asyncio.Event().wait())
+
+    try:
+        wf._check_loop_body_completion("body_a", graph, {"inner": pending_controller})
+
+        graph.get_node.assert_not_called()
+    finally:
+        pending_controller.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await pending_controller
 
 
 @pytest.mark.asyncio
@@ -478,7 +524,7 @@ async def test_restore_loop_record_caches_resolved_inputs_and_source_times(patch
 async def test_retry_loop_uses_stored_resolved_inputs_without_resolving_expression(patched_workflow) -> None:
     from unittest.mock import MagicMock
 
-    from syntara.workflows.workflow_engine.graph import ActivityNode
+    from syntara.workflow_core.graph import ActivityNode
 
     wf = _wf(retry_points=["after"], bodies={"loop_1": {"body_a"}})
     wf.pre_resolved_outputs = {}
@@ -499,7 +545,7 @@ async def test_retry_loop_uses_stored_resolved_inputs_without_resolving_expressi
         patch.object(wf, "_resolve_node_parameters") as resolve_parameters,
         patch.object(wf, "_dispatch_node", dispatch),
         patch.object(wf, "_process_node_result", return_value={"output": {"iteration_count": 0}}),
-        patch("syntara.workflows.workflow_engine.dynamic_workflow.resolve_timeout", return_value=30),
+        patch("syntara.workflow_runtime.engines.temporal.dynamic_workflow.resolve_timeout", return_value=30),
         patch.object(wf, "_apply_input_overrides"),
     ):
         await wf._execute_node(node, MagicMock())
@@ -513,7 +559,7 @@ async def test_retry_loop_uses_stored_resolved_inputs_without_resolving_expressi
 
 @pytest.mark.asyncio
 async def test_replayed_loop_does_not_evaluate_do_while_condition(patched_workflow) -> None:
-    from syntara.workflows.workflow_engine.graph import ActivityNode
+    from syntara.workflow_core.graph import ActivityNode
 
     wf = _wf(retry_points=["after"], bodies={"loop_1": {"body_a"}})
     wf.loop_state["loop_1"] = DoWhileLoopState(condition="${body_a.done}", max_iterations=5, current_index=2)
@@ -522,9 +568,10 @@ async def test_replayed_loop_does_not_evaluate_do_while_condition(patched_workfl
 
     with (
         patch.object(wf, "_replayed_loop_control", new_callable=AsyncMock, return_value=replayed_result),
-        patch("syntara.workflows.workflow_engine.dynamic_workflow.safe_eval_with_namespace") as evaluate,
+        patch("syntara.workflow_runtime.engines.temporal.dynamic_workflow.safe_eval_with_namespace") as evaluate,
         patch(
-            "syntara.workflows.workflow_engine.dynamic_workflow.workflow.execute_activity", new_callable=AsyncMock
+            "syntara.workflow_runtime.engines.temporal.dynamic_workflow.workflow.execute_activity",
+            new_callable=AsyncMock,
         ) as execute,
     ):
         result = await wf._execute_loop_node(
@@ -550,6 +597,13 @@ def test_selected_failure_path_uses_the_full_temporal_id_not_the_display_counter
     assert wf._selected_failure_iteration_paths() == {"body_a": [[2, 1]]}
 
 
+def test_selected_failure_path_accepts_legacy_iteration_ids() -> None:
+    wf = _wf(retry_points=["body_a"], bodies={"outer": {"inner", "body_a"}, "inner": {"body_a"}})
+    wf._retry_source_temporal_statuses = {"body_a#iter-2#iter-1": "failed"}
+
+    assert wf._selected_failure_iteration_paths() == {"body_a": [[2, 1]]}
+
+
 def test_display_name_cannot_supply_a_missing_failure_iteration_path() -> None:
     wf = _wf(retry_points=["body_a"], bodies={"loop_1": {"body_a"}})
     wf._retry_source_statuses = {"body_a": "failed"}
@@ -560,7 +614,7 @@ def test_display_name_cannot_supply_a_missing_failure_iteration_path() -> None:
 def test_selected_nested_failure_refreshes_inner_items_from_the_target_outer_item(patched_workflow) -> None:
     from unittest.mock import MagicMock
 
-    from syntara.workflows.workflow_engine.graph import ActivityNode
+    from syntara.workflow_core.graph import ActivityNode
 
     wf = _wf(retry_points=["body_a"], bodies={"outer": {"inner", "body_a"}, "inner": {"body_a"}})
     wf.loop_body_map = {"inner": "outer", "body_a": "inner"}

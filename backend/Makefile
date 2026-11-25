@@ -38,6 +38,16 @@ COMPOSE_CMD ?= uv run podman-compose
 COMPOSE_ARGS ?= -p $(PODMAN_PROJECT) -f ../podman-compose.yml
 COMPOSE_FINAL_CMD := $(COMPOSE_CMD) $(COMPOSE_ARGS)
 
+# `make services-run` starts every service podman-compose.yml enables without a
+# profile or with SERVICES_RUN_PROFILE, except SERVICES_RUN_EXCLUDE (the API and
+# UI, which `make dev` runs locally). The list is read from the compose file when
+# the target runs, so adding a service there needs no change here. The same list
+# is passed to tools/wait_for_services.py, which waits until each one is healthy.
+SERVICES_RUN_PROFILE := mcp-scenarios
+SERVICES_RUN_EXCLUDE := syntara syntara-ui
+SERVICES_WAIT_TIMEOUT ?= 300
+WAIT_FOR_SERVICES ?= uv run python tools/wait_for_services.py
+
 # S2S mTLS configuration for local development
 S2S_TLS_VARS = \
 	APP_S2S_TLS_ENABLED=true \
@@ -50,7 +60,7 @@ WORKER_BASE_URL = https://localhost:8000/api/v1
 # ========================================================
 
 .PHONY: install
-install: _deps-install-dev _deps-install-pre-commit ## Complete setup from scratch
+install: _deps-install-dev _deps-install-pre-commit _check-libmagic ## Complete setup from scratch
 	@echo ""
 	@echo "🎉 Syntara setup complete!"
 	@echo ""
@@ -85,7 +95,23 @@ _check-uv:
 		exit 1; \
 	fi
 
-_check-dependency-binaries: _check-uv
+# python-magic is a thin wrapper around the libmagic C library, which uv
+# cannot install. Fail early with install hints instead of crashing at API startup.
+# Skips when python-magic itself is not installed; _check-dependency-binaries and
+# `make install` report that case.
+.PHONY: _check-libmagic
+_check-libmagic: _check-uv
+	@if ! uv run --no-sync python -c "import importlib.util as u; u.find_spec('magic') is None or __import__('magic')" >/dev/null 2>&1; then \
+		echo "❌ libmagic not found (required by python-magic for file type detection)."; \
+		echo "   Install it, then re-run this command:"; \
+		echo "     macOS:         brew install libmagic"; \
+		echo "     Fedora/RHEL:   sudo dnf install file-libs"; \
+		echo "     Debian/Ubuntu: sudo apt install libmagic1"; \
+		echo "     Windows:       see docs/windows-setup-guide.md"; \
+		exit 1; \
+	fi
+
+_check-dependency-binaries: _check-uv _check-libmagic
 	@if ! uv run python -c "import src" 2>/dev/null; then \
 		echo "❌ syntara package not installed. Run 'make install' first"; \
 		exit 1; \
@@ -310,7 +336,7 @@ worker-run: check-deps _ensure-secrets _ensure-certs ## Run Temporal workflow wo
 	APP_AGENT_ORCHESTRATOR_BASE_URL=$(WORKER_BASE_URL) \
 	APP_APPROVALS_API_BASE_URL=$(WORKER_BASE_URL) \
 	APP_TOOL_MANAGER_BASE_URL=$(WORKER_BASE_URL) \
-	uv run python -m syntara.workflows.worker
+	uv run python -m syntara.workflow_runtime.workers.worker
 
 .PHONY: background-worker-run
 background-worker-run: check-deps _ensure-secrets _ensure-certs ## Run Temporal workflow background worker
@@ -325,7 +351,7 @@ background-worker-run: check-deps _ensure-secrets _ensure-certs ## Run Temporal 
 	APP_AGENT_ORCHESTRATOR_BASE_URL=$(WORKER_BASE_URL) \
 	APP_APPROVALS_API_BASE_URL=$(WORKER_BASE_URL) \
 	APP_TOOL_MANAGER_BASE_URL=$(WORKER_BASE_URL) \
-	uv run python -m syntara.workflows.background_worker
+	uv run python -m syntara.workflow_runtime.workers.background_worker
 
 
 # Database
@@ -462,15 +488,19 @@ run-all: _ensure-secrets _ensure-certs ## Start all services (foreground, Ctrl+C
 	$(COMPOSE_FINAL_CMD) up --build --force-recreate
 
 .PHONY: services-run
-services-run: _ensure-secrets _ensure-certs ## Start all services (database + cache + temporal + UI + worker + background-worker + MCP) in background
+services-run: _ensure-secrets _ensure-certs ## Start all services (database + cache + temporal + UI + worker + background-worker + MCP) in background and wait until healthy
 	@echo "🚀 Starting all services (database + cache + temporal + UI + worker + background-worker + MCP)..."
 	@echo "📍 Database: postgresql://admin:admin@localhost:$${APP_DB_PORT:-5432}/syntara_api"
 	@echo "📍 Cache: cache://localhost:$${APP_CACHE_PORT:-6379}"
 	@echo "📍 Temporal Server: localhost:$${APP_TEMPORAL_PORT:-7233}"
 	@echo "📍 Temporal UI: http://localhost:$${APP_TEMPORAL_UI_PORT:-8081}"
 	@echo "📍 MCP Server: http://localhost:$${MCP_PORT:-8765}/mcp"
-	$(COMPOSE_FINAL_CMD) --profile mcp-scenarios up --build --force-recreate -d database redis temporal temporal-ui temporal-worker temporal-background-worker mcp-server mcp-server-scenarios moto
-	@echo "✅ All services started in background"
+	@services="$$($(WAIT_FOR_SERVICES) --print-services --compose-file ../podman-compose.yml \
+		--profile $(SERVICES_RUN_PROFILE) $(addprefix --exclude ,$(SERVICES_RUN_EXCLUDE)))" || exit 1; \
+	echo "📦 Services: $$services"; \
+	$(COMPOSE_FINAL_CMD) --profile $(SERVICES_RUN_PROFILE) up --build --force-recreate -d $$services && \
+	$(WAIT_FOR_SERVICES) --project $(PODMAN_PROJECT) --timeout $(SERVICES_WAIT_TIMEOUT) $$services
+	@echo "✅ All services started in background and healthy"
 	@echo "   Use 'make services-logs' to view logs"
 	@echo "   Use 'make services-stop' to stop services"
 

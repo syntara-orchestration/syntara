@@ -39,6 +39,20 @@ def _definition(
     }
 
 
+def _loop_definition() -> dict[str, Any]:
+    return {
+        "triggers": TRIGGERS,
+        "nodes": [
+            {"id": "loop_1", "type": "loop", "parameters": {}},
+            {"id": "body_step", "type": "script", "parameters": {"code": "exit 1"}},
+        ],
+        "edges": [
+            {"from": "trigger_1", "to": "loop_1"},
+            {"from": "loop_1", "to": "body_step"},
+        ],
+    }
+
+
 def test_strip_iteration_suffix() -> None:
     assert strip_iteration_suffix("step_2#iter-3") == "step_2"
     assert strip_iteration_suffix("step_2") == "step_2"
@@ -80,16 +94,26 @@ def _make_execution(status: ExecutionStatus) -> Mock:
     return execution
 
 
-def _make_activity(name: str) -> Mock:
+def _make_activity(name: str, *, temporal_activity_id: str | None = None, iteration: int | None = None) -> Mock:
     activity = Mock()
     activity.activity_name = name
+    activity.temporal_activity_id = temporal_activity_id or name
+    activity.iteration = iteration
     activity.status = ActivityStatus.FAILED
     return activity
 
 
-def _make_completed_activity(name: str, output: dict[str, Any] | None = None) -> Mock:
+def _make_completed_activity(
+    name: str,
+    output: dict[str, Any] | None = None,
+    *,
+    temporal_activity_id: str | None = None,
+    iteration: int | None = None,
+) -> Mock:
     activity = Mock()
     activity.activity_name = name
+    activity.temporal_activity_id = temporal_activity_id or name
+    activity.iteration = iteration
     activity.status = ActivityStatus.COMPLETED
     activity.output_data = output if output is not None else {"result": "ok"}
     return activity
@@ -135,6 +159,24 @@ async def test_validate_retry_rejects_unknown_failure_point() -> None:
     verdict = await validate_retry_from_failure(session, execution.id, ["nope"])
     assert verdict.eligible is False
     assert "nope" in (verdict.reason or "")
+
+
+@pytest.mark.asyncio
+async def test_validate_retry_rejection_does_not_report_result_counts() -> None:
+    execution = _make_execution(ExecutionStatus.FAILED)
+    session = _mock_session(
+        (execution, "one"),
+        ([_make_activity("step_2")], "all"),
+        ([_make_completed_activity("step_1")], "all"),
+        (_make_version(1), "one"),
+    )
+
+    verdict = await validate_retry_from_failure(session, execution.id, ["nope"])
+
+    assert verdict.eligible is False
+    assert verdict.step_count_by_eligible_point == {}
+    assert verdict.total_step_count == 0
+    assert verdict.retained_result_count == 0
 
 
 @pytest.mark.asyncio
@@ -210,6 +252,42 @@ async def test_validate_retry_rejects_sanitized_upstream_output() -> None:
     assert clean.eligible is True
     assert clean.sanitized_node_ids == []
     assert clean.sanitized_replacements == {}
+
+
+@pytest.mark.asyncio
+async def test_invalid_execution_state_does_not_report_sanitized_retry_nodes() -> None:
+    execution = _make_execution(ExecutionStatus.RUNNING)
+    ref_nodes = [
+        dict(node, parameters={**node.get("parameters", {}), "input_ref": "${step_1.token}"})
+        if node["id"] == "step_2"
+        else node
+        for node in NODES
+    ]
+    session = _field_session(execution, ref_nodes, [_make_completed_activity("step_1", {"token": "[REDACTED]"})])
+
+    verdict = await validate_retry_from_failure(session, execution.id, ["step_2"])
+
+    assert verdict.eligible is False
+    assert "running" in (verdict.reason or "")
+    assert verdict.sanitized_node_ids == []
+
+
+@pytest.mark.asyncio
+async def test_invalid_selection_does_not_report_sanitized_retry_nodes() -> None:
+    execution = _make_execution(ExecutionStatus.FAILED)
+    ref_nodes = [
+        dict(node, parameters={**node.get("parameters", {}), "input_ref": "${step_1.token}"})
+        if node["id"] in {"step_2", "step_3"}
+        else node
+        for node in NODES
+    ]
+    session = _field_session(execution, ref_nodes, [_make_completed_activity("step_1", {"token": "[REDACTED]"})])
+
+    verdict = await validate_retry_from_failure(session, execution.id, ["step_3"])
+
+    assert verdict.eligible is False
+    assert "neither failed nor eligible replacements" in (verdict.reason or "")
+    assert verdict.sanitized_node_ids == []
 
 
 @pytest.mark.asyncio
@@ -768,6 +846,21 @@ def _converge_definition() -> dict[str, Any]:
     }
 
 
+def _loop_converge_definition() -> dict[str, Any]:
+    loop = {"id": "loop_1", "type": "loop", "parameters": {}}
+    body = {"id": "step_a", "type": "script", "parameters": {"code": "exit 1"}}
+    converge = {"id": "conv_1", "type": "converge", "parameters": {}}
+    return {
+        "triggers": TRIGGERS,
+        "nodes": [loop, body, converge],
+        "edges": [
+            {"from": "trigger_1", "to": "loop_1"},
+            {"from": "loop_1", "to": "step_a"},
+            {"from": "step_a", "to": "conv_1"},
+        ],
+    }
+
+
 def _converge_session(execution: Mock, converge_status: str) -> AsyncSession:
     snapshot = _make_version(1)
     snapshot.workflow_definition = _converge_definition()
@@ -792,6 +885,100 @@ async def test_validate_retry_rejects_failure_under_completed_converge() -> None
     verdict = await validate_retry_from_failure(session, execution.id, ["step_a"])
     assert verdict.eligible is False
     assert "conv_1" in (verdict.reason or "")
+
+
+@pytest.mark.asyncio
+async def test_validate_retry_allows_later_loop_failure_when_earlier_converge_completed() -> None:
+    """A completed converge from iteration 0 must not block a failure in iteration 1."""
+    execution = _make_execution(ExecutionStatus.FAILED)
+    session = _run_session(
+        execution,
+        _loop_converge_definition(),
+        failed=[_make_activity("step_a#iter-1", temporal_activity_id="step_a_iter_1", iteration=1)],
+        completed=[_make_completed_activity("conv_1", temporal_activity_id="conv_1_iter_0", iteration=0)],
+    )
+
+    verdict = await validate_retry_from_failure(session, execution.id, ["step_a"])
+
+    assert verdict.eligible is True
+    assert verdict.reason is None
+
+
+@pytest.mark.asyncio
+async def test_validate_retry_rejects_loop_failure_when_same_iteration_converge_completed() -> None:
+    """A converge completed in the failed occurrence's iteration still blocks retry."""
+    execution = _make_execution(ExecutionStatus.FAILED)
+    session = _run_session(
+        execution,
+        _loop_converge_definition(),
+        failed=[_make_activity("step_a#iter-1", temporal_activity_id="step_a_iter_1", iteration=1)],
+        completed=[_make_completed_activity("conv_1#iter-1", temporal_activity_id="conv_1_iter_1", iteration=1)],
+    )
+
+    verdict = await validate_retry_from_failure(session, execution.id, ["step_a"])
+
+    assert verdict.eligible is False
+    assert "conv_1" in (verdict.reason or "")
+
+
+@pytest.mark.asyncio
+async def test_validate_retry_rejects_loop_failure_when_outer_converge_completed() -> None:
+    """A converge outside the loop is shared by all iteration paths."""
+    execution = _make_execution(ExecutionStatus.FAILED)
+    session = _run_session(
+        execution,
+        _loop_converge_definition(),
+        failed=[_make_activity("step_a#iter-1", temporal_activity_id="step_a_iter_1", iteration=1)],
+        completed=[_make_completed_activity("conv_1", temporal_activity_id="conv_1", iteration=None)],
+    )
+
+    verdict = await validate_retry_from_failure(session, execution.id, ["step_a"])
+
+    assert verdict.eligible is False
+    assert "conv_1" in (verdict.reason or "")
+
+
+@pytest.mark.asyncio
+async def test_validate_retry_allows_base_selection_when_only_some_failed_iterations_reached_converge() -> None:
+    """Base-node selection remains useful if any failed occurrence still needs retry."""
+    execution = _make_execution(ExecutionStatus.FAILED)
+    session = _run_session(
+        execution,
+        _loop_converge_definition(),
+        failed=[
+            _make_activity("step_a", temporal_activity_id="step_a_iter_0", iteration=0),
+            _make_activity("step_a#iter-1", temporal_activity_id="step_a_iter_1", iteration=1),
+        ],
+        completed=[_make_completed_activity("conv_1", temporal_activity_id="conv_1_iter_0", iteration=0)],
+    )
+
+    verdict = await validate_retry_from_failure(session, execution.id, ["step_a"])
+
+    assert verdict.eligible is True
+    assert verdict.reason is None
+
+
+@pytest.mark.asyncio
+async def test_missing_snapshot_node_reason_precedes_completed_converge_reason() -> None:
+    """A missing retained-version node should report the actionable version error."""
+    execution = _make_execution(ExecutionStatus.FAILED)
+    snapshot = _make_version(1)
+    snapshot.workflow_definition = {
+        "triggers": TRIGGERS,
+        "nodes": [{"id": "conv_1", "type": "converge", "parameters": {}}],
+        "edges": [{"from": "missing_step", "to": "conv_1"}],
+    }
+    session = _mock_session(
+        (execution, "one"),
+        ([_make_activity("missing_step")], "all"),
+        ([_make_completed_activity("conv_1")], "all"),
+        (snapshot, "one"),
+    )
+
+    verdict = await validate_retry_from_failure(session, execution.id, ["missing_step"])
+
+    assert verdict.eligible is False
+    assert "not nodes in the executed workflow version: missing_step" in (verdict.reason or "")
 
 
 @pytest.mark.asyncio
@@ -831,6 +1018,19 @@ async def test_validate_retry_empty_selection_defaults_to_all_failed() -> None:
 
 
 @pytest.mark.asyncio
+async def test_validate_retry_keeps_loop_control_as_a_failed_start_point() -> None:
+    execution = _make_execution(ExecutionStatus.FAILED)
+    for selection in (["loop_1"], []):
+        verdict = await validate_retry_from_failure(
+            _run_session(execution, _loop_definition(), failed=[_make_activity("loop_1")]),
+            execution.id,
+            selection,
+        )
+        assert verdict.eligible is True
+        assert verdict.eligible_point_ids == ["loop_1"]
+
+
+@pytest.mark.asyncio
 async def test_validate_retry_rejects_empty_selection_with_no_failed_nodes() -> None:
     """Defaulting still rejects when there are no failed nodes at all to default to."""
     execution = _make_execution(ExecutionStatus.FAILED)
@@ -846,6 +1046,19 @@ async def test_validate_retry_rejects_iteration_suffixed_selection() -> None:
     verdict = await validate_retry_from_failure(_run_session(execution, _definition()), execution.id, ["step_2#iter-1"])
     assert verdict.eligible is False
     assert "base node" in (verdict.reason or "")
+    assert verdict.eligible_point_ids == ["step_2"]
+
+
+@pytest.mark.asyncio
+async def test_validate_retry_suggests_base_id_for_nested_iteration_selection() -> None:
+    execution = _make_execution(ExecutionStatus.FAILED)
+
+    verdict = await validate_retry_from_failure(
+        _run_session(execution, _definition()), execution.id, ["step_2#iter-1#iter-2"]
+    )
+
+    assert verdict.eligible is False
+    assert verdict.eligible_point_ids == ["step_2"]
 
 
 @pytest.mark.asyncio
@@ -1086,6 +1299,9 @@ async def test_validate_retry_rejects_override_with_unknown_parameter_key() -> N
     assert verdict.eligible is False
     assert "not_a_param" in (verdict.reason or "")
     assert "code" in (verdict.reason or "")
+    assert verdict.eligible_point_ids == ["step_2"]
+    assert verdict.step_count_by_eligible_point == {"step_2": 2}
+    assert verdict.total_step_count == 2
 
 
 @pytest.mark.asyncio

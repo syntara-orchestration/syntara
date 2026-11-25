@@ -113,7 +113,7 @@ The items below cover patterns ESLint **cannot** catch:
 14. **No unnecessary `useEffect`** -- never use `useEffect` to compute derived state, chain state updates, or handle user events; use event handlers, `useMemo`, or inline calculations instead ([React docs](https://react.dev/learn/you-might-not-need-an-effect), [`.agents/skills/frontend-coding-standards/SKILL.md`](../.agents/skills/frontend-coding-standards/SKILL.md) §23)
 15. **Cascading form field resets belong in `onChange`** -- when one field change should reset another, put the `setValue()` calls in the field's `onChange` handler, not in a `useEffect` watching the field value
 16. **E2E tests must be self-contained** -- every E2E test must create ALL resources it needs and delete ALL created resources in a `try-finally` block; `test.skip()` is only acceptable for data that is impossible to create programmatically (e.g., human-approved records, external integrations) — if the test can create the data via API, it must (see [`.agents/skills/frontend-playwright-e2e/SKILL.md`](../.agents/skills/frontend-playwright-e2e/SKILL.md))
-17. **Use `RhUi*` icons for action buttons** -- never use PatternFly icons like `PlusCircleIcon` directly; use `RhUiAddIcon`, `RhUiDuplicate`, etc. from `@patternfly/react-icons`
+17. **Use `RhUi*` icons by default** -- import `RhUi`-prefixed icons from `@patternfly/react-icons`; the ESLint config defines allowed exceptions
 18. **CSS module classes over inline style objects** -- prefer `.module.css` classes over `style={{ ... }}` props; CSS modules are more DOM-efficient, cacheable, and keep styles co-located
 19. **No mutable counters in `.map()`** -- do not use `let` counters inside `.map()` or `.forEach()`; pre-compute indices immutably or use the callback's index parameter
 20. **Never use `eslint-disable`** -- do not add `eslint-disable` or `eslint-disable-next-line` to new or modified code. Every rule catches a real problem; fix the code so the rule passes. Pre-existing suppressions are tech debt being cleaned up. See [`.agents/skills/frontend-coding-standards/SKILL.md`](../.agents/skills/frontend-coding-standards/SKILL.md) §28
@@ -130,7 +130,7 @@ The items below cover patterns ESLint **cannot** catch:
 31. **Prefer ref callback cleanup functions** -- when attaching DOM listeners or observers, return a cleanup from the ref callback instead of pairing `useRef` + `useEffect` (see [`.agents/skills/frontend-coding-standards/SKILL.md`](../.agents/skills/frontend-coding-standards/SKILL.md) §38)
 32. **No new `useContext`** -- React 19 reads context with `use(Context)`; do not add `useContext` (see [`.agents/skills/frontend-coding-standards/SKILL.md`](../.agents/skills/frontend-coding-standards/SKILL.md) §39)
 33. **Prefer `useOptimistic` for clear toggle/counter mutations** -- update UI inside a `startTransition` Action with `mutateAsync`; do not hand-roll pending mirror state for simple before/after mutations (see [`.agents/skills/frontend-coding-standards/SKILL.md`](../.agents/skills/frontend-coding-standards/SKILL.md) §40)
-34. **No new barrel files in `src/`** -- do not create a file that only re-exports from other files. Import directly from the source file instead. ESLint enforces this at `warn` (`barrel-files/avoid-barrel-files`), scoped to `src/**/*.{ts,tsx}` -- new `src/` code must not add a new warning. Does not apply to `e2e/` or other non-production directories (see [`.agents/skills/frontend-coding-standards/SKILL.md`](../.agents/skills/frontend-coding-standards/SKILL.md) §43)
+34. **No new barrel files in `src/`** -- do not create a file that only re-exports from other files. Import directly from the source file instead. ESLint enforces this at `error` (`barrel-files/avoid-barrel-files`), scoped to `src/**/*.{ts,tsx}`. Does not apply to `e2e/` or other non-production directories (see [`.agents/skills/frontend-coding-standards/SKILL.md`](../.agents/skills/frontend-coding-standards/SKILL.md) §43)
 35. **Use TanStack Router for URL search state** -- see [URL Search State](../.agents/skills/frontend-coding-standards/SKILL.md#url-search-state) for `validateSearch`, `useSearch`, `useNavigate`, and list-filter patterns
 
 ### Feature Preservation Rules
@@ -201,9 +201,11 @@ To use the real backend instead of the mock API:
 3. Export the backend URL and start the UI:
 
 ```bash
-export VITE_API_URL=http://localhost:8000
+export VITE_API_URL=https://localhost:8000
 npm start
 ```
+
+`make dev` from the repository root sets `VITE_API_URL` for you. The backend dev server uses HTTPS with a self-signed certificate, which the Vite proxy accepts (`secure: false`). Use `http://` only if you run the backend with `APP_S2S_TLS_ENABLED=false`, as in the [Windows setup guide](../docs/windows-setup-guide.md).
 
 ## Architecture Documentation
 

@@ -1,6 +1,7 @@
 import type { ExecutionsAPI } from '@syntara/contracts'
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
+import { axe } from 'vitest-axe'
 
 import { ActivityStatusLabel, StatusLabel } from './ExecutionStatus'
 
@@ -102,10 +103,40 @@ describe('ActivityStatusLabel', () => {
     render(<ActivityStatusLabel status="completed" replayed />)
     expect(screen.getByText('Successful')).toBeInTheDocument()
     expect(screen.getByTestId('replayed-output-badge')).toBeInTheDocument()
+    const details = screen.getByRole('group', { name: 'Activity status and retry information' })
+    expect(details).toContainElement(screen.getByText('Successful'))
+    expect(details).toContainElement(screen.getByTestId('replayed-output-badge'))
   })
 
   it('does not show the replayed badge when replayed is explicitly false', () => {
     render(<ActivityStatusLabel status="completed" replayed={false} />)
     expect(screen.queryByTestId('replayed-output-badge')).not.toBeInTheDocument()
+  })
+
+  it('labels a retained failure separately from the activity status', () => {
+    render(<ActivityStatusLabel status="failed" retainedFailure />)
+
+    expect(screen.getByText('Failed')).toBeInTheDocument()
+    expect(screen.getByText('Retained failure')).toBeInTheDocument()
+  })
+
+  it('labels reused trigger input separately from reused action output', () => {
+    render(<ActivityStatusLabel status="completed" triggerInputReused />)
+
+    expect(screen.getByText('Successful')).toBeInTheDocument()
+    expect(screen.getByText('Reused trigger input')).toBeInTheDocument()
+    expect(screen.queryByTestId('replayed-output-badge')).not.toBeInTheDocument()
+  })
+
+  it('does not add a browser-native tooltip to the reused-trigger label', () => {
+    render(<ActivityStatusLabel status="completed" triggerInputReused />)
+
+    expect(screen.queryByTitle(/trigger ran again with input from the source run/i)).not.toBeInTheDocument()
+  })
+
+  it('has no accessibility violations when status and retry markers are combined', async () => {
+    const { container } = render(<ActivityStatusLabel status="failed" retainedFailure />)
+
+    expect(await axe(container)).toHaveNoViolations()
   })
 })

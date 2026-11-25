@@ -267,7 +267,7 @@ class TestCreateApprovalContract:
             response,
             error_type="https://api.example.com/errors/validation-error",
             title="Request Validation Error",
-            detail=("Validation failed: execution_id: Input should be a valid UUID, invalid character: found `n` at 1"),
+            detail=("Validation failed: execution_id: Input should be a valid UUID, invalid character: found `n` at 0"),
             code="REQUEST_VALIDATION_ERROR",
             retryable=False,
         )
@@ -288,7 +288,7 @@ class TestCreateApprovalContract:
             title="Request Validation Error",
             detail=(
                 "Validation failed: workflow_context -> workflow_id: Input should be a valid UUID, "
-                "invalid character: found `n` at 1"
+                "invalid character: found `n` at 0"
             ),
             code="REQUEST_VALIDATION_ERROR",
             retryable=False,

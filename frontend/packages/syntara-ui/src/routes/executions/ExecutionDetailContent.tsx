@@ -6,7 +6,8 @@ import type React from 'react'
 import { SynPanelStack, SynPanelStackItem } from '../../components/layout/SynPanelStack'
 import { ResizableDivider } from '../../components/ResizableDivider'
 import type { PaginationFooterProps } from '../../components/table/PaginationFooter'
-import { useAlerts } from '../../providers/alerts'
+import { useAlerts } from '../../providers/alerts/AlertContext'
+import { useFeatureFlag } from '../../providers/use-feature-flag'
 import type { FilterConfig } from '../../types/filters'
 import { detachPromise } from '../../utils/detachPromise'
 import { ExecutionDetailsPanel, type WorkflowDefShape } from '../builder/ExecutionDetailsPanel'
@@ -17,8 +18,10 @@ import { useExecutionStore } from '../workflows/stores/useExecutionStore'
 
 import { ConnectionBanner } from './ConnectionBanner'
 import styles from './ExecutionDetail.module.css'
+import { useRunDetailsPanelExpand } from './hooks/useRunDetailsPanelExpand'
 import { getRetryDetailSelection } from './retryDetailSelection'
 import { RetryFromFailureSidePanel } from './RetryFromFailureSidePanel'
+import type { RunDetailsPanelExpandControl } from './RunDetailsPanelExpandButton'
 import { useRetryInputOverrides } from './useRetryInputOverrides'
 
 type Execution = ExecutionsAPI.components['schemas']['ExecutionRead']
@@ -84,6 +87,8 @@ type ExecutionDetailContentLayoutProps = Readonly<{
   retryInputOverrides?: ReturnType<typeof useRetryInputOverrides>['state']
   panelHeight: number
   panelHeightPercent: number
+  isPanelExpanded: boolean
+  panelExpandControl?: RunDetailsPanelExpandControl
   onResize: (deltaY: number) => void
 }>
 
@@ -111,6 +116,8 @@ function ExecutionDetailContentLayout({
   retryInputOverrides,
   panelHeight,
   panelHeightPercent,
+  isPanelExpanded,
+  panelExpandControl,
   onResize,
 }: ExecutionDetailContentLayoutProps) {
   const isStale = useExecutionStore((state) => state.isStale)
@@ -158,27 +165,33 @@ function ExecutionDetailContentLayout({
           </Flex>
         )}
         <SynPanelStack>
-          <SynPanelStackItem isFilled>
-            <ExecutionViewContent
-              workflow={workflow}
-              executionStatus={execution?.status ?? null}
-              executionActivities={activities}
-              executionId={executionId}
-              onNodeClick={onNodeClick}
-              selectedActivityId={currentApprovalNodeId ?? selectedStepId}
-              retryPreviewPointIds={retryPreviewPointIds}
-            />
-          </SynPanelStackItem>
+          {!isPanelExpanded && (
+            <SynPanelStackItem isFilled>
+              <ExecutionViewContent
+                workflow={workflow}
+                executionStatus={execution?.status ?? null}
+                executionActivities={activities}
+                executionId={executionId}
+                onNodeClick={onNodeClick}
+                selectedActivityId={currentApprovalNodeId ?? selectedStepId}
+                retryPreviewPointIds={retryPreviewPointIds}
+              />
+            </SynPanelStackItem>
+          )}
 
-          <ResizableDivider onResize={onResize} currentValue={panelHeightPercent} />
+          {!isPanelExpanded && <ResizableDivider onResize={onResize} currentValue={panelHeightPercent} />}
 
-          <SynPanelStackItem style={{ height: `${String(panelHeight)}px` }}>
+          <SynPanelStackItem
+            isFilled={isPanelExpanded}
+            style={isPanelExpanded ? { minHeight: 0 } : { height: `${String(panelHeight)}px` }}
+          >
             <ExecutionDetailsPanel
               executionId={executionId}
               workflowDefinition={workflow?.version.workflow_definition}
               selectedNodeId={retryDetailNodeId}
               selectedNodeName={retryDetailNodeName}
               onNodeSelect={onStepSelect}
+              panelExpandControl={panelExpandControl}
               retryMode={retryMode}
               retryInputOverrides={retryInputOverrides}
             />
@@ -248,6 +261,12 @@ export function ExecutionDetailContent(props: ExecutionDetailContentProps) {
   const { showError } = useAlerts()
   const prevStatusRef = useRef(execution?.status)
   const [panelHeight, setPanelHeight] = useState(300)
+  const isWorkflowBuilderQolEnabled = useFeatureFlag('workflow_builder_qol')
+  const { isPanelExpanded, panelExpandControl } = useRunDetailsPanelExpand(
+    panelHeight,
+    setPanelHeight,
+    isWorkflowBuilderQolEnabled
+  )
   const [retryPreviewPointIds, setRetryPreviewPointIds] = useState<string[]>([])
   const retryPreviewEdges = useMemo(
     () => getRetryPreviewEdges(workflow?.version.workflow_definition),
@@ -342,6 +361,8 @@ export function ExecutionDetailContent(props: ExecutionDetailContentProps) {
       retryInputOverrides={retryPanelOpen ? retryInputOverridesState : undefined}
       panelHeight={panelHeight}
       panelHeightPercent={panelHeightPercent}
+      isPanelExpanded={isPanelExpanded}
+      panelExpandControl={panelExpandControl}
       onResize={handleResize}
     />
   )

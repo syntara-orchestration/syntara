@@ -8,7 +8,6 @@ import { executionsRoutes } from './routes/executions'
 import { featureFlagDemoRoutes } from './routes/feature-flag-demo'
 import { myProfileRoutes } from './routes/my-profile'
 import { settingsRoutes } from './routes/settings'
-import { supportRoutes } from './routes/support'
 import { workflowsRoutes } from './routes/workflows'
 
 export const buildTanStackRouteTree = () =>
@@ -23,5 +22,4 @@ export const buildTanStackRouteTree = () =>
     ...authenticationRoutes,
     ...accessManagementRoutes,
     ...myProfileRoutes,
-    ...supportRoutes,
   ])

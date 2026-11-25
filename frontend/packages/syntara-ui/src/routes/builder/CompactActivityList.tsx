@@ -4,13 +4,12 @@ import { Tbody, Td, Tr } from '@patternfly/react-table'
 import { ExecutionTimeRange } from '../../components/table/ExecutionTimestamp'
 import { SynScrollableTableContainer } from '../../components/table/SynScrollableTableContainer'
 import type { ActivityState } from '../workflows/execution/types'
-import { parseCompositeKey } from '../workflows/execution/utils/activityState'
 
 import styles from './CompactActivityList.module.css'
 import type { ActivityOrderItem } from './ExecutionActivityTable'
 import { ActivityStatusLabel } from './ExecutionStatus'
 import { ACTIVITY_STATUS } from './utils/executionState/executionHelpers'
-import { isReplayedStep } from './utils/replayedNodes'
+import { getRetryActivityMarkers } from './utils/replayedNodes'
 
 export type CompactActivityListProps = {
   activityStates: Map<string, ActivityState>
@@ -29,14 +28,14 @@ export function CompactActivityList({
   replayBaselineAt,
 }: Readonly<CompactActivityListProps>) {
   return (
-    <SynScrollableTableContainer caption="Activity list" useFixedLayout={false} variant="compact">
+    <SynScrollableTableContainer caption="Activity list" useFixedLayout={false}>
       <Tbody>
         {activityOrder.map(({ id, name, type }) => {
           const state = activityStates.get(id)
+          const retryMarkers = getRetryActivityMarkers(state, replayBaselineAt, type)
           const hasTimeRange = Boolean(state?.startedAt)
-          const { baseId } = parseCompositeKey(id)
           const displayName = name ?? id
-          const isSelected = baseId === selectedNodeId
+          const isSelected = id === selectedNodeId
 
           return (
             <Tr
@@ -61,7 +60,9 @@ export function CompactActivityList({
                 <ActivityStatusLabel
                   status={state?.status ?? ACTIVITY_STATUS.PENDING}
                   nodeType={type}
-                  replayed={isReplayedStep(state?.startedAt, replayBaselineAt, state?.status)}
+                  replayed={retryMarkers.replayed}
+                  retainedFailure={retryMarkers.retainedFailure}
+                  triggerInputReused={retryMarkers.triggerInputReused}
                 />
               </Td>
             </Tr>

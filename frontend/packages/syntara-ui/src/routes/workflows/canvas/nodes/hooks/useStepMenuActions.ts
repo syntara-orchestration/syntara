@@ -10,8 +10,8 @@ import {
 import { useReactFlow } from '@xyflow/react'
 import { createElement, useCallback, type ReactNode } from 'react'
 
-import { type StepMenuCategoryUnion, StepMenuCategory } from '../../../../../constants'
-import { useAlerts } from '../../../../../providers/alerts'
+import { type StepMenuCategoryUnion, StepMenuCategory } from '../../../../../constants/nodeTypes'
+import { useAlerts } from '../../../../../providers/alerts/AlertContext'
 import type { NodeActionsContextValue } from '../../../../../routes/builder/NodeActionsContext'
 import { useStepActions } from '../../../../../routes/builder/StepActionsContext'
 import { getErrorMessage } from '../../../../../utils/apiErrors'
@@ -19,7 +19,7 @@ import { detachPromise } from '../../../../../utils/detachPromise'
 import { resolveFlowNodeId } from '../../../../../utils/triggerNodeIds'
 
 // Re-export for convenience
-export { StepMenuCategory, type StepMenuCategoryUnion } from '../../../../../constants'
+export { StepMenuCategory, type StepMenuCategoryUnion } from '../../../../../constants/nodeTypes'
 
 export type StepMenuAction = {
   id: string
@@ -55,8 +55,18 @@ function buildBuilderActions(
   disabled: boolean,
   handlers: BuilderActionHandlers
 ): StepMenuAction[] {
+  const viewDetailsAction: StepMenuAction = {
+    id: 'view-details',
+    label: 'View step details',
+    onClick: handlers.onViewDetails,
+    icon: createElement(RhUiInformationIcon),
+  }
+
   if (stepCategory === StepMenuCategory.CONTROL_FLOW) {
-    return [{ id: 'replace', label: 'Replace', onClick: handlers.onReplace, icon: createElement(RhUiSyncIcon) }]
+    return [
+      viewDetailsAction,
+      { id: 'replace', label: 'Replace', onClick: handlers.onReplace, icon: createElement(RhUiSyncIcon) },
+    ]
   }
 
   const activityActions: StepMenuAction[] =
@@ -79,15 +89,7 @@ function buildBuilderActions(
         ]
       : []
 
-  return [
-    {
-      id: 'view-details',
-      label: 'View step details',
-      onClick: handlers.onViewDetails,
-      icon: createElement(RhUiInformationIcon),
-    },
-    ...activityActions,
-  ]
+  return [viewDetailsAction, ...activityActions]
 }
 
 function appendDeleteAction(actions: StepMenuAction[], deleteAction: StepMenuAction): StepMenuAction[] {

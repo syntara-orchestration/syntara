@@ -4,6 +4,7 @@ import type { ReactNode } from 'react'
 
 import { ApprovalPendingBadge } from '../../components/labels/ApprovalPendingBadge'
 import { SynLabel } from '../../components/labels/SynLabel'
+import { SynLink } from '../../components/SynLink'
 import { ExecutionTimestamp } from '../../components/table/ExecutionTimestamp'
 import { StatusLabel } from '../builder/ExecutionStatus'
 import { RunHistoryToggleButton } from '../builder/RunHistoryToggleButton'
@@ -39,7 +40,9 @@ export function ExecutionDetailTitleRowAddons({ execution }: Readonly<{ executio
       {execution.retried_from_execution_id ? (
         <FlexItem data-testid="retried-from-badge">
           <SynLabel isCompact={false}>
-            {`Retried from: ${execution.retried_from_execution_id.slice(0, TRUNCATED_ID_LENGTH)}`}
+            <SynLink to={`/executions/${execution.retried_from_execution_id}?history=closed`}>
+              {`Retried from: ${execution.retried_from_execution_id.slice(0, TRUNCATED_ID_LENGTH)}`}
+            </SynLink>
           </SynLabel>
         </FlexItem>
       ) : null}
@@ -85,8 +88,6 @@ export function ExecutionDetailHeaderToolbar({
   onRetryFromFailureClick,
   isRetryMode = false,
 }: ExecutionDetailHeaderToolbarProps) {
-  if (isRetryMode) return null
-
   const isRetryable = isExecutionRetryable(execution?.status, execution?.mode)
   const showRetryFromFailure = isRetryFromFailureEligible(execution?.status, execution?.mode)
   let retryAction: ReactNode = null
@@ -126,7 +127,7 @@ export function ExecutionDetailHeaderToolbar({
       {isCancellable && execution && (
         <CancelExecutionButton executionId={executionId} projectId={execution.project_id} />
       )}
-      {retryAction}
+      {!isRetryMode && retryAction}
       <Button variant="secondary" onClick={onCopyToEditor}>
         Copy to editor
       </Button>

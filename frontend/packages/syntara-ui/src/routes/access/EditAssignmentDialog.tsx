@@ -16,7 +16,7 @@ import { SynForm } from '../../components/forms/SynForm'
 import { SynFormField } from '../../components/forms/SynFormField'
 import { invalidateAuthzCaches } from '../../hooks/invalidateAuthzCaches'
 import { useSynForm } from '../../hooks/useSynForm'
-import { useAlerts } from '../../providers/alerts'
+import { useAlerts } from '../../providers/alerts/AlertContext'
 import { detachPromise } from '../../utils/detachPromise'
 import { buildAssignmentBody } from '../access-management/RoleAssignmentTypes'
 

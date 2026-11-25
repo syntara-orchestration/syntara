@@ -2,7 +2,7 @@ import { useState } from 'react'
 
 import { usersClient } from '../../../client'
 import { useMutationErrorHandler } from '../../../hooks/useMutationErrorHandler'
-import { useAlerts } from '../../../providers/alerts'
+import { useAlerts } from '../../../providers/alerts/AlertContext'
 
 import type { UserIdentity } from './identityUtils'
 

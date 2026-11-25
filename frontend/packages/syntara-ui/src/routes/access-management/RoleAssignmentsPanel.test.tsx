@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 
 import { SynListPanel } from '../../components/panels/list/SynListPanel'
-import { AlertProvider } from '../../providers/alerts'
+import { AlertProvider } from '../../providers/alerts/AlertProvider'
 import { searchParamsMock } from '../../test/searchParamsMock'
 import { accessClient } from '../access/accessClient'
 import { useAllProjects, useSelectableProjects } from '../access/useAllProjects'

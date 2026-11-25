@@ -1,4 +1,4 @@
-import { FlowNodeType } from '../../constants'
+import { FlowNodeType } from '../../constants/nodeTypes'
 import { parseCompositeKey } from '../workflows/execution/utils/activityState'
 
 export type RetryPreviewGraphEdge = Readonly<{ source: string; target: string }>

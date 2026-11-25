@@ -1,4 +1,4 @@
-import { FlowNodeType } from '../../constants'
+import { FlowNodeType } from '../../constants/nodeTypes'
 
 import { getNotRetriedFailureCount, getRetryPreviewCanvasStates } from './retryPreviewCanvasState'
 

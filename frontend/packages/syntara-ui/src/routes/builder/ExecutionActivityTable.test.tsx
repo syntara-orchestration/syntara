@@ -1,3 +1,4 @@
+import { ActivityTypeEnum } from '@syntara/contracts'
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
@@ -26,10 +27,12 @@ function state(id: string, overrides: Partial<ActivityState> = {}): [string, Act
 function renderTable({
   states = new Map<string, ActivityState>(),
   order = [],
+  selectedNodeId,
   replayBaselineAt,
 }: {
   states?: Map<string, ActivityState>
   order?: ActivityOrderItem[]
+  selectedNodeId?: string | null
   replayBaselineAt?: string | null
 } = {}) {
   return render(
@@ -37,6 +40,7 @@ function renderTable({
       activityStates={states}
       activityOrder={order}
       now={NOW}
+      selectedNodeId={selectedNodeId}
       replayBaselineAt={replayBaselineAt}
     />
   )
@@ -57,7 +61,7 @@ describe('ExecutionActivityTable', () => {
     it('shows formatted dates and elapsed for completed activity', () => {
       renderTable({
         states: new Map([state('task-1', { status: 'completed', startedAt: T0, completedAt: T2 })]),
-        order: [{ id: 'task-1', name: 'Task' }],
+        order: [{ id: 'task-1', name: 'Task', type: ActivityTypeEnum.SCRIPT }],
       })
 
       expect(screen.getByText('1m 0s')).toBeInTheDocument()
@@ -95,20 +99,39 @@ describe('ExecutionActivityTable', () => {
       expect(labels[1]).toHaveTextContent('failed')
     })
 
+    it('highlights only the selected loop iteration', () => {
+      const order: ActivityOrderItem[] = [
+        { id: 'task-1', name: 'Task (iter 0)' },
+        { id: 'task-1#iter-1', name: 'Task (iter 1)' },
+        { id: 'task-1#iter-2', name: 'Task (iter 2)' },
+      ]
+
+      renderTable({
+        states: new Map(order.map(({ id }) => state(id))),
+        order,
+        selectedNodeId: 'task-1#iter-1',
+      })
+
+      const rows = screen.getAllByRole('row')
+      expect(rows[1]).not.toHaveClass('pf-m-selected')
+      expect(rows[2]).toHaveClass('pf-m-selected')
+      expect(rows[3]).not.toHaveClass('pf-m-selected')
+    })
+
     it('marks a row replayed when its start predates the retry baseline', () => {
       renderTable({
         states: new Map([state('task-1', { status: 'completed', startedAt: T0 })]),
-        order: [{ id: 'task-1', name: 'Task' }],
+        order: [{ id: 'task-1', name: 'Task', type: ActivityTypeEnum.SCRIPT }],
         replayBaselineAt: T2,
       })
 
       expect(screen.getByTestId('activity-status-label-replayed')).toBeInTheDocument()
     })
 
-    it('does not mark a retained failure as replayed', () => {
+    it('does not mark a retained failure without output as replayed', () => {
       renderTable({
         states: new Map([state('task-1', { status: 'failed', startedAt: T0 })]),
-        order: [{ id: 'task-1', name: 'Script' }],
+        order: [{ id: 'task-1', name: 'Script', type: ActivityTypeEnum.SCRIPT }],
         replayBaselineAt: T2,
       })
 
@@ -118,7 +141,7 @@ describe('ExecutionActivityTable', () => {
     it('does not mark a row replayed when there is no retry baseline', () => {
       renderTable({
         states: new Map([state('task-1', { status: 'completed', startedAt: T0 })]),
-        order: [{ id: 'task-1', name: 'Task' }],
+        order: [{ id: 'task-1', name: 'Task', type: ActivityTypeEnum.SCRIPT }],
       })
 
       expect(screen.queryByTestId('activity-status-label-replayed')).not.toBeInTheDocument()

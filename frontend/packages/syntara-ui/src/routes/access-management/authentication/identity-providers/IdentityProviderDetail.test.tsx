@@ -7,11 +7,16 @@ import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { axe } from 'vitest-axe'
 
 import { adminClient, identityProvidersClient } from '../../../../client'
-import { AlertProvider } from '../../../../providers/alerts'
+import { AlertProvider } from '../../../../providers/alerts/AlertProvider'
 import { routerTestState } from '../../../../test/setup'
 import { accessFetchClient } from '../../../access/accessClient'
 
-import { IdentityProviderDetail } from './IdentityProviderDetail'
+import {
+  IdentityProviderDetail,
+  IdentityProviderDetailsTabRoute,
+  IdentityProviderGroupMappingTabRoute,
+  IdentityProviderUnknownTabRoute,
+} from './IdentityProviderDetail'
 import { IdpTypeKey } from './idpTypePresets'
 
 type MutationCallbacks = {
@@ -30,6 +35,29 @@ vi.mock('./GroupMappingTab', () => ({
     </div>
   ),
 }))
+
+function IdentityProviderDetailTestOutlet() {
+  const tab = routerTestState.pathname.split('/').at(-1)
+  if (tab === 'group-mapping') return <IdentityProviderGroupMappingTabRoute />
+  if (tab === 'invalid-tab') return <IdentityProviderUnknownTabRoute />
+  return <IdentityProviderDetailsTabRoute />
+}
+
+vi.mock('@tanstack/react-router', async () => {
+  const actual = await vi.importActual<typeof import('@tanstack/react-router')>('@tanstack/react-router')
+  const { MockLink } = await import('../../../../test/setup')
+  return {
+    ...actual,
+    Link: MockLink,
+    Outlet: IdentityProviderDetailTestOutlet,
+    useParams: vi.fn(() => ({ providerId: VALID_PROVIDER_ID })),
+    useNavigate: () => routerTestState.navigate,
+    useRouterState: (opts?: { select?: (s: { location: { pathname: string; searchStr: string } }) => unknown }) => {
+      const state = { location: { pathname: routerTestState.pathname, searchStr: routerTestState.searchStr } }
+      return opts?.select ? opts.select(state) : state
+    },
+  }
+})
 
 vi.mock('../../../../client', async (importOriginal) => {
   const original = await importOriginal<typeof import('../../../../client')>()
@@ -223,14 +251,15 @@ describe('IdentityProviderDetail', () => {
     expect(mockRefetch).toHaveBeenCalled()
   })
 
-  it('navigates to edit page from primary Edit provider button', async () => {
-    const user = userEvent.setup()
+  it('links to the edit route from primary Edit provider control', () => {
     vi.mocked(identityProvidersClient.useQuery).mockReturnValue(mockQueryReturn())
 
     render(<IdentityProviderDetail />, { wrapper: createWrapper() })
 
-    await user.click(screen.getByRole('button', { name: /edit provider/i }))
-    expect(routerTestState.navigate).toHaveBeenCalled()
+    expect(screen.getByRole('link', { name: /edit provider/i })).toHaveAttribute(
+      'href',
+      `/system-administration/authentication/identity-providers/${VALID_PROVIDER_ID}/edit`
+    )
   })
 
   it('shows manual endpoints when auto_discovery is false', () => {
@@ -850,7 +879,7 @@ describe('IdentityProviderDetail', () => {
 
     render(<IdentityProviderDetail />, { wrapper: createWrapper() })
 
-    expect(screen.getByRole('button', { name: 'Edit provider' })).toHaveAttribute('aria-disabled', 'true')
+    expect(screen.getByRole('link', { name: 'Edit provider' })).toHaveAttribute('aria-disabled', 'true')
   })
 
   it('disables revoke action in kebab menu when canRevoke is false', async () => {

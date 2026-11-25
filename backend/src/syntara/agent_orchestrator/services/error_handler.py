@@ -4,6 +4,7 @@ Provides structured error classification for LLM streaming failures following
 RFC 9457 Problem Details format for WebSocket error events.
 """
 
+import re
 from uuid import UUID
 
 from syntara.agent_orchestrator.exceptions import AgentTimeoutError, ToolDiscoveryError, ToolSelectionUnavailableError
@@ -11,6 +12,11 @@ from syntara.core.models.error import ErrorData
 
 # Base URI for error types
 ERROR_TYPE_BASE_URI = "https://api.example.com/errors"
+
+# A standalone 5xx status code. Word boundaries keep 5xx-looking digit runs
+# embedded in unrelated numbers (request ids, token counts, timestamps) from
+# matching.
+_SERVER_ERROR_STATUS_PATTERN = re.compile(r"\b5\d{2}\b")
 
 
 def _build_instance_uri(invocation_id: UUID | None) -> str | None:
@@ -23,19 +29,32 @@ def _contains_any(text: str, keywords: list[str]) -> bool:
     return any(keyword in text for keyword in keywords)
 
 
+def _is_server_error(error_msg: str) -> bool:
+    """Check if error indicates a server-side failure (any 5xx status)."""
+    return _SERVER_ERROR_STATUS_PATTERN.search(error_msg) is not None
+
+
 def _is_rate_limit_error(error_msg: str) -> bool:
-    """Check if error indicates rate limiting."""
+    """Check if error indicates rate limiting.
+
+    A 5xx status takes precedence over an incidental ``429`` appearing elsewhere
+    in the message (e.g. a request id or provider body text), so this earlier
+    check does not mask a genuine upstream server failure.
+    """
+    if _is_server_error(error_msg):
+        return False
     return _contains_any(error_msg, ["rate limit", "429"])
 
 
 def _is_auth_error(error_msg: str) -> bool:
-    """Check if error indicates authentication failure."""
+    """Check if error indicates authentication failure.
+
+    As with rate limiting, a 5xx status takes precedence over an incidental
+    ``401``/``403`` mention so an upstream server failure is not masked.
+    """
+    if _is_server_error(error_msg):
+        return False
     return _contains_any(error_msg, ["unauthorized", "403", "401"])
-
-
-def _is_server_error(error_msg: str) -> bool:
-    """Check if error indicates server-side failure."""
-    return _contains_any(error_msg, ["500", "502", "503"])
 
 
 def _is_network_error(error_msg: str) -> bool:

@@ -12,6 +12,7 @@ import type { FilterConfig } from '../../types/filters'
 import { formatElapsedTime } from '../../utils/dateUtils'
 import { detachPromise } from '../../utils/detachPromise'
 import type { RetryInputOverridesState } from '../executions/retryInputOverrides'
+import type { RunDetailsPanelExpandControl } from '../executions/RunDetailsPanelExpandButton'
 import { StepExecutionDetailsPanel } from '../executions/StepExecutionDetailsPanel'
 import type { ActivityState } from '../workflows/execution/types'
 import { parseCompositeKey } from '../workflows/execution/utils/activityState'
@@ -47,6 +48,7 @@ type ExecutionDetailsPanelProps = {
   onNodeSelect?: (nodeId: string, nodeName: string) => void
   headerLabel?: string
   onClosePanel?: () => void
+  panelExpandControl?: RunDetailsPanelExpandControl
   retryMode?: boolean
   retryInputOverrides?: RetryInputOverridesState
 }
@@ -77,6 +79,7 @@ type ThreePanelLayoutProps = {
   onRowClick?: (nodeId: string, nodeName: string) => void
   headerLabel?: string
   onClosePanel?: () => void
+  panelExpandControl?: RunDetailsPanelExpandControl
   replayBaselineAt?: string | null
   retryMode: boolean
   retryInputOverrides?: RetryInputOverridesState
@@ -103,6 +106,7 @@ function ThreePanelLayout({
   onRowClick,
   headerLabel,
   onClosePanel,
+  panelExpandControl,
   replayBaselineAt,
   retryMode,
   retryInputOverrides,
@@ -148,6 +152,7 @@ function ThreePanelLayout({
           onViewModeChange={onViewModeChange}
           headerLabel={headerLabel}
           onClosePanel={onClosePanel}
+          panelExpandControl={panelExpandControl}
         />
       </div>
       <Flex
@@ -200,6 +205,7 @@ function ThreePanelLayout({
               executionId={executionId}
               stepState={selectedNodeState}
               stepType={selectedNodeType}
+              replayBaselineAt={replayBaselineAt}
               retryInputOverride={retryInputOverride}
             />
           ) : (
@@ -244,6 +250,7 @@ type SinglePanelLayoutProps = {
   selectedNodeId?: string | null
   headerLabel?: string
   onClosePanel?: () => void
+  panelExpandControl?: RunDetailsPanelExpandControl
   replayBaselineAt?: string | null
 }
 
@@ -276,6 +283,7 @@ function SinglePanelLayout({
   selectedNodeId,
   headerLabel,
   onClosePanel,
+  panelExpandControl,
   replayBaselineAt,
 }: Readonly<SinglePanelLayoutProps>) {
   const resolvedError = useMemo(
@@ -303,6 +311,7 @@ function SinglePanelLayout({
             onViewModeChange={onViewModeChange}
             headerLabel={headerLabel}
             onClosePanel={onClosePanel}
+            panelExpandControl={panelExpandControl}
           />
         </StackItem>
 
@@ -356,6 +365,7 @@ export function ExecutionDetailsPanel({
   onNodeSelect,
   headerLabel,
   onClosePanel,
+  panelExpandControl,
   retryMode = false,
   retryInputOverrides,
 }: Readonly<ExecutionDetailsPanelProps>) {
@@ -411,15 +421,14 @@ export function ExecutionDetailsPanel({
   const hasFilteredOutActivities = hasActiveFilters && activityOrder.length > 0
   const showFilters = activityOrder.length > 0 || hasActiveFilters
 
-  const { resolvedNodeId, effectiveKey, displayStepName, selectedNodeState, selectedNodeType, handleRowClick } =
-    useSelectedActivity({
-      selectedNodeId,
-      selectedNodeNameProp,
-      activityStates,
-      activityOrder,
-      nameMap,
-      onNodeSelect,
-    })
+  const { effectiveKey, displayStepName, selectedNodeState, selectedNodeType, handleRowClick } = useSelectedActivity({
+    selectedNodeId,
+    selectedNodeNameProp,
+    activityStates,
+    activityOrder,
+    nameMap,
+    onNodeSelect,
+  })
 
   const effectiveViewMode: ViewMode = retryMode ? retryModeViewMode : viewMode
 
@@ -459,7 +468,7 @@ export function ExecutionDetailsPanel({
         showFilters={showFilters}
         filters={filters}
         onFilterChange={handleFilterChange}
-        selectedNodeId={resolvedNodeId}
+        selectedNodeId={effectiveKey}
         detailNodeId={effectiveKey}
         displayStepName={displayStepName}
         executionId={executionId}
@@ -471,6 +480,7 @@ export function ExecutionDetailsPanel({
         headerLabel={headerLabel}
         onClosePanel={onClosePanel}
         replayBaselineAt={replayBaselineAt}
+        panelExpandControl={panelExpandControl}
         retryMode={retryMode}
         retryInputOverrides={retryInputOverrides}
       />
@@ -493,10 +503,11 @@ export function ExecutionDetailsPanel({
       viewMode={effectiveViewMode}
       onViewModeChange={handleViewModeChange}
       onRowClick={handleRowClick}
-      selectedNodeId={resolvedNodeId}
+      selectedNodeId={effectiveKey}
       headerLabel={headerLabel}
       onClosePanel={onClosePanel}
       replayBaselineAt={replayBaselineAt}
+      panelExpandControl={panelExpandControl}
     />
   )
 }

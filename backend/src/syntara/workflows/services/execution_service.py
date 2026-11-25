@@ -30,6 +30,11 @@ from syntara.metrics.dependencies import get_metrics_recorder
 from syntara.metrics.emission import emit_completion_metrics
 from syntara.metrics.interface_tag import interface_context_var
 from syntara.metrics.types import ComponentLabel, MetricType
+from syntara.workflow_core.models import NodeType, resolve_trigger_node
+from syntara.workflow_core.validation import apply_schema_defaults
+from syntara.workflow_runtime.execution import WorkflowExecutionService
+from syntara.workflow_runtime.signals import resolve_signal_failure_message
+from syntara.workflow_runtime.utils.workflow_metadata import build_workflow_metadata, resolve_user_display_name
 from syntara.workflows.audit.execution_lifecycle import ExecutionAction, ExecutionLifecycleEvent
 from syntara.workflows.exceptions import (
     ExecutionInTerminalStateError,
@@ -42,7 +47,6 @@ from syntara.workflows.exceptions import (
     WorkflowNotFoundError,
     WorkflowNotPublishedError,
 )
-from syntara.workflows.json_schema_validation import apply_schema_defaults
 from syntara.workflows.models.activity_execution import (
     ActivityExecution,
     ActivityExecutionListResponse,
@@ -64,10 +68,6 @@ from syntara.workflows.models.workflow import Workflow
 from syntara.workflows.models.workflow_definition import WorkflowDefinition
 from syntara.workflows.models.workflow_version import WorkflowVersion
 from syntara.workflows.services.retry_validation import RetryValidation, validate_retry_from_failure
-from syntara.workflows.utils.workflow_metadata import build_workflow_metadata, resolve_user_display_name
-from syntara.workflows.workflow_engine.models.workflow_definition import NodeType, resolve_trigger_node
-from syntara.workflows.workflow_engine.services.temporal_execution_service import TemporalExecutionService
-from syntara.workflows.workflow_engine.signals.processor import resolve_signal_failure_message
 
 if TYPE_CHECKING:
     from syntara.metrics.recorder import MetricsRecorder
@@ -195,7 +195,7 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
         self,
         session: AsyncSession,
         user: User,
-        temporal_service: TemporalExecutionService | None = None,
+        temporal_service: WorkflowExecutionService | None = None,
     ) -> None:
         """Initialize service with database session.
 
@@ -1251,7 +1251,8 @@ class ExecutionService(UserReferenceResolverMixin, BaseService):
 
         failed_types: set[str] = set()
         for activity in failed_activities:
-            failed_types.add(activity.node_type.value)
+            if activity.node_type is not None:
+                failed_types.add(activity.node_type.value)
 
         # Sort deterministically and bound to 50 entries
         return sorted(failed_types)[:50]

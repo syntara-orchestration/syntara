@@ -6,6 +6,8 @@ import { useUnsavedChanges } from '../../app/useUnsavedChanges'
 import { useUrlTab } from '../../hooks/useUrlTab'
 import { detachPromise } from '../../utils/detachPromise'
 
+import styles from './SynUrlTabs.module.css'
+
 type UrlTabsProps = Omit<TabsProps, 'activeKey' | 'onSelect' | 'ref' | 'children'> & {
   /**
    * Tab children (`<Tab>` elements). Typed as `ReactNode` to accept pre-cloned Tab arrays from
@@ -27,6 +29,10 @@ type UrlTabsProps = Omit<TabsProps, 'activeKey' | 'onSelect' | 'ref' | 'children
    * instead of navigating directly. Use on pages where a tab may have unsaved state.
    */
   guardUnsavedChanges?: boolean
+  /** Accessible panel names by tab key. Unlisted panels use their tab key as a fallback. */
+  tabPanelLabels?: Readonly<Record<string, string>>
+  /** Applies the full-height spacing layout used by nested detail tabs. */
+  routePanelLayout?: 'detail'
   /**
    * Optional callback to render the active tab's content inside a proper `role="tabpanel"` wrapper.
    *
@@ -52,6 +58,8 @@ export function SynUrlTabs({
   validTabs,
   children,
   guardUnsavedChanges,
+  tabPanelLabels,
+  routePanelLayout,
   renderPanel,
   ...tabsProps
 }: UrlTabsProps) {
@@ -138,14 +146,14 @@ export function SynUrlTabs({
       </Tabs>
       {stubKeys.map((key) => (
         // Standalone panel element satisfying PF's generated aria-controls for childless Tabs.
-        // aria-label uses the eventKey as a fallback accessible name; callers needing richer labels
-        // should pass renderPanel (which provides the full panel) or use SynListPanelView with
-        // tabKey/tabLabel for SynListPanel compound usage.
+        // aria-label uses the eventKey as a fallback accessible name. Callers can provide the
+        // human-readable tab title through tabPanelLabels.
         <section
           key={key}
           id={`${uid}-panel-${key}`}
           role="tabpanel"
-          aria-label={key}
+          aria-label={tabPanelLabels?.[key] ?? key}
+          className={renderPanel && key === activeTab && routePanelLayout === 'detail' ? styles.routePanel : undefined}
           hidden={key !== activeTab ? true : undefined}
         >
           {renderPanel && key === activeTab ? renderPanel(activeTab) : null}
