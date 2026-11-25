@@ -187,6 +187,8 @@ async def test_project_scoped_deny_on_global_assignment_fails_closed(
             "matched_policy": "",
             "denial_reason": "policy_deny",
             "denied_by": deny_name,
+            "denied_scope": "project",
+            "denied_project": "",
         }
 
     # The deny keeps its kind selector: other step types stay authorable.
