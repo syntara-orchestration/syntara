@@ -21,10 +21,11 @@ describe('SynFormField', () => {
     renderWithForm<FormData>({ schema, defaultValues: { username: '' } }, (form) => (
       <SynForm form={form}>
         <SynFormField<FormData, 'username'> name="username" label="Username">
-          {({ field }) => (
+          {({ field, describedBy }) => (
             <TextInput
               id="username"
               aria-label="Username"
+              aria-describedby={describedBy}
               value={field.value ?? ''}
               onChange={field.onChange}
               name={field.name}
@@ -34,7 +35,9 @@ describe('SynFormField', () => {
       </SynForm>
     ))
 
-    expect(screen.getByRole('textbox', { name: 'Username' })).toBeInTheDocument()
+    const input = screen.getByRole('textbox', { name: 'Username' })
+    expect(input).toBeInTheDocument()
+    expect(input).not.toHaveAttribute('aria-describedby')
   })
 
   it('renders the label', () => {
@@ -79,10 +82,11 @@ describe('SynFormField', () => {
   it('shows a hint when there is no error', () => {
     renderWithForm<FormData>({ schema, defaultValues: { username: '' } }, ({ control }) => (
       <SynFormField name="username" control={control} label="Username" hint="Enter your username">
-        {({ field }) => (
+        {({ field, describedBy }) => (
           <TextInput
             id="username"
             aria-label="Username"
+            aria-describedby={describedBy}
             value={field.value ?? ''}
             onChange={field.onChange}
             name={field.name}
@@ -91,7 +95,66 @@ describe('SynFormField', () => {
       </SynFormField>
     ))
 
+    const input = screen.getByRole('textbox', { name: 'Username' })
     expect(screen.getByText('Enter your username')).toBeInTheDocument()
+    const describedBy = input.getAttribute('aria-describedby')
+    expect(describedBy).toBeTruthy()
+    expect(input).toHaveAccessibleDescription('Enter your username')
+  })
+
+  it('generates unique helper IDs that do not collide with field IDs', () => {
+    const multiFieldSchema = z.object({ first: z.string(), second: z.string() })
+    renderWithForm({ schema: multiFieldSchema, defaultValues: { first: '', second: '' } }, ({ control }) => (
+      <>
+        <SynFormField name="first" control={control} label="First field" fieldId="field" hint="First hint">
+          {({ field, describedBy }) => (
+            <TextInput
+              id="field"
+              aria-label="First field"
+              aria-describedby={describedBy}
+              value={field.value ?? ''}
+              onChange={field.onChange}
+              name={field.name}
+            />
+          )}
+        </SynFormField>
+        <SynFormField
+          name="second"
+          control={control}
+          label="Second field"
+          fieldId="field-helper-text"
+          hint="Second hint"
+        >
+          {({ field, describedBy }) => (
+            <TextInput
+              id="field-helper-text"
+              aria-label="Second field"
+              aria-describedby={describedBy}
+              value={field.value ?? ''}
+              onChange={field.onChange}
+              name={field.name}
+            />
+          )}
+        </SynFormField>
+      </>
+    ))
+
+    const firstInput = screen.getByRole('textbox', { name: 'First field' })
+    const secondInput = screen.getByRole('textbox', { name: 'Second field' })
+    expect(screen.getByText('First hint')).toBeInTheDocument()
+    expect(screen.getByText('Second hint')).toBeInTheDocument()
+    const firstDescriptionId = firstInput.getAttribute('aria-describedby')
+    const secondDescriptionId = secondInput.getAttribute('aria-describedby')
+    expect(firstDescriptionId).toBeTruthy()
+    expect(secondDescriptionId).toBeTruthy()
+
+    expect(firstInput).toHaveAccessibleDescription('First hint')
+    expect(secondInput).toHaveAccessibleDescription('Second hint')
+    expect(firstDescriptionId).not.toBe(firstInput.id)
+    expect(firstDescriptionId).not.toBe(secondInput.id)
+    expect(secondDescriptionId).not.toBe(firstInput.id)
+    expect(secondDescriptionId).not.toBe(secondInput.id)
+    expect(firstDescriptionId).not.toBe(secondDescriptionId)
   })
 
   it('shows a validation error and hides the hint after failed submit', async () => {
@@ -99,10 +162,11 @@ describe('SynFormField', () => {
     renderWithForm<FormData>({ schema, defaultValues: { username: '' } }, ({ control, handleSubmit }) => (
       <>
         <SynFormField name="username" control={control} label="Username" hint="Enter your username">
-          {({ field, fieldState }) => (
+          {({ field, fieldState, describedBy }) => (
             <TextInput
               id="username"
               aria-label="Username"
+              aria-describedby={describedBy}
               validated={fieldState.error ? 'error' : 'default'}
               value={field.value ?? ''}
               onChange={field.onChange}
@@ -117,9 +181,45 @@ describe('SynFormField', () => {
       </>
     ))
 
+    const input = screen.getByRole('textbox', { name: 'Username' })
+    expect(screen.getByText('Enter your username')).toBeInTheDocument()
+    const describedBy = input.getAttribute('aria-describedby')
+    expect(describedBy).toBeTruthy()
+
     await user.click(screen.getByRole('button', { name: 'Submit' }))
 
     expect(await screen.findByText('Username is required')).toBeInTheDocument()
+    expect(input).toHaveAttribute('aria-describedby', describedBy)
+    expect(input).toHaveAccessibleDescription(/Username is required/)
+    expect(screen.queryByText('Enter your username')).not.toBeInTheDocument()
+  })
+
+  it('does not describe the field when an error has no rendered message', async () => {
+    const user = userEvent.setup()
+    renderWithForm<FormData>({ schema, defaultValues: { username: '' } }, ({ control, setError }) => (
+      <>
+        <SynFormField name="username" control={control} label="Username" hint="Enter your username">
+          {({ field, describedBy }) => (
+            <TextInput
+              id="username"
+              aria-label="Username"
+              aria-describedby={describedBy}
+              value={field.value ?? ''}
+              onChange={field.onChange}
+              name={field.name}
+            />
+          )}
+        </SynFormField>
+        <button type="button" onClick={() => setError('username', { type: 'manual' })}>
+          Set error without a message
+        </button>
+      </>
+    ))
+
+    const input = screen.getByRole('textbox', { name: 'Username' })
+    await user.click(screen.getByRole('button', { name: 'Set error without a message' }))
+
+    expect(input).not.toHaveAttribute('aria-describedby')
     expect(screen.queryByText('Enter your username')).not.toBeInTheDocument()
   })
 
@@ -148,10 +248,11 @@ describe('SynFormField', () => {
       ({ control, handleSubmit }) => (
         <>
           <SynFormField name="username" control={control} label="Username" isRequired>
-            {({ field, fieldState }) => (
+            {({ field, fieldState, describedBy }) => (
               <TextInput
                 id="username"
                 aria-label="Username"
+                aria-describedby={describedBy}
                 validated={fieldState.error ? 'error' : 'default'}
                 value={field.value ?? ''}
                 onChange={field.onChange}
@@ -168,7 +269,11 @@ describe('SynFormField', () => {
     )
 
     await user.click(screen.getByRole('button', { name: 'Submit' }))
-    await screen.findByText('Username is required')
+    expect(await screen.findByText('Username is required')).toBeInTheDocument()
+    const input = screen.getByRole('textbox', { name: 'Username' })
+    const describedBy = input.getAttribute('aria-describedby')
+    expect(describedBy).toBeTruthy()
+    expect(input).toHaveAccessibleDescription(/Username is required/)
 
     expect(await axe(container)).toHaveNoViolations()
   })
@@ -224,10 +329,11 @@ describe('SynFormField', () => {
     renderWithForm<FormData>({ schema, defaultValues: { username: '' } }, ({ control, handleSubmit }) => (
       <>
         <SynFormField name="username" control={control} label="Username" hint="Enter your username" hideFooter>
-          {({ field }) => (
+          {({ field, describedBy }) => (
             <TextInput
               id="username"
               aria-label="Username"
+              aria-describedby={describedBy}
               value={field.value ?? ''}
               onChange={field.onChange}
               name={field.name}
@@ -242,6 +348,7 @@ describe('SynFormField', () => {
 
     await user.click(screen.getByRole('button', { name: 'Submit' }))
 
+    expect(screen.getByRole('textbox', { name: 'Username' })).not.toHaveAttribute('aria-describedby')
     expect(screen.queryByText('Username is required')).not.toBeInTheDocument()
     expect(screen.queryByText('Enter your username')).not.toBeInTheDocument()
   })

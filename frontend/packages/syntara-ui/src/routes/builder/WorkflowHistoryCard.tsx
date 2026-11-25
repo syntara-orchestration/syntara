@@ -157,7 +157,6 @@ export function ExecutionHistoryRow({ execution, onSelect, isSelected }: Executi
         onSelect={onSelect}
         data-item-id={execution.id}
         aria-label={rowLabel}
-        overlay
         className={styles.historyRowOverlay}
       />
       <Stack className={styles.historyRowStack}>

@@ -81,6 +81,23 @@
 }
 
 /*
+ * Temporary: compact + mixed sort headers — sort cells center on the sort button; plain th
+ * default to bottom alignment. Middle-align all header cells and normalize sort button margin.
+ * Scoped to .pf-m-compact; remove when PF adjusts.
+ */
+.table:global(.pf-v6-c-table.pf-m-compact) {
+  :global(thead.pf-v6-c-table__thead tr.pf-v6-c-table__tr > th.pf-v6-c-table__th) {
+    padding-block-start: var(--pf-t--global--spacer--sm);
+    padding-block-end: var(--pf-t--global--spacer--sm);
+    vertical-align: middle;
+  }
+
+  :global(thead.pf-v6-c-table__thead th.pf-v6-c-table__sort .pf-v6-c-table__button) {
+    margin-block-end: 0;
+  }
+}
+
+/*
  * Sticky header glass: isPlain sets thead background to transparent so rows show through
  * while scrolling. Triple-layer the glass color (~87.5% effective opacity).
  */

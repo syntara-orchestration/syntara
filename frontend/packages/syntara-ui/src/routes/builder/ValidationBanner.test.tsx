@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 
 import type { ValidationError } from './builderReducer'
-import { AUTHORIZED_SERVICE_ACCOUNT_REQUIRED_MESSAGE } from './node-forms/triggerFormSchema'
+import { AUTHORIZED_SERVICE_ACCOUNT_REQUIRED_MESSAGE } from './step-forms/triggerFormSchema'
 import {
   humanizeValidationMessage,
   mergeHumanizedMessages,
@@ -237,11 +237,11 @@ describe('ValidationBanner', () => {
   })
 
   it('renders node name as clickable term in description list', async () => {
-    const onNavigateToNode = vi.fn()
+    const onNavigateToStep = vi.fn()
     const errors: ValidationError[] = [{ message: 'MyNode: is disconnected', nodeId: 'node-1', nodeName: 'MyNode' }]
 
     render(
-      <ValidationBanner errors={errors} dismissed={false} dispatch={mockDispatch} onNavigateToNode={onNavigateToNode} />
+      <ValidationBanner errors={errors} dismissed={false} dispatch={mockDispatch} onNavigateToStep={onNavigateToStep} />
     )
     await expandAlert()
 
@@ -250,7 +250,7 @@ describe('ValidationBanner', () => {
   })
 
   it('links unprefixed webhook errors to nodeId when nodeName is missing', async () => {
-    const onNavigateToNode = vi.fn()
+    const onNavigateToStep = vi.fn()
     const errors: ValidationError[] = [
       {
         message: '[] should be non-empty',
@@ -260,19 +260,19 @@ describe('ValidationBanner', () => {
     ]
 
     render(
-      <ValidationBanner errors={errors} dismissed={false} dispatch={mockDispatch} onNavigateToNode={onNavigateToNode} />
+      <ValidationBanner errors={errors} dismissed={false} dispatch={mockDispatch} onNavigateToStep={onNavigateToStep} />
     )
     const user = await expandAlert()
 
     expect(screen.queryByText('Workflow')).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'snow_trigger' }))
 
-    expect(onNavigateToNode).toHaveBeenCalledWith('snow_trigger')
+    expect(onNavigateToStep).toHaveBeenCalledWith('snow_trigger')
     expect(screen.getByText(AUTHORIZED_SERVICE_ACCOUNT_REQUIRED_MESSAGE)).toBeInTheDocument()
   })
 
   it('prefers nodeName over nodeId for unprefixed webhook errors', async () => {
-    const onNavigateToNode = vi.fn()
+    const onNavigateToStep = vi.fn()
     const errors: ValidationError[] = [
       {
         message: '[] should be non-empty',
@@ -283,7 +283,7 @@ describe('ValidationBanner', () => {
     ]
 
     render(
-      <ValidationBanner errors={errors} dismissed={false} dispatch={mockDispatch} onNavigateToNode={onNavigateToNode} />
+      <ValidationBanner errors={errors} dismissed={false} dispatch={mockDispatch} onNavigateToStep={onNavigateToStep} />
     )
     await expandAlert()
 
@@ -291,29 +291,29 @@ describe('ValidationBanner', () => {
     expect(screen.queryByRole('button', { name: 'snow_trigger' })).not.toBeInTheDocument()
   })
 
-  it('calls onNavigateToNode when node term link is clicked', async () => {
-    const onNavigateToNode = vi.fn()
+  it('calls onNavigateToStep when node term link is clicked', async () => {
+    const onNavigateToStep = vi.fn()
     const errors: ValidationError[] = [{ message: 'MyNode: is disconnected', nodeId: 'node-1', nodeName: 'MyNode' }]
 
     render(
-      <ValidationBanner errors={errors} dismissed={false} dispatch={mockDispatch} onNavigateToNode={onNavigateToNode} />
+      <ValidationBanner errors={errors} dismissed={false} dispatch={mockDispatch} onNavigateToStep={onNavigateToStep} />
     )
     const user = await expandAlert()
 
     await user.click(screen.getByRole('button', { name: 'MyNode' }))
 
-    expect(onNavigateToNode).toHaveBeenCalledWith('node-1')
+    expect(onNavigateToStep).toHaveBeenCalledWith('node-1')
   })
 
   it('groups plain errors under Workflow without a link', async () => {
-    const onNavigateToNode = vi.fn()
+    const onNavigateToStep = vi.fn()
     const errors: ValidationError[] = [
       { message: 'Missing trigger', nodeId: null },
       { message: 'Some raw error', nodeId: null },
     ]
 
     render(
-      <ValidationBanner errors={errors} dismissed={false} dispatch={mockDispatch} onNavigateToNode={onNavigateToNode} />
+      <ValidationBanner errors={errors} dismissed={false} dispatch={mockDispatch} onNavigateToStep={onNavigateToStep} />
     )
     await expandAlert()
 
@@ -323,7 +323,7 @@ describe('ValidationBanner', () => {
     expect(screen.queryByRole('button', { name: 'Workflow' })).not.toBeInTheDocument()
   })
 
-  it('renders terms as plain text when onNavigateToNode is not provided', async () => {
+  it('renders terms as plain text when onNavigateToStep is not provided', async () => {
     const errors: ValidationError[] = [
       { message: 'MyNode: is disconnected', nodeId: 'node-1', nodeName: 'MyNode' },
       { message: 'Missing trigger', nodeId: null },
@@ -340,7 +340,7 @@ describe('ValidationBanner', () => {
   })
 
   it('humanizes and merges structured backend errors with node name term', async () => {
-    const onNavigateToNode = vi.fn()
+    const onNavigateToStep = vi.fn()
     const errors: ValidationError[] = [
       {
         message: "'language' is a required property",
@@ -355,7 +355,7 @@ describe('ValidationBanner', () => {
     ]
 
     render(
-      <ValidationBanner errors={errors} dismissed={false} dispatch={mockDispatch} onNavigateToNode={onNavigateToNode} />
+      <ValidationBanner errors={errors} dismissed={false} dispatch={mockDispatch} onNavigateToStep={onNavigateToStep} />
     )
     await expandAlert()
 
@@ -364,13 +364,13 @@ describe('ValidationBanner', () => {
   })
 
   it('humanizes simple prefixed errors with node name term', async () => {
-    const onNavigateToNode = vi.fn()
+    const onNavigateToStep = vi.fn()
     const errors: ValidationError[] = [
       { message: "Script4: 'language' is a required property", nodeId: 'node-1', nodeName: 'Script4' },
     ]
 
     render(
-      <ValidationBanner errors={errors} dismissed={false} dispatch={mockDispatch} onNavigateToNode={onNavigateToNode} />
+      <ValidationBanner errors={errors} dismissed={false} dispatch={mockDispatch} onNavigateToStep={onNavigateToStep} />
     )
     await expandAlert()
 
@@ -379,7 +379,7 @@ describe('ValidationBanner', () => {
   })
 
   it('stacks multiple errors vertically under the same node', async () => {
-    const onNavigateToNode = vi.fn()
+    const onNavigateToStep = vi.fn()
     const errors: ValidationError[] = [
       {
         message: "'123_bad_id' does not match '^[a-zA-Z_][a-zA-Z0-9_]*$'",
@@ -394,7 +394,7 @@ describe('ValidationBanner', () => {
     ]
 
     render(
-      <ValidationBanner errors={errors} dismissed={false} dispatch={mockDispatch} onNavigateToNode={onNavigateToNode} />
+      <ValidationBanner errors={errors} dismissed={false} dispatch={mockDispatch} onNavigateToStep={onNavigateToStep} />
     )
     await expandAlert()
 
@@ -420,7 +420,7 @@ describe('ValidationBanner', () => {
   })
 
   it('displays field name from fieldPath for non-empty validation errors', async () => {
-    const onNavigateToNode = vi.fn()
+    const onNavigateToStep = vi.fn()
     const errors: ValidationError[] = [
       {
         message: "'' should be non-empty",
@@ -431,7 +431,7 @@ describe('ValidationBanner', () => {
     ]
 
     render(
-      <ValidationBanner errors={errors} dismissed={false} dispatch={mockDispatch} onNavigateToNode={onNavigateToNode} />
+      <ValidationBanner errors={errors} dismissed={false} dispatch={mockDispatch} onNavigateToStep={onNavigateToStep} />
     )
     await expandAlert()
 
@@ -440,14 +440,14 @@ describe('ValidationBanner', () => {
   })
 
   it('has no accessibility violations', async () => {
-    const onNavigateToNode = vi.fn()
+    const onNavigateToStep = vi.fn()
     const errors: ValidationError[] = [
       { message: 'MyNode: is disconnected', nodeId: 'node-1', nodeName: 'MyNode' },
       { message: 'Missing trigger', nodeId: null },
     ]
 
     const { container } = render(
-      <ValidationBanner errors={errors} dismissed={false} dispatch={mockDispatch} onNavigateToNode={onNavigateToNode} />
+      <ValidationBanner errors={errors} dismissed={false} dispatch={mockDispatch} onNavigateToStep={onNavigateToStep} />
     )
     await expandAlert()
 

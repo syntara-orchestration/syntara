@@ -34,16 +34,16 @@ from temporalio.service import RPCError, RPCStatusCode
 
 from syntara.core.config.base import get_settings
 from syntara.core.tls.temporal import build_temporal_tls_config
-from syntara.workflows.exceptions import ScheduledTriggerSyncError, TriggerValidationError
-from syntara.workflows.utils.schedule_parser import (
+from syntara.workflow_core.models import NodeType, ScheduledTriggerConfig
+from syntara.workflow_runtime.authentication import build_auth_header
+from syntara.workflow_runtime.schedules import (
     SCHEDULE_ID_PREFIX,
     build_schedule_execution_workflow_id,
     build_schedule_id,
     config_to_temporal_schedule,
 )
+from syntara.workflows.exceptions import ScheduledTriggerSyncError, TriggerValidationError
 from syntara.workflows.validators import collect_scheduled_trigger_config_findings
-from syntara.workflows.workflow_engine.models.workflow_definition import NodeType, ScheduledTriggerConfig
-from syntara.workflows.workflow_engine.workflow_auth import build_auth_header
 
 logger = structlog.stdlib.get_logger(__name__)
 
@@ -83,6 +83,11 @@ _search_attr_available: bool | None = None
 
 _CONNECTION_ERRORS = frozenset({RPCStatusCode.UNAVAILABLE, RPCStatusCode.DEADLINE_EXCEEDED})
 
+# Temporal acknowledges AddSearchAttributes before the new mapping can be resolved
+# by requests that use it, so the first schedule after registration can be rejected.
+_SEARCH_ATTR_PROPAGATION_TIMEOUT_SECONDS = 15.0
+_SEARCH_ATTR_PROPAGATION_POLL_SECONDS = 0.25
+
 
 async def _abort_schedule_delete(
     should_abort: Callable[[], Awaitable[bool]] | None,
@@ -107,6 +112,34 @@ async def _abort_schedule_delete(
             remaining=remaining,
         )
     return True
+
+
+def _is_search_attribute_unmapped(error: RPCError) -> bool:
+    """Return True when Temporal rejected a request because the attribute has no mapping yet."""
+    return (
+        error.status == RPCStatusCode.INVALID_ARGUMENT
+        and "no mapping defined" in error.message
+        and SA_ORCHESTRATOR_WORKFLOW_ID.name in error.message
+    )
+
+
+async def _create_schedule_with_retry(
+    client: Client,
+    schedule_id: str,
+    schedule: Schedule,
+    search_attributes: TypedSearchAttributes | None = None,
+) -> None:
+    """Create a Temporal Schedule, retrying while a new search attribute propagates."""
+    deadline = time.monotonic() + _SEARCH_ATTR_PROPAGATION_TIMEOUT_SECONDS
+    while True:
+        try:
+            await client.create_schedule(schedule_id, schedule, search_attributes=search_attributes)
+            return
+        except RPCError as e:
+            if not _is_search_attribute_unmapped(e) or time.monotonic() >= deadline:
+                raise
+            logger.debug("Waiting for search attribute mapping to propagate", schedule_id=schedule_id)
+            await asyncio.sleep(_SEARCH_ATTR_PROPAGATION_POLL_SECONDS)
 
 
 async def _update_schedule_with_retry(
@@ -380,7 +413,7 @@ class ScheduledTriggerService:
             workflow_definition: The full workflow definition dict.
             is_builtin: When True, routes to ``settings.background_task_queue``
                 instead of ``settings.task_queue`` — same branch
-                ``TemporalExecutionService`` uses for manually-triggered
+                ``WorkflowExecutionService`` uses for manually-triggered
                 builtin executions.
 
         Returns:
@@ -598,7 +631,7 @@ class ScheduledTriggerService:
             )
 
         try:
-            await client.create_schedule(schedule_id, schedule, search_attributes=search_attrs)
+            await _create_schedule_with_retry(client, schedule_id, schedule, search_attrs)
             logger.info(
                 "Created Temporal Schedule",
                 schedule_id=schedule_id,

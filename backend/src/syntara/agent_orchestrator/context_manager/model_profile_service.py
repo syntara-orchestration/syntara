@@ -59,7 +59,7 @@ def _normalize_model_name(model: str) -> list[str]:
     """Return candidate model names for registry lookup.
 
     OpenRouter-style names use a ``provider/model`` format (e.g.
-    ``"anthropic/claude-sonnet-4"``).  LangChain registries use
+    ``"anthropic/claude-sonnet-4.5"``).  LangChain registries use
     provider-native names (e.g. ``"claude-sonnet-4-0"``).  This function
     returns the original name first, then the stripped suffix so both
     exact and prefix-stripped lookups are attempted.
@@ -189,7 +189,7 @@ class ModelProfileService:
         or the hint maps to an unknown registry (e.g. ``"red_hat_ai"``),
         searches all registries.
 
-        Handles OpenRouter-style model names (e.g. ``"anthropic/claude-sonnet-4"``)
+        Handles OpenRouter-style model names (e.g. ``"anthropic/claude-sonnet-4.5"``)
         by stripping the provider prefix before lookup.
 
         Returns:

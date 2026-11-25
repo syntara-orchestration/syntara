@@ -2,12 +2,12 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 
-import type { NodeMenuAction } from '../../routes/workflows/canvas/nodes/hooks/useNodeMenuActions'
+import type { StepMenuAction } from '../../routes/workflows/canvas/nodes/hooks/useStepMenuActions'
 
 import { SynStepMenu } from './SynStepMenu'
 
 describe('SynStepMenu', () => {
-  const createMenuAction = (overrides: Partial<NodeMenuAction> = {}): NodeMenuAction => ({
+  const createMenuAction = (overrides: Partial<StepMenuAction> = {}): StepMenuAction => ({
     id: 'test-action',
     label: 'Test Action',
     onClick: vi.fn(),
@@ -31,7 +31,7 @@ describe('SynStepMenu', () => {
       const actions = [createMenuAction()]
       render(<SynStepMenu menuActions={actions} className="custom-menu-class" />)
 
-      const wrapper = screen.getByTestId('node-menu-wrapper')
+      const wrapper = screen.getByTestId('step-menu-wrapper')
       expect(wrapper).toHaveClass('custom-menu-class')
     })
 
@@ -39,7 +39,7 @@ describe('SynStepMenu', () => {
       const actions = [createMenuAction()]
       render(<SynStepMenu menuActions={actions} style={{ marginTop: '10px' }} />)
 
-      const wrapper = screen.getByTestId('node-menu-wrapper')
+      const wrapper = screen.getByTestId('step-menu-wrapper')
       expect(wrapper).toHaveStyle({ marginTop: '10px' })
     })
 
@@ -47,7 +47,7 @@ describe('SynStepMenu', () => {
       const actions = [createMenuAction()]
       render(<SynStepMenu menuActions={actions} />)
 
-      const wrapper = screen.getByTestId('node-menu-wrapper')
+      const wrapper = screen.getByTestId('step-menu-wrapper')
       expect(wrapper).toHaveClass('nodrag')
       expect(wrapper).toHaveClass('nopan')
     })
@@ -178,7 +178,7 @@ describe('SynStepMenu', () => {
 
     it('renders separator between items', async () => {
       const user = userEvent.setup()
-      const actions: NodeMenuAction[] = [
+      const actions: StepMenuAction[] = [
         createMenuAction({ id: '1', label: 'Edit' }),
         { id: 'sep', label: '', onClick: vi.fn(), separator: true },
         createMenuAction({ id: '2', label: 'Delete', variant: 'danger' }),
@@ -334,7 +334,7 @@ describe('SynStepMenu', () => {
       const actions = [createMenuAction()]
       render(<SynStepMenu menuActions={actions} />)
 
-      const wrapper = screen.getByTestId('node-menu-wrapper')
+      const wrapper = screen.getByTestId('step-menu-wrapper')
       expect(wrapper).not.toHaveAttribute('role')
       expect(wrapper).not.toHaveAttribute('tabIndex')
     })

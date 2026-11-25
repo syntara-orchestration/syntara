@@ -40,7 +40,7 @@ const KEBAB_CLICK_TIMEOUT = 5_000
  * to save and no save to fail. `run-step.spec.ts`'s own siblings already moved
  * to this pattern for exactly this reason.
  */
-async function createTwoNodeWorkflowViaApi(app: Page, workflowName: string): Promise<{ id: string }> {
+async function createTwoStepWorkflowViaApi(app: Page, workflowName: string): Promise<{ id: string }> {
   const { id } = await createWorkflowViaApi({
     app,
     name: workflowName,
@@ -72,14 +72,14 @@ async function createTwoNodeWorkflowViaApi(app: Page, workflowName: string): Pro
 }
 
 /**
- * Click a React Flow node's kebab menu by its visible text label.
+ * Click a workflow step's kebab menu by its visible label.
  * Avoid Reset layout here — layout animation remounts nodes and detaches the menu.
  */
-async function openNodeKebabMenu(app: Page, nodeText: string) {
+async function openStepKebabMenu(app: Page, stepName: string) {
   await waitForUIReady(app)
-  const node = app.locator('[role="group"][aria-roledescription="node"]').filter({ hasText: nodeText })
+  const node = app.locator('[role="group"][aria-roledescription="node"]').filter({ hasText: stepName })
   await expect(node).toBeVisible({ timeout: 15_000 })
-  // Hover so the node is settled before interacting (same pattern as delete-nodes E2E)
+  // Hover so the node is settled before interacting (same pattern as delete-steps E2E)
   await node.hover()
 
   // Ensure node is expanded so the kebab is reachable
@@ -95,12 +95,12 @@ async function openNodeKebabMenu(app: Page, nodeText: string) {
 }
 
 /**
- * Open the Run step choice dialog for a node by its canvas label.
+ * Open the Run step choice dialog for a step by its canvas label.
  * Retries the full kebab → menuitem flow when React Flow remounts mid-click
  * ("element is not stable" / "element was detached from the DOM").
  */
-async function openRunStepDialog(app: Page, nodeText: string) {
-  const dialogHeading = app.getByRole('heading', { name: `Run ${nodeText}?` })
+async function openRunStepDialog(app: Page, stepName: string) {
+  const dialogHeading = app.getByRole('heading', { name: `Run ${stepName}?` })
   await expect(async () => {
     // Close a leftover menu from a prior attempt so we start from a clean toggle
     if (
@@ -111,7 +111,7 @@ async function openRunStepDialog(app: Page, nodeText: string) {
     ) {
       await app.keyboard.press('Escape')
     }
-    await openNodeKebabMenu(app, nodeText)
+    await openStepKebabMenu(app, stepName)
     await app.getByRole('menuitem', { name: 'Run step' }).click({ force: true, timeout: KEBAB_CLICK_TIMEOUT })
     await expect(dialogHeading).toBeVisible({ timeout: KEBAB_CLICK_TIMEOUT })
   }).toPass({ timeout: 30_000, intervals: [500, 1_000, 2_000] })
@@ -119,14 +119,14 @@ async function openRunStepDialog(app: Page, nodeText: string) {
 
 test.describe('Run Step', () => {
   test('opens "Run step" dialog from step kebab menu', async ({ app }) => {
-    // Arrange - Create a workflow with a script node
+    // Arrange - Create a workflow with a script step
     const workflowName = buildUniqueName('e2e-run-step')
     const { id } = await createBasicWorkflowViaApi(app, workflowName, 'Test action')
     await openWorkflowInBuilder(app, workflowName, id)
 
     try {
-      // Act - Click the kebab menu on the script node
-      await openNodeKebabMenu(app, 'Test action')
+      // Act - Click the kebab menu on the script step
+      await openStepKebabMenu(app, 'Test action')
 
       // Assert - Verify "Run step" menu item is visible
       await expect(app.getByRole('menuitem', { name: 'Run step' })).toBeVisible()
@@ -169,9 +169,9 @@ test.describe('Run Step', () => {
   // link toggles. Unchanged sibling tests fail the same way, so this is a separate
   // pre-existing locator problem, not something this workflow migration can settle.
   test.skip('transitions to mock data editor when "Set mock data" is clicked', async ({ app }) => {
-    // Arrange - Create workflow with two nodes so second node has a predecessor to mock
+    // Arrange - Create workflow with two steps so second step has a predecessor to mock
     const workflowName = buildUniqueName('e2e-run-step-mock')
-    const { id } = await createTwoNodeWorkflowViaApi(app, workflowName)
+    const { id } = await createTwoStepWorkflowViaApi(app, workflowName)
 
     try {
       await openRunStepDialog(app, 'Second action')
@@ -235,7 +235,7 @@ test.describe('Run Step', () => {
   })
 
   test('closes dialog when Cancel is clicked from mock editor', async ({ app }) => {
-    // Single-node workflow via the API — the builder opens clean, so no save runs
+    // Single-step workflow via the API — the builder opens clean, so no save runs
     // ahead of the kebab click.
     const workflowName = buildUniqueName('e2e-run-step-cancel-mock')
     const { id } = await createBasicWorkflowViaApi(app, workflowName, 'Test action')
@@ -276,12 +276,12 @@ test.describe('Run Step', () => {
   })
 
   test('executes workflow when "Run all previous steps" is clicked', async ({ app }) => {
-    // Arrange - Create workflow with two nodes
+    // Arrange - Create workflow with two steps
     const workflowName = buildUniqueName('e2e-run-step-all')
-    const { id } = await createTwoNodeWorkflowViaApi(app, workflowName)
+    const { id } = await createTwoStepWorkflowViaApi(app, workflowName)
 
     try {
-      // Act - Open Run step dialog on second node
+      // Act - Open Run step dialog on second step
       await openRunStepDialog(app, 'Second action')
 
       // Act - Click "Run all previous steps"
@@ -326,12 +326,12 @@ test.describe('Run Step', () => {
 
   // Skipped for the same ambiguous "Set mock data" locator as above.
   test.skip('dialog state resets when closed and reopened', async ({ app }) => {
-    // Arrange - Create workflow with two nodes
+    // Arrange - Create workflow with two steps
     const workflowName = buildUniqueName('e2e-run-step-reset')
-    const { id } = await createTwoNodeWorkflowViaApi(app, workflowName)
+    const { id } = await createTwoStepWorkflowViaApi(app, workflowName)
 
     try {
-      // Act 1 - Open mock editor on second node
+      // Act 1 - Open mock editor on second step
       await openRunStepDialog(app, 'Second action')
       await app.getByRole('button', { name: 'Set mock data' }).click()
       await expect(app.getByTestId('inline-code-editor')).toBeVisible()
