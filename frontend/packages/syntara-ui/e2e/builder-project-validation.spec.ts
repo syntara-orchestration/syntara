@@ -21,7 +21,9 @@
  * project first so that pre-fill cannot apply.
  */
 
-import { test, expect, toAppUrl } from './fixtures'
+import { randomUUID } from 'node:crypto'
+
+import { type Page, test, expect, toAppUrl } from './fixtures'
 import { buildUniqueName, clickSaveAndWait, openNewWorkflowBuilder, selectProjectDialog } from './helpers/workflows'
 import {
   createProjectViaApi,
@@ -30,6 +32,21 @@ import {
   deleteWorkflowViaApi,
   ensureProject,
 } from './utils/api'
+
+async function mockProjectList(app: Page, count: number) {
+  const prefix = buildUniqueName('e2e-proj-picker')
+  const resources = Array.from({ length: count }, (_, index) => ({
+    id: randomUUID(),
+    name: `${prefix}-${index + 1}`,
+    is_builtin: false,
+  }))
+
+  await app.route(
+    (url) => url.pathname === '/api/v1/projects',
+    (route) => route.fulfill({ json: { resources, next: null } })
+  )
+  return resources
+}
 
 test.describe('New workflow — project selection modal', () => {
   test('opening a new workflow shows the project modal instead of the canvas', async ({ app }) => {
@@ -46,6 +63,55 @@ test.describe('New workflow — project selection modal', () => {
     // The builder is not rendered until a project is confirmed
     await expect(app.getByRole('heading', { name: 'Select a trigger step' })).not.toBeVisible()
     await expect(app.getByPlaceholder('Workflow name')).not.toBeVisible()
+  })
+
+  test('project dropdown options below the dialog edge accept pointer clicks', async ({ app }) => {
+    const projects = await mockProjectList(app, 4)
+    await app.goto(toAppUrl('/workflow-builder/new'))
+
+    const dialog = selectProjectDialog(app)
+    const projectInput = dialog.getByLabel('Project', { exact: true })
+    const closedHeight = await dialog.evaluate((element) => element.clientHeight)
+    await projectInput.click()
+
+    const project = projects[3]
+    const option = dialog.getByRole('option', { name: project.name, exact: true })
+    await expect(option).toBeInViewport({ ratio: 1 })
+    const dialogBottom = await dialog.evaluate((element) => element.getBoundingClientRect().bottom)
+    const optionTop = await option.evaluate((element) => element.getBoundingClientRect().top)
+    expect(optionTop).toBeGreaterThan(dialogBottom)
+    expect(await dialog.evaluate((element) => element.clientHeight)).toBe(closedHeight)
+    expect(await dialog.evaluate((element) => element.scrollTop)).toBe(0)
+
+    await option.click()
+    await expect(projectInput).toHaveValue(project.name)
+  })
+
+  test('long project dropdown scrolls independently on a short viewport', async ({ app }) => {
+    const projects = await mockProjectList(app, 16)
+    await app.setViewportSize({ width: 1280, height: 440 })
+    await app.goto(toAppUrl('/workflow-builder/new'))
+
+    const dialog = selectProjectDialog(app)
+    await dialog.getByLabel('Project', { exact: true }).click()
+    const firstOption = dialog.getByRole('option', { name: projects[0].name, exact: true })
+    const project = projects[9]
+    const option = dialog.getByRole('option', { name: project.name, exact: true })
+    await expect(option).toBeAttached()
+    await expect(option).not.toBeInViewport()
+
+    const dialogTop = await dialog.evaluate((element) => element.getBoundingClientRect().top)
+    await firstOption.hover()
+    await app.mouse.wheel(0, 260)
+    await expect(option).toBeInViewport({ ratio: 0.95 })
+    expect(await dialog.evaluate((element) => element.getBoundingClientRect().top)).toBe(dialogTop)
+    expect(await dialog.evaluate((element) => element.scrollTop)).toBe(0)
+
+    await option.press('Enter')
+    await dialog.getByRole('button', { name: 'Continue', exact: true }).press('Enter')
+    await expect(dialog).not.toBeVisible()
+    await expect(app).toHaveURL(new RegExp(`/workflow-builder/new\\?(?:.*&)?projectId=${project.id}`))
+    await expect(app.getByRole('heading', { name: 'Select a trigger step' })).toBeVisible()
   })
 
   test('Continue is disabled until a project is selected', async ({ app }) => {

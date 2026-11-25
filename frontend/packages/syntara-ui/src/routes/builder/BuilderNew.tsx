@@ -96,6 +96,7 @@ export default function BuilderNew() {
         isOpen
         onClose={handleCancel}
         variant="medium"
+        className={styles.projectModal}
         aria-labelledby="new-workflow-project-title"
         aria-describedby="new-workflow-project-description"
       >
