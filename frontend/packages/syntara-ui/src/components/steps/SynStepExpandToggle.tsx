@@ -4,7 +4,7 @@ import { use } from 'react'
 
 import { SynStepExpandedContext } from './SynStepExpandedContext'
 
-export function SynStepExpandToggle({ nodeLabel }: Readonly<{ nodeLabel?: string }>) {
+export function SynStepExpandToggle({ stepLabel }: Readonly<{ stepLabel?: string }>) {
   const expandedState = use(SynStepExpandedContext)
   const expanded = expandedState === null ? true : expandedState[0]
   const setExpanded = expandedState ? expandedState[1] : () => {}
@@ -16,7 +16,7 @@ export function SynStepExpandToggle({ nodeLabel }: Readonly<{ nodeLabel?: string
   }
 
   const action = expanded ? 'Collapse' : 'Expand'
-  const ariaLabel = nodeLabel ? `${action} details for ${nodeLabel}` : `${action} step details`
+  const ariaLabel = stepLabel ? `${action} details for ${stepLabel}` : `${action} step details`
 
   return (
     <Icon

@@ -215,7 +215,7 @@ The app never hard-fails at startup due to S3. This lets developers work on non-
 The `useFileStorageStatus` React hook polls `GET /api/v1/files/storage_status` every 5 minutes (`refetchInterval`, paused while the tab is backgrounded) and exposes `{ isConfigured, isLoading }`. The interval is what makes the gate self-correcting in both directions — uploads re-enable after storage recovers and disable if it breaks — without requiring a reload:
 
 - **Settings page** — shows a PatternFly `Alert` warning banner when S3 is unconfigured: "File uploads are disabled. Contact your platform administrator to configure S3 storage."
-- **Workflow builder** — disables the file upload section in `AIAgentNodeForm` with a tooltip explaining the S3 requirement
+- **Workflow builder** — disables the file upload section in `AIAgentStepForm` with a tooltip explaining the S3 requirement
 - **Fail-open default** — `isConfigured` defaults to `true` while loading or on error, so the UI doesn't flash a false warning
 
 ### S3 Client Resilience

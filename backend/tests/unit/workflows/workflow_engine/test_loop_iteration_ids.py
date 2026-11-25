@@ -2,7 +2,7 @@
 
 from unittest.mock import patch
 
-from syntara.workflows.workflow_engine.utils.loop_iteration_ids import (
+from syntara.workflow_runtime.engines.temporal.utils.loop_iteration_ids import (
     approval_temporal_activity_id,
     innermost_iteration_index,
     join_loop_iteration_id,
@@ -131,7 +131,7 @@ def test_loop_control_activity_id_unpatched_nested_uses_own_index_only() -> None
     body_map = {"inner": "outer"}
     control = {"outer": {"current_index": 2}}
     with patch(
-        "syntara.workflows.workflow_engine.utils.loop_iteration_ids.use_unique_loop_iteration_ids",
+        "syntara.workflow_runtime.engines.temporal.utils.loop_iteration_ids.use_unique_loop_iteration_ids",
         return_value=False,
     ):
         assert loop_control_activity_id("inner", 0, body_map, control) == "inner_iter_0"
@@ -143,7 +143,7 @@ def test_approval_temporal_activity_id_new_and_unpatched() -> None:
     control = {"loop": {"current_index": 3}}
     assert approval_temporal_activity_id("approval", body_map, control) == "approval_iter_3"
     with patch(
-        "syntara.workflows.workflow_engine.utils.loop_iteration_ids.use_unique_loop_iteration_ids",
+        "syntara.workflow_runtime.engines.temporal.utils.loop_iteration_ids.use_unique_loop_iteration_ids",
         return_value=False,
     ):
         assert approval_temporal_activity_id("approval", body_map, control) == "approval"

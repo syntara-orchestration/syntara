@@ -15,7 +15,7 @@ import { useCursorPagination, useCursorReset } from '../../hooks/useCursorPagina
 import { useDialogState } from '../../hooks/useDialogState'
 import { useProjectSelector } from '../../hooks/useProjectSelector'
 import { useProjectsForGrouping } from '../../hooks/useProjectsForGrouping'
-import { useAlerts } from '../../providers/alerts'
+import { useAlerts } from '../../providers/alerts/AlertContext'
 import { getErrorMessage } from '../../utils/apiErrors'
 import { detachPromise } from '../../utils/detachPromise'
 import { useDocLink } from '../../utils/docs/useDocLink'
@@ -274,7 +274,6 @@ export default function Workflows() {
               isPending={isInitialWorkflowsLoad}
               error={workflowsQuery.error}
               onRetry={() => detachPromise(workflowsQuery.refetch())}
-              isFetching={workflowsQuery.isFetching}
               sortedWorkflows={sortedWorkflows}
               hasActiveFilters={hasActiveFilters}
               filters={filters}

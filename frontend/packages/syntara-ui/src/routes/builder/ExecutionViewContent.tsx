@@ -198,8 +198,8 @@ function ExecutionViewContentInner(props: ExecutionViewContentProps) {
  * Renders workflow execution visualization without any editing features
  *
  * Key differences from BuilderContent:
- * - No AddNodePanel
- * - No NodeDetailsPanel
+ * - No AddStepPanel
+ * - No StepDetailsPanel
  * - No WorkflowSidepanel
  * - No save/run buttons
  * - Node clicks only for approval nodes in waiting status (via onNodeClick prop)

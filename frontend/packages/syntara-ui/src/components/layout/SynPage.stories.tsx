@@ -122,7 +122,7 @@ export const FullFormPageLayout: Story = {
         ]}
         toolbar={
           <>
-            <Button variant="secondary">Cancel</Button>
+            <Button variant="link">Cancel</Button>
             <Button variant="primary">Save</Button>
           </>
         }

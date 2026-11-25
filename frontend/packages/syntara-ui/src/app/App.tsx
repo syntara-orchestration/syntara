@@ -1,15 +1,23 @@
 import { QueryClientProvider } from '@tanstack/react-query'
 import { RouterProvider } from '@tanstack/react-router'
 
-import { AlertProvider } from '../providers/alerts'
-import { BrandProvider } from '../providers/brand'
+import { AlertProvider } from '../providers/alerts/AlertProvider'
+import { BrandProvider } from '../providers/brand/BrandProvider'
+import { FeatureFlagsProvider } from '../providers/feature-flags-provider'
 import { ColorSchemeProvider } from '../providers/theme/ColorSchemeProvider'
+import { useFeatureFlags } from '../providers/use-feature-flag'
 import { queryClient } from '../queryClient'
 import { TestSignInCallback } from '../routes/access-management/authentication/identity-providers/TestSignInCallback'
 import { DocLinkProvider } from '../utils/docs/DocLinkProvider'
 
 import { AppRoute } from './AppRoute'
 import { tanstackRouter } from './tanstackRouter'
+
+function AppRouter() {
+  const featureFlags = useFeatureFlags()
+
+  return <RouterProvider router={tanstackRouter} context={{ featureFlags }} />
+}
 
 export default function App() {
   // Handle test-signin callback before auth — the popup doesn't need a full session.
@@ -21,15 +29,17 @@ export default function App() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <BrandProvider>
-        <DocLinkProvider>
-          <ColorSchemeProvider>
-            <AlertProvider>
-              <RouterProvider router={tanstackRouter} />
-            </AlertProvider>
-          </ColorSchemeProvider>
-        </DocLinkProvider>
-      </BrandProvider>
+      <FeatureFlagsProvider>
+        <BrandProvider>
+          <DocLinkProvider>
+            <ColorSchemeProvider>
+              <AlertProvider>
+                <AppRouter />
+              </AlertProvider>
+            </ColorSchemeProvider>
+          </DocLinkProvider>
+        </BrandProvider>
+      </FeatureFlagsProvider>
     </QueryClientProvider>
   )
 }

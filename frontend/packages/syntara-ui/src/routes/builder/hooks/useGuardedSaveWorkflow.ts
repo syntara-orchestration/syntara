@@ -6,23 +6,23 @@ type AutoSubmitFn = () => Promise<boolean>
 
 type UseGuardedSaveWorkflowOptions = {
   handleSaveWorkflow: (options?: { expectedVersionOverride?: number }) => Promise<boolean>
-  isNodeEditorOpen: boolean
-  nodeEditorMode: 'add' | 'edit' | null
+  isStepEditorOpen: boolean
+  stepEditorMode: 'add' | 'edit' | null
   autoSubmitRef: MutableRefObject<AutoSubmitFn | null>
   dispatch: Dispatch<BuilderAction>
 }
 
 export function useGuardedSaveWorkflow({
   handleSaveWorkflow,
-  isNodeEditorOpen,
-  nodeEditorMode,
+  isStepEditorOpen,
+  stepEditorMode,
   autoSubmitRef,
   dispatch,
 }: UseGuardedSaveWorkflowOptions) {
   return useCallback(
     async (options?: { expectedVersionOverride?: number }): Promise<boolean> => {
-      if (isNodeEditorOpen) {
-        if (nodeEditorMode === 'edit' && autoSubmitRef.current) {
+      if (isStepEditorOpen) {
+        if (stepEditorMode === 'edit' && autoSubmitRef.current) {
           const submitted = await autoSubmitRef.current()
           if (submitted) return handleSaveWorkflow(options)
           return false
@@ -32,6 +32,6 @@ export function useGuardedSaveWorkflow({
       }
       return handleSaveWorkflow(options)
     },
-    [isNodeEditorOpen, nodeEditorMode, handleSaveWorkflow, dispatch, autoSubmitRef]
+    [isStepEditorOpen, stepEditorMode, handleSaveWorkflow, dispatch, autoSubmitRef]
   )
 }

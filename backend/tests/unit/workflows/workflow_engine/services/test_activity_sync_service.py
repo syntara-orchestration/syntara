@@ -5,33 +5,34 @@ import json
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 from typing import Any
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import AsyncMock, Mock, call, patch
 from uuid import UUID, uuid4
 
 import pytest
+from sqlalchemy import Select
 from temporalio.api.enums.v1 import EventType
 from temporalio.client import WorkflowExecutionStatus, WorkflowQueryRejectedError
 from temporalio.exceptions import ApplicationError
 from temporalio.service import RPCError, RPCStatusCode
 
 from syntara.core.exceptions import SafeValueError
-from syntara.workflows.models.activity_execution import ActivityExecution, ActivityStatus
-from syntara.workflows.models.execution import Execution, ExecutionStatus
-from syntara.workflows.workflow_engine.activities.internal import register_activity_monitoring
-from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName, NodeType
-from syntara.workflows.workflow_engine.services.activity_sync_service import (
+from syntara.workflow_core.models import ActivityName, NodeType
+from syntara.workflow_runtime.engines.temporal.activities.internal import register_activity_monitoring
+from syntara.workflow_runtime.engines.temporal.services.activity_sync_service import (
     _PENDING_ACTIVITY_STATE_STARTED as STARTED_STATE,
 )
-from syntara.workflows.workflow_engine.services.activity_sync_service import (
+from syntara.workflow_runtime.engines.temporal.services.activity_sync_service import (
     ActivitySyncService,
     ExecutionMonitorMetadata,
     SyntheticActivityStarted,
     SyntheticPartialOutput,
 )
-from syntara.workflows.workflow_engine.utils.timeout_messages import (
+from syntara.workflow_runtime.engines.utils.timeout_messages import (
     build_timeout_error_message,
     format_timeout_friendly,
 )
+from syntara.workflows.models.activity_execution import ActivityExecution, ActivityStatus
+from syntara.workflows.models.execution import Execution, ExecutionStatus
 
 
 def create_test_metadata(
@@ -199,7 +200,7 @@ class TestPublishHelpersTreatRedisFailureAsNonFatal:
         )
         execution.activities = []
 
-        with patch("syntara.workflows.workflow_engine.services.activity_sync_service.logger") as mock_logger:
+        with patch("syntara.workflow_runtime.engines.temporal.services.activity_sync_service.logger") as mock_logger:
             await service._publish_snapshot(execution, "initial_snapshot")  # does not raise
 
         mock_logger.exception.assert_called_once()
@@ -216,7 +217,7 @@ class TestPublishHelpersTreatRedisFailureAsNonFatal:
         service, mock_publisher = self._make_service(mock_session_factory)
         mock_publisher.publish_execution_patch.side_effect = RedisConnectionError("pool exhausted")
 
-        with patch("syntara.workflows.workflow_engine.services.activity_sync_service.logger") as mock_logger:
+        with patch("syntara.workflow_runtime.engines.temporal.services.activity_sync_service.logger") as mock_logger:
             await service._publish_execution_patch(uuid4(), [])  # does not raise
 
         mock_logger.exception.assert_called_once()
@@ -249,11 +250,11 @@ class TestRegisterActivityMonitoring:
 
         with (
             patch(
-                "syntara.workflows.workflow_engine.activities.internal.activity_monitoring.get_activity_sync_service",
+                "syntara.workflow_runtime.engines.temporal.activities.internal.activity_monitoring.get_activity_sync_service",
                 return_value=mock_sync_service,
             ),
             patch(
-                "syntara.workflows.workflow_engine.activities.internal.activity_monitoring.AsyncSessionLocal",
+                "syntara.workflow_runtime.engines.temporal.activities.internal.activity_monitoring.AsyncSessionLocal",
                 return_value=mock_session,
             ),
         ):
@@ -274,7 +275,7 @@ class TestRegisterActivityMonitoring:
         mock_sync_service.start_monitoring_execution = Mock()
 
         with patch(
-            "syntara.workflows.workflow_engine.activities.internal.activity_monitoring.get_activity_sync_service",
+            "syntara.workflow_runtime.engines.temporal.activities.internal.activity_monitoring.get_activity_sync_service",
             return_value=mock_sync_service,
         ):
             await register_activity_monitoring(execution_id, temporal_workflow_id)
@@ -307,15 +308,15 @@ class TestRegisterActivityMonitoring:
 
         with (
             patch(
-                "syntara.workflows.workflow_engine.activities.internal.activity_monitoring.get_activity_sync_service",
+                "syntara.workflow_runtime.engines.temporal.activities.internal.activity_monitoring.get_activity_sync_service",
                 return_value=mock_sync_service,
             ),
             patch(
-                "syntara.workflows.workflow_engine.activities.internal.activity_monitoring.AsyncSessionLocal",
+                "syntara.workflow_runtime.engines.temporal.activities.internal.activity_monitoring.AsyncSessionLocal",
                 return_value=mock_session,
             ),
             patch(
-                "syntara.workflows.workflow_engine.activities.internal.activity_monitoring.asyncio.sleep",
+                "syntara.workflow_runtime.engines.temporal.activities.internal.activity_monitoring.asyncio.sleep",
                 new_callable=AsyncMock,
             ),
         ):
@@ -343,15 +344,15 @@ class TestRegisterActivityMonitoring:
 
         with (
             patch(
-                "syntara.workflows.workflow_engine.activities.internal.activity_monitoring.get_activity_sync_service",
+                "syntara.workflow_runtime.engines.temporal.activities.internal.activity_monitoring.get_activity_sync_service",
                 return_value=mock_sync_service,
             ),
             patch(
-                "syntara.workflows.workflow_engine.activities.internal.activity_monitoring.AsyncSessionLocal",
+                "syntara.workflow_runtime.engines.temporal.activities.internal.activity_monitoring.AsyncSessionLocal",
                 return_value=mock_session,
             ),
             patch(
-                "syntara.workflows.workflow_engine.activities.internal.activity_monitoring.asyncio.sleep",
+                "syntara.workflow_runtime.engines.temporal.activities.internal.activity_monitoring.asyncio.sleep",
                 new_callable=AsyncMock,
             ),
         ):
@@ -368,7 +369,7 @@ class TestRegisterActivityMonitoring:
 
         with (
             patch(
-                "syntara.workflows.workflow_engine.activities.internal.activity_monitoring.get_activity_sync_service",
+                "syntara.workflow_runtime.engines.temporal.activities.internal.activity_monitoring.get_activity_sync_service",
                 return_value=None,
             ),
             pytest.raises(RuntimeError, match="Activity sync service not available"),
@@ -2972,7 +2973,7 @@ class TestInputDataCredentialScrubbing(TestActivitySyncTerminalCleanup):
     @pytest.mark.asyncio
     async def test_scrubbed_credential_fields_persisted(self) -> None:
         """Pre-scrubbed input data from the workflow query should be persisted as-is."""
-        from syntara.workflows.workflow_engine.utils.credential_scrubber import REDACTED
+        from syntara.workflow_core.utils.credential_scrubber import REDACTED
 
         activity = self._create_mock_activity_execution(activity_name="approval-node")
         self._mock_session_with_activities([activity])
@@ -3206,7 +3207,8 @@ class TestScheduleDescribeProbe:
         queue: asyncio.Queue[Any] = asyncio.Queue()
 
         with patch(
-            "syntara.workflows.workflow_engine.services.activity_sync_service.asyncio.sleep", new_callable=AsyncMock
+            "syntara.workflow_runtime.engines.temporal.services.activity_sync_service.asyncio.sleep",
+            new_callable=AsyncMock,
         ):
             await self.service._schedule_describe_probe(
                 handle=mock_handle,
@@ -3241,7 +3243,8 @@ class TestScheduleDescribeProbe:
         queue: asyncio.Queue[Any] = asyncio.Queue()
 
         with patch(
-            "syntara.workflows.workflow_engine.services.activity_sync_service.asyncio.sleep", new_callable=AsyncMock
+            "syntara.workflow_runtime.engines.temporal.services.activity_sync_service.asyncio.sleep",
+            new_callable=AsyncMock,
         ):
             await self.service._schedule_describe_probe(
                 handle=mock_handle,
@@ -3268,7 +3271,8 @@ class TestScheduleDescribeProbe:
         queue: asyncio.Queue[Any] = asyncio.Queue()
 
         with patch(
-            "syntara.workflows.workflow_engine.services.activity_sync_service.asyncio.sleep", new_callable=AsyncMock
+            "syntara.workflow_runtime.engines.temporal.services.activity_sync_service.asyncio.sleep",
+            new_callable=AsyncMock,
         ):
             await self.service._schedule_describe_probe(
                 handle=mock_handle,
@@ -3305,7 +3309,8 @@ class TestScheduleDescribeProbe:
         queue: asyncio.Queue[Any] = asyncio.Queue()
 
         with patch(
-            "syntara.workflows.workflow_engine.services.activity_sync_service.asyncio.sleep", new_callable=AsyncMock
+            "syntara.workflow_runtime.engines.temporal.services.activity_sync_service.asyncio.sleep",
+            new_callable=AsyncMock,
         ):
             await self.service._schedule_describe_probe(
                 handle=mock_handle,
@@ -3333,7 +3338,8 @@ class TestScheduleDescribeProbe:
         queue: asyncio.Queue[Any] = asyncio.Queue()
 
         with patch(
-            "syntara.workflows.workflow_engine.services.activity_sync_service.asyncio.sleep", new_callable=AsyncMock
+            "syntara.workflow_runtime.engines.temporal.services.activity_sync_service.asyncio.sleep",
+            new_callable=AsyncMock,
         ):
             await self.service._schedule_describe_probe(
                 handle=mock_handle,
@@ -3369,7 +3375,7 @@ class TestScheduleDescribeProbe:
     @pytest.mark.asyncio
     async def test_partial_output_is_scrubbed_at_source(self) -> None:
         """Partial output containing credential fields should be scrubbed before entering the queue."""
-        from syntara.workflows.workflow_engine.utils.credential_scrubber import REDACTED
+        from syntara.workflow_core.utils.credential_scrubber import REDACTED
 
         pa = self._make_started_pa_with_heartbeat(
             partial_output={"job_id": 42, "bearer_token": "sk-secret-123"},
@@ -3382,7 +3388,7 @@ class TestScheduleDescribeProbe:
         queue: asyncio.Queue[Any] = asyncio.Queue()
 
         with patch(
-            "syntara.workflows.workflow_engine.services.activity_sync_service.asyncio.sleep",
+            "syntara.workflow_runtime.engines.temporal.services.activity_sync_service.asyncio.sleep",
             new_callable=AsyncMock,
         ):
             await self.service._schedule_describe_probe(
@@ -3849,7 +3855,7 @@ class TestProcessHistoryEvent:
     @pytest.mark.asyncio
     async def test_caps_probe_tasks(self) -> None:
         """Test that probe tasks are capped at _DESCRIBE_PROBE_MAX_TASKS."""
-        from syntara.workflows.workflow_engine.services.activity_sync_service import _DESCRIBE_PROBE_MAX_TASKS
+        from syntara.workflow_runtime.engines.temporal.services.activity_sync_service import _DESCRIBE_PROBE_MAX_TASKS
 
         # Fill probe_tasks with non-done tasks to hit the cap
         for _ in range(_DESCRIBE_PROBE_MAX_TASKS):
@@ -3884,7 +3890,7 @@ class TestProcessHistoryEvent:
     @pytest.mark.asyncio
     async def test_prunes_done_tasks_before_cap_check(self) -> None:
         """Test that completed probe tasks are pruned before checking the cap."""
-        from syntara.workflows.workflow_engine.services.activity_sync_service import _DESCRIBE_PROBE_MAX_TASKS
+        from syntara.workflow_runtime.engines.temporal.services.activity_sync_service import _DESCRIBE_PROBE_MAX_TASKS
 
         # Fill with done tasks
         for _ in range(_DESCRIBE_PROBE_MAX_TASKS):
@@ -4210,8 +4216,10 @@ class TestRunMonitorLoop:
 class TestMonitorExecutionRetry:
     """Tests for _monitor_execution retry logic with exponential backoff."""
 
-    _SLEEP_PATH = "syntara.workflows.workflow_engine.services.activity_sync_service.asyncio.sleep"
-    _RANDOM_PATH = "syntara.workflows.workflow_engine.services.activity_sync_monitor.secrets.SystemRandom.random"
+    _SLEEP_PATH = "syntara.workflow_runtime.engines.temporal.services.activity_sync_service.asyncio.sleep"
+    _RANDOM_PATH = (
+        "syntara.workflow_runtime.engines.temporal.services.activity_sync_monitor.secrets.SystemRandom.random"
+    )
 
     def setup_method(self) -> None:
         """Set up test fixtures."""
@@ -5351,6 +5359,63 @@ class TestReconcileStaleExecutions:
 
         mock_session.commit.assert_not_awaited()
 
+    def _make_paused_approval_execution(self) -> Mock:
+        """Create a mock execution PAUSED awaiting an approval decision."""
+        execution = Mock(spec=Execution)
+        execution.id = uuid4()
+        execution.temporal_workflow_id = f"workflow-{execution.id}"
+        execution.status = ExecutionStatus.PAUSED
+        execution.created_at = datetime(2026, 1, 1, tzinfo=UTC)
+        execution.activities = []
+        return execution
+
+    @staticmethod
+    def _status_query_matches(stmt: Select[tuple[Execution]], status: ExecutionStatus) -> bool:
+        """Return True if a status-filtering ``select(Execution)`` statement matches ``status``.
+
+        Compiles the real statement with literal binds so this holds regardless
+        of whether the filter is a plain equality, an ``IN`` clause, or an
+        ``OR`` chain of equalities.
+        """
+        compiled = str(stmt.compile(compile_kwargs={"literal_binds": True})).lower()
+        return f"'{status.value}'" in compiled
+
+    @pytest.mark.asyncio
+    async def test_paused_approval_execution_is_reconciled_after_worker_restart(self) -> None:
+        """A worker restart must not leave an approval-paused execution stuck forever.
+
+        The underlying Temporal workflow can finish (the approval gets decided
+        and downstream nodes run) while the worker that was monitoring it is
+        down. Startup reconciliation must bring a PAUSED execution's DB status
+        in line with Temporal's terminal status, the same way it already does
+        for RUNNING (see test_completed_workflow_updates_db above) — otherwise
+        the run is stuck showing "Paused - Pending Approval" forever even
+        though it finished.
+        """
+        service, mock_session, mock_client = self._make_service()
+        execution = self._make_paused_approval_execution()
+
+        mock_event = Mock()
+        mock_event.event_type = EventType.EVENT_TYPE_WORKFLOW_EXECUTION_COMPLETED
+        mock_event.event_time = datetime(2026, 1, 1, 0, 5, tzinfo=UTC)
+        mock_event.workflow_execution_completed_event_attributes = None
+        mock_client.get_workflow_handle = Mock(
+            return_value=self._make_temporal_handle("COMPLETED", events=[mock_event]),
+        )
+
+        async def _exec(stmt: Select[tuple[Execution]]) -> Mock:
+            result = Mock()
+            result.all.return_value = [execution] if self._status_query_matches(stmt, execution.status) else []
+            result.one_or_none.return_value = execution
+            return result
+
+        mock_session.exec = _exec
+
+        with patch.object(service, "_publish_snapshot", new_callable=AsyncMock):
+            await service.reconcile_stale_executions()
+
+        assert execution.status == ExecutionStatus.COMPLETED
+
 
 class TestQueryActivityIoOutputMerge:
     """Test _query_activity_io merges partial output with final output."""
@@ -5423,6 +5488,22 @@ class TestQueryActivityIoOutputMerge:
         )
 
         assert output_data == {"invocation_id": "abc-123"}
+
+    @pytest.mark.asyncio
+    async def test_queries_loop_iteration_with_named_args(self) -> None:
+        """Loop I/O queries pass both activity ID and iteration via ``args``."""
+        mock_handle = AsyncMock()
+        mock_handle.query.side_effect = [{"value": 2}, {"stdout": "2\\n"}]
+        activity_data: dict[str, Any] = {"status": ActivityStatus.COMPLETED, "iteration": 1}
+
+        input_data, output_data = await self.service._query_activity_io(mock_handle, "my-activity", activity_data, None)
+
+        assert input_data == {"value": 2}
+        assert output_data == {"stdout": "2\\n"}
+        assert mock_handle.query.await_args_list == [
+            call("get_activity_input", args=["my-activity", 1]),
+            call("get_activity_output", args=["my-activity", 1]),
+        ]
 
     @pytest.mark.asyncio
     async def test_completed_query_returns_output_skips_update(self) -> None:
@@ -5765,7 +5846,7 @@ class TestQueryActivityIoQueryFailure:
         )
         activity_data: dict[str, Any] = {"status": ActivityStatus.RUNNING}
 
-        with patch("syntara.workflows.workflow_engine.services.activity_execution_sync.logger") as mock_logger:
+        with patch("syntara.workflow_runtime.engines.temporal.services.activity_execution_sync.logger") as mock_logger:
             with pytest.raises(RPCError):
                 await self.service._query_activity_io(mock_handle, "my-activity", activity_data, None)
 

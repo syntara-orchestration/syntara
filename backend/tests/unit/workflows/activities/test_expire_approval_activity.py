@@ -9,7 +9,7 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from syntara.workflows.workflow_engine.activities.approval_activity import (
+from syntara.workflow_runtime.engines.temporal.activities.approval_activity import (
     _is_approval_for_node,
     expire_approval_requests_activity,
 )
@@ -51,7 +51,7 @@ async def test_expire_success(
 
     with (
         patch(
-            "syntara.workflows.workflow_engine.activities.approval_activity.ApprovalsApiClient",
+            "syntara.workflow_runtime.engines.temporal.activities.approval_activity.ApprovalsApiClient",
             return_value=mock_client,
         ),
     ):
@@ -73,7 +73,7 @@ async def test_expire_no_pending_approvals(execution_id: str, node_id: str) -> N
 
     with (
         patch(
-            "syntara.workflows.workflow_engine.activities.approval_activity.ApprovalsApiClient",
+            "syntara.workflow_runtime.engines.temporal.activities.approval_activity.ApprovalsApiClient",
             return_value=mock_client,
         ),
     ):
@@ -97,7 +97,7 @@ async def test_expire_filters_by_node_id(execution_id: str, node_id: str) -> Non
 
     with (
         patch(
-            "syntara.workflows.workflow_engine.activities.approval_activity.ApprovalsApiClient",
+            "syntara.workflow_runtime.engines.temporal.activities.approval_activity.ApprovalsApiClient",
             return_value=mock_client,
         ),
     ):
@@ -122,7 +122,7 @@ async def test_expire_matches_loop_iteration_suffix(execution_id: str, node_id: 
 
     with (
         patch(
-            "syntara.workflows.workflow_engine.activities.approval_activity.ApprovalsApiClient",
+            "syntara.workflow_runtime.engines.temporal.activities.approval_activity.ApprovalsApiClient",
             return_value=mock_client,
         ),
     ):
@@ -147,7 +147,7 @@ async def test_expire_matches_nested_loop_iteration_suffix(execution_id: str, no
 
     with (
         patch(
-            "syntara.workflows.workflow_engine.activities.approval_activity.ApprovalsApiClient",
+            "syntara.workflow_runtime.engines.temporal.activities.approval_activity.ApprovalsApiClient",
             return_value=mock_client,
         ),
     ):
@@ -183,7 +183,7 @@ async def test_expire_ignores_non_numeric_iter_suffix(execution_id: str, node_id
 
     with (
         patch(
-            "syntara.workflows.workflow_engine.activities.approval_activity.ApprovalsApiClient",
+            "syntara.workflow_runtime.engines.temporal.activities.approval_activity.ApprovalsApiClient",
             return_value=mock_client,
         ),
     ):
@@ -196,7 +196,7 @@ async def test_expire_ignores_non_numeric_iter_suffix(execution_id: str, node_id
 @pytest.mark.asyncio
 async def test_expire_api_error_returns_gracefully(execution_id: str, node_id: str) -> None:
     """API errors are caught and returned as error info, not raised."""
-    from syntara.workflows.clients.approvals_client import ApprovalsApiClientError
+    from syntara.workflow_runtime.clients.approvals_client import ApprovalsApiClientError
 
     mock_client = AsyncMock()
     mock_client.list_approvals_by_execution = AsyncMock(
@@ -207,7 +207,7 @@ async def test_expire_api_error_returns_gracefully(execution_id: str, node_id: s
 
     with (
         patch(
-            "syntara.workflows.workflow_engine.activities.approval_activity.ApprovalsApiClient",
+            "syntara.workflow_runtime.engines.temporal.activities.approval_activity.ApprovalsApiClient",
             return_value=mock_client,
         ),
     ):
@@ -233,11 +233,11 @@ async def test_expire_all_pending_when_node_id_none(execution_id: str) -> None:
 
     with (
         patch(
-            "syntara.workflows.workflow_engine.activities.approval_activity.ApprovalsApiClient",
+            "syntara.workflow_runtime.engines.temporal.activities.approval_activity.ApprovalsApiClient",
             return_value=mock_client,
         ),
         patch(
-            "syntara.workflows.workflow_engine.activities.approval_activity.AuditEventDispatcher",
+            "syntara.workflow_runtime.engines.temporal.activities.approval_activity.AuditEventDispatcher",
         ) as mock_dispatcher,
     ):
         result = await expire_approval_requests_activity(execution_id)
@@ -268,7 +268,7 @@ async def test_expire_fails_before_mutating_on_malformed_record(execution_id: st
     mock_client.__aexit__ = AsyncMock(return_value=None)
 
     with patch(
-        "syntara.workflows.workflow_engine.activities.approval_activity.ApprovalsApiClient",
+        "syntara.workflow_runtime.engines.temporal.activities.approval_activity.ApprovalsApiClient",
         return_value=mock_client,
     ):
         result = await expire_approval_requests_activity(execution_id)
@@ -288,7 +288,7 @@ async def test_expire_unexpected_error_returns_gracefully(execution_id: str, nod
 
     with (
         patch(
-            "syntara.workflows.workflow_engine.activities.approval_activity.ApprovalsApiClient",
+            "syntara.workflow_runtime.engines.temporal.activities.approval_activity.ApprovalsApiClient",
             return_value=mock_client,
         ),
     ):

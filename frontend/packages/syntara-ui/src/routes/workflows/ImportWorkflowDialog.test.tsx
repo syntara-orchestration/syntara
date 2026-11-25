@@ -18,7 +18,7 @@ const mockShowError = vi.fn()
 const mockPost = vi.fn<(...args: unknown[]) => Promise<{ data?: unknown; error?: unknown }>>()
 const mockNavigate = vi.fn()
 
-vi.mock('../../providers/alerts', () => ({
+vi.mock('../../providers/alerts/AlertContext', () => ({
   useAlerts: () => ({ showAlert: mockShowAlert, showError: mockShowError }),
 }))
 

@@ -3,7 +3,7 @@ import { useCallback, useMemo, useState } from 'react'
 
 import { executionsClient } from '../../../client'
 import { useBlurOnOpen } from '../../../hooks/useBlurOnOpen'
-import { useAlerts } from '../../../providers/alerts'
+import { useAlerts } from '../../../providers/alerts/AlertContext'
 import { schemaToTemplateJson } from '../../../utils/jsonSchemaTemplate'
 
 import { ExpandableCodeEditor } from './ExpandableCodeEditor'

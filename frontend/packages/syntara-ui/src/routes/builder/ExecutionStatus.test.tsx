@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 
 import { ActivityStatusLabel, StatusLabel } from './ExecutionStatus'
+import { getActivityStatusDisplayLabel } from './executionStatusConstants'
 
 type ActivityStatus = ExecutionsAPI.components['schemas']['ActivityStatus']
 
@@ -18,6 +19,25 @@ describe('StatusLabel', () => {
   ] as const)('renders "%s" as "%s"', (status, label) => {
     render(<StatusLabel status={status} />)
     expect(screen.getByText(label)).toBeInTheDocument()
+  })
+})
+
+describe('getActivityStatusDisplayLabel', () => {
+  it('returns "Running" for waiting wait nodes', () => {
+    expect(getActivityStatusDisplayLabel('waiting', 'wait')).toBe('Running')
+  })
+
+  it('returns "Waiting for approval" for waiting non-wait nodes', () => {
+    expect(getActivityStatusDisplayLabel('waiting', 'approval')).toBe('Waiting for approval')
+    expect(getActivityStatusDisplayLabel('waiting')).toBe('Waiting for approval')
+  })
+
+  it.each<[ActivityStatus, string]>([
+    ['completed', 'Successful'],
+    ['failed', 'Failed'],
+    ['pending', 'Pending'],
+  ])('returns display label for "%s"', (status, label) => {
+    expect(getActivityStatusDisplayLabel(status)).toBe(label)
   })
 })
 
