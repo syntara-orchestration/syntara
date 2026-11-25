@@ -46,7 +46,7 @@ vi.mock('../utils/parseImportedDefinition', () => ({
           { id: 'copied-cond-1', type: 'script' },
         ],
       },
-      triggers: [{ id: 'copied-trigger-1', type: 'manual_trigger' }],
+      triggers: def.withoutTriggers ? [] : [{ id: 'copied-trigger-1', type: 'manual_trigger' }],
     },
     edges: [
       { id: 'e1', source: 'copied-trigger-1', target: 'copied-task-1' },
@@ -201,7 +201,7 @@ describe('useExecutionCopyToEditor', () => {
       const opts = buildOptions({ executionCopy: buildExecutionCopy() })
       const { result } = renderHook(() => useExecutionCopyToEditor(opts))
 
-      expect(result.current.blockedRunCopy).toEqual({ labels: ['Script', 'Manual trigger'] })
+      expect(result.current.blockedRunCopy).toEqual({ labels: ['Script', 'Manual trigger'], losesAllTriggers: true })
       expect(replaceSpy).not.toHaveBeenCalled()
       expect(opts.dispatch).not.toHaveBeenCalled()
       expect(opts.showSuccess).not.toHaveBeenCalled()
@@ -230,10 +230,49 @@ describe('useExecutionCopyToEditor', () => {
       expect(opts.showSuccess).toHaveBeenCalledWith({
         title: 'Run copied to editor',
         description:
-          'The run has been loaded into the editor with pinned runtime data. Steps of these types were left out: Script, Manual trigger.',
+          'The run has been loaded into the editor with pinned runtime data. Steps of these types were left out: Script, Manual trigger. Review and reconnect the affected steps. Add a permitted trigger before running this workflow.',
       })
       expect(replaceStateSpy).toHaveBeenCalledWith({}, '', window.location.pathname)
       expect(result.current.blockedRunCopy).toBeNull()
+    })
+
+    it('keeps a permitted trigger and leaves the trigger step out of the toast', () => {
+      mockNodeKinds.byKind = new Map([['script', verdict('script', 'Script')]])
+      const replaceSpy = vi.spyOn(useWorkflowStore.getState(), 'replaceWorkflowContent')
+      const opts = buildOptions({ executionCopy: buildExecutionCopy() })
+      const { result } = renderHook(() => useExecutionCopyToEditor(opts))
+
+      expect(result.current.blockedRunCopy).toEqual({ labels: ['Script'], losesAllTriggers: false })
+
+      act(() => result.current.confirmBlockedRunCopy())
+
+      const [workflowDef, edges] = replaceSpy.mock.calls[0]
+      expect(workflowDef.triggers?.map((t) => t.id)).toEqual(['copied-trigger-1'])
+      expect(edges.map((e) => e.id)).toEqual(['e1'])
+      expect(opts.showSuccess).toHaveBeenCalledWith({
+        title: 'Run copied to editor',
+        description:
+          'The run has been loaded into the editor with pinned runtime data. Steps of these types were left out: Script. Review and reconnect the affected steps.',
+      })
+    })
+
+    it('does not report losing triggers when the run had none', () => {
+      const opts = buildOptions({
+        executionCopy: buildExecutionCopy({
+          workflowDefinition: { name: 'test-wf', description: 'desc', withoutTriggers: true },
+        }),
+      })
+      const { result } = renderHook(() => useExecutionCopyToEditor(opts))
+
+      expect(result.current.blockedRunCopy).toEqual({ labels: ['Script'], losesAllTriggers: false })
+
+      act(() => result.current.confirmBlockedRunCopy())
+
+      expect(opts.showSuccess).toHaveBeenCalledWith({
+        title: 'Run copied to editor',
+        description:
+          'The run has been loaded into the editor with pinned runtime data. Steps of these types were left out: Script. Review and reconnect the affected steps.',
+      })
     })
 
     it('copies nothing on cancel, cleans the URL and does not prompt again', () => {

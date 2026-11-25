@@ -26,6 +26,14 @@ export function BlockedRunCopyDialog({ blockedRunCopy, onConfirm, onCancel }: Re
         You don&apos;t have permission to write these step types: {blockedRunCopy?.labels.join(', ')}. Copy the run
         without those steps?
       </Content>
+      <Content component="p">
+        Connections to those steps will be removed. Review and reconnect the affected steps after copying.
+      </Content>
+      {blockedRunCopy?.losesAllTriggers && (
+        <Content component="p">
+          No trigger will be copied. Add a permitted trigger before running this workflow.
+        </Content>
+      )}
     </SynConfirmationDialog>
   )
 }
