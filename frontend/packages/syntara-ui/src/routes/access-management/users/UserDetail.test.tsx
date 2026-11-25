@@ -913,18 +913,16 @@ describe('UserDetail', () => {
   // ---- Navigation ---------------------------------------------------------
 
   describe('Navigation', () => {
-    it('navigates to edit page when Edit user button is clicked', async () => {
-      const user = userEvent.setup()
+    it('renders Edit user as a link to the edit route', () => {
       render(<UserDetail />, { wrapper })
 
-      await user.click(screen.getByRole('button', { name: 'Edit user' }))
-
-      expect(routerTestState.navigate).toHaveBeenCalledWith({
-        to: `/system-administration/access-management/users/${VALID_USER_ID}/edit`,
-      })
+      expect(screen.getByRole('link', { name: 'Edit user' })).toHaveAttribute(
+        'href',
+        `/system-administration/access-management/users/${VALID_USER_ID}/edit`
+      )
     })
 
-    it('disables Edit user button when canUpdate is false', () => {
+    it('disables Edit user link when canUpdate is false', () => {
       vi.mocked(useUserPermissions).mockReturnValue({
         canCreate: true,
         canUpdate: false,
@@ -936,7 +934,7 @@ describe('UserDetail', () => {
 
       render(<UserDetail />, { wrapper })
 
-      expect(screen.getByRole('button', { name: 'Edit user' })).toHaveAttribute('aria-disabled', 'true')
+      expect(screen.getByRole('link', { name: 'Edit user' })).toHaveAttribute('aria-disabled', 'true')
     })
 
     it('renders kebab menu with delete action for non-built-in users', async () => {
@@ -984,7 +982,7 @@ describe('UserDetail', () => {
 
       render(<UserDetail />, { wrapper })
 
-      expect(screen.getByRole('button', { name: 'Edit user' })).toBeInTheDocument()
+      expect(screen.getByRole('link', { name: 'Edit user' })).toBeInTheDocument()
       expect(screen.queryByRole('button', { name: 'User actions' })).not.toBeInTheDocument()
     })
 

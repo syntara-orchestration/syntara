@@ -14,9 +14,8 @@ import { ActivityTypeEnum, type ExecutionsAPI } from '@syntara/contracts'
 import type React from 'react'
 
 import { SynLabel } from '../../components/labels/SynLabel'
-import { capitalize } from '../../utils/capitalize'
 
-import { activityStatusDisplayLabels, executionStatusDisplayLabels } from './executionStatusConstants'
+import { executionStatusDisplayLabels, getActivityStatusDisplayLabel } from './executionStatusConstants'
 
 type ExecutionStatus = ExecutionsAPI.components['schemas']['ExecutionStatus']
 type ActivityStatus = ExecutionsAPI.components['schemas']['ActivityStatus']
@@ -74,17 +73,12 @@ const activityStatusIcons: Record<ActivityStatus, React.ComponentType<{ classNam
 }
 
 export function ActivityStatusLabel({ status, nodeType }: Readonly<{ status: ActivityStatus; nodeType?: string }>) {
-  if (nodeType === ActivityTypeEnum.WAIT && status === 'waiting') {
-    return (
-      <SynLabel variant="outline" status="custom" icon={<RhUiSyncIcon />}>
-        Running
-      </SynLabel>
-    )
-  }
-
-  const IconComponent = activityStatusIcons[status] ?? RhUiEllipsisHorizontalFillIcon
-  const variant = activityStatusVariant[status] ?? 'custom'
-  const displayLabel = activityStatusDisplayLabels[status] ?? capitalize(status)
+  const displayLabel = getActivityStatusDisplayLabel(status, nodeType)
+  const isWaitNodeRunning = nodeType === ActivityTypeEnum.WAIT && status === 'waiting'
+  const IconComponent = isWaitNodeRunning
+    ? RhUiSyncIcon
+    : (activityStatusIcons[status] ?? RhUiEllipsisHorizontalFillIcon)
+  const variant = isWaitNodeRunning ? 'custom' : (activityStatusVariant[status] ?? 'custom')
 
   return (
     <SynLabel variant="outline" status={variant} icon={<IconComponent />}>
