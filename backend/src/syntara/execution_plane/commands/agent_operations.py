@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import re
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import structlog
 from execution_plane_client.commands.agent import AgentOperation, AgentOperationCommandResult
@@ -158,8 +158,9 @@ class AgentOperationCommandHandler:
             if tool.name in handle_by_name:
                 raise CommandResourceStateError
             args_schema = getattr(tool, "args_schema", None)
-            if hasattr(args_schema, "model_json_schema"):
-                schema = args_schema.model_json_schema()
+            schema_factory = getattr(args_schema, "model_json_schema", None)
+            if callable(schema_factory):
+                schema = schema_factory()
             elif isinstance(args_schema, dict):
                 schema = args_schema
             else:
@@ -227,6 +228,8 @@ class AgentOperationCommandHandler:
             "structured_extract": LLMInteractionType.EXTRACTION,
         }[mode]
 
+        raw_result: object
+        parsed_output: Any | None = None
         try:
             if mode == "standard":
                 raw_result = await record_llm_call(
@@ -234,7 +237,6 @@ class AgentOperationCommandHandler:
                     lambda: llm.bind_tools(selected_tools).ainvoke(messages),
                     model=getattr(llm, "model_name", None),
                 )
-                parsed_output = None
                 if len(getattr(raw_result, "tool_calls", []) or []) > _MAX_TOOL_CALLS_PER_TURN:
                     raise CommandResourceStateError  # noqa: TRY301 -- reject oversized provider tool batches.
             else:
@@ -357,7 +359,7 @@ class AgentOperationCommandHandler:
         }
 
     @staticmethod
-    def _messages(raw_messages: list[object]) -> list[Any]:
+    def _messages(raw_messages: list[object]) -> list[Any]:  # noqa: C901 -- validates the agent callback's message protocol.
         """Convert the runtime's small message vocabulary to LangChain messages."""
         messages: list[Any] = []
         for raw in raw_messages:
@@ -365,8 +367,14 @@ class AgentOperationCommandHandler:
                 raise CommandResourceStateError
             role = raw["role"]
             content = raw.get("content", "")
-            if not isinstance(content, (str, list, dict)):
+            if isinstance(content, dict):
+                content = json.dumps(content, ensure_ascii=False)
+            elif not isinstance(content, str) and not (
+                isinstance(content, list) and all(isinstance(item, (str, dict)) for item in content)
+            ):
                 raise CommandResourceStateError
+            if isinstance(content, list):
+                content = cast("list[str | dict[str, Any]]", content)
             if role == "system":
                 messages.append(SystemMessage(content=content))
             elif role == "user":

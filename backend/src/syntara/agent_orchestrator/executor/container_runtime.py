@@ -12,10 +12,12 @@ from http import HTTPStatus
 from typing import TYPE_CHECKING, Any
 
 import structlog
-from execution_plane_client.commands.work import WorkExecute, WorkloadInvocation
+from execution_plane_client.commands.bulk_work import WorkItemSelector
+from execution_plane_client.commands.work import ResolvedExecution, WorkExecute, WorkloadInvocation
 from execution_plane_client.models.work_item import WorkItemStatus
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import ValidationError as JsonSchemaValidationError
+from pydantic import ValidationError as PydanticValidationError
 from sqlmodel import col, select
 from temporalio import activity
 from temporalio.exceptions import ApplicationError
@@ -132,8 +134,9 @@ async def execute_container_agent(  # noqa: C901, PLR0912, PLR0915 -- preserves 
                 "AO could not identify a selected MCP tool", type="AgentToolConfigError", non_retryable=True
             )
         args_schema = getattr(tool, "args_schema", None)
-        if hasattr(args_schema, "model_json_schema"):
-            schema = args_schema.model_json_schema()
+        schema_factory = getattr(args_schema, "model_json_schema", None)
+        if callable(schema_factory):
+            schema = schema_factory()
         elif isinstance(args_schema, dict):
             schema = args_schema
         else:
@@ -237,11 +240,14 @@ async def execute_container_agent(  # noqa: C901, PLR0912, PLR0915 -- preserves 
         tools_used = []
 
     model_name = orchestration._get_model_name()  # noqa: SLF001 -- use the model metadata AO already exposes internally.
+    response_metadata = output.get("response_metadata")
+    if not isinstance(response_metadata, dict):
+        response_metadata = {}
     result_dict: dict[str, Any] = {
         "type": "answer",
         "content": output["content"],
         "response_metadata": {
-            **(output.get("response_metadata") if isinstance(output.get("response_metadata"), dict) else {}),
+            **response_metadata,
             "source": "container",
             "model": model_name,
             "orchestration": "agent-runtime",
@@ -280,11 +286,8 @@ async def execute_container_agent(  # noqa: C901, PLR0912, PLR0915 -- preserves 
         if step.get("type") == "tool_result"
     ]
 
-    final_state = {
-        "metadata": ctx.to_state_dict(),
-        "result": result_dict,
-        "messages": [],
-    }
+    prepared_state["result"] = result_dict
+    prepared_state["messages"] = []
     stream_id = get_invocation_stream_id(invocation.id)
     result_dict["response_metadata"]["stream_id"] = stream_id
     async with StreamClient() as stream_client:
@@ -292,7 +295,7 @@ async def execute_container_agent(  # noqa: C901, PLR0912, PLR0915 -- preserves 
             invocation.id, stream_id, stream_client
         )
     await orchestration._handle_completion_callback(  # noqa: SLF001 -- preserve the existing Temporal callback contract.
-        final_state, invocation.id, ctx, signal_result=result_dict
+        prepared_state, invocation.id, ctx, signal_result=result_dict
     )
     return result_dict
 
@@ -316,22 +319,26 @@ async def _submit_and_wait(  # noqa: C901, PLR0912, PLR0915 -- keeps submit, rec
                 "Agent Runtime Action is not registered in AO", type="AgentRuntimeConfigError", non_retryable=True
             )
         image = plugin.image_reference
-        resolved_execution = plugin.resolved_execution
-        resolved_bindings = resolved_execution.get("bindings") if isinstance(resolved_execution, dict) else None
+        try:
+            resolved_execution_model = ResolvedExecution.model_validate(plugin.resolved_execution)
+        except PydanticValidationError as error:
+            raise ApplicationError(
+                "Agent Runtime compiled binding is missing or inconsistent in AO",
+                type="AgentRuntimeConfigError",
+                non_retryable=True,
+            ) from error
+        resolved_bindings = resolved_execution_model.bindings
         if (
-            not isinstance(resolved_bindings, list)
-            or len(resolved_bindings) != 1
-            or not isinstance(resolved_bindings[0], dict)
-            or resolved_bindings[0].get("step_identity") != plugin.step_identity
-            or not isinstance(resolved_bindings[0].get("step_revision_id"), str)
-            or not execution_plane_plugin_supports_revision(plugin, str(resolved_bindings[0].get("step_revision_id")))
+            len(resolved_bindings) != 1
+            or resolved_bindings[0].step_identity != plugin.step_identity
+            or not execution_plane_plugin_supports_revision(plugin, resolved_bindings[0].step_revision_id)
         ):
             raise ApplicationError(
                 "Agent Runtime compiled binding is missing or inconsistent in AO",
                 type="AgentRuntimeConfigError",
                 non_retryable=True,
             )
-        step_revision_id = resolved_bindings[0]["step_revision_id"]
+        step_revision_id = resolved_bindings[0].step_revision_id
         try:
             Draft202012Validator(execution_plane_plugin_input_schema(plugin)).validate(inputs)
         except (ValueError, JsonSchemaValidationError) as error:
@@ -351,7 +358,7 @@ async def _submit_and_wait(  # noqa: C901, PLR0912, PLR0915 -- keeps submit, rec
         step_revision_id=step_revision_id,
         inputs=inputs,
         host_operations=["agent.model.turn", "agent.mcp.call"],
-        resolved_execution=resolved_execution,
+        resolved_execution=resolved_execution_model,
         timeout_seconds=timeout_seconds,
     )
     command = WorkExecute(
@@ -377,8 +384,8 @@ async def _submit_and_wait(  # noqa: C901, PLR0912, PLR0915 -- keeps submit, rec
                         type="AgentRuntimeProtocolError",
                         non_retryable=True,
                     )
-            except ExecutionPlaneRejectedError as error:
-                if error.status_code != HTTPStatus.CONFLICT:
+            except ExecutionPlaneRejectedError as rejection:
+                if rejection.status_code != HTTPStatus.CONFLICT:
                     raise
             while asyncio.get_running_loop().time() < deadline:
                 work = await client.get_work_item(work_item_id=work_item_id)
@@ -386,13 +393,13 @@ async def _submit_and_wait(  # noqa: C901, PLR0912, PLR0915 -- keeps submit, rec
                 if status == WorkItemStatus.COMPLETED.value:
                     value = work.get("result")
                     return value if isinstance(value, dict) else {}
-                error = _work_item_error(status, work.get("result"))
-                if error is not None:
-                    raise error
+                work_item_error = _work_item_error(status, work.get("result"))
+                if work_item_error is not None:
+                    raise work_item_error
                 activity.heartbeat({"agent_runtime_work_item_id": str(work_item_id), "status": status})
                 await asyncio.sleep(min(1.0, max(0.0, deadline - asyncio.get_running_loop().time())))
             with suppress(Exception):
-                await client.cancel_work_item(work_item_id=work_item_id)
+                await client.cancel_work_items(selector=WorkItemSelector(work_item_ids=[work_item_id]))
             raise ApplicationError(
                 "Agent Runtime exceeded the step timeout", type="AgentRuntimeTimeout", non_retryable=True
             )
@@ -403,7 +410,7 @@ async def _submit_and_wait(  # noqa: C901, PLR0912, PLR0915 -- keeps submit, rec
     except asyncio.CancelledError:
         with suppress(Exception):
             async with ExecutionPlaneHttpClient(timeout=settings.ep_request_timeout_seconds) as client:
-                await client.cancel_work_item(work_item_id=work_item_id)
+                await client.cancel_work_items(selector=WorkItemSelector(work_item_ids=[work_item_id]))
         raise
 
 

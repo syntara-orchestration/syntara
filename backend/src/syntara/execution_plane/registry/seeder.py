@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-import os
 import json
+import os
 from datetime import UTC, datetime
 from importlib.resources import files
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 from uuid import uuid4
 
 import structlog
@@ -31,7 +31,6 @@ _PLUGIN_SEEDS = (
         "RELATED_IMAGE_SCRIPT_PYTHON",
         "quay.io/aap/ansible-automation-platform/ao-python-rhel9:devel",
         None,
-        None,
     ),
     (
         "script-bash",
@@ -41,7 +40,6 @@ _PLUGIN_SEEDS = (
         "RELATED_IMAGE_SCRIPT_BASH",
         "quay.io/aap/ansible-automation-platform/ao-bash-rhel9:devel",
         None,
-        None,
     ),
     (
         "agent-runtime",
@@ -50,7 +48,6 @@ _PLUGIN_SEEDS = (
         "agent-runtime.yaml",
         None,
         "quay.io/aap/ansible-automation-platform/ao-agent-runtime:devel",
-        "agent-runtime-resolved-execution.json",
         "agent-runtime-resolved-execution.json",
     ),
 )
@@ -75,8 +72,12 @@ def _load_resolved_execution(filename: str | None, expected_identity: str) -> di
     if filename is None:
         return None
     contents = files("syntara.execution_plane.registry.manifests").joinpath(filename).read_text(encoding="utf-8")
-    document = json.loads(contents)
-    bindings = document.get("bindings") if isinstance(document, dict) else None
+    loaded: object = json.loads(contents)
+    if not isinstance(loaded, dict):
+        message = f"Packaged resolved execution data {filename!r} must be a JSON object"
+        raise TypeError(message)
+    document = cast("dict[str, Any]", loaded)
+    bindings = document.get("bindings")
     if (
         not isinstance(bindings, list)
         or len(bindings) != 1
@@ -86,6 +87,14 @@ def _load_resolved_execution(filename: str | None, expected_identity: str) -> di
         message = f"Packaged resolved execution data {filename!r} has the wrong Action identity"
         raise ValueError(message)
     return document
+
+
+def _resolve_image_reference(name: str, image_env_var: str | None, default: str) -> str:
+    if name == "agent-runtime":
+        return get_settings().agent_runtime_image
+    if image_env_var is None:
+        return default
+    return os.environ.get(image_env_var) or default
 
 
 async def seed_execution_plane_plugins(session: AsyncSession) -> None:
@@ -98,11 +107,7 @@ async def seed_execution_plane_plugins(session: AsyncSession) -> None:
             "node_type": node_type,
             "step_identity": step_identity,
             "manifest": _load_manifest(filename, name),
-            "image_reference": (
-                get_settings().agent_runtime_image
-                if name == "agent-runtime"
-                else os.environ.get(image_env_var) or image_reference
-            ),
+            "image_reference": _resolve_image_reference(name, image_env_var, image_reference),
             "resolved_execution": _load_resolved_execution(resolved_filename, step_identity),
             "created_at": now,
             "updated_at": now,
