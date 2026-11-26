@@ -10,8 +10,11 @@ metadata:
     pipelinesascode.tekton.dev/max-keep-runs: "3"
     pipelinesascode.tekton.dev/on-cel-expression: >-
       event == "push" && target_branch == "devel" &&
-      (files.all.exists(x, x.startsWith("backend/")) ||
-      ".tekton/ansible-automation-orchestrator-backend-devel-push.yaml".pathChanged())
+      body.commits.exists(c,
+        c.added.exists(f, f.startsWith("backend/") || f == ".tekton/ansible-automation-orchestrator-backend-devel-push.yaml") ||
+        c.modified.exists(f, f.startsWith("backend/") || f == ".tekton/ansible-automation-orchestrator-backend-devel-push.yaml") ||
+        c.removed.exists(f, f.startsWith("backend/") || f == ".tekton/ansible-automation-orchestrator-backend-devel-push.yaml")
+      )
   creationTimestamp: null
   labels:
     appstudio.openshift.io/application: ansible-automation-orchestrator-devel
