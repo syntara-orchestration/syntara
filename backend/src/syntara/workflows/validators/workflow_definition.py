@@ -1113,7 +1113,18 @@ class WorkflowValidator:
                     system_continue_on_failure=system_continue_on_failure,
                 )
             )
-            findings.extend(check_template_expressions(workflow_definition, node_ids))
+            output_mapping_findings = _check_output_mapping_references(workflow_definition, node_ids)
+            output_mapping_finding_keys = {
+                (finding.node_id, finding.field_path, finding.category, finding.severity)
+                for finding in output_mapping_findings
+            }
+            findings.extend(
+                finding
+                for finding in check_template_expressions(workflow_definition, node_ids)
+                if (finding.node_id, finding.field_path, finding.category, finding.severity)
+                not in output_mapping_finding_keys
+            )
+            findings.extend(output_mapping_findings)
 
         findings.extend(collect_scheduled_trigger_config_findings(workflow_definition))
         findings.extend(_check_output_contract_findings(workflow_definition))
