@@ -78,3 +78,49 @@ async def test_seed_upserts_managed_images_and_preserves_an_administrator_pin(
     upgraded_by_name = {plugin.name: plugin for plugin in upgraded_rows}
     assert upgraded_by_name["script-bash"].id == initial_ids[1]
     assert upgraded_by_name["script-bash"].image_reference == bash_f
+
+
+@pytest.mark.asyncio
+async def test_http_seed_installs_dependencies_and_preserves_admin_pin(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    test_db_session: AsyncSession,
+) -> None:
+    from syntara.execution_plane.registry.models import ExecutionPlaneCredentialRecipe, ExecutionPlaneIntegrationType
+
+    policy = tmp_path / "policy.json"
+    policy.write_text("{}")
+    monkeypatch.setenv("APP_SCRIPT_IMAGE_POLICY_PATH", str(policy))
+    monkeypatch.setattr(seeder, "verify_script_image_reference", Mock())
+    for name in ("SCRIPT_PYTHON", "SCRIPT_BASH", "HTTP_REQUEST"):
+        monkeypatch.setenv(f"RELATED_IMAGE_{name}", _reference("registry.example/workload", "a"))
+    await seeder.seed_execution_plane_plugins(test_db_session)
+    first = (
+        await test_db_session.exec(select(ExecutionPlanePlugin).where(ExecutionPlanePlugin.name == "http-request"))
+    ).one()
+    original_id = first.id
+    first.image_reference = _reference("registry.example/admin-http", "b")
+    test_db_session.add(first)
+    await test_db_session.commit()
+    monkeypatch.setenv("RELATED_IMAGE_HTTP_REQUEST", _reference("registry.example/workload", "c"))
+    await seeder.seed_execution_plane_plugins(test_db_session)
+    second = (
+        await test_db_session.exec(select(ExecutionPlanePlugin).where(ExecutionPlanePlugin.name == "http-request"))
+    ).one()
+    assert second.id == original_id
+    assert second.image_reference == _reference("registry.example/admin-http", "b")
+    integration = (
+        await test_db_session.exec(
+            select(ExecutionPlaneIntegrationType).where(
+                ExecutionPlaneIntegrationType.integration_type_id == "syntara.http"
+            )
+        )
+    ).one()
+    recipe = (
+        await test_db_session.exec(
+            select(ExecutionPlaneCredentialRecipe).where(
+                ExecutionPlaneCredentialRecipe.credential_recipe_id == "syntara.http.bearer"
+            )
+        )
+    ).one()
+    assert recipe.integration_type_id == integration.integration_type_id

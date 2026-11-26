@@ -947,3 +947,11 @@ Code quality and coverage are tracked via SonarCloud. SonarCloud analysis runs a
 - 📖 **[Developer Getting Started Guide](docs/developer-getting-started.md)** - Architecture deep dive with examples
 - 📖 **[Development with Worktrees Guide](docs/development-with-worktrees.md)** - Parallel development setup
 - 📖 **[Architecture Decision Records](docs/decision-records.md)** - Design rationale and decisions
+
+### HTTP workload registry
+
+`RELATED_IMAGE_HTTP_REQUEST` optionally seeds the HTTP Action, IntegrationType
+and bearer CredentialRecipe using the existing image verification policy.
+Seeding preserves administrator image pins and does not change HTTP workflow
+routing. See [HTTP registry seeding](../docs/http-container-release.md) for the
+required release inputs and the separate runtime migration requirements.

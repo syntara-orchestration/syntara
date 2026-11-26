@@ -1,0 +1,22 @@
+---
+apiVersion: syntara.io/v1alpha1
+kind: IntegrationType
+metadata:
+  name: http
+  displayName: HTTP Service
+  description: Generic HTTP connection for the HTTP Request step.
+spec:
+  id: syntara.http
+  endpointKinds: [https]
+  credentialTypes: [syntara.http.bearer]
+  configuration:
+    kind: inline
+    value:
+      type: object
+      additionalProperties: false
+      required: [baseUrl]
+      properties:
+        baseUrl:
+          type: string
+          format: uri
+          pattern: "^https://"

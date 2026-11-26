@@ -1,0 +1,75 @@
+---
+apiVersion: syntara.io/v1alpha1
+kind: Action
+metadata:
+  name: http-request
+  displayName: HTTP Request
+  description: Makes an outbound HTTP request from a container step.
+spec:
+  runtime:
+    kind: custom-runner
+    entryPoint: "syntara_node_http_request:HttpRequestStep"
+  integrationType: syntara.http
+  input:
+    kind: inline
+    value:
+      type: object
+      required:
+        - url
+      additionalProperties: false
+      properties:
+        url:
+          type: string
+          description: Target URL (http:// or https:// only; SSRF protection blocks private/loopback/reserved IPs and validates redirect destinations).
+        credential_name:
+          type: string
+          description: Declared logical bearer credential name to read through the SDK.
+        method:
+          type: string
+          enum: [GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS]
+          default: GET
+        headers:
+          type: object
+          additionalProperties:
+            type: string
+          description: HTTP request headers.
+        body:
+          description: Request body — a JSON object or raw string.
+        query_params:
+          type: object
+          additionalProperties:
+            type: string
+          description: Query string parameters appended to the URL.
+        timeout_seconds:
+          type: integer
+          minimum: 1
+          maximum: 3600
+          default: 30
+        follow_redirects:
+          type: boolean
+          default: false
+  output:
+    kind: inline
+    value:
+      type: object
+      required: [status_code, body, headers, elapsed]
+      additionalProperties: false
+      properties:
+        status_code:
+          type: integer
+          description: HTTP response status code.
+        body:
+          description: Parsed JSON response body, or raw text if not JSON.
+        headers:
+          type: object
+          additionalProperties:
+            type: string
+          description: HTTP response headers.
+        elapsed:
+          type: number
+          description: Request duration in seconds.
+  error:
+    kind: inline
+    value:
+      type: object
+      additionalProperties: true

@@ -22,6 +22,7 @@ _IMAGE_REFERENCE: Final = re.compile(
 _ACTION_IDENTITIES: Final[dict[NodeType, str]] = {
     NodeType.SCRIPT_PYTHON: "syntara.script-python.script-python",
     NodeType.SCRIPT_BASH: "syntara.script-bash.script-bash",
+    NodeType.HTTP_REQUEST: "syntara.http-request.http-request",
 }
 _POLICY_PATH_ENV = "APP_SCRIPT_IMAGE_POLICY_PATH"
 _COSIGN_TIMEOUT_SECONDS = 120
