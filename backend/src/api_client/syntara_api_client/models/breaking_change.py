@@ -15,19 +15,21 @@ class BreakingChange:
     """A single breaking change detected in an output schema.
 
     Attributes:
-        change_type: Type of breaking change (removed_output, type_change, new_required_output)
-        field_path: Dotted path to the affected field
-        old_type: Previous field type (for type changes)
-        new_type: New field type (for type changes and new required outputs)
+        change_type: Category of output contract change.
+        field_path: Dotted path to the affected public output field.
+        old_type: Previous JSON Schema type, when applicable.
+        new_type: Candidate JSON Schema type, when applicable.
         description: Human-readable description
 
         Attributes:
-            change_type (str):
-            field_path (str):
-            description (str):
-            old_type (None | str | Unset):
-            new_type (None | str | Unset):
-            is_breaking (bool | Unset):  Default: True.
+            change_type (str): Change category, such as removed_output, type_change, new_required_output, added_output,
+                required_output, optional_output, constraint_change, mapping_changed, or removed_trigger.
+            field_path (str): Dotted path to the affected public output field, or the trigger ID when a trigger is removed.
+            description (str): Human-readable explanation of the contract change.
+            old_type (None | str | Unset): Previous JSON Schema type, when applicable.
+            new_type (None | str | Unset): Candidate JSON Schema type, when applicable.
+            is_breaking (bool | Unset): Whether this change can break consumers of the published output contract. Default:
+                True.
     """
 
     change_type: str

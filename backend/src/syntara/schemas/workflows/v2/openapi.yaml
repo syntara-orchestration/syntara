@@ -338,7 +338,12 @@ paths:
   /workflows/{workflow_id}/invocation_schema:
     get:
       summary: Get workflow invocation schema
-      description: Get the latest published Subworkflow Trigger schemas for a workflow.
+      description: >-
+        Returns the invocation contract from the workflow's latest published version. The response includes each
+        Subworkflow Trigger's input schema and declared public output schema; it does not expose draft schemas or
+        internal child step outputs. Requires read access to the workflow. If the workflow has no published version,
+        the endpoint returns 404. A published workflow without a Subworkflow Trigger returns 200 with `is_eligible`
+        set to false and an empty `triggers` list.
       operationId: get_workflow_invocation_schema
       tags:
         - Workflows
@@ -357,11 +362,56 @@ paths:
             title: Workflow Id
       responses:
         '200':
-          description: Published Subworkflow Trigger schemas
+          description: Invocation metadata and Subworkflow Trigger schemas from the latest published version
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/WorkflowInvocationSchemaRead'
+              examples:
+                eligibleWorkflow:
+                  summary: Published workflow with a declared public output contract
+                  value:
+                    workflow_id: 6c7085a1-5f73-47f1-8f63-728a40b055f6
+                    published_version_id: 7a0594be-a081-4756-98cf-480f0a2a51a7
+                    published_version: 4
+                    published_version_name: Incident intake
+                    published_version_created_at: '2026-11-21T14:20:00Z'
+                    is_eligible: true
+                    triggers:
+                      - trigger_node_id: incident_intake
+                        name: Incident intake
+                        input_schema:
+                          type: object
+                          properties:
+                            incident_id:
+                              type: string
+                          required:
+                            - incident_id
+                        output_schema:
+                          type: object
+                          properties:
+                            incident:
+                              type: object
+                              properties:
+                                id:
+                                  type: string
+                                status:
+                                  type: string
+                              required:
+                                - id
+                                - status
+                          required:
+                            - incident
+                ineligibleWorkflow:
+                  summary: Published workflow without a Subworkflow Trigger
+                  value:
+                    workflow_id: 6c7085a1-5f73-47f1-8f63-728a40b055f6
+                    published_version_id: 7a0594be-a081-4756-98cf-480f0a2a51a7
+                    published_version: 4
+                    published_version_name: Manual workflow
+                    published_version_created_at: '2026-11-21T14:20:00Z'
+                    is_eligible: false
+                    triggers: []
         '400':
           $ref: '../../base/shared-resources.openapi.yaml#/components/responses/BadRequestError'
         '401':
@@ -822,17 +872,17 @@ paths:
   /workflows/{workflow_id}/check_subworkflow_output_contract_changes:
     post:
       summary: Check for Sub-workflow output contract changes before publishing
-      description: |
+      description: >-
         Check a candidate workflow definition for Sub-workflow output contract changes.
 
-        Compares the submitted candidate definition against the currently published version
-        to detect breaking changes such as:
-        - Removed outputs
-        - Type changes
-        - New required outputs
+        Compares the submitted candidate definition against the currently published version and reports changes
+        grouped by Subworkflow Trigger. The response includes all contract changes, a separate breaking-change
+        subset, and visible published parent workflow steps that reference affected triggers.
 
-        This endpoint does not publish the candidate definition. It should be called before
-        publishing to warn users about breaking changes that may affect parent workflows.
+        Removing an output or trigger, changing an output type or constraint, and adding a required output can be
+        breaking. Adding an optional output, making an output optional, or changing its source mapping is nonbreaking.
+
+        The endpoint does not save or publish the candidate definition.
       operationId: check_subworkflow_output_contract_changes
       tags:
         - Workflows
@@ -851,17 +901,107 @@ paths:
             title: Workflow Id
       requestBody:
         required: true
+        description: Candidate workflow definition to compare with the currently published output contracts. The candidate is not saved or published.
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/WorkflowValidateRequest'
+            examples:
+              candidateOutputContract:
+                summary: Candidate definition declaring a public output
+                value:
+                  workflow_definition:
+                    schema_version: 2.0.0
+                    name: Incident intake
+                    triggers:
+                      - id: incident_intake
+                        type: subworkflow_trigger
+                        name: Incident intake
+                        parameters:
+                          output_schema:
+                            type: object
+                            properties:
+                              status:
+                                type: string
+                            required:
+                              - status
+                          output_mapping:
+                            status: '${collect_status.stdout}'
+                    nodes:
+                      - id: collect_status
+                        type: script
+                        parameters:
+                          language: bash
+                          code: echo ready
+                    edges:
+                      - from: incident_intake
+                        to: collect_status
       responses:
         '200':
-          description: Sub-workflow output contract changes detection result
+          description: All detected output contract changes and the breaking subset
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/BreakingChangesResponse'
+              examples:
+                noChanges:
+                  summary: The candidate preserves the published output contract
+                  value:
+                    has_breaking_changes: false
+                    triggers: []
+                    has_contract_changes: false
+                    contract_changes: []
+                    parent_workflows: []
+                breakingOutputRemoval:
+                  summary: A required public output was removed
+                  value:
+                    has_breaking_changes: true
+                    triggers:
+                      - trigger_id: incident_intake
+                        trigger_name: Incident intake
+                        changes:
+                          - change_type: removed_output
+                            field_path: incident.status
+                            old_type: string
+                            description: 'Removed public output: incident.status'
+                            is_breaking: true
+                    has_contract_changes: true
+                    contract_changes:
+                      - trigger_id: incident_intake
+                        trigger_name: Incident intake
+                        changes:
+                          - change_type: removed_output
+                            field_path: incident.status
+                            old_type: string
+                            description: 'Removed public output: incident.status'
+                            is_breaking: true
+                    parent_workflows:
+                      - workflow_id: 484e8e3b-93bc-4dc8-bcab-f73f55589ab0
+                        workflow_name: Incident escalation
+                        workflow_version: 12
+                        step_id: run_incident_review
+                        step_name: Run incident review
+                nonBreakingOutputAddition:
+                  summary: An optional public output was added
+                  value:
+                    has_breaking_changes: false
+                    triggers: []
+                    has_contract_changes: true
+                    contract_changes:
+                      - trigger_id: incident_intake
+                        trigger_name: Incident intake
+                        changes:
+                          - change_type: added_output
+                            field_path: incident.priority
+                            new_type: string
+                            description: 'Added optional output: incident.priority'
+                            is_breaking: false
+                    parent_workflows:
+                      - workflow_id: 484e8e3b-93bc-4dc8-bcab-f73f55589ab0
+                        workflow_name: Incident escalation
+                        workflow_version: 12
+                        step_id: run_incident_review
+                        step_name: Run incident review
         '400':
           $ref: '../../base/shared-resources.openapi.yaml#/components/responses/BadRequestError'
         '401':
@@ -1205,10 +1345,10 @@ components:
         A single breaking change detected in an output schema.
 
         Attributes:
-            change_type: Type of breaking change (removed_output, type_change, new_required_output)
-            field_path: Dotted path to the affected field
-            old_type: Previous field type (for type changes)
-            new_type: New field type (for type changes and new required outputs)
+            change_type: Category of output contract change.
+            field_path: Dotted path to the affected public output field.
+            old_type: Previous JSON Schema type, when applicable.
+            new_type: Candidate JSON Schema type, when applicable.
             description: Human-readable description
       required:
         - change_type
@@ -1219,26 +1359,34 @@ components:
         change_type:
           type: string
           title: Change Type
+          description: >-
+            Change category, such as removed_output, type_change, new_required_output, added_output,
+            required_output, optional_output, constraint_change, mapping_changed, or removed_trigger.
         field_path:
           type: string
           title: Field Path
+          description: Dotted path to the affected public output field, or the trigger ID when a trigger is removed.
         old_type:
           anyOf:
             - type: string
             - type: 'null'
           title: Old Type
+          description: Previous JSON Schema type, when applicable.
         new_type:
           anyOf:
             - type: string
             - type: 'null'
           title: New Type
+          description: Candidate JSON Schema type, when applicable.
         description:
           type: string
           title: Description
+          description: Human-readable explanation of the contract change.
         is_breaking:
           type: boolean
           title: Is Breaking
           default: true
+          description: Whether this change can break consumers of the published output contract.
 
     TriggerBreakingChanges:
       type: object
@@ -1258,21 +1406,24 @@ components:
         trigger_id:
           type: string
           title: Trigger Id
+          description: ID of the Subworkflow Trigger whose output contract changed.
         trigger_name:
           anyOf:
             - type: string
             - type: 'null'
           title: Trigger Name
+          description: Optional display name of the Subworkflow Trigger.
         changes:
           type: array
           items:
             $ref: '#/components/schemas/BreakingChange'
           title: Changes
+          description: Output contract changes detected for this trigger.
 
     BreakingChangesResponse:
       type: object
       title: BreakingChangesResponse
-      description: Response containing the output contract diff and current parent references.
+      description: Response containing output contract changes and visible parent references.
       required:
         - has_breaking_changes
         - triggers
@@ -1281,25 +1432,30 @@ components:
         has_breaking_changes:
           type: boolean
           title: Has Breaking Changes
+          description: Whether any detected output contract change is breaking.
         triggers:
           type: array
           items:
             $ref: '#/components/schemas/TriggerBreakingChanges'
           title: Triggers
+          description: Per-trigger groups containing breaking changes only; empty when none are breaking.
         has_contract_changes:
           type: boolean
           title: Has Contract Changes
           default: false
+          description: Whether any output schema or source mapping changed, including nonbreaking changes.
         contract_changes:
           type: array
           items:
             $ref: '#/components/schemas/TriggerBreakingChanges'
           title: Contract Changes
+          description: All detected per-trigger changes, including nonbreaking changes.
         parent_workflows:
           type: array
           items:
             $ref: '#/components/schemas/WorkflowReferenceRead'
           title: Parent Workflows
+          description: Visible, currently published parent workflow steps referencing triggers whose output contracts changed.
     WorkflowReferenceRead:
       type: object
       title: WorkflowReferenceRead
@@ -1315,20 +1471,25 @@ components:
           type: string
           format: uuid
           title: Workflow Id
+          description: ID of the published parent workflow that references the child.
         workflow_name:
           type: string
           title: Workflow Name
+          description: Name of the published parent workflow.
         workflow_version:
           type: integer
           title: Workflow Version
+          description: Published version number of the parent workflow.
         step_id:
           type: string
           title: Step Id
+          description: ID of the Sub-workflow node in the parent workflow.
         step_name:
           anyOf:
             - type: string
             - type: 'null'
           title: Step Name
+          description: Optional display name of the referencing node.
     WorkflowVersionUpdate:
       type: object
       title: WorkflowVersionUpdate

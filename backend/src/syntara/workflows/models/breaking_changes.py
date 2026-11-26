@@ -11,20 +11,30 @@ class BreakingChange(SQLModel):
     """A single breaking change detected in an output schema.
 
     Attributes:
-        change_type: Type of breaking change (removed_output, type_change, new_required_output)
-        field_path: Dotted path to the affected field
-        old_type: Previous field type (for type changes)
-        new_type: New field type (for type changes and new required outputs)
+        change_type: Category of output contract change.
+        field_path: Dotted path to the affected public output field.
+        old_type: Previous JSON Schema type, when applicable.
+        new_type: Candidate JSON Schema type, when applicable.
         description: Human-readable description
 
     """
 
-    change_type: str
-    field_path: str
-    old_type: str | None = None
-    new_type: str | None = None
-    description: str
-    is_breaking: bool = True
+    change_type: str = Field(
+        description=(
+            "Change category, such as removed_output, type_change, new_required_output, added_output, "
+            "required_output, optional_output, constraint_change, mapping_changed, or removed_trigger."
+        )
+    )
+    field_path: str = Field(
+        description="Dotted path to the affected public output field, or the trigger ID when a trigger is removed."
+    )
+    old_type: str | None = Field(default=None, description="Previous JSON Schema type, when applicable.")
+    new_type: str | None = Field(default=None, description="Candidate JSON Schema type, when applicable.")
+    description: str = Field(description="Human-readable explanation of the contract change.")
+    is_breaking: bool = Field(
+        default=True,
+        description="Whether this change can break consumers of the published output contract.",
+    )
 
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")  # type: ignore[assignment]
 
@@ -39,9 +49,9 @@ class TriggerBreakingChanges(SQLModel):
 
     """
 
-    trigger_id: str
-    trigger_name: str | None = None
-    changes: list[BreakingChange]
+    trigger_id: str = Field(description="ID of the Subworkflow Trigger whose output contract changed.")
+    trigger_name: str | None = Field(default=None, description="Optional display name of the Subworkflow Trigger.")
+    changes: list[BreakingChange] = Field(description="Output contract changes detected for this trigger.")
 
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")  # type: ignore[assignment]
 
@@ -49,22 +59,35 @@ class TriggerBreakingChanges(SQLModel):
 class WorkflowReferenceRead(SQLModel):
     """A currently published parent workflow step that references this child."""
 
-    workflow_id: UUID
-    workflow_name: str
-    workflow_version: int
-    step_id: str
-    step_name: str | None = None
+    workflow_id: UUID = Field(description="ID of the published parent workflow that references the child.")
+    workflow_name: str = Field(description="Name of the published parent workflow.")
+    workflow_version: int = Field(description="Published version number of the parent workflow.")
+    step_id: str = Field(description="ID of the Sub-workflow node in the parent workflow.")
+    step_name: str | None = Field(default=None, description="Optional display name of the referencing node.")
 
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")  # type: ignore[assignment]
 
 
 class BreakingChangesResponse(SQLModel):
-    """Response containing the output contract diff and current parent references."""
+    """Response containing output contract changes and visible parent references."""
 
-    has_breaking_changes: bool
-    triggers: list[TriggerBreakingChanges]
-    has_contract_changes: bool = False
-    contract_changes: list[TriggerBreakingChanges] = Field(default_factory=list)
-    parent_workflows: list[WorkflowReferenceRead] = Field(default_factory=list)
+    has_breaking_changes: bool = Field(description="Whether any detected output contract change is breaking.")
+    triggers: list[TriggerBreakingChanges] = Field(
+        description="Per-trigger groups containing breaking changes only; empty when none are breaking."
+    )
+    has_contract_changes: bool = Field(
+        default=False,
+        description="Whether any output schema or source mapping changed, including nonbreaking changes.",
+    )
+    contract_changes: list[TriggerBreakingChanges] = Field(
+        default_factory=list,
+        description="All detected per-trigger changes, including nonbreaking changes.",
+    )
+    parent_workflows: list[WorkflowReferenceRead] = Field(
+        default_factory=list,
+        description=(
+            "Visible, currently published parent workflow steps referencing triggers whose output contracts changed."
+        ),
+    )
 
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")  # type: ignore[assignment]

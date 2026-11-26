@@ -17,14 +17,18 @@ T = TypeVar("T", bound="BreakingChangesResponse")
 
 @_attrs_define
 class BreakingChangesResponse:
-    """Response containing the output contract diff and current parent references.
+    """Response containing output contract changes and visible parent references.
 
     Attributes:
-        has_breaking_changes (bool):
-        triggers (list[TriggerBreakingChanges]):
-        has_contract_changes (bool | Unset):  Default: False.
-        contract_changes (list[TriggerBreakingChanges] | Unset):
-        parent_workflows (list[WorkflowReferenceRead] | Unset):
+        has_breaking_changes (bool): Whether any detected output contract change is breaking.
+        triggers (list[TriggerBreakingChanges]): Per-trigger groups containing breaking changes only; empty when none
+            are breaking.
+        has_contract_changes (bool | Unset): Whether any output schema or source mapping changed, including nonbreaking
+            changes. Default: False.
+        contract_changes (list[TriggerBreakingChanges] | Unset): All detected per-trigger changes, including nonbreaking
+            changes.
+        parent_workflows (list[WorkflowReferenceRead] | Unset): Visible, currently published parent workflow steps
+            referencing triggers whose output contracts changed.
     """
 
     has_breaking_changes: bool

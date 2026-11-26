@@ -141,7 +141,11 @@ def sync_detailed(
 ) -> Response[ErrorData | ExecutionListResponse]:
     """List child executions
 
-     Retrieve child (sub-workflow) executions spawned by a parent execution.
+     Returns child workflow execution records spawned by this parent execution. Use this endpoint to
+    inspect nested run status and correlate each child with the parent Sub-workflow node that started
+    it. The optional `node_id` filter selects one parent node; a `for_each` node can have multiple child
+    executions, one per iteration. Results use standard execution pagination and are limited to child
+    executions in projects visible to the caller. Read permission on the parent execution is required.
 
     Args:
         execution_id (UUID):
@@ -188,7 +192,11 @@ def sync(
 ) -> ErrorData | ExecutionListResponse | None:
     """List child executions
 
-     Retrieve child (sub-workflow) executions spawned by a parent execution.
+     Returns child workflow execution records spawned by this parent execution. Use this endpoint to
+    inspect nested run status and correlate each child with the parent Sub-workflow node that started
+    it. The optional `node_id` filter selects one parent node; a `for_each` node can have multiple child
+    executions, one per iteration. Results use standard execution pagination and are limited to child
+    executions in projects visible to the caller. Read permission on the parent execution is required.
 
     Args:
         execution_id (UUID):
@@ -229,7 +237,11 @@ async def asyncio_detailed(
 ) -> Response[ErrorData | ExecutionListResponse]:
     """List child executions
 
-     Retrieve child (sub-workflow) executions spawned by a parent execution.
+     Returns child workflow execution records spawned by this parent execution. Use this endpoint to
+    inspect nested run status and correlate each child with the parent Sub-workflow node that started
+    it. The optional `node_id` filter selects one parent node; a `for_each` node can have multiple child
+    executions, one per iteration. Results use standard execution pagination and are limited to child
+    executions in projects visible to the caller. Read permission on the parent execution is required.
 
     Args:
         execution_id (UUID):
@@ -273,7 +285,11 @@ async def asyncio(
 ) -> ErrorData | ExecutionListResponse | None:
     """List child executions
 
-     Retrieve child (sub-workflow) executions spawned by a parent execution.
+     Returns child workflow execution records spawned by this parent execution. Use this endpoint to
+    inspect nested run status and correlate each child with the parent Sub-workflow node that started
+    it. The optional `node_id` filter selects one parent node; a `for_each` node can have multiple child
+    executions, one per iteration. Results use standard execution pagination and are limited to child
+    executions in projects visible to the caller. Read permission on the parent execution is required.
 
     Args:
         execution_id (UUID):
