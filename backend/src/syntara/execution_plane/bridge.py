@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Annotated
 
+import structlog
 from execution_plane_client.catalog import CommandCatalog
 from execution_plane_client.commands.results import TransportReceipt
 from execution_plane_client.errors import ProtocolConflict, UnsupportedCommand
@@ -34,6 +35,8 @@ from syntara.workflows.executions_router import get_temporal_execution_service
 
 if TYPE_CHECKING:
     from execution_plane_client.handlers import HandlingResult
+
+logger = structlog.stdlib.get_logger(__name__)
 
 router = SyntaraRouter(prefix="/api/execution_plane/v1", tags=["Execution Plane"])
 catalog = CommandCatalog()
@@ -116,7 +119,13 @@ async def receive_execution_plane_command(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT, detail="Work item is not eligible for credential resolution"
         ) from None
-    except (ValidationError, UnsupportedCommand, ProtocolConflict):
+    except (ValidationError, UnsupportedCommand, ProtocolConflict) as exc:
+        logger.warning(
+            "Command rejected as invalid",
+            command_type=message.command.command_type if message is not None else None,
+            error_type=type(exc).__qualname__,
+            error_detail=str(exc)[:1000],
+        )
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Invalid command") from None
     return _transport_receipt(message, handled)
 
