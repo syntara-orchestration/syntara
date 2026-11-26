@@ -465,7 +465,7 @@ export const builderInteractivePages: CanvasPageEntry[] = [
     maskCanvas: false,
     path: AppRoute.WorkflowBuilder.New,
     waitFor: async (page) => {
-      await expect(page.getByRole('heading', { name: 'Select a trigger step' })).toBeVisible({
+      await expect(page.getByRole('heading', { name: 'Select a trigger step type' })).toBeVisible({
         timeout: 30_000,
       })
     },
@@ -488,7 +488,7 @@ export const builderInteractivePages: CanvasPageEntry[] = [
     maskCanvas: false,
     path: AppRoute.WorkflowBuilder.New,
     waitFor: async (page) => {
-      await expect(page.getByRole('heading', { name: 'Select a trigger step' })).toBeVisible({
+      await expect(page.getByRole('heading', { name: 'Select a trigger step type' })).toBeVisible({
         timeout: 30_000,
       })
     },

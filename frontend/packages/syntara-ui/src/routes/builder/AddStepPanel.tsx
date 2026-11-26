@@ -113,7 +113,7 @@ export function AddStepPanel(props: AddStepPanelProps) {
   const isShowingSubtypeList = !!selectedStep?.subtypes?.length
 
   const panelTitle =
-    isShowingSubtypeList && selectedStep ? (selectedStep.selectionTitle ?? 'Select a step') : 'Add step'
+    isShowingSubtypeList && selectedStep ? (selectedStep.selectionTitle ?? 'Select a step type') : 'Add step'
 
   return (
     <SynPanel
