@@ -96,11 +96,12 @@ export default function BuilderNew() {
         isOpen
         onClose={handleCancel}
         variant="medium"
+        className={styles.projectModal}
         aria-labelledby="new-workflow-project-title"
         aria-describedby="new-workflow-project-description"
       >
         <ModalHeader title="Select a project" labelId="new-workflow-project-title" />
-        <ModalBody>
+        <ModalBody className={styles.projectModalBody}>
           <Content component={ContentVariants.p} id="new-workflow-project-description">
             Choose the project that will own this workflow. Its permissions decide who can access the workflow and which
             step types you can add, and its resources are available while you build and run it. You cannot change the

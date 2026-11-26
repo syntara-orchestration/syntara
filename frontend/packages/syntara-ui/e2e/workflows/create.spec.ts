@@ -89,6 +89,18 @@ test.describe('Workflows - Create New Workflow', () => {
     await expect(app.getByRole('heading', { name: 'Select a trigger step' })).toBeVisible()
   })
 
+  test('project menu in the new-workflow dialog is fully visible', async ({ app }) => {
+    await app.goto(toAppUrl('/workflow-builder/new'))
+    const dialog = app.getByRole('dialog', { name: 'Select a project' })
+    await expect(dialog).toBeVisible()
+
+    await dialog.getByPlaceholder('Select a project').click()
+
+    // The menu is taller than the dialog. Its last entry sits below the dialog's
+    // edge, so it is only in view when the dialog does not cut the menu off.
+    await expect(dialog.getByRole('option', { name: 'Create project' })).toBeInViewport()
+  })
+
   test('workflow name can be customized before saving', async ({ app }) => {
     const customName = buildUniqueName('e2e-custom')
 
