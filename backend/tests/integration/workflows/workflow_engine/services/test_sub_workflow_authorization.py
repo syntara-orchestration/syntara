@@ -111,20 +111,39 @@ async def test_authorized_actor_creates_child(
     test_db_session_factory: async_sessionmaker[AsyncSession],
     test_user: User,
     test_project_id: UUID,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """An allowed actor creates and persists the child Execution."""
+    from syntara.audit.dispatcher import AuditEventDispatcher
+    from syntara.workflows.audit.subworkflow_invocation import SubWorkflowInvocationEvent
+
     child_wf_id = await _create_published_child(test_db_session, created_by=test_user.id, project_id=test_project_id)
     parent_exec = str(await seed_parent_execution(test_db_session, created_by=test_user.id, project_id=test_project_id))
+    parent = await test_db_session.get(Execution, UUID(parent_exec))
+    assert parent is not None
+    events: list[object] = []
+    monkeypatch.setattr(AuditEventDispatcher, "dispatch", lambda event: events.append(event))
     setup = SubWorkflowSetupActivity(
         session_factory=test_db_session_factory, task_queue=_TASK_QUEUE, evaluator=_StubEvaluator(allow=True)
     )
 
     result = await setup.run(_params(child_wf_id), parent_exec, _NODE_ID, str(test_user.id), 0)
 
+    retry_result = await setup.run(_params(child_wf_id), parent_exec, _NODE_ID, str(test_user.id), 0)
+
     async with test_db_session_factory() as session:
         child = await session.get(Execution, UUID(result["execution_id"]))
     assert child is not None
     assert child.status == ExecutionStatus.PENDING
+    invocation_events = [event for event in events if isinstance(event, SubWorkflowInvocationEvent)]
+    assert len(invocation_events) == 1
+    assert invocation_events[0].actor_id == test_user.id
+    assert invocation_events[0].parent_workflow_id == parent.workflow_id
+    assert invocation_events[0].parent_execution_id == UUID(parent_exec)
+    assert invocation_events[0].parent_node_id == _NODE_ID
+    assert invocation_events[0].child_workflow_id == child_wf_id
+    assert invocation_events[0].child_execution_id == child.id
+    assert retry_result["execution_id"] == result["execution_id"]
 
 
 @pytest.mark.integration
@@ -134,10 +153,18 @@ async def test_unauthorized_actor_denied_before_child_creation(
     test_db_session_factory: async_sessionmaker[AsyncSession],
     test_user: User,
     test_project_id: UUID,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """A denied actor is rejected with a non-retryable error and no child row is written."""
+    from syntara.audit.dispatcher import AuditEventDispatcher
+    from syntara.workflows.audit.subworkflow_invocation import SubWorkflowAuthorizationDeniedEvent
+
     child_wf_id = await _create_published_child(test_db_session, created_by=test_user.id, project_id=test_project_id)
     parent_exec = str(await seed_parent_execution(test_db_session, created_by=test_user.id, project_id=test_project_id))
+    parent = await test_db_session.get(Execution, UUID(parent_exec))
+    assert parent is not None
+    events: list[object] = []
+    monkeypatch.setattr(AuditEventDispatcher, "dispatch", lambda event: events.append(event))
     setup = SubWorkflowSetupActivity(
         session_factory=test_db_session_factory, task_queue=_TASK_QUEUE, evaluator=_StubEvaluator(allow=False)
     )
@@ -147,6 +174,14 @@ async def test_unauthorized_actor_denied_before_child_creation(
 
     assert exc.value.type == _AUTHZ_ERROR
     assert exc.value.non_retryable is True
+    denial_events = [event for event in events if isinstance(event, SubWorkflowAuthorizationDeniedEvent)]
+    assert len(denial_events) == 1
+    assert denial_events[0].actor_id == test_user.id
+    assert denial_events[0].parent_workflow_id == parent.workflow_id
+    assert denial_events[0].parent_execution_id == UUID(parent_exec)
+    assert denial_events[0].parent_node_id == _NODE_ID
+    assert denial_events[0].child_workflow_id == child_wf_id
+    assert denial_events[0].denial_reason == "policy_deny"
     async with test_db_session_factory() as session:
         assert await session.get(Execution, _child_id(parent_exec)) is None
 

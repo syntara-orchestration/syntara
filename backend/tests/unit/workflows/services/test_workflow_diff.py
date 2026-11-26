@@ -15,13 +15,16 @@ from syntara.workflows.services.workflow_diff import generate_change_summary
 def _make_definition(
     nodes: list[dict[str, Any]] | None = None,
     edges: list[dict[str, Any]] | None = None,
+    triggers: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Build a minimal workflow definition for testing."""
     return {
         "schema_version": "2.0.0",
         "name": "test-workflow",
         "description": "Test workflow",
-        "triggers": [{"id": "trigger_manual", "type": "manual_trigger", "parameters": {}}],
+        "triggers": (
+            triggers if triggers is not None else [{"id": "trigger_manual", "type": "manual_trigger", "parameters": {}}]
+        ),
         "nodes": nodes or [],
         "edges": edges or [],
     }
@@ -83,6 +86,33 @@ class TestGenerateChangeSummary:
         assert {"id": "api_call", "type": "http_request"} in result["nodes_modified"]
         assert result["nodes_added"] == []
         assert result["nodes_removed"] == []
+
+    def test_subworkflow_trigger_added_removed_and_modified(self) -> None:
+        old = _make_definition(
+            triggers=[
+                {"id": "manual", "type": "manual_trigger", "parameters": {}},
+                {"id": "removed_child", "type": "subworkflow_trigger", "parameters": {}},
+                {
+                    "id": "updated_child",
+                    "type": "subworkflow_trigger",
+                    "parameters": {"input_schema": {"type": "object", "properties": {}}},
+                },
+            ],
+        )
+        new = _make_definition(
+            triggers=[
+                {"id": "manual", "type": "manual_trigger", "parameters": {}},
+                {"id": "updated_child", "type": "subworkflow_trigger", "parameters": {"input_schema": {}}},
+                {"id": "added_child", "type": "subworkflow_trigger", "parameters": {}},
+            ],
+        )
+
+        result = generate_change_summary(old, new)
+
+        assert result is not None
+        assert result["triggers_added"] == [{"id": "added_child", "type": "subworkflow_trigger"}]
+        assert result["triggers_removed"] == [{"id": "removed_child", "type": "subworkflow_trigger"}]
+        assert result["triggers_modified"] == [{"id": "updated_child", "type": "subworkflow_trigger"}]
 
     def test_edge_added(self) -> None:
         """AC4: Added edge as 'from -> to' string."""
@@ -175,4 +205,13 @@ class TestGenerateChangeSummary:
         new = _make_definition(nodes=[{"id": "n1", "type": "script", "parameters": {}}])
         result = generate_change_summary(old, new)
         assert result is not None
-        assert set(result.keys()) == {"nodes_added", "nodes_removed", "nodes_modified", "edges_added", "edges_removed"}
+        assert set(result.keys()) == {
+            "triggers_added",
+            "triggers_removed",
+            "triggers_modified",
+            "nodes_added",
+            "nodes_removed",
+            "nodes_modified",
+            "edges_added",
+            "edges_removed",
+        }

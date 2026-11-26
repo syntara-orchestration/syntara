@@ -1,7 +1,7 @@
 """Workflow lifecycle — domain event and audit handler.
 
 Fired by WorkflowService when a user creates, updates, deletes, publishes,
-unpublishes, or restores a workflow definition.  These are user-initiated
+unpublishes, or restores a workflow definition. These are user-initiated
 CRUD actions (category: USER_ACTION), not runtime execution events.
 """
 
@@ -42,6 +42,7 @@ class WorkflowLifecycleEvent:
     workflow_id: UUID
     workflow_name: str
     action: WorkflowAction
+    actor_id: UUID | None = field(default=None)
     version: int | None = field(default=None)
     project_id: UUID | None = field(default=None)
     error_type: str | None = field(default=None)
@@ -80,6 +81,7 @@ class WorkflowLifecycleHandler(AuditEventHandler[WorkflowLifecycleEvent]):
             event_message=f"Workflow {event.action}: {event.workflow_name}",
             source_component="syntara.workflows",
             structured_data=data,
+            actor_id=event.actor_id,
             workflow_id=event.workflow_id,
             resource_urn=f"urn:syntara:workflow:{event.workflow_id}",
             resource_name=event.workflow_name,

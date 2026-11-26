@@ -49,6 +49,7 @@ from syntara.workflows.workflow_engine.services.temporal_execution_service impor
 _CHILD_WF_ID = uuid4()
 _CHILD_VERSION_ID = uuid4()
 _CHILD_PROJECT_ID = uuid4()
+_PARENT_WORKFLOW_ID = uuid4()
 _CHILD_CREATED_BY = uuid4()
 _PARENT_EXECUTION_ID = str(uuid4())
 _PARENT_USER_ID = str(uuid4())
@@ -166,7 +167,7 @@ class _MockSession:
         if model_name == "WorkflowVersion" and str(_id) == str(_CHILD_VERSION_ID):
             return self._child_version
         if model_name == "Execution" and str(_id) == _PARENT_EXECUTION_ID:
-            return SimpleNamespace(project_id=_CHILD_PROJECT_ID)
+            return SimpleNamespace(project_id=_CHILD_PROJECT_ID, workflow_id=_PARENT_WORKFLOW_ID)
         return None
 
     def add(self, _obj: object) -> None:
