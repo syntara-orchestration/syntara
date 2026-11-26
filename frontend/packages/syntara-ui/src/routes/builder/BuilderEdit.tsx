@@ -114,6 +114,7 @@ export default function BuilderEdit() {
         workflowId={workflowId}
         executionCopy={executionCopy}
         pendingCopyNavigation={!!executionIdParam}
+        copyNavigationExecutionId={executionIdParam}
         initialViewVersion={initialViewVersion}
       />
     </ReactFlowProvider>

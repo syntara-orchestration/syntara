@@ -52,7 +52,14 @@ export function useExecutionCopyToEditor({
   useEffect(() => {
     const copy = executionCopy ?? latchedExecutionCopyRef.current
     if (!copy || !currentWorkflow || !isWorkflowInitialized) return
-    if (mostRecentExecutionId === copy.executionId && mostRecentRunPanelOpen) return
+    const contentAlreadyApplied = contentReplacedForExecutionRef.current === copy.executionId
+    if (
+      mostRecentExecutionId === copy.executionId &&
+      mostRecentRunPanelOpen &&
+      contentAlreadyApplied
+    ) {
+      return
+    }
 
     const timer = window.setTimeout(() => {
       const workflowAtApply = useWorkflowStore.getState().currentWorkflow

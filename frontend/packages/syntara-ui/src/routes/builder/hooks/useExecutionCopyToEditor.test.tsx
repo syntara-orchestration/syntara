@@ -151,6 +151,17 @@ describe('useExecutionCopyToEditor', () => {
     expect(opts.showSuccess).toHaveBeenCalledOnce()
   })
 
+  it('still applies workflow content when execution id matches but content was not replaced yet', async () => {
+    const replaceSpy = vi.spyOn(useWorkflowStore.getState(), 'replaceWorkflowContent')
+    const opts = buildOptions({
+      executionCopy: buildExecutionCopy({ executionId: 'exec-stale-pin' }),
+      mostRecentExecutionId: 'exec-stale-pin',
+      mostRecentRunPanelOpen: true,
+    })
+    renderHook(() => useExecutionCopyToEditor(opts))
+    await waitFor(() => expect(replaceSpy).toHaveBeenCalledOnce())
+  })
+
   it('reopens the run panel when execution id matches but the panel was closed', async () => {
     const dispatch = vi.fn()
     const executionCopy = buildExecutionCopy({ executionId: 'exec-panel' })
