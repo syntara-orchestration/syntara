@@ -84,8 +84,9 @@ are preparation only and must not be reported as live acceptance success.
 The shared EP worker filters outputs before storing/sending the result, whereas
 AO completion validation currently checks the full Action output schema. A local
 reproduction with the packaged HTTP manifest and `{"output": {}}` produces
-`ExecutionPlaneProtocolError` because `status_code` is required. Thus an HTTP
-node with `outputs: {}` cannot yet be treated as supported by the EP path.
+`ExecutionPlaneProtocolError` because `status_code` is required. The HTTP EP activity therefore rejects any explicit `outputs` selection before
+submission, including `outputs: {}`. Use default full outputs or the native
+executor until this contract is resolved.
 Non-empty mapping expressions also need parity with native output mapping; EP
 currently selects keys rather than evaluating those expressions. Resolve this
 shared completion/mapping contract before promoting the HTTP runtime draft.

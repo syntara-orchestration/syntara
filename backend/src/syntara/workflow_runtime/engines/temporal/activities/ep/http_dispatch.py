@@ -55,6 +55,9 @@ async def dispatch_http_to_ep(
     config: APIExecutorParameters,
 ) -> dict[str, Any]:
     """Execute an explicitly selected HTTP target without a native fallback."""
+    if output_config is not None:
+        message = "HTTP EP currently requires default full outputs; remove output selection or use the native executor"
+        raise ApplicationError(message, type="ConfigError", non_retryable=True)
     if not isinstance(config.execution_profile, ExecutionTargetProfile):
         message = "HTTP EP requires an execution target"
         raise ApplicationError(message, type="ConfigError", non_retryable=True)

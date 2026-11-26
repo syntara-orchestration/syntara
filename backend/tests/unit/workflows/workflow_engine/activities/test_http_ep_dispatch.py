@@ -50,13 +50,13 @@ async def test_unsupported_inputs_fail_before_dispatch(fields: dict[str, Any]) -
 
 
 @pytest.mark.asyncio
-async def test_selected_target_and_output_mapping_reach_shared_dispatch() -> None:
+async def test_selected_target_and_full_outputs_reach_shared_dispatch() -> None:
     inputs = _inputs() | {ENGINE_TIMEOUT_SECONDS_KEY: 42, "_internal": "private"}
     execution_id = uuid4()
     config = APIExecutorParameters.model_validate(inputs)
     result = {"output": {"status_code": 200}}
     with patch.object(http_dispatch, "_dispatch_to_ep", AsyncMock(return_value=result)) as dispatch:
-        assert await http_dispatch.dispatch_http_to_ep(inputs, {}, str(execution_id), config) == result
+        assert await http_dispatch.dispatch_http_to_ep(inputs, None, str(execution_id), config) == result
     assert dispatch.await_args is not None
     assert config.execution_profile is not None
     args = dispatch.await_args.args
@@ -64,7 +64,7 @@ async def test_selected_target_and_output_mapping_reach_shared_dispatch() -> Non
     assert args[0]["method"] == "GET"
     assert "_internal" not in args[0]
     assert "execution_profile" not in args[0]
-    assert args[1:] == ({}, execution_id, config.execution_profile.execution_target_id, "http-request")
+    assert args[1:] == (None, execution_id, config.execution_profile.execution_target_id, "http-request")
 
 
 @pytest.mark.asyncio
@@ -106,3 +106,16 @@ async def test_http_activity_hands_explicit_profile_to_dispatch() -> None:
         assert await http_request_activity.execute_http_request_activity(inputs, {}, execution_id) == {"output": {}}
     assert dispatch.await_args is not None
     assert dispatch.await_args.args[:3] == (inputs, {}, execution_id)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("outputs", [{}, {"status_code": "{{ status_code }}"}])
+async def test_output_selection_is_rejected_before_http_can_run(outputs: dict[str, str]) -> None:
+    inputs = _inputs()
+    with patch.object(http_dispatch, "_dispatch_to_ep", AsyncMock()) as dispatch:
+        with pytest.raises(ApplicationError, match="default full outputs") as raised:
+            await http_dispatch.dispatch_http_to_ep(
+                inputs, outputs, str(uuid4()), APIExecutorParameters.model_validate(inputs)
+            )
+        assert raised.value.non_retryable
+        dispatch.assert_not_awaited()
