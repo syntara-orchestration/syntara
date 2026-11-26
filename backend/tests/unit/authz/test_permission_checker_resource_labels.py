@@ -10,7 +10,7 @@ from uuid import uuid4
 import pytest
 from fastapi.exceptions import RequestValidationError
 
-from syntara.authz.dependencies import PermissionChecker, ProjectScopeFilter, VisibilityFilter
+from syntara.authz.dependencies import AnyProjectPermission, PermissionChecker, ProjectScopeFilter, VisibilityFilter
 from syntara.authz.engine import AllowedProjectsResult, AuthzResult, VisibilityResult
 from syntara.authz.exceptions import AuthorizationDeniedError
 from syntara.credentials.models.credential import Credential
@@ -362,6 +362,43 @@ class TestProjectScopeFilter:
 
             assert result == expected
             mock_resolve.assert_called_once()
+
+
+class TestAnyProjectPermission:
+    """Require at least one allowed project without changing scope resolution."""
+
+    @pytest.mark.parametrize("scope", ["global", "project", "none"])
+    async def test_requires_nonempty_scope(self, scope: str) -> None:
+        permission = AnyProjectPermission("workflow", "create")
+        expected = AllowedProjectsResult(
+            all_projects=scope == "global", project_ids=[uuid4()] if scope == "project" else []
+        )
+        request, user, db = _mock_request(), _mock_user(), AsyncMock()
+        with patch(
+            "syntara.authz.dependencies.resolve_allowed_projects", new_callable=AsyncMock, return_value=expected
+        ) as resolve:
+            if scope == "none":
+                with pytest.raises(AuthorizationDeniedError):
+                    await permission(request, user, db)
+            else:
+                assert await permission(request, user, db) is expected
+            resolve.assert_awaited_once_with(
+                db=db,
+                evaluator=request.app.state.authz_evaluator,
+                user_id=user.id,
+                resource_type="workflow",
+                action="create",
+                user_labels=user.labels,
+                user_metadata=user.authz_metadata,
+            )
+
+    async def test_preserves_certificate_authentication_bypass(self) -> None:
+        request = _mock_request()
+        request.state.is_cert_authenticated = True
+        with patch("syntara.authz.dependencies.resolve_allowed_projects", new_callable=AsyncMock) as resolve:
+            result = await AnyProjectPermission("workflow", "create")(request, _mock_user(), AsyncMock())
+        assert result.all_projects
+        resolve.assert_not_awaited()
 
 
 class TestVisibilityFilter:

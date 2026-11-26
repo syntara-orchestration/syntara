@@ -280,7 +280,7 @@ function BuilderContentBody(props: BuilderContentProps) {
 
   const { publish: onPublish, isPublishing } = usePublishWorkflow({
     workflowId,
-    currentVersion,
+    currentVersion: loadedVersion ?? currentVersion,
     workflowName,
     workflowDescription,
     expectedVersion: loadedVersion,

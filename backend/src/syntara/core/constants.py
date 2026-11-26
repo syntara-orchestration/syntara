@@ -74,6 +74,7 @@ class EventStreamLimits:
     DEFAULT_MAX_HEADERS = 128
     HEADER_JSON_OVERHEAD_BYTES = len('{"name":"","value_base64":""}')
     COMMITTED_POSITION_TIMEOUT_SECONDS = 5
+    OFFSET_COMMIT_TIMEOUT_SECONDS = 5
 
 
 class EventRunnerDefaults:

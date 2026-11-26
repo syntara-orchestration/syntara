@@ -8,10 +8,14 @@ import pytest_asyncio
 from sqlalchemy.exc import OperationalError
 
 from syntara.eventstreams.core.deduplication import TemporalAcceptance
+from syntara.eventstreams.core.envelope import RawEvent
 from syntara.eventstreams.core.handler import BlockedDelivery, EventLaunchError, ResolvedDelivery, SchedulingFailureCode
 from syntara.eventstreams.core.preparation import AcceptedWorkflow, PreparedExecution
+from syntara.eventstreams.core.processing import HeldRecord
+from syntara.eventstreams.models.subscription_snapshot import SubscriptionSnapshot
 from syntara.eventstreams.services import admission_service as module
 from syntara.eventstreams.services.admission_service import EventAdmissionService
+from syntara.eventstreams.services.record_processing_service import EventRecordProcessingService
 from tests.helpers.eventstream_sessions import session_factory
 from tests.unit.eventstreams.test_execution_preparation_service import preparation_context
 from tests.unit.eventstreams.test_record_processing_service import terminal
@@ -19,7 +23,8 @@ from tests.unit.eventstreams.test_record_processing_service import terminal
 
 @pytest_asyncio.fixture
 async def scheduling(monkeypatch):
-    prepared = await preparation_context(monkeypatch).prepare()
+    preparation = preparation_context(monkeypatch)
+    prepared = await preparation.prepare()
     assert isinstance(prepared, PreparedExecution)
     accepted = AcceptedWorkflow.model_validate(
         {
@@ -45,6 +50,7 @@ async def scheduling(monkeypatch):
         store=store,
         launcher=launcher,
         service=EventAdmissionService(factory, launcher),
+        preparation=preparation,
     )
 
 
@@ -60,6 +66,7 @@ async def test_start_precedes_execution_write_and_resolution_follows_commit(sche
     context.launcher.start.side_effect = start
     result = await context.service.schedule(context.prepared)
     assert isinstance(result, ResolvedDelivery)
+    context.launcher.lookup.assert_not_awaited()
     assert len(context.sessions) == 1
     context.sessions[0].begin.return_value.__aexit__.assert_awaited_once_with(None, None, None)
 
@@ -73,6 +80,33 @@ async def test_failed_start_does_not_write_execution(scheduling) -> None:
     assert context.sessions == []
 
 
+@pytest.mark.parametrize("accepted", [False, True])
+async def test_capacity_denial_checks_for_an_accepted_run(scheduling, monkeypatch, *, accepted: bool) -> None:
+    context = scheduling
+    preparation = context.preparation
+    preparation.capacity.side_effect = None
+    preparation.capacity.return_value = 2
+    processing = EventRecordProcessingService(lambda: preparation.session, preparation.service, context.service)
+    monkeypatch.setattr(processing, "admission_eligible", AsyncMock(return_value=True))
+    if accepted:
+        context.launcher.lookup.side_effect = None
+        context.launcher.lookup.return_value = context.accepted
+    result = await processing.process(
+        preparation.snapshot,
+        context.prepared.identity,
+        RawEvent(value=b'{"count":2}', source_metadata=preparation.envelope.source_metadata),
+    )
+    if accepted:
+        assert isinstance(result, ResolvedDelivery)
+        context.store.persist.assert_awaited_once()
+    else:
+        assert isinstance(result, HeldRecord)
+        assert result.reason == "execution_capacity"
+        context.store.persist.assert_not_awaited()
+    context.launcher.lookup.assert_awaited_once_with(context.prepared.identity)
+    context.launcher.start.assert_not_awaited()
+
+
 async def test_lost_start_response_recovers_original_arguments(scheduling) -> None:
     context = scheduling
     context.launcher.start.side_effect = EventLaunchError(SchedulingFailureCode.TEMPORAL_UNAVAILABLE)
@@ -84,21 +118,54 @@ async def test_lost_start_response_recovers_original_arguments(scheduling) -> No
     context.launcher.start.assert_awaited_once()
 
 
-async def test_normal_execution_is_checked_before_temporal(scheduling) -> None:
+async def test_existing_execution_needs_no_temporal_call(scheduling) -> None:
     context = scheduling
     context.store.lookup.return_value = terminal(context.prepared.identity).terminal
-    assert isinstance(await context.service.recover_accepted(context.prepared.identity), ResolvedDelivery)
+    assert isinstance(await context.service.lookup_execution(context.prepared.identity), ResolvedDelivery)
     context.launcher.lookup.assert_not_awaited()
     context.launcher.start.assert_not_awaited()
 
 
-async def test_only_confirmed_absence_allows_new_preparation(scheduling) -> None:
-    assert await scheduling.service.recover_accepted(scheduling.prepared.identity) is None
-    scheduling.launcher.lookup.side_effect = EventLaunchError(SchedulingFailureCode.HISTORY_UNAVAILABLE)
-    result = await scheduling.service.recover_accepted(scheduling.prepared.identity)
-    assert result is not None
-    assert not isinstance(result, ResolvedDelivery)
+@pytest.mark.parametrize("existing_execution", [False, True])
+async def test_republished_schema_resolves_original_execution_or_repairs_accepted_run(
+    scheduling, *, existing_execution
+) -> None:
+    context = scheduling
+    revised = SubscriptionSnapshot.model_validate(
+        {
+            **context.preparation.snapshot.model_dump(mode="json"),
+            "configuration_revision": context.preparation.snapshot.configuration_revision + 1,
+            "input_schema": {"$schema": "http://json-schema.org/draft-07/schema#", "required": ["new_field"]},
+        }
+    )
+    if existing_execution:
+        context.store.lookup.return_value = terminal(context.prepared.identity).terminal
+    else:
+        context.launcher.lookup.side_effect = None
+        context.launcher.lookup.return_value = context.accepted
+    service = EventRecordProcessingService(context.service._sessions, context.preparation.service, context.service)
+    record = RawEvent(value=b'{"count":2}', source_metadata=context.preparation.envelope.source_metadata)
+    result = await service.process(revised, context.prepared.identity, record)
+    assert isinstance(result, ResolvedDelivery)
+    context.store.lookup.assert_awaited_once_with(context.prepared.identity)
+    context.launcher.start.assert_not_awaited()
+    if existing_execution:
+        context.launcher.lookup.assert_not_awaited()
+        context.store.persist.assert_not_awaited()
+    else:
+        context.launcher.lookup.assert_awaited_once_with(context.prepared.identity)
+        saved = context.store.persist.call_args.args[0]
+        assert saved.workflow_arguments() == context.prepared.workflow_arguments()
+        context.sessions[-1].begin.return_value.__aexit__.assert_awaited_once_with(None, None, None)
+
+
+async def test_missing_execution_allows_direct_start_without_temporal_lookup(scheduling) -> None:
+    assert await scheduling.service.lookup_execution(scheduling.prepared.identity) is None
+    scheduling.launcher.lookup.assert_not_awaited()
     scheduling.launcher.start.assert_not_awaited()
+    assert isinstance(await scheduling.service.schedule(scheduling.prepared), ResolvedDelivery)
+    scheduling.launcher.lookup.assert_not_awaited()
+    scheduling.launcher.start.assert_awaited_once_with(scheduling.prepared)
 
 
 async def test_database_failure_retries_same_execution_without_restarting(scheduling) -> None:

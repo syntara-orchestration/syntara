@@ -10,7 +10,7 @@ from uuid import UUID, uuid4
 
 import structlog
 from temporalio.client import Client
-from temporalio.service import RPCError
+from temporalio.service import RetryConfig, RPCError
 
 from syntara.core.config.base import TEMPORAL_DEFAULT_BACKGROUND_TASK_QUEUE, get_settings
 from syntara.core.exceptions import SafeValueError
@@ -315,6 +315,8 @@ async def create_temporal_execution_service(
     temporal_address: str | None = None,
     namespace: str | None = None,
     task_queue: str | None = None,
+    *,
+    retry_config: RetryConfig | None = None,
 ) -> TemporalExecutionService:
     """Create a temporal execution service with a new Temporal client.
 
@@ -322,6 +324,7 @@ async def create_temporal_execution_service(
         temporal_address: Temporal server address (default from settings)
         namespace: Temporal namespace (default from settings)
         task_queue: Task queue name (default from settings)
+        retry_config: Optional client RPC retry policy
 
     Returns:
         TemporalExecutionService instance
@@ -341,6 +344,7 @@ async def create_temporal_execution_service(
         namespace=namespace,
         tls=build_temporal_tls_config(),
         interceptors=[WorkflowAuthClientInterceptor()],
+        retry_config=retry_config,
     )
     # TODO: Handle how TemporalExecutionService is dispatched/deployed  # noqa: TD002, TD003
     # via containerization. This will be addressed in a future Containerization & Deployment ticket.

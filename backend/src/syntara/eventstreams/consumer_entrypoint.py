@@ -5,6 +5,7 @@ import asyncio
 import signal
 
 import structlog
+from temporalio.service import RetryConfig
 
 from syntara.audit.outbox.worker import AuditOutboxWorker, get_outbox_worker
 from syntara.audit.registration import discover_and_register_all_handlers
@@ -76,7 +77,9 @@ async def _run_connected(
 
 async def _connect_temporal(shutdown: asyncio.Event) -> TemporalExecutionService | None:
     """Bound connection startup and release task-held client references on return."""
-    connecting = asyncio.create_task(create_temporal_execution_service())
+    # A rejection must describe the only start request. Application recovery
+    # owns retries so a later rejection cannot hide an earlier acceptance.
+    connecting = asyncio.create_task(create_temporal_execution_service(retry_config=RetryConfig(max_retries=1)))
     stopping = asyncio.create_task(shutdown.wait())
     try:
         async with asyncio.timeout(EventWorkerDefaults.STARTUP_TIMEOUT_SECONDS):

@@ -1,7 +1,7 @@
-"""Resolve accepted runs before decoding and admitting new Kafka records."""
+"""Filter locally before Execution lookup and new Kafka workflow admission."""
 
-from collections.abc import Callable
-from contextlib import suppress
+from collections.abc import AsyncIterator, Callable
+from contextlib import asynccontextmanager, suppress
 from datetime import UTC, datetime, timedelta
 
 import structlog
@@ -18,7 +18,7 @@ from syntara.eventstreams.core.deduplication import DeliveryIdentity
 from syntara.eventstreams.core.envelope import RawEvent
 from syntara.eventstreams.core.filter_input import EventFilterInput, FilterPayload
 from syntara.eventstreams.core.handler import ResolvedDelivery, RetryDelivery, SchedulingFailureCode
-from syntara.eventstreams.core.preparation import PreparedExecution
+from syntara.eventstreams.core.preparation import ExecutionCapacityUnavailable, PreparedExecution
 from syntara.eventstreams.core.processing import HeldRecord, InspectedRecord, RecordProcessingGate, SkippedRecord
 from syntara.eventstreams.core.results import EventDecodeFailure
 from syntara.eventstreams.core.serialization import EventDecodeSuccess, JsonEventDecoder
@@ -31,6 +31,7 @@ from syntara.filtering.models.result import FilterOutcome, FilterResult
 from syntara.workflows.models.workflow import Workflow
 
 type RecordResult = ResolvedDelivery | HeldRecord | SkippedRecord
+type HandoffReservation = Callable[[PreparedExecution], bool]
 logger = structlog.stdlib.get_logger(__name__)
 
 
@@ -108,6 +109,31 @@ class EventRecordProcessingService:
         except (SyntaraError, ValueError):
             return False
 
+    @asynccontextmanager
+    async def local_skip_commit_guard(self, snapshot: SubscriptionSnapshot) -> AsyncIterator[bool]:
+        """Serialize a skip batch's checkpoint with publication on its source.
+
+        Keep the lifecycle locks until the broker commit settles or its group
+        membership is fenced, even after the caller stops waiting. A
+        reconciled local gate alone cannot fence a publication it has not seen.
+        Already completed skips may drain after local admission closes.
+        """
+        async with self._sessions() as session, session.begin():
+            lifecycle = await lock_source_lifecycle(session, snapshot.source_id)
+            if lifecycle is None:
+                yield False
+                return
+            subscription, source = lifecycle
+            yield (
+                subscription.id == snapshot.subscription_id
+                and subscription.workflow_id == snapshot.workflow_id
+                and subscription.configuration_revision == snapshot.configuration_revision
+                and subscription.published_version_id == snapshot.published_version_id
+                and subscription.active_source_generation == source.generation == snapshot.source_generation
+                and source.id == snapshot.source_id
+                and source.retired_at is None
+            )
+
     def _scheduled(self, snapshot: SubscriptionSnapshot, result: SchedulingResult) -> ResolvedDelivery | HeldRecord:
         if isinstance(result, ResolvedDelivery):
             return result
@@ -118,9 +144,11 @@ class EventRecordProcessingService:
         return self._hold(result.error_code.value)
 
     async def _accepted(
-        self, snapshot: SubscriptionSnapshot, identity: DeliveryIdentity
+        self, snapshot: SubscriptionSnapshot, identity: DeliveryIdentity, *, recover: bool = False
     ) -> ResolvedDelivery | HeldRecord | None:
-        result = await self._admission.recover_accepted(identity)
+        result = await (
+            self._admission.recover_accepted(identity) if recover else self._admission.lookup_execution(identity)
+        )
         return None if result is None else self._scheduled(snapshot, result)
 
     async def process(
@@ -130,48 +158,141 @@ class EventRecordProcessingService:
         event: RawEvent | None,
         *,
         admission_guard: Callable[[], bool] | None = None,
+        handoff: PreparedExecution | None = None,
+        reserve_handoff: HandoffReservation | None = None,
+        matched_at: datetime | None = None,
+        remember_match: Callable[[datetime], None] | None = None,
     ) -> RecordResult:
-        """Check Execution and Temporal before current decoding, resources and capacity."""
+        """Complete local skips before I/O; look up Execution only for valid matches."""
         try:
-            accepted = await self._accepted(snapshot, identity)
-            if accepted is not None:
-                return accepted
-            if (
-                event is None
-                or not self._admission_open(snapshot, admission_guard)
-                or not await self.admission_eligible(snapshot)
-            ):
-                return self._hold("admission_closed")
-            if not self._event_matches(snapshot, identity, event):
-                return self._hold("delivery_evidence_mismatch")
-            decoded = self.evaluate_filter(snapshot, identity, event)
-            if isinstance(decoded, SkippedRecord):
-                return decoded if self._admission_open(snapshot, admission_guard) else self._hold("admission_closed")
-            return await self._prepare_and_schedule(snapshot, identity, decoded, admission_guard)
+            if handoff is not None:
+                if handoff.identity != identity:
+                    return self._hold("delivery_evidence_mismatch")
+                return await self._resume_handoff(snapshot, handoff, admission_guard)
+            if event is None:
+                accepted = await self._accepted(snapshot, identity, recover=True)
+                return accepted if accepted is not None else self._hold("admission_closed")
+            decoded = self._decode_event(snapshot, identity, event, admission_guard, matched_at)
+            # The queue owns the raw bytes until preparation converts its reservation.
+            del event
+            if isinstance(decoded, (SkippedRecord, HeldRecord)):
+                return decoded
+            result: RecordResult
+            if isinstance(decoded, EventDecodeFailure):
+                result = await self.hold_content_failure(snapshot, identity, decoded, admission_guard=admission_guard)
+            else:
+                if remember_match is not None:
+                    remember_match(decoded.envelope.source_metadata.received_at)
+                result = await self._process_match(
+                    snapshot, identity, decoded, admission_guard, reserve_handoff, recover=matched_at is not None
+                )
+            return result
         except (SQLAlchemyError, OSError, TimeoutError, SyntaraError, ValueError) as exc:
             if isinstance(exc, (SQLAlchemyError, OSError, TimeoutError)):
                 self._dependency_failed(snapshot)
-            return self._hold("dependency_unavailable")
+            return self._hold("dependency_unavailable").model_copy(update={"handoff": handoff})
+
+    def _decode_event(
+        self,
+        snapshot: SubscriptionSnapshot,
+        identity: DeliveryIdentity,
+        event: RawEvent,
+        guard: Callable[[], bool] | None,
+        matched_at: datetime | None = None,
+    ) -> EventDecodeSuccess | EventDecodeFailure | SkippedRecord | HeldRecord:
+        """Validate trusted coordinates and complete local filter outcomes before I/O."""
+        if not self._event_matches(snapshot, identity, event):
+            return self._hold("delivery_evidence_mismatch")
+        if not self._admission_open(snapshot, guard):
+            return self._hold("admission_closed")
+        if matched_at is not None:
+            metadata = event.source_metadata.model_copy(update={"received_at": matched_at})
+            return self._decode_payload(snapshot, event.model_copy(update={"source_metadata": metadata}))
+        decoded = self.evaluate_filter(snapshot, identity, event)
+        if isinstance(decoded, SkippedRecord) and not self._admission_open(snapshot, guard):
+            return self._hold("admission_closed")
+        return decoded
+
+    def inspect_unbuffered(
+        self,
+        snapshot: SubscriptionSnapshot,
+        identity: DeliveryIdentity,
+        event: RawEvent,
+        *,
+        admission_guard: Callable[[], bool] | None = None,
+    ) -> InspectedRecord | EventDecodeFailure | SkippedRecord | HeldRecord:
+        """Classify the payload while its bytes are available, without downstream I/O."""
+        decoded = self._decode_event(snapshot, identity, event, admission_guard)
+        return InspectedRecord(identity=identity) if isinstance(decoded, EventDecodeSuccess) else decoded
+
+    async def _process_match(
+        self,
+        snapshot: SubscriptionSnapshot,
+        identity: DeliveryIdentity,
+        decoded: EventDecodeSuccess,
+        guard: Callable[[], bool] | None,
+        reserve_handoff: HandoffReservation | None,
+        *,
+        recover: bool = False,
+    ) -> RecordResult:
+        """Reuse an existing Execution before checking admission for a direct start."""
+        accepted = await self._accepted(snapshot, identity, recover=recover)
+        if accepted is not None:
+            return accepted
+        if not self._admission_open(snapshot, guard) or not await self.admission_eligible(snapshot):
+            return self._hold("admission_closed")
+        return await self._prepare_and_schedule(snapshot, identity, decoded, guard, reserve_handoff)
+
+    async def _resume_handoff(
+        self, snapshot: SubscriptionSnapshot, prepared: PreparedExecution, guard: Callable[[], bool] | None
+    ) -> RecordResult:
+        """Keep attempted arguments through local retries, even after admission closes."""
+        accepted = await self._accepted(snapshot, prepared.identity, recover=True)
+        if accepted is not None:
+            return accepted.model_copy(update={"handoff": prepared}) if isinstance(accepted, HeldRecord) else accepted
+        if not self._admission_open(snapshot, guard) or not await self.admission_eligible(snapshot):
+            return self._hold("admission_closed").model_copy(update={"handoff": prepared})
+        return await self._schedule(snapshot, prepared, already_retained=True)
+
+    async def _schedule(
+        self,
+        snapshot: SubscriptionSnapshot,
+        prepared: PreparedExecution,
+        *,
+        reserve_handoff: HandoffReservation | None = None,
+        already_retained: bool = False,
+    ) -> RecordResult:
+        if reserve_handoff is not None and not reserve_handoff(prepared):
+            return await self._accepted(snapshot, prepared.identity, recover=True) or self._hold("queue_capacity")
+        scheduled = await self._admission.schedule(prepared)
+        result = self._scheduled(snapshot, scheduled)
+        if isinstance(scheduled, ResolvedDelivery):
+            return scheduled
+        # A rejection of a retry cannot clear an earlier ambiguous submission.
+        if scheduled.start_rejected and not already_retained:
+            return result.model_copy(update={"handoff_rejected": True})
+        return result.model_copy(update={"handoff": prepared})
 
     async def _prepare_and_schedule(
         self,
         snapshot: SubscriptionSnapshot,
         identity: DeliveryIdentity,
-        decoded: EventDecodeSuccess | EventDecodeFailure,
+        decoded: EventDecodeSuccess,
         guard: Callable[[], bool] | None,
+        reserve_handoff: HandoffReservation | None,
     ) -> RecordResult:
-        if isinstance(decoded, EventDecodeFailure):
-            return self._skip_content(snapshot, identity, decoded, guard)
         if not self._admission_open(snapshot, guard):
             return self._hold("admission_closed")
         prepared = await self._preparation.prepare_delivery(snapshot, identity, decoded.envelope)
         if isinstance(prepared, EventDecodeFailure):
-            return self._skip_content(snapshot, identity, prepared, guard)
+            return await self.hold_content_failure(snapshot, identity, prepared, admission_guard=guard)
+        if isinstance(prepared, ExecutionCapacityUnavailable):
+            return await self._accepted(snapshot, identity, recover=True) or self._hold(prepared.reason)
         if not isinstance(prepared, PreparedExecution):
             return self._hold(prepared.reason)
         if not self._admission_open(snapshot, guard):
             return self._hold("admission_closed")
-        return self._scheduled(snapshot, await self._admission.schedule(prepared))
+        return await self._schedule(snapshot, prepared, reserve_handoff=reserve_handoff)
 
     async def inspect_only(
         self,
@@ -183,26 +304,23 @@ class EventRecordProcessingService:
         admission_guard: Callable[[], bool] | None = None,
     ) -> RecordResult | InspectedRecord:
         """Resolve accepted work or inspect delivered content without starting a workflow."""
-        accepted = await self._accepted(snapshot, identity)
-        if accepted is not None:
-            return accepted
         if not self._event_matches(snapshot, identity, event):
             return self._hold("delivery_evidence_mismatch")
         # Inspection grants no start or commit permission. It must remain
         # available behind the partition fence that requested this drain.
-        if apply_filter:
-            if not self._admission_open(snapshot, admission_guard) or not await self.admission_eligible(snapshot):
-                return self._hold("admission_closed")
-            decoded = self.evaluate_filter(snapshot, identity, event)
-            if isinstance(decoded, SkippedRecord):
-                return decoded if self._admission_open(snapshot, admission_guard) else self._hold("admission_closed")
-        else:
-            decoded = self._decoder.decode(event, schema=snapshot.model_dump(mode="json")["input_schema"])
-        if isinstance(decoded, EventDecodeFailure):
+        if apply_filter and not self._admission_open(snapshot, admission_guard):
+            return self._hold("admission_closed")
+        decoded = self.evaluate_filter(snapshot, identity, event)
+        if isinstance(decoded, SkippedRecord):
             if apply_filter:
-                return self._skip_content(snapshot, identity, decoded, admission_guard)
+                return decoded if self._admission_open(snapshot, admission_guard) else self._hold("admission_closed")
+            return InspectedRecord(identity=identity)
+        if isinstance(decoded, EventDecodeFailure) and apply_filter:
+            return await self.hold_content_failure(snapshot, identity, decoded, admission_guard=admission_guard)
+        accepted = await self._accepted(snapshot, identity, recover=not apply_filter)
+        if accepted is None and isinstance(decoded, EventDecodeFailure):
             self._audit_content_failure(snapshot, identity, decoded)
-        return InspectedRecord(identity=identity)
+        return accepted if accepted is not None else InspectedRecord(identity=identity)
 
     async def hold_content_failure(
         self,
@@ -213,7 +331,7 @@ class EventRecordProcessingService:
         admission_guard: Callable[[], bool] | None = None,
     ) -> RecordResult:
         """Recover accepted work or classify proven invalid content under current gates."""
-        accepted = await self._accepted(snapshot, identity)
+        accepted = await self._accepted(snapshot, identity, recover=True)
         if accepted is not None:
             return accepted
         return self._skip_content(snapshot, identity, failure, admission_guard)
@@ -295,7 +413,7 @@ class EventRecordProcessingService:
             result = prepared.precheck(view)
             if result.outcome != FilterOutcome.MATCH:
                 return self._skip_filter(snapshot, identity, result)
-        decoded = self._decoder.decode(event, schema=snapshot.model_dump(mode="json")["input_schema"])
+        decoded = self._decode_payload(snapshot, event)
         if isinstance(decoded, EventDecodeSuccess) and prepared is not None and view is not None:
             view.payload = FilterPayload(state="decoded", value=decoded.envelope.payload)
             view.cloudevents = decoded.envelope.cloudevents
@@ -303,6 +421,11 @@ class EventRecordProcessingService:
             if result.outcome != FilterOutcome.MATCH:
                 return self._skip_filter(snapshot, identity, result)
         return decoded
+
+    def _decode_payload(
+        self, snapshot: SubscriptionSnapshot, event: RawEvent
+    ) -> EventDecodeSuccess | EventDecodeFailure:
+        return self._decoder.decode(event, schema=snapshot.model_dump(mode="json")["input_schema"])
 
     @staticmethod
     def _skip_filter(snapshot: SubscriptionSnapshot, identity: DeliveryIdentity, result: FilterResult) -> SkippedRecord:

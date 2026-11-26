@@ -275,9 +275,9 @@ async function processSaveResult(
     ctx.showSuccess({ title: `Workflow ${verb}`, description: `${ctx.nameToSave} has been saved.` })
   }
 
-  await completeSave(ctx.queryClient, ctx.markClean, ctx.isNew ? saveResult.data?.id : undefined, ctx.setLocation)
   const newVersion = saveResult.data?.current_version
   if (ctx.willPatchExisting && newVersion != null) ctx.onVersionUpdated?.(newVersion)
+  await completeSave(ctx.queryClient, ctx.markClean, ctx.isNew ? saveResult.data?.id : undefined, ctx.setLocation)
   if (!hasIssues) ctx.onValidationFindings?.([])
   if (hasIssues && ctx.blockOnWarnings) return false
   return true

@@ -67,6 +67,7 @@ class ManagedRunnerFactory:
             self._preparation,
             self._admission,
             work_semaphore=self._resources.processing,
+            inspection_semaphore=self._resources.inspection,
             gate=self._resources.gate,
         )
 
