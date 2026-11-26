@@ -14,6 +14,8 @@ export function SynStepHeaderActions(
     menuActions?: StepMenuAction[]
     expandable?: boolean
     showMenuActions: boolean
+    /** When menu actions are hidden, still offer the view-details action as a View button. */
+    showViewAction?: boolean
     menuClassName?: string
     menuPopperProps?: ComponentProps<typeof SynStepMenu>['popperProps']
   }>
@@ -21,11 +23,12 @@ export function SynStepHeaderActions(
   const menuActions = props.menuActions ?? []
   const editAction = menuActions.find((action) => action.id === 'view-details')
   const showEdit = props.showMenuActions && editAction !== undefined
+  const showView = !props.showMenuActions && props.showViewAction === true && editAction !== undefined
   const kebabActions = showEdit ? menuActions.filter((action) => action.id !== 'view-details') : menuActions
   const showMenu = props.showMenuActions && kebabActions.length > 0
   const showExpand = props.expandable === true
 
-  if (!showEdit && !showExpand && !showMenu) {
+  if (!showEdit && !showView && !showExpand && !showMenu) {
     return null
   }
 
@@ -43,6 +46,11 @@ export function SynStepHeaderActions(
       {showEdit && editAction ? (
         <FlexItem>
           <SynStepEditButton stepTitle={props.stepTitle} onClick={editAction.onClick} />
+        </FlexItem>
+      ) : null}
+      {showView && editAction ? (
+        <FlexItem>
+          <SynStepEditButton stepTitle={props.stepTitle} onClick={editAction.onClick} mode="view" />
         </FlexItem>
       ) : null}
       {showMenu ? (

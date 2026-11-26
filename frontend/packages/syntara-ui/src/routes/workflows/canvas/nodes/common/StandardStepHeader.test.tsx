@@ -13,7 +13,18 @@ vi.mock('@xyflow/react', async () => {
   }
 })
 
+import { ExecutionViewContext } from '../../../../builder/ExecutionViewContext'
+import { VersionViewContext } from '../../../../builder/VersionViewContext'
+
 import { StandardStepHeader } from './StandardStepHeader'
+
+function builderMenuActions(onViewDetails = vi.fn()) {
+  return [
+    { id: 'view-details', label: 'View step details', onClick: onViewDetails },
+    { id: 'duplicate', label: 'Duplicate', onClick: vi.fn() },
+    { id: 'delete', label: 'Delete', onClick: vi.fn(), variant: 'danger' as const },
+  ]
+}
 
 describe('StandardStepHeader', () => {
   it('renders title and subtitle', () => {
@@ -201,6 +212,77 @@ describe('StandardStepHeader', () => {
 
     expect(screen.queryByRole('button', { name: /step actions menu/i })).not.toBeInTheDocument()
     mockNodesConnectable.value = true
+  })
+
+  it('offers a View button and no step menu when the canvas is read-only', async () => {
+    mockNodesConnectable.value = false
+    const user = userEvent.setup()
+    const onViewDetails = vi.fn()
+
+    try {
+      render(<StandardStepHeader title="Test Step" subtitle="Task" menuActions={builderMenuActions(onViewDetails)} />)
+
+      await user.click(screen.getByRole('button', { name: 'View Test Step' }))
+      expect(onViewDetails).toHaveBeenCalledTimes(1)
+      expect(screen.queryByRole('button', { name: 'Edit Test Step' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /step actions menu/i })).not.toBeInTheDocument()
+    } finally {
+      mockNodesConnectable.value = true
+    }
+  })
+
+  it('offers a View button and no step menu when viewing a previous version', async () => {
+    const user = userEvent.setup()
+    const onViewDetails = vi.fn()
+
+    render(
+      <VersionViewContext.Provider value={true}>
+        <StandardStepHeader title="Test Step" subtitle="Task" menuActions={builderMenuActions(onViewDetails)} />
+      </VersionViewContext.Provider>
+    )
+
+    await user.click(screen.getByRole('button', { name: 'View Test Step' }))
+    expect(onViewDetails).toHaveBeenCalledTimes(1)
+    expect(screen.queryByRole('button', { name: 'Edit Test Step' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /step actions menu/i })).not.toBeInTheDocument()
+  })
+
+  it('offers no View button on a read-only canvas without a view-details action', () => {
+    mockNodesConnectable.value = false
+
+    try {
+      render(
+        <StandardStepHeader
+          title="Test Step"
+          subtitle="Task"
+          menuActions={[{ id: 'delete', label: 'Delete', onClick: vi.fn(), variant: 'danger' as const }]}
+        />
+      )
+
+      expect(screen.queryByRole('button', { name: 'View Test Step' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /step actions menu/i })).not.toBeInTheDocument()
+    } finally {
+      mockNodesConnectable.value = true
+    }
+  })
+
+  it('shows neither View, Edit nor the step menu in execution view', () => {
+    render(
+      <ExecutionViewContext.Provider value={true}>
+        <StandardStepHeader title="Test Step" subtitle="Task" menuActions={builderMenuActions()} />
+      </ExecutionViewContext.Provider>
+    )
+
+    expect(screen.queryByRole('button', { name: 'View Test Step' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Edit Test Step' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /step actions menu/i })).not.toBeInTheDocument()
+  })
+
+  it('keeps Edit, not View, when the canvas is editable', () => {
+    render(<StandardStepHeader title="Test Step" subtitle="Task" menuActions={builderMenuActions()} />)
+
+    expect(screen.getByRole('button', { name: 'Edit Test Step' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'View Test Step' })).not.toBeInTheDocument()
   })
 
   it('prevents event propagation from menu trigger', async () => {

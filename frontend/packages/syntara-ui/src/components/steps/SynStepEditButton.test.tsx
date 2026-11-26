@@ -38,6 +38,19 @@ describe('SynStepEditButton', () => {
     expect(await screen.findByRole('tooltip')).toHaveTextContent('Edit step')
   })
 
+  it('is labelled for viewing in view mode', async () => {
+    const user = userEvent.setup()
+    const onView = vi.fn()
+    render(<SynStepEditButton stepTitle="Deploy" onClick={onView} mode="view" />)
+
+    const button = screen.getByRole('button', { name: 'View Deploy' })
+    expect(button).toHaveTextContent('View')
+    await user.hover(button)
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('View step')
+    await user.click(button)
+    expect(onView).toHaveBeenCalledTimes(1)
+  })
+
   it('has no axe violations', async () => {
     const { container } = render(<SynStepEditButton stepTitle="Deploy" onClick={vi.fn()} />)
 
