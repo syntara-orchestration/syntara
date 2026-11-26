@@ -306,17 +306,50 @@ test('creates, edits and saves a Kafka Publish action', async ({ app }, testInfo
     // Editing and reopening the disabled step must not silently re-enable it.
     await expect(app.getByRole('menuitem', { name: 'Enable', exact: true })).toBeVisible()
     await app.getByRole('menuitem', { name: 'Enable', exact: true }).click()
-    await clickSaveAndWait(app)
-    await app.getByRole('button', { name: /Publish/i }).click()
-    const dialog = app.getByRole('dialog')
-    await expect(dialog).toBeVisible()
-    await dialog.getByRole('button', { name: 'Publish workflow', exact: true }).click()
-    await expect(dialog).toBeHidden()
+    const workflowPath = `/api/v1/workflows/${workflowId}`
+    let resumeRefresh: (() => void) | undefined
+    const refreshGate = new Promise<void>((resolve) => {
+      resumeRefresh = resolve
+    })
+    await app.route(
+      (url) => url.pathname === workflowPath,
+      async (route) => {
+        if (route.request().method() === 'GET') await refreshGate
+        await route.continue()
+      }
+    )
+
+    let version: number
+    try {
+      await clickSaveAndWait(app)
+      await app.getByRole('button', { name: 'Publish workflow', exact: true }).click()
+      const dialog = app.getByRole('dialog', { name: 'Publish workflow', exact: true })
+      await expect(dialog).toBeVisible()
+
+      // Publish immediately while the builder still has the pre-save workflow details.
+      const [published] = await Promise.all([
+        app.waitForResponse((response) => {
+          const { pathname } = new URL(response.url())
+          return (
+            response.request().method() === 'POST' &&
+            pathname.startsWith(`${workflowPath}/versions/`) &&
+            pathname.endsWith('/publish')
+          )
+        }),
+        dialog.getByRole('button', { name: 'Publish workflow', exact: true }).click(),
+      ])
+      expect(published.ok(), `Publish returned HTTP ${published.status()}`).toBeTruthy()
+      const result = z
+        .object({ current_version: z.number(), version: z.object({ version: z.number() }) })
+        .parse(await published.json())
+      version = result.version.version
+      expect(version).toBe(result.current_version)
+      await expect(dialog).toBeHidden()
+    } finally {
+      resumeRefresh?.()
+    }
     await app.getByRole('button', { name: 'Workflow actions', exact: true }).click()
     await app.getByRole('menuitem', { name: 'Version history', exact: true }).click()
-    const versionsResponse = await apiRequest(app, 'get', `/workflows/${workflowId}`, { token })
-    const version = z.object({ version: z.object({ version: z.number() }) }).parse(await versionsResponse.json())
-      .version.version
     await app
       .getByRole('listitem')
       .filter({ has: app.getByRole('button', { name: `Actions for version ${version}`, exact: true }) })
