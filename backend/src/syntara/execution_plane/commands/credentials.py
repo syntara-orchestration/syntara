@@ -79,6 +79,7 @@ class CredentialResolveClusterCommandHandler:
             integration is None
             or integration.integration_type != IntegrationType.OPENSHIFT
             or integration.management_credential_id != payload.credential_ref
+            or not integration.enabled
         ):
             raise CommandResourceStateError
         credential = await self._resolve_credential_document(context.session, payload.credential_ref)

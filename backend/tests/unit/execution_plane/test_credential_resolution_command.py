@@ -79,6 +79,7 @@ async def test_credential_command_returns_typed_correlated_transport_receipt(
     integration = SimpleNamespace(
         integration_type=IntegrationType.OPENSHIFT,
         management_credential_id=payload.credential_ref,
+        enabled=True,
     )
     dispatch = MagicMock()
 
@@ -149,6 +150,7 @@ async def test_credential_command_uses_credential_specific_permission(
             return_value=SimpleNamespace(
                 integration_type=IntegrationType.OPENSHIFT,
                 management_credential_id=payload.credential_ref,
+                enabled=True,
             )
         ),
     )
@@ -362,6 +364,7 @@ async def test_cluster_credential_command_handler_validates_ownership_and_audits
     integration = SimpleNamespace(
         integration_type=IntegrationType.OPENSHIFT,
         management_credential_id=credential_ref,
+        enabled=True,
     )
     dispatch = MagicMock()
     monkeypatch.setattr(AuditEventDispatcher, "dispatch", dispatch)
@@ -410,6 +413,42 @@ async def test_cluster_credential_command_handler_rejects_invalid_ownership(
 ) -> None:
     message = credential_command()
     payload = CredentialResolveCluster.model_validate(message.command.payload)
+    dispatch = MagicMock()
+    resolve_credential = AsyncMock(return_value={"bearer_token": "resolved-token"})
+    monkeypatch.setattr(AuditEventDispatcher, "dispatch", dispatch)
+    monkeypatch.setattr(
+        command_credentials.CredentialResolveClusterCommandHandler,
+        "_load_integration",
+        AsyncMock(return_value=integration),
+    )
+    monkeypatch.setattr(
+        command_credentials.CredentialResolveClusterCommandHandler,
+        "_resolve_credential_document",
+        resolve_credential,
+    )
+
+    with pytest.raises(CommandResourceStateError):
+        await command_credentials.CredentialResolveClusterCommandHandler().handle(
+            message,
+            payload,
+            command_context,
+        )
+
+    resolve_credential.assert_not_awaited()
+    dispatch.assert_not_called()
+
+
+async def test_cluster_credential_command_handler_rejects_disabled_integration(
+    monkeypatch: pytest.MonkeyPatch,
+    command_context: AOCommandContext,
+) -> None:
+    message = credential_command()
+    payload = CredentialResolveCluster.model_validate(message.command.payload)
+    integration = SimpleNamespace(
+        integration_type=IntegrationType.OPENSHIFT,
+        management_credential_id=payload.credential_ref,
+        enabled=False,
+    )
     dispatch = MagicMock()
     resolve_credential = AsyncMock(return_value={"bearer_token": "resolved-token"})
     monkeypatch.setattr(AuditEventDispatcher, "dispatch", dispatch)
