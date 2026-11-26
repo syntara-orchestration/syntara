@@ -175,7 +175,7 @@ class TestValidateCredentialProjectScope:  # noqa: D101
 
 class TestValidateCredentialBindingRecipes:  # noqa: D101
     @staticmethod
-    def _definition(recipe_id: str) -> dict[str, object]:
+    def _definition(recipe_id: object) -> dict[str, object]:
         return {
             "schema_version": "2.0.0",
             "nodes": [
@@ -246,6 +246,22 @@ class TestValidateCredentialBindingRecipes:  # noqa: D101
             ),
         ):
             await svc._validate_credential_binding_recipes(self._definition("${workflow.recipe_id}"))
+
+    @pytest.mark.asyncio
+    async def test_non_string_recipe_does_not_raise_type_error(self) -> None:
+        svc, _session = _make_service()
+
+        with (
+            patch(
+                "syntara.workflows.services.workflow_service.get_execution_plane_plugin_by_node_type",
+                AsyncMock(return_value=SimpleNamespace(name="script-python")),
+            ),
+            patch(
+                "syntara.workflows.services.workflow_service.execution_plane_plugin_credential_recipe_ids",
+                AsyncMock(return_value=("future.plugin.token",)),
+            ),
+        ):
+            await svc._validate_credential_binding_recipes(self._definition(123))
 
     @pytest.mark.asyncio
     async def test_rejects_bindings_when_plugin_has_no_recipes(self) -> None:

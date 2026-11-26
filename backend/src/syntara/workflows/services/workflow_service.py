@@ -471,7 +471,12 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
                 raise SafeValueError(msg) from error
             for binding in bindings:
                 recipe_id = binding.get("credential_recipe_id") if isinstance(binding, dict) else None
-                if recipe_id and recipe_id not in recipe_ids and not TEMPLATE_PATTERN.search(recipe_id):
+                if (
+                    isinstance(recipe_id, str)
+                    and recipe_id
+                    and recipe_id not in recipe_ids
+                    and not TEMPLATE_PATTERN.search(recipe_id)
+                ):
                     msg = f"Node '{node_name}' binds unreachable credential recipe '{recipe_id}'."
                     raise SafeValueError(msg)
 
