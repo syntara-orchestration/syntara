@@ -25,6 +25,11 @@ import structlog
 from temporalio import activity
 from temporalio.exceptions import ApplicationError
 
+from syntara.audit.dispatcher import AuditEventDispatcher
+from syntara.workflows.audit.subworkflow_invocation import (
+    SubWorkflowAuthorizationDeniedEvent,
+    SubWorkflowInvocationEvent,
+)
 from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName, NodeType
 
 if TYPE_CHECKING:
@@ -50,6 +55,9 @@ async def authorize_child_invocation(
     *,
     actor_id: UUID,
     child_workflow: Workflow,
+    parent_workflow_id: UUID | None = None,
+    parent_execution_id: UUID | None = None,
+    parent_node_id: str | None = None,
 ) -> None:
     """Enforce execute-permission for a sub-workflow invocation.
 
@@ -83,6 +91,7 @@ async def authorize_child_invocation(
     # worker has no session, so fail closed here.
     actor = await session.get(User, actor_id)
     if actor is None or not actor.is_enabled:
+        denial_reason = "principal_missing" if actor is None else "principal_disabled"
         # Log the child identifiers and denial reason for diagnostics. The raised
         # message stays generic so it never leaks child details to the caller.
         logger.info(
@@ -91,7 +100,15 @@ async def authorize_child_invocation(
             child_workflow_id=str(child_workflow.id),
             child_workflow_name=child_workflow.name,
             project_id=str(child_workflow.project_id),
-            denial_reason="principal_missing" if actor is None else "principal_disabled",
+            denial_reason=denial_reason,
+        )
+        _emit_authorization_denial(
+            actor_id=actor_id,
+            child_workflow_id=child_workflow.id,
+            parent_workflow_id=parent_workflow_id,
+            parent_execution_id=parent_execution_id,
+            parent_node_id=parent_node_id,
+            denial_reason=denial_reason,
         )
         msg = "Sub-workflow invocation principal is missing or disabled; refusing to create child execution."
         raise ApplicationError(msg, type="SubWorkflowAuthorizationError", non_retryable=True)
@@ -119,8 +136,40 @@ async def authorize_child_invocation(
             denial_reason="policy_deny",
             denied_by=authz_result.denied_by,
         )
+        _emit_authorization_denial(
+            actor_id=actor_id,
+            child_workflow_id=child_workflow.id,
+            parent_workflow_id=parent_workflow_id,
+            parent_execution_id=parent_execution_id,
+            parent_node_id=parent_node_id,
+            denial_reason="policy_deny",
+        )
         msg = "Not authorized to run child workflow."
         raise ApplicationError(msg, type="SubWorkflowAuthorizationError", non_retryable=True)
+
+
+def _emit_authorization_denial(
+    *,
+    actor_id: UUID,
+    child_workflow_id: UUID,
+    parent_workflow_id: UUID | None,
+    parent_execution_id: UUID | None,
+    parent_node_id: str | None,
+    denial_reason: str,
+) -> None:
+    """Dispatch a denial event when the caller's parent context is available."""
+    if parent_workflow_id is None or parent_execution_id is None or parent_node_id is None:
+        return
+    AuditEventDispatcher.dispatch(
+        SubWorkflowAuthorizationDeniedEvent(
+            actor_id=actor_id,
+            parent_workflow_id=parent_workflow_id,
+            parent_execution_id=parent_execution_id,
+            parent_node_id=parent_node_id,
+            child_workflow_id=child_workflow_id,
+            denial_reason=denial_reason,
+        )
+    )
 
 
 class SubWorkflowSetupActivity:
@@ -291,7 +340,7 @@ class SubWorkflowSetupActivity:
                 child_published_version_id=child_workflow.published_version_id,
             )
 
-            await self._assert_child_in_parent_project(
+            parent_workflow_id = await self._assert_child_in_parent_project(
                 session,
                 parent_execution_id=parent_execution_id,
                 child_workflow_id=child_workflow_id,
@@ -308,6 +357,9 @@ class SubWorkflowSetupActivity:
                     self._evaluator,
                     actor_id=created_by_uuid,
                     child_workflow=child_workflow,
+                    parent_workflow_id=parent_workflow_id,
+                    parent_execution_id=UUID(parent_execution_id),
+                    parent_node_id=parent_node_id,
                 )
 
             if not child_workflow.is_enabled:
@@ -371,6 +423,17 @@ class SubWorkflowSetupActivity:
             session.add(execution)
             await session.commit()
 
+        AuditEventDispatcher.dispatch(
+            SubWorkflowInvocationEvent(
+                actor_id=created_by_uuid,
+                parent_workflow_id=parent_workflow_id,
+                parent_execution_id=UUID(parent_execution_id),
+                parent_node_id=parent_node_id,
+                child_workflow_id=child_wf_id,
+                child_execution_id=child_execution_id,
+            )
+        )
+
         logger.info(
             "Child execution created for sub-workflow",
             child_execution_id=child_execution_id_str,
@@ -419,22 +482,21 @@ class SubWorkflowSetupActivity:
         child_workflow_id: UUID,
         child_project_id: UUID,
         child_execution_id_str: str,
-    ) -> None:
+    ) -> UUID:
         """Reject a cross-project sub-workflow invocation before the child is created.
 
-        Loads the parent execution in the caller's session and requires the child
-        workflow to share its project. A missing or malformed parent id is rejected
-        rather than bypassed, so neither the new-invocation path nor the idempotent
-        resume path can create or resume a child across a project boundary.
+            Loads the parent execution in the caller's session and requires the child
+            workflow to share its project. A missing or malformed parent id is rejected
+            rather than bypassed, so neither the new-invocation path nor the idempotent
+            resume path can create or resume a child across a project boundary.
 
-        This is project isolation only. It is NOT the execute-permission (RBAC) check
-        required by ANSTRAT-2347 AC-3; runtime execution authorization is tracked under
-        AAP-91266 and must land before the feature reaches devel.
+        After this project-boundary check, the caller performs the separate
+        execute-permission check in ``authorize_child_invocation``.
 
         Raises:
-            ApplicationError: Non-retryable ``SubWorkflowProjectScopeError`` when the
-                parent execution is missing or malformed, or is in a different project
-                from the child workflow.
+                ApplicationError: Non-retryable ``SubWorkflowProjectScopeError`` when the
+                    parent execution is missing or malformed, or is in a different project
+                    from the child workflow.
 
         """
         from syntara.workflows.models.execution import Execution  # noqa: PLC0415
@@ -466,6 +528,8 @@ class SubWorkflowSetupActivity:
                 f"A sub-workflow must be in the same project as its parent."
             )
             raise ApplicationError(msg, type="SubWorkflowProjectScopeError", non_retryable=True)
+
+        return parent.workflow_id
 
     async def _resume_pinned_child_execution(
         self,

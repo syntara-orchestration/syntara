@@ -714,43 +714,72 @@ async def test_referencing_parent_count_is_independent_of_page_size_and_cursor(
 async def test_delete_referenced_requires_confirm_and_audits(
     test_db_session: AsyncSession, test_user: User, test_project_id: UUID, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Deleting a referenced workflow needs confirm; the confirmed deletion records the parent count."""
+    """A 409 is not a deletion audit; confirmed deletion records all affected parent ids."""
     from syntara.audit.dispatcher import AuditEventDispatcher
     from syntara.workflows.audit.workflow_lifecycle import WorkflowAction, WorkflowLifecycleEvent
     from syntara.workflows.exceptions import WorkflowReferencedByPublishedParentsError
 
+    actor_id = test_user.id
     service = WorkflowService(test_db_session, test_user)
     child = await _publish(
         test_db_session,
-        created_by=test_user.id,
+        created_by=actor_id,
         project_id=test_project_id,
         definition=_plain_def(),
         name=f"child-{uuid4().hex[:8]}",
     )
-    await _publish(
+    parent_a = await _publish(
         test_db_session,
-        created_by=test_user.id,
+        created_by=actor_id,
         project_id=test_project_id,
         definition=_referencing_def(child),
-        name=f"parent-{uuid4().hex[:8]}",
+        name=f"parent-a-{uuid4().hex[:8]}",
     )
-
-    with pytest.raises(WorkflowReferencedByPublishedParentsError) as exc_info:
-        await service.delete_workflow(child)
-    assert exc_info.value.referencing_count == 1
-    assert exc_info.value.workflow_id == child
-    test_db_session.expire_all()
-    assert await test_db_session.get(Workflow, child) is not None
+    parent_b = await _publish(
+        test_db_session,
+        created_by=actor_id,
+        project_id=test_project_id,
+        definition=_referencing_def(child),
+        name=f"parent-b-{uuid4().hex[:8]}",
+    )
 
     events: list[Any] = []
     monkeypatch.setattr(AuditEventDispatcher, "dispatch", lambda event: events.append(event))
+
+    with pytest.raises(WorkflowReferencedByPublishedParentsError) as exc_info:
+        await service.delete_workflow(child)
+    assert exc_info.value.referencing_count == 2
+    assert exc_info.value.workflow_id == child
+    test_db_session.expire_all()
+    assert await test_db_session.get(Workflow, child) is not None
+    assert events == []
+
     await service.delete_workflow(child, confirm=True)
     test_db_session.expire_all()
     assert await test_db_session.get(Workflow, child) is None
     deleted = [e for e in events if isinstance(e, WorkflowLifecycleEvent) and e.action == WorkflowAction.DELETED]
-    assert deleted, "expected a DELETED lifecycle event"
+    assert len(deleted) == 1
+    assert deleted[0].workflow_id == child
+    assert deleted[0].actor_id == actor_id
     assert deleted[0].referencing_parent_ids is not None
-    assert len(deleted[0].referencing_parent_ids) == 1
+    assert set(deleted[0].referencing_parent_ids) == {parent_a, parent_b}
+
+    unreferenced = await _publish(
+        test_db_session,
+        created_by=actor_id,
+        project_id=test_project_id,
+        definition=_plain_def(),
+        name=f"unreferenced-{uuid4().hex[:8]}",
+    )
+    events.clear()
+    await service.delete_workflow(unreferenced)
+    unreferenced_deletions = [
+        e for e in events if isinstance(e, WorkflowLifecycleEvent) and e.action == WorkflowAction.DELETED
+    ]
+    assert len(unreferenced_deletions) == 1
+    assert unreferenced_deletions[0].workflow_id == unreferenced
+    assert unreferenced_deletions[0].actor_id == actor_id
+    assert unreferenced_deletions[0].referencing_parent_ids is None
 
 
 def _ref_node_for(child_id: UUID, trigger_node_id: str, index: int = 0) -> dict[str, Any]:

@@ -163,9 +163,10 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
         """Initialize WorkflowService with database session and user context."""
         super().__init__(session, user, convert_resource_mixin=WorkflowConvertResourceMixin())
         self.opa_client = opa_client
+        self._audit_actor_id = user.id
 
-    @staticmethod
     def _emit_lifecycle_event(
+        self,
         *,
         workflow_id: UUID,
         workflow_name: str,
@@ -178,11 +179,13 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
         change_summary: dict[str, Any] | None = None,
         user_id: UUID | None = None,
     ) -> None:
+        actor_id = user_id if user_id is not None else self._audit_actor_id
         AuditEventDispatcher.dispatch(
             WorkflowLifecycleEvent(
                 workflow_id=workflow_id,
                 workflow_name=workflow_name,
                 action=action,
+                actor_id=actor_id,
                 version=version,
                 project_id=project_id,
                 error_type=error_type,
@@ -196,7 +199,7 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
                     workflow_name=workflow_name,
                     version=version,
                     change_summary=change_summary,
-                    user_id=user_id,
+                    user_id=actor_id,
                 )
             )
 
@@ -2098,6 +2101,7 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
                 ``confirm`` is False
 
         """
+        actor_id = self._audit_actor_id
         workflow = await self.get_workflow_by_id(workflow_id)
 
         if workflow.is_builtin:
@@ -2159,6 +2163,7 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
                 action=WorkflowAction.DELETED,
                 project_id=wf_project_id,
                 error_type=type(exc).__name__,
+                user_id=actor_id,
             )
             raise
 
@@ -2167,6 +2172,7 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
             workflow_name=wf_name,
             action=WorkflowAction.DELETED,
             project_id=wf_project_id,
+            user_id=actor_id,
             referencing_parent_ids=referencing_parent_ids or None,
         )
 

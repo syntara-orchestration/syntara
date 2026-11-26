@@ -20,6 +20,7 @@ from syntara.workflows.audit.workflow_version import (
 
 WORKFLOW_ID = uuid4()
 PROJECT_ID = uuid4()
+ACTOR_ID = uuid4()
 
 
 class TestWorkflowVersionCreatedHandler:
@@ -50,6 +51,9 @@ class TestWorkflowVersionCreatedHandler:
     def test_change_summary_included_in_structured_data(self) -> None:
         """AC1-4: Auto-generated change summary appears in audit log structured data."""
         summary = {
+            "triggers_added": [],
+            "triggers_removed": [],
+            "triggers_modified": [{"id": "child_trigger", "type": "subworkflow_trigger"}],
             "nodes_added": [{"id": "http_node", "type": "http_request"}],
             "nodes_removed": [],
             "nodes_modified": [],
@@ -61,9 +65,13 @@ class TestWorkflowVersionCreatedHandler:
             workflow_name="test-wf",
             version=3,
             change_summary=summary,
+            user_id=ACTOR_ID,
         )
         audit_event = WorkflowVersionCreatedHandler().handle(event)
 
+        assert audit_event.actor_id == ACTOR_ID
+        assert audit_event.event_status == EventStatus.SUCCESS
+        assert audit_event.workflow_id == WORKFLOW_ID
         assert audit_event.structured_data.change_summary == summary
 
     def test_no_change_summary_omitted_from_structured_data(self) -> None:
@@ -100,13 +108,19 @@ class TestWorkflowVersionPublishedHandler:
         assert not hasattr(audit_event.structured_data, "referencing_parent_ids")
 
     def test_produces_audit_event(self) -> None:
-        event = WorkflowVersionPublishedEvent(workflow_id=WORKFLOW_ID, workflow_name="test-wf", version=2)
+        event = WorkflowVersionPublishedEvent(
+            workflow_id=WORKFLOW_ID,
+            workflow_name="test-wf",
+            version=2,
+            user_id=ACTOR_ID,
+        )
         audit_event = WorkflowVersionPublishedHandler().handle(event)
 
         assert audit_event is not None
         assert audit_event.event_category == EventCategory.USER_ACTION
         assert audit_event.event_severity == EventSeverity.INFO
         assert audit_event.event_status == EventStatus.SUCCESS
+        assert audit_event.actor_id == ACTOR_ID
         assert audit_event.event_action == "workflow_version_published"
         assert audit_event.source_component == "syntara.workflows"
         assert audit_event.workflow_id == WORKFLOW_ID
