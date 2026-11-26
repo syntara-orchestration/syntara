@@ -1,5 +1,5 @@
 import { TriggerTypeEnum } from '@syntara/contracts'
-import { screen, waitFor } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { axe } from 'vitest-axe'
@@ -473,12 +473,14 @@ describe('TriggerStepForm Component', () => {
       expect(screen.queryByLabelText('Schedule expression')).not.toBeInTheDocument()
     })
 
-    it('shows EDA webhook activation alert', () => {
+    it('shows EDA activation alert with rulebook and job template guidance', () => {
       renderWithHeader(
         <TriggerStepForm onSubmit={mockOnSubmit} initialData={{ triggerType: TriggerTypeEnum.EDA_TRIGGER }} />
       )
 
       expect(screen.getByText('EDA activation')).toBeInTheDocument()
+      expect(screen.getByText(/configure a rulebook activation to run a job template/i)).toBeInTheDocument()
+      expect(screen.getByText(/playbook sends the event payload to this endpoint/i)).toBeInTheDocument()
     })
 
     it('auto-generates a valid webhook path for new EDA triggers', () => {
@@ -563,6 +565,20 @@ describe('TriggerStepForm Component', () => {
       // a panel ID that may not exist in the DOM when only the active tab is rendered
       const results = await axe(container, { rules: { 'aria-valid-attr-value': { enabled: false } } })
       expect(results).toHaveNoViolations()
+    })
+
+    it('describes the EDA integration flow in the endpoint URL help', async () => {
+      const user = userEvent.setup()
+      renderWithHeader(
+        <TriggerStepForm onSubmit={mockOnSubmit} initialData={{ triggerType: TriggerTypeEnum.EDA_TRIGGER }} />
+      )
+
+      await user.click(screen.getByRole('button', { name: 'Endpoint URL help' }))
+
+      const helpDialog = screen.getByRole('dialog', { name: 'Endpoint URL help' })
+      expect(within(helpDialog).getByText(/rulebook activation runs a job template/i)).toBeInTheDocument()
+      expect(within(helpDialog).getByText(/playbook sends a POST request with the event payload/i)).toBeInTheDocument()
+      expect(within(helpDialog).queryByText(/rulebook to send a POST/i)).not.toBeInTheDocument()
     })
   })
 })
