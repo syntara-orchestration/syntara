@@ -1,7 +1,10 @@
-import { useEffect, useRef, type Dispatch } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch } from 'react'
 
+import { useNodeKindsQuery } from '../../../hooks/useNodeKindsQuery'
 import { useWorkflowStore } from '../../../stores/useWorkflowStore'
 import type { BuilderAction } from '../builderReducer'
+import { blockedStepTypesIn, withoutStepTypes, type CanvasDefinition } from '../stepTypeCanvasGuards'
+import { STEP_TYPE_PERMISSIONS_UNAVAILABLE_TOOLTIP } from '../stepTypePaletteGating'
 import { collectCopiedRunActivityIds } from '../utils/executionState/collectCopiedRunActivityIds'
 import { parseImportedDefinition } from '../utils/parseImportedDefinition'
 
@@ -11,59 +14,185 @@ export type ExecutionCopyData = {
   preserveWorkflow?: boolean
 }
 
+type Alert = { title: string; description?: string }
+
 type UseExecutionCopyToEditorOptions = {
   executionCopy: ExecutionCopyData | undefined
+  /** Project whose step-type denies apply to the copied steps. */
+  projectId: string | null | undefined
   dispatch: Dispatch<BuilderAction>
   markDirty: () => void
-  showSuccess: (alert: { title: string; description?: string }) => void
+  showSuccess: (alert: Alert) => void
+  showError: (alert: Alert) => void
 }
 
+/**
+ * The copy is waiting for the user to accept leaving out the step types they
+ * may not write. `losesAllTriggers` is true when the run has triggers and every
+ * one of them is of a blocked type, so the partial copy would have none.
+ */
+export type BlockedRunCopy = { labels: string[]; losesAllTriggers: boolean }
+
+/** The steps a partial copy left out, for the success toast. */
+type RunCopyOmission = BlockedRunCopy
+
+export type ExecutionCopyToEditor = {
+  blockedRunCopy: BlockedRunCopy | null
+  confirmBlockedRunCopy: () => void
+  cancelBlockedRunCopy: () => void
+}
+
+/**
+ * How the copy of the run's definition resolves, once it can. `copy-all` and
+ * `unavailable` are applied by the effect; `resolved` means a prompt handler
+ * already applied or dropped the copy.
+ */
+type RunCopyDecision = 'copy-all' | 'unavailable' | 'resolved'
+
+function clearExecutionParams() {
+  const url = new URL(window.location.href)
+  url.searchParams.delete('fromExecution')
+  url.searchParams.delete('linkExecution')
+  window.history.replaceState({}, '', url.pathname + url.search)
+}
+
+/** Whether the definition has triggers and removing `blockedKinds` would remove all of them. */
+function losesAllTriggers(workflowDef: CanvasDefinition['workflowDef'], blockedKinds: ReadonlySet<string>): boolean {
+  const triggers = workflowDef.triggers ?? []
+  return triggers.length > 0 && triggers.every(({ type }) => (type ? blockedKinds.has(type) : false))
+}
+
+function copySuccessDescription(omission: RunCopyOmission | null): string {
+  const description = 'The run has been loaded into the editor with pinned runtime data.'
+  if (!omission) return description
+  const parts = [
+    description,
+    `Steps of these types were left out: ${omission.labels.join(', ')}.`,
+    'Review and reconnect the affected steps.',
+  ]
+  if (omission.losesAllTriggers) parts.push('Add a permitted trigger before running this workflow.')
+  return parts.join(' ')
+}
+
+function copyRunToEditor(
+  executionId: string,
+  { workflowDef, edges, nodePositions }: CanvasDefinition,
+  omission: RunCopyOmission | null,
+  { dispatch, markDirty, showSuccess }: Pick<UseExecutionCopyToEditorOptions, 'dispatch' | 'markDirty' | 'showSuccess'>
+) {
+  useWorkflowStore.getState().replaceWorkflowContent(workflowDef, edges, nodePositions)
+
+  if (workflowDef.name && typeof workflowDef.name === 'string') {
+    dispatch({ type: 'SET_WORKFLOW_NAME', payload: workflowDef.name })
+  }
+  if (workflowDef.description && typeof workflowDef.description === 'string') {
+    dispatch({ type: 'SET_WORKFLOW_DESCRIPTION', payload: workflowDef.description })
+  }
+  markDirty()
+  showSuccess({ title: 'Run copied to editor', description: copySuccessDescription(omission) })
+  dispatch({
+    type: 'SET_MOST_RECENT_EXECUTION',
+    payload: { executionId, copiedRunActivityIds: collectCopiedRunActivityIds(workflowDef) },
+  })
+  clearExecutionParams()
+}
+
+/**
+ * Load a run into the editor ("copy run to editor"), or link it to the current
+ * graph when `preserveWorkflow` is set.
+ *
+ * Copying the run's definition adds its step types to the canvas, so it waits
+ * for the project's step-type verdicts. When some step types are denied, it
+ * returns `blockedRunCopy` and copies only once the user confirms leaving those
+ * steps out. It fails closed when the verdicts are unavailable.
+ */
 export function useExecutionCopyToEditor({
   executionCopy,
+  projectId,
   dispatch,
   markDirty,
   showSuccess,
-}: UseExecutionCopyToEditorOptions): void {
+  showError,
+}: UseExecutionCopyToEditorOptions): ExecutionCopyToEditor {
   const hasAppliedRef = useRef(false)
+  const [decision, setDecision] = useState<RunCopyDecision | null>(null)
   const currentWorkflow = useWorkflowStore((s) => s.currentWorkflow)
+
+  const definition = executionCopy && !executionCopy.preserveWorkflow ? executionCopy.workflowDefinition : undefined
+  const { nodeKindByKind, isLoading, isUnavailable } = useNodeKindsQuery(projectId, { enabled: Boolean(definition) })
+  const parsed = useMemo(() => (definition ? parseImportedDefinition(definition) : null), [definition])
+  const verdictsReady = Boolean(projectId) && !isLoading && !isUnavailable
+  const blocked = useMemo(
+    () => (parsed && verdictsReady ? blockedStepTypesIn(parsed.workflowDef, nodeKindByKind) : []),
+    [parsed, verdictsReady, nodeKindByKind]
+  )
+
+  // Settled during render rather than in the effect, so a verdict refetch after
+  // the copy (for example a policy change) cannot open the prompt afterwards.
+  const canDecide = parsed !== null && Boolean(currentWorkflow) && decision === null
+  if (canDecide && isUnavailable) {
+    setDecision('unavailable')
+  } else if (canDecide && verdictsReady && blocked.length === 0) {
+    setDecision('copy-all')
+  }
 
   useEffect(() => {
     if (!executionCopy || hasAppliedRef.current || !currentWorkflow) return
-    hasAppliedRef.current = true
 
-    let copiedRunActivityIds: string[] | undefined
-
-    if (!executionCopy.preserveWorkflow) {
-      const { workflowDef, edges, nodePositions } = parseImportedDefinition(executionCopy.workflowDefinition)
-      useWorkflowStore.getState().replaceWorkflowContent(workflowDef, edges, nodePositions)
-      copiedRunActivityIds = collectCopiedRunActivityIds(workflowDef)
-
-      if (workflowDef.name && typeof workflowDef.name === 'string') {
-        dispatch({ type: 'SET_WORKFLOW_NAME', payload: workflowDef.name })
-      }
-      if (workflowDef.description && typeof workflowDef.description === 'string') {
-        dispatch({ type: 'SET_WORKFLOW_DESCRIPTION', payload: workflowDef.description })
-      }
-      markDirty()
-      showSuccess({
-        title: 'Run copied to editor',
-        description: 'The run has been loaded into the editor with pinned runtime data.',
-      })
-    } else {
+    if (executionCopy.preserveWorkflow) {
+      hasAppliedRef.current = true
       // Link execution to current graph — snapshot IDs so newly added nodes get no status
-      copiedRunActivityIds = collectCopiedRunActivityIds(currentWorkflow)
+      dispatch({
+        type: 'SET_MOST_RECENT_EXECUTION',
+        payload: {
+          executionId: executionCopy.executionId,
+          copiedRunActivityIds: collectCopiedRunActivityIds(currentWorkflow),
+        },
+      })
+      clearExecutionParams()
+      return
     }
 
-    dispatch({
-      type: 'SET_MOST_RECENT_EXECUTION',
-      payload: {
-        executionId: executionCopy.executionId,
-        copiedRunActivityIds,
-      },
-    })
-    const url = new URL(window.location.href)
-    url.searchParams.delete('fromExecution')
-    url.searchParams.delete('linkExecution')
-    window.history.replaceState({}, '', url.pathname + url.search)
-  }, [executionCopy, currentWorkflow, dispatch, markDirty, showSuccess])
+    if (!parsed) return
+    if (decision === 'unavailable') {
+      hasAppliedRef.current = true
+      showError({ title: 'Cannot copy run to editor', description: STEP_TYPE_PERMISSIONS_UNAVAILABLE_TOOLTIP })
+      clearExecutionParams()
+    } else if (decision === 'copy-all') {
+      hasAppliedRef.current = true
+      copyRunToEditor(executionCopy.executionId, parsed, null, { dispatch, markDirty, showSuccess })
+    }
+  }, [executionCopy, currentWorkflow, parsed, decision, dispatch, markDirty, showSuccess, showError])
+
+  const isPromptOpen = canDecide && verdictsReady && blocked.length > 0
+  const omission = useMemo<RunCopyOmission | null>(() => {
+    if (!parsed || blocked.length === 0) return null
+    const blockedKinds = new Set(blocked.map((stepType) => stepType.kind))
+    return {
+      labels: blocked.map((stepType) => stepType.label),
+      losesAllTriggers: losesAllTriggers(parsed.workflowDef, blockedKinds),
+    }
+  }, [parsed, blocked])
+
+  const confirmBlockedRunCopy = useCallback(() => {
+    if (!executionCopy || !parsed || !omission || hasAppliedRef.current) return
+    hasAppliedRef.current = true
+    setDecision('resolved')
+    const filtered = withoutStepTypes(
+      parsed,
+      blocked.map((stepType) => stepType.kind)
+    )
+    copyRunToEditor(executionCopy.executionId, filtered, omission, { dispatch, markDirty, showSuccess })
+  }, [executionCopy, parsed, blocked, omission, dispatch, markDirty, showSuccess])
+
+  const cancelBlockedRunCopy = useCallback(() => {
+    if (hasAppliedRef.current) return
+    hasAppliedRef.current = true
+    setDecision('resolved')
+    clearExecutionParams()
+  }, [])
+
+  const blockedRunCopy = isPromptOpen ? omission : null
+
+  return { blockedRunCopy, confirmBlockedRunCopy, cancelBlockedRunCopy }
 }

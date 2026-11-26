@@ -29,6 +29,7 @@ import type { ActivityState } from '../workflows/execution/types'
 import { useExecutionStore, useExecutionWithLiveStatus } from '../workflows/stores/useExecutionStore'
 
 import { ApprovalSidePanel } from './ApprovalSidePanel'
+import { BlockedForkDialog } from './BlockedForkDialog'
 import { ExecutionDetailErrorStates } from './components/ExecutionDetailErrorStates'
 import { ConnectionBanner } from './ConnectionBanner'
 import { CopyToEditorDialog } from './CopyToEditorDialog'
@@ -340,11 +341,23 @@ export default function ExecutionDetail() {
   const copyToEditorDialog = useDialogState<void>()
   const isCancellable = isExecutionCancellable(execution?.status)
 
-  const { forkAsNewWorkflow, isForkLoading } = useForkWorkflow({
+  const { forkAsNewWorkflow, isForkLoading, blockedFork, confirmBlockedFork, cancelBlockedFork } = useForkWorkflow({
     workflowDefinition: execution?.workflow_definition,
     workflowName: workflow?.name ?? 'Workflow',
     projectId: execution?.project_id,
   })
+
+  const openForkedWorkflow = (id: string | undefined) => {
+    if (!id || !executionId) return
+    copyToEditorDialog.close()
+    detachPromise(
+      navigate({
+        to: '/workflow-builder/$workflowId',
+        params: { workflowId: id },
+        search: { linkExecution: executionId },
+      })
+    )
+  }
 
   const toggleHistoryCard = () => {
     const willOpen = !historyCardOpen
@@ -447,7 +460,7 @@ export default function ExecutionDetail() {
       </SynReactFlowViewportGuard>
 
       <CopyToEditorDialog
-        isOpen={copyToEditorDialog.isOpen}
+        isOpen={copyToEditorDialog.isOpen && !blockedFork}
         onClose={copyToEditorDialog.close}
         onReplace={() => {
           copyToEditorDialog.close()
@@ -460,19 +473,14 @@ export default function ExecutionDetail() {
               })
             )
         }}
-        onFork={async () => {
-          const id = await forkAsNewWorkflow()
-          if (!id || !executionId) return
-          copyToEditorDialog.close()
-          detachPromise(
-            navigate({
-              to: '/workflow-builder/$workflowId',
-              params: { workflowId: id },
-              search: { linkExecution: executionId },
-            })
-          )
-        }}
+        onFork={async () => openForkedWorkflow(await forkAsNewWorkflow())}
         isForkLoading={isForkLoading}
+      />
+      <BlockedForkDialog
+        blockedFork={blockedFork}
+        onConfirm={() => detachPromise(confirmBlockedFork().then(openForkedWorkflow))}
+        onCancel={cancelBlockedFork}
+        isLoading={isForkLoading}
       />
     </SynPage>
   )

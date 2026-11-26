@@ -140,8 +140,9 @@ test.describe('Approval Workflow Creation', () => {
       await searchInput.fill(workflowName)
       await app.getByRole('button', { name: 'Apply filter' }).click()
 
-      // Verify workflow appears in the list
-      await expect(app.getByText(workflowName)).toBeVisible({ timeout: 10_000 })
+      // Verify workflow appears in the list. Match the row link specifically — the
+      // active Name filter chip shows the same text, so getByText would be ambiguous.
+      await expect(app.getByRole('link', { name: workflowName })).toBeVisible({ timeout: 10_000 })
     } finally {
       if (workflowId) {
         await apiRequest(app, 'delete', `/workflows/${workflowId}`).catch(() => {})

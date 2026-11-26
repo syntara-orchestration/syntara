@@ -123,7 +123,7 @@ export function useBuilderSession({
     [navigate]
   )
   const [searchParams, setSearchParams] = useSearchParams()
-  const { showSuccess } = useAlerts()
+  const { showSuccess, showError } = useAlerts()
   const [saveAttemptedWithoutProject, setSaveAttemptedWithoutProject] = useState(false)
   // A new workflow arrives with the project chosen in BuilderNew's picker (R18), and an
   // existing one keeps its project, so the toolbar only shows the project. The selector
@@ -206,7 +206,15 @@ export function useBuilderSession({
     setStoredEdges: store.setEdges,
     loadWorkflowWithEdges: store.loadWorkflowWithEdges,
   })
-  useExecutionCopyToEditor({ executionCopy, dispatch, markDirty: store.markDirty, showSuccess })
+  const builderProjectId = workflow?.project_id ?? selectedProject?.id ?? stableProjectId
+  const executionCopyToEditor = useExecutionCopyToEditor({
+    executionCopy,
+    projectId: builderProjectId,
+    dispatch,
+    markDirty: store.markDirty,
+    showSuccess,
+    showError,
+  })
 
   const initialViewVersionRef = useRef(initialViewVersion)
   useEffect(() => {
@@ -222,7 +230,6 @@ export function useBuilderSession({
     }
   }, [initialViewVersion, dispatch, clearExecutionFilters])
   const isBuiltin = currentWorkflow?.is_builtin === true
-  const builderProjectId = workflow?.project_id ?? selectedProject?.id ?? stableProjectId
   const permissions = useEditorPermissions({ workflow, workflowId, isNew, isBuiltin, builderProjectId, queryClient })
   const { builderPermissions } = permissions
   useUndoRedoKeyboard({
@@ -267,6 +274,7 @@ export function useBuilderSession({
     clearExecutionFilters,
     handleExecutionNavigate,
     executionPaginationFooterProps,
+    executionCopyToEditor,
     ...permissions,
     ...versionFilter,
   }

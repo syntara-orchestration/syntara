@@ -51,6 +51,7 @@ type BuilderToolbarContentProps = Readonly<{
   onUnpublish: () => void
   onDuplicate: () => void
   onPendingImport: (data: PendingImportData) => void
+  getImportRefusal?: (data: PendingImportData) => string | null
   triggers?: { id: string; name?: string }[]
   isBuiltin: boolean
   isAddStepPanelOpen: boolean
@@ -103,6 +104,7 @@ function BuilderToolbarContent({
   onUnpublish,
   onDuplicate,
   onPendingImport,
+  getImportRefusal,
   triggers,
   isAddStepPanelOpen,
   hasNoWorkflowSteps,
@@ -211,6 +213,7 @@ function BuilderToolbarContent({
       onUnpublish={onUnpublish}
       onDuplicate={onDuplicate}
       onPendingImport={onPendingImport}
+      getImportRefusal={getImportRefusal}
       triggers={triggers}
       isAddStepPanelOpen={isAddStepPanelOpen}
       hasNoWorkflowSteps={hasNoWorkflowSteps}
@@ -349,6 +352,7 @@ export type BuilderWorkflowPageHeaderProps = Readonly<{
   isRestoreDisabled?: boolean
   restoreTooltip?: string
   onPendingImport: (data: PendingImportData) => void
+  getImportRefusal?: (data: PendingImportData) => string | null
   isStepEditorOpen?: boolean
 }>
 
@@ -400,6 +404,7 @@ export function BuilderWorkflowPageHeader({
   isRestoreDisabled,
   restoreTooltip,
   onPendingImport,
+  getImportRefusal,
   isStepEditorOpen,
 }: BuilderWorkflowPageHeaderProps) {
   const builderDocLink = useDocLink('builder')
@@ -436,6 +441,7 @@ export function BuilderWorkflowPageHeader({
       onUnpublish={onUnpublish}
       onDuplicate={onDuplicate}
       onPendingImport={onPendingImport}
+      getImportRefusal={getImportRefusal}
       triggers={triggers}
       isAddStepPanelOpen={isAddStepPanelOpen}
       hasNoWorkflowSteps={hasNoWorkflowSteps}

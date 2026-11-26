@@ -15,6 +15,7 @@ import { useBuilderSession } from './builderSession'
 import { BuilderWorkflowPageHeader } from './BuilderWorkflowPageHeader'
 import { BuilderWorkspace } from './BuilderWorkspace'
 import { useBuilderWorkspace } from './builderWorkspaceState'
+import { BlockedRunCopyDialog } from './components/BlockedRunCopyDialog'
 import { BuilderDialogs } from './components/BuilderDialogs'
 import { UnsavedStepEditorDialog } from './components/UnsavedStepEditorDialog'
 import { useBuilderDialogProps } from './hooks/useBuilderDialogProps'
@@ -88,6 +89,7 @@ export function BuilderContent(props: BuilderContentProps) {
     createWorkflow: authoring.createWorkflow,
     setLocation,
     pinnedMockDataForDialog: workspace.pinnedMockDataForDialog,
+    getImportRefusal: workspace.getImportRefusal,
   })
   return (
     <StepActionsContext.Provider value={workspace.stepActionsValue}>
@@ -120,6 +122,7 @@ export function BuilderContent(props: BuilderContentProps) {
                     onUnpublish={authoring.onUnpublish}
                     onDuplicate={duplication.handleDuplicateWorkflow}
                     onPendingImport={setPendingImport}
+                    getImportRefusal={workspace.getImportRefusal}
                     isLiveRunActive={workspace.isLiveRunActive}
                     executionId={state.mostRecentExecutionId}
                     executionStatus={workspace.mostRecentExecution?.status}
@@ -173,6 +176,11 @@ export function BuilderContent(props: BuilderContentProps) {
                 />
               </SynReactFlowViewportGuard>
               <BuilderDialogs {...dialogProps} conflictDialogProps={authoring.conflictDialogProps} />
+              <BlockedRunCopyDialog
+                blockedRunCopy={session.executionCopyToEditor.blockedRunCopy}
+                onConfirm={session.executionCopyToEditor.confirmBlockedRunCopy}
+                onCancel={session.executionCopyToEditor.cancelBlockedRunCopy}
+              />
               <UnsavedStepEditorDialog
                 isOpen={state.unsavedStepEditorDialogOpen}
                 onClose={() => dispatch({ type: 'SET_UNSAVED_STEP_EDITOR_DIALOG', payload: false })}

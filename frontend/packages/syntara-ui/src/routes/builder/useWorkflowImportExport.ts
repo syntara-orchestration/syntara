@@ -27,6 +27,12 @@ type UseWorkflowImportExportOptions = Readonly<{
   workflowName: string
   workflowDescription: string
   onPendingImport: (data: PendingImportData) => void
+  /**
+   * Refuse applying an import to an unsaved workflow's canvas when it would
+   * introduce a step type the caller may not author. Returns the refusal
+   * message, or null to allow the import.
+   */
+  getImportRefusal?: (data: PendingImportData) => string | null
   canEdit?: boolean
 }>
 
@@ -63,6 +69,7 @@ export function useWorkflowImportExport({
   workflowName,
   workflowDescription,
   onPendingImport,
+  getImportRefusal,
   canEdit = true,
 }: UseWorkflowImportExportOptions) {
   const importFileRef = useRef<HTMLInputElement>(null)
@@ -95,6 +102,11 @@ export function useWorkflowImportExport({
           const pendingData: PendingImportData = { workflowDef, edges, nodePositions, name, description }
 
           if (isNew) {
+            const refusal = getImportRefusal?.(pendingData) ?? null
+            if (refusal) {
+              showError({ title: 'Cannot import into this workflow', description: refusal })
+              return
+            }
             applyImportToCanvas(pendingData, dispatch, markDirty, showError)
           } else {
             onPendingImport(pendingData)
@@ -106,7 +118,7 @@ export function useWorkflowImportExport({
 
       event.target.value = ''
     },
-    [dispatch, markDirty, showError, isNew, onPendingImport, canEdit]
+    [dispatch, markDirty, showError, isNew, onPendingImport, getImportRefusal, canEdit]
   )
 
   const handleExport = useCallback(() => {

@@ -13,6 +13,8 @@ export type UseBuilderFlowInteractionHandlersOptions = {
   reactFlowInstance: ReactFlowInstance
   dispatch: Dispatch<BuilderAction>
   duplicateActivity: (nodeId: string) => void
+  /** Whether the step may be duplicated. Reports the refusal itself and returns false. */
+  canDuplicateActivity?: (nodeId: string) => boolean
   edgeIdToReplace: string | null
   targetNodeId: string | null
   sourceHandle: string | null | undefined
@@ -28,6 +30,7 @@ export function useBuilderFlowInteractionHandlers({
   reactFlowInstance,
   dispatch,
   duplicateActivity,
+  canDuplicateActivity,
   edgeIdToReplace,
   targetNodeId,
   sourceHandle,
@@ -136,6 +139,7 @@ export function useBuilderFlowInteractionHandlers({
   const handleDuplicateStep = useCallback(
     (nodeId: string) => {
       if (!canEdit) return
+      if (canDuplicateActivity && !canDuplicateActivity(nodeId)) return
       const node = reactFlowInstance.getNode(nodeId)
       dispatch({ type: 'CLOSE_NODE_EDITOR' })
       if (node) {
@@ -149,7 +153,7 @@ export function useBuilderFlowInteractionHandlers({
       }
       duplicateActivity(nodeId)
     },
-    [canEdit, dispatch, reactFlowInstance, duplicateActivity]
+    [canEdit, dispatch, reactFlowInstance, duplicateActivity, canDuplicateActivity]
   )
 
   const handleToggleStepDisabled = useCallback(
