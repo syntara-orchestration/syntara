@@ -144,13 +144,6 @@ export const triggerFormSchema = triggerFormSchemaBase.superRefine((data, ctx) =
 
   if (WEBHOOK_TRIGGER_TYPES.has(data.triggerType)) {
     validateWebhookPathFormat(data.webhookPath, ctx)
-    if (!data.authorizedServiceAccountIds?.length) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: AUTHORIZED_SERVICE_ACCOUNT_REQUIRED_MESSAGE,
-        path: ['authorizedServiceAccountIds'],
-      })
-    }
   }
 })
 

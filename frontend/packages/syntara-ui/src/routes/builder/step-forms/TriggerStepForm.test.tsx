@@ -36,9 +36,10 @@ vi.mock('../../../utils/backendUrl', () => ({
   backendOrigin: 'https://example.com',
 }))
 
-// Mock ServiceAccountSelect to avoid async state updates from useQuery/useCanI
+// Mock ServiceAccountSelect to avoid async state updates from useQuery/useCanI.
+// Render a static control so FormGroup label `for` / `fieldId` association is wired in tests.
 vi.mock('./ServiceAccountSelect', () => ({
-  ServiceAccountSelect: () => null,
+  ServiceAccountSelect: ({ id }: { id: string }) => <input type="text" id={id} readOnly value="" />,
 }))
 
 // Mock ScheduleBuilderFields
@@ -68,6 +69,18 @@ vi.mock('../../../components/forms/ScheduleBuilderFields', () => ({
 
 async function submitTriggerForm() {
   await submitForm()
+}
+
+function expectAuthorizedServiceAccountsFieldRequired() {
+  expect(
+    screen.getByText((_content, element) => {
+      if (element?.tagName !== 'LABEL') {
+        return false
+      }
+      const text = element.textContent ?? ''
+      return text.includes('Authorized service accounts') && text.includes('*')
+    })
+  ).toBeInTheDocument()
 }
 
 describe('TriggerStepForm Component', () => {
@@ -434,6 +447,35 @@ describe('TriggerStepForm Component', () => {
       expect(screen.queryByTestId('schedule-builder-fields')).not.toBeInTheDocument()
     })
 
+    it('marks authorized service accounts as required', () => {
+      renderWithHeader(
+        <TriggerStepForm onSubmit={mockOnSubmit} initialData={{ triggerType: TriggerTypeEnum.WEBHOOK_TRIGGER }} />
+      )
+
+      expectAuthorizedServiceAccountsFieldRequired()
+    })
+
+    it('allows saving a draft trigger with no authorized service accounts selected', async () => {
+      renderWithHeader(
+        <TriggerStepForm
+          onSubmit={mockOnSubmit}
+          initialData={{ triggerType: TriggerTypeEnum.WEBHOOK_TRIGGER, authorizedServiceAccountIds: [] }}
+        />
+      )
+
+      await submitTriggerForm()
+
+      await waitFor(() => {
+        expect(mockOnSubmit).toHaveBeenCalledWith(
+          expect.objectContaining({
+            triggerType: TriggerTypeEnum.WEBHOOK_TRIGGER,
+            authorizedServiceAccountIds: [],
+          })
+        )
+      })
+      expect(screen.queryByText('At least one authorized service account is required')).not.toBeInTheDocument()
+    })
+
     it('renders with initial webhook trigger data', async () => {
       const user = userEvent.setup()
       renderWithHeader(
@@ -535,6 +577,35 @@ describe('TriggerStepForm Component', () => {
       await waitFor(() => {
         expect(mockOnSubmit).toHaveBeenCalled()
       })
+    })
+
+    it('marks authorized service accounts as required', () => {
+      renderWithHeader(
+        <TriggerStepForm onSubmit={mockOnSubmit} initialData={{ triggerType: TriggerTypeEnum.EDA_TRIGGER }} />
+      )
+
+      expectAuthorizedServiceAccountsFieldRequired()
+    })
+
+    it('allows saving a draft trigger with no authorized service accounts selected', async () => {
+      renderWithHeader(
+        <TriggerStepForm
+          onSubmit={mockOnSubmit}
+          initialData={{ triggerType: TriggerTypeEnum.EDA_TRIGGER, authorizedServiceAccountIds: [] }}
+        />
+      )
+
+      await submitTriggerForm()
+
+      await waitFor(() => {
+        expect(mockOnSubmit).toHaveBeenCalledWith(
+          expect.objectContaining({
+            triggerType: TriggerTypeEnum.EDA_TRIGGER,
+            authorizedServiceAccountIds: [],
+          })
+        )
+      })
+      expect(screen.queryByText('At least one authorized service account is required')).not.toBeInTheDocument()
     })
 
     it('renders with initial EDA trigger data', async () => {

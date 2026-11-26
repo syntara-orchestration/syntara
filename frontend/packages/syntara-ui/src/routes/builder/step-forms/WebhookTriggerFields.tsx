@@ -54,6 +54,7 @@ export function WebhookFields() {
           name="authorizedServiceAccountIds"
           label="Authorized service accounts"
           fieldId="webhook-authorized-service-accounts"
+          isRequired
           labelHelp={
             <FieldHelpPopover
               headerContent="Authorized service accounts"
