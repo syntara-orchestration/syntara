@@ -132,6 +132,32 @@ describe('useBuilderWorkflowLifecycle', () => {
     await waitFor(() => expect(loadWorkflowWithEdges).toHaveBeenCalledTimes(1))
   })
 
+  it('syncs metadata without INIT_WORKFLOW when copy-to-editor is pending', async () => {
+    const workflow = {
+      id: 'wf-1',
+      version: { workflow_definition: { nodes: [] } },
+    } as unknown as WorkflowWithVersion
+    const dispatch = vi.fn()
+    renderHook(() =>
+      useBuilderWorkflowLifecycle(
+        createDeps({
+          isNew: false,
+          workflowId: 'wf-1',
+          workflow,
+          dispatch,
+          pendingExecutionCopy: true,
+        })
+      )
+    )
+    await waitFor(() => {
+      expect(dispatch).toHaveBeenCalledWith({
+        type: 'SET_WORKFLOW_NAME',
+        payload: 'processed',
+      })
+    })
+    expect(dispatch).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'INIT_WORKFLOW' }) as BuilderAction)
+  })
+
   it('loads existing workflow via processExistingWorkflow when version is present', async () => {
     const workflow = {
       id: 'wf-1',
@@ -139,7 +165,7 @@ describe('useBuilderWorkflowLifecycle', () => {
     } as unknown as WorkflowWithVersion
     const loadWorkflowWithEdges = vi.fn()
     const dispatch = vi.fn()
-    renderHook(() =>
+    const { result } = renderHook(() =>
       useBuilderWorkflowLifecycle(
         createDeps({
           isNew: false,
@@ -158,30 +184,40 @@ describe('useBuilderWorkflowLifecycle', () => {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- vitest asymmetric matcher
         payload: expect.objectContaining({ name: 'processed' }),
       })
+      expect(result.current.isWorkflowInitialized).toBe(true)
     })
   })
 
-  it('syncs INIT_WORKFLOW from workflow metadata when editing', async () => {
-    processExistingWorkflowMock.mockImplementationOnce((wf: WorkflowWithVersion) => ({
-      flattenedWorkflow: {
-        schema_version: '2.0.0',
-        name: wf.name,
-        description: wf.description ?? '',
-        workflow: { activities: [] },
-      },
-      generatedEdges: [] as EdgeConnection[],
-      initPayload: {
-        name: wf.name,
-        description: wf.description ?? wf.name ?? DEFAULT_WORKFLOW_NAME,
-      },
-    }))
+  it('resets isWorkflowInitialized when workflowId changes', async () => {
+    const workflow = {
+      id: 'wf-1',
+      version: { workflow_definition: { nodes: [] } },
+    } as unknown as WorkflowWithVersion
+    const { result, rerender } = renderHook((p: ReturnType<typeof createDeps>) => useBuilderWorkflowLifecycle(p), {
+      initialProps: createDeps({
+        isNew: false,
+        workflowId: 'wf-1',
+        workflow,
+      }),
+    })
+    await waitFor(() => expect(result.current.isWorkflowInitialized).toBe(true))
+    rerender(
+      createDeps({
+        isNew: false,
+        workflowId: 'wf-2',
+        workflow: { ...workflow, id: 'wf-2' },
+      })
+    )
+    await waitFor(() => expect(result.current.isWorkflowInitialized).toBe(false))
+  })
+
+  it('syncs workflow metadata without INIT_WORKFLOW before graph load', async () => {
     const workflow = {
       id: 'wf-1',
       name: 'Named',
       description: 'Desc',
       is_enabled: true,
       labels: { env: 'prod' },
-      version: { workflow_definition: {} },
     } as unknown as WorkflowWithVersion
     const dispatch = vi.fn()
     renderHook(() =>
@@ -196,13 +232,17 @@ describe('useBuilderWorkflowLifecycle', () => {
     )
     await waitFor(() => {
       expect(dispatch).toHaveBeenCalledWith({
-        type: 'INIT_WORKFLOW',
-        payload: {
-          name: 'Named',
-          description: 'Desc',
-        },
+        type: 'SET_WORKFLOW_NAME',
+        payload: 'Named',
       })
     })
+    await waitFor(() => {
+      expect(dispatch).toHaveBeenCalledWith({
+        type: 'SET_WORKFLOW_DESCRIPTION',
+        payload: 'Desc',
+      })
+    })
+    expect(dispatch).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'INIT_WORKFLOW' }) as BuilderAction)
   })
 
   it('dispatches SET_WORKFLOW_NAME when default name conflicts with list', async () => {

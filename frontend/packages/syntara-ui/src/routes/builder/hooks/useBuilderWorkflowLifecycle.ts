@@ -1,6 +1,6 @@
 import type { WorkflowAPI } from '@syntara/contracts'
 import { useQueryClient } from '@tanstack/react-query'
-import { useEffect, useRef, type Dispatch } from 'react'
+import { useEffect, useRef, useState, type Dispatch } from 'react'
 
 import { workflowClient } from '../../../client'
 import type { WorkflowDefinition } from '../../../stores/workflowStoreTypes'
@@ -32,7 +32,9 @@ export function useBuilderWorkflowLifecycle(options: {
     nodePositions?: Record<string, { x: number; y: number }>,
     projectId?: string | null
   ) => void
-}): void {
+  /** Copy-to-editor navigation: avoid INIT clearing a run panel that was just pinned. */
+  pendingExecutionCopy?: boolean
+}): { isWorkflowInitialized: boolean } {
   const {
     workflowId,
     isNew,
@@ -47,6 +49,7 @@ export function useBuilderWorkflowLifecycle(options: {
     setWorkflow,
     setStoredEdges,
     loadWorkflowWithEdges,
+    pendingExecutionCopy = false,
   } = options
 
   const queryClient = useQueryClient()
@@ -56,6 +59,7 @@ export function useBuilderWorkflowLifecycle(options: {
   const hasInitedNewWorkflowRef = useRef(false)
   const hasAppliedDefaultNameRef = useRef(false)
   const hasRefetchedWorkflowsOnceRef = useRef(false)
+  const [isWorkflowInitialized, setIsWorkflowInitialized] = useState(false)
 
   useEffect(() => {
     if (prevWorkflowIdRef.current !== workflowId) {
@@ -65,6 +69,7 @@ export function useBuilderWorkflowLifecycle(options: {
       hasInitedNewWorkflowRef.current = false
       hasAppliedDefaultNameRef.current = false
       hasRefetchedWorkflowsOnceRef.current = false
+      setIsWorkflowInitialized(false)
       prevWorkflowIdRef.current = workflowId
     }
   }, [workflowId, setWorkflow, setStoredEdges])
@@ -89,33 +94,51 @@ export function useBuilderWorkflowLifecycle(options: {
           type: 'INIT_WORKFLOW',
           payload: { name: defaultName, description: 'New workflow' },
         })
+        setIsWorkflowInitialized(true)
       })
     } else if (workflow?.version?.workflow_definition && !hasLoadedRef.current && workflow.id === workflowId) {
       const { flattenedWorkflow, generatedEdges, nodePositions, initPayload } = processExistingWorkflow(workflow)
 
       queueMicrotask(() => {
         loadWorkflowWithEdges(flattenedWorkflow, generatedEdges, nodePositions, workflow.project_id ?? null)
-        dispatch({ type: 'INIT_WORKFLOW', payload: { ...initPayload, initialViewVersion } })
+        if (pendingExecutionCopy) {
+          // Fresh reducer on copy navigation — metadata only; INIT_WORKFLOW clears pinned run state.
+          dispatch({ type: 'SET_WORKFLOW_NAME', payload: initPayload.name })
+          dispatch({ type: 'SET_WORKFLOW_DESCRIPTION', payload: initPayload.description })
+        } else {
+          dispatch({
+            type: 'INIT_WORKFLOW',
+            payload: { ...initPayload, initialViewVersion },
+          })
+        }
         hasLoadedRef.current = true
+        setIsWorkflowInitialized(true)
       })
     }
-  }, [isNew, workflow, workflowId, loadWorkflowWithEdges, workflowsListResources, dispatch, initialViewVersion])
+  }, [
+    isNew,
+    workflow,
+    workflowId,
+    loadWorkflowWithEdges,
+    workflowsListResources,
+    dispatch,
+    initialViewVersion,
+    pendingExecutionCopy,
+  ])
 
   useEffect(() => {
     if (!workflow || isNew || hasLoadedRef.current || workflow.id !== workflowId) {
       return
     }
+    const name = workflow.name
+    const description = workflow.description ?? workflow.name ?? DEFAULT_WORKFLOW_NAME
     queueMicrotask(() => {
       if (hasLoadedRef.current) {
         return
       }
-      dispatch({
-        type: 'INIT_WORKFLOW',
-        payload: {
-          name: workflow.name,
-          description: workflow.description ?? workflow.name ?? DEFAULT_WORKFLOW_NAME,
-        },
-      })
+      // Metadata only — do not INIT_WORKFLOW here; it clears pinned run panel during copy-to-editor.
+      dispatch({ type: 'SET_WORKFLOW_NAME', payload: name })
+      dispatch({ type: 'SET_WORKFLOW_DESCRIPTION', payload: description })
     })
   }, [workflow, workflowId, isNew, dispatch])
 
@@ -143,4 +166,6 @@ export function useBuilderWorkflowLifecycle(options: {
       })
     )
   }, [isNew, queryClient, workflowsListDataUndefined, workflowsListIsPending, workflowsListError])
+
+  return { isWorkflowInitialized }
 }

@@ -54,7 +54,10 @@ export default function BuilderEdit() {
         query: { include: 'workflow_definition' },
       },
     },
-    { enabled: !!executionIdParam }
+    {
+      enabled: !!executionIdParam,
+      refetchOnMount: 'always',
+    }
   )
 
   const executionCopy = useMemo((): ExecutionCopyData | undefined => {
@@ -110,6 +113,8 @@ export default function BuilderEdit() {
         isNew={false}
         workflowId={workflowId}
         executionCopy={executionCopy}
+        pendingCopyNavigation={!!executionIdParam}
+        copyNavigationExecutionId={executionIdParam}
         initialViewVersion={initialViewVersion}
       />
     </ReactFlowProvider>

@@ -13,6 +13,9 @@ export type ExecutionCopyData = {
 
 type UseExecutionCopyToEditorOptions = {
   executionCopy: ExecutionCopyData | undefined
+  isWorkflowInitialized: boolean
+  mostRecentExecutionId: string | null
+  mostRecentRunPanelOpen: boolean
   dispatch: Dispatch<BuilderAction>
   markDirty: () => void
   showSuccess: (alert: { title: string; description?: string }) => void
@@ -20,50 +23,115 @@ type UseExecutionCopyToEditorOptions = {
 
 export function useExecutionCopyToEditor({
   executionCopy,
+  isWorkflowInitialized,
+  mostRecentExecutionId,
+  mostRecentRunPanelOpen,
   dispatch,
   markDirty,
   showSuccess,
 }: UseExecutionCopyToEditorOptions): void {
-  const hasAppliedRef = useRef(false)
+  const contentReplacedForExecutionRef = useRef<string | null>(null)
+  const latchedExecutionCopyRef = useRef<ExecutionCopyData | undefined>(undefined)
   const currentWorkflow = useWorkflowStore((s) => s.currentWorkflow)
 
   useEffect(() => {
-    if (!executionCopy || hasAppliedRef.current || !currentWorkflow) return
-    hasAppliedRef.current = true
+    if (executionCopy) {
+      latchedExecutionCopyRef.current = executionCopy
+    }
+  }, [executionCopy])
 
-    let copiedRunActivityIds: string[] | undefined
+  const reducerSynced =
+    !!executionCopy && mostRecentExecutionId != null && mostRecentExecutionId === executionCopy.executionId
 
-    if (!executionCopy.preserveWorkflow) {
-      const { workflowDef, edges, nodePositions } = parseImportedDefinition(executionCopy.workflowDefinition)
-      useWorkflowStore.getState().replaceWorkflowContent(workflowDef, edges, nodePositions)
-      copiedRunActivityIds = collectCopiedRunActivityIds(workflowDef)
+  useEffect(() => {
+    if (executionCopy || mostRecentExecutionId) return
+    contentReplacedForExecutionRef.current = null
+    latchedExecutionCopyRef.current = undefined
+  }, [executionCopy, mostRecentExecutionId])
 
-      if (workflowDef.name && typeof workflowDef.name === 'string') {
-        dispatch({ type: 'SET_WORKFLOW_NAME', payload: workflowDef.name })
-      }
-      if (workflowDef.description && typeof workflowDef.description === 'string') {
-        dispatch({ type: 'SET_WORKFLOW_DESCRIPTION', payload: workflowDef.description })
-      }
-      markDirty()
-      showSuccess({
-        title: 'Run copied to editor',
-        description: 'The run has been loaded into the editor with pinned runtime data.',
-      })
-    } else {
-      // Link execution to current graph — snapshot IDs so newly added nodes get no status
-      copiedRunActivityIds = collectCopiedRunActivityIds(currentWorkflow)
+  useEffect(() => {
+    const copy = executionCopy ?? latchedExecutionCopyRef.current
+    if (!copy || !currentWorkflow || !isWorkflowInitialized) return
+    const contentAlreadyApplied = contentReplacedForExecutionRef.current === copy.executionId
+    if (mostRecentExecutionId === copy.executionId && mostRecentRunPanelOpen && contentAlreadyApplied) {
+      return
     }
 
-    dispatch({
-      type: 'SET_MOST_RECENT_EXECUTION',
-      payload: {
-        executionId: executionCopy.executionId,
-        copiedRunActivityIds,
-      },
-    })
-    const url = new URL(window.location.href)
-    url.searchParams.delete('fromExecution')
-    url.searchParams.delete('linkExecution')
-    window.history.replaceState({}, '', url.pathname + url.search)
-  }, [executionCopy, currentWorkflow, dispatch, markDirty, showSuccess])
+    const timer = window.setTimeout(() => {
+      const workflowAtApply = useWorkflowStore.getState().currentWorkflow
+      if (!workflowAtApply) return
+
+      let copiedRunActivityIds: string[] | undefined
+      const contentAlreadyReplaced = contentReplacedForExecutionRef.current === copy.executionId
+      const executionAlreadyInReducer = mostRecentExecutionId === copy.executionId
+
+      if (executionAlreadyInReducer && !mostRecentRunPanelOpen) {
+        copiedRunActivityIds = collectCopiedRunActivityIds(workflowAtApply)
+        dispatch({
+          type: 'SET_MOST_RECENT_EXECUTION',
+          payload: {
+            executionId: copy.executionId,
+            copiedRunActivityIds,
+          },
+        })
+        return
+      }
+
+      if (!copy.preserveWorkflow && !contentAlreadyReplaced) {
+        const { workflowDef, edges, nodePositions } = parseImportedDefinition(copy.workflowDefinition)
+        useWorkflowStore.getState().replaceWorkflowContent(workflowDef, edges, nodePositions)
+        copiedRunActivityIds = collectCopiedRunActivityIds(workflowDef)
+        contentReplacedForExecutionRef.current = copy.executionId
+
+        if (workflowDef.name && typeof workflowDef.name === 'string') {
+          dispatch({ type: 'SET_WORKFLOW_NAME', payload: workflowDef.name })
+        }
+        if (workflowDef.description && typeof workflowDef.description === 'string') {
+          dispatch({ type: 'SET_WORKFLOW_DESCRIPTION', payload: workflowDef.description })
+        }
+        markDirty()
+        showSuccess({
+          title: 'Run copied to editor',
+          description: 'The run has been loaded into the editor with pinned runtime data.',
+        })
+      } else if (copy.preserveWorkflow) {
+        copiedRunActivityIds = collectCopiedRunActivityIds(workflowAtApply)
+      } else {
+        copiedRunActivityIds = collectCopiedRunActivityIds(workflowAtApply)
+      }
+
+      dispatch({
+        type: 'SET_MOST_RECENT_EXECUTION',
+        payload: {
+          executionId: copy.executionId,
+          copiedRunActivityIds,
+        },
+      })
+    }, 0)
+    return () => window.clearTimeout(timer)
+  }, [
+    executionCopy,
+    currentWorkflow,
+    isWorkflowInitialized,
+    mostRecentExecutionId,
+    mostRecentRunPanelOpen,
+    dispatch,
+    markDirty,
+    showSuccess,
+  ])
+
+  useEffect(() => {
+    if (!reducerSynced) return
+    const timer = window.setTimeout(() => {
+      const url = new URL(window.location.href)
+      if (!url.searchParams.has('fromExecution') && !url.searchParams.has('linkExecution')) return
+      url.searchParams.delete('fromExecution')
+      url.searchParams.delete('linkExecution')
+      window.history.replaceState({}, '', url.pathname + url.search)
+      window.setTimeout(() => {
+        latchedExecutionCopyRef.current = undefined
+      }, 500)
+    }, 2_000)
+    return () => window.clearTimeout(timer)
+  }, [reducerSynced])
 }

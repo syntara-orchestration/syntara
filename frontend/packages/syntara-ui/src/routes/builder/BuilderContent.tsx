@@ -70,7 +70,15 @@ type WorkflowVersion = WorkflowAPI.components['schemas']['WorkflowVersionRead']
 /* eslint-disable max-lines */
 // eslint-disable-next-line max-lines-per-function, complexity
 export function BuilderContent(props: BuilderContentProps) {
-  const { workflow, isNew, workflowId, executionCopy, initialViewVersion } = props
+  const {
+    workflow,
+    isNew,
+    workflowId,
+    executionCopy,
+    pendingCopyNavigation,
+    copyNavigationExecutionId,
+    initialViewVersion,
+  } = props
   const isWorkflowBuilderQolEnabled = useFeatureFlag('workflow_builder_qol')
   const navigate = useNavigate()
   const setLocation = useCallback(
@@ -171,7 +179,7 @@ export function BuilderContent(props: BuilderContentProps) {
     mostRecentRunPanelOpen,
   })
 
-  useBuilderWorkflowLifecycle({
+  const { isWorkflowInitialized } = useBuilderWorkflowLifecycle({
     workflowId,
     isNew,
     workflow,
@@ -185,8 +193,34 @@ export function BuilderContent(props: BuilderContentProps) {
     setWorkflow,
     setStoredEdges,
     loadWorkflowWithEdges,
+    pendingExecutionCopy: !!executionCopy || !!pendingCopyNavigation,
   })
-  useExecutionCopyToEditor({ executionCopy, dispatch, markDirty, showSuccess })
+  useEffect(() => {
+    if (!pendingCopyNavigation || !copyNavigationExecutionId) return
+    if (!isWorkflowInitialized) return
+    if (mostRecentExecutionId === copyNavigationExecutionId && mostRecentRunPanelOpen) return
+    dispatch({
+      type: 'SET_MOST_RECENT_EXECUTION',
+      payload: { executionId: copyNavigationExecutionId },
+    })
+  }, [
+    pendingCopyNavigation,
+    copyNavigationExecutionId,
+    isWorkflowInitialized,
+    mostRecentExecutionId,
+    mostRecentRunPanelOpen,
+    dispatch,
+  ])
+
+  useExecutionCopyToEditor({
+    executionCopy,
+    isWorkflowInitialized,
+    mostRecentExecutionId,
+    mostRecentRunPanelOpen,
+    dispatch,
+    markDirty,
+    showSuccess,
+  })
 
   const initialViewVersionRef = useRef(initialViewVersion)
   useEffect(() => {

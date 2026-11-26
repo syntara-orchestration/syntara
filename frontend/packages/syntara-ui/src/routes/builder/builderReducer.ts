@@ -2,6 +2,7 @@ import type { Node } from '@xyflow/react'
 
 import type { NodeType } from '../workflows/canvas/nodes/NodeType'
 
+import { initWorkflowRunPanelState } from './builderReducerInitRunPanel'
 import type { FlowPosition } from './types'
 
 export type ValidationSeverity = 'error' | 'warning'
@@ -106,7 +107,13 @@ export type BuilderAction =
   | { type: 'SET_SELECTED_TRIGGER'; payload: number }
   | {
       type: 'INIT_WORKFLOW'
-      payload: { name: string; description: string; initialViewVersion?: number | null }
+      payload: {
+        name: string
+        description: string
+        initialViewVersion?: number | null
+        /** Keep pinned run panel when INIT races copy-to-editor on the same mount. */
+        preserveMostRecentRun?: boolean
+      }
     }
   | { type: 'SET_VALIDATION_ERRORS'; payload: ValidationError[]; source?: ValidationSource }
   | { type: 'CLEAR_VALIDATION_ERRORS' }
@@ -475,9 +482,10 @@ export function builderReducer(state: BuilderState, action: BuilderAction): Buil
         ...state,
         mostRecentRunPanelOpen: false,
       }
-    case 'INIT_WORKFLOW':
+    case 'INIT_WORKFLOW': {
       // SECURITY: Reset all UI state when initializing a new workflow
       // Prevents stale UI state (selected nodes, open panels) from persisting across workflow changes
+      const runPanel = initWorkflowRunPanelState(state, action.payload.preserveMostRecentRun)
       return {
         ...state,
         // Reset workflow metadata
@@ -494,9 +502,7 @@ export function builderReducer(state: BuilderState, action: BuilderAction): Buil
         versionHistoryOpen: action.payload.initialViewVersion != null,
         viewingVersion: action.payload.initialViewVersion ?? null,
         selectedTriggerIndex: 0,
-        mostRecentExecutionId: null,
-        copiedRunActivityIds: null,
-        mostRecentRunPanelOpen: false,
+        ...runPanel,
         validationErrors: [],
         validationBannerDismissed: false,
         validationSource: null,
@@ -509,6 +515,7 @@ export function builderReducer(state: BuilderState, action: BuilderAction): Buil
         replacementNodeId: null,
         newNodeDesiredPosition: null,
       }
+    }
     default:
       return state
   }

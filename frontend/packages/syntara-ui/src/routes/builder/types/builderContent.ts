@@ -7,5 +7,8 @@ export type BuilderContentProps = Readonly<{
   isNew: boolean
   workflowId: string | null
   executionCopy?: ExecutionCopyData
+  /** URL has fromExecution/linkExecution while execution payload may still be in flight. */
+  pendingCopyNavigation?: boolean
+  copyNavigationExecutionId?: string | null
   initialViewVersion?: number | null
 }>
