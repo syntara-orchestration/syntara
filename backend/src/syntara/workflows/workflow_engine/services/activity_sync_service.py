@@ -27,6 +27,7 @@ from syntara.workflows.models.visualization import JsonPatchOperation
 from syntara.workflows.models.workflow import Workflow
 from syntara.workflows.models.workflow_version import WorkflowVersion
 from syntara.workflows.services.activity_update_publisher import ActivityUpdatePublisher
+from syntara.workflows.utils.datetime import ensure_timezone_aware
 from syntara.workflows.workflow_engine.models.workflow_definition import NodeType
 from syntara.workflows.workflow_engine.services.activity_execution_state import ActivityExecutionStateMixin
 from syntara.workflows.workflow_engine.services.activity_execution_sync import ActivityExecutionSyncMixin
@@ -74,6 +75,7 @@ _MONITOR_RETRY_JITTER_FACTOR = 0.5
 
 
 _QueueItem = QueueItem
+
 
 __all__ = [
     "ActivitySyncService",
@@ -250,6 +252,12 @@ class ActivitySyncService(
                     execution.status = ExecutionStatus.RUNNING
                     execution.last_processed_event_id = event.event_id
                     execution.updated_at = datetime.now(UTC)
+                    execution_metadata = dict(execution.execution_metadata or {})
+                    if execution_metadata.get("parent_execution_id"):
+                        execution_metadata.setdefault(
+                            "workflow_started_at", ensure_timezone_aware(event.event_time).isoformat()
+                        )
+                        execution.execution_metadata = execution_metadata
                     await session.commit()
                     logger.info("Updated execution to RUNNING status", execution_id=metadata.execution_id)
 
@@ -403,6 +411,14 @@ class ActivitySyncService(
                 fresh_execution.error_details = error_details
             fresh_execution.updated_at = datetime.now(UTC)
             await session.commit()
+
+            await self._dispatch_subworkflow_invocation_telemetry(
+                session,
+                fresh_execution,
+                status,
+                completed_at,
+                request_id=None,
+            )
 
         await self._publish_snapshot(execution.id, "final_snapshot")
         logger.info("Reconciled stale execution", execution_id=execution.id, new_status=status.value)

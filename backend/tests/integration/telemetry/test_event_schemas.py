@@ -4,10 +4,15 @@ Validates that Pydantic models produce valid events and consistent JSON schemas.
 """
 
 import json
+from datetime import UTC, datetime
 
 import jsonschema
 
 from syntara.telemetry.events.node_execution import NodeExecutionEvent
+from syntara.telemetry.events.sub_workflow_invocation import (
+    SubWorkflowInvocationEvent,
+    SubWorkflowInvocationMode,
+)
 from syntara.telemetry.events.workflow_execution import (
     WorkflowExecutionCompletedEvent,
     WorkflowExecutionStartEvent,
@@ -119,6 +124,52 @@ class TestNodeExecutionEventSchema:
             )
             event_dict = event.model_dump(mode="json")
             jsonschema.validate(instance=event_dict, schema=schema)
+
+
+class TestSubWorkflowInvocationTelemetryEventSchema:
+    """Contract tests for per-invocation Segment telemetry."""
+
+    def test_event_schema_includes_required_aggregation_fields(self) -> None:
+        schema = SubWorkflowInvocationEvent.model_json_schema()
+        assert schema["type"] == "object"
+        assert {
+            "parent_execution_id",
+            "parent_workflow_id",
+            "parent_workflow_name",
+            "child_execution_id",
+            "child_workflow_id",
+            "child_workflow_name",
+            "invocation_mode",
+            "status",
+            "installation_anon_id",
+            "occurred_at",
+        } <= set(schema["required"])
+
+    def test_event_serializes_for_segment_and_supports_future_embed_mode(self) -> None:
+        event = SubWorkflowInvocationEvent(
+            parent_execution_id=VALID_WORKFLOW_EXECUTION_ID,
+            parent_workflow_id=VALID_WORKFLOW_EXECUTION_ID,
+            parent_workflow_name="Parent",
+            parent_node_id="run_child",
+            child_execution_id=VALID_WORKFLOW_EXECUTION_ID,
+            child_workflow_id=VALID_WORKFLOW_EXECUTION_ID,
+            child_workflow_name="Child",
+            invocation_mode=SubWorkflowInvocationMode.REFERENCE,
+            status="completed",
+            invocation_duration_ms=1200,
+            child_execution_duration_ms=1000,
+            installation_anon_id="anonymous-installation-id",
+            occurred_at=datetime(2026, 11, 24, 10, 0, tzinfo=UTC),
+            entitlement_id="",
+        )
+        schema = SubWorkflowInvocationEvent.model_json_schema()
+        event_dict = event.model_dump(mode="json")
+        jsonschema.validate(instance=event_dict, schema=schema)
+        assert json.dumps(event.to_segment_event())
+        assert event.to_segment_event()["event"] == "sub_workflow_invocation"
+
+        future_embed_event = event.model_copy(update={"invocation_mode": SubWorkflowInvocationMode.EMBED})
+        assert future_embed_event.invocation_mode == SubWorkflowInvocationMode.EMBED
 
 
 class TestWorkflowVersionCreatedEventSchema:
