@@ -5,7 +5,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock, MagicMock
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import httpx
 import pytest
@@ -13,14 +13,17 @@ from execution_plane_client.commands.credentials import CredentialResolveCluster
 from execution_plane_client.errors import ProtocolConflict
 from fastapi import FastAPI, Request, Response
 
+from syntara.audit.dispatcher import AuditEventDispatcher
 from syntara.authz.exceptions import AuthorizationDeniedError, authorization_denied_handler
 from syntara.core.config.base import get_settings
 from syntara.core.database.session import get_db
 from syntara.core.models.principal import service_principal_id
+from syntara.credentials.audit.credential import CredentialClusterResolvedEvent
 from syntara.execution_plane import bridge
 from syntara.execution_plane.commands import credentials as command_credentials
 from syntara.execution_plane.commands.context import AOCommandContext
 from syntara.execution_plane.commands.errors import CommandResourceStateError
+from syntara.integrations.models.integration import IntegrationType
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
@@ -49,8 +52,11 @@ def callback(monkeypatch: pytest.MonkeyPatch) -> tuple[FastAPI, AsyncMock]:
     return app, session
 
 
-def credential_command() -> MessageEnvelope:
-    return CredentialResolveCluster(credential_ref=uuid4()).to_message(
+def credential_command(*, resource_id: UUID | None = None, credential_ref: UUID | None = None) -> MessageEnvelope:
+    return CredentialResolveCluster(
+        resource_id=resource_id or uuid4(),
+        credential_ref=credential_ref or uuid4(),
+    ).to_message(
         source_id="execution-plane",
         destination_id="syntara-orchestration",
         client_id="syntara-orchestration",
@@ -69,6 +75,12 @@ async def test_credential_command_returns_typed_correlated_transport_receipt(
     app, _ = callback
     message = credential_command()
     resolved: dict[str, Any] = {}
+    payload = CredentialResolveCluster.model_validate(message.command.payload)
+    integration = SimpleNamespace(
+        integration_type=IntegrationType.OPENSHIFT,
+        management_credential_id=payload.credential_ref,
+    )
+    dispatch = MagicMock()
 
     async def resolve_credential(
         _handler: object,
@@ -78,6 +90,12 @@ async def test_credential_command_returns_typed_correlated_transport_receipt(
         resolved["credential_ref"] = credential_ref
         return {"bearer_token": "resolved-token"}
 
+    monkeypatch.setattr(
+        command_credentials.CredentialResolveClusterCommandHandler,
+        "_load_integration",
+        AsyncMock(return_value=integration),
+    )
+    monkeypatch.setattr(AuditEventDispatcher, "dispatch", dispatch)
     monkeypatch.setattr(
         command_credentials.CredentialResolveClusterCommandHandler,
         "_resolve_credential_document",
@@ -91,14 +109,26 @@ async def test_credential_command_returns_typed_correlated_transport_receipt(
     assert response.json() == {
         "received": True,
         "message_id": str(message.message_id),
-        "resource": None,
+        "resource": {
+            "kind": "cluster",
+            "resource_id": str(payload.resource_id),
+            "resource_key": None,
+            "revision": None,
+        },
         "result": {
             "command_type": "credential.resolve.cluster",
             "command_revision": 1,
             "credential": {"bearer_token": "resolved-token"},
         },
     }
-    assert resolved["credential_ref"] == CredentialResolveCluster.model_validate(message.command.payload).credential_ref
+    assert resolved["credential_ref"] == payload.credential_ref
+    dispatch.assert_called_once()
+    event = dispatch.call_args.args[0]
+    assert isinstance(event, CredentialClusterResolvedEvent)
+    assert event.credential_id == payload.credential_ref
+    assert event.integration_id == payload.resource_id
+    assert event.message_id == message.message_id
+    assert event.service_identity == message.source_id
 
 
 @pytest.mark.asyncio
@@ -108,7 +138,20 @@ async def test_credential_command_uses_credential_specific_permission(
     app, _ = callback
     authorize = AsyncMock()
     authorize.return_value.allowed = True
+    message = credential_command()
+    payload = CredentialResolveCluster.model_validate(message.command.payload)
     monkeypatch.setattr(bridge, "authorize", authorize)
+    monkeypatch.setattr(AuditEventDispatcher, "dispatch", MagicMock())
+    monkeypatch.setattr(
+        command_credentials.CredentialResolveClusterCommandHandler,
+        "_load_integration",
+        AsyncMock(
+            return_value=SimpleNamespace(
+                integration_type=IntegrationType.OPENSHIFT,
+                management_credential_id=payload.credential_ref,
+            )
+        ),
+    )
     monkeypatch.setattr(
         command_credentials.CredentialResolveClusterCommandHandler,
         "_resolve_credential_document",
@@ -116,9 +159,7 @@ async def test_credential_command_uses_credential_specific_permission(
     )
 
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://ao") as client:
-        response = await client.post(
-            "/api/execution_plane/v1/commands", json=credential_command().model_dump(mode="json")
-        )
+        response = await client.post("/api/execution_plane/v1/commands", json=message.model_dump(mode="json"))
 
     assert response.status_code == 200, response.text
     assert authorize.await_count == 1
@@ -191,6 +232,18 @@ async def test_credential_command_rejects_invalid_command(callback: tuple[FastAP
     app, _ = callback
     body = credential_command().model_dump(mode="json")
     body["command"]["command_revision"] = 2
+
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://ao") as client:
+        response = await client.post("/api/execution_plane/v1/commands", json=body)
+
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_credential_command_requires_cluster_identity(callback: tuple[FastAPI, AsyncMock]) -> None:
+    app, _ = callback
+    body = credential_command().model_dump(mode="json")
+    del body["command"]["payload"]["resource_id"]
 
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://ao") as client:
         response = await client.post("/api/execution_plane/v1/commands", json=body)
@@ -295,3 +348,88 @@ async def test_cluster_credential_command_handler_rejects_unexpected_payload(
             payload,
             command_context,
         )
+
+
+@pytest.mark.asyncio
+async def test_cluster_credential_command_handler_validates_ownership_and_audits_resolution(
+    monkeypatch: pytest.MonkeyPatch,
+    command_context: AOCommandContext,
+) -> None:
+    resource_id = uuid4()
+    credential_ref = uuid4()
+    message = credential_command(resource_id=resource_id, credential_ref=credential_ref)
+    payload = CredentialResolveCluster.model_validate(message.command.payload)
+    integration = SimpleNamespace(
+        integration_type=IntegrationType.OPENSHIFT,
+        management_credential_id=credential_ref,
+    )
+    dispatch = MagicMock()
+    monkeypatch.setattr(AuditEventDispatcher, "dispatch", dispatch)
+    monkeypatch.setattr(
+        command_credentials.CredentialResolveClusterCommandHandler,
+        "_load_integration",
+        AsyncMock(return_value=integration),
+    )
+    monkeypatch.setattr(
+        command_credentials.CredentialResolveClusterCommandHandler,
+        "_resolve_credential_document",
+        AsyncMock(return_value={"bearer_token": "resolved-token"}),
+    )
+
+    handled = await command_credentials.CredentialResolveClusterCommandHandler().handle(
+        message,
+        payload,
+        command_context,
+    )
+
+    assert handled.resource is not None
+    assert handled.resource.resource_id == resource_id
+    dispatch.assert_called_once()
+    event = dispatch.call_args.args[0]
+    assert isinstance(event, CredentialClusterResolvedEvent)
+    assert event.credential_id == credential_ref
+    assert event.integration_id == resource_id
+    assert event.message_id == message.message_id
+    assert event.service_identity == message.source_id
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "integration",
+    [
+        None,
+        SimpleNamespace(integration_type=IntegrationType.MCP_SERVER, management_credential_id=uuid4()),
+        SimpleNamespace(integration_type=IntegrationType.OPENSHIFT, management_credential_id=uuid4()),
+        SimpleNamespace(integration_type=IntegrationType.OPENSHIFT, management_credential_id=None),
+    ],
+)
+async def test_cluster_credential_command_handler_rejects_invalid_ownership(
+    integration: SimpleNamespace | None,
+    monkeypatch: pytest.MonkeyPatch,
+    command_context: AOCommandContext,
+) -> None:
+    message = credential_command()
+    payload = CredentialResolveCluster.model_validate(message.command.payload)
+    dispatch = MagicMock()
+    resolve_credential = AsyncMock(return_value={"bearer_token": "resolved-token"})
+    monkeypatch.setattr(AuditEventDispatcher, "dispatch", dispatch)
+    monkeypatch.setattr(
+        command_credentials.CredentialResolveClusterCommandHandler,
+        "_load_integration",
+        AsyncMock(return_value=integration),
+    )
+    monkeypatch.setattr(
+        command_credentials.CredentialResolveClusterCommandHandler,
+        "_resolve_credential_document",
+        resolve_credential,
+    )
+
+    with pytest.raises(CommandResourceStateError):
+        await command_credentials.CredentialResolveClusterCommandHandler().handle(
+            message,
+            payload,
+            command_context,
+        )
+
+    resolve_credential.assert_not_awaited()
+    dispatch.assert_not_called()

@@ -18,6 +18,7 @@ from syntara.audit.models.audit_event import (
     EventStatus,
 )
 from syntara.audit.models.structured_data import AuditContextData
+from syntara.core.models.principal import PrincipalType
 
 if TYPE_CHECKING:
     from uuid import UUID
@@ -51,6 +52,26 @@ class CredentialEncryptionFailureEvent:
     credential_name: str
     operation: str  # "decrypt"
     error_type: str
+
+
+@dataclass
+class CredentialClusterResolvedEvent:
+    """Domain event fired after an authorized cluster credential resolution."""
+
+    credential_id: UUID
+    integration_id: UUID
+    message_id: UUID
+    service_identity: str
+
+
+@dataclass
+class CredentialWorkloadResolvedEvent:
+    """Domain event fired after an authorized workload credential resolution."""
+
+    credential_id: UUID
+    work_item_id: UUID
+    message_id: UUID
+    service_identity: str
 
 
 # ---------------------------------------------------------------------------
@@ -123,4 +144,58 @@ class CredentialEncryptionFailureHandler(AuditEventHandler[CredentialEncryptionF
             structured_data=data,
             resource_urn=f"urn:syntara:credential:{event.credential_id}",
             resource_name=event.credential_name,
+        )
+
+
+class CredentialClusterResolvedHandler(AuditEventHandler[CredentialClusterResolvedEvent]):
+    """Maps an authorized cluster credential resolution to a non-secret AuditEvent."""
+
+    def handle(self, event: CredentialClusterResolvedEvent) -> AuditEvent:
+        """Map a CredentialClusterResolvedEvent without including credential values."""
+        data = AuditContextData(
+            data_type="credential-cluster-resolution",
+            credential_id=str(event.credential_id),
+            integration_id=str(event.integration_id),
+            message_id=str(event.message_id),
+            service_identity=event.service_identity,
+        )
+
+        return AuditEvent(
+            event_category=EventCategory.SECURITY_EVENT,
+            event_severity=EventSeverity.INFO,
+            event_status=EventStatus.SUCCESS,
+            event_action="credential_resolved",
+            event_message="Credential resolved for an Execution Plane cluster",
+            actor_username=event.service_identity,
+            actor_type=PrincipalType.SERVICE_ACCOUNT,
+            source_component="syntara.execution_plane.commands.credentials",
+            structured_data=data,
+            resource_urn=f"urn:syntara:credential:{event.credential_id}",
+        )
+
+
+class CredentialWorkloadResolvedHandler(AuditEventHandler[CredentialWorkloadResolvedEvent]):
+    """Maps an authorized workload credential resolution to a non-secret AuditEvent."""
+
+    def handle(self, event: CredentialWorkloadResolvedEvent) -> AuditEvent:
+        """Map a CredentialWorkloadResolvedEvent without including credential values."""
+        data = AuditContextData(
+            data_type="credential-workload-resolution",
+            credential_id=str(event.credential_id),
+            work_item_id=str(event.work_item_id),
+            message_id=str(event.message_id),
+            service_identity=event.service_identity,
+        )
+
+        return AuditEvent(
+            event_category=EventCategory.SECURITY_EVENT,
+            event_severity=EventSeverity.INFO,
+            event_status=EventStatus.SUCCESS,
+            event_action="credential_resolved",
+            event_message="Credential resolved for an Execution Plane work item",
+            actor_username=event.service_identity,
+            actor_type=PrincipalType.SERVICE_ACCOUNT,
+            source_component="syntara.execution_plane.commands.credentials",
+            structured_data=data,
+            resource_urn=f"urn:syntara:credential:{event.credential_id}",
         )
