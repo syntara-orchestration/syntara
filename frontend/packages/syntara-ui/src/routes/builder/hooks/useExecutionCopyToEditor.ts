@@ -53,11 +53,7 @@ export function useExecutionCopyToEditor({
     const copy = executionCopy ?? latchedExecutionCopyRef.current
     if (!copy || !currentWorkflow || !isWorkflowInitialized) return
     const contentAlreadyApplied = contentReplacedForExecutionRef.current === copy.executionId
-    if (
-      mostRecentExecutionId === copy.executionId &&
-      mostRecentRunPanelOpen &&
-      contentAlreadyApplied
-    ) {
+    if (mostRecentExecutionId === copy.executionId && mostRecentRunPanelOpen && contentAlreadyApplied) {
       return
     }
 
