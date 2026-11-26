@@ -29,6 +29,7 @@ _SCOPE_ERROR = "SubWorkflowProjectScopeError"
 @dataclass
 class _FakeParent:
     project_id: UUID
+    workflow_id: UUID = field(default_factory=uuid4)
 
 
 class _FakeSession:

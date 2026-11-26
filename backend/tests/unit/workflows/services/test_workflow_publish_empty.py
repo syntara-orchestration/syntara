@@ -30,6 +30,7 @@ def mock_service() -> WorkflowService:
     service = WorkflowService.__new__(WorkflowService)
     service.session = session
     service.user = user
+    service._audit_actor_id = user.id
     return service
 
 
