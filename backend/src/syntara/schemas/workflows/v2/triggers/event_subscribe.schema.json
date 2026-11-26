@@ -27,6 +27,21 @@
         "maxLength": 1024,
         "description": "Topic/subject to subscribe to. Transport-specific naming rules (e.g. Kafka's charset and length limits) are enforced against the resolved Integration."
       },
+      "start": {
+        "$ref": "#/$defs/kafka_start_configuration",
+        "description": "Optional Kafka reading policies. Saved positions take precedence over new starting choices."
+      },
+      "group_id": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "minLength": 1,
+        "maxLength": 512,
+        "pattern": "^[a-zA-Z0-9._-]+$",
+        "default": null,
+        "description": "Optional Kafka consumer group. Omitted or null generates a group for a new source and preserves the existing group on same-source republish. Fixed after the first successful publication."
+      },
       "input_schema": {
         "type": [
           "object",
@@ -50,6 +65,37 @@
     "additionalProperties": false
   },
   "$defs": {
+    "kafka_start_configuration": {
+      "type": "object",
+      "properties": {
+        "position": {
+          "type": "string",
+          "enum": [
+            "latest",
+            "earliest"
+          ],
+          "default": "latest"
+        },
+        "added_partition_position": {
+          "type": "string",
+          "enum": [
+            "latest",
+            "earliest"
+          ],
+          "default": "earliest"
+        },
+        "offset_gap_policy": {
+          "type": "string",
+          "enum": [
+            "fail",
+            "earliest",
+            "latest"
+          ],
+          "default": "earliest"
+        }
+      },
+      "additionalProperties": false
+    },
     "filter_configuration": {
       "type": "object",
       "required": [

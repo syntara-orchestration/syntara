@@ -66,13 +66,14 @@ def start_audit_outbox_worker() -> None:
         _state = AuditLifecycleState.RUNNING
 
 
-async def stop_audit_outbox_worker() -> None:
+async def stop_audit_outbox_worker(*, timeout_seconds: float | None = None) -> None:
     """Flush and stop audit outbox worker during shutdown.
 
     Ensures in-flight audit outbox events are drained and the worker is stopped.
 
     Thread-safe and idempotent - safe to call multiple times.
     Must be called last during shutdown to avoid dropping events.
+    Best-effort callers may supply a deadline to bound draining and cancellation.
     """
     global _state  # noqa: PLW0603
 
@@ -81,14 +82,19 @@ async def stop_audit_outbox_worker() -> None:
             logger.debug("audit.components.already_stopped", state=_state)
             return
 
-        # Wait for in-flight audit writes to complete
-        outbox_worker = get_outbox_worker()
-        if outbox_worker is not None:
-            await outbox_worker.drain()
-            await outbox_worker.stop()
-            logger.info("AuditOutboxWorker shutdown.")
-
-        _state = AuditLifecycleState.STOPPED
+        try:
+            outbox_worker = get_outbox_worker()
+            if outbox_worker is not None:
+                if timeout_seconds is None:
+                    try:
+                        await outbox_worker.drain()
+                    finally:
+                        await outbox_worker.stop()
+                else:
+                    await outbox_worker.shutdown(timeout_seconds=timeout_seconds)
+                logger.info("AuditOutboxWorker shutdown.")
+        finally:
+            _state = AuditLifecycleState.STOPPED
 
 
 # =============================================================================

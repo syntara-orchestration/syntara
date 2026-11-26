@@ -101,9 +101,9 @@ class RecoveryReplacementRequest(RecoveryRequest):
 
 
 class AutomaticRecoveryRequest(RecoveryRequest):
-    """Internal earliest-only reset; never supplied by an administrative route."""
+    """Internal configuration-authorized reset; no administrative route supplies it."""
 
-    policy: Literal[RecoveryPolicy.RETAINED_BEGINNING] = RecoveryPolicy.RETAINED_BEGINNING
+    policy: RecoveryPolicy = RecoveryPolicy.RETAINED_BEGINNING
     acknowledge_duplicate_risk: Literal[False] = False
     allow_unscheduled_disposition: Literal[False] = False
 

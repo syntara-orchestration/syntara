@@ -25,9 +25,15 @@ function triggersEqual(a: Trigger, b: Trigger): boolean {
   if (a.type !== b.type) return false
   if (a.name !== b.name) return false
 
-  // Deep compare parameters objects
-  const aParams = a.parameters ?? {}
-  const bParams = b.parameters ?? {}
+  // Kafka normalizes both an omitted filter and explicit null to no filtering.
+  const aParams: Record<string, unknown> = {
+    ...a.parameters,
+    ...(a.type === TriggerTypeEnum.EVENT_SUBSCRIBE && { filter: a.parameters?.filter ?? null }),
+  }
+  const bParams: Record<string, unknown> = {
+    ...b.parameters,
+    ...(b.type === TriggerTypeEnum.EVENT_SUBSCRIBE && { filter: b.parameters?.filter ?? null }),
+  }
   const aKeys = Object.keys(aParams).sort((a, b) => a.localeCompare(b))
   const bKeys = Object.keys(bParams).sort((a, b) => a.localeCompare(b))
 
@@ -163,7 +169,7 @@ function buildWebhookStyleTrigger(
 
 function buildUpdatedTrigger(data: TriggerFormData, trigger: Trigger, name: string | undefined): Trigger {
   if (data.triggerType === TriggerTypeEnum.EVENT_SUBSCRIBE) {
-    return buildKafkaSubscribeTrigger(trigger.id, name ?? 'Kafka Subscribe trigger', data)
+    return buildKafkaSubscribeTrigger(trigger.id, name ?? 'Kafka Subscribe trigger', data, trigger)
   }
   if (data.triggerType === TriggerTypeEnum.MANUAL_TRIGGER) {
     const inputSchema = parseJsonSchema(data.inputSchema)

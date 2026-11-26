@@ -6,10 +6,11 @@ from unittest.mock import AsyncMock, Mock
 import pytest
 from sqlmodel import select
 
+from syntara.audit.dispatcher import AuditEventDispatcher
 from syntara.audit.outbox.models import AuditOutboxRecord
 from syntara.eventstreams.adapters.kafka_metadata import KafkaSourceMetadata
 from syntara.eventstreams.core.envelope import RawEvent
-from syntara.eventstreams.core.processing import HeldRecord, SkippedRecord
+from syntara.eventstreams.core.processing import SkippedRecord
 from syntara.eventstreams.models.source import EventSubscriptionSource
 from syntara.eventstreams.models.subscription import EventSubscription
 from syntara.eventstreams.models.subscription_snapshot import SubscriptionSnapshot
@@ -124,14 +125,19 @@ async def test_false_key_condition_can_skip_invalid_json_without_decoding(prepar
 
 
 @pytest.mark.parametrize("value", [b"not-json", None], ids=["invalid-json", "tombstone"])
-async def test_matching_filter_holds_invalid_content_without_execution(preparation_context, monkeypatch, value) -> None:
+async def test_matching_filter_audits_and_skips_invalid_content_without_execution(
+    preparation_context, monkeypatch, value
+) -> None:
     context = preparation_context
     service, preparation, admission, event = await processing(context, "true")
     logs = Mock()
     monkeypatch.setattr(module, "logger", logs)
+    audit = Mock()
+    monkeypatch.setattr(AuditEventDispatcher, "dispatch", audit)
     result = await service.process(context.snapshot, context.identity(), event.model_copy(update={"value": value}))
-    assert isinstance(result, HeldRecord)
-    assert result.permanent_content_error
+    assert isinstance(result, SkippedRecord)
+    assert result.outcome == "invalid_content"
+    audit.assert_called_once()
     async with context.session_factory() as session:
         assert await session.get(Execution, context.identity().execution_id) is None
     logs.error.assert_not_called()

@@ -10,15 +10,16 @@ For each received record:
 
 1. Derive the stable Execution UUID and Temporal workflow ID from the deployment,
    integration, source generation, workflow, subscription and Kafka coordinates.
-2. Reuse a matching confirmed normal Execution when one exists.
-3. Otherwise look up the stable Temporal workflow ID and verify its signed
-   start arguments. Recover an accepted run using its original version, input,
-   principal and timestamps.
-4. Only confirmed absence permits current lifecycle, credential, payload and
-   capacity checks, followed by preparation in memory.
-5. Start Temporal outside a database transaction. After acceptance, persist the
-   normal Execution and scheduling confirmation in a short transaction.
-6. Advance the resolved prefix only after that transaction commits.
+2. Recover a confirmed normal Execution or retained signed Temporal acceptance
+   before applying current filters, decoding rules, or admission checks.
+3. If no accepted run exists, check current lifecycle, credentials, and capacity,
+   then evaluate the filter and validate content. No-matches, filter errors, and
+   known invalid content can complete locally under the offset-safety checks.
+4. For a valid match, prepare detached start arguments in memory and start Temporal
+   outside a database transaction. On duplicate or uncertain acceptance, verify
+   retained signed arguments and recover the original run.
+5. After verified acceptance, persist the normal Execution and scheduling
+   confirmation in a short transaction, then advance the resolved prefix.
 
 A failed or ambiguous start creates no pre-start Execution. A failed database
 write retries the same accepted arguments in a fresh transaction, without
@@ -58,24 +59,48 @@ valid; later received records cannot advance past an unresolved earlier head.
 If admission closes during a fetch, its unqueued records are also rewound.
 Each partition task drains queued heads in order, with one handoff at a time,
 releasing the shared processing slot between records.
+Accepted runs recover from Execution or Temporal evidence on redelivery rather
+than from a saved in-memory handoff. Inspection of oversized records uses a
+bounded timeout and shares the processing concurrency limit.
 
-Invalid content stays uncommitted while the required author-visible activity
-logging is unavailable. Local holds do not create per-message database rows.
-A restart reads the uncommitted record again. Validation-only inspection during
-position recovery never starts a workflow or creates a commit candidate.
-A new publication revalidates held content using its new schema. A hold retained
-after partition revocation does not block healthy sibling partitions.
+Known invalid content emits a sanitized record-rejection event through the
+existing platform OTEL audit pipeline. Activity logs are deferred. Audit failure
+does not block an otherwise eligible skip and audit delivery is never offset
+evidence. The skip remains tied to its source, configuration revision, assignment
+epoch, current lifecycle/dependency gates, and all earlier records' completion.
+Rejected-record audit writes use the existing `audit_writer_max_concurrent_writes`
+setting to bound pending background tasks as well as active writes. At capacity,
+the audit event is dropped with an operational warning; an otherwise safe skip
+still proceeds. Other audit callers and transactional audit writes retain their
+existing behavior.
+
+After consumer draining, the standalone worker bounds audit cleanup by
+`EventWorkerDefaults.HINT_TIMEOUT_SECONDS`. It waits only for inserts started in
+that process, reserving half the budget for cancellation. It never starts the
+shared outbox poller, claims or deletes shared rows, or exports audit events to
+OTLP. The existing platform publisher delivers those rows. A blocked audit
+collector therefore cannot leave an export thread running in the Kafka process.
+Incomplete insert cleanup is logged without preventing database disposal.
+
+Uninspected content and unknown dependency/source state remain held. Local holds
+and skips create no delivery-ledger rows. A restart re-evaluates uncommitted work.
+Validation-only inspection behind a recovery fence never starts a workflow or
+creates a commit candidate. Accepted runs recover their original signed
+arguments before current content rules can discard a redelivered record.
 
 ## Initial positions and automatic recovery
 
-The saved first topic partition set starts at the read-committed visible end.
-Partitions added later start at retained beginning. Saved boundaries survive
-retries; ready partitions may continue while an added partition initializes.
+The saved first topic partition set defaults to the read-committed visible end.
+Partitions added later default to retained beginning. Published reading settings
+can override these choices for partitions without saved boundaries. Saved
+boundaries survive retries and republish; ready partitions may continue while
+an added partition initializes.
 
 Valid group commits govern normal resumption. Missing or out-of-range offsets
-recover automatically from retained beginning. A partition token and revision
-keep the selected boundary stable across interruptions. Local tasks must drain,
-and source identity and assignment must remain verified.
+use the published `fail`, `earliest`, or `latest` policy, defaulting to earliest.
+A partition token and revision keep a selected policy and boundary stable across
+interruptions and republish. Local tasks must drain, and source identity and
+assignment must remain verified.
 
 See [initialization](eventstreams/kafka-initialization.md),
 [connection testing](event-subscription-controls.md) and

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from syntara.audit.discovery import discover_handlers
 from syntara.audit.registration import _handler_packages
+from syntara.eventstreams import audit as eventstreams_audit
+from syntara.eventstreams.audit.record_rejection import EventRecordRejectedEvent, EventRecordRejectedHandler
 from syntara.invocations.audit.invocation_cancelled import InvocationCancelledEvent
 from syntara.invocations.audit.invocation_created import InvocationCreatedEvent
 from syntara.tool_manager.audit.tool_bulk_update import ToolBulkUpdateEvent
@@ -24,3 +26,10 @@ class TestHandlerPackagesRegistration:
         assert ToolBulkUpdateEvent in event_types
         assert InvocationCreatedEvent in event_types
         assert InvocationCancelledEvent in event_types
+
+    def test_eventstream_record_rejection_handler_is_registered_and_discoverable(self) -> None:
+        assert eventstreams_audit in _handler_packages()
+
+        handlers = discover_handlers(eventstreams_audit)
+
+        assert isinstance(handlers[EventRecordRejectedEvent], EventRecordRejectedHandler)

@@ -46,13 +46,30 @@ function kafkaSubscribeDraftParameters(data: TriggerFormData): Partial<KafkaSubs
   }
 }
 
-/** Shared create/edit mapping so reopening a trigger preserves optional omissions. */
-export function buildKafkaSubscribeTrigger(id: string, name: string, data: TriggerFormData): Activity {
+/** Preserve backend-only consumption settings when editing an existing Kafka trigger. */
+export function buildKafkaSubscribeTrigger(
+  id: string,
+  name: string,
+  data: TriggerFormData,
+  previousTrigger?: Activity
+): Activity {
+  const previousParameters =
+    previousTrigger?.type === TriggerTypeEnum.EVENT_SUBSCRIBE ? previousTrigger.parameters : undefined
+  const parameters = kafkaSubscribeDraftParameters(data)
+  const sourceChanged =
+    previousParameters !== undefined &&
+    (previousParameters.integration_id !== parameters.integration_id || previousParameters.topic !== parameters.topic)
   return {
     id,
     name,
     type: TriggerTypeEnum.EVENT_SUBSCRIBE,
-    parameters: kafkaSubscribeDraftParameters(data),
+    parameters: {
+      ...(previousParameters?.start !== undefined && { start: previousParameters.start }),
+      ...(previousParameters?.group_id !== undefined && {
+        group_id: sourceChanged ? null : previousParameters.group_id,
+      }),
+      ...parameters,
+    },
   }
 }
 
