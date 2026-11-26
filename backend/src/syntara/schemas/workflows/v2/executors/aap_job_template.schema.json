@@ -132,6 +132,10 @@
         "items": {
           "type": "string"
         }
+      },
+      "use_input_variables": {
+        "type": "boolean",
+        "description": "UI-only marker indicating the \"Use input variables\" toggle is enabled in the Workflow Builder. Has no effect on execution."
       }
     },
     "anyOf": [
