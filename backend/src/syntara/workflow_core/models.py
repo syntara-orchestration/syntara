@@ -437,7 +437,7 @@ class BashScriptExecutorParameters(ScriptExecutorParametersBase):
     """Parameters for Bash script executor."""
 
 
-class APIExecutorParameters(CredentialBindingsMixin, TemplateAwareBaseModel):
+class APIExecutorParameters(ExecutionPlaneMixin, CredentialBindingsMixin, TemplateAwareBaseModel):
     """Parameters for API executor (http_request activity)."""
 
     method: HTTPMethod = Field(description="HTTP method")

@@ -1780,7 +1780,7 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         finally:
             self._scrub_activity_credentials(resolved_parameters)
 
-    async def _dispatch_node_to_executor(
+    async def _dispatch_node_to_executor(  # noqa: C901 - executor-specific argument and timeout routing
         self,
         node: ActivityNode,
         resolved_parameters: dict[str, Any],
@@ -1795,6 +1795,13 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
             extra_args: list[Any] | None = None
             if node_type in _SCRIPT_NODE_TYPES:
                 extra_args = [self.execution_id]
+            elif (
+                node_type == NodeType.HTTP_REQUEST
+                and resolved_parameters.get("execution_profile") is not None
+                and workflow.patched("http-ep-dispatch-v1")
+            ):
+                extra_args = [self.execution_id]
+                self._active_ep_nodes.add(node_id)
             elif node_type in self._AAP_NODE_TYPES:
                 extra_args = [self.execution_id, self._created_by_user_id]
             elif node_type == NodeType.AGENTIC:

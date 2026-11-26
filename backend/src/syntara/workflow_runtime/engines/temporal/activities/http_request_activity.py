@@ -24,6 +24,7 @@ from syntara.workflow_core.utils.credential_scrubber import ensure_resolved_cred
 from syntara.workflow_runtime.engines.temporal import constants
 
 from .common import HEARTBEAT_STOP_MONITOR, ActivityExecutionError, is_retryable_http_status
+from .ep.http_dispatch import dispatch_http_to_ep
 from .output_mapping import dump_output
 
 logger = structlog.stdlib.get_logger(__name__)
@@ -127,6 +128,7 @@ def _resolve_credentials_and_url(
 async def execute_http_request_activity(
     input_config: dict[str, Any],
     output_config: dict[str, str] | None,
+    execution_id: str | None = None,
 ) -> dict[str, Any]:
     """Execute HTTP request node for v2 workflows.
 
@@ -134,6 +136,7 @@ async def execute_http_request_activity(
     Output mapping is applied internally before returning to avoid storing suppressed fields in Temporal.
 
     Args:
+        execution_id: Workflow execution identity for explicitly selected EP placement.
         input_config: Resolved node configuration (templates already resolved)
         output_config: Output mapping configuration (field_name -> template expression)
                        None = return full result, {} = suppress all, {...} = extract specific fields
@@ -160,6 +163,12 @@ async def execute_http_request_activity(
         fields = [str(e["loc"]) for e in exc.errors()]
         msg = f"Invalid configuration: {exc.error_count()} error(s) in fields {fields}"
         raise ApplicationError(msg, type="ValidationError", non_retryable=True) from None
+
+    if config.execution_profile is not None:
+        if execution_id is None:
+            message = "HTTP EP requires an execution ID"
+            raise ApplicationError(message, type="ConfigError", non_retryable=True)
+        return await dispatch_http_to_ep(input_config, output_config, execution_id, config)
 
     headers = dict(config.headers)
     request_url, url_from_credential = _resolve_credentials_and_url(input_config, config, headers)

@@ -2115,6 +2115,17 @@ components:
       description: "Parameters for Ansible Automation Platform Workflow Job Template executor.\n\nInherits common Ansible Automation Platform fields from AAPResourceReferenceMixin (credential_id, organization,\ninventory, extra_vars, limit, tags, skip_tags, labels, timeout)."
     APIExecutorParameters:
       properties:
+        execution_profile:
+          anyOf:
+            - oneOf:
+                - $ref: '#/components/schemas/ExecutionTargetProfile'
+              discriminator:
+                propertyName: type
+                mapping:
+                  execution_target: '#/components/schemas/ExecutionTargetProfile'
+            - type: 'null'
+          title: Execution Profile
+          description: Execution Plane placement profile for this workload.
         method:
           $ref: '#/components/schemas/HTTPMethod'
           description: HTTP method

@@ -117,6 +117,12 @@ class AoClient:
             pytest.fail(f"failed to create execution: {created!r}")
         return created
 
+    def cancel_execution(self, execution_id: str) -> None:
+        self._json(self._client.post(f"{self.api}/executions/{execution_id}/cancel", headers=self._headers()))
+
+    def delete_workflow(self, workflow_id: str) -> None:
+        self._json(self._client.delete(f"{self.api}/workflows/{workflow_id}", headers=self._headers()))
+
     def get_execution(self, execution_id: str) -> dict[str, Any]:
         body = self._json(
             self._client.get(
@@ -191,10 +197,21 @@ class EpClient:
             pytest.fail(f"unexpected work-item payload: {body!r}")
         return body
 
-    def list_work_items(self, *, status: str | None = None, limit: int = 100) -> list[dict[str, Any]]:
+    def list_work_items(
+        self,
+        *,
+        status: str | None = None,
+        limit: int = 100,
+        work_item_id: str | None = None,
+        execution_target_id: str | None = None,
+    ) -> list[dict[str, Any]]:
         params: dict[str, str | int] = {"limit": limit, "sort": "-created_at"}
         if status:
             params["status"] = status
+        if work_item_id:
+            params["id"] = work_item_id
+        if execution_target_id:
+            params["execution_target_id"] = execution_target_id
         body = self._json(self._client.get(f"{self.api}/work-items", headers=self._headers(), params=params))
         resources = body.get("resources") if isinstance(body, dict) else None
         if not isinstance(resources, list):
