@@ -560,3 +560,45 @@ async def test_project_delete_prevents_new_workflows_from_bypassing_checks(
     with patch.object(service, "_check_workflow_step_types", side_effect=try_concurrent_insert) as check:
         await service.delete_project(test_project_id)
     check.assert_awaited_once()
+
+
+async def _pattern_projects(db, user, *, extra_roles: tuple[str, ...] = ()) -> dict[str, Project]:
+    """Projects payments/payroll/sandbox, a step-author grant and a `pay*` Script deny."""
+    projects = {name: Project(name=name) for name in ("payments", "payroll", "sandbox")}
+    db.add_all(projects.values())
+    db.add(Role(name="no-script-in-pay", scope="project", policy_names=["step_type:write:any:deny:script"]))
+    db.add(RoleAssignment(principal_id=user.id, role_name="step-author"))
+    for role_name in extra_roles:
+        db.add(RoleAssignment(principal_id=user.id, role_name=role_name))
+    await db.flush()
+    db.add(RoleAssignment(principal_id=user.id, role_name="no-script-in-pay", project_pattern="pay*"))
+    await db.commit()
+    clear_authz_cache()
+    return projects
+
+
+@pytest.mark.parametrize("extra_roles", [(), ("admin",)], ids=["author", "admin"])
+async def test_project_pattern_deny_blocks_matching_projects_only(test_db_session, test_user, evaluator, extra_roles):
+    """`pay*` refuses Script steps in payments and payroll, not in sandbox, admin or not."""
+    db = test_db_session
+    projects = await _pattern_projects(db, test_user, extra_roles=extra_roles)
+    definition = create_minimal_workflow_definition()
+    service = WorkflowService(db, test_user, evaluator)
+    for name, project in projects.items():
+        workflow, _ = await _stored_workflow(db, test_user, project.id, create_minimal_workflow_definition("wait"))
+        with patch("syntara.workflows.node_permissions.AuditEventDispatcher.dispatch") as dispatch:
+            if name == "sandbox":
+                await service.update_workflow(workflow.id, name="renamed", workflow_definition=definition)
+                assert not any(isinstance(c.args[0], AuthorizationDeniedEvent) for c in dispatch.call_args_list)
+                continue
+            with pytest.raises(NodeKindWriteDeniedError) as raised:
+                await service.update_workflow(workflow.id, name="renamed", workflow_definition=definition)
+        blocked = raised.value.blocked_step_types
+        assert [(b.kind, b.reason, b.project) for b in blocked] == [("script", "explicit_deny", name)]
+        denied = [c.args[0] for c in dispatch.call_args_list if isinstance(c.args[0], AuthorizationDeniedEvent)]
+        context = denied[-1].context
+        assert context["project"] == name
+        assert context["project_pattern"] == "pay*"
+        assert context["scope"] == "project"
+        await db.refresh(workflow)
+        assert workflow.name == "governed"

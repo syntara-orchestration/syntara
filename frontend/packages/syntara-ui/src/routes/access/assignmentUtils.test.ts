@@ -124,6 +124,27 @@ describe('buildPermissionRow', () => {
     expect(row.sourceEndpoint).toBe('role-assignments')
   })
 
+  it('shows a pattern assignment with its pattern as scope, not as System', () => {
+    const patternAssignment = {
+      ...systemAssignment,
+      role_name: 'no-script',
+      project_pattern: 'pay*',
+    } as unknown as RoleAssignmentRead
+    const row = buildPermissionRow(patternAssignment)
+    expect(row.scopeType).toBe('project')
+    expect(row.scopeName).toBe('Projects matching pay*')
+    expect(row.scopeName).not.toBe('System')
+    expect(row.projectPattern).toBe('pay*')
+    expect(row.projectId).toBeUndefined()
+    // Revocation goes through the global endpoint: the row has no single project.
+    expect(row.sourceEndpoint).toBe('role-assignments')
+  })
+
+  it('leaves projectPattern unset for system and project rows', () => {
+    expect(buildPermissionRow(systemAssignment).projectPattern).toBeUndefined()
+    expect(buildPermissionRow(projectAssignment).projectPattern).toBeUndefined()
+  })
+
   it('derives principalType from API response', () => {
     expect(buildPermissionRow(projectAssignment).principalType).toBe('user')
     expect(buildPermissionRow(systemAssignment).principalType).toBe('group')

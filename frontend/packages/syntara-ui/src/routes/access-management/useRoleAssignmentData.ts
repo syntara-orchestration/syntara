@@ -3,6 +3,7 @@ import { useMemo } from 'react'
 import { getErrorCode, getErrorStatus } from '../../utils/apiErrors'
 import { detachPromise } from '../../utils/detachPromise'
 import { accessClient } from '../access/accessClient'
+import { formatProjectPatternScope } from '../access/assignmentUtils'
 
 import { RolePrincipalType } from './RoleAssignmentTypes'
 
@@ -19,6 +20,8 @@ export type RoleAssignmentRow = {
   scopeType: 'system' | 'project'
   createdAt: string | null
   projectId?: string
+  /** Set for assignments that apply to every project whose name matches this pattern. */
+  projectPattern?: string
 }
 
 export function useRoleAssignmentData(principalType: RolePrincipalType, principalId: string) {
@@ -65,15 +68,20 @@ export function useRoleAssignmentData(principalType: RolePrincipalType, principa
     return assignments.map((a) => {
       const policyNames = a.role_policies ?? []
       const isProject = !!a.project_id
+      const projectPattern = a.project_pattern ?? undefined
+      let scope = 'System'
+      if (a.project_id != null) scope = a.project_name ?? a.project_id
+      else if (projectPattern) scope = formatProjectPatternScope(projectPattern)
       return {
         id: a.id,
         roleName: a.role_name,
         roleDescription: a.role_description ?? null,
         policies: policyNames.map((name) => ({ name })),
-        scope: a.project_id != null ? (a.project_name ?? a.project_id) : 'System',
-        scopeType: isProject ? ('project' as const) : ('system' as const),
+        scope,
+        scopeType: isProject || projectPattern ? ('project' as const) : ('system' as const),
         createdAt: a.created_at ?? null,
         projectId: a.project_id ?? undefined,
+        projectPattern,
       }
     })
   }, [queryForbidden, activeQuery.data])

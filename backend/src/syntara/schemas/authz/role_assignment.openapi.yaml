@@ -24,8 +24,9 @@ paths:
       description: |-
         Assign a role to a user or group.
 
-        When project_id is provided the assignment is project-scoped;
-        otherwise it is a global (system-level) assignment.
+        When project_id is provided the assignment is project-scoped; when
+        project_pattern is provided it applies (deny-only) to every project whose
+        name matches; otherwise it is a global (system-level) assignment.
       operationId: create_role_assignment
       x-app-permission:
         resource: role-assignment
@@ -276,6 +277,7 @@ components:
         Request body for creating a role assignment.
 
         Exactly one of ``principal_id`` or ``group_id`` must be provided.
+        At most one of ``project_id`` or ``project_pattern`` may be provided.
       required:
         - role_name
       properties:
@@ -300,6 +302,15 @@ components:
               format: uuid
             - type: 'null'
           title: Project Id
+        project_pattern:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Project Pattern
+          description: >-
+            Project-name pattern using '*' as a wildcard (for example 'pay*'). The assignment then
+            applies to every project whose current name matches. Only custom, deny-only,
+            project-scope roles can be assigned with a pattern. Mutually exclusive with project_id.
 
     SubResourceRoleAssignmentCreate:
       type: object
@@ -383,6 +394,11 @@ components:
             - type: string
             - type: 'null'
           title: Project Name
+        project_pattern:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Project Pattern
         is_builtin:
           type: boolean
           default: false

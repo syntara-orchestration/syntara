@@ -46,6 +46,7 @@ class RoleAssignmentEvent:
     group_id: UUID | None = field(default=None)
     group_name: str | None = field(default=None)
     project_id: UUID | None = field(default=None)
+    project_pattern: str | None = field(default=None)
     error_type: str | None = field(default=None)
 
 
@@ -82,6 +83,8 @@ class RoleAssignmentHandler(AuditEventHandler[RoleAssignmentEvent]):
             data.principal_name = event.principal_name
         if event.project_id is not None:
             data.project_id = str(event.project_id)
+        if event.project_pattern is not None:
+            data.project_pattern = event.project_pattern
         if is_error:
             data.error_type = event.error_type
 

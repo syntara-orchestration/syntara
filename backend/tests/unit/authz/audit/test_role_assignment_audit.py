@@ -214,3 +214,27 @@ class TestRoleAssignmentHandler:
         assert result.event_status == EventStatus.ERROR
         assert isinstance(result.structured_data, AuditContextData)
         assert result.structured_data.error_type == "DatabaseError"
+
+
+class TestRoleAssignmentHandlerProjectPattern:
+    """Pattern assignments record their pattern in the audit trail."""
+
+    def test_event_defaults_to_no_pattern(self) -> None:
+        event = RoleAssignmentEvent(assignment_id=uuid4(), role_name="Viewer", action="assigned")
+        assert event.project_pattern is None
+        result = RoleAssignmentHandler().handle(event)
+        assert getattr(result.structured_data, "project_pattern", None) is None
+
+    def test_pattern_appears_in_structured_data(self) -> None:
+        event = RoleAssignmentEvent(
+            assignment_id=uuid4(),
+            principal_type="user",
+            principal_id=uuid4(),
+            principal_name="carol",
+            role_name="no-script",
+            action="assigned",
+            project_pattern="pay*",
+        )
+        result = RoleAssignmentHandler().handle(event)
+        assert result.structured_data.project_pattern == "pay*"
+        assert getattr(result.structured_data, "project_id", None) is None

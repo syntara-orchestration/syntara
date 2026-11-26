@@ -172,7 +172,7 @@ function RoleAssignmentsTableBody({
                       <Truncate content={row.scope} />
                     </LinkCell>
                   ) : (
-                    '-'
+                    <>{row.projectPattern ? <Truncate content={row.scope} /> : '-'}</>
                   )}
                 </Td>
               )}

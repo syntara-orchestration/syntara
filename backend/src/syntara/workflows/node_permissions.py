@@ -36,6 +36,8 @@ class NodeKindDenial:
     blocked: BlockedStepType
     policy: str | None = None
     scope: str | None = None
+    # Set when the deny came from a role assigned with a project-name pattern.
+    project_pattern: str | None = None
 
 
 def node_kind_denial(kind: str, project_name: str, result: AuthzResult) -> NodeKindDenial | None:
@@ -45,6 +47,7 @@ def node_kind_denial(kind: str, project_name: str, result: AuthzResult) -> NodeK
     statement = next((p for p in result.effective_policies if p.get("name") == result.denied_by), {})
     explicit = result.denied or bool(result.denied_by)
     scope = statement.get("scope") if explicit else None
+    project_pattern = statement.get("project_pattern") if explicit else None
     return NodeKindDenial(
         blocked=BlockedStepType(
             kind=kind,
@@ -55,6 +58,7 @@ def node_kind_denial(kind: str, project_name: str, result: AuthzResult) -> NodeK
         ),
         policy=result.policy_name(result.denied_by) if result.denied_by else None,
         scope=scope,
+        project_pattern=project_pattern,
     )
 
 
@@ -76,7 +80,13 @@ async def check_node_kind_write_permission(
         msg = "Cannot verify step-type write permission without a workflow project"
         raise AuthorizationDeniedError(msg)
 
-    def audit_denial(kind: str, reason: str, policy: str | None = None, scope: str | None = None) -> None:
+    def audit_denial(
+        kind: str,
+        reason: str,
+        policy: str | None = None,
+        scope: str | None = None,
+        project_pattern: str | None = None,
+    ) -> None:
         AuditEventDispatcher.dispatch(
             AuthorizationDeniedEvent(
                 user_id=user.id,
@@ -87,7 +97,13 @@ async def check_node_kind_write_permission(
                 resource_name=resource_name,
                 action=operation,
                 denied_by=policy,
-                context={"kind": kind, "reason": reason, "scope": scope, "project": project_name},
+                context={
+                    "kind": kind,
+                    "reason": reason,
+                    "scope": scope,
+                    "project": project_name,
+                    "project_pattern": project_pattern,
+                },
             )
         )
 
@@ -122,6 +138,6 @@ async def check_node_kind_write_permission(
         denial = node_kind_denial(kind, project_name, result)
         if denial is not None:
             denials.append(denial)
-            audit_denial(kind, denial.blocked.reason, denial.policy, denial.scope)
+            audit_denial(kind, denial.blocked.reason, denial.policy, denial.scope, denial.project_pattern)
     if denials:
         raise NodeKindWriteDeniedError(operation, [denial.blocked for denial in denials])

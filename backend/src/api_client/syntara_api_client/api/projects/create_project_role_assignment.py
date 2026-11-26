@@ -114,6 +114,7 @@ def sync_detailed(
         body (RoleAssignmentCreate): Request body for creating a role assignment.
 
             Exactly one of ``principal_id`` or ``group_id`` must be provided.
+            At most one of ``project_id`` or ``project_pattern`` may be provided.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -150,6 +151,7 @@ def sync(
         body (RoleAssignmentCreate): Request body for creating a role assignment.
 
             Exactly one of ``principal_id`` or ``group_id`` must be provided.
+            At most one of ``project_id`` or ``project_pattern`` may be provided.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -181,6 +183,7 @@ async def asyncio_detailed(
         body (RoleAssignmentCreate): Request body for creating a role assignment.
 
             Exactly one of ``principal_id`` or ``group_id`` must be provided.
+            At most one of ``project_id`` or ``project_pattern`` may be provided.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -215,6 +218,7 @@ async def asyncio(
         body (RoleAssignmentCreate): Request body for creating a role assignment.
 
             Exactly one of ``principal_id`` or ``group_id`` must be provided.
+            At most one of ``project_id`` or ``project_pattern`` may be provided.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

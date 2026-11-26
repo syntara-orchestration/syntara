@@ -224,6 +224,33 @@ describe('AssignmentsTab', () => {
     expect(await axe(container)).toHaveNoViolations()
   })
 
+  it('shows a pattern assignment with its pattern instead of System and blocks editing it', async () => {
+    const user = userEvent.setup()
+    setupAssignmentsQuery([
+      {
+        ...sampleAssignments[2],
+        id: 'pattern-1',
+        principal_name: 'carol',
+        role_name: 'no-script',
+        project_id: null,
+        project_name: null,
+        project_pattern: 'pay*',
+      },
+    ])
+    render(<AssignmentsTab />, { wrapper })
+
+    const row = screen.getByRole('row', { name: /carol.*no-script/ })
+    expect(within(row).queryByText('System')).not.toBeInTheDocument()
+    expect(within(row).getByText('Project')).toBeInTheDocument()
+    expect(within(row).getByText('Projects matching pay*')).toBeInTheDocument()
+
+    await user.click(within(row).getByRole('button', { name: 'Kebab toggle' }))
+    const edit = await screen.findByRole('menuitem', { name: /Edit assignment/ })
+    expect(edit).toHaveAttribute('aria-disabled', 'true')
+    await user.click(await screen.findByRole('menuitem', { name: /Delete assignment/ }))
+    expect(await screen.findByText(/in projects matching/)).toBeInTheDocument()
+  })
+
   it('refreshes authz caches after deleting an assignment', async () => {
     const user = userEvent.setup()
     setupAssignmentsQuery(sampleAssignments)

@@ -25,8 +25,9 @@ export interface paths {
      * Create role assignment
      * @description Assign a role to a user or group.
      *
-     *     When project_id is provided the assignment is project-scoped;
-     *     otherwise it is a global (system-level) assignment.
+     *     When project_id is provided the assignment is project-scoped; when
+     *     project_pattern is provided it applies (deny-only) to every project whose
+     *     name matches; otherwise it is a global (system-level) assignment.
      */
     post: operations['create_role_assignment']
     delete?: never
@@ -71,6 +72,7 @@ export interface components {
      * @description Request body for creating a role assignment.
      *
      *     Exactly one of ``principal_id`` or ``group_id`` must be provided.
+     *     At most one of ``project_id`` or ``project_pattern`` may be provided.
      */
     RoleAssignmentCreate: {
       /** Principal Id */
@@ -81,6 +83,11 @@ export interface components {
       role_name: string
       /** Project Id */
       project_id?: string | null
+      /**
+       * Project Pattern
+       * @description Project-name pattern using '*' as a wildcard (for example 'pay*'). The assignment then applies to every project whose current name matches. Only custom, deny-only, project-scope roles can be assigned with a pattern. Mutually exclusive with project_id.
+       */
+      project_pattern?: string | null
     }
     /**
      * SubResourceRoleAssignmentCreate
@@ -125,6 +132,8 @@ export interface components {
       project_id?: string | null
       /** Project Name */
       project_name?: string | null
+      /** Project Pattern */
+      project_pattern?: string | null
       /**
        * Is Builtin
        * @default false

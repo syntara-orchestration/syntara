@@ -15,6 +15,7 @@ from syntara.auth import get_current_user
 from syntara.authz.dependencies import PermissionChecker, VisibilityFilter, get_authz_evaluator
 from syntara.authz.engine import VisibilityResult, resolve_visibility
 from syntara.authz.models.assignments import RoleAssignment
+from syntara.authz.project_patterns import validate_project_pattern
 from syntara.authz.services.role_assignment_service import RoleAssignmentService
 from syntara.core.database.session import get_db
 from syntara.core.exceptions import SafeValueError
@@ -32,12 +33,21 @@ class RoleAssignmentCreate(SQLModel):
     """Request body for creating a role assignment.
 
     Exactly one of ``principal_id`` or ``group_id`` must be provided.
+    At most one of ``project_id`` or ``project_pattern`` may be provided.
     """
 
     principal_id: UUID | None = None
     group_id: UUID | None = None
     role_name: str
     project_id: UUID | None = None
+    project_pattern: str | None = Field(
+        default=None,
+        description=(
+            "Project-name pattern using '*' as a wildcard (for example 'pay*'). The assignment then "
+            "applies to every project whose current name matches. Only custom, deny-only, "
+            "project-scope roles can be assigned with a pattern. Mutually exclusive with project_id."
+        ),
+    )
 
     @model_validator(mode="after")
     def validate_principal_xor_group(self) -> "RoleAssignmentCreate":
@@ -45,6 +55,19 @@ class RoleAssignmentCreate(SQLModel):
         if (self.principal_id is None) == (self.group_id is None):
             msg = "Exactly one of principal_id or group_id must be provided"
             raise ValueError(msg)
+        return self
+
+    @model_validator(mode="after")
+    def validate_project_scope(self) -> "RoleAssignmentCreate":
+        """Ensure project_id and project_pattern are not combined and the pattern is well formed."""
+        if self.project_pattern is None:
+            return self
+        if self.project_id is not None:
+            msg = "Provide project_id or project_pattern, not both"
+            raise ValueError(msg)
+        error = validate_project_pattern(self.project_pattern)
+        if error:
+            raise ValueError(error)
         return self
 
 
@@ -61,6 +84,7 @@ class RoleAssignmentRead(SQLModel):
     role_policies: list[str] = []
     project_id: UUID | None = None
     project_name: str | None = None
+    project_pattern: str | None = None
     is_builtin: bool = False
     created_at: datetime | None = None
 
@@ -90,7 +114,13 @@ class RoleAssignmentListParams(BaseListParams):
     )
     role_name: str | None = Field(default=None, description="Filter by role name")
     project_id: UUID | None = Field(default=None, description="Filter by project ID")
-    scope: Literal["system", "project"] | None = Field(default=None, description="Filter by scope")
+    scope: Literal["system", "project"] | None = Field(
+        default=None,
+        description=(
+            "Filter by scope. 'system' returns system-wide assignments only; 'project' returns "
+            "assignments to a project or to a project_pattern"
+        ),
+    )
 
 
 class ProjectRoleAssignmentListParams(BaseListParams):
@@ -278,14 +308,16 @@ async def create_role_assignment(
 ) -> RoleAssignmentRead:
     """Assign a role to a user or group.
 
-    When project_id is provided the assignment is project-scoped;
-    otherwise it is a global (system-level) assignment.
+    When project_id is provided the assignment is project-scoped; when
+    project_pattern is provided it applies (deny-only) to every project whose
+    name matches; otherwise it is a global (system-level) assignment.
     """
     result = await service.assign(
         principal_id=body.principal_id,
         group_id=body.group_id,
         role_name=body.role_name,
         project_id=body.project_id,
+        project_pattern=body.project_pattern,
     )
     return RoleAssignmentRead.model_validate(result)
 

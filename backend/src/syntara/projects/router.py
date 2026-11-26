@@ -42,6 +42,7 @@ from syntara.authz.services.policy_service import PolicyService
 from syntara.authz.services.role_assignment_service import RoleAssignmentService
 from syntara.authz.services.role_service import RoleService
 from syntara.core.database.session import get_db
+from syntara.core.exceptions import SafeValueError
 from syntara.core.models import User
 from syntara.core.syntara_router import NO_PERMISSION, SyntaraRouter
 from syntara.credentials.exceptions import CredentialNotFoundError
@@ -377,6 +378,11 @@ async def create_project_role_assignment(
     project_service: Annotated[ProjectService, Depends(get_project_service)],
 ) -> RoleAssignmentRead:
     """Assign a role to a user or group within a project."""
+    if body.project_pattern is not None:
+        # The request body is shared with POST /role_assignments; a pattern makes
+        # no sense under a single project and must not be silently ignored.
+        msg = "project_pattern is only accepted by POST /role_assignments"
+        raise SafeValueError(msg)
     await project_service.get_project(project_id)
     result = await service.assign(
         principal_id=body.principal_id,

@@ -995,6 +995,8 @@ export interface components {
       project_id?: string | null
       /** Project Name */
       project_name?: string | null
+      /** Project Pattern */
+      project_pattern?: string | null
       /**
        * Is Builtin
        * @default false

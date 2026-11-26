@@ -22,6 +22,10 @@ if TYPE_CHECKING:
 
 logger = structlog.stdlib.get_logger(__name__)
 
+PATTERN_RENAME_DENIED_MESSAGE = (
+    "Renaming this project changes which system-wide restrictions apply to it. Ask a system administrator."
+)
+
 
 class ProjectService(BaseService):
     """Service for project CRUD and role management."""
@@ -185,6 +189,7 @@ class ProjectService(BaseService):
             msg = f"The built-in '{project.name}' project cannot be modified"
             raise BuiltinProtectionError(msg)
         if name is not None:
+            await self._check_rename_against_project_patterns(project, name)
             project.name = name
         if description is not None:
             project.description = description
@@ -194,6 +199,71 @@ class ProjectService(BaseService):
         await self.session.commit()
         await self.session.refresh(project)
         return project
+
+    async def _check_rename_against_project_patterns(self, project: Project, new_name: str) -> None:
+        """Require system-level project:update when a rename changes pattern coverage.
+
+        Role assignments with a ``project_pattern`` match project names live,
+        so renaming a project can move it into or out of a system-wide deny.
+        Such a rename is left to callers allowed to update projects at system
+        level (system administrators); other renames are unaffected.
+
+        Kept as a single, self-contained check so the rule can be changed or
+        dropped without touching the rest of the update path.
+        """
+        from syntara.authz.project_patterns import project_pattern_matches  # noqa: PLC0415
+
+        if new_name == project.name:
+            return
+        rows = await self.session.exec(
+            select(RoleAssignment.project_pattern).where(col(RoleAssignment.project_pattern).is_not(None)).distinct()
+        )
+        patterns = [p for p in rows.all() if p is not None]
+        if not any(project_pattern_matches(p, project.name) != project_pattern_matches(p, new_name) for p in patterns):
+            return
+
+        from syntara.authz.engine import AuthzRequest, authorize  # noqa: PLC0415
+        from syntara.authz.exceptions import AuthorizationDeniedError  # noqa: PLC0415
+
+        allowed = False
+        denied_by: str | None = None
+        if self.opa_client is not None:
+            result = await authorize(
+                self.session,
+                self.opa_client,
+                AuthzRequest(
+                    user_id=self.user.id,
+                    action="update",
+                    resource_type="project",
+                    resource_id=str(project.id),
+                    # Empty project: only a system-level grant satisfies this check.
+                    resource_project="",
+                    user_labels=self.user.labels,
+                    user_metadata=self.user.authz_metadata,
+                ),
+            )
+            allowed = result.allowed
+            denied_by = result.denied_by or None
+        if allowed:
+            return
+
+        from syntara.audit.dispatcher import AuditEventDispatcher  # noqa: PLC0415
+        from syntara.authz.audit.authorization_denied import AuthorizationDeniedEvent  # noqa: PLC0415
+
+        AuditEventDispatcher.dispatch(
+            AuthorizationDeniedEvent(
+                user_id=self.user.id,
+                username=self.user.username,
+                resource_id=str(project.id),
+                resource_type="project",
+                resource_name=project.name,
+                action="update",
+                denied_by=denied_by,
+                principal_type=self.user.__dict__.get("__principal_type__"),
+                context={"reason": "rename_changes_project_pattern_coverage", "new_name": new_name},
+            )
+        )
+        raise AuthorizationDeniedError(PATTERN_RENAME_DENIED_MESSAGE)
 
     async def delete_project(self, project_id: UUID) -> None:
         """Hard-delete a project and cascade-delete all project-scoped resources.

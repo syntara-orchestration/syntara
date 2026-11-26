@@ -145,6 +145,9 @@ User
 
 - **`project_id IS NULL`** → global assignment, policies apply system-wide
 - **`project_id IS NOT NULL`** → project-scoped assignment, policies apply only within that project
+- **`project_pattern IS NOT NULL`** (then `project_id IS NULL`) → deny-only assignment
+  that applies to every project whose name matches the pattern; see
+  [Project-pattern deny assignments](#project-pattern-deny-assignments)
 
 ## Default Bootstrap State
 
@@ -432,6 +435,74 @@ The default `step_type:write:any` policy and `step-author` role are built-in.
 Both seed paths maintain a protected global assignment to the authenticated
 group. Restrict step types with explicit deny policies on custom roles.
 
+### Project-pattern deny assignments
+
+A role assignment can name a project-name pattern instead of a single project,
+so one assignment restricts a principal in several projects:
+
+```http
+POST /api/v1/role_assignments
+{"principal_id": "<uuid>", "role_name": "no-script", "project_pattern": "pay*"}
+```
+
+With the `no-script` role holding `step_type:write:any:deny:script`, the
+principal cannot write Script steps in `payments` or `payroll`, and is not
+affected by this assignment in `sandbox`.
+
+**Syntax.** Project-name characters (letters, digits, `:`, `_`, `-`) plus `*`,
+which matches any run of characters, including none. Matching is
+case-sensitive and covers the whole name. A pattern must contain at least one
+`*` (use `project_id` for a single project) and at least one other character
+(`*` alone would match every project; use a system-wide assignment instead).
+Maximum length is the project-name maximum (255). `project_id` and
+`project_pattern` are mutually exclusive.
+
+**Deny-only.** Only custom roles that are system-defined (not owned by a
+project), have scope `project` and contain nothing but deny statements can be
+assigned with a pattern; anything else is rejected with HTTP 422. The resolver
+enforces the same rule independently: for a pattern assignment it emits only
+deny statements, looks the role and its policies up at system level only, and
+stamps each statement with a concrete project name. A pattern assignment
+therefore never grants access, even if its role is edited after it was
+assigned.
+
+**Who may create or revoke.** Pattern assignments are only accepted by the
+global `POST /role_assignments` endpoint. That endpoint checks
+`role-assignment:assign` against the request's `project_id`; a pattern request
+has none, so the check is system-level and in practice only system
+administrators can create (or revoke) pattern assignments. The project, user
+and group sub-resource endpoints do not accept `project_pattern`.
+
+**Live matching.** Patterns are matched against current project names every
+time policies are resolved:
+
+- a project created later with a matching name is covered immediately;
+- renaming a project can move it into or out of a pattern. Such a rename
+  requires `project:update` at system level; a project administrator gets HTTP
+  403 ("Renaming this project changes which system-wide restrictions apply to
+  it. Ask a system administrator."). Renames that do not change whether the
+  project matches any stored pattern are unaffected.
+
+A pattern only restricts projects whose names match; it says nothing about
+projects with other names that the principal can access or create.
+
+**Evaluation and reporting.** The Rego policy is unchanged: it only sees
+per-project deny statements, exactly as if the role had been assigned to each
+matching project. Each expanded statement carries an extra `project_pattern`
+key, which Rego ignores. Responses to callers (`NODE_KIND_WRITE_DENIED`,
+`node_kinds`, `can_i`) are unchanged and report the concrete project, never the
+pattern. Audit events record it:
+
+- step-type denial events include `project_pattern` next to `scope` and
+  `project` when the deny came from a pattern assignment;
+- role-assignment events (`role_assigned`, `role_revoked`) include
+  `project_pattern`.
+
+`GET /role_assignments` returns `project_pattern` on each row. Pattern rows
+are listed under `scope=project`, not `scope=system`, and do not match a
+`project_id` filter. Project-scoped visibility (`role-assignment:read:project`)
+does not include pattern rows, because they are not attached to one project.
+
 ## Query Endpoints
 
 The `/authz` router provides introspection endpoints:
@@ -450,7 +521,7 @@ The `/authz` router provides introspection endpoints:
 The `/role_assignments` endpoints provide a unified view of both user and group role assignments.
 
 ```
-POST   /role_assignments           — create (global or project-scoped)
+POST   /role_assignments           — create (global, project-scoped or project_pattern)
 GET    /role_assignments           — list with project-aware visibility
 GET    /role_assignments/{id}      — detail with project-aware visibility
 DELETE /role_assignments/{id}      — revoke
@@ -464,6 +535,7 @@ DELETE /role_assignments/{id}      — revoke
 | `principal_name` | Filter by username or group name |
 | `role_name` | Filter by role name |
 | `project_id` | Filter by project ID |
+| `scope` | `system` (system-wide assignments) or `project` (assignments to a project or to a `project_pattern`) |
 | `sort` | Sort field (prefix with `-` for descending). Sortable: `created_at`, `principal_name`, `principal_type`, `role_name`, `project_name` |
 | `cursor` | Cursor for pagination |
 | `limit` | Page size |

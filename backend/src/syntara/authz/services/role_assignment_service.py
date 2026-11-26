@@ -16,9 +16,12 @@ from syntara.authz.audit.role_assignment import RoleAssignmentEvent
 from syntara.authz.exceptions import BuiltinProtectionError
 from syntara.authz.models.assignments import RoleAssignment
 from syntara.authz.models.project import Project
+from syntara.authz.project_patterns import validate_project_pattern
 from syntara.authz.role_conventions import (
     builtin_role_policy_names,
     get_builtin_role,
+    is_builtin_policy,
+    resolve_builtin_policy_statements,
 )
 from syntara.core.constants import ValidationMessages
 from syntara.core.exceptions import SafeValueError
@@ -52,7 +55,7 @@ def _sort_value_from_row(row: Any, sort_field: str) -> str | None:  # noqa: ANN4
     if sort_field == "principal_type":
         return serialize_sort_value(row[3])
     if sort_field == "scope":
-        return serialize_sort_value("project" if row[0].project_id else "system")
+        return serialize_sort_value("project" if row[0].project_id or row[0].project_pattern else "system")
     return serialize_sort_value(getattr(row[0], sort_field, None))
 
 
@@ -90,10 +93,13 @@ class RoleAssignmentService:
         group_id: UUID | None = None,
         role_name: str,
         project_id: UUID | None = None,
+        project_pattern: str | None = None,
     ) -> dict[str, Any]:
         """Create a role assignment.
 
         Exactly one of ``principal_id`` or ``group_id`` must be provided.
+        At most one of ``project_id`` or ``project_pattern`` may be provided;
+        a pattern assignment requires a custom, deny-only, project-scope role.
 
         Returns:
             Assignment dict with resolved principal_name and project_name.
@@ -105,6 +111,14 @@ class RoleAssignmentService:
         if (principal_id is None) == (group_id is None):
             msg = "Exactly one of principal_id or group_id must be provided"
             raise SafeValueError(msg)
+
+        if project_pattern is not None:
+            if project_id is not None:
+                msg = "Provide project_id or project_pattern, not both"
+                raise SafeValueError(msg)
+            pattern_error = validate_project_pattern(project_pattern)
+            if pattern_error:
+                raise SafeValueError(pattern_error)
 
         if project_id is not None:
             from syntara.core.queries.project_queries import assert_project_alive  # noqa: PLC0415
@@ -119,7 +133,10 @@ class RoleAssignmentService:
             principal_name = None
             principal_type_label = None
 
-        await self._validate_role(role_name, project_id)
+        if project_pattern is not None:
+            await self._validate_pattern_role(role_name)
+        else:
+            await self._validate_role(role_name, project_id)
 
         target_display = group_name or f"{principal_type_label} '{principal_name}'"
         await self._check_duplicate_assignment(
@@ -127,6 +144,7 @@ class RoleAssignmentService:
             group_id=group_id,
             role_name=role_name,
             project_id=project_id,
+            project_pattern=project_pattern,
             target_display=target_display,
         )
 
@@ -135,6 +153,7 @@ class RoleAssignmentService:
             group_id=group_id,
             role_name=role_name,
             project_id=project_id,
+            project_pattern=project_pattern,
         )
         self.session.add(assignment)
         try:
@@ -156,6 +175,7 @@ class RoleAssignmentService:
             group_name=group_name,
             role_name=role_name,
             project_id=str(project_id) if project_id else None,
+            project_pattern=project_pattern,
         )
         AuditEventDispatcher.dispatch(
             RoleAssignmentEvent(
@@ -168,6 +188,7 @@ class RoleAssignmentService:
                 role_name=role_name,
                 action="assigned",
                 project_id=project_id,
+                project_pattern=project_pattern,
             ),
         )
         display_name = principal_name or group_name
@@ -224,6 +245,7 @@ class RoleAssignmentService:
 
         scope_col = case(
             (RoleAssignment.project_id.is_not(None), "project"),  # type: ignore[union-attr]
+            (RoleAssignment.project_pattern.is_not(None), "project"),  # type: ignore[union-attr]
             else_="system",
         ).label("scope")
 
@@ -329,6 +351,7 @@ class RoleAssignmentService:
         _group_id = assignment.group_id
         _role_name = assignment.role_name
         _project_id = assignment.project_id
+        _project_pattern = assignment.project_pattern
 
         # Resolve display names via joined query (outerjoins handle deleted entities
         # gracefully — returns None instead of raising, so orphaned assignments
@@ -352,6 +375,7 @@ class RoleAssignmentService:
                 role_name=_role_name,
                 action="revoked",
                 project_id=_project_id,
+                project_pattern=_project_pattern,
             ),
         )
 
@@ -392,11 +416,13 @@ class RoleAssignmentService:
         role_name: str,
         project_id: UUID | None,
         target_display: str,
+        project_pattern: str | None = None,
     ) -> None:
         """Raise if an identical role assignment already exists."""
         clauses: builtins.list[Any] = [
             RoleAssignment.role_name == role_name,
             RoleAssignment.project_id == project_id,
+            RoleAssignment.project_pattern == project_pattern,
         ]
         if principal_id is not None:
             clauses.append(RoleAssignment.principal_id == principal_id)
@@ -509,10 +535,20 @@ class RoleAssignmentService:
         if principal_type is not None:
             base = base.where(principal_type_col == principal_type)
         if scope is not None:
+            # Pattern rows have no project_id but are not system-wide: they only
+            # restrict the projects they match, so they are listed as "project".
             if scope == "system":
-                base = base.where(RoleAssignment.project_id.is_(None))  # type: ignore[union-attr]
+                base = base.where(
+                    RoleAssignment.project_id.is_(None),  # type: ignore[union-attr]
+                    RoleAssignment.project_pattern.is_(None),  # type: ignore[union-attr]
+                )
             elif scope == "project":
-                base = base.where(RoleAssignment.project_id.is_not(None))  # type: ignore[union-attr]
+                base = base.where(
+                    or_(
+                        RoleAssignment.project_id.is_not(None),  # type: ignore[union-attr]
+                        RoleAssignment.project_pattern.is_not(None),  # type: ignore[union-attr]
+                    )
+                )
         return base
 
     async def _query_one(self, assignment_id: UUID) -> dict[str, Any] | None:
@@ -638,6 +674,53 @@ class RoleAssignmentService:
             msg = f"Role '{role_name}' is a project role and requires a project_id"
             raise SafeValueError(msg)
 
+    async def _validate_pattern_role(self, role_name: str) -> None:
+        """Validate that a role can be assigned with a project_pattern.
+
+        A pattern assignment has no project_id, so any code that does not know
+        about patterns would see it as system-wide. Restricting it to custom,
+        system-level, project-scope roles made only of deny statements keeps
+        such an assignment from ever granting access. The resolver also emits
+        only deny statements for pattern assignments, independently of this
+        check, in case the role or its policies change later.
+        """
+        if get_builtin_role(role_name):
+            msg = f"Role '{role_name}' is a built-in role; a project_pattern requires a custom deny-only role"
+            raise SafeValueError(msg)
+        from syntara.authz.models.policy import Policy  # noqa: PLC0415
+        from syntara.authz.models.role import Role  # noqa: PLC0415
+
+        result = await self.session.exec(select(Role).where(Role.name == role_name))
+        roles = result.all()
+        role = next((r for r in roles if r.project_id is None), None)
+        if role is None:
+            if roles:
+                msg = f"Role '{role_name}' belongs to a project and cannot be assigned with a project_pattern"
+            else:
+                msg = f"Role '{role_name}' not found"
+            raise SafeValueError(msg)
+        if role.scope != "project":
+            msg = f"Role '{role_name}' is a system role; a project_pattern requires a project-scope role"
+            raise SafeValueError(msg)
+
+        statements: builtins.list[dict[str, Any]] = []
+        custom_names = [pn for pn in role.policy_names if not is_builtin_policy(pn)]
+        for pn in role.policy_names:
+            if is_builtin_policy(pn):
+                statements.extend(resolve_builtin_policy_statements(pn))
+        if custom_names:
+            policies = await self.session.exec(
+                select(Policy).where(
+                    Policy.name.in_(custom_names),  # type: ignore[attr-defined]
+                    Policy.project_id.is_(None),  # type: ignore[union-attr]
+                )
+            )
+            for policy in policies.all():
+                statements.extend(policy.to_statement_dicts())
+        if not statements or any(stmt.get("effect") != "deny" for stmt in statements):
+            msg = f"Role '{role_name}' must contain only deny statements to be assigned with a project_pattern"
+            raise SafeValueError(msg)
+
     async def _resolve_project_name(self, project_id: UUID) -> str | None:
         result = await self.session.exec(
             select(Project.name).where(
@@ -662,6 +745,7 @@ class RoleAssignmentService:
             "role_name": assignment.role_name,
             "project_id": assignment.project_id,
             "project_name": project_name,
+            "project_pattern": assignment.project_pattern,
             "created_at": assignment.created_at,
         }
 

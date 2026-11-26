@@ -150,6 +150,46 @@ class TestListNodeKinds:
         assert elsewhere["script"]["blocked_by"] is None
 
     @pytest.mark.asyncio
+    async def test_project_pattern_deny_blocks_only_matching_projects(
+        self, author_client: AsyncClient, author_user: User, test_db_session: AsyncSession
+    ) -> None:
+        db = test_db_session
+        projects = {name: await _make_project(db, name) for name in ("payments", "payroll", "sandbox")}
+        db.add(Role(name="no-script-in-pay", scope="project", policy_names=["step_type:write:any:deny:script"]))
+        await db.flush()
+        db.add(RoleAssignment(principal_id=author_user.id, role_name="no-script-in-pay", project_pattern="pay*"))
+        await db.commit()
+
+        for name, project in projects.items():
+            response = await author_client.get(_NODE_KINDS_URL, params={"project_id": str(project.id)})
+            entries = _by_kind(response.json())
+            blocked = name != "sandbox"
+            assert entries["script"]["can_write"] is not blocked, name
+            assert entries["script"]["blocked_by"] == ({"kind": "script", "label": "Script"} if blocked else None)
+            assert entries["http_request"]["can_write"] is True
+            # Neither the pattern nor the policy reaches the caller.
+            assert "pay*" not in response.text
+            assert "no-script-in-pay" not in response.text
+
+            can_i = await author_client.post(
+                "/api/v1/authz/can_i",
+                json={
+                    "action": "write",
+                    "resource_type": "step_type",
+                    "resource_labels": {"kind": "script"},
+                    "resource_project": name,
+                },
+            )
+            assert can_i.status_code == 200, can_i.text
+            verdict = can_i.json()
+            assert verdict["allowed"] is not blocked
+            if blocked:
+                # The concrete project, never the pattern.
+                assert verdict["denied_project"] == name
+                assert verdict["denied_scope"] == "project"
+            assert "pay*" not in can_i.text
+
+    @pytest.mark.asyncio
     async def test_global_deny_blocks_in_every_project(
         self, author_client: AsyncClient, author_user: User, test_db_session: AsyncSession
     ) -> None:

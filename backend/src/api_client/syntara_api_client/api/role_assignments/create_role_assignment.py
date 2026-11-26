@@ -106,13 +106,15 @@ def sync_detailed(
 
      Assign a role to a user or group.
 
-    When project_id is provided the assignment is project-scoped;
-    otherwise it is a global (system-level) assignment.
+    When project_id is provided the assignment is project-scoped; when
+    project_pattern is provided it applies (deny-only) to every project whose
+    name matches; otherwise it is a global (system-level) assignment.
 
     Args:
         body (RoleAssignmentCreate): Request body for creating a role assignment.
 
             Exactly one of ``principal_id`` or ``group_id`` must be provided.
+            At most one of ``project_id`` or ``project_pattern`` may be provided.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -142,13 +144,15 @@ def sync(
 
      Assign a role to a user or group.
 
-    When project_id is provided the assignment is project-scoped;
-    otherwise it is a global (system-level) assignment.
+    When project_id is provided the assignment is project-scoped; when
+    project_pattern is provided it applies (deny-only) to every project whose
+    name matches; otherwise it is a global (system-level) assignment.
 
     Args:
         body (RoleAssignmentCreate): Request body for creating a role assignment.
 
             Exactly one of ``principal_id`` or ``group_id`` must be provided.
+            At most one of ``project_id`` or ``project_pattern`` may be provided.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -173,13 +177,15 @@ async def asyncio_detailed(
 
      Assign a role to a user or group.
 
-    When project_id is provided the assignment is project-scoped;
-    otherwise it is a global (system-level) assignment.
+    When project_id is provided the assignment is project-scoped; when
+    project_pattern is provided it applies (deny-only) to every project whose
+    name matches; otherwise it is a global (system-level) assignment.
 
     Args:
         body (RoleAssignmentCreate): Request body for creating a role assignment.
 
             Exactly one of ``principal_id`` or ``group_id`` must be provided.
+            At most one of ``project_id`` or ``project_pattern`` may be provided.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -207,13 +213,15 @@ async def asyncio(
 
      Assign a role to a user or group.
 
-    When project_id is provided the assignment is project-scoped;
-    otherwise it is a global (system-level) assignment.
+    When project_id is provided the assignment is project-scoped; when
+    project_pattern is provided it applies (deny-only) to every project whose
+    name matches; otherwise it is a global (system-level) assignment.
 
     Args:
         body (RoleAssignmentCreate): Request body for creating a role assignment.
 
             Exactly one of ``principal_id`` or ``group_id`` must be provided.
+            At most one of ``project_id`` or ``project_pattern`` may be provided.
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

@@ -57,6 +57,62 @@ def test_denial_uses_exact_effective_statement(scope, project):
     assert denial.blocked.reason == "explicit_deny"
 
 
+def test_denial_carries_project_pattern_for_audit_only():
+    result = _result(
+        denied=True,
+        identifier="no-script@payments",
+        policies=[
+            {
+                "name": "no-script@payments",
+                "policy_name": "no-script",
+                "effect": "deny",
+                "scope": "project",
+                "project": "payments",
+                "project_pattern": "pay*",
+            }
+        ],
+    )
+    denial = node_kind_denial("script", "payments", result)
+    assert denial.project_pattern == "pay*"
+    assert denial.blocked.project == "payments"
+    assert "pay*" not in denial.blocked.model_dump_json()
+
+
+async def test_pattern_deny_is_audited_with_its_pattern_but_not_returned():
+    db = AsyncMock()
+    db.scalar.return_value = "payments"
+    user = User(id=uuid4(), username="author")
+    result = _result(
+        denied=True,
+        identifier="no-script@payments",
+        policies=[
+            {
+                "name": "no-script@payments",
+                "policy_name": "no-script",
+                "effect": "deny",
+                "scope": "project",
+                "project": "payments",
+                "project_pattern": "pay*",
+            }
+        ],
+    )
+    with (
+        patch("syntara.workflows.node_permissions.authorize", AsyncMock(return_value=result)),
+        patch("syntara.workflows.node_permissions.AuditEventDispatcher.dispatch") as dispatch,
+        pytest.raises(NodeKindWriteDeniedError) as raised,
+    ):
+        await check_node_kind_write_permission(
+            db, MagicMock(), user, [{"nodes": [{"type": "script"}]}], project_id=uuid4(), operation="save workflow"
+        )
+    audit = AuthorizationDeniedHandler().handle(dispatch.call_args.args[0])
+    assert audit.structured_data.project_pattern == "pay*"
+    assert audit.structured_data.project == "payments"
+    request = Request({"type": "http", "scheme": "https", "server": ("test", 443), "path": "/workflows", "headers": []})
+    body = node_kind_write_denied_handler(request, raised.value).body.decode()
+    assert "pay*" not in body
+    assert "project_pattern" not in body
+
+
 def test_missing_allow_has_no_policy_attribution():
     denial = node_kind_denial("script", "payments", _result())
     assert denial.policy is None

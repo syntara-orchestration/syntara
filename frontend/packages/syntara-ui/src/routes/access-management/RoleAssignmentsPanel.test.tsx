@@ -129,6 +129,7 @@ type AssignmentResource = {
   role_policies: string[]
   project_id: string | null
   project_name: string | null
+  project_pattern?: string | null
   created_at: string | null
 }
 
@@ -417,6 +418,25 @@ describe('RoleAssignmentsPanel', () => {
 
       const systemLabels = screen.getAllByText('System')
       expect(systemLabels.length).toBeGreaterThanOrEqual(2)
+    })
+
+    it('shows a pattern assignment with its pattern instead of System', () => {
+      setupMocks({
+        userAssignments: [
+          {
+            ...mockUserAssignments[0],
+            id: 'ua-pattern',
+            role_name: 'no-script',
+            project_pattern: 'pay*',
+          },
+        ],
+      })
+      render(<RoleAssignmentsPanel principalType="user" principalId="u1" />, { wrapper })
+
+      const row = screen.getByRole('row', { name: /no-script/ })
+      expect(within(row).queryByText('System')).not.toBeInTheDocument()
+      expect(within(row).getByText('Project')).toBeInTheDocument()
+      expect(within(row).getByText('Projects matching pay*')).toBeInTheDocument()
     })
 
     it('shows policies as labels when row is expanded', async () => {
