@@ -7,12 +7,15 @@ export function SynStepEditButton(
     stepTitle: string
     onClick: () => void
     className?: string
+    /** `view` labels the button for opening the step's form read-only. */
+    mode?: 'edit' | 'view'
   }>
 ) {
-  const accessibleName = `Edit ${props.stepTitle}`
+  const label = props.mode === 'view' ? 'View' : 'Edit'
+  const accessibleName = `${label} ${props.stepTitle}`
 
   return (
-    <Tooltip content="Edit step">
+    <Tooltip content={`${label} step`}>
       <Button
         variant="secondary"
         size="sm"
@@ -24,7 +27,7 @@ export function SynStepEditButton(
         }}
         onMouseDown={(event) => event.stopPropagation()}
       >
-        Edit
+        {label}
       </Button>
     </Tooltip>
   )

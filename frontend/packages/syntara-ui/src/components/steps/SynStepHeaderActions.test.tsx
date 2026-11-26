@@ -68,6 +68,36 @@ describe('SynStepHeaderActions', () => {
     expect(screen.queryByRole('button', { name: 'Edit Deploy' })).not.toBeInTheDocument()
   })
 
+  it('renders only a View button when the step can be viewed but not changed', async () => {
+    const user = userEvent.setup()
+    const onView = vi.fn()
+    const menuActions = [
+      { id: 'view-details', label: 'View step details', onClick: onView },
+      { id: 'delete', label: 'Delete', onClick: vi.fn(), variant: 'danger' as const },
+    ]
+
+    render(<SynStepHeaderActions stepTitle="Deploy" showMenuActions={false} showViewAction menuActions={menuActions} />)
+
+    await user.click(screen.getByRole('button', { name: 'View Deploy' }))
+    expect(onView).toHaveBeenCalledTimes(1)
+    expect(screen.queryByRole('button', { name: 'Edit Deploy' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /step actions menu/i })).not.toBeInTheDocument()
+  })
+
+  it('prefers Edit over View when menu actions are allowed', () => {
+    render(
+      <SynStepHeaderActions
+        stepTitle="Deploy"
+        showMenuActions
+        showViewAction
+        menuActions={[{ id: 'view-details', label: 'View step details', onClick: vi.fn() }]}
+      />
+    )
+
+    expect(screen.getByRole('button', { name: 'Edit Deploy' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'View Deploy' })).not.toBeInTheDocument()
+  })
+
   it('has no axe violations', async () => {
     const { container } = render(
       <SynStepExpandedContext.Provider value={[true, vi.fn()]}>

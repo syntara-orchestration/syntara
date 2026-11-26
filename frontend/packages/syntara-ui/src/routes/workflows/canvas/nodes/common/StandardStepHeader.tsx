@@ -45,8 +45,11 @@ export function StandardStepHeader(props: Readonly<StandardStepHeaderProps>) {
   const isVersionView = useIsVersionView()
 
   const stepTitle = props.title ?? props.subtitle ?? ''
-  const showMenuActions =
-    Boolean(props.menuActions?.length) && !isExecutionView && !isActiveExecution && !isVersionView && nodesConnectable
+  const canShowActions = Boolean(props.menuActions?.length) && !isExecutionView && !isActiveExecution
+  const isReadOnlyCanvas = isVersionView || !nodesConnectable
+  const showMenuActions = canShowActions && !isReadOnlyCanvas
+  // A read-only canvas keeps a way to open the step's form, which is then read-only too.
+  const showViewAction = canShowActions && isReadOnlyCanvas
 
   return (
     <Stack>
@@ -68,6 +71,7 @@ export function StandardStepHeader(props: Readonly<StandardStepHeaderProps>) {
                 menuActions={props.menuActions}
                 expandable={props.expandable}
                 showMenuActions={showMenuActions}
+                showViewAction={showViewAction}
                 menuPopperProps={props.menuPopperProps}
               />
             </FlexItem>

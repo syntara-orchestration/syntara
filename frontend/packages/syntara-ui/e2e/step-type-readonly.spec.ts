@@ -10,27 +10,62 @@ import {
   publishWorkflowViaApi,
 } from './utils/api'
 
+function waitWorkflowDefinition(name: string, duration = 1) {
+  return {
+    schema_version: '2.0.0',
+    name,
+    triggers: [{ id: 'trigger', type: 'manual_trigger', name: 'Manual trigger', parameters: {} }],
+    nodes: [{ id: 'wait', type: 'wait', name: 'Wait', parameters: { duration } }],
+    edges: [{ from: 'trigger', to: 'wait' }],
+  }
+}
+
 async function createWaitWorkflow(app: Page, name: string, projectId?: string) {
   const token = await getAuthToken(app)
   const project = projectId ? { id: projectId } : await ensureProject(app)
   if (!token || !project) throw new Error('Workflow setup requires an authenticated project')
   const response = await apiRequest(app, 'post', '/workflows', {
     token,
-    data: {
-      name,
-      project_id: project.id,
-      workflow_definition: {
-        schema_version: '2.0.0',
-        name,
-        triggers: [{ id: 'trigger', type: 'manual_trigger', name: 'Manual trigger', parameters: {} }],
-        nodes: [{ id: 'wait', type: 'wait', name: 'Wait', parameters: { duration: 1 } }],
-        edges: [{ from: 'trigger', to: 'wait' }],
-      },
-    },
+    data: { name, project_id: project.id, workflow_definition: waitWorkflowDefinition(name) },
   })
   expect(response.ok()).toBeTruthy()
   const workflow = (await response.json()) as { id: string; current_version: number }
   return { id: workflow.id, versionNumber: workflow.current_version }
+}
+
+async function denyWaitSteps(app: Page) {
+  await app.route('**/api/v1/authz/can_i', async (route) => {
+    const body = route.request().postDataJSON() as {
+      resource_type?: string
+      resource_labels?: { kind?: string }
+    }
+    if (body.resource_type === 'step_type' && body.resource_labels?.kind === 'wait') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          allowed: false,
+          denied: true,
+          denied_by: 'no-waits',
+          denial_reason: 'policy_deny',
+          denied_scope: 'project',
+          denied_project: 'payments',
+        }),
+      })
+      return
+    }
+    await route.continue()
+  })
+}
+
+async function expectWaitFormIsViewOnly(app: Page) {
+  await expect(app.getByRole('button', { name: 'Close step editor' })).toBeVisible()
+  await expect(app.getByRole('textbox', { name: 'Name', exact: true })).toBeDisabled()
+  await expect(app.getByLabel('Seconds', { exact: true })).toBeDisabled()
+  await expect(app.getByLabel('Seconds', { exact: true })).toHaveValue('1')
+  await expect(app.getByRole('button', { name: 'Update', exact: true })).toHaveCount(0)
+  await expect(app.getByRole('button', { name: 'Run step', exact: true })).toHaveCount(0)
+  await expect(app.getByRole('button', { name: 'Step actions menu' })).toHaveCount(0)
 }
 
 test.describe('Step-type read-only workflow actions', { tag: '@pr-check' }, () => {
@@ -113,6 +148,63 @@ test.describe('Step-type read-only workflow actions', { tag: '@pr-check' }, () =
       await back.focus()
       await restore.hover()
       await expect(app.getByRole('tooltip')).toHaveText(reason)
+    } finally {
+      if (workflowId) await deleteWorkflowViaApi(app, workflowId)
+    }
+  })
+
+  test('a step of a read-only workflow opens for viewing with its fields disabled', async ({ app }) => {
+    const workflowName = buildUniqueName('step-type-readonly-view-step')
+    let workflowId: string | undefined
+
+    try {
+      const workflow = await createWaitWorkflow(app, workflowName)
+      workflowId = workflow.id
+      await denyWaitSteps(app)
+
+      await openWorkflowInBuilder(app, workflowName, workflow.id)
+      await expect(app.getByText('You are viewing this workflow in read-only mode.')).toBeVisible()
+      await expect(app.getByRole('button', { name: 'Edit Wait', exact: true })).toHaveCount(0)
+      await expect(app.getByRole('button', { name: 'Step actions menu' })).toHaveCount(0)
+
+      await app.getByRole('button', { name: 'View Wait', exact: true }).click()
+      await expectWaitFormIsViewOnly(app)
+      await expect(app.getByRole('button', { name: 'Save workflow' })).toHaveAttribute('aria-disabled', 'true')
+    } finally {
+      if (workflowId) await deleteWorkflowViaApi(app, workflowId)
+    }
+  })
+
+  test('a step of a previous version opens for viewing with its fields disabled', async ({ app }) => {
+    const workflowName = buildUniqueName('previous-version-view-step')
+    let workflowId: string | undefined
+
+    try {
+      const workflow = await createWaitWorkflow(app, workflowName)
+      workflowId = workflow.id
+      const update = await apiRequest(app, 'patch', `/workflows/${workflow.id}`, {
+        data: { workflow_definition: waitWorkflowDefinition(workflowName, 2) },
+      })
+      expect(update.ok()).toBeTruthy()
+
+      await openWorkflowInBuilder(app, workflowName, workflow.id)
+      await app.getByRole('button', { name: 'Workflow actions' }).click()
+      await app.getByRole('menuitem', { name: 'Version history' }).click()
+      await app
+        .getByRole('listitem')
+        .filter({
+          has: app.getByRole('button', { name: `Actions for version ${workflow.versionNumber}`, exact: true }),
+        })
+        .click()
+      await expect(app.getByRole('button', { name: 'Restore version' })).toBeVisible()
+      await expect(app.getByRole('button', { name: 'Edit Wait', exact: true })).toHaveCount(0)
+      await expect(app.getByRole('button', { name: 'Step actions menu' })).toHaveCount(0)
+
+      await app.getByRole('button', { name: 'View Wait', exact: true }).click()
+      await expect(
+        app.getByText('You are viewing a previous version. Return to the editor to make changes.')
+      ).toBeVisible()
+      await expectWaitFormIsViewOnly(app)
     } finally {
       if (workflowId) await deleteWorkflowViaApi(app, workflowId)
     }
