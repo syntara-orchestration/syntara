@@ -110,6 +110,7 @@ class EventWorkerDefaults:
     FINALIZATION_CONCURRENCY = 8
     HINT_TIMEOUT_SECONDS = 1
     HINT_CHANNEL = "syntara:eventstreams:subscription_changes"
+    SHUTDOWN_CLEANUP_ALLOWANCE_SECONDS = PLACEMENT_TIMEOUT_SECONDS + HINT_TIMEOUT_SECONDS
 
 
 class EventSchedulingDefaults:

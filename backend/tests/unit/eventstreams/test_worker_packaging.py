@@ -1,20 +1,75 @@
 """Local compose and configuration contracts; no live deployment or broker claims."""
 
+import asyncio
 import json
+import os
 import re
+import sys
 from pathlib import Path
 from uuid import UUID
 
+import pytest
 import yaml
 
 from syntara.core.config.base import Settings
 from syntara.core.constants import EventWorkerDefaults
+from syntara.eventstreams.consumer_health import HEALTH_PORT
 from syntara.eventstreams.consumer_service import placement_targets
 from syntara.eventstreams.models.consumer_worker import EventConsumerWorker
 from syntara.eventstreams.models.subscription import EventSubscription
 from syntara.integrations.models.integration_configuration import KafkaConfiguration
 
 ROOT = Path(__file__).resolve().parents[4]
+
+
+def _published_tcp_ports(mapping: str | int | dict[str, str | int]) -> range:
+    """Read fixed host TCP ports from Compose short or long syntax."""
+    if isinstance(mapping, dict) and mapping.get("protocol", "tcp") != "tcp":
+        return range(0)
+    specification = mapping.get("published") if isinstance(mapping, dict) else mapping
+    if specification is None:
+        return range(0)
+    specification = re.sub(r"\$\{\w+:-([^}]+)\}", r"\1", str(specification))
+    specification, _, protocol = specification.partition("/")
+    if protocol and protocol != "tcp":
+        return range(0)
+    if not isinstance(mapping, dict):
+        parts = specification.rsplit(":", 2)
+        if len(parts) < 2:
+            return range(0)
+        specification = parts[-2]
+    if not specification:
+        return range(0)
+    first, _, last = specification.partition("-")
+    return range(int(first), int(last or first) + 1)
+
+
+@pytest.mark.parametrize(
+    ("mapping", "expected"),
+    [
+        ("8768", []),
+        (8768, []),
+        ("8000:80/tcp", [8000]),
+        ("8000-8001:80-81", [8000, 8001]),
+        ("127.0.0.1:8767-8769:8000-8002/tcp", [8767, 8768, 8769]),
+        ("[::1]:8000:80", [8000]),
+        ("${PORT:-8000}:80", [8000]),
+        ("8000:80/udp", []),
+        ("127.0.0.1::80", []),
+        ({"target": 8768}, []),
+        ({"published": "8000-8001", "target": 80}, [8000, 8001]),
+        ({"published": 8000, "target": 80, "protocol": "udp"}, []),
+    ],
+)
+def test_compose_published_tcp_ports(mapping, expected):
+    assert list(_published_tcp_ports(mapping)) == expected
+
+
+def test_probe_listener_does_not_conflict_with_local_compose_ports():
+    compose = yaml.safe_load((ROOT / "podman-compose.yml").read_text())
+    for service in compose["services"].values():
+        for mapping in service.get("ports", []):
+            assert HEALTH_PORT not in _published_tcp_ports(mapping), mapping
 
 
 def test_environment_examples_omit_event_tuning_and_compose_uses_code_defaults():
@@ -36,13 +91,82 @@ def test_environment_examples_omit_event_tuning_and_compose_uses_code_defaults()
         assert match.group(1) == task_queue
     assert worker["profiles"] == ["eventstream"]
     assert worker["stop_grace_period"] == "60s"
-    cleanup_headroom = EventWorkerDefaults.PLACEMENT_TIMEOUT_SECONDS + EventWorkerDefaults.HINT_TIMEOUT_SECONDS
+    cleanup_headroom = EventWorkerDefaults.SHUTDOWN_CLEANUP_ALLOWANCE_SECONDS
     assert int(worker["stop_grace_period"].removesuffix("s")) > (
         Settings.model_fields["event_drain_timeout_seconds"].default + cleanup_headroom
     )
     assert "redis" not in worker["depends_on"]
     assert "kafka" not in worker["depends_on"]
-    assert worker["command"] == ["python", "-m", "syntara.eventstreams.consumer_entrypoint"]
+    assert worker["command"] == [
+        "start-event-stream-worker",
+        "--termination-grace-period-seconds",
+        worker["stop_grace_period"].removesuffix("s"),
+    ]
+    assert worker["healthcheck"]["test"] == ["CMD", "python", "-m", "syntara.eventstreams.consumer_health", "ready"]
+
+
+def test_backend_image_packages_executable_launcher_and_health_module():
+    scripts = ROOT / "backend/containers/syntara/scripts"
+    launcher = scripts / "start-event-stream-worker"
+    assert launcher.stat().st_mode & 0o111
+    assert launcher.read_text() == '#!/bin/bash\nexec python -m syntara.eventstreams.consumer_entrypoint "$@"\n'
+    containerfile = (scripts.parent / "Containerfile").read_text()
+    assert (
+        "COPY containers/syntara/scripts/start-event-stream-worker /usr/local/bin/start-event-stream-worker"
+    ) in containerfile
+    assert "COPY src/ ./src/" in containerfile
+    assert "COPY --from=builder /opt/app-root/ /opt/app-root/" in containerfile
+    probe_module = ROOT / "backend/src/syntara/eventstreams/consumer_health.py"
+    assert probe_module.is_file()
+
+
+async def test_probe_import_excludes_worker_settings_and_clients():
+    script = """
+import importlib
+import json
+import sys
+
+importlib.import_module("syntara.eventstreams.consumer_health")
+print(json.dumps(sorted(sys.modules)))
+"""
+    process = await asyncio.create_subprocess_exec(
+        sys.executable, "-c", script, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+    )
+    output, error = await asyncio.wait_for(process.communicate(), timeout=5)
+    assert process.returncode == 0, error.decode()
+    modules = json.loads(output)
+    excluded = (
+        "syntara.core.config",
+        "syntara.core.database",
+        "syntara.eventstreams.consumer_entrypoint",
+        "syntara.eventstreams.consumer_lifecycle",
+        "syntara.eventstreams.consumer_service",
+        "aiokafka",
+        "kafka",
+        "redis",
+        "temporalio",
+    )
+    assert not {name for name in modules if any(name == prefix or name.startswith(prefix + ".") for prefix in excluded)}
+
+
+async def test_packaged_launcher_exits_cleanly_when_feature_is_disabled():
+    environment = dict(os.environ, APP_EVENTSTREAM_ENABLED="false")
+    environment["PATH"] = str(Path(sys.executable).parent) + os.pathsep + environment.get("PATH", "")
+    launcher = ROOT / "backend/containers/syntara/scripts/start-event-stream-worker"
+    process = await asyncio.create_subprocess_exec(
+        str(launcher),
+        "--termination-grace-period-seconds",
+        "60",
+        env=environment,
+        stdout=asyncio.subprocess.DEVNULL,
+        stderr=asyncio.subprocess.DEVNULL,
+    )
+    try:
+        assert await asyncio.wait_for(process.wait(), timeout=15) == 0
+    finally:
+        if process.returncode is None:
+            process.kill()
+            await process.wait()
 
 
 def test_disposable_broker_has_no_persistent_storage_or_customer_credentials():

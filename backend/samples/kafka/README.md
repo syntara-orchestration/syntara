@@ -79,11 +79,14 @@ cat backend/samples/kafka/event.example.json | \
 
 The worker depends on PostgreSQL and Temporal, with existing development signing,
 encryption and mTLS files. Redis and the fixture broker are not startup dependencies;
-a worker with no active subscriptions remains running. Compose invokes the existing
-Python entrypoint directly; deployment health probes and operator packaging are
-deferred to M2. The profiles are separate so
+a worker with no active subscriptions remains running. Compose invokes the backend
+image's `start-event-stream-worker` launcher and checks authoritative readiness
+using `python -m syntara.eventstreams.consumer_health ready`. Rebuild older backend
+images before using this configuration. The profiles are separate so
 using the worker never provisions a customer broker. Compose's worker grace is
-60 seconds; keep it longer than any overridden drain deadline.
+60 seconds and is passed to the launcher for validation against the backend drain
+deadline and cleanup allowance. Worker tuning uses code defaults, without compose
+environment overrides or operator CRD tuning fields.
 
 Like the other local workers, the compose consumer mounts `backend/src` from the
 checkout. Restart `eventstream-consumer` after Python source changes; rebuild the
