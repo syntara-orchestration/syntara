@@ -24,7 +24,7 @@ from syntara.execution_plane.commands.context import AOCommandContext
 from syntara.execution_plane.commands.errors import CommandResourceStateError
 from syntara.execution_plane.utils import execution_plane_work_item_id
 from syntara.integrations.exceptions import IntegrationCredentialNotFoundError
-from syntara.workflow_core.models import ConditionNodeParameters
+from syntara.workflow_core.models import ConditionNodeParameters, NodeType
 from syntara.workflows.models.activity_execution import ActivityExecution, ActivityStatus
 from syntara.workflows.models.execution import Execution
 from syntara.workflows.models.workflow_definition import ConditionNode
@@ -130,6 +130,19 @@ def activity(
     return result
 
 
+def _allow_plugin_recipe(monkeypatch: pytest.MonkeyPatch, recipe_id: str = "acme.echo.api-token") -> None:
+    monkeypatch.setattr(
+        command_credentials,
+        "get_execution_plane_plugin_by_node_type",
+        AsyncMock(return_value=SimpleNamespace(name="plugin")),
+    )
+    monkeypatch.setattr(
+        command_credentials,
+        "execution_plane_plugin_credential_recipe_ids",
+        AsyncMock(return_value=(recipe_id,)),
+    )
+
+
 @pytest.fixture
 def command_context() -> AOCommandContext:
     return AOCommandContext(session=AsyncMock(), temporal_service=None)
@@ -142,6 +155,7 @@ async def test_workload_credential_command_resolves_bound_generic_node(
     app, _ = callback
     message, payload = workload_command(credential_ref=uuid4())
     row = activity(credential_ref=payload.credential_ref)
+    _allow_plugin_recipe(monkeypatch)
     resolved: dict[str, object] = {}
 
     async def load_activity(_handler: object, _session: AsyncMock, work_item_id: object) -> ActivityExecution:
@@ -192,6 +206,7 @@ async def test_workload_credential_command_uses_workload_specific_permission(
     authorize = AsyncMock()
     authorize.return_value.allowed = True
     monkeypatch.setattr(bridge, "authorize", authorize)
+    _allow_plugin_recipe(monkeypatch)
     message, payload = workload_command()
     monkeypatch.setattr(
         command_credentials.CredentialResolveWorkloadCommandHandler,
@@ -289,6 +304,39 @@ async def test_workload_credential_command_rejects_unbound_recipe_or_reference(
         response = await client.post("/api/execution_plane/v1/commands", json=message.model_dump(mode="json"))
 
     assert response.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_workload_credential_command_rejects_recipe_unreachable_from_plugin(
+    command_context: AOCommandContext,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    handler = command_credentials.CredentialResolveWorkloadCommandHandler()
+    message, payload = workload_command(credential_ref=uuid4())
+    row = activity(credential_ref=payload.credential_ref, credential_recipe_id=payload.credential_recipe_id)
+    row.node_type = NodeType.SCRIPT_PYTHON
+    resolve_document = AsyncMock()
+
+    async def load_activity(_handler: object, _session: AsyncMock, _work_item_id: object) -> ActivityExecution:
+        return row
+
+    monkeypatch.setattr(command_credentials.CredentialResolveWorkloadCommandHandler, "_load_activity", load_activity)
+    monkeypatch.setattr(handler, "_resolve_credential_document", resolve_document)
+    monkeypatch.setattr(
+        command_credentials,
+        "get_execution_plane_plugin_by_node_type",
+        AsyncMock(return_value=SimpleNamespace(name="script-python")),
+    )
+    monkeypatch.setattr(
+        command_credentials,
+        "execution_plane_plugin_credential_recipe_ids",
+        AsyncMock(return_value=()),
+    )
+
+    with pytest.raises(CommandResourceStateError):
+        await handler.handle(message, payload, command_context)
+
+    resolve_document.assert_not_called()
 
 
 @pytest.mark.asyncio

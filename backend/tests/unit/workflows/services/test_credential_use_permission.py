@@ -9,6 +9,7 @@ Covers _check_credential_use_permission and _validate_credential_project_scope:
   - missing / wrong-project credentials → SafeValueError
 """
 
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
@@ -170,6 +171,196 @@ class TestValidateCredentialProjectScope:  # noqa: D101
         allowed.allowed = True
         with patch("syntara.workflows.services.workflow_service.authorize", return_value=allowed):
             await svc._validate_credential_project_scope(self._def_with_cred(str(cred_id)), project_id=project_id)
+
+
+class TestValidateCredentialBindingRecipes:  # noqa: D101
+    @staticmethod
+    def _definition(recipe_id: str) -> dict[str, object]:
+        return {
+            "schema_version": "2.0.0",
+            "nodes": [
+                {
+                    "id": "script",
+                    "name": "Run script",
+                    "type": "script_python",
+                    "parameters": {
+                        "code": "pass",
+                        "credential_bindings": [
+                            {
+                                "credential_recipe_id": recipe_id,
+                                "credential_ref": "00000000-0000-0000-0000-000000000001",
+                            }
+                        ],
+                    },
+                }
+            ],
+            "edges": [],
+            "triggers": [],
+        }
+
+    @pytest.mark.asyncio
+    async def test_rejects_recipe_unreachable_from_plugin(self) -> None:
+        svc, _session = _make_service()
+
+        with (
+            patch(
+                "syntara.workflows.services.workflow_service.get_execution_plane_plugin_by_node_type",
+                AsyncMock(return_value=SimpleNamespace(name="script-python")),
+            ),
+            patch(
+                "syntara.workflows.services.workflow_service.execution_plane_plugin_credential_recipe_ids",
+                AsyncMock(return_value=("future.plugin.token",)),
+            ),
+            pytest.raises(SafeValueError, match=r"Node 'Run script'.*other\.plugin\.token"),
+        ):
+            await svc._validate_credential_binding_recipes(self._definition("other.plugin.token"))
+
+    @pytest.mark.asyncio
+    async def test_accepts_recipe_reachable_from_plugin(self) -> None:
+        svc, _session = _make_service()
+
+        with (
+            patch(
+                "syntara.workflows.services.workflow_service.get_execution_plane_plugin_by_node_type",
+                AsyncMock(return_value=SimpleNamespace(name="script-python")),
+            ),
+            patch(
+                "syntara.workflows.services.workflow_service.execution_plane_plugin_credential_recipe_ids",
+                AsyncMock(return_value=("future.plugin.token",)),
+            ),
+        ):
+            await svc._validate_credential_binding_recipes(self._definition("future.plugin.token"))
+
+    @pytest.mark.asyncio
+    async def test_accepts_template_recipe_at_save_time(self) -> None:
+        svc, _session = _make_service()
+
+        with (
+            patch(
+                "syntara.workflows.services.workflow_service.get_execution_plane_plugin_by_node_type",
+                AsyncMock(return_value=SimpleNamespace(name="script-python")),
+            ),
+            patch(
+                "syntara.workflows.services.workflow_service.execution_plane_plugin_credential_recipe_ids",
+                AsyncMock(return_value=("future.plugin.token",)),
+            ),
+        ):
+            await svc._validate_credential_binding_recipes(self._definition("${workflow.recipe_id}"))
+
+    @pytest.mark.asyncio
+    async def test_rejects_bindings_when_plugin_has_no_recipes(self) -> None:
+        svc, _session = _make_service()
+
+        with (
+            patch(
+                "syntara.workflows.services.workflow_service.get_execution_plane_plugin_by_node_type",
+                AsyncMock(return_value=SimpleNamespace(name="script-python")),
+            ),
+            patch(
+                "syntara.workflows.services.workflow_service.execution_plane_plugin_credential_recipe_ids",
+                AsyncMock(return_value=()),
+            ),
+            pytest.raises(SafeValueError, match=r"Node 'Run script'.*future\.plugin\.token"),
+        ):
+            await svc._validate_credential_binding_recipes(self._definition("future.plugin.token"))
+
+    @pytest.mark.asyncio
+    async def test_rejects_bindings_when_plugin_is_not_registered(self) -> None:
+        svc, _session = _make_service()
+
+        with (
+            patch(
+                "syntara.workflows.services.workflow_service.get_execution_plane_plugin_by_node_type",
+                AsyncMock(return_value=None),
+            ),
+            pytest.raises(SafeValueError, match="no registered Execution Plane plugin"),
+        ):
+            await svc._validate_credential_binding_recipes(self._definition("future.plugin.token"))
+
+    @pytest.mark.asyncio
+    async def test_rejects_bindings_when_plugin_contract_is_invalid(self) -> None:
+        svc, _session = _make_service()
+
+        with (
+            patch(
+                "syntara.workflows.services.workflow_service.get_execution_plane_plugin_by_node_type",
+                AsyncMock(return_value=SimpleNamespace(name="script-python")),
+            ),
+            patch(
+                "syntara.workflows.services.workflow_service.execution_plane_plugin_credential_recipe_ids",
+                AsyncMock(side_effect=ValueError("invalid IntegrationType")),
+            ),
+            pytest.raises(SafeValueError, match="invalid Execution Plane plugin contract"),
+        ):
+            await svc._validate_credential_binding_recipes(self._definition("future.plugin.token"))
+
+
+class TestCredentialBindingRecipeValidationPaths:
+    """All workflow save and inline-publish paths invoke recipe validation."""
+
+    @pytest.mark.asyncio
+    async def test_create_workflow_validates_binding_recipes(self) -> None:
+        svc, _session = _make_service()
+        definition = TestValidateCredentialBindingRecipes._definition("future.plugin.token")
+        sentinel = RuntimeError("credential recipe validation invoked")
+        validator = MagicMock()
+        validator.collect_findings.return_value = MagicMock(error_count=0, warning_count=0, findings=[])
+
+        with (
+            patch("syntara.workflows.services.workflow_service.workflow_validator", validator),
+            patch("syntara.core.queries.project_queries.assert_project_alive", AsyncMock()),
+            patch.object(svc.session, "get", AsyncMock(return_value=None)),
+            patch.object(svc, "_validate_credential_project_scope", AsyncMock()),
+            patch.object(svc, "_validate_credential_binding_recipes", AsyncMock(side_effect=sentinel)),
+            pytest.raises(RuntimeError, match="credential recipe validation invoked"),
+        ):
+            await svc.create_workflow("workflow", None, {}, definition, uuid4())
+
+    @pytest.mark.asyncio
+    async def test_create_workflow_version_validates_binding_recipes(self) -> None:
+        svc, _session = _make_service()
+        workflow = MagicMock()
+        workflow.project_id = uuid4()
+        workflow.current_version = 1
+        definition = TestValidateCredentialBindingRecipes._definition("future.plugin.token")
+        sentinel = RuntimeError("credential recipe validation invoked")
+        validator = MagicMock()
+        validator.collect_findings.return_value = MagicMock(error_count=0, warning_count=0, findings=[])
+
+        with (
+            patch("syntara.workflows.services.workflow_service.workflow_validator", validator),
+            patch.object(svc, "_get_version_or_none", AsyncMock(return_value=None)),
+            patch.object(svc, "_validate_credential_project_scope", AsyncMock()),
+            patch.object(svc, "_validate_credential_binding_recipes", AsyncMock(side_effect=sentinel)),
+            pytest.raises(RuntimeError, match="credential recipe validation invoked"),
+        ):
+            await svc.create_workflow_version(workflow, definition, "change")
+
+    @pytest.mark.asyncio
+    async def test_inline_publish_validates_binding_recipes(self) -> None:
+        svc, _session = _make_service()
+        workflow = MagicMock()
+        workflow.is_builtin = False
+        workflow.project_id = uuid4()
+        definition = TestValidateCredentialBindingRecipes._definition("future.plugin.token")
+        target_version = MagicMock()
+        target_version.workflow_definition = definition
+        sentinel = RuntimeError("credential recipe validation invoked")
+        validator = MagicMock()
+        validator.collect_findings.return_value = MagicMock(error_count=0, warning_count=0, findings=[])
+
+        with (
+            patch.object(svc, "_get_workflow_for_update", AsyncMock(return_value=workflow)),
+            patch.object(svc, "_check_expected_version", AsyncMock()),
+            patch.object(svc, "_get_version_or_none", AsyncMock(return_value=target_version)),
+            patch.object(svc, "_create_and_flush_version", AsyncMock(return_value=target_version)),
+            patch("syntara.workflows.services.workflow_service.get_system_continue_on_failure", AsyncMock()),
+            patch("syntara.workflows.services.workflow_service.workflow_validator", validator),
+            patch.object(svc, "_validate_credential_project_scope", AsyncMock()),
+            patch.object(svc, "_validate_credential_binding_recipes", AsyncMock(side_effect=sentinel)),
+            pytest.raises(RuntimeError, match="credential recipe validation invoked"),
+        ):
+            await svc.publish_workflow_version(uuid4(), version=1, workflow_definition=definition)
 
 
 class TestPublishWorkflowVersionCredentialCheck:  # noqa: D101

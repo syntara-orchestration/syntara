@@ -31,8 +31,13 @@ from syntara.credentials.lib.auth_types import AUTH_TYPE_URL
 from syntara.credentials.models.credential import Credential
 from syntara.credentials.models.credential_type import CredentialType
 from syntara.execution_plane.deletion import delete_execution_plane_work_items
+from syntara.execution_plane.registry.repository import (
+    execution_plane_plugin_credential_recipe_ids,
+    get_execution_plane_plugin_by_node_type,
+)
 from syntara.metrics.dependencies import get_metrics_recorder
 from syntara.metrics.types import ComponentLabel, MetricType
+from syntara.workflow_core.models import TEMPLATE_PATTERN
 from syntara.workflows.audit.workflow_lifecycle import WorkflowAction, WorkflowLifecycleEvent
 from syntara.workflows.audit.workflow_version import (
     WorkflowVersionCreatedEvent,
@@ -448,6 +453,28 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
 
         await self._check_credential_use_permission(credential_ids, previous_credential_ids, project_id)
 
+    async def _validate_credential_binding_recipes(self, workflow_definition: dict[str, Any]) -> None:
+        """Reject concrete binding recipes that the node plugin cannot request."""
+        for node in workflow_definition.get("nodes", []):
+            bindings = (node.get("parameters") or {}).get("credential_bindings") or []
+            if not bindings:
+                continue
+            node_name = node.get("name") or node.get("id") or "unknown"
+            plugin = await get_execution_plane_plugin_by_node_type(self.session, node.get("type"))
+            if plugin is None:
+                msg = f"Node '{node_name}' has credential bindings but no registered Execution Plane plugin."
+                raise SafeValueError(msg)
+            try:
+                recipe_ids = await execution_plane_plugin_credential_recipe_ids(self.session, plugin)
+            except ValueError as error:
+                msg = f"Node '{node_name}' has an invalid Execution Plane plugin contract: {error}"
+                raise SafeValueError(msg) from error
+            for binding in bindings:
+                recipe_id = binding.get("credential_recipe_id") if isinstance(binding, dict) else None
+                if recipe_id and recipe_id not in recipe_ids and not TEMPLATE_PATTERN.search(recipe_id):
+                    msg = f"Node '{node_name}' binds unreachable credential recipe '{recipe_id}'."
+                    raise SafeValueError(msg)
+
     async def _check_credential_use_permission(
         self,
         credential_ids: set[str],
@@ -635,6 +662,7 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
             raise BuiltinProtectionError(msg)
 
         await self._validate_credential_project_scope(workflow_definition, project_id)
+        await self._validate_credential_binding_recipes(workflow_definition)
         await self._validate_no_secret_url_conflicts(workflow_definition)
         ref_findings = await validate_workflow_references(
             self.session, workflow_definition, project_id, is_import=is_import
@@ -1210,6 +1238,7 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
                 if prev_version and prev_version.workflow_definition:
                     previous_cred_ids = self._extract_credential_ids(prev_version.workflow_definition)
             await self._validate_credential_project_scope(workflow_definition, workflow.project_id, previous_cred_ids)
+            await self._validate_credential_binding_recipes(workflow_definition)
             await self._validate_no_secret_url_conflicts(workflow_definition)
             ref_findings = await validate_workflow_references(self.session, workflow_definition, workflow.project_id)
             if ref_findings:
@@ -1406,6 +1435,7 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
             await self._validate_credential_project_scope(
                 workflow_definition, workflow.project_id, previous_credential_ids=None
             )
+            await self._validate_credential_binding_recipes(workflow_definition)
             await self._validate_no_secret_url_conflicts(workflow_definition)
             stale_tool_findings = await validate_workflow_references(
                 self.session, workflow_definition, workflow.project_id
