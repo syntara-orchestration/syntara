@@ -107,7 +107,7 @@ test('designer selects a published child, maps its inputs, and saves the Sub-wor
   }
 })
 
-test('input picker renders output groups for a 64-step child workflow', async ({ app }) => {
+test('input picker exposes declared nested outputs and inserts their expression for a large child', async ({ app }) => {
   const childName = buildUniqueName('e2e-subworkflow-large-child')
   const parentName = buildUniqueName('e2e-subworkflow-large-parent')
   let childWorkflowId: string | undefined
@@ -128,7 +128,26 @@ test('input picker renders output groups for a 64-step child workflow', async ({
           id: 'child_subworkflow_trigger',
           type: 'subworkflow_trigger',
           name: 'Child invocation',
-          parameters: { input_schema: { type: 'object', properties: {} } },
+          parameters: {
+            input_schema: { type: 'object', properties: {} },
+            output_schema: {
+              type: 'object',
+              required: ['release'],
+              properties: {
+                release: {
+                  type: 'object',
+                  description: 'Release metadata',
+                  required: ['version'],
+                  properties: {
+                    version: { type: 'string', description: 'Published release version' },
+                  },
+                },
+              },
+            },
+            output_mapping: {
+              'release.version': '${child_step_63.stdout}',
+            },
+          },
         },
       ],
       nodes: childSteps,
@@ -154,9 +173,9 @@ test('input picker renders output groups for a 64-step child workflow', async ({
         },
         {
           id: 'consume_child_outputs',
-          type: 'script',
+          type: ActivityTypeEnum.AGENTIC,
           name: 'Consume child outputs',
-          parameters: { language: 'python', code: 'print("consumed")' },
+          parameters: { prompt: 'Release version: ', tool_selection_strategy: 'NONE' },
         },
       ],
       edges: [
@@ -167,7 +186,6 @@ test('input picker renders output groups for a 64-step child workflow', async ({
     parentWorkflowId = parent.id
 
     await app.goto(toAppUrl(`/workflow-builder/${parent.id}`))
-    const renderStartedAt = Date.now()
     await clickNode(app, 'Consume child outputs')
     await expect(app.getByRole('heading', { name: 'Input', exact: true })).toBeVisible()
 
@@ -175,12 +193,31 @@ test('input picker renders output groups for a 64-step child workflow', async ({
       has: app.getByRole('heading', { name: 'Input', exact: true }),
     })
     const childSection = inputPanel.getByRole('button', { name: 'Invoke large child', exact: true })
-    const lastChildStep = inputPanel.getByText('Child step 63', { exact: false })
-    if (!(await lastChildStep.isVisible())) await childSection.click()
+    await expect(childSection).toBeVisible()
+    const childWorkflowIdField = inputPanel.getByText('T child_workflow_id', { exact: true })
+    if (!(await childWorkflowIdField.isVisible())) await childSection.click()
 
-    await expect(lastChildStep).toBeVisible({ timeout: 30_000 })
-    await expect(inputPanel.getByText('T stdout', { exact: true })).toHaveCount(64, { timeout: 30_000 })
-    expect(Date.now() - renderStartedAt).toBeLessThan(20_000)
+    await expect(childWorkflowIdField).toBeVisible({ timeout: 30_000 })
+    await expect(inputPanel.getByText('T child_status', { exact: true })).toBeVisible()
+    await expect(inputPanel.getByText('{} outputs', { exact: true })).toBeVisible()
+    await expect(inputPanel.getByText('{} release', { exact: true })).toBeVisible()
+
+    const releaseGroup = inputPanel.getByRole('treeitem', { name: /\{\} release/ })
+    await releaseGroup.getByRole('button', { name: /\{\} release/ }).click()
+
+    const nestedOutput = inputPanel
+      .getByRole('tree', { name: 'Schema preview' })
+      .locator('[draggable="true"]')
+      .filter({ hasText: 'T version' })
+    await expect(nestedOutput).toBeVisible()
+    await expect(inputPanel.getByText('Child step 63', { exact: false })).not.toBeAttached()
+
+    const promptField = app.getByRole('textbox', { name: 'Prompt', exact: true })
+    await expect(nestedOutput).toHaveCount(1)
+    await expect(promptField).toHaveValue('Release version: ')
+    await nestedOutput.hover()
+    await nestedOutput.dragTo(promptField)
+    await expect(promptField).toHaveValue('Release version: ${invoke_large_child.outputs.release.version}')
   } finally {
     if (parentWorkflowId) await deleteWorkflowViaApi(app, parentWorkflowId)
     if (childWorkflowId) await deleteWorkflowViaApi(app, childWorkflowId)
