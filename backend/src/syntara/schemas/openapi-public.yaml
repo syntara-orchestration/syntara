@@ -25424,7 +25424,11 @@ paths:
                 retryable: true
     delete:
       summary: Delete workflow
-      description: Permanently delete a workflow and cascade-delete all its versions and executions.
+      description: |-
+        Permanently delete a workflow and cascade-delete all its versions and executions.
+
+        If the workflow is referenced by published parents, deletion requires ``confirm=true``;
+        otherwise it returns 409 with the count of referencing parents (no parent details).
       operationId: delete_workflow
       tags:
         - Workflows
@@ -25441,6 +25445,13 @@ paths:
             type: string
             format: uuid
             title: Workflow Id
+        - name: confirm
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: false
+            title: Confirm
       responses:
         '204':
           description: Workflow deleted
@@ -25494,17 +25505,11 @@ paths:
                 retryable: false
                 instance: /api/v1/workflows
         '409':
-          description: Conflict
+          description: Conflict. When the workflow is referenced by published parents the body is a WorkflowReferencedConfirmationProblem (carrying referencing_count); resend with confirm=true to delete. Other conflicts (for example active executions blocking deletion) use the generic problem shape.
           content:
             application/problem+json:
               schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/conflict
-                title: Conflict
-                detail: The request conflicts with the current state of the resource
-                code: CONFLICT
-                retryable: false
+                $ref: '#/components/schemas/WorkflowReferencedConfirmationProblem'
         '422':
           description: Validation Error
           content:
@@ -26001,6 +26006,303 @@ paths:
                 detail: An unexpected error occurred
                 code: INTERNAL_ERROR
                 retryable: true
+  /workflows/used_by_counts:
+    get:
+      summary: Batch Used-By totals for multiple workflows
+      description: |-
+        Return the Used-By total for each requested workflow the caller may read.
+
+        Totals count distinct published parents across all projects (matching the Used-By badge), so a workflow list can show per-row counts with one request instead of one call per row.
+      operationId: get_workflow_used_by_counts
+      tags:
+        - Workflows
+      security:
+        - bearerAuth: []
+      x-app-permission:
+        resource: workflow
+        action: read
+      parameters:
+        - name: workflow_ids
+          in: query
+          required: true
+          schema:
+            type: array
+            items:
+              type: string
+              format: uuid
+            maxItems: 100
+            title: Workflow Ids
+      responses:
+        '200':
+          description: Used-By totals for the requested workflows the caller may read
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowUsedByCountsResponse'
+        '400':
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/bad-request
+                title: Bad Request
+                detail: The request was malformed or contained invalid parameters
+                code: BAD_REQUEST
+                retryable: false
+        '401':
+          description: Unauthorized
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/unauthorized
+                title: Unauthorized
+                detail: Authentication is required to access this resource
+                code: UNAUTHORIZED
+                retryable: false
+        '403':
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/forbidden
+                title: Forbidden
+                detail: You do not have permission to access this resource
+                code: FORBIDDEN
+                retryable: false
+        '404':
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/not-found
+                title: Resource Not Found
+                detail: No resource exists with the provided identifier
+                code: NOT_FOUND
+                retryable: false
+                instance: /api/v1/workflows
+        '409':
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/conflict
+                title: Conflict
+                detail: The request conflicts with the current state of the resource
+                code: CONFLICT
+                retryable: false
+        '422':
+          description: Validation Error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/validation-error
+                title: Validation Error
+                detail: Field 'name' must be between 1 and 255 characters
+                code: VALIDATION_ERROR
+                retryable: false
+                instance: /api/v1/workflows
+        '429':
+          description: Too Many Requests
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/rate-limited
+                title: Too Many Requests
+                detail: Rate limit exceeded. Try again in 60 seconds.
+                code: RATE_LIMITED
+                retryable: true
+        '500':
+          description: Internal Server Error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/internal-error
+                title: Internal Server Error
+                detail: An unexpected error occurred
+                code: INTERNAL_ERROR
+                retryable: true
+  /workflows/{workflow_id}/used_by:
+    get:
+      summary: List published workflows that reference this workflow
+      description: |-
+        List published workflows whose published version references this workflow (Used-By).
+
+        ``referencing_parent_count`` is every distinct published parent across all projects; ``resources`` is the page of parents the caller may view. Access requires read permission on this workflow.
+      operationId: list_workflow_used_by
+      tags:
+        - Workflows
+      security:
+        - bearerAuth: []
+      x-app-permission:
+        resource: workflow
+        action: read
+      parameters:
+        - name: workflow_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+            title: Workflow Id
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+            exclusiveMinimum: 0
+            maximum: 100
+            title: Limit
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+              - type: 'null'
+            title: Cursor
+        - name: sort
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: string
+                pattern: ^-?[a-z][a-z0-9_]*$
+              - type: 'null'
+            title: Sort
+        - name: trigger_node_ids
+          in: query
+          required: false
+          schema:
+            anyOf:
+              - type: array
+                items:
+                  type: string
+                maxItems: 50
+              - type: 'null'
+            x-query-param: true
+            title: Trigger Node Ids
+      responses:
+        '200':
+          description: Published parent workflows that reference this workflow
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowUsedByResponse'
+        '400':
+          description: Bad Request
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/bad-request
+                title: Bad Request
+                detail: The request was malformed or contained invalid parameters
+                code: BAD_REQUEST
+                retryable: false
+        '401':
+          description: Unauthorized
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/unauthorized
+                title: Unauthorized
+                detail: Authentication is required to access this resource
+                code: UNAUTHORIZED
+                retryable: false
+        '403':
+          description: Forbidden
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/forbidden
+                title: Forbidden
+                detail: You do not have permission to access this resource
+                code: FORBIDDEN
+                retryable: false
+        '404':
+          description: Not Found
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/not-found
+                title: Resource Not Found
+                detail: No resource exists with the provided identifier
+                code: NOT_FOUND
+                retryable: false
+                instance: /api/v1/workflows
+        '409':
+          description: Conflict
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/conflict
+                title: Conflict
+                detail: The request conflicts with the current state of the resource
+                code: CONFLICT
+                retryable: false
+        '422':
+          description: Validation Error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/validation-error
+                title: Validation Error
+                detail: Field 'name' must be between 1 and 255 characters
+                code: VALIDATION_ERROR
+                retryable: false
+                instance: /api/v1/workflows
+        '429':
+          description: Too Many Requests
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/rate-limited
+                title: Too Many Requests
+                detail: Rate limit exceeded. Try again in 60 seconds.
+                code: RATE_LIMITED
+                retryable: true
+        '500':
+          description: Internal Server Error
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ErrorData'
+              example:
+                type: https://api.example.com/errors/internal-error
+                title: Internal Server Error
+                detail: An unexpected error occurred
+                code: INTERNAL_ERROR
+                retryable: true
   /workflows/{workflow_id}/versions/{version}:
     get:
       summary: Get workflow version
@@ -26258,7 +26560,11 @@ paths:
   /workflows/{workflow_id}/versions/{version}/publish:
     post:
       summary: Publish workflow version
-      description: Publish a specific workflow version.
+      description: |-
+        Publish a specific workflow version.
+
+        If publishing removes a Subworkflow Trigger that published parents invoke, it requires
+        ``confirm=true``; otherwise it returns 409 with the count of affected parents (no parent details).
       operationId: publish_workflow_version
       tags:
         - Workflows
@@ -26282,6 +26588,13 @@ paths:
             type: integer
             title: Version
           description: Version number to publish
+        - name: confirm
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: false
+            title: Confirm
       requestBody:
         required: true
         content:
@@ -26345,17 +26658,11 @@ paths:
                 retryable: false
                 instance: /api/v1/workflows
         '409':
-          description: Conflict
+          description: Conflict. When publishing removes a Subworkflow Trigger invoked by published parents the body is a WorkflowPublishTriggerRemovalConfirmationProblem (carrying affected_count); resend with confirm=true. Other conflicts (version conflict, publish validation) use the generic problem shape.
           content:
             application/problem+json:
               schema:
-                $ref: '#/components/schemas/ErrorData'
-              example:
-                type: https://api.example.com/errors/conflict
-                title: Conflict
-                detail: The request conflicts with the current state of the resource
-                code: CONFLICT
-                retryable: false
+                $ref: '#/components/schemas/WorkflowPublishTriggerRemovalConfirmationProblem'
         '422':
           description: Validation Error
           content:
@@ -35554,6 +35861,245 @@ components:
           total: 150
         - next: eyJpZCI6Im5leHQifQ
           prev: eyJpZCI6InByZXYifQ
+    WorkflowReferencedConfirmationProblem:
+      description: |-
+        Typed RFC 9457 problem body for the delete-confirmation 409.
+
+        Extends the base problem with the count of referencing published parents; their identities are
+        never disclosed, since the caller may lack read access to them. Mirrors
+        ``WorkflowReferencedConfirmationProblem`` in the OpenAPI spec so generated clients type the field.
+      examples:
+        - code: RATE_LIMIT_EXCEEDED
+          detail: OpenRouter API rate limit exceeded. Please try again in a few moments.
+          instance: /invocations/550e8400-e29b-41d4-a716-446655440000
+          retryable: true
+          title: LLM Rate Limit Exceeded
+          type: https://api.example.com/errors/llm-error
+        - code: STREAM_TIMEOUT
+          detail: LLM streaming timed out after 30 seconds
+          instance: /invocations/550e8400-e29b-41d4-a716-446655440000
+          retryable: true
+          title: Streaming Timeout
+          type: https://api.example.com/errors/timeout-error
+      properties:
+        code:
+          description: Machine-readable error code for programmatic handling
+          examples:
+            - RATE_LIMIT_EXCEEDED
+          maxLength: 100
+          minLength: 1
+          title: Code
+          type: string
+        detail:
+          description: Human-readable explanation specific to this occurrence
+          examples:
+            - 'OpenRouter API returned error: rate limit exceeded. Please try again in a few moments.'
+          maxLength: 2000
+          minLength: 1
+          title: Detail
+          type: string
+        instance:
+          anyOf:
+            - maxLength: 2048
+              type: string
+            - type: 'null'
+          description: Optional URI reference identifying the specific occurrence
+          examples:
+            - /invocations/550e8400-e29b-41d4-a716-446655440000
+          title: Instance
+        referencing_count:
+          anyOf:
+            - minimum: 1.0
+              type: integer
+            - type: 'null'
+          description: Distinct published parents that reference this workflow and would be affected by deletion.
+          title: Referencing Count
+        retryable:
+          description: Whether this error can be retried by creating a new invocation
+          examples:
+            - true
+          title: Retryable
+          type: boolean
+        title:
+          description: Short, human-readable summary of the problem
+          examples:
+            - LLM Service Unavailable
+          maxLength: 200
+          minLength: 1
+          title: Title
+          type: string
+        type:
+          description: URI reference identifying the problem type
+          examples:
+            - https://api.example.com/errors/llm-error
+          maxLength: 500
+          minLength: 1
+          title: Type
+          type: string
+      required:
+        - type
+        - title
+        - detail
+        - code
+        - retryable
+      title: WorkflowReferencedConfirmationProblem
+      type: object
+    WorkflowPublishTriggerRemovalConfirmationProblem:
+      description: |-
+        Typed RFC 9457 problem body for the publish trigger-removal 409.
+
+        Extends the base problem with the count of affected published parents (identities are never
+        disclosed). Mirrors ``WorkflowPublishTriggerRemovalConfirmationProblem`` in the OpenAPI spec.
+      examples:
+        - code: RATE_LIMIT_EXCEEDED
+          detail: OpenRouter API rate limit exceeded. Please try again in a few moments.
+          instance: /invocations/550e8400-e29b-41d4-a716-446655440000
+          retryable: true
+          title: LLM Rate Limit Exceeded
+          type: https://api.example.com/errors/llm-error
+        - code: STREAM_TIMEOUT
+          detail: LLM streaming timed out after 30 seconds
+          instance: /invocations/550e8400-e29b-41d4-a716-446655440000
+          retryable: true
+          title: Streaming Timeout
+          type: https://api.example.com/errors/timeout-error
+      properties:
+        affected_count:
+          anyOf:
+            - minimum: 1.0
+              type: integer
+            - type: 'null'
+          description: Distinct published parents that invoke a Subworkflow Trigger removed by this publish.
+          title: Affected Count
+        code:
+          description: Machine-readable error code for programmatic handling
+          examples:
+            - RATE_LIMIT_EXCEEDED
+          maxLength: 100
+          minLength: 1
+          title: Code
+          type: string
+        detail:
+          description: Human-readable explanation specific to this occurrence
+          examples:
+            - 'OpenRouter API returned error: rate limit exceeded. Please try again in a few moments.'
+          maxLength: 2000
+          minLength: 1
+          title: Detail
+          type: string
+        instance:
+          anyOf:
+            - maxLength: 2048
+              type: string
+            - type: 'null'
+          description: Optional URI reference identifying the specific occurrence
+          examples:
+            - /invocations/550e8400-e29b-41d4-a716-446655440000
+          title: Instance
+        retryable:
+          description: Whether this error can be retried by creating a new invocation
+          examples:
+            - true
+          title: Retryable
+          type: boolean
+        title:
+          description: Short, human-readable summary of the problem
+          examples:
+            - LLM Service Unavailable
+          maxLength: 200
+          minLength: 1
+          title: Title
+          type: string
+        type:
+          description: URI reference identifying the problem type
+          examples:
+            - https://api.example.com/errors/llm-error
+          maxLength: 500
+          minLength: 1
+          title: Type
+          type: string
+      required:
+        - type
+        - title
+        - detail
+        - code
+        - retryable
+      title: WorkflowPublishTriggerRemovalConfirmationProblem
+      type: object
+    WorkflowUsedByResponse:
+      type: object
+      required:
+        - resources
+        - referencing_parent_count
+      title: WorkflowUsedByResponse
+      description: |-
+        Used-By response: the published parents that reference a given workflow.
+
+        ``resources`` is the RBAC-filtered page of referencing parents the requester may view, paged by
+        ``next``/``prev``. ``referencing_parent_count`` is a domain value -- not a pagination total --
+        giving the number of distinct published parents across all projects, counted regardless of the
+        requester's visibility, so the Used-By badge reflects true impact even when some parents sit in
+        projects the caller cannot see. The page envelope's ``total``/``include_total`` are deliberately
+        omitted here: the visible page is already bounded by ``limit`` and the meaningful count is the
+        cross-project domain value above.
+      properties:
+        resources:
+          type: array
+          items:
+            $ref: '#/components/schemas/WorkflowRead'
+          maxItems: 100
+          title: Resources
+          description: Page of referencing published parents the caller may view.
+        next:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Next
+          description: Cursor for the next page of referencing parents.
+        prev:
+          anyOf:
+            - type: string
+            - type: 'null'
+          title: Prev
+          description: Cursor for the previous page of referencing parents.
+        referencing_parent_count:
+          type: integer
+          minimum: 0.0
+          title: Referencing Parent Count
+          description: Distinct published parent workflows that reference this workflow, counted across all projects regardless of the requester's visibility. A domain value, not a pagination total.
+      examples:
+        - referencing_parent_count: 3
+          resources: []
+    WorkflowUsedByCount:
+      type: object
+      required:
+        - workflow_id
+        - referencing_parent_count
+      title: WorkflowUsedByCount
+      description: Used-By count for a single workflow, returned by the batch counts endpoint.
+      properties:
+        workflow_id:
+          type: string
+          format: uuid
+          title: Workflow Id
+        referencing_parent_count:
+          type: integer
+          minimum: 0.0
+          title: Referencing Parent Count
+          description: Distinct published parent workflows that reference this workflow, across all projects, regardless of the requester's visibility.
+    WorkflowUsedByCountsResponse:
+      type: object
+      title: WorkflowUsedByCountsResponse
+      description: |-
+        Batch Used-By totals for a set of workflows.
+
+        Totals are counted across all projects (matching the Used-By badge). Only workflows the caller may read are included; others are omitted so the endpoint cannot probe counts for workflows outside the caller's visibility.
+      properties:
+        counts:
+          type: array
+          items:
+            $ref: '#/components/schemas/WorkflowUsedByCount'
+          title: Counts
     WorkflowCreate:
       type: object
       title: WorkflowCreate

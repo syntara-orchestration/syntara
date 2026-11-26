@@ -76,6 +76,9 @@ export interface paths {
     /**
      * Delete workflow
      * @description Permanently delete a workflow and cascade-delete all its versions and executions.
+     *
+     *     If the workflow is referenced by published parents, deletion requires ``confirm=true``;
+     *     otherwise it returns 409 with the count of referencing parents (no parent details).
      */
     delete: operations['delete_workflow']
     options?: never
@@ -152,6 +155,50 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/workflows/used_by_counts': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * Batch Used-By totals for multiple workflows
+     * @description Return the Used-By total for each requested workflow the caller may read.
+     *
+     *     Totals count distinct published parents across all projects (matching the Used-By badge), so a workflow list can show per-row counts with one request instead of one call per row.
+     */
+    get: operations['get_workflow_used_by_counts']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/workflows/{workflow_id}/used_by': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * List published workflows that reference this workflow
+     * @description List published workflows whose published version references this workflow (Used-By).
+     *
+     *     ``referencing_parent_count`` is every distinct published parent across all projects; ``resources`` is the page of parents the caller may view. Access requires read permission on this workflow.
+     */
+    get: operations['list_workflow_used_by']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/workflows/{workflow_id}/versions/{version}': {
     parameters: {
       query?: never
@@ -188,6 +235,9 @@ export interface paths {
     /**
      * Publish workflow version
      * @description Publish a specific workflow version.
+     *
+     *     If publishing removes a Subworkflow Trigger that published parents invoke, it requires
+     *     ``confirm=true``; otherwise it returns 409 with the count of affected parents (no parent details).
      */
     post: operations['publish_workflow_version']
     delete?: never
@@ -930,6 +980,203 @@ export interface components {
        * @description Array of resources in current page
        */
       resources: components['schemas']['WorkflowRead'][]
+    }
+    /**
+     * WorkflowReferencedConfirmationProblem
+     * @description Typed RFC 9457 problem body for the delete-confirmation 409.
+     *
+     *     Extends the base problem with the count of referencing published parents; their identities are
+     *     never disclosed, since the caller may lack read access to them. Mirrors
+     *     ``WorkflowReferencedConfirmationProblem`` in the OpenAPI spec so generated clients type the field.
+     * @example {
+     *       "code": "RATE_LIMIT_EXCEEDED",
+     *       "detail": "OpenRouter API rate limit exceeded. Please try again in a few moments.",
+     *       "instance": "/invocations/550e8400-e29b-41d4-a716-446655440000",
+     *       "retryable": true,
+     *       "title": "LLM Rate Limit Exceeded",
+     *       "type": "https://api.example.com/errors/llm-error"
+     *     }
+     * @example {
+     *       "code": "STREAM_TIMEOUT",
+     *       "detail": "LLM streaming timed out after 30 seconds",
+     *       "instance": "/invocations/550e8400-e29b-41d4-a716-446655440000",
+     *       "retryable": true,
+     *       "title": "Streaming Timeout",
+     *       "type": "https://api.example.com/errors/timeout-error"
+     *     }
+     */
+    WorkflowReferencedConfirmationProblem: {
+      /**
+       * Code
+       * @description Machine-readable error code for programmatic handling
+       * @example RATE_LIMIT_EXCEEDED
+       */
+      code: string
+      /**
+       * Detail
+       * @description Human-readable explanation specific to this occurrence
+       * @example OpenRouter API returned error: rate limit exceeded. Please try again in a few moments.
+       */
+      detail: string
+      /**
+       * Instance
+       * @description Optional URI reference identifying the specific occurrence
+       * @example /invocations/550e8400-e29b-41d4-a716-446655440000
+       */
+      instance?: string | null
+      /**
+       * Referencing Count
+       * @description Distinct published parents that reference this workflow and would be affected by deletion.
+       */
+      referencing_count?: number | null
+      /**
+       * Retryable
+       * @description Whether this error can be retried by creating a new invocation
+       * @example true
+       */
+      retryable: boolean
+      /**
+       * Title
+       * @description Short, human-readable summary of the problem
+       * @example LLM Service Unavailable
+       */
+      title: string
+      /**
+       * Type
+       * @description URI reference identifying the problem type
+       * @example https://api.example.com/errors/llm-error
+       */
+      type: string
+    }
+    /**
+     * WorkflowPublishTriggerRemovalConfirmationProblem
+     * @description Typed RFC 9457 problem body for the publish trigger-removal 409.
+     *
+     *     Extends the base problem with the count of affected published parents (identities are never
+     *     disclosed). Mirrors ``WorkflowPublishTriggerRemovalConfirmationProblem`` in the OpenAPI spec.
+     * @example {
+     *       "code": "RATE_LIMIT_EXCEEDED",
+     *       "detail": "OpenRouter API rate limit exceeded. Please try again in a few moments.",
+     *       "instance": "/invocations/550e8400-e29b-41d4-a716-446655440000",
+     *       "retryable": true,
+     *       "title": "LLM Rate Limit Exceeded",
+     *       "type": "https://api.example.com/errors/llm-error"
+     *     }
+     * @example {
+     *       "code": "STREAM_TIMEOUT",
+     *       "detail": "LLM streaming timed out after 30 seconds",
+     *       "instance": "/invocations/550e8400-e29b-41d4-a716-446655440000",
+     *       "retryable": true,
+     *       "title": "Streaming Timeout",
+     *       "type": "https://api.example.com/errors/timeout-error"
+     *     }
+     */
+    WorkflowPublishTriggerRemovalConfirmationProblem: {
+      /**
+       * Affected Count
+       * @description Distinct published parents that invoke a Subworkflow Trigger removed by this publish.
+       */
+      affected_count?: number | null
+      /**
+       * Code
+       * @description Machine-readable error code for programmatic handling
+       * @example RATE_LIMIT_EXCEEDED
+       */
+      code: string
+      /**
+       * Detail
+       * @description Human-readable explanation specific to this occurrence
+       * @example OpenRouter API returned error: rate limit exceeded. Please try again in a few moments.
+       */
+      detail: string
+      /**
+       * Instance
+       * @description Optional URI reference identifying the specific occurrence
+       * @example /invocations/550e8400-e29b-41d4-a716-446655440000
+       */
+      instance?: string | null
+      /**
+       * Retryable
+       * @description Whether this error can be retried by creating a new invocation
+       * @example true
+       */
+      retryable: boolean
+      /**
+       * Title
+       * @description Short, human-readable summary of the problem
+       * @example LLM Service Unavailable
+       */
+      title: string
+      /**
+       * Type
+       * @description URI reference identifying the problem type
+       * @example https://api.example.com/errors/llm-error
+       */
+      type: string
+    }
+    /**
+     * WorkflowUsedByResponse
+     * @description Used-By response: the published parents that reference a given workflow.
+     *
+     *     ``resources`` is the RBAC-filtered page of referencing parents the requester may view, paged by
+     *     ``next``/``prev``. ``referencing_parent_count`` is a domain value -- not a pagination total --
+     *     giving the number of distinct published parents across all projects, counted regardless of the
+     *     requester's visibility, so the Used-By badge reflects true impact even when some parents sit in
+     *     projects the caller cannot see. The page envelope's ``total``/``include_total`` are deliberately
+     *     omitted here: the visible page is already bounded by ``limit`` and the meaningful count is the
+     *     cross-project domain value above.
+     * @example {
+     *       "referencing_parent_count": 3,
+     *       "resources": []
+     *     }
+     */
+    WorkflowUsedByResponse: {
+      /**
+       * Resources
+       * @description Page of referencing published parents the caller may view.
+       */
+      resources: components['schemas']['WorkflowRead'][]
+      /**
+       * Next
+       * @description Cursor for the next page of referencing parents.
+       */
+      next?: string | null
+      /**
+       * Prev
+       * @description Cursor for the previous page of referencing parents.
+       */
+      prev?: string | null
+      /**
+       * Referencing Parent Count
+       * @description Distinct published parent workflows that reference this workflow, counted across all projects regardless of the requester's visibility. A domain value, not a pagination total.
+       */
+      referencing_parent_count: number
+    }
+    /**
+     * WorkflowUsedByCount
+     * @description Used-By count for a single workflow, returned by the batch counts endpoint.
+     */
+    WorkflowUsedByCount: {
+      /**
+       * Workflow Id
+       * Format: uuid
+       */
+      workflow_id: string
+      /**
+       * Referencing Parent Count
+       * @description Distinct published parent workflows that reference this workflow, across all projects, regardless of the requester's visibility.
+       */
+      referencing_parent_count: number
+    }
+    /**
+     * WorkflowUsedByCountsResponse
+     * @description Batch Used-By totals for a set of workflows.
+     *
+     *     Totals are counted across all projects (matching the Used-By badge). Only workflows the caller may read are included; others are omitted so the endpoint cannot probe counts for workflows outside the caller's visibility.
+     */
+    WorkflowUsedByCountsResponse: {
+      /** Counts */
+      counts?: components['schemas']['WorkflowUsedByCount'][]
     }
     /**
      * WorkflowCreate
@@ -2971,7 +3218,9 @@ export interface operations {
   }
   delete_workflow: {
     parameters: {
-      query?: never
+      query?: {
+        confirm?: boolean
+      }
       header?: never
       path: {
         workflow_id: string
@@ -2991,7 +3240,15 @@ export interface operations {
       401: components['responses']['UnauthorizedError']
       403: components['responses']['ForbiddenError']
       404: components['responses']['NotFoundError']
-      409: components['responses']['ConflictError']
+      /** @description Conflict. When the workflow is referenced by published parents the body is a WorkflowReferencedConfirmationProblem (carrying referencing_count); resend with confirm=true to delete. Other conflicts (for example active executions blocking deletion) use the generic problem shape. */
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/problem+json': components['schemas']['WorkflowReferencedConfirmationProblem']
+        }
+      }
       422: components['responses']['ValidationError']
       429: components['responses']['RateLimitError']
       500: components['responses']['InternalServerError']
@@ -3130,6 +3387,71 @@ export interface operations {
       500: components['responses']['InternalServerError']
     }
   }
+  get_workflow_used_by_counts: {
+    parameters: {
+      query: {
+        workflow_ids: string[]
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Used-By totals for the requested workflows the caller may read */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['WorkflowUsedByCountsResponse']
+        }
+      }
+      400: components['responses']['BadRequestError']
+      401: components['responses']['UnauthorizedError']
+      403: components['responses']['ForbiddenError']
+      404: components['responses']['NotFoundError']
+      409: components['responses']['ConflictError']
+      422: components['responses']['ValidationError']
+      429: components['responses']['RateLimitError']
+      500: components['responses']['InternalServerError']
+    }
+  }
+  list_workflow_used_by: {
+    parameters: {
+      query?: {
+        limit?: number
+        cursor?: string | null
+        sort?: string | null
+        trigger_node_ids?: string[] | null
+      }
+      header?: never
+      path: {
+        workflow_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Published parent workflows that reference this workflow */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['WorkflowUsedByResponse']
+        }
+      }
+      400: components['responses']['BadRequestError']
+      401: components['responses']['UnauthorizedError']
+      403: components['responses']['ForbiddenError']
+      404: components['responses']['NotFoundError']
+      409: components['responses']['ConflictError']
+      422: components['responses']['ValidationError']
+      429: components['responses']['RateLimitError']
+      500: components['responses']['InternalServerError']
+    }
+  }
   get_workflow_version: {
     parameters: {
       query?: never
@@ -3205,7 +3527,9 @@ export interface operations {
   }
   publish_workflow_version: {
     parameters: {
-      query?: never
+      query?: {
+        confirm?: boolean
+      }
       header?: never
       path: {
         workflow_id: string
@@ -3233,7 +3557,15 @@ export interface operations {
       401: components['responses']['UnauthorizedError']
       403: components['responses']['ForbiddenError']
       404: components['responses']['NotFoundError']
-      409: components['responses']['ConflictError']
+      /** @description Conflict. When publishing removes a Subworkflow Trigger invoked by published parents the body is a WorkflowPublishTriggerRemovalConfirmationProblem (carrying affected_count); resend with confirm=true. Other conflicts (version conflict, publish validation) use the generic problem shape. */
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/problem+json': components['schemas']['WorkflowPublishTriggerRemovalConfirmationProblem']
+        }
+      }
       422: components['responses']['ValidationError']
       429: components['responses']['RateLimitError']
       500: components['responses']['InternalServerError']

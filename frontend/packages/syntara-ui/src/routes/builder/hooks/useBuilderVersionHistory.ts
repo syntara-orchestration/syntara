@@ -82,7 +82,11 @@ export function useBuilderVersionHistory({
     exportVersion,
     openInNewWindow,
     publishVersion,
+    reviewVersionForPublish,
     isPublishingVersion,
+    isCheckingOutputContract,
+    reviewedPublishVersion,
+    reviewFailedVersion,
     breakingChanges,
     contractChanges,
     parentWorkflows,
@@ -93,6 +97,7 @@ export function useBuilderVersionHistory({
     updateVersionMetadata,
     updateMetadataMutation,
     paginationFooterProps,
+    triggerRemovalConfirmDialog,
   } = useVersionHistory({ workflowId, isNew, onVersionUpdated })
 
   const viewedVersionQuery = workflowClient.useQuery(
@@ -184,13 +189,18 @@ export function useBuilderVersionHistory({
 
   return {
     filteredVersions,
+    triggerRemovalConfirmDialog,
     publishedVersionName,
     statusFilter,
     setStatusFilter,
     exportVersion,
     openInNewWindow,
     publishVersion,
+    reviewVersionForPublish,
     isPublishingVersion,
+    isCheckingOutputContract,
+    reviewedPublishVersion,
+    reviewFailedVersion,
     breakingChanges,
     publishReview: { contractChanges, parentWorkflows },
     confirmPublishVersion,

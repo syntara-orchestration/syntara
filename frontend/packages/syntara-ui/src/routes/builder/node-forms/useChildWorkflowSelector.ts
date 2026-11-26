@@ -259,11 +259,16 @@ export function useChildWorkflowSelector({
     workflowsQuery.isError || selectedWorkflowQuery.isError || schemaLookup.hasRetryableError ? 'danger' : 'warning'
 
   function retryFailedLookups(workflowId?: string) {
-    if (projectId) detachPromise(workflowsQuery.refetch())
-    if (selectedWorkflowQuery.isError) detachPromise(selectedWorkflowQuery.refetch())
-    const queries = workflowId ? [schemasByWorkflowId.get(workflowId)] : [...schemasByWorkflowId.values()]
-    for (const query of queries) {
+    if (workflowId) {
+      const query = schemasByWorkflowId.get(workflowId)
       if (query) detachPromise(query.refetch())
+      return
+    }
+
+    if (projectId && workflowsQuery.isError) detachPromise(workflowsQuery.refetch())
+    if (selectedWorkflowQuery.isError) detachPromise(selectedWorkflowQuery.refetch())
+    for (const query of schemasByWorkflowId.values()) {
+      if (query.isError) detachPromise(query.refetch())
     }
   }
 

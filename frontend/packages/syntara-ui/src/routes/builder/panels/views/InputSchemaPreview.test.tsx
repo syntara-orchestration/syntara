@@ -1,5 +1,6 @@
 import type { OutputFieldDef } from '@syntara/contracts'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import { axe } from 'vitest-axe'
 
@@ -32,6 +33,41 @@ describe('InputSchemaPreview', () => {
 
     expect(screen.getByText('Standard output from the script execution')).toBeInTheDocument()
     expect(screen.getByText('Process exit code (0 = success)')).toBeInTheDocument()
+  })
+
+  it('shows a Required badge only for required fields and renders runtime values below the description', () => {
+    const tree: InputSchemaPreviewNode[] = [
+      {
+        name: 'release_url',
+        type: 'string',
+        description: 'URL of the published release',
+        fieldPath: ['release_url'],
+        required: true,
+      },
+      {
+        name: 'notes',
+        type: 'string',
+        description: 'Optional release notes',
+        fieldPath: ['notes'],
+        required: false,
+      },
+    ]
+    render(
+      <InputSchemaPreview
+        tree={tree}
+        nodeId="invoke_child"
+        runtimeValues={{ release_url: 'https://example.test/release', notes: 'No changes' }}
+      />
+    )
+
+    const requiredField = screen.getByRole('treeitem', { name: /release_url/ })
+    expect(within(requiredField).getByText('Required')).toBeInTheDocument()
+    expect(within(requiredField).getByText('URL of the published release')).toBeInTheDocument()
+    expect(within(requiredField).getByText('https://example.test/release')).toBeInTheDocument()
+
+    const optionalField = screen.getByRole('treeitem', { name: /notes/ })
+    expect(within(optionalField).queryByText('optional')).not.toBeInTheDocument()
+    expect(within(optionalField).getByText('No changes')).toBeInTheDocument()
   })
 
   it('renders type label T for string fields', () => {
@@ -76,10 +112,11 @@ describe('InputSchemaPreview', () => {
     expect(screen.getByText('? mystery')).toBeInTheDocument()
   })
 
-  it('renders the info banner about expected output fields', () => {
+  it('shows an accessible help popover beside the expected output fields heading', () => {
     render(<InputSchemaPreview fields={sampleFields} nodeId="step-1" />)
 
-    expect(screen.getByText('Expected output fields (run step to see actual values)')).toBeInTheDocument()
+    expect(screen.getByText('Expected output fields')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Expected output fields help' })).toBeInTheDocument()
   })
 
   it('renders a tree with the schema preview aria-label', () => {
@@ -121,7 +158,8 @@ describe('InputSchemaPreview', () => {
     expect(setDataCalls[1][1]).toBe('${step-1.hostname}')
   })
 
-  it('builds the public dotted-path expression when dragging a nested declared output', () => {
+  it('builds the public dotted-path expression when dragging a nested declared output', async () => {
+    const user = userEvent.setup()
     const nestedOutputTree: InputSchemaPreviewNode[] = [
       {
         name: 'outputs',
@@ -152,6 +190,9 @@ describe('InputSchemaPreview', () => {
 
     const expression = '${invoke_child.outputs.release.version}'
     const setDataCalls: Array<[string, string]> = []
+    const releaseGroup = screen.getByRole('treeitem', { name: '{} release Release metadata' })
+    await user.click(within(releaseGroup).getByRole('button'))
+
     fireEvent.dragStart(screen.getByText('T version'), {
       dataTransfer: {
         setData: (format: string, value: string) => setDataCalls.push([format, value]),
@@ -222,11 +263,107 @@ describe('InputSchemaPreview', () => {
     render(<InputSchemaPreview fields={nestedFields} nodeId="step-1" searchTerm="status" />)
 
     // Parent group should be visible
-    expect(screen.getByText(/Result/)).toBeInTheDocument()
+    expect(screen.getByText('{} Result')).toBeInTheDocument()
     // Matching child should be visible
     expect(screen.getByText(/status/)).toBeInTheDocument()
     // Non-matching child should not be visible
     expect(screen.queryByText(/data/)).not.toBeInTheDocument()
+  })
+
+  it('collapses nested declared-output groups until expanded', () => {
+    const nestedTree: InputSchemaPreviewNode[] = [
+      {
+        name: 'outputs',
+        type: 'object',
+        description: 'Declared outputs',
+        fieldPath: ['outputs'],
+        isGroup: true,
+        children: [
+          {
+            name: 'release',
+            type: 'object',
+            description: 'Release metadata',
+            fieldPath: ['outputs', 'release'],
+            isGroup: true,
+            children: [
+              {
+                name: 'url',
+                type: 'string',
+                description: 'Release URL',
+                fieldPath: ['outputs', 'release', 'url'],
+              },
+            ],
+          },
+        ],
+      },
+    ]
+
+    render(
+      <InputSchemaPreview
+        tree={nestedTree}
+        nodeId="invoke_child"
+        runtimeValues={{ outputs: { release: { url: 'https://example.test/release' } } }}
+      />
+    )
+
+    const releaseGroup = screen.getByRole('treeitem', { name: /^\{\} release/ })
+    expect(releaseGroup).toHaveAttribute('aria-expanded', 'false')
+    expect(within(releaseGroup).getByText('{"url":"https://example.test/release"}')).toBeInTheDocument()
+    expect(screen.queryByText('T url')).not.toBeInTheDocument()
+  })
+
+  it('matches full dotted paths and expands matching ancestors during search', () => {
+    const nestedTree: InputSchemaPreviewNode[] = [
+      {
+        name: 'outputs',
+        type: 'object',
+        description: 'Declared outputs',
+        fieldPath: ['outputs'],
+        isGroup: true,
+        children: [
+          {
+            name: 'release',
+            type: 'object',
+            description: 'Release metadata',
+            fieldPath: ['outputs', 'release'],
+            isGroup: true,
+            children: [
+              {
+                name: 'artifact',
+                type: 'object',
+                description: 'Published artifact',
+                fieldPath: ['outputs', 'release', 'artifact'],
+                isGroup: true,
+                children: [
+                  {
+                    name: 'download_url',
+                    type: 'string',
+                    description: 'Download URL',
+                    fieldPath: ['outputs', 'release', 'artifact', 'download_url'],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    ]
+    const { rerender } = render(<InputSchemaPreview tree={nestedTree} nodeId="invoke_child" />)
+
+    rerender(<InputSchemaPreview tree={nestedTree} nodeId="invoke_child" searchTerm="release.artifact.download_url" />)
+
+    expect(screen.getByText('T download_url')).toBeInTheDocument()
+    const releaseGroup = screen.getByRole('treeitem', { name: /^\{\} release/ })
+    const artifactGroup = screen.getByRole('treeitem', { name: /^\{\} artifact/ })
+    expect(releaseGroup).toHaveAttribute('aria-expanded', 'true')
+    expect(artifactGroup).toHaveAttribute('aria-expanded', 'true')
+  })
+
+  it('shows a clear empty state when the schema search has no matches', () => {
+    render(<InputSchemaPreview fields={sampleFields} nodeId="step-1" searchTerm="not-a-field" />)
+
+    expect(screen.getByText('No output fields match your search')).toBeInTheDocument()
+    expect(screen.getByText('No output fields match “not-a-field”.')).toBeInTheDocument()
   })
 
   it('highlights matching text in field names and descriptions', () => {

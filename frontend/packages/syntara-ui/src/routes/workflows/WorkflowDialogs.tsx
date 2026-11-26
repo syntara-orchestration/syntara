@@ -48,7 +48,7 @@ type WorkflowDialogsProps = {
   /** Handler to delete a workflow - dialog closes in onSettled callback */
   onDeleteWorkflow: (workflow: Workflow) => void
   /** Handler to publish a workflow - dialog closes in onSettled callback */
-  onPublishWorkflow: (workflow: Workflow, publishName?: string, description?: string) => void
+  onPublishWorkflow: (workflow: Workflow, version: number, publishName?: string, description?: string) => void
   /** Handler to unpublish a workflow - dialog closes in onSettled callback */
   onUnpublishWorkflow: (workflow: Workflow) => void
   /** Handler to delete a project - dialog closes in onSettled callback */
@@ -168,6 +168,7 @@ export function WorkflowDialogs({
       <WorkflowDeleteDialog
         isOpen={deleteDialog.isOpen}
         workflowName={deleteDialog.item?.name ?? ''}
+        workflowId={deleteDialog.item?.id}
         onClose={deleteDialog.close}
         onConfirm={() => {
           if (deleteDialog.item) {

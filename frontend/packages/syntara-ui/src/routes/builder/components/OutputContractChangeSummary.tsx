@@ -1,18 +1,7 @@
-import {
-  Button,
-  Content,
-  ExpandableSection,
-  List,
-  ListItem,
-  Modal,
-  ModalBody,
-  ModalFooter,
-  ModalHeader,
-  Stack,
-  StackItem,
-} from '@patternfly/react-core'
+import { Content, ExpandableSection, List, ListItem, Stack, StackItem } from '@patternfly/react-core'
 import type { WorkflowAPI } from '@syntara/contracts'
-import { useState } from 'react'
+
+import { SynLabel } from '../../../components/labels/SynLabel'
 
 type ContractChange = WorkflowAPI.components['schemas']['TriggerBreakingChanges']
 type ParentReference = WorkflowAPI.components['schemas']['WorkflowReferenceRead']
@@ -20,112 +9,104 @@ type ParentReference = WorkflowAPI.components['schemas']['WorkflowReferenceRead'
 type Props = Readonly<{
   context: 'save' | 'publish'
   contractChanges: ContractChange[]
+  breakingChanges?: ContractChange[]
+  hasBreakingChanges?: boolean
   parentWorkflows: ParentReference[]
 }>
 
-type ParentWorkflowGroup = {
-  workflowId: string
-  workflowName: string
-  workflowVersion: number
-  stepDescriptions: string[]
-}
+type OutputChangeDetail = Readonly<{
+  key: string
+  text: string
+  changeType: string
+  fieldPath: string
+  oldType?: string | null
+  newType?: string | null
+  triggerName: string
+}>
 
-const CHANGE_TYPE_LABELS: Record<string, string> = {
-  removed_trigger: 'Sub-workflow triggers removed',
-  removed_output: 'Outputs removed',
-  type_change: 'Output types changed',
-  new_required_output: 'Required outputs added',
-  added_output: 'Optional outputs added',
-  optional_output: 'Outputs made optional',
-  constraint_change: 'Output constraints changed',
-}
-
-function getParentWorkflowGroups(references: ParentReference[]): ParentWorkflowGroup[] {
-  const groups = new Map<string, ParentWorkflowGroup>()
-  for (const reference of references) {
-    const stepDescription = reference.step_name || reference.step_id
-    const existing = groups.get(reference.workflow_id)
-    if (existing) {
-      if (!existing.stepDescriptions.includes(stepDescription)) existing.stepDescriptions.push(stepDescription)
-      continue
-    }
-    groups.set(reference.workflow_id, {
-      workflowId: reference.workflow_id,
-      workflowName: reference.workflow_name,
-      workflowVersion: reference.workflow_version,
-      stepDescriptions: [stepDescription],
-    })
-  }
-  return [...groups.values()]
-}
-
-function groupContractChanges(changes: ContractChange[]) {
-  const counts = new Map<string, number>()
-  for (const trigger of changes) {
-    for (const change of trigger.changes) {
-      const label = CHANGE_TYPE_LABELS[change.change_type] ?? 'Other output changes'
-      counts.set(label, (counts.get(label) ?? 0) + 1)
-    }
-  }
-  return [...counts.entries()]
-}
-
-function ParentWorkflowReferencesModal({
-  isOpen,
-  onClose,
-  parentWorkflows,
-}: Readonly<{
-  isOpen: boolean
-  onClose: () => void
-  parentWorkflows: ParentReference[]
-}>) {
-  const parentGroups = getParentWorkflowGroups(parentWorkflows)
-
-  return (
-    <Modal isOpen={isOpen} onClose={onClose} variant="medium" aria-label="Visible published parent workflows">
-      <ModalHeader title="Visible published parent workflows" />
-      <ModalBody>
-        <Content component="p">
-          These {parentGroups.length} visible parent workflows will use the updated child version on their next run.
-          References outside your visibility scope may not be listed.
-        </Content>
-        <List isPlain>
-          {parentGroups.map((parent) => (
-            <ListItem key={parent.workflowId}>
-              {parent.workflowName} (parent v{parent.workflowVersion}) — {parent.stepDescriptions.join(', ')}
-            </ListItem>
-          ))}
-        </List>
-      </ModalBody>
-      <ModalFooter>
-        <Button variant="primary" onClick={onClose}>
-          Done
-        </Button>
-      </ModalFooter>
-    </Modal>
-  )
-}
-
-function ParentWorkflowImpact({
-  context,
-  parentWorkflows,
-}: Readonly<{
-  context: 'save' | 'publish'
-  parentWorkflows: ParentReference[]
-}>) {
-  const [isParentReferencesOpen, setIsParentReferencesOpen] = useState(false)
-  const parentWorkflowCount = getParentWorkflowGroups(parentWorkflows).length
-
-  if (context === 'save') {
-    return (
-      <StackItem>
-        <Content component="p">
-          Saving updates this draft only. Zero published parent workflows are affected; they continue using the latest
-          published child version.
-        </Content>
-      </StackItem>
+function getOutputChangeDetails(contractChanges: ContractChange[]): OutputChangeDetail[] {
+  const schemaChangeKeys = new Set(
+    contractChanges.flatMap((trigger) =>
+      trigger.changes
+        .filter((change) => change.change_type !== 'mapping_changed')
+        .map((change) => `${trigger.trigger_id}:${change.field_path}`)
     )
+  )
+
+  return contractChanges.flatMap((trigger) => {
+    return trigger.changes.flatMap((change) => {
+      const changeKey = `${trigger.trigger_id}:${change.field_path}`
+      if (change.change_type === 'mapping_changed' && schemaChangeKeys.has(changeKey)) return []
+
+      const triggerName = trigger.trigger_name || trigger.trigger_id
+      const rawDescription =
+        change.description.trim().replace(/[.\s]+$/, '') || `${change.change_type}: ${change.field_path}`
+      const typeDetails =
+        change.old_type && change.new_type && change.old_type !== change.new_type
+          ? `${change.old_type} → ${change.new_type}`
+          : change.old_type || change.new_type
+      const description =
+        typeDetails && !rawDescription.includes(typeDetails) ? `${rawDescription} (${typeDetails})` : rawDescription
+      return {
+        key: `${trigger.trigger_id}:${change.change_type}:${change.field_path}:${description}`,
+        text: `${triggerName}: ${description}`,
+        changeType: change.change_type,
+        fieldPath: change.field_path,
+        oldType: change.old_type,
+        newType: change.new_type,
+        triggerName,
+      }
+    })
+  })
+}
+
+function describeOutputChange(change: OutputChangeDetail): string {
+  const outputName = `“${change.fieldPath}”`
+  switch (change.changeType) {
+    case 'removed_output':
+      return `removes the output ${outputName}`
+    case 'type_change':
+      return `changes the type of the output ${outputName}`
+    case 'new_required_output':
+      return `adds the required output ${outputName}`
+    case 'required_output':
+      return `makes the output ${outputName} required`
+    case 'added_output':
+      return `adds the optional output ${outputName}`
+    case 'optional_output':
+      return `makes the output ${outputName} optional`
+    case 'constraint_change':
+      if (change.fieldPath === '$root') return 'changes root-level validation constraints'
+      return `changes validation constraints for the output ${outputName}`
+    case 'removed_trigger':
+      return `removes the Subworkflow Trigger “${change.triggerName}”`
+    case 'mapping_changed':
+      return `changes the source mapping for the output ${outputName}`
+    default:
+      return `changes the output ${outputName}`
   }
+}
+
+function summarizeOutputChanges(details: OutputChangeDetail[], context: Props['context']): string {
+  if (details.length === 0) return 'No declared output changes were detected.'
+
+  const versionKind = context === 'publish' ? 'This version' : 'This draft'
+  const firstChange = describeOutputChange(details[0])
+  const additionalChangeCount = details.length - 1
+  if (additionalChangeCount === 0) return `${versionKind} ${firstChange}.`
+
+  const changeLabel =
+    additionalChangeCount === 1 ? 'additional output contract change' : 'additional output contract changes'
+  return `${versionKind} ${firstChange} and ${additionalChangeCount} ${changeLabel}.`
+}
+
+function shouldShowDetails(details: OutputChangeDetail[]): boolean {
+  if (details.length > 1) return true
+  return details.some((detail) => detail.changeType !== 'removed_output' && Boolean(detail.oldType || detail.newType))
+}
+
+function ParentWorkflowImpact({ parentWorkflows }: Readonly<{ parentWorkflows: ParentReference[] }>) {
+  const parentWorkflowCount = new Set(parentWorkflows.map((parent) => parent.workflow_id)).size
 
   if (parentWorkflowCount === 0) {
     return (
@@ -138,66 +119,49 @@ function ParentWorkflowImpact({
   }
 
   return (
-    <>
-      <StackItem>
-        <Content component="h4">{parentWorkflowCount} visible published parent workflows affected</Content>
-        <Content component="p">
-          They will use the updated child version on their next run. References outside your visibility scope may not be
-          listed.
-        </Content>
-        <Button variant="link" onClick={() => setIsParentReferencesOpen(true)}>
-          View visible parent workflows
-        </Button>
-      </StackItem>
-      <ParentWorkflowReferencesModal
-        isOpen={isParentReferencesOpen}
-        onClose={() => setIsParentReferencesOpen(false)}
-        parentWorkflows={parentWorkflows}
-      />
-    </>
+    <StackItem>
+      <SynLabel color="grey">
+        Used by {parentWorkflowCount} visible published {parentWorkflowCount === 1 ? 'workflow' : 'workflows'}
+      </SynLabel>
+    </StackItem>
   )
 }
 
-export function OutputContractChangeSummary({ context, contractChanges, parentWorkflows }: Props) {
-  const changeCounts = groupContractChanges(contractChanges)
-  const totalChangeCount = changeCounts.reduce((total, [, count]) => total + count, 0)
+export function OutputContractChangeSummary({
+  context,
+  contractChanges,
+  breakingChanges,
+  hasBreakingChanges = false,
+  parentWorkflows,
+}: Props) {
+  const changesToSummarize =
+    context === 'publish' && hasBreakingChanges ? (breakingChanges ?? contractChanges) : contractChanges
+  const changeDetails = getOutputChangeDetails(changesToSummarize)
+  const changeSummary = summarizeOutputChanges(changeDetails, context)
+  const impactSummary =
+    context === 'publish'
+      ? 'Published parent workflows will use the updated child version on their next run.'
+      : 'Saving updates this draft only; published parent workflows continue using the latest published child version.'
 
   return (
     <Stack hasGutter>
       <StackItem>
-        <Content component="p">These changes affect the values and fields exposed by the child workflow.</Content>
+        <Content component="p">
+          {changeSummary} {impactSummary}
+        </Content>
       </StackItem>
-      {totalChangeCount > 0 ? (
+      {shouldShowDetails(changeDetails) && (
         <StackItem>
-          <Content component="h4">Output contract changes</Content>
-          <List isPlain>
-            {changeCounts.map(([label, count]) => (
-              <ListItem key={label}>
-                {label}: {count}
-              </ListItem>
-            ))}
-          </List>
-          <ExpandableSection toggleText={`View details for ${totalChangeCount} output changes`} isIndented>
-            {contractChanges.map((trigger) => (
-              <Stack hasGutter key={trigger.trigger_id}>
-                <StackItem>
-                  <Content component="h4">{trigger.trigger_name || trigger.trigger_id}</Content>
-                  <List isPlain>
-                    {trigger.changes.map((change) => (
-                      <ListItem key={`${change.change_type}-${change.field_path}`}>{change.description}</ListItem>
-                    ))}
-                  </List>
-                </StackItem>
-              </Stack>
-            ))}
+          <ExpandableSection toggleText="View output change details" isIndented>
+            <List isPlain>
+              {changeDetails.map((detail) => (
+                <ListItem key={detail.key}>{detail.text}</ListItem>
+              ))}
+            </List>
           </ExpandableSection>
         </StackItem>
-      ) : (
-        <StackItem>
-          <Content component="p">No output field changes are included in this review.</Content>
-        </StackItem>
       )}
-      <ParentWorkflowImpact context={context} parentWorkflows={parentWorkflows} />
+      {context === 'publish' && <ParentWorkflowImpact parentWorkflows={parentWorkflows} />}
     </Stack>
   )
 }

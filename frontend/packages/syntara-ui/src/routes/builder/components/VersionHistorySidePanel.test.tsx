@@ -1,5 +1,7 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import type { ReactElement } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 
@@ -57,6 +59,10 @@ function createSidePanelState(overrides: Partial<VersionSidePanelState> = {}): V
     publishDialog: {
       isOpen: false,
       isPublishing: false,
+      isCheckingContractChanges: false,
+      isPublishDisabled: true,
+      hasContractReviewError: false,
+      onRetryContractReview: vi.fn(),
       breakingChanges: [],
       contractChanges: [],
       parentWorkflows: [],
@@ -90,9 +96,15 @@ function createSidePanelState(overrides: Partial<VersionSidePanelState> = {}): V
   }
 }
 
+const testQueryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+
+function renderWithClient(ui: ReactElement) {
+  return render(<QueryClientProvider client={testQueryClient}>{ui}</QueryClientProvider>)
+}
+
 describe('VersionHistorySidePanel', () => {
   it('renders VersionHistoryPanel when show is true and node editor is closed', () => {
-    render(<VersionHistorySidePanel sidePanel={createSidePanelState()} isNodeEditorOpen={false} />)
+    renderWithClient(<VersionHistorySidePanel sidePanel={createSidePanelState()} isNodeEditorOpen={false} />)
 
     expect(screen.getByTestId('version-history-panel')).toBeInTheDocument()
   })
@@ -109,7 +121,7 @@ describe('VersionHistorySidePanel', () => {
         onPerPageChange: vi.fn(),
       },
     })
-    render(<VersionHistorySidePanel sidePanel={sidePanel} isNodeEditorOpen={false} />)
+    renderWithClient(<VersionHistorySidePanel sidePanel={sidePanel} isNodeEditorOpen={false} />)
 
     const panel = screen.getByTestId('version-history-panel')
     expect(panel).toHaveAttribute('data-page', '2')
@@ -117,13 +129,15 @@ describe('VersionHistorySidePanel', () => {
   })
 
   it('does not render VersionHistoryPanel when show is false', () => {
-    render(<VersionHistorySidePanel sidePanel={createSidePanelState({ show: false })} isNodeEditorOpen={false} />)
+    renderWithClient(
+      <VersionHistorySidePanel sidePanel={createSidePanelState({ show: false })} isNodeEditorOpen={false} />
+    )
 
     expect(screen.queryByTestId('version-history-panel')).not.toBeInTheDocument()
   })
 
   it('does not render VersionHistoryPanel when node editor is open', () => {
-    render(<VersionHistorySidePanel sidePanel={createSidePanelState()} isNodeEditorOpen={true} />)
+    renderWithClient(<VersionHistorySidePanel sidePanel={createSidePanelState()} isNodeEditorOpen={true} />)
 
     expect(screen.queryByTestId('version-history-panel')).not.toBeInTheDocument()
   })
@@ -133,6 +147,10 @@ describe('VersionHistorySidePanel', () => {
       publishDialog: {
         isOpen: true,
         isPublishing: false,
+        isCheckingContractChanges: false,
+        isPublishDisabled: false,
+        hasContractReviewError: false,
+        onRetryContractReview: vi.fn(),
         breakingChanges: [],
         contractChanges: [],
         parentWorkflows: [],
@@ -142,7 +160,7 @@ describe('VersionHistorySidePanel', () => {
         onCancelBreakingChanges: vi.fn(),
       },
     })
-    render(<VersionHistorySidePanel sidePanel={sidePanel} isNodeEditorOpen={false} />)
+    renderWithClient(<VersionHistorySidePanel sidePanel={sidePanel} isNodeEditorOpen={false} />)
 
     expect(screen.getByTestId('publish-dialog')).toBeInTheDocument()
   })
@@ -156,7 +174,7 @@ describe('VersionHistorySidePanel', () => {
         onCancel: vi.fn(),
       },
     })
-    render(<VersionHistorySidePanel sidePanel={sidePanel} isNodeEditorOpen={false} />)
+    renderWithClient(<VersionHistorySidePanel sidePanel={sidePanel} isNodeEditorOpen={false} />)
 
     expect(screen.getByTestId('save-before-view-dialog')).toBeInTheDocument()
   })
@@ -171,7 +189,7 @@ describe('VersionHistorySidePanel', () => {
         onConfirm: vi.fn(),
       },
     })
-    render(<VersionHistorySidePanel sidePanel={sidePanel} isNodeEditorOpen={false} />)
+    renderWithClient(<VersionHistorySidePanel sidePanel={sidePanel} isNodeEditorOpen={false} />)
 
     expect(screen.getByText('Restore version from May 19, 2026?')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Restore version' })).toBeInTheDocument()
@@ -189,7 +207,7 @@ describe('VersionHistorySidePanel', () => {
         onConfirm,
       },
     })
-    render(<VersionHistorySidePanel sidePanel={sidePanel} isNodeEditorOpen={false} />)
+    renderWithClient(<VersionHistorySidePanel sidePanel={sidePanel} isNodeEditorOpen={false} />)
 
     await user.click(screen.getByRole('button', { name: 'Restore version' }))
 
@@ -207,13 +225,13 @@ describe('VersionHistorySidePanel', () => {
         initialDescription: 'First release',
       },
     })
-    render(<VersionHistorySidePanel sidePanel={sidePanel} isNodeEditorOpen={false} />)
+    renderWithClient(<VersionHistorySidePanel sidePanel={sidePanel} isNodeEditorOpen={false} />)
 
     expect(screen.getByText('Edit version name and description')).toBeInTheDocument()
   })
 
   it('does not render EditVersionDialog when editDialog is closed', () => {
-    render(<VersionHistorySidePanel sidePanel={createSidePanelState()} isNodeEditorOpen={false} />)
+    renderWithClient(<VersionHistorySidePanel sidePanel={createSidePanelState()} isNodeEditorOpen={false} />)
 
     expect(screen.queryByText('Edit version name and description')).not.toBeInTheDocument()
   })
@@ -229,7 +247,7 @@ describe('VersionHistorySidePanel', () => {
           onConfirm: vi.fn(),
         },
       })
-      const { container } = render(<VersionHistorySidePanel sidePanel={sidePanel} isNodeEditorOpen={false} />)
+      const { container } = renderWithClient(<VersionHistorySidePanel sidePanel={sidePanel} isNodeEditorOpen={false} />)
       expect(await axe(container)).toHaveNoViolations()
     })
   })

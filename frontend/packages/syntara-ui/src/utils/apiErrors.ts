@@ -8,6 +8,8 @@
  * - WebSocket error events: { data: { ... } }
  */
 
+import type { WorkflowAPI } from '@syntara/contracts'
+
 /** RFC 9457 Problem Details format */
 export type ProblemDetails = {
   type: string
@@ -709,6 +711,56 @@ export function isConflictError(error: unknown): boolean {
  */
 export function isWorkflowVersionConflictError(error: unknown): error is Record<string, unknown> {
   return getErrorCode(error) === 'WORKFLOW_VERSION_CONFLICT'
+}
+
+/** True when a publish was rejected because it removes a Subworkflow Trigger used by published parents. */
+export function isPublishTriggerRemovalConfirmationError(error: unknown): boolean {
+  return getErrorCode(error) === 'WORKFLOW_PUBLISH_TRIGGER_REMOVAL_CONFIRMATION_REQUIRED'
+}
+
+/** Generated problem schema for the publish trigger-removal 409 (count field only). */
+type TriggerRemovalConfirmationProblem = Pick<
+  WorkflowAPI.components['schemas']['WorkflowPublishTriggerRemovalConfirmationProblem'],
+  'affected_count'
+>
+
+/**
+ * Distinct count of affected published parents from a trigger-removal publish confirmation 409.
+ *
+ * Returns ``null`` when the count is missing or not a positive integer, so a malformed confirmation
+ * response is handled as a generic error instead of a misleading zero-count dependency dialog. The
+ * field name is checked against the generated contract via ``satisfies keyof``.
+ */
+export function extractPublishTriggerRemovalAffectedCount(error: unknown): number | null {
+  if (!error || typeof error !== 'object') return null
+  const body = getErrorBody(error as Record<string, unknown>)
+  const count = body['affected_count' satisfies keyof TriggerRemovalConfirmationProblem]
+  return typeof count === 'number' && Number.isInteger(count) && count >= 1 ? count : null
+}
+
+/** True when a delete was rejected because the workflow is referenced by published parents. */
+export function isWorkflowReferencedConfirmationError(error: unknown): boolean {
+  return getErrorCode(error) === 'WORKFLOW_REFERENCED_CONFIRMATION_REQUIRED'
+}
+
+/** Generated problem schema for the delete confirmation 409 (count field only). */
+type ReferencedConfirmationProblem = Pick<
+  WorkflowAPI.components['schemas']['WorkflowReferencedConfirmationProblem'],
+  'referencing_count'
+>
+
+/**
+ * Distinct count of referencing published parents from a delete confirmation 409.
+ *
+ * Returns ``null`` when the count is missing or not a positive integer, so a malformed confirmation
+ * response is handled as a generic error instead of a misleading zero-count dependency dialog. The
+ * field name is checked against the generated contract via ``satisfies keyof``.
+ */
+export function extractReferencedParentCount(error: unknown): number | null {
+  if (!error || typeof error !== 'object') return null
+  const body = getErrorBody(error as Record<string, unknown>)
+  const count = body['referencing_count' satisfies keyof ReferencedConfirmationProblem]
+  return typeof count === 'number' && Number.isInteger(count) && count >= 1 ? count : null
 }
 
 function getErrorBody(error: Record<string, unknown>): Record<string, unknown> {

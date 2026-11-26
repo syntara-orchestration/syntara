@@ -1,5 +1,5 @@
 import { ActivityTypeEnum } from '@syntara/contracts'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
@@ -117,6 +117,44 @@ describe('InputNodeContent for Sub-workflow steps', () => {
     })
     expect(dragCalls.find(([format]) => format === 'text/plain')?.[1]).toBe('${invoke_child.outputs.status}')
     expect(await axe(container)).toHaveNoViolations()
+  })
+
+  it('shows schema descriptions and runtime values together for a completed child', async () => {
+    const user = userEvent.setup()
+    vi.mocked(useChildWorkflowSchema).mockReturnValue(
+      makeSchemaState({
+        selectedTriggerNodeId: 'child-entry',
+        isEligible: true,
+        childSteps: [declaredOutputs()],
+      })
+    )
+
+    render(
+      <InputNodeContent
+        upstreamNode={upstreamNode}
+        hasData
+        mergedExecutionData={{
+          invoke_child: {
+            child_execution_id: 'execution-1',
+            child_status: 'completed',
+            outputs: { status: 'ready' },
+          },
+        }}
+        triggers={undefined}
+        activeView="schema"
+        searchTerm=""
+      />
+    )
+
+    const outputField = screen.getByRole('treeitem', { name: /^T status/ })
+    expect(within(outputField).getByText('Public status')).toBeInTheDocument()
+    expect(within(outputField).getByText('ready')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Expected output fields help' }))
+    expect(
+      screen.getByText(
+        'Required fields must be produced or the child run fails. Optional fields may be omitted if their source step does not run.'
+      )
+    ).toBeInTheDocument()
   })
 
   it('renders a large declared output contract without exposing internal step groups', () => {

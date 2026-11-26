@@ -1,6 +1,7 @@
 import type { WorkflowAPI } from '@syntara/contracts'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { renderHook, waitFor } from '@testing-library/react'
+import { render, renderHook, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import type { ReactNode } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -34,6 +35,17 @@ type MutationCallbacks = {
   onSettled?: () => void
 }
 
+const mocks = vi.hoisted(() => ({ publishParams: vi.fn() }))
+// Shared, test-controllable publish behavior for the trigger-removal 409 path.
+const publishMock = vi.hoisted(() => ({ simulate409: false, confirmCalls: [] as boolean[] }))
+
+// Shared, test-controllable delete behavior for the referenced-parents 409 path.
+const deleteMock = vi.hoisted((): { simulate409: boolean; confirmCalls: boolean[]; retryError: unknown } => ({
+  simulate409: false,
+  confirmCalls: [],
+  retryError: null,
+}))
+
 // Mock the API clients
 vi.mock('../../client', () => ({
   executionsClient: {
@@ -57,8 +69,22 @@ vi.mock('../../client', () => ({
       if (path === '/workflows/{workflow_id}') {
         // Delete mutation
         return {
-          mutate: vi.fn((_params: unknown, callbacks?: MutationCallbacks) => {
-            // Simulate successful deletion
+          mutate: vi.fn((params: unknown, callbacks?: MutationCallbacks) => {
+            const confirm = (params as { params?: { query?: { confirm?: boolean } } })?.params?.query?.confirm === true
+            deleteMock.confirmCalls.push(confirm)
+            // Referenced-by-published-parents 409: an unconfirmed delete is rejected until confirm=true.
+            if (deleteMock.simulate409 && !confirm) {
+              callbacks?.onError?.({
+                cause: { code: 'WORKFLOW_REFERENCED_CONFIRMATION_REQUIRED', referencing_count: 3 },
+              })
+              callbacks?.onSettled?.()
+              return
+            }
+            if (confirm && deleteMock.retryError) {
+              callbacks?.onError?.(deleteMock.retryError)
+              callbacks?.onSettled?.()
+              return
+            }
             callbacks?.onSuccess?.()
             callbacks?.onSettled?.()
           }),
@@ -68,8 +94,19 @@ vi.mock('../../client', () => ({
       if (typeof path === 'string' && path.includes('/publish')) {
         // Publish mutation
         return {
-          mutate: vi.fn((_params: unknown, callbacks?: MutationCallbacks) => {
-            // Simulate successful publish
+          mutate: vi.fn((params: unknown, callbacks?: MutationCallbacks) => {
+            mocks.publishParams(params)
+            const confirm = (params as { params?: { query?: { confirm?: boolean } } })?.params?.query?.confirm === true
+            publishMock.confirmCalls.push(confirm)
+            // Trigger-removal 409: an unconfirmed publish is rejected until confirm=true.
+            if (publishMock.simulate409 && !confirm) {
+              callbacks?.onError?.({
+                cause: { code: 'WORKFLOW_PUBLISH_TRIGGER_REMOVAL_CONFIRMATION_REQUIRED', affected_count: 2 },
+              })
+              callbacks?.onSettled?.()
+              return
+            }
+            // Simulate successful publish.
             callbacks?.onSuccess?.()
             callbacks?.onSettled?.()
           }),
@@ -111,6 +148,194 @@ describe('useWorkflowActions', () => {
     vi.clearAllMocks()
     vi.mocked(executionsFetchClient.POST).mockReset()
     vi.mocked(workflowFetchClient.GET).mockReset()
+    publishMock.simulate409 = false
+    publishMock.confirmCalls = []
+    deleteMock.simulate409 = false
+    deleteMock.confirmCalls = []
+    deleteMock.retryError = null
+  })
+
+  describe('publish trigger-removal confirmation (list page)', () => {
+    it('opens the confirm dialog on a trigger-removal 409 and republishes with confirm=true', async () => {
+      publishMock.simulate409 = true
+      const user = userEvent.setup()
+
+      function Harness() {
+        const actions = useWorkflowActions({
+          showSuccess: mockShowSuccess,
+          showError: mockShowError,
+          onNavigate: mockOnNavigate,
+          onRefetch: mockOnRefetch,
+        })
+        return (
+          <>
+            <button type="button" onClick={() => actions.handlePublishWorkflow(mockWorkflow())}>
+              do-publish
+            </button>
+            {actions.triggerRemovalConfirmDialog}
+          </>
+        )
+      }
+
+      render(<Harness />, { wrapper: createWrapper() })
+      await user.click(screen.getByRole('button', { name: 'do-publish' }))
+
+      // First publish (confirm=false) returns the 409 -> confirmation dialog, no generic error yet.
+      const confirmButton = await screen.findByRole('button', { name: 'Publish anyway' })
+      expect(mockShowError).not.toHaveBeenCalled()
+
+      await user.click(confirmButton)
+
+      await waitFor(() =>
+        expect(mockShowSuccess).toHaveBeenCalledWith(expect.objectContaining({ title: 'Workflow published' }))
+      )
+      expect(publishMock.confirmCalls).toEqual([false, true])
+    })
+  })
+
+  describe('referenced delete confirmation (list page)', () => {
+    it('opens the confirm dialog on a referenced 409 and re-deletes with confirm=true', async () => {
+      deleteMock.simulate409 = true
+      const user = userEvent.setup()
+
+      function Harness() {
+        const actions = useWorkflowActions({
+          showSuccess: mockShowSuccess,
+          showError: mockShowError,
+          onNavigate: mockOnNavigate,
+          onRefetch: mockOnRefetch,
+        })
+        return (
+          <>
+            <button type="button" onClick={() => actions.handleDeleteWorkflow(mockWorkflow())}>
+              do-delete
+            </button>
+            {actions.referencedDeleteConfirmDialog}
+          </>
+        )
+      }
+
+      render(<Harness />, { wrapper: createWrapper() })
+      await user.click(screen.getByRole('button', { name: 'do-delete' }))
+
+      // First delete (confirm=false) returns the 409 -> confirmation dialog, no generic error yet.
+      const confirmButton = await screen.findByRole('button', { name: 'Delete anyway' })
+      expect(mockShowError).not.toHaveBeenCalled()
+
+      await user.click(confirmButton)
+
+      await waitFor(() =>
+        expect(mockShowSuccess).toHaveBeenCalledWith(expect.objectContaining({ title: 'Workflow deleted' }))
+      )
+      expect(deleteMock.confirmCalls).toEqual([false, true])
+    })
+
+    it('cancelling the dependency dialog issues no confirmed DELETE (sequence stays [false])', async () => {
+      deleteMock.simulate409 = true
+      const user = userEvent.setup()
+
+      function Harness() {
+        const actions = useWorkflowActions({
+          showSuccess: mockShowSuccess,
+          showError: mockShowError,
+          onNavigate: mockOnNavigate,
+          onRefetch: mockOnRefetch,
+        })
+        return (
+          <>
+            <button type="button" onClick={() => actions.handleDeleteWorkflow(mockWorkflow())}>
+              do-delete
+            </button>
+            {actions.referencedDeleteConfirmDialog}
+          </>
+        )
+      }
+
+      render(<Harness />, { wrapper: createWrapper() })
+      await user.click(screen.getByRole('button', { name: 'do-delete' }))
+      await screen.findByRole('button', { name: 'Delete anyway' })
+
+      await user.click(screen.getByRole('button', { name: 'Cancel' }))
+
+      // Cancel must never issue a confirmed DELETE: the request sequence stays [false].
+      expect(deleteMock.confirmCalls).toEqual([false])
+      expect(mockShowSuccess).not.toHaveBeenCalled()
+      await waitFor(() => expect(screen.queryByRole('button', { name: 'Delete anyway' })).not.toBeInTheDocument())
+    })
+
+    it('onDeleteSettled from the initial 409 does not clear the dependency confirmation', async () => {
+      deleteMock.simulate409 = true
+      const onDeleteSettled = vi.fn()
+      const user = userEvent.setup()
+
+      function Harness() {
+        const actions = useWorkflowActions({
+          showSuccess: mockShowSuccess,
+          showError: mockShowError,
+          onNavigate: mockOnNavigate,
+          onRefetch: mockOnRefetch,
+          onDeleteSettled,
+        })
+        return (
+          <>
+            <button type="button" onClick={() => actions.handleDeleteWorkflow(mockWorkflow())}>
+              do-delete
+            </button>
+            {actions.referencedDeleteConfirmDialog}
+          </>
+        )
+      }
+
+      render(<Harness />, { wrapper: createWrapper() })
+      await user.click(screen.getByRole('button', { name: 'do-delete' }))
+
+      // onDeleteSettled (which closes the original delete dialog) fires on the 409, but the
+      // dependency confirmation stays open and functional.
+      await waitFor(() => expect(onDeleteSettled).toHaveBeenCalledTimes(1))
+      const confirmButton = await screen.findByRole('button', { name: 'Delete anyway' })
+      await user.click(confirmButton)
+
+      await waitFor(() =>
+        expect(mockShowSuccess).toHaveBeenCalledWith(expect.objectContaining({ title: 'Workflow deleted' }))
+      )
+      expect(deleteMock.confirmCalls).toEqual([false, true])
+      expect(onDeleteSettled).toHaveBeenCalledTimes(2)
+    })
+
+    it('surfaces an unrelated error when the confirmed retry fails, with no success and no further retry', async () => {
+      deleteMock.simulate409 = true
+      deleteMock.retryError = { cause: { code: 'WORKFLOW_HAS_ACTIVE_EXECUTIONS' }, message: 'has active executions' }
+      const user = userEvent.setup()
+
+      function Harness() {
+        const actions = useWorkflowActions({
+          showSuccess: mockShowSuccess,
+          showError: mockShowError,
+          onNavigate: mockOnNavigate,
+          onRefetch: mockOnRefetch,
+        })
+        return (
+          <>
+            <button type="button" onClick={() => actions.handleDeleteWorkflow(mockWorkflow())}>
+              do-delete
+            </button>
+            {actions.referencedDeleteConfirmDialog}
+          </>
+        )
+      }
+
+      render(<Harness />, { wrapper: createWrapper() })
+      await user.click(screen.getByRole('button', { name: 'do-delete' }))
+      await user.click(await screen.findByRole('button', { name: 'Delete anyway' }))
+
+      await waitFor(() =>
+        expect(mockShowError).toHaveBeenCalledWith(expect.objectContaining({ title: 'Failed to delete workflow' }))
+      )
+      expect(mockShowSuccess).not.toHaveBeenCalled()
+      // Confirmed once (true); the failed retry is surfaced, not retried again.
+      expect(deleteMock.confirmCalls).toEqual([false, true])
+      expect(screen.queryByRole('button', { name: 'Delete anyway' })).not.toBeInTheDocument()
+    })
   })
 
   describe('onSettled callbacks', () => {
@@ -151,7 +376,7 @@ describe('useWorkflowActions', () => {
       )
 
       const workflow = mockWorkflow()
-      result.current.handlePublishWorkflow(workflow)
+      result.current.handlePublishWorkflow(workflow, 1)
 
       await waitFor(() => {
         expect(mockOnPublishSettled).toHaveBeenCalledTimes(1)
@@ -218,12 +443,56 @@ describe('useWorkflowActions', () => {
       )
 
       const workflow = mockWorkflow({ name: 'My Workflow' })
-      result.current.handlePublishWorkflow(workflow)
+      result.current.handlePublishWorkflow(workflow, 1)
 
       await waitFor(() => {
         expect(mockShowSuccess).toHaveBeenCalledWith({
           title: 'Workflow published',
         })
+      })
+    })
+
+    it('publishes the explicitly reviewed version instead of the workflow row version', async () => {
+      const { result } = renderHook(
+        () =>
+          useWorkflowActions({
+            showSuccess: mockShowSuccess,
+            showError: mockShowError,
+            onNavigate: mockOnNavigate,
+            onRefetch: mockOnRefetch,
+          }),
+        { wrapper: createWrapper() }
+      )
+
+      const workflow = mockWorkflow({ current_version: 8 })
+      result.current.handlePublishWorkflow(workflow, 5, 'Reviewed version', 'Reviewed description')
+
+      await waitFor(() => expect(mocks.publishParams).toHaveBeenCalledOnce())
+      expect(mocks.publishParams).toHaveBeenCalledWith({
+        params: { path: { workflow_id: 'wf-1', version: 5 }, query: { confirm: false } },
+        body: { name: 'Reviewed version', change_description: 'Reviewed description' },
+      })
+    })
+
+    it('publishes the version whose contract was reviewed', async () => {
+      const { result } = renderHook(
+        () =>
+          useWorkflowActions({
+            showSuccess: mockShowSuccess,
+            showError: mockShowError,
+            onNavigate: mockOnNavigate,
+            onRefetch: mockOnRefetch,
+          }),
+        { wrapper: createWrapper() }
+      )
+
+      const workflow = mockWorkflow({ current_version: 8 })
+      result.current.handlePublishWorkflow(workflow, 5, 'Reviewed version', 'Description')
+
+      await waitFor(() => expect(mocks.publishParams).toHaveBeenCalledOnce())
+      expect(mocks.publishParams).toHaveBeenCalledWith({
+        params: { path: { workflow_id: 'wf-1', version: 5 }, query: { confirm: false } },
+        body: { name: 'Reviewed version', change_description: 'Description' },
       })
     })
 

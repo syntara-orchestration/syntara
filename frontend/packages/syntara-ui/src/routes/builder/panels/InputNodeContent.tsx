@@ -39,6 +39,7 @@ type ChildWorkflowOutputContentProps = Pick<
   'upstreamNode' | 'onRunPreviousSteps' | 'workflowId' | 'searchTerm'
 > & {
   expressionNodeId: string
+  nodeData: Record<string, unknown> | null
 }
 
 function ChildWorkflowOutputStatus({
@@ -134,6 +135,7 @@ function ChildWorkflowOutputContent({
   onRunPreviousSteps,
   workflowId,
   searchTerm,
+  nodeData,
 }: Readonly<ChildWorkflowOutputContentProps>) {
   const childSchema = useChildWorkflowSchema({
     workflowId: upstreamNode.childWorkflowId ?? null,
@@ -147,7 +149,7 @@ function ChildWorkflowOutputContent({
 
   return (
     <Stack hasGutter>
-      {onRunPreviousSteps && workflowId && (
+      {!nodeData && onRunPreviousSteps && workflowId && (
         <StackItem>
           <Alert variant="info" isInline isPlain title="Expected input fields">
             <Button variant="link" onClick={onRunPreviousSteps} isInline>
@@ -160,16 +162,18 @@ function ChildWorkflowOutputContent({
       <StackItem>
         <ChildWorkflowOutputStatus childWorkflowId={upstreamNode.childWorkflowId} schema={childSchema} />
       </StackItem>
-      {hasDeclaredOutputs && (
-        <StackItem>
-          <Alert variant="info" isInline isPlain title="Declared outputs may be unavailable at runtime">
-            Required values fail the child run if their source is missing. Optional values are omitted when their source
-            step does not run.
-          </Alert>
-        </StackItem>
-      )}
       <StackItem>
-        <InputSchemaPreview tree={outputTree} nodeId={expressionNodeId} searchTerm={searchTerm} />
+        <InputSchemaPreview
+          tree={outputTree}
+          nodeId={expressionNodeId}
+          searchTerm={searchTerm}
+          runtimeValues={nodeData ?? undefined}
+          helpText={
+            hasDeclaredOutputs
+              ? 'Required fields must be produced or the child run fails. Optional fields may be omitted if their source step does not run.'
+              : 'Run the step to see actual values.'
+          }
+        />
       </StackItem>
     </Stack>
   )
@@ -188,19 +192,20 @@ export function InputNodeContent({
   const nodeData = hasData ? (mergedExecutionData?.[upstreamNode.id] ?? null) : null
   const expressionNodeId = TRIGGER_TYPES.has(upstreamNode.type) ? 'trigger' : upstreamNode.id
 
-  if (!nodeData) {
-    if (upstreamNode.type === ActivityTypeEnum.SUB_WORKFLOW) {
-      return (
-        <ChildWorkflowOutputContent
-          upstreamNode={upstreamNode}
-          expressionNodeId={expressionNodeId}
-          onRunPreviousSteps={onRunPreviousSteps}
-          workflowId={workflowId}
-          searchTerm={searchTerm}
-        />
-      )
-    }
+  if (upstreamNode.type === ActivityTypeEnum.SUB_WORKFLOW && (!nodeData || activeView === 'schema')) {
+    return (
+      <ChildWorkflowOutputContent
+        upstreamNode={upstreamNode}
+        expressionNodeId={expressionNodeId}
+        onRunPreviousSteps={onRunPreviousSteps}
+        workflowId={workflowId}
+        searchTerm={searchTerm}
+        nodeData={nodeData}
+      />
+    )
+  }
 
+  if (!nodeData) {
     const schema = getNodeOutputSchema(upstreamNode.type)
     const effectiveSchema = schema ?? getTriggerInputSchemaFields(upstreamNode.id, triggers)
     if (!effectiveSchema) {
@@ -232,14 +237,7 @@ export function InputNodeContent({
 
   switch (activeView) {
     case 'schema':
-      return (
-        <InputSchemaView
-          data={nodeData}
-          nodeId={expressionNodeId}
-          searchTerm={searchTerm}
-          hierarchical={upstreamNode.type === ActivityTypeEnum.SUB_WORKFLOW ? true : undefined}
-        />
-      )
+      return <InputSchemaView data={nodeData} nodeId={expressionNodeId} searchTerm={searchTerm} />
     case 'table':
       return <InputTableView data={nodeData} searchTerm={searchTerm} />
     case 'json':

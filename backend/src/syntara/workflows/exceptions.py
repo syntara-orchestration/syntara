@@ -164,6 +164,44 @@ class WorkflowHasActiveExecutionsError(WorkflowError):
         )
 
 
+@fastapi_exception(handler="syntara.workflows.error_handlers.workflow_referenced_delete_handler")
+class WorkflowReferencedByPublishedParentsError(WorkflowError):
+    """Raised when deleting a workflow referenced by published parents needs confirmation.
+
+    Deletion is allowed but requires an explicit confirm flag, so the UI can warn first. Only the
+    count of referencing parents is exposed -- never their identities, which the caller may not
+    be permitted to see.
+    """
+
+    def __init__(self, referencing_count: int, *, workflow_id: UUID) -> None:
+        """Initialize with the number of published parents referencing the workflow."""
+        self.workflow_id = workflow_id
+        self.referencing_count = referencing_count
+        super().__init__(
+            f"Workflow {workflow_id} is referenced by {referencing_count} published workflow(s). "
+            "Confirm deletion to proceed."
+        )
+
+
+@fastapi_exception(handler="syntara.workflows.error_handlers.workflow_publish_trigger_removal_handler")
+class WorkflowPublishTriggerRemovalConfirmationError(WorkflowError):
+    """Raised when a publish would remove a Subworkflow Trigger invoked by published parents.
+
+    Publishing is allowed but requires explicit confirmation so published callers are not broken
+    silently. Only the distinct count of affected published parents is exposed -- never their
+    identities, which the caller may not be permitted to see.
+    """
+
+    def __init__(self, affected_count: int, *, workflow_id: UUID) -> None:
+        """Initialize with the number of distinct published parents that would be affected."""
+        self.workflow_id = workflow_id
+        self.affected_count = affected_count
+        super().__init__(
+            f"Publishing workflow {workflow_id} removes a Subworkflow Trigger invoked by "
+            f"{affected_count} published workflow(s). Confirm to proceed."
+        )
+
+
 # ============================================================================
 # Trigger Exceptions (shared across trigger types)
 # ============================================================================

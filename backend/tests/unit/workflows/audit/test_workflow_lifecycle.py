@@ -119,3 +119,37 @@ class TestWorkflowLifecycleHandler:
         assert result.event_severity == EventSeverity.ERROR
         assert result.structured_data.error_type == "OperationalError"
         assert "version" not in result.structured_data.model_dump(exclude_none=True)
+
+
+def test_workflow_deleted_records_referencing_parent_ids() -> None:
+    """A confirmed deletion of a referenced workflow records the affected parent ids and count."""
+    parent_a = uuid4()
+    parent_b = uuid4()
+    event = WorkflowLifecycleEvent(
+        workflow_id=WORKFLOW_ID,
+        workflow_name="Shared sub-workflow",
+        action=WorkflowAction.DELETED,
+        project_id=PROJECT_ID,
+        referencing_parent_ids=[parent_a, parent_b],
+    )
+
+    result = WorkflowLifecycleHandler().handle(event)
+
+    assert result.event_action == "workflow_deleted"
+    assert result.workflow_id == WORKFLOW_ID
+    assert set(result.structured_data.referencing_parent_ids) == {str(parent_a), str(parent_b)}
+    assert result.structured_data.referencing_parent_count == 2
+
+
+def test_workflow_deleted_without_references_omits_parent_fields() -> None:
+    """Deleting an unreferenced workflow does not add the parent-id audit fields."""
+    event = WorkflowLifecycleEvent(
+        workflow_id=WORKFLOW_ID,
+        workflow_name="Lonely workflow",
+        action=WorkflowAction.DELETED,
+        project_id=PROJECT_ID,
+    )
+
+    result = WorkflowLifecycleHandler().handle(event)
+
+    assert not hasattr(result.structured_data, "referencing_parent_ids")

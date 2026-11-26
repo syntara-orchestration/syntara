@@ -42,6 +42,9 @@ vi.mock('../../client', () => ({
       isPending: false,
     })),
   },
+  workflowClient: {
+    useQuery: vi.fn(() => ({ data: undefined, isLoading: false, error: null })),
+  },
 }))
 
 vi.mock('../../providers/alerts/AlertContext', () => ({
@@ -569,6 +572,7 @@ describe('BuilderWorkflowPageHeader', () => {
   it('opens publish dialog and calls onPublish with form data', async () => {
     const user = userEvent.setup()
     const onPublish = vi.fn()
+    const onReviewOutputContract = vi.fn()
 
     render(
       <BuilderWorkflowPageHeader
@@ -578,6 +582,7 @@ describe('BuilderWorkflowPageHeader', () => {
         workflow={{ id: 'wf-1' }}
         publishedVersionId={null}
         onPublish={onPublish}
+        onReviewOutputContract={onReviewOutputContract}
       />
     )
 
@@ -589,6 +594,7 @@ describe('BuilderWorkflowPageHeader', () => {
 
     // Publish dialog should open
     await screen.findByText('Publish workflow?')
+    expect(onReviewOutputContract).toHaveBeenCalledOnce()
 
     // Submit the form
     const submitButton = screen.getByRole('button', { name: 'Publish workflow' })

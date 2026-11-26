@@ -59,6 +59,7 @@ class WorkflowVersionPublishedEvent:
     published_version_id: UUID | None = field(default=None)
     user_id: UUID | None = field(default=None)
     error_type: str | None = field(default=None)
+    referencing_parent_ids: list[UUID] | None = field(default=None)
 
 
 @dataclass
@@ -131,6 +132,11 @@ class WorkflowVersionPublishedHandler(AuditEventHandler[WorkflowVersionPublished
             data.project_id = str(event.project_id)
         if is_error:
             data.error_type = event.error_type
+        if event.referencing_parent_ids:
+            # Internal audit of the published parents affected by a confirmed trigger-removing publish.
+            # Unfiltered by visibility on purpose; this is the audit log, not a public API response.
+            data.referencing_parent_ids = [str(parent_id) for parent_id in event.referencing_parent_ids]
+            data.referencing_parent_count = len(event.referencing_parent_ids)
 
         return AuditEvent(
             event_category=EventCategory.USER_ACTION,

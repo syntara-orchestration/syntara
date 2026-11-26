@@ -275,9 +275,12 @@ export function BuilderContent(props: BuilderContentProps) {
     breakingChanges,
     contractChanges,
     parentWorkflows,
+    isPublishReviewFailed,
     confirmPublish,
     cancelBreakingChangeWarning,
     reviewOutputContract,
+    reviewOutputContractForPublish,
+    triggerRemovalConfirmDialog: publishTriggerRemovalDialog,
   } = usePublishWorkflow({
     workflowId,
     currentVersion,
@@ -301,6 +304,9 @@ export function BuilderContent(props: BuilderContentProps) {
     },
     [handleSaveWorkflow, isNew, reviewOutputContract, workflow?.published_version_id]
   )
+  const handleReviewOutputContractOnPublishOpen = useCallback(() => {
+    detachPromise(reviewOutputContractForPublish())
+  }, [reviewOutputContractForPublish])
   const guardedSaveWorkflow = useGuardedSaveWorkflow({
     handleSaveWorkflow: handleSaveWithOutputContractReview,
     isNodeEditorOpen,
@@ -349,6 +355,7 @@ export function BuilderContent(props: BuilderContentProps) {
     handleToggleDetails,
     handleToggleHistory,
     handleToggleVersionHistory: baseHandleToggleVersionHistory,
+    referencedDeleteConfirmDialog,
   } = useBuilderToolbarHandlers({
     workflow: workflow,
     workflowName,
@@ -637,11 +644,15 @@ export function BuilderContent(props: BuilderContentProps) {
                   publishedVersionId={workflow?.published_version_id ?? null}
                   currentVersionId={workflow?.version?.id}
                   isPublishing={isPublishing}
+                  isCheckingContractChanges={isCheckingBreakingChanges}
+                  isPublishDisabled={isPublishReviewFailed}
+                  hasContractReviewError={isPublishReviewFailed}
                   breakingChanges={breakingChanges}
                   contractChanges={contractChanges}
                   parentWorkflows={parentWorkflows}
                   onConfirmPublish={confirmPublish}
                   onCancelBreakingChanges={cancelBreakingChangeWarning}
+                  onReviewOutputContract={handleReviewOutputContractOnPublishOpen}
                   ProjectSelector={ProjectSelector}
                   dispatch={dispatch}
                   markDirty={markDirty}
@@ -787,6 +798,7 @@ export function BuilderContent(props: BuilderContentProps) {
                       tooltip: builderPermissions.tooltips.edit,
                     }}
                   />
+                  {versionPanel.triggerRemovalConfirmDialog}
 
                   <NodeEditorAutoSubmitContext.Provider value={autoSubmitRef}>
                     <NodeEditorOverlay
@@ -848,6 +860,8 @@ export function BuilderContent(props: BuilderContentProps) {
               bodyText="Opening the duplicated workflow will exit the editor view and will permanently delete all recent unsaved progress on your current workflow. Please save your work before leaving."
               buttonLabel="Open without saving"
             />
+            {publishTriggerRemovalDialog}
+            {referencedDeleteConfirmDialog}
           </SynPage>
         </VersionViewProvider>
       </SynStepExpandedAllContext.Provider>

@@ -6,13 +6,14 @@ HTTP/API concerns in the FastAPI endpoints.
 
 import asyncio
 import threading
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from copy import deepcopy
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 from uuid import UUID, uuid4
 
 import structlog
+from sqlalchemy import bindparam, or_, text
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import col, func, select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -49,7 +50,9 @@ from syntara.workflows.exceptions import (
     WorkflowNameConflictError,
     WorkflowNotFoundError,
     WorkflowNotPublishedError,
+    WorkflowPublishTriggerRemovalConfirmationError,
     WorkflowPublishValidationError,
+    WorkflowReferencedByPublishedParentsError,
     WorkflowVersionConflictError,
     WorkflowVersionNotFoundError,
 )
@@ -60,6 +63,9 @@ from syntara.workflows.models import (
     WorkflowListResponse,
     WorkflowRead,
     WorkflowReferenceRead,
+    WorkflowUsedByCount,
+    WorkflowUsedByCountsResponse,
+    WorkflowUsedByResponse,
     WorkflowVersion,
 )
 from syntara.workflows.models.execution import TERMINAL_EXECUTION_STATUSES, Execution
@@ -83,6 +89,8 @@ from syntara.workflows.validators import (
 from syntara.workflows.workflow_engine.models.workflow_definition import NodeType
 
 if TYPE_CHECKING:
+    from sqlalchemy import ColumnElement
+
     from syntara.workflows.models import WorkflowVersionListResponse, WorkflowVersionRead
     from syntara.workflows.utils.serialization import VersionPublishTimestamps
 
@@ -165,6 +173,7 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
         version: int | None = None,
         project_id: UUID | None = None,
         error_type: str | None = None,
+        referencing_parent_ids: list[UUID] | None = None,
         new_version_created: bool = False,
         change_summary: dict[str, Any] | None = None,
         user_id: UUID | None = None,
@@ -177,6 +186,7 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
                 version=version,
                 project_id=project_id,
                 error_type=error_type,
+                referencing_parent_ids=referencing_parent_ids,
             )
         )
         if new_version_created and version is not None:
@@ -541,6 +551,28 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
                 )
                 raise SafeValueError(msg)
 
+    async def _validate_project_workflow_references(
+        self,
+        workflow_definition: dict[str, Any],
+        project_id: UUID,
+        workflow_id: UUID,
+        *,
+        is_import: bool = False,
+    ) -> list[ValidationFinding]:
+        ref_findings = await validate_workflow_references(
+            self.session,
+            workflow_definition,
+            project_id,
+            is_import=is_import,
+        )
+        subworkflow_findings = await validate_subworkflow_project_references(
+            self.session,
+            workflow_definition,
+            project_id,
+            workflow_id=workflow_id,
+        )
+        return [*ref_findings, *subworkflow_findings]
+
     def _is_duplicate_name_error(self, e: IntegrityError) -> bool:
         """Check if IntegrityError is due to duplicate workflow name.
 
@@ -612,6 +644,7 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
         recorder = get_metrics_recorder()
         component = ComponentLabel.WORKFLOW_ENGINE
         system_cof = await get_system_continue_on_failure()
+        workflow_id = uuid4()
 
         with recorder.time(
             MetricType.WORKFLOW_VALIDATION_DURATION,
@@ -645,13 +678,12 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
 
         await self._validate_credential_project_scope(workflow_definition, project_id)
         await self._validate_no_secret_url_conflicts(workflow_definition)
-        ref_findings = await validate_workflow_references(
-            self.session, workflow_definition, project_id, is_import=is_import
+        reference_findings = await self._validate_project_workflow_references(
+            workflow_definition,
+            project_id,
+            workflow_id,
+            is_import=is_import,
         )
-        subworkflow_findings = await validate_subworkflow_project_references(
-            self.session, workflow_definition, project_id
-        )
-        reference_findings = [*ref_findings, *subworkflow_findings]
         if reference_findings:
             result = ValidationResult.from_findings([*result.findings, *reference_findings])
             has_validation_issues = True
@@ -661,7 +693,7 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
 
         # Create workflow
         workflow = Workflow(
-            id=uuid4(),
+            id=workflow_id,
             name=name,
             description=description,
             labels=labels,
@@ -781,6 +813,218 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
             include_total=include_total,
             allowed_projects=allowed_projects,
         )
+
+    @staticmethod
+    def _references_published_child(
+        child_workflow_id: UUID, trigger_node_id: str | None = None
+    ) -> "ColumnElement[bool]":
+        """Predicate: a workflow's published version references the child via a sub_workflow node.
+
+        JSONB containment ignores the node's other keys and any extra nodes, so a parent with
+        several sub-workflow nodes to the same child still satisfies it, as a single row. When
+        ``trigger_node_id`` is given, only parents invoking that specific child trigger match.
+        """
+        parameters: dict[str, str] = {"workflow_id": str(child_workflow_id)}
+        if trigger_node_id is not None:
+            parameters["trigger_node_id"] = trigger_node_id
+        reference = {"nodes": [{"type": "sub_workflow", "parameters": parameters}]}
+        referencing_versions = select(WorkflowVersion.id).where(
+            col(WorkflowVersion.workflow_definition).contains(reference)
+        )
+        return col(Workflow.published_version_id).in_(referencing_versions)
+
+    @classmethod
+    def _references_any_trigger(
+        cls, child_workflow_id: UUID, trigger_node_ids: "Sequence[str]"
+    ) -> "ColumnElement[bool]":
+        """Predicate: a published parent references the child via ANY of the given child triggers.
+
+        An OR of per-trigger containment predicates; a parent referencing several of the triggers
+        still matches as a single ``workflows`` row, so counts and id lists are distinct parents.
+        """
+        return or_(*[cls._references_published_child(child_workflow_id, trigger_id) for trigger_id in trigger_node_ids])
+
+    @staticmethod
+    def _subworkflow_trigger_ids(definition: dict[str, Any]) -> set[str]:
+        """Collect the node ids of the Subworkflow Trigger nodes declared in a definition."""
+        ids: set[str] = set()
+        triggers = definition.get("triggers", []) if isinstance(definition, dict) else []
+        if isinstance(triggers, list):
+            for trigger in triggers:
+                if isinstance(trigger, dict) and trigger.get("type") == NodeType.SUBWORKFLOW_TRIGGER:
+                    trigger_id = trigger.get("id")
+                    if isinstance(trigger_id, str):
+                        ids.add(trigger_id)
+        return ids
+
+    async def get_referencing_published_parent_ids(
+        self, child_workflow_id: UUID, trigger_node_id: str | None = None
+    ) -> list[UUID]:
+        """Return the ids of every published workflow referencing the child, across all projects.
+
+        Unfiltered by visibility -- intended for internal lifecycle operations (such as publish and
+        delete warnings) that must consider all affected published parents. This is not exposed
+        through the public API, which returns an RBAC-filtered page instead.
+        """
+        result = await self.session.exec(
+            select(Workflow.id).where(self._references_published_child(child_workflow_id, trigger_node_id))
+        )
+        return list(result.all())
+
+    async def get_referencing_published_parent_ids_for_triggers(
+        self, child_workflow_id: UUID, trigger_node_ids: "Sequence[str]"
+    ) -> list[UUID]:
+        """Return the ids of published parents referencing the child via ANY of the given triggers.
+
+        Unfiltered by visibility -- for internal lifecycle checks (publish/delete gates and audit).
+        Parents are distinct: a workflow referencing several of the triggers appears once.
+        """
+        if not trigger_node_ids:
+            return []
+        result = await self.session.exec(
+            select(Workflow.id).where(self._references_any_trigger(child_workflow_id, trigger_node_ids))
+        )
+        return list(result.all())
+
+    async def count_referencing_published_parents(
+        self, child_workflow_id: UUID, trigger_node_ids: list[str] | None = None
+    ) -> int:
+        """Count distinct published parents that reference the child (unfiltered by visibility).
+
+        Containment-based match (``_references_published_child``), shared by the single Used-By
+        endpoint and the publish/delete lifecycle gates. The batch endpoint
+        (``count_published_parents_batch``) counts the same concept with a set-based JSONB expansion
+        for efficiency; the two are separate query shapes over one domain rule. A parity test
+        (``test_batch_count_matches_single_count_helper``) pins the two paths on the fixtures it
+        covers (dedupe, draft exclusion, non-``sub_workflow`` nodes, cross-project, self-reference);
+        it reduces, but does not by itself eliminate, the risk of the two SQL expressions drifting.
+
+        Unfiltered by project on purpose: this is dependency discovery for lifecycle-impact
+        visibility, a separate concern from invocation eligibility. Same-project is the rule for
+        *invoking* a sub-workflow and is enforced at configuration/publish
+        (``validators.workflow_subworkflows``) and at runtime
+        (``sub_workflow_setup_activity._assert_child_in_parent_project``). This count instead reports
+        every persisted published reference to the child regardless of project, so a delete/publish
+        warning stays complete even for a reference that same-project validation would reject; it
+        does not permit any cross-project invocation.
+
+        When ``trigger_node_ids`` is given, only parents invoking one of those child Subworkflow
+        Triggers are counted; otherwise any sub-workflow reference to the child counts.
+        """
+        predicate = (
+            self._references_any_trigger(child_workflow_id, trigger_node_ids)
+            if trigger_node_ids
+            else self._references_published_child(child_workflow_id)
+        )
+        return (await self.session.scalar(select(func.count()).select_from(Workflow).where(predicate))) or 0
+
+    async def list_published_parents(
+        self,
+        child_workflow_id: UUID,
+        *,
+        limit: int = 20,
+        cursor: str | None = None,
+        sort: str | None = None,
+        trigger_node_ids: list[str] | None = None,
+        allowed_projects: AllowedProjectsResult | None = None,
+    ) -> WorkflowUsedByResponse:
+        """List published workflows whose published version references ``child_workflow_id``.
+
+        ``referencing_parent_count`` counts every distinct published parent across all projects, with
+        no visibility filter; ``resources`` is the RBAC-filtered, paginated page of parents the
+        caller may view. Draft-only references are excluded because the match is against each
+        workflow's published version, and a parent is counted once even when it has several
+        sub-workflow nodes pointing at the same child.
+        """
+        references_child = (
+            self._references_any_trigger(child_workflow_id, trigger_node_ids)
+            if trigger_node_ids
+            else self._references_published_child(child_workflow_id)
+        )
+        referencing_parent_count = await self.count_referencing_published_parents(child_workflow_id, trigger_node_ids)
+
+        page = await self.list_resources(
+            model=Workflow,
+            response_type=WorkflowListResponse,
+            limit=limit,
+            cursor=cursor,
+            sort=sort or "-created_at",
+            allowed_projects=allowed_projects,
+            extra_predicates=[references_child],
+        )
+        await self.populate_published_version_numbers(page.resources)
+        return WorkflowUsedByResponse(
+            referencing_parent_count=referencing_parent_count,
+            resources=page.resources,
+            next=page.next,
+            prev=page.prev,
+        )
+
+    async def count_published_parents_batch(
+        self,
+        workflow_ids: list[UUID],
+        *,
+        allowed_projects: AllowedProjectsResult | None = None,
+    ) -> WorkflowUsedByCountsResponse:
+        """Return the Used-By total for each requested workflow the caller may read.
+
+        Each total counts distinct published parents across all projects (dependency discovery,
+        unfiltered by project -- see ``count_referencing_published_parents``), matching the Used-By
+        badge. Workflows outside the caller's visibility are omitted, so the endpoint cannot be used
+        to probe reference counts for workflows the caller cannot see.
+
+        Set-based implementation: one JSONB-expansion (``jsonb_array_elements``) aggregate that
+        unnests each published parent's nodes and groups by referenced child id, so N child ids are
+        counted in a single pass instead of one containment COUNT per child (which would be N+1).
+        The single-workflow path uses a containment match instead; retaining two shapes is a
+        current-access-pattern choice rather than a technical necessity -- a common set-based
+        expansion could serve both, including optional trigger filtering, and may be worth
+        consolidating later. There is no GIN index on ``workflow_versions.workflow_definition``
+        today, so neither shape is index-accelerated; the shared domain semantics are guarded by the
+        parity test, not by an index.
+        """
+        if not workflow_ids:
+            return WorkflowUsedByCountsResponse(counts=[])
+
+        readable_stmt = select(Workflow.id).where(col(Workflow.id).in_(workflow_ids))
+        if allowed_projects is not None and not allowed_projects.all_projects:
+            readable_stmt = readable_stmt.where(col(Workflow.project_id).in_(allowed_projects.project_ids))
+        readable_ids = list((await self.session.exec(readable_stmt)).all())
+
+        # Single aggregate pass: unnest each published parent's nodes and group by the referenced
+        # child id, instead of one COUNT query per requested workflow. Counts distinct parents
+        # across all projects (unfiltered), matching the Used-By badge; requested children with no
+        # published parents are zero-filled below so every readable id is represented.
+        if not readable_ids:
+            return WorkflowUsedByCountsResponse(counts=[])
+        child_id_strs = [str(workflow_id) for workflow_id in readable_ids]
+        aggregate = text(
+            """
+            SELECT node->'parameters'->>'workflow_id' AS child_id, COUNT(DISTINCT w.id) AS cnt
+            FROM workflows w
+            JOIN workflow_versions v ON v.id = w.published_version_id
+            CROSS JOIN LATERAL jsonb_array_elements(
+                CASE
+                    WHEN jsonb_typeof(v.workflow_definition->'nodes') = 'array'
+                    THEN v.workflow_definition->'nodes'
+                    ELSE '[]'::jsonb
+                END
+            ) AS node
+            WHERE node->>'type' = 'sub_workflow'
+              AND node->'parameters'->>'workflow_id' IN :child_ids
+            GROUP BY child_id
+            """
+        ).bindparams(bindparam("child_ids", value=child_id_strs, expanding=True))
+        result = await self.session.execute(aggregate)
+        counts_by_child: dict[str, int] = {str(child_id): int(cnt) for child_id, cnt in result.all()}
+        counts = [
+            WorkflowUsedByCount(
+                workflow_id=workflow_id,
+                referencing_parent_count=counts_by_child.get(str(workflow_id), 0),
+            )
+            for workflow_id in readable_ids
+        ]
+        return WorkflowUsedByCountsResponse(counts=counts)
 
     async def get_publish_context(
         self, version_ids: list[UUID]
@@ -1321,11 +1565,11 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
                     previous_cred_ids = self._extract_credential_ids(prev_version.workflow_definition)
             await self._validate_credential_project_scope(workflow_definition, workflow.project_id, previous_cred_ids)
             await self._validate_no_secret_url_conflicts(workflow_definition)
-            ref_findings = await validate_workflow_references(self.session, workflow_definition, workflow.project_id)
-            subworkflow_findings = await validate_subworkflow_project_references(
-                self.session, workflow_definition, workflow.project_id
+            reference_findings = await self._validate_project_workflow_references(
+                workflow_definition,
+                workflow.project_id,
+                workflow.id,
             )
-            reference_findings = [*ref_findings, *subworkflow_findings]
             if reference_findings:
                 result = ValidationResult.from_findings([*result.findings, *reference_findings])
                 workflow.has_validation_issues = True
@@ -1453,6 +1697,33 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
 
         return workflow, current_version, validation_result
 
+    async def _check_publish_trigger_removal(
+        self, workflow: Workflow, target_version: WorkflowVersion, *, confirm: bool
+    ) -> list[UUID]:
+        """Return the published parents affected by a Subworkflow Trigger removal in this publish.
+
+        Compares the current published version against the version being published and finds the
+        published parents that invoke a removed trigger (distinct across removed triggers, unfiltered
+        by visibility). Raises WorkflowPublishTriggerRemovalConfirmationError when such parents exist
+        and ``confirm`` is False; otherwise returns them (possibly empty) for auditing.
+        """
+        if workflow.published_version_id is None or workflow.published_version_id == target_version.id:
+            return []
+        previously_published = await self.session.get(WorkflowVersion, workflow.published_version_id)
+        if previously_published is None:
+            return []
+        removed_trigger_ids = self._subworkflow_trigger_ids(
+            previously_published.workflow_definition
+        ) - self._subworkflow_trigger_ids(target_version.workflow_definition)
+        if not removed_trigger_ids:
+            return []
+        affected_parent_ids = await self.get_referencing_published_parent_ids_for_triggers(
+            workflow.id, sorted(removed_trigger_ids)
+        )
+        if affected_parent_ids and not confirm:
+            raise WorkflowPublishTriggerRemovalConfirmationError(len(affected_parent_ids), workflow_id=workflow.id)
+        return affected_parent_ids
+
     async def publish_workflow_version(  # noqa: C901, PLR0915
         self,
         workflow_id: UUID,
@@ -1461,6 +1732,8 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
         change_description: str | None = None,
         workflow_definition: dict[str, Any] | None = None,
         expected_version: int | None = None,
+        *,
+        confirm: bool = False,
     ) -> tuple[Workflow, WorkflowVersion, str]:
         """Publish a workflow version via pointer update (no copy).
 
@@ -1514,11 +1787,16 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
 
         definition_findings = result.findings
         subworkflow_findings = await validate_subworkflow_project_references(
-            self.session, definition, workflow.project_id
+            self.session, definition, workflow.project_id, workflow_id=workflow.id
         )
         validation_result = ValidationResult.from_findings([*definition_findings, *subworkflow_findings])
         if _has_blocking_publish_findings(definition_findings, subworkflow_findings):
             raise WorkflowPublishValidationError(validation_result)
+
+        # Confirmation gate: block an unconfirmed publish that would remove a Subworkflow Trigger
+        # still invoked by published parents. Reads the current published version (not the request),
+        # so it cannot be bypassed with stale client state.
+        affected_parent_ids = await self._check_publish_trigger_removal(workflow, target_version, confirm=confirm)
 
         stale_tool_findings: list[ValidationFinding] = []
         if workflow_definition is not None and workflow.project_id is not None:
@@ -1622,6 +1900,7 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
                 project_id=workflow.project_id,
                 published_version_id=target_version.id,
                 user_id=self.user.id,
+                referencing_parent_ids=affected_parent_ids or None,
             )
         )
 
@@ -1802,24 +2081,32 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
         )
         return workflow, new_version
 
-    async def delete_workflow(self, workflow_id: UUID) -> None:
+    async def delete_workflow(self, workflow_id: UUID, *, confirm: bool = False) -> None:
         """Hard-delete a workflow and cascade-delete its versions and executions.
 
         Versions and executions are cascade-deleted via DB FK (ondelete=CASCADE).
 
         Args:
             workflow_id: UUID of workflow to delete
+            confirm: Allow deletion of a workflow referenced by published parents
 
         Raises:
             WorkflowNotFoundError: If workflow not found
             BuiltinWorkflowDeleteError: If workflow is a built-in
             WorkflowHasActiveExecutionsError: If workflow has non-terminal executions
+            WorkflowReferencedByPublishedParentsError: If referenced by published parents and
+                ``confirm`` is False
 
         """
         workflow = await self.get_workflow_by_id(workflow_id)
 
         if workflow.is_builtin:
             raise BuiltinWorkflowDeleteError(workflow.name)
+
+        # Capture identity before the delete+commit below. After session.delete() + commit() the
+        # instance is detached, so reading its attributes in the post-commit audit emit can trigger
+        # lazy IO outside the async greenlet (MissingGreenlet). Use these locals for the emits.
+        wf_id, wf_name, wf_project_id = workflow.id, workflow.name, workflow.project_id
 
         non_terminal_count = await self.session.scalar(
             select(func.count())
@@ -1831,6 +2118,15 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
         )
         if non_terminal_count:
             raise WorkflowHasActiveExecutionsError(non_terminal_count, workflow_id=workflow_id)
+
+        # Re-check published references at delete time so the decision never relies on stale UI
+        # state. The caller-facing error carries only the count -- never the parents' identities,
+        # which the caller may not be allowed to see. The full id list is recorded in the audit
+        # log (reusing the internal unfiltered query), not returned through the API.
+        referencing_parent_ids = await self.get_referencing_published_parent_ids(workflow_id)
+        referencing_count = len(referencing_parent_ids)
+        if referencing_count and not confirm:
+            raise WorkflowReferencedByPublishedParentsError(referencing_count, workflow_id=workflow_id)
 
         # Explicit cleanup retained so trigger deletion is logged individually
         # (delete_triggers_for_workflow logs each removal); DB CASCADE would also
@@ -1858,19 +2154,20 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
             await self.session.commit()
         except Exception as exc:
             self._emit_lifecycle_event(
-                workflow_id=workflow.id,
-                workflow_name=workflow.name,
+                workflow_id=wf_id,
+                workflow_name=wf_name,
                 action=WorkflowAction.DELETED,
-                project_id=workflow.project_id,
+                project_id=wf_project_id,
                 error_type=type(exc).__name__,
             )
             raise
 
         self._emit_lifecycle_event(
-            workflow_id=workflow.id,
-            workflow_name=workflow.name,
+            workflow_id=wf_id,
+            workflow_name=wf_name,
             action=WorkflowAction.DELETED,
-            project_id=workflow.project_id,
+            project_id=wf_project_id,
+            referencing_parent_ids=referencing_parent_ids or None,
         )
 
         self._schedule_trigger_deletion(workflow_id)

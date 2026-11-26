@@ -80,6 +80,25 @@ class TestWorkflowVersionCreatedHandler:
 class TestWorkflowVersionPublishedHandler:
     """Tests for WorkflowVersionPublishedHandler."""
 
+    def test_confirmed_trigger_removal_records_affected_parent_ids(self) -> None:
+        parent_a = uuid4()
+        parent_b = uuid4()
+        event = WorkflowVersionPublishedEvent(
+            workflow_id=WORKFLOW_ID,
+            workflow_name="test-wf",
+            version=2,
+            referencing_parent_ids=[parent_a, parent_b],
+        )
+        audit_event = WorkflowVersionPublishedHandler().handle(event)
+
+        assert set(audit_event.structured_data.referencing_parent_ids) == {str(parent_a), str(parent_b)}
+        assert audit_event.structured_data.referencing_parent_count == 2
+
+    def test_publish_without_trigger_removal_omits_parent_fields(self) -> None:
+        event = WorkflowVersionPublishedEvent(workflow_id=WORKFLOW_ID, workflow_name="test-wf", version=2)
+        audit_event = WorkflowVersionPublishedHandler().handle(event)
+        assert not hasattr(audit_event.structured_data, "referencing_parent_ids")
+
     def test_produces_audit_event(self) -> None:
         event = WorkflowVersionPublishedEvent(workflow_id=WORKFLOW_ID, workflow_name="test-wf", version=2)
         audit_event = WorkflowVersionPublishedHandler().handle(event)
