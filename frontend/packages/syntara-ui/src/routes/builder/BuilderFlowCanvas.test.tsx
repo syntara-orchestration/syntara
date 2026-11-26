@@ -1,4 +1,6 @@
-import { act, render, screen } from '@testing-library/react'
+import { act, render, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import type { OnBeforeDelete } from '@xyflow/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 
@@ -15,12 +17,16 @@ const flowStore = vi.hoisted(() => ({
   },
   listeners: new Set<() => void>(),
   updateNodeInternals: vi.fn(),
+  latestReactFlowProps: null as Record<string, unknown> | null,
 }))
 
 vi.mock('@xyflow/react', async () => {
   const { useRef, useSyncExternalStore } = await import('react')
   return {
-    ReactFlow: ({ children }: { children?: React.ReactNode }) => <div data-testid="reactflow">{children}</div>,
+    ReactFlow: ({ children, ...props }: { children?: React.ReactNode }) => {
+      flowStore.latestReactFlowProps = props
+      return <div data-testid="reactflow">{children}</div>
+    },
     Background: () => null,
     BackgroundVariant: { Dots: 'dots' },
     ConnectionLineType: { SmoothStep: 'smoothstep' },
@@ -100,7 +106,14 @@ describe('BuilderFlowCanvas', () => {
     flowStore.state = { transform: [0, 0, 1], nodes }
     flowStore.listeners.clear()
     flowStore.updateNodeInternals.mockClear()
+    flowStore.latestReactFlowProps = null
   })
+
+  function getOnBeforeDelete(): OnBeforeDelete<NodeType, EdgeType> {
+    const handler = flowStore.latestReactFlowProps?.onBeforeDelete
+    expect(handler).toBeTypeOf('function')
+    return handler as OnBeforeDelete<NodeType, EdgeType>
+  }
 
   it('renders the React Flow canvas shell', () => {
     render(<BuilderFlowCanvas {...defaultProps} />)
@@ -208,6 +221,52 @@ describe('BuilderFlowCanvas', () => {
     render(<BuilderFlowCanvas {...defaultProps} effectiveExecutionStatus="running" />)
 
     expect(screen.getByRole('progressbar')).toBeInTheDocument()
+  })
+
+  it('allows edge-only deletion without opening the confirmation dialog', async () => {
+    render(<BuilderFlowCanvas {...defaultProps} />)
+
+    await expect(getOnBeforeDelete()({ nodes: [], edges: [edges[0]] })).resolves.toBe(true)
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('blocks node deletion in read-only mode without opening the confirmation dialog', async () => {
+    render(<BuilderFlowCanvas {...defaultProps} isReadOnly />)
+
+    await expect(getOnBeforeDelete()({ nodes, edges: [] })).resolves.toBe(false)
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('shows delete confirmation and resolves false when cancelled', async () => {
+    const user = userEvent.setup()
+    render(<BuilderFlowCanvas {...defaultProps} />)
+
+    let deletion!: ReturnType<OnBeforeDelete<NodeType, EdgeType>>
+    act(() => {
+      deletion = getOnBeforeDelete()({ nodes, edges: [] })
+    })
+    const confirmationDialog = await screen.findByRole('dialog')
+    expect(within(confirmationDialog).getByRole('heading', { name: /Delete step\?/ })).toBeInTheDocument()
+    await user.click(within(confirmationDialog).getByRole('button', { name: 'Cancel' }))
+
+    await expect(deletion).resolves.toBe(false)
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('shows delete confirmation and resolves true when confirmed', async () => {
+    const user = userEvent.setup()
+    render(<BuilderFlowCanvas {...defaultProps} />)
+
+    let deletion!: ReturnType<OnBeforeDelete<NodeType, EdgeType>>
+    act(() => {
+      deletion = getOnBeforeDelete()({ nodes, edges: [] })
+    })
+    const confirmationDialog = await screen.findByRole('dialog')
+    expect(within(confirmationDialog).getByRole('heading', { name: /Delete step\?/ })).toBeInTheDocument()
+    await user.click(within(confirmationDialog).getByRole('button', { name: 'Delete' }))
+
+    await expect(deletion).resolves.toBe(true)
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
   it('has no accessibility violations in edit mode', async () => {

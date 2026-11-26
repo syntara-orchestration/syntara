@@ -18,6 +18,7 @@ import {
   verifyStepVisible,
   triggerLayout,
   expectCanvasStepTitleVisible,
+  confirmWorkflowStepDeleteDialog,
 } from '../helpers/workflows'
 
 test('delete a middle step removes the step and its connected edges', async ({ app }) => {
@@ -65,6 +66,7 @@ test('delete a middle step removes the step and its connected edges', async ({ a
     const deleteMenuItem = app.getByRole('menuitem', { name: 'Delete' })
     await expect(deleteMenuItem).toBeVisible()
     await deleteMenuItem.click()
+    await confirmWorkflowStepDeleteDialog(app)
 
     // Verify Step B is removed from canvas
     await expect(nodeB).not.toBeAttached()
@@ -131,6 +133,7 @@ for (const { position, steps, deleteStep, remainingSteps } of deletePositionCase
       await kebabButton.click()
 
       await app.getByRole('menuitem', { name: 'Delete' }).click()
+      await confirmWorkflowStepDeleteDialog(app)
 
       // Verify deleted step is removed from the DOM
       await expect(targetNode).not.toBeAttached({ timeout: 10000 })
