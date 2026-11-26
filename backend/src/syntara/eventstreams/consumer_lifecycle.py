@@ -2,6 +2,7 @@
 
 import asyncio
 import signal
+from collections.abc import Callable
 from typing import Any
 
 import structlog
@@ -98,11 +99,13 @@ async def run_event_worker(
     hints: SubscriptionHintListener,
     *,
     shutdown_event: asyncio.Event | None = None,
+    on_shutdown: Callable[[], None] | None = None,
 ) -> None:
     """Run membership/reconciliation and delegate transport-owned drain.
 
     The optional event supports embedding and isolated tests. Readiness is exposed
-    by manager.ready; no operational HTTP routes or packaging are installed here.
+    by manager.ready; the optional, idempotent on_shutdown callback closes
+    process-local readiness before drain.
     """
     shutdown = shutdown_event if shutdown_event is not None else asyncio.Event()
     loop = asyncio.get_running_loop()
@@ -111,6 +114,8 @@ async def run_event_worker(
     stopping: asyncio.Task[bool] | None = None
 
     def close_admission() -> None:
+        if on_shutdown is not None:
+            on_shutdown()
         manager.close_reconciliation()
         resources.close_admission()
 
