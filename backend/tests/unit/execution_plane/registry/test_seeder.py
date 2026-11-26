@@ -64,8 +64,8 @@ async def test_seed_requires_verified_digest_images_and_preserves_administrator_
     assert "jsonb_set" in compiled
     assert "ao-python-rhel9:devel" in parameters
     assert "ao-bash-rhel9:devel" in parameters
-    assert "ao-python-rhel9:2026.8" in parameters
-    assert "ao-bash-rhel9:2026.8" in parameters
+    assert "ao-python-rhel9:2026.8" not in parameters
+    assert "ao-bash-rhel9:2026.8" not in parameters
     session.commit.assert_awaited_once()
 
 

@@ -1,0 +1,23 @@
+---
+apiVersion: syntara.io/v1alpha1
+kind: CredentialRecipe
+metadata:
+  name: http-bearer
+  displayName: HTTP Bearer Token
+  description: Bearer token used by the HTTP Request step.
+spec:
+  id: syntara.http.bearer
+  integrationType: syntara.http
+  credentialSchema:
+    kind: inline
+    value:
+      type: object
+      required: [token]
+      additionalProperties: false
+      properties:
+        token:
+          type: string
+          minLength: 1
+  secretFields: [token]
+  issuance:
+    kind: static-bearer.v1

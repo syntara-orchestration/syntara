@@ -1,4 +1,4 @@
-"""Seed Python and Bash Actions with configured workload images."""
+"""Seed built-in Actions with configured workload images."""
 
 from __future__ import annotations
 
@@ -13,12 +13,16 @@ from uuid import uuid4
 
 import structlog
 import yaml
-from sqlalchemy import ARRAY, Text, case, cast, func, or_
+from sqlalchemy import ARRAY, Text, case, cast, false, func, or_
 from sqlalchemy.dialects.postgresql import JSONB, insert
 from sqlmodel import select
 
 from syntara.execution_plane.registry.image_policy import script_image_digest, verify_script_image_reference
-from syntara.execution_plane.registry.models import ExecutionPlanePlugin
+from syntara.execution_plane.registry.models import (
+    ExecutionPlaneCredentialRecipe,
+    ExecutionPlaneIntegrationType,
+    ExecutionPlanePlugin,
+)
 from syntara.workflow_core.models import NodeType
 
 if TYPE_CHECKING:
@@ -62,8 +66,24 @@ def _load_manifest(filename: str, expected_name: str) -> dict[str, Any]:
     return manifest
 
 
+def _configured_seeds() -> list[tuple[str, NodeType, str, str, str]]:
+    """Enable HTTP only when its approved image has been configured."""
+    seeds = list(_PLUGIN_SEEDS)
+    if os.environ.get("RELATED_IMAGE_HTTP_REQUEST"):
+        seeds.append(
+            (
+                "http-request",
+                NodeType.HTTP_REQUEST,
+                "syntara.http-request.http-request",
+                "http-request.yaml",
+                "RELATED_IMAGE_HTTP_REQUEST",
+            )
+        )
+    return seeds
+
+
 async def seed_execution_plane_plugins(session: AsyncSession) -> None:
-    """Seed verified script Actions without replacing an administrator's image pin."""
+    """Seed verified Actions without replacing an administrator's image pin."""
     policy_path = os.environ.get("APP_SCRIPT_IMAGE_POLICY_PATH")
     if not policy_path or not await asyncio.to_thread(Path(policy_path).is_file):
         logger.warning("execution_plane_plugins.unavailable", reason="script_image_policy_not_installed")
@@ -71,10 +91,10 @@ async def seed_execution_plane_plugins(session: AsyncSession) -> None:
 
     now = datetime.now(UTC)
     rows: list[dict[str, Any]] = []
-    for name, node_type, step_identity, filename, image_env_var in _PLUGIN_SEEDS:
+    for name, node_type, step_identity, filename, image_env_var in _configured_seeds():
         image_reference = os.environ.get(image_env_var)
         if not image_reference:
-            message = f"{image_env_var} must contain the approved script workload image reference"
+            message = f"{image_env_var} must contain the approved workload image reference"
             raise ValueError(message)
         await asyncio.to_thread(verify_script_image_reference, node_type, image_reference)
         rows.append(
@@ -110,7 +130,7 @@ async def seed_execution_plane_plugins(session: AsyncSession) -> None:
             typing_cast("Any", ExecutionPlanePlugin.image_reference) == legacy_reference
             for legacy_reference in _LEGACY_SEED_REFERENCES.get(name, ())
         ]
-        can_advance_managed_reference = or_(*managed_references, *legacy_image_references)
+        can_advance_managed_reference = or_(false(), *managed_references, *legacy_image_references)
         labels_with_managed_reference = func.jsonb_set(
             func.coalesce(ExecutionPlanePlugin.labels, cast({}, JSONB)),
             cast(["managed_image_reference"], ARRAY(Text)),
@@ -134,6 +154,8 @@ async def seed_execution_plane_plugins(session: AsyncSession) -> None:
             },
         )
         await session.exec(statement)
+    if any(row["name"] == "http-request" for row in rows):
+        await _seed_http_credentials(session)
     await session.commit()
     persisted_plugins = {
         plugin.name: plugin
@@ -158,3 +180,22 @@ async def seed_execution_plane_plugins(session: AsyncSession) -> None:
             disposition=disposition,
         )
     logger.info("execution_plane_plugins.seeded", count=len(rows))
+
+
+async def _seed_http_credentials(session: AsyncSession) -> None:
+    """Install the HTTP integration and recipe in the Action seed transaction."""
+    for model, filename, identity_field in (
+        (ExecutionPlaneIntegrationType, "http-integration.yaml", "integration_type_id"),
+        (ExecutionPlaneCredentialRecipe, "http-bearer.yaml", "credential_recipe_id"),
+    ):
+        manifest = yaml.safe_load(files("syntara.execution_plane.registry.manifests").joinpath(filename).read_text())
+        values = {"id": uuid4(), identity_field: manifest["spec"]["id"], "manifest": manifest, "labels": {}}
+        if model is ExecutionPlaneCredentialRecipe:
+            values["integration_type_id"] = manifest["spec"]["integrationType"]
+        statement = insert(model).values(values)
+        await session.exec(
+            statement.on_conflict_do_update(
+                index_elements=[identity_field],
+                set_={"manifest": statement.excluded.manifest},
+            )
+        )
