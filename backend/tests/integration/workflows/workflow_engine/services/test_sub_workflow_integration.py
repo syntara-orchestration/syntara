@@ -388,6 +388,7 @@ async def _run_parent_workflow(
     workflow_def: dict[str, Any] | None = None,
     workflow_name: str = "sub-wf-integration",
     child_workflow_def: dict[str, Any] | None = None,
+    workflow_metadata: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Start a parent workflow and return its raw result."""
     from temporalio.testing import WorkflowEnvironment
@@ -410,7 +411,7 @@ async def _run_parent_workflow(
             trigger_node_id="trigger",
             include_node_results=True,
             execution_id=_PARENT_EXECUTION_ID,
-            workflow_metadata=_parent_workflow_metadata(),
+            workflow_metadata=workflow_metadata or _parent_workflow_metadata(),
         )
         handle = temporal_env.client.get_workflow_handle(start.temporal_workflow_id)
         raw: dict[str, Any] = await asyncio.wait_for(handle.result(), timeout=_WORKFLOW_RESULT_TIMEOUT)
@@ -745,6 +746,28 @@ def _parent_workflow_def_child_failure_cof() -> dict[str, Any]:
             {"from": "sub_wf_node", "to": "downstream_script"},
         ],
     }
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+class TestSubWorkflowDepthGuard:
+    """Keep the runtime nesting-depth check active as a publication-time fallback."""
+
+    async def test_depth_ten_fails_before_a_child_execution_is_started(self, temporal_env: object) -> None:
+        _CAPTURED_ADDS.clear()
+        metadata = _parent_workflow_metadata()
+        metadata["sub_workflow_depth"] = 10
+
+        result = await _run_parent_workflow(
+            temporal_env,
+            workflow_name="sub-wf-depth-guard",
+            workflow_metadata=metadata,
+        )
+
+        assert result["status"] == "failed"
+        assert "sub_wf_node" in result["failed_activities"]
+        assert "nesting depth 10 exceeds maximum (10)" in result["failed_activities"]["sub_wf_node"]
+        assert _CAPTURED_ADDS == []
 
 
 @pytest.mark.integration

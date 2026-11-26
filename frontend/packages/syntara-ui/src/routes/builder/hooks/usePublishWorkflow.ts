@@ -66,39 +66,14 @@ type UsePublishWorkflowOptions = {
   onVersionUpdated?: (version: number) => void
 }
 
-export function usePublishWorkflow({
+function usePublishMutation({
   workflowId,
-  currentVersion,
-  workflowName,
-  workflowDescription,
-  expectedVersion: optionsExpectedVersion,
   onConflict,
   onVersionUpdated,
-}: UsePublishWorkflowOptions) {
+}: Pick<UsePublishWorkflowOptions, 'workflowId' | 'onConflict' | 'onVersionUpdated'>) {
   const queryClient = useQueryClient()
   const { showSuccess, showError, showWarning } = useAlerts()
   const { guardPublishError, triggerRemovalConfirmDialog } = useTriggerRemovalPublishConfirm()
-  const {
-    breakingChanges,
-    contractChanges,
-    parentWorkflows,
-    isChecking: isCheckingBreakingChanges,
-    clearReview: clearContractReview,
-    reviewOutputContract: reviewContract,
-  } = useOutputContractReview(workflowId)
-  const [pendingPublish, setPendingPublish] = useState<PendingPublish | null>(null)
-
-  const reviewOutputContract = useCallback(
-    (workflowDefinition?: unknown) => {
-      const candidate = workflowDefinition ?? getCurrentWorkflowDefinition(workflowName, workflowDescription)
-      if (!workflowId || !isRecord(candidate)) return Promise.resolve(null)
-      return reviewContract(candidate, (error) => {
-        showError({ title: 'Could not check output contract changes', description: getErrorMessage(error) })
-      })
-    },
-    [workflowId, workflowName, workflowDescription, reviewContract, showError]
-  )
-
   const { mutate: publishMutation, isPending: isPublishing } = workflowClient.useMutation(
     'post',
     '/workflows/{workflow_id}/versions/{version}/publish'
@@ -106,8 +81,7 @@ export function usePublishWorkflow({
 
   const publishNow = useCallback(
     (pending: PendingPublish, confirm = false) => {
-      // `attempt` is hoisted, so onError can retry with confirm=true after a trigger-removal 409
-      // without capturing the memoized callback (which React Compiler disallows).
+      // `attempt` is hoisted so the 409 retry doesn't capture a callback in the retry closure.
       function attempt(useConfirm: boolean) {
         publishMutation(
           {
@@ -138,8 +112,6 @@ export function usePublishWorkflow({
                 onConflict(extractVersionConflictInfo(error))
                 return
               }
-              // Trigger-removal fallback: on a 409 that publishing would remove a Subworkflow Trigger a
-              // published parent uses, confirm and retry with confirm=true.
               if (guardPublishError(error, () => attempt(true))) return
               showError({ title: 'Failed to publish workflow', description: getErrorMessage(error) })
             },
@@ -160,6 +132,61 @@ export function usePublishWorkflow({
       showError,
       guardPublishError,
     ]
+  )
+
+  return { publishNow, isPublishing, showError, triggerRemovalConfirmDialog }
+}
+
+export function usePublishWorkflow({
+  workflowId,
+  currentVersion,
+  workflowName,
+  workflowDescription,
+  expectedVersion: optionsExpectedVersion,
+  onConflict,
+  onVersionUpdated,
+}: UsePublishWorkflowOptions) {
+  const { publishNow, isPublishing, showError, triggerRemovalConfirmDialog } = usePublishMutation({
+    workflowId,
+    onConflict,
+    onVersionUpdated,
+  })
+  const {
+    breakingChanges,
+    contractChanges,
+    parentWorkflows,
+    isChecking: isCheckingBreakingChanges,
+    clearReview: clearContractReview,
+    reviewOutputContract: reviewContract,
+  } = useOutputContractReview(workflowId)
+  const [pendingPublish, setPendingPublish] = useState<PendingPublish | null>(null)
+  const [isPublishReviewFailed, setIsPublishReviewFailed] = useState(false)
+
+  const reviewOutputContract = useCallback(
+    (workflowDefinition?: unknown) => {
+      const candidate = workflowDefinition ?? getCurrentWorkflowDefinition(workflowName, workflowDescription)
+      if (!workflowId || !isRecord(candidate)) return Promise.resolve(null)
+      return reviewContract(candidate, (error) => {
+        showError({ title: 'Could not check output contract changes', description: getErrorMessage(error) })
+      })
+    },
+    [workflowId, workflowName, workflowDescription, reviewContract, showError]
+  )
+
+  const reviewOutputContractForPublish = useCallback(
+    async (workflowDefinition?: unknown) => {
+      setIsPublishReviewFailed(false)
+      clearContractReview()
+      try {
+        const response = await reviewOutputContract(workflowDefinition)
+        setIsPublishReviewFailed(response === null)
+        return response
+      } catch (error) {
+        setIsPublishReviewFailed(true)
+        throw error
+      }
+    },
+    [clearContractReview, reviewOutputContract]
   )
 
   const publish = useCallback(
@@ -185,18 +212,19 @@ export function usePublishWorkflow({
         ...(expectedVersion != null ? { expectedVersion } : {}),
       }
       if (!workflowDefinition) {
+        setIsPublishReviewFailed(false)
         publishNow(pending, confirm)
         return
       }
-      clearContractReview()
       setPendingPublish(pending)
       detachPromise(
-        reviewOutputContract(workflowDefinition).then((response) => {
+        reviewOutputContractForPublish(workflowDefinition).then((response) => {
           if (!response) {
             setPendingPublish(null)
             return
           }
-          if (response.has_breaking_changes || (response.has_contract_changes && response.parent_workflows?.length)) {
+          // Parent references are visibility-filtered, so an empty list does not guarantee no consumers are affected.
+          if (response.has_breaking_changes || response.has_contract_changes) {
             return
           }
           setPendingPublish(null)
@@ -210,25 +238,57 @@ export function usePublishWorkflow({
       workflowName,
       workflowDescription,
       optionsExpectedVersion,
-      clearContractReview,
-      reviewOutputContract,
+      reviewOutputContractForPublish,
       publishNow,
     ]
   )
 
-  const confirmPublish = useCallback(() => {
-    if (!pendingPublish) return
-    const pending = pendingPublish
-    clearContractReview()
-    setPendingPublish(null)
-    // Preserve the trigger-removal confirm computed at publish() time so confirming the
-    // output-contract change also covers a trigger removal the user already acknowledged.
-    publishNow(pending, pending.confirm ?? false)
-  }, [pendingPublish, clearContractReview, publishNow])
+  const confirmPublish = useCallback(
+    (publishName?: string, description?: string, onSettled?: () => void, callOptions?: { confirm?: boolean }) => {
+      let pending = pendingPublish
+      if (!pending) {
+        if (!workflowId || currentVersion == null) return
+        const workflowDefinition = getCurrentWorkflowDefinition(workflowName, workflowDescription)
+        pending = {
+          publishName,
+          description,
+          version: currentVersion,
+          confirm: callOptions?.confirm ?? false,
+          ...(workflowDefinition ? { workflowDefinition } : {}),
+          ...(optionsExpectedVersion != null ? { expectedVersion: optionsExpectedVersion } : {}),
+          ...(onSettled ? { onSettled } : {}),
+        }
+      } else {
+        pending = {
+          ...pending,
+          publishName: publishName ?? pending.publishName,
+          description: description ?? pending.description,
+          confirm: callOptions?.confirm ?? pending.confirm,
+          ...(onSettled ? { onSettled } : {}),
+        }
+      }
+
+      clearContractReview()
+      setPendingPublish(null)
+      setIsPublishReviewFailed(false)
+      publishNow(pending, pending.confirm ?? false)
+    },
+    [
+      pendingPublish,
+      workflowId,
+      currentVersion,
+      workflowName,
+      workflowDescription,
+      optionsExpectedVersion,
+      clearContractReview,
+      publishNow,
+    ]
+  )
 
   const cancelBreakingChangeWarning = useCallback(() => {
     clearContractReview()
     setPendingPublish(null)
+    setIsPublishReviewFailed(false)
   }, [clearContractReview])
 
   return {
@@ -238,9 +298,11 @@ export function usePublishWorkflow({
     breakingChanges,
     contractChanges,
     parentWorkflows,
+    isPublishReviewFailed,
     confirmPublish,
     cancelBreakingChangeWarning,
     reviewOutputContract,
+    reviewOutputContractForPublish,
     triggerRemovalConfirmDialog,
   }
 }

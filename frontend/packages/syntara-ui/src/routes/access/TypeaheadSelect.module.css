@@ -1,0 +1,7 @@
+.noOptionsMessage {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}

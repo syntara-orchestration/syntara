@@ -551,6 +551,28 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
                 )
                 raise SafeValueError(msg)
 
+    async def _validate_project_workflow_references(
+        self,
+        workflow_definition: dict[str, Any],
+        project_id: UUID,
+        workflow_id: UUID,
+        *,
+        is_import: bool = False,
+    ) -> list[ValidationFinding]:
+        ref_findings = await validate_workflow_references(
+            self.session,
+            workflow_definition,
+            project_id,
+            is_import=is_import,
+        )
+        subworkflow_findings = await validate_subworkflow_project_references(
+            self.session,
+            workflow_definition,
+            project_id,
+            workflow_id=workflow_id,
+        )
+        return [*ref_findings, *subworkflow_findings]
+
     def _is_duplicate_name_error(self, e: IntegrityError) -> bool:
         """Check if IntegrityError is due to duplicate workflow name.
 
@@ -622,6 +644,7 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
         recorder = get_metrics_recorder()
         component = ComponentLabel.WORKFLOW_ENGINE
         system_cof = await get_system_continue_on_failure()
+        workflow_id = uuid4()
 
         with recorder.time(
             MetricType.WORKFLOW_VALIDATION_DURATION,
@@ -655,13 +678,12 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
 
         await self._validate_credential_project_scope(workflow_definition, project_id)
         await self._validate_no_secret_url_conflicts(workflow_definition)
-        ref_findings = await validate_workflow_references(
-            self.session, workflow_definition, project_id, is_import=is_import
+        reference_findings = await self._validate_project_workflow_references(
+            workflow_definition,
+            project_id,
+            workflow_id,
+            is_import=is_import,
         )
-        subworkflow_findings = await validate_subworkflow_project_references(
-            self.session, workflow_definition, project_id
-        )
-        reference_findings = [*ref_findings, *subworkflow_findings]
         if reference_findings:
             result = ValidationResult.from_findings([*result.findings, *reference_findings])
             has_validation_issues = True
@@ -671,7 +693,7 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
 
         # Create workflow
         workflow = Workflow(
-            id=uuid4(),
+            id=workflow_id,
             name=name,
             description=description,
             labels=labels,
@@ -1543,11 +1565,11 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
                     previous_cred_ids = self._extract_credential_ids(prev_version.workflow_definition)
             await self._validate_credential_project_scope(workflow_definition, workflow.project_id, previous_cred_ids)
             await self._validate_no_secret_url_conflicts(workflow_definition)
-            ref_findings = await validate_workflow_references(self.session, workflow_definition, workflow.project_id)
-            subworkflow_findings = await validate_subworkflow_project_references(
-                self.session, workflow_definition, workflow.project_id
+            reference_findings = await self._validate_project_workflow_references(
+                workflow_definition,
+                workflow.project_id,
+                workflow.id,
             )
-            reference_findings = [*ref_findings, *subworkflow_findings]
             if reference_findings:
                 result = ValidationResult.from_findings([*result.findings, *reference_findings])
                 workflow.has_validation_issues = True
@@ -1765,7 +1787,7 @@ class WorkflowService(UserReferenceResolverMixin, BaseService):
 
         definition_findings = result.findings
         subworkflow_findings = await validate_subworkflow_project_references(
-            self.session, definition, workflow.project_id
+            self.session, definition, workflow.project_id, workflow_id=workflow.id
         )
         validation_result = ValidationResult.from_findings([*definition_findings, *subworkflow_findings])
         if _has_blocking_publish_findings(definition_findings, subworkflow_findings):

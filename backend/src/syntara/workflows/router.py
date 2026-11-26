@@ -660,16 +660,20 @@ async def check_subworkflow_output_contract_changes(
 
     # Detect breaking changes
     new_definition = request.workflow_definition
+    if not isinstance(new_definition.get("triggers"), list):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="workflow_definition.triggers must be an array",
+        )
     contract_changes_by_trigger = detect_workflow_contract_changes(old_definition, new_definition)
     changes_by_trigger = filter_breaking_workflow_contract_changes(contract_changes_by_trigger)
 
     def trigger_name_for(trigger_id: str) -> str | None:
-        # Get trigger name from new definition
-        for trigger in new_definition.get("triggers", []):
-            if isinstance(trigger, dict) and trigger.get("id") == trigger_id:
-                return trigger.get("name") if isinstance(trigger.get("name"), str) else None
-        if old_definition:
-            for trigger in old_definition.get("triggers", []):
+        for definition in (new_definition, old_definition):
+            triggers = definition.get("triggers", []) if isinstance(definition, dict) else []
+            if not isinstance(triggers, list):
+                continue
+            for trigger in triggers:
                 if isinstance(trigger, dict) and trigger.get("id") == trigger_id:
                     return trigger.get("name") if isinstance(trigger.get("name"), str) else None
         return None

@@ -319,7 +319,7 @@ function TriggerFormFields({
   }, [nameField, onHeaderContentChange])
 
   const parametersContent = (
-    <Stack hasGutter>
+    <Stack hasGutter className={nodeFormStyles.triggerFormContent}>
       <input type="hidden" {...register('triggerType')} />
 
       {triggerType === TriggerTypeEnum.MANUAL_TRIGGER && (

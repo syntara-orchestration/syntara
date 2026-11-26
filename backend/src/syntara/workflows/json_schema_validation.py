@@ -181,6 +181,18 @@ def _deny_all_refs(uri: str) -> NoReturn:
 _NO_REF_REGISTRY: Registry[Any] = Registry(retrieve=_deny_all_refs)  # type: ignore[call-arg]
 
 
+def validate_json_schema_instance(schema: dict[str, Any], instance: object) -> list[jsonschema.ValidationError]:
+    """Return validation errors for an instance using the hardened schema boundary.
+
+    Definition checks run at the runtime boundary as well as when the schema is
+    saved, so legacy or otherwise unvalidated stored schemas cannot introduce
+    remote references or unsafe regular expressions.
+    """
+    validate_json_schema_definition(schema)
+    validator = jsonschema.Draft7Validator(schema, registry=_NO_REF_REGISTRY)
+    return list(validator.iter_errors(instance))
+
+
 # ---------------------------------------------------------------------------
 # Default-filling validator
 # ---------------------------------------------------------------------------

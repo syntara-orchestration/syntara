@@ -1,5 +1,5 @@
 import type { WorkflowAPI } from '@syntara/contracts'
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 
 import { workflowClient } from '../../client'
 import type { DialogState } from '../../hooks/useDialogState'
@@ -13,88 +13,285 @@ type Workflow = WorkflowAPI.components['schemas']['WorkflowRead']
 
 type PendingPublishReview = {
   workflow: Workflow
-  publishName?: string
-  description?: string
-  review: WorkflowAPI.components['schemas']['BreakingChangesResponse']
+  version: number
+  publishedVersionId: string | null
+  review: WorkflowAPI.components['schemas']['BreakingChangesResponse'] | null
+}
+
+type PublishReviewDialogState = Readonly<{
+  isPublishDisabled: boolean
+  isCheckingContractChanges: boolean
+  hasContractReviewError: boolean
+  breakingChanges: WorkflowAPI.components['schemas']['TriggerBreakingChanges'][]
+  contractChanges: WorkflowAPI.components['schemas']['TriggerBreakingChanges'][]
+  parentWorkflows: WorkflowAPI.components['schemas']['WorkflowReferenceRead'][]
+}>
+
+type UseWorkflowOutputReviewProps = Readonly<{
+  isOpen: boolean
+  workflow: Workflow | null | undefined
+  workflowDefinition: unknown
+  version: number | undefined
+  publishedVersionId: string | null
+  isFetching: boolean
+  isLoading: boolean
+  error: unknown
+  pendingReview: PendingPublishReview | null
+  setPendingReview: (review: PendingPublishReview) => void
+  reviewOutputContract: (
+    definition: unknown
+  ) => Promise<WorkflowAPI.components['schemas']['BreakingChangesResponse'] | null>
+  showError: (alert: { title: string; description: string }) => void
+}>
+
+function isCurrentWorkflowReview(
+  pendingReview: PendingPublishReview | null,
+  workflow: Workflow | null | undefined,
+  version: number | undefined,
+  publishedVersionId: string | null
+): boolean {
+  return Boolean(
+    workflow &&
+    version != null &&
+    pendingReview?.workflow.id === workflow.id &&
+    pendingReview.version === version &&
+    pendingReview.publishedVersionId === publishedVersionId
+  )
+}
+
+function useWorkflowOutputReview({
+  isOpen,
+  workflow,
+  workflowDefinition,
+  version,
+  publishedVersionId,
+  isFetching,
+  isLoading,
+  error,
+  pendingReview,
+  setPendingReview,
+  reviewOutputContract,
+  showError,
+}: UseWorkflowOutputReviewProps): boolean {
+  const hasCurrentReview = isCurrentWorkflowReview(pendingReview, workflow, version, publishedVersionId)
+
+  useEffect(() => {
+    if (!isOpen || !workflow?.id || isFetching || isLoading) return
+
+    if (!workflowDefinition || version == null) {
+      showError({
+        title: 'Failed to check output contract changes',
+        description: getErrorMessage(error ?? 'Workflow definition is unavailable.'),
+      })
+      return
+    }
+
+    if (hasCurrentReview) return
+
+    let isCurrent = true
+    detachPromise(
+      reviewOutputContract(workflowDefinition)
+        .then((review) => {
+          if (isCurrent) setPendingReview({ workflow, version, publishedVersionId, review })
+        })
+        .catch((reviewError: unknown) => {
+          if (isCurrent) {
+            showError({ title: 'Failed to check output contract changes', description: getErrorMessage(reviewError) })
+            setPendingReview({ workflow, version, publishedVersionId, review: null })
+          }
+        })
+    )
+
+    return () => {
+      isCurrent = false
+    }
+  }, [
+    error,
+    hasCurrentReview,
+    isFetching,
+    isLoading,
+    isOpen,
+    reviewOutputContract,
+    setPendingReview,
+    showError,
+    version,
+    publishedVersionId,
+    workflow,
+    workflowDefinition,
+  ])
+
+  return hasCurrentReview
+}
+
+function isWorkflowReviewInProgress({
+  isOpen,
+  workflowId,
+  isFetching,
+  isLoading,
+  workflowDefinition,
+  version,
+  hasCurrentReview,
+}: Readonly<{
+  isOpen: boolean
+  workflowId: string
+  isFetching: boolean
+  isLoading: boolean
+  workflowDefinition: unknown
+  version: number | undefined
+  hasCurrentReview: boolean
+}>): boolean {
+  return Boolean(
+    isOpen && workflowId && (isFetching || isLoading || (workflowDefinition && version != null && !hasCurrentReview))
+  )
+}
+
+function getPublishReviewDialogState({
+  isOpen,
+  isPublishing,
+  isReviewPublishing,
+  hasCurrentReview,
+  workflowId,
+  workflowDefinition,
+  version,
+  isFetching,
+  isLoading,
+  pendingReview,
+}: Readonly<{
+  isOpen: boolean
+  isPublishing: boolean
+  isReviewPublishing: boolean
+  hasCurrentReview: boolean
+  workflowId: string
+  workflowDefinition: unknown
+  version: number | undefined
+  isFetching: boolean
+  isLoading: boolean
+  pendingReview: PendingPublishReview | null
+}>): PublishReviewDialogState & { isPublishing: boolean } {
+  const isCheckingContractChanges = isWorkflowReviewInProgress({
+    isOpen,
+    workflowId,
+    isFetching,
+    isLoading,
+    workflowDefinition,
+    version,
+    hasCurrentReview,
+  })
+  const review = pendingReview?.review
+  const canPublish = hasCurrentReview && Boolean(workflowDefinition) && Boolean(review)
+
+  return {
+    isPublishing: isPublishing || isReviewPublishing,
+    isPublishDisabled: !canPublish,
+    isCheckingContractChanges,
+    hasContractReviewError: Boolean(hasCurrentReview && pendingReview?.review === null),
+    breakingChanges: review?.triggers ?? [],
+    contractChanges: review?.contract_changes ?? [],
+    parentWorkflows: review?.parent_workflows ?? [],
+  }
+}
+
+function getPublishReviewOptions(workflow: Workflow | null | undefined) {
+  return {
+    workflowId: workflow?.id ?? null,
+    currentVersion: workflow?.current_version,
+    workflowName: workflow?.name,
+    workflowDescription: workflow?.description ?? '',
+  }
+}
+
+function useWorkflowDetailQuery(workflowId: string, isOpen: boolean) {
+  return workflowClient.useQuery(
+    'get',
+    '/workflows/{workflow_id}',
+    { params: { path: { workflow_id: workflowId } } },
+    { enabled: isOpen && workflowId.length > 0 }
+  )
+}
+
+function usePublishReviewedVersion(
+  canPublish: boolean,
+  pendingReview: PendingPublishReview | null,
+  onPublishWorkflow: Props['onPublishWorkflow']
+) {
+  return useCallback(
+    (publishName?: string, description?: string) => {
+      if (!canPublish || !pendingReview) return
+      onPublishWorkflow(pendingReview.workflow, pendingReview.version, publishName, description)
+    },
+    [canPublish, onPublishWorkflow, pendingReview]
+  )
 }
 
 type Props = Readonly<{
   publishDialog: DialogState<Workflow>
   isPublishing: boolean
-  onPublishWorkflow: (workflow: Workflow, publishName?: string, description?: string) => void
+  onPublishWorkflow: (workflow: Workflow, version: number, publishName?: string, description?: string) => void
 }>
 
 export function WorkflowPublishDialog({ publishDialog, isPublishing, onPublishWorkflow }: Props) {
   const { showError } = useAlerts()
   const [pendingReview, setPendingReview] = useState<PendingPublishReview | null>(null)
   const workflow = publishDialog.item
-  const workflowQuery = workflowClient.useQuery(
-    'get',
-    '/workflows/{workflow_id}',
-    { params: { path: { workflow_id: workflow?.id ?? '' } } },
-    { enabled: publishDialog.isOpen && Boolean(workflow?.id) }
+  const workflowId = workflow?.id ?? ''
+  const workflowQuery = useWorkflowDetailQuery(workflowId, publishDialog.isOpen)
+  const { reviewOutputContract, isPublishing: isReviewPublishing } = usePublishWorkflow(
+    getPublishReviewOptions(workflow)
   )
-  const publishReview = usePublishWorkflow({
-    workflowId: workflow?.id ?? null,
-    currentVersion: workflow?.current_version,
-    workflowName: workflow?.name,
-    workflowDescription: workflow?.description ?? '',
-  })
 
   const closeDialog = useCallback(() => {
     setPendingReview(null)
     publishDialog.close()
   }, [publishDialog])
 
-  const reviewAndPublish = useCallback(
-    (publishName?: string, description?: string) => {
-      if (!workflow) return
-      detachPromise(
-        (async () => {
-          try {
-            const detail = workflowQuery.data ?? (await workflowQuery.refetch()).data
-            const definition = detail?.version?.workflow_definition
-            if (!definition) {
-              showError({
-                title: 'Failed to check output contract changes',
-                description: 'Workflow definition is unavailable.',
-              })
-              return
-            }
-            const review = await publishReview.reviewOutputContract(definition)
-            if (!review) return
-            if (review.has_breaking_changes || (review.has_contract_changes && review.parent_workflows?.length)) {
-              setPendingReview({ workflow, publishName, description, review })
-              return
-            }
-            onPublishWorkflow(workflow, publishName, description)
-          } catch (error) {
-            showError({ title: 'Failed to check output contract changes', description: getErrorMessage(error) })
-          }
-        })()
-      )
-    },
-    [onPublishWorkflow, publishReview, showError, workflow, workflowQuery]
-  )
-
-  const confirmPublish = useCallback(() => {
-    if (!pendingReview) return
-    const pending = pendingReview
-    setPendingReview(null)
-    onPublishWorkflow(pending.workflow, pending.publishName, pending.description)
-  }, [onPublishWorkflow, pendingReview])
+  const workflowDefinition = workflowQuery.data?.version?.workflow_definition
+  const version = workflowQuery.data?.version?.version
+  const publishedVersionId = workflowQuery.data?.published_version_id ?? workflow?.published_version_id ?? null
+  const hasCurrentReview = useWorkflowOutputReview({
+    isOpen: publishDialog.isOpen,
+    workflow,
+    workflowDefinition,
+    version,
+    publishedVersionId,
+    isFetching: workflowQuery.isFetching,
+    isLoading: workflowQuery.isLoading,
+    error: workflowQuery.error,
+    pendingReview,
+    setPendingReview,
+    reviewOutputContract,
+    showError,
+  })
+  const retryContractReview = useCallback(() => setPendingReview(null), [])
+  const reviewDialogState = getPublishReviewDialogState({
+    isOpen: publishDialog.isOpen,
+    isPublishing,
+    isReviewPublishing,
+    hasCurrentReview,
+    workflowId,
+    workflowDefinition,
+    version,
+    isFetching: workflowQuery.isFetching,
+    isLoading: workflowQuery.isLoading,
+    pendingReview,
+  })
+  const canPublish = !reviewDialogState.isPublishDisabled
+  const publishReviewedVersion = usePublishReviewedVersion(canPublish, pendingReview, onPublishWorkflow)
 
   return (
     <PublishWorkflowDialog
       isOpen={publishDialog.isOpen}
-      isPublishing={isPublishing || publishReview.isPublishing}
+      isPublishing={reviewDialogState.isPublishing}
+      isCheckingContractChanges={reviewDialogState.isCheckingContractChanges}
+      isPublishDisabled={reviewDialogState.isPublishDisabled}
+      hasContractReviewError={reviewDialogState.hasContractReviewError}
+      onRetryContractReview={retryContractReview}
       onClose={closeDialog}
-      onPublish={reviewAndPublish}
+      onPublish={publishReviewedVersion}
       workflowId={workflow?.id}
-      breakingChanges={pendingReview?.review.triggers ?? []}
-      contractChanges={pendingReview?.review.contract_changes ?? []}
-      parentWorkflows={pendingReview?.review.parent_workflows ?? []}
-      onConfirmContractChanges={confirmPublish}
+      breakingChanges={reviewDialogState.breakingChanges}
+      contractChanges={reviewDialogState.contractChanges}
+      parentWorkflows={reviewDialogState.parentWorkflows}
+      onConfirmContractChanges={publishReviewedVersion}
       onCancelBreakingChanges={() => setPendingReview(null)}
     />
   )

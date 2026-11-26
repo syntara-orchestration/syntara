@@ -51,6 +51,33 @@ def test_subworkflow_schema_has_setting_schema(subworkflow_schema: dict[str, Any
     assert "settingSchema" in subworkflow_schema
 
 
+def test_subworkflow_trigger_examples_show_the_output_schema_and_mapping_together() -> None:
+    trigger_schema_path = SCHEMA_DIR / "triggers" / "subworkflow.schema.json"
+    with trigger_schema_path.open() as f:
+        trigger_schema: dict[str, Any] = json.load(f)
+
+    properties = trigger_schema["parameterSchema"]["properties"]
+    output_schema_example = properties["output_schema"]["examples"][0]
+    output_mapping_example = properties["output_mapping"]["examples"][0]
+
+    assert output_schema_example["properties"]["release"]["properties"]["url"]["type"] == "string"
+    assert output_mapping_example == {"release.url": "${publish.stdout_json.url}"}
+
+
+def test_subworkflow_trigger_examples_show_schema_and_mapping_relationship() -> None:
+    """Trigger examples show a declared nested field and its matching source mapping."""
+    schema_path = SCHEMA_DIR / "triggers" / "subworkflow.schema.json"
+    with schema_path.open() as f:
+        trigger_schema: dict[str, Any] = json.load(f)
+
+    properties = trigger_schema["parameterSchema"]["properties"]
+    output_schema_example = properties["output_schema"]["examples"][0]
+    output_mapping_example = properties["output_mapping"]["examples"][0]
+
+    assert output_schema_example["properties"]["release"]["properties"]["url"]["type"] == "string"
+    assert output_mapping_example == {"release.url": "${publish.stdout_json.url}"}
+
+
 def test_subworkflow_config_minimal_valid(subworkflow_schema: dict[str, Any]) -> None:
     """Minimal valid config with only required fields should pass."""
     config = {
