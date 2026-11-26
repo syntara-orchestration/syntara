@@ -140,10 +140,22 @@ GA_CREDENTIAL_TYPES: list[dict[str, Any]] = [
         },
         "injectors": {
             "extra_vars": {
-                "auth_type": "aap",
                 "aap_username": "{{username}}",
                 "aap_password": "{{password}}",
                 "aap_oauth_token": "{{oauth_token}}",
+                # Container step contract (syntara.aap.credential recipe): the
+                # dispatched AAP Workflow Action resolves authentication from
+                # token / username / password keys. Emitted alongside the
+                # aap_* keys so both the in-process executor and the
+                # container step can consume the same resolved credential.
+                # No short marker values (e.g. an auth type name): the plugin
+                # SDK fingerprint-scans step output for every credential
+                # document string, and a short value that appears in normal
+                # output (such as the AAP host in the job URL) is rejected
+                # as a credential leak.
+                "token": "{{oauth_token}}",
+                "username": "{{username}}",
+                "password": "{{password}}",
             },
             "env": {},
             "file": {},
