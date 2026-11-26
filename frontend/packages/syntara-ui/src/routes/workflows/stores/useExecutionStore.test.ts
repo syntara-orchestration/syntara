@@ -278,15 +278,14 @@ describe('useExecutionStore', () => {
       expect(state.activityErrors.get('failed_task')).toBe('Connection timeout')
     })
 
-    it('clears all activity states when called with empty array', () => {
+    it('preserves activity states when called with empty array', () => {
       useExecutionStore.getState().injectPendingStates(['task1', 'task2'])
       expect(useExecutionStore.getState().activityStates.size).toBe(2)
 
       useExecutionStore.getState().setActivityExecutions([])
 
       const state = useExecutionStore.getState()
-      expect(state.activityStates.size).toBe(0)
-      expect(state.activityErrors.size).toBe(0)
+      expect(state.activityStates.size).toBe(2)
     })
 
     it('handles ActivityData from Execution.activities (activity_id shape)', () => {
@@ -1035,6 +1034,53 @@ describe('useExecutionStore', () => {
       useExecutionStore.getState().setExecution(execution)
 
       expect(useExecutionStore.getState().activityStates.get('wait_node')?.status).toBe('waiting')
+    })
+
+    it('accepts terminal status from snapshot after patch left activity in-flight', () => {
+      useExecutionStore.getState().reset()
+
+      useExecutionStore
+        .getState()
+        .applyPatch([{ op: 'replace', path: '/activities/script_step/status', value: 'running' }], 'patch-running')
+
+      const execution = createMockExecution({
+        activities: [
+          {
+            activity_id: 'script_step',
+            status: 'completed',
+            error_details: null,
+            started_at: '2025-12-10T15:00:05Z',
+            completed_at: '2025-12-10T15:00:10Z',
+          },
+        ],
+      })
+      useExecutionStore.getState().setExecution(execution)
+
+      expect(useExecutionStore.getState().activityStates.get('script_step')?.status).toBe('completed')
+    })
+
+    it('rejects stale terminal status from REST while activity is in-flight locally', () => {
+      useExecutionStore.getState().setActivityExecutions([
+        {
+          activity_id: 'script_step',
+          status: 'running',
+          error_details: null,
+          started_at: '2025-12-10T15:00:05Z',
+          completed_at: null,
+        },
+      ])
+
+      useExecutionStore.getState().setActivityExecutions([
+        {
+          activity_id: 'script_step',
+          status: 'failed',
+          error_details: 'stale timeout',
+          started_at: '2025-12-10T15:00:05Z',
+          completed_at: '2025-12-10T15:00:10Z',
+        },
+      ])
+
+      expect(useExecutionStore.getState().activityStates.get('script_step')?.status).toBe('running')
     })
 
     it('preserves error details when failed status survives merge', () => {
