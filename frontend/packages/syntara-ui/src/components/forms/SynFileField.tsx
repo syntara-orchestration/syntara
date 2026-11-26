@@ -19,6 +19,7 @@ type SynFileFieldControlProps<TFieldValues extends FieldValues, TName extends Fi
   dropzoneProps?: FileUploadProps['dropzoneProps']
   hideDefaultPreview: boolean
   isDisabled?: boolean
+  onFileChange?: (file: File | undefined) => void
 }
 
 function SynFileFieldControl<TFieldValues extends FieldValues, TName extends FieldPath<TFieldValues>>({
@@ -30,6 +31,7 @@ function SynFileFieldControl<TFieldValues extends FieldValues, TName extends Fie
   dropzoneProps,
   hideDefaultPreview,
   isDisabled,
+  onFileChange,
 }: Readonly<SynFileFieldControlProps<TFieldValues, TName>>) {
   const wrapperRef = useRef<HTMLDivElement>(null)
   const selectedFile = getSelectedFile(field.value)
@@ -50,10 +52,12 @@ function SynFileFieldControl<TFieldValues extends FieldValues, TName extends Fie
 
   const handleFileInputChange = (_event: DropEvent, inputFile: File) => {
     field.onChange(inputFile)
+    onFileChange?.(inputFile)
   }
 
   const handleClearClick = () => {
     field.onChange(undefined)
+    onFileChange?.(undefined)
   }
 
   return (
@@ -116,6 +120,8 @@ export type SynFileFieldProps<
   hideDefaultPreview?: boolean
   /** Disables the file upload control. */
   isDisabled?: boolean
+  /** Called after the selected file changes. */
+  onFileChange?: (file: File | undefined) => void
 }
 
 /**
@@ -151,6 +157,7 @@ export function SynFileField<
   dropzoneProps,
   hideDefaultPreview = true,
   isDisabled,
+  onFileChange,
 }: Readonly<SynFileFieldProps<TFieldValues, TName>>) {
   const resolvedFieldId = fieldId ?? name
 
@@ -174,6 +181,7 @@ export function SynFileField<
           dropzoneProps={dropzoneProps}
           hideDefaultPreview={hideDefaultPreview}
           isDisabled={isDisabled}
+          onFileChange={onFileChange}
         />
       )}
     </SynFormField>
