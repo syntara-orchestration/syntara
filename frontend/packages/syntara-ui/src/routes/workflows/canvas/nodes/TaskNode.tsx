@@ -161,7 +161,7 @@ export function TaskActivityDetails(
             </>
           )}
           {taskExecutor === ExecutorTypeEnum.KAFKA_PUBLISH &&
-            renderText('Target topic', typeof config.topic === 'string' ? config.topic : undefined)}
+            renderText('Topic', typeof config.topic === 'string' ? config.topic : undefined)}
           {renderText(
             isExpression(aapJobConfig?.job_template_name) ? 'Job template expression' : 'Job template',
             aapJobConfig?.job_template_name

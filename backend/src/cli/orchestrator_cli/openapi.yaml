@@ -37213,6 +37213,47 @@ components:
             - $ref: '#/components/schemas/ValidationResult'
             - type: 'null'
           description: Validation findings from the last save operation. Only included in create/update responses; use has_validation_issues for the durable indicator.
+    KafkaSubscriptionSourceRead:
+      description: Effective Kafka group for the current, non-retired subscription source.
+      properties:
+        trigger_node_id:
+          title: Trigger Node Id
+          type: string
+        source_id:
+          format: uuid
+          title: Source Id
+          type: string
+        generation:
+          title: Generation
+          type: integer
+        configuration_revision:
+          title: Configuration Revision
+          type: integer
+        integration_id:
+          format: uuid
+          title: Integration Id
+          type: string
+        topic:
+          title: Topic
+          type: string
+        group_id:
+          title: Group Id
+          type: string
+        group_id_is_generated:
+          description: Whether the effective group is the automatic ID for this source identity.
+          title: Group Id Is Generated
+          type: boolean
+      required:
+        - trigger_node_id
+        - source_id
+        - generation
+        - configuration_revision
+        - integration_id
+        - topic
+        - group_id
+        - group_id_is_generated
+      title: KafkaSubscriptionSourceRead
+      type: object
     WorkflowReadWithVersion:
       type: object
       title: WorkflowReadWithVersion
@@ -37312,6 +37353,12 @@ components:
         version:
           $ref: '#/components/schemas/WorkflowVersionRead'
           description: Current active version details
+        kafka_subscription_sources:
+          description: Current projected Kafka sources, including while unpublished; excludes retired subscriptions.
+          items:
+            $ref: '#/components/schemas/KafkaSubscriptionSourceRead'
+          title: Kafka Subscription Sources
+          type: array
     PublishWorkflowVersionResponse:
       type: object
       title: PublishWorkflowVersionResponse
@@ -37408,6 +37455,12 @@ components:
         version:
           $ref: '#/components/schemas/WorkflowVersionRead'
           description: Current active version details
+        kafka_subscription_sources:
+          description: Current projected Kafka sources, including while unpublished; excludes retired subscriptions.
+          items:
+            $ref: '#/components/schemas/KafkaSubscriptionSourceRead'
+          title: Kafka Subscription Sources
+          type: array
         warning:
           type: string
           default: ''

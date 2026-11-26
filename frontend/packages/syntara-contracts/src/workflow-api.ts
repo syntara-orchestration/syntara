@@ -483,6 +483,37 @@ export interface components {
       validation_result?: components['schemas']['ValidationResult'] | null
     }
     /**
+     * KafkaSubscriptionSourceRead
+     * @description Effective Kafka group for the current, non-retired subscription source.
+     */
+    KafkaSubscriptionSourceRead: {
+      /** Trigger Node Id */
+      trigger_node_id: string
+      /**
+       * Source Id
+       * Format: uuid
+       */
+      source_id: string
+      /** Generation */
+      generation: number
+      /** Configuration Revision */
+      configuration_revision: number
+      /**
+       * Integration Id
+       * Format: uuid
+       */
+      integration_id: string
+      /** Topic */
+      topic: string
+      /** Group Id */
+      group_id: string
+      /**
+       * Group Id Is Generated
+       * @description Whether the effective group is the automatic ID for this source identity.
+       */
+      group_id_is_generated: boolean
+    }
+    /**
      * WorkflowReadWithVersion
      * @description Schema for workflow response with current version details.
      *
@@ -558,6 +589,11 @@ export interface components {
       validation_result?: components['schemas']['ValidationResult'] | null
       /** @description Current active version details */
       version: components['schemas']['WorkflowVersionRead']
+      /**
+       * Kafka Subscription Sources
+       * @description Current projected Kafka sources, including while unpublished; excludes retired subscriptions.
+       */
+      kafka_subscription_sources?: components['schemas']['KafkaSubscriptionSourceRead'][]
     }
     /**
      * PublishWorkflowVersionResponse
@@ -633,6 +669,11 @@ export interface components {
       validation_result?: components['schemas']['ValidationResult'] | null
       /** @description Current active version details */
       version: components['schemas']['WorkflowVersionRead']
+      /**
+       * Kafka Subscription Sources
+       * @description Current projected Kafka sources, including while unpublished; excludes retired subscriptions.
+       */
+      kafka_subscription_sources?: components['schemas']['KafkaSubscriptionSourceRead'][]
       /**
        * Warning
        * @description Non-fatal warning from the publish operation

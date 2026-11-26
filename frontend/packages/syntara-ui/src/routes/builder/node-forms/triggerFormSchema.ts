@@ -1,9 +1,22 @@
-import { MissedSchedulePolicyEnum, ScheduleTypeEnum, TriggerTypeEnum, WEBHOOK_TRIGGER_TYPES } from '@syntara/contracts'
+import {
+  KafkaOffsetGapPolicyEnum,
+  KafkaStartPositionEnum,
+  MissedSchedulePolicyEnum,
+  ScheduleTypeEnum,
+  TriggerTypeEnum,
+  WEBHOOK_TRIGGER_TYPES,
+} from '@syntara/contracts'
 import { z } from 'zod'
 
 import { safeJSONReviver } from '../../../utils/jsonSafeParse'
 import { parseRepeatingInterval } from '../../../utils/triggerFormatting'
 import { isValidWebhookPath } from '../../../utils/webhookPath'
+
+export const kafkaStartSchema = z.object({
+  position: z.enum(KafkaStartPositionEnum).optional(),
+  added_partition_position: z.enum(KafkaStartPositionEnum).optional(),
+  offset_gap_policy: z.enum(KafkaOffsetGapPolicyEnum).optional(),
+})
 
 /**
  * Zod schema for the Trigger node form.
@@ -35,7 +48,9 @@ const triggerFormSchemaBase = z.object({
   runtimeCredentialId: z.string().optional(),
   topic: z.string().optional(),
   filterExpression: z.string().optional(),
-  authorizedServiceAccountIds: z.array(z.string().uuid()).optional(),
+  kafkaStart: kafkaStartSchema.optional(),
+  kafkaGroupId: z.string().nullable().optional(),
+  authorizedServiceAccountIds: z.array(z.uuid()).optional(),
 })
 
 function validateInputSchemaJson(schemaText: string | undefined, ctx: z.RefinementCtx) {
@@ -43,20 +58,20 @@ function validateInputSchemaJson(schemaText: string | undefined, ctx: z.Refineme
   if (!trimmed) return
 
   if (trimmed.length > 100_000) {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Input schema must be 100KB or less', path: ['inputSchema'] })
+    ctx.addIssue({ code: 'custom', message: 'Input schema must be 100KB or less', path: ['inputSchema'] })
     return
   }
   try {
     const parsed: unknown = JSON.parse(trimmed, safeJSONReviver)
     if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
       ctx.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: 'custom',
         message: 'Input schema must be a JSON object',
         path: ['inputSchema'],
       })
     }
   } catch {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Invalid JSON — check syntax', path: ['inputSchema'] })
+    ctx.addIssue({ code: 'custom', message: 'Invalid JSON — check syntax', path: ['inputSchema'] })
   }
 }
 
@@ -67,7 +82,7 @@ function validateWebhookPathFormat(webhookPath: string | undefined, ctx: z.Refin
 
   if (normalized.length > 128) {
     ctx.addIssue({
-      code: z.ZodIssueCode.custom,
+      code: 'custom',
       message: 'Webhook path must be 128 characters or fewer',
       path: ['webhookPath'],
     })
@@ -75,7 +90,7 @@ function validateWebhookPathFormat(webhookPath: string | undefined, ctx: z.Refin
   }
   if (!isValidWebhookPath(normalized)) {
     ctx.addIssue({
-      code: z.ZodIssueCode.custom,
+      code: 'custom',
       message:
         'Path must start and end with a letter or number, and contain only lowercase letters, numbers, hyphens, and underscores',
       path: ['webhookPath'],
@@ -88,7 +103,7 @@ function validateScheduleInterval(data: z.infer<typeof triggerFormSchemaBase>, c
   if (!parsed.start) return
   if (parsed.end && parsed.end < parsed.start) {
     ctx.addIssue({
-      code: z.ZodIssueCode.custom,
+      code: 'custom',
       message: 'End date must be on or after the start date',
       path: ['interval'],
     })
@@ -102,13 +117,13 @@ function validateCronFormat(cron: string | undefined, ctx: z.RefinementCtx) {
   const fields = cronValue.split(/\s+/)
   if (fields.length !== 5) {
     ctx.addIssue({
-      code: z.ZodIssueCode.custom,
+      code: 'custom',
       message: 'Cron expression must have exactly 5 fields: minute hour day-of-month month day-of-week',
       path: ['cron'],
     })
   } else if (!fields.every((f) => /^[\d*/,-]+$/.test(f))) {
     ctx.addIssue({
-      code: z.ZodIssueCode.custom,
+      code: 'custom',
       message: 'Cron fields may only contain digits, *, /, -, and ,',
       path: ['cron'],
     })
@@ -116,19 +131,26 @@ function validateCronFormat(cron: string | undefined, ctx: z.RefinementCtx) {
 }
 
 function validateKafkaSubscribe(data: z.infer<typeof triggerFormSchemaBase>, ctx: z.RefinementCtx) {
+  if (data.kafkaGroupId && (data.kafkaGroupId.length > 512 || !/^[a-zA-Z0-9._-]+$/.test(data.kafkaGroupId))) {
+    ctx.addIssue({
+      code: 'custom',
+      message: 'Use 1–512 ASCII letters, numbers, dots, underscores, or hyphens',
+      path: ['kafkaGroupId'],
+    })
+  }
   if (Array.from(data.filterExpression ?? '').length > 16_384) {
     ctx.addIssue({
-      code: z.ZodIssueCode.custom,
+      code: 'custom',
       message: 'CEL expression must be 16,384 characters or fewer',
       path: ['filterExpression'],
     })
   }
-  if (data.integrationId && !z.string().uuid().safeParse(data.integrationId).success) {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Select a Kafka Integration', path: ['integrationId'] })
+  if (data.integrationId && !z.uuid().safeParse(data.integrationId).success) {
+    ctx.addIssue({ code: 'custom', message: 'Select a Kafka Integration', path: ['integrationId'] })
   }
-  if (data.runtimeCredentialId && !z.string().uuid().safeParse(data.runtimeCredentialId).success) {
+  if (data.runtimeCredentialId && !z.uuid().safeParse(data.runtimeCredentialId).success) {
     ctx.addIssue({
-      code: z.ZodIssueCode.custom,
+      code: 'custom',
       message: 'Select a valid runtime credential',
       path: ['runtimeCredentialId'],
     })
@@ -138,7 +160,7 @@ function validateKafkaSubscribe(data: z.infer<typeof triggerFormSchemaBase>, ctx
     (data.topic.length > 249 || !/^[a-zA-Z0-9._-]+$/.test(data.topic) || ['.', '..'].includes(data.topic))
   ) {
     ctx.addIssue({
-      code: z.ZodIssueCode.custom,
+      code: 'custom',
       message: 'Enter one exact Kafka topic (1–249 letters, numbers, dots, underscores, or hyphens)',
       path: ['topic'],
     })
@@ -161,7 +183,7 @@ export const triggerFormSchema = triggerFormSchemaBase.superRefine((data, ctx) =
   if (data.triggerType === TriggerTypeEnum.SCHEDULED && data.scheduleType === ScheduleTypeEnum.INTERVAL) {
     if (!data.interval?.trim()) {
       ctx.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: 'custom',
         message: 'A schedule is required',
         path: ['interval'],
       })
@@ -173,7 +195,7 @@ export const triggerFormSchema = triggerFormSchemaBase.superRefine((data, ctx) =
   if (data.triggerType === TriggerTypeEnum.SCHEDULED && data.scheduleType === ScheduleTypeEnum.CRON) {
     if (!data.cron?.trim()) {
       ctx.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: 'custom',
         message: 'Cron expression is required',
         path: ['cron'],
       })
@@ -186,7 +208,7 @@ export const triggerFormSchema = triggerFormSchemaBase.superRefine((data, ctx) =
     validateWebhookPathFormat(data.webhookPath, ctx)
     if (!data.authorizedServiceAccountIds?.length) {
       ctx.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: 'custom',
         message: AUTHORIZED_SERVICE_ACCOUNT_REQUIRED_MESSAGE,
         path: ['authorizedServiceAccountIds'],
       })

@@ -25,8 +25,10 @@ import {
 import { SynForm } from '../../../components/forms/SynForm'
 import { SynFormField } from '../../../components/forms/SynFormField'
 import { SynTextField } from '../../../components/forms/SynTextField'
+import { SynErrorState } from '../../../components/states/SynErrorState'
 import { SynSelect } from '../../../components/SynSelect'
 import { useSynForm } from '../../../hooks/useSynForm'
+import { detachPromise } from '../../../utils/detachPromise'
 import { getDefaultRepeatingInterval } from '../../../utils/triggerFormatting'
 import { generateWebhookPath } from '../../../utils/webhookPath'
 import { NodeEditorAutoSubmitContext, useRegisterAutoSubmit } from '../hooks/useNodeEditorAutoSubmit'
@@ -41,8 +43,9 @@ import { ActivityNameField } from './shared/ActivityNameField'
 import { NodeFormContainer } from './shared/NodeFormContainer'
 import nodeFormStyles from './shared/nodeFormStyles.module.css'
 import { NodeFormTabsLayout } from './shared/NodeFormTabsLayout'
-import { normalizeWebhookPath, triggerFormSchema, type TriggerFormData } from './triggerFormSchema'
+import { triggerFormSchema, type TriggerFormData } from './triggerFormSchema'
 import { kafkaResourceErrors } from './useKafkaSubscribeResources'
+import { useTriggerFormSubmit } from './useTriggerFormSubmit'
 import { WebhookFields } from './WebhookTriggerFields'
 
 const executionConflictLabelHelp = (
@@ -93,6 +96,7 @@ function buildTriggerFormDefaults(initialData?: Partial<TriggerFormData>): Trigg
 }
 
 type TriggerNodeFormProps = Readonly<{
+  kafkaTriggerId?: string
   onSubmit: (data: TriggerFormData) => void
   initialData?: Partial<TriggerFormData>
   workflowId?: string | null
@@ -273,11 +277,13 @@ function ScheduleIntervalFields({
 // ── Main form fields ─────────────────────────────────────────────────────
 
 function TriggerFormFields({
+  kafkaTriggerId,
   workflowId,
   projectId,
   onHeaderContentChange,
   validationErrors,
 }: Readonly<{
+  kafkaTriggerId?: string
   workflowId?: string | null
   projectId?: string
   onHeaderContentChange?: (content: ReactNode | null) => void
@@ -329,7 +335,7 @@ function TriggerFormFields({
       <input type="hidden" {...register('triggerType')} />
 
       {triggerType === TriggerTypeEnum.EVENT_SUBSCRIBE && (
-        <KafkaSubscribeFields workflowId={workflowId} projectId={projectId} />
+        <KafkaSubscribeFields workflowId={workflowId} projectId={projectId} triggerId={kafkaTriggerId} />
       )}
       {triggerType === TriggerTypeEnum.MANUAL_TRIGGER && (
         <fieldset disabled={isVersionView} className={nodeFormStyles.disabledFieldset}>
@@ -468,43 +474,39 @@ function TriggerNodeFormContent(props: TriggerNodeFormProps) {
     formState: { errors },
   } = form
 
-  const handleSubmit = (data: TriggerFormData) => {
-    const isManual = data.triggerType === TriggerTypeEnum.MANUAL_TRIGGER
-    const isKafka = data.triggerType === TriggerTypeEnum.EVENT_SUBSCRIBE
-    const isScheduled = data.triggerType === TriggerTypeEnum.SCHEDULED
-    const isWebhookStyle = WEBHOOK_TRIGGER_TYPES.has(data.triggerType)
-
-    const cleanedData: TriggerFormData = {
-      name: data.name,
-      triggerType: data.triggerType,
-      inputSchema: isManual || isWebhookStyle || isKafka ? data.inputSchema : undefined,
-      scheduleType: isScheduled ? data.scheduleType : undefined,
-      interval: isScheduled && data.scheduleType === ScheduleTypeEnum.INTERVAL ? data.interval : undefined,
-      cron: isScheduled && data.scheduleType === ScheduleTypeEnum.CRON ? data.cron : undefined,
-      timezone: isScheduled ? data.timezone : undefined,
-      missedSchedulePolicy: isScheduled ? data.missedSchedulePolicy : undefined,
-      webhookPath: isWebhookStyle ? normalizeWebhookPath(data.webhookPath ?? '') : undefined,
-      integrationId: isKafka ? data.integrationId : undefined,
-      runtimeCredentialId: isKafka ? data.runtimeCredentialId : undefined,
-      topic: isKafka ? data.topic : undefined,
-      filterExpression: isKafka ? data.filterExpression : undefined,
-      authorizedServiceAccountIds: isWebhookStyle ? data.authorizedServiceAccountIds : undefined,
-    }
-    props.onSubmit(cleanedData)
-  }
+  const groupUpdate = useTriggerFormSubmit({
+    schema,
+    workflowId: props.workflowId,
+    triggerId: props.kafkaTriggerId,
+    onSubmit: props.onSubmit,
+  })
+  const handleSubmit = groupUpdate.submit
 
   const autoSubmitRef = use(NodeEditorAutoSubmitContext)
-  useRegisterAutoSubmit(autoSubmitRef, form, handleSubmit)
+  useRegisterAutoSubmit(autoSubmitRef, form, handleSubmit, { allowIncomplete: true })
 
   return (
-    <NodeFormContainer formId="trigger-node-form" onSubmit={form.handleSubmit(handleSubmit)}>
+    <NodeFormContainer
+      formId="trigger-node-form"
+      onSubmit={form.handleSubmit(handleSubmit, () => handleSubmit(form.getValues()))}
+    >
       <SynForm form={form}>
-        <TriggerFormFields
-          workflowId={props.workflowId}
-          projectId={props.projectId}
-          onHeaderContentChange={props.onHeaderContentChange}
-          validationErrors={errors}
-        />
+        {groupUpdate.isError && (
+          <SynErrorState
+            title="Unable to check published consumer groups"
+            message={groupUpdate.error}
+            onRetry={() => detachPromise(handleSubmit(form.getValues()))}
+          />
+        )}
+        <fieldset disabled={groupUpdate.isPending} className={nodeFormStyles.disabledFieldset}>
+          <TriggerFormFields
+            kafkaTriggerId={props.kafkaTriggerId}
+            workflowId={props.workflowId}
+            projectId={props.projectId}
+            onHeaderContentChange={props.onHeaderContentChange}
+            validationErrors={errors}
+          />
+        </fieldset>
       </SynForm>
     </NodeFormContainer>
   )

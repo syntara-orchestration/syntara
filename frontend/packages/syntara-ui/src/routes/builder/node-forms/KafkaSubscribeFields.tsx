@@ -1,16 +1,18 @@
-import { Alert, Content, ContentVariants, ExpandableSection, Stack, StackItem } from '@patternfly/react-core'
-import { use, useState } from 'react'
+import { Stack, StackItem, TextInput } from '@patternfly/react-core'
+import { IntegrationTypeEnum } from '@syntara/contracts'
+import { use } from 'react'
 import { useFormContext, useWatch } from 'react-hook-form'
 
+import { FormFieldError } from '../../../components/FormFieldError'
 import { FormLabelWithHelp } from '../../../components/FormLabelWithHelp'
 import { SynFormField } from '../../../components/forms/SynFormField'
-import { SynTextField } from '../../../components/forms/SynTextField'
-import { useCredentialPermissions } from '../../configuration/credentials/useCredentialPermissions'
 import { CredentialSelector } from '../components/CredentialSelector'
+import { IntegrationSelector } from '../components/IntegrationSelector'
 import { useIsVersionView } from '../VersionViewContext'
 
+import { KafkaConsumerSettings } from './KafkaConsumerSettings'
 import { KafkaCredentialConnection } from './KafkaCredentialConnection'
-import { KafkaIntegrationField } from './KafkaIntegrationField'
+import { KafkaSubscribeBehaviorAlert } from './KafkaSubscribeBehaviorAlert'
 import { KafkaSubscribeFilter } from './KafkaSubscribeFilter'
 import { kafkaSubscribeParameters } from './kafkaSubscribeMapping'
 import { KafkaSubscribePreflight } from './KafkaSubscribePreflight'
@@ -25,11 +27,10 @@ const KAFKA_CREDENTIAL_TYPES = ['Kafka']
 export function KafkaSubscribeFields({
   workflowId,
   projectId,
-}: Readonly<{ workflowId?: string | null; projectId?: string }>) {
+  triggerId,
+}: Readonly<{ workflowId?: string | null; projectId?: string; triggerId?: string }>) {
   const isReadOnly = useIsVersionView()
   const resources = use(KafkaSubscribeResourceContext)
-  const [deliveryExpanded, setDeliveryExpanded] = useState(false)
-  const { canCreate } = useCredentialPermissions({ resourceProject: projectId })
   const { control, setValue } = useFormContext<TriggerFormData>()
   const values = useWatch({ control })
   const parsed = triggerFormSchema.safeParse(values)
@@ -52,45 +53,56 @@ export function KafkaSubscribeFields({
     values.topic,
     values.inputSchema,
     values.filterExpression,
+    values.kafkaStart,
+    values.kafkaGroupId,
     resourceErrors,
   ])
 
   return (
     <Stack hasGutter>
       <StackItem>
-        <Alert variant="info" isInline title="Kafka Subscribe activation" component="h4">
-          <Content component={ContentVariants.p}>
-            Publishing activates this subscription. Configuration changes apply on the next publish. The runtime
-            credential authenticates to Kafka. The platform supplies the workflow execution identity automatically.
-          </Content>
-        </Alert>
-      </StackItem>
-      <StackItem>
-        <ExpandableSection
-          toggleText="Message delivery behavior"
-          isExpanded={deliveryExpanded}
-          onToggle={(_event, expanded) => setDeliveryExpanded(expanded)}
-        >
-          <Content component={ContentVariants.p}>
-            Each subscription uses a platform-managed group. Partitions present at first activation start with new
-            messages at the visible-end boundary saved when each partition initializes. Partitions added later start at
-            their earliest retained message. Initialized partitions resume from valid committed offsets. Missing or
-            invalid established checkpoints require recovery; they do not reset automatically. Auto-commit is off.
-            Commit follows durable scheduling or resolution, without waiting for workflow completion.
-          </Content>
-        </ExpandableSection>
+        <KafkaSubscribeBehaviorAlert />
       </StackItem>
       <StackItem>
         <fieldset disabled={isReadOnly} className={nodeFormStyles.disabledFieldset}>
           <Stack hasGutter>
             <StackItem>
-              {resources && <KafkaIntegrationField resources={resources} isDisabled={isReadOnly} />}
+              <SynFormField<TriggerFormData, 'integrationId'>
+                name="integrationId"
+                label="Integration"
+                hideFormGroupLabel
+                hideFooter
+              >
+                {({ field }) => (
+                  <IntegrationSelector
+                    integrationType={IntegrationTypeEnum.KAFKA}
+                    label="Integration"
+                    isRequired
+                    fieldId="subscribe-integration"
+                    placeholder="Select a Kafka integration"
+                    projectId={projectId}
+                    value={field.value || undefined}
+                    isDisabled={isReadOnly}
+                    onChange={(value) => {
+                      const next = value ?? ''
+                      if (next === (field.value ?? '')) return
+                      setValue('integrationId', next, { shouldDirty: true, shouldValidate: true })
+                      setValue('runtimeCredentialId', '', { shouldDirty: true, shouldValidate: true })
+                      setValue('kafkaGroupId', null, { shouldDirty: true, shouldValidate: true })
+                    }}
+                  />
+                )}
+              </SynFormField>
+              <FormFieldError
+                id="subscribe-integration-error"
+                message={resources?.integrations.isPending ? undefined : resourceErrors.integrationId}
+              />
             </StackItem>
             {values.integrationId && (
               <StackItem>
                 <SynFormField<TriggerFormData, 'runtimeCredentialId'>
                   name="runtimeCredentialId"
-                  label=""
+                  label="Runtime credential"
                   hideFormGroupLabel
                   hideFooter
                 >
@@ -98,9 +110,11 @@ export function KafkaSubscribeFields({
                     <KafkaCredentialConnection
                       key={values.integrationId}
                       credentialName={resources?.credentials.credentials.find((item) => item.id === field.value)?.name}
+                      credentialLabel="Kafka credential"
                       isPending={resourcesLoading}
                       errorMessage={resourceErrors.runtimeCredentialId ?? fieldState.error?.message}
                       isDisabled={isReadOnly}
+                      isRequired
                       isCompact
                     >
                       {(onSelected) => (
@@ -108,22 +122,21 @@ export function KafkaSubscribeFields({
                           value={field.value}
                           onChange={(value) => {
                             setValue('runtimeCredentialId', value ?? '', { shouldDirty: true, shouldValidate: true })
-                            if (value) onSelected()
+                            onSelected()
                           }}
                           projectId={projectId}
                           compatibleTypeNames={KAFKA_CREDENTIAL_TYPES}
-                          label="Kafka runtime credential"
-                          fieldId="kafka-runtime-credential"
+                          label="Runtime credential"
+                          hideLabel
+                          fieldId="subscribe-credential"
+                          placeholder="Select a credential"
                           isRequired
-                          isSearchable
-                          allowCreate={canCreate && !isReadOnly}
                           isDisabled={isReadOnly || !values.integrationId || resourcesLoading}
                           errorMessage={
                             resourcesLoading
                               ? undefined
                               : (resourceErrors.runtimeCredentialId ?? fieldState.error?.message)
                           }
-                          helpText="Used to authenticate this subscription to Kafka. Select a Kafka credential explicitly; the Integration management credential is not substituted. This does not select the workflow execution identity."
                         />
                       )}
                     </KafkaCredentialConnection>
@@ -132,15 +145,33 @@ export function KafkaSubscribeFields({
               </StackItem>
             )}
             <StackItem>
-              <SynTextField
+              <SynFormField<TriggerFormData, 'topic'>
                 name="topic"
                 label="Topic"
                 fieldId="kafka-topic"
                 isRequired
-                isDisabled={isReadOnly}
-                placeholder="orders.created"
                 hint="One exact Kafka topic. Expressions, wildcards, and topic lists are not supported."
-              />
+              >
+                {({ field, fieldState, describedBy }) => (
+                  <TextInput
+                    id="kafka-topic"
+                    name={field.name}
+                    ref={field.ref}
+                    value={field.value ?? ''}
+                    onBlur={field.onBlur}
+                    isRequired
+                    isDisabled={isReadOnly}
+                    placeholder="orders.created"
+                    validated={fieldState.error ? 'error' : 'default'}
+                    aria-describedby={describedBy}
+                    onChange={(_event, value) => {
+                      if (value !== field.value)
+                        setValue('kafkaGroupId', null, { shouldDirty: true, shouldValidate: true })
+                      field.onChange(value)
+                    }}
+                  />
+                )}
+              </SynFormField>
             </StackItem>
             <StackItem>
               <PayloadValidationSection
@@ -163,6 +194,9 @@ export function KafkaSubscribeFields({
       </StackItem>
       <StackItem>
         <KafkaSubscribeFilter isReadOnly={isReadOnly} />
+      </StackItem>
+      <StackItem>
+        <KafkaConsumerSettings workflowId={workflowId} triggerId={triggerId} isReadOnly={isReadOnly} />
       </StackItem>
       <StackItem>
         <KafkaSubscribePreflight

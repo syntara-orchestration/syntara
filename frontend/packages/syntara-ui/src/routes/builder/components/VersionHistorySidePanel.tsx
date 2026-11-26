@@ -3,6 +3,7 @@ import { Content, FlexItem } from '@patternfly/react-core'
 import { SynConfirmationDialog } from '../../../components/dialogs/SynConfirmationDialog'
 import { EditVersionDialog } from '../EditVersionDialog'
 import type { VersionSidePanelState } from '../hooks/useBuilderVersionPanel'
+import { KafkaGroupConflictDialog } from '../KafkaGroupConflictDialog'
 import { PublishWorkflowDialog } from '../PublishWorkflowDialog'
 import { SaveBeforeViewDialog } from '../SaveBeforeViewDialog'
 import { VersionHistoryPanel } from '../VersionHistoryPanel'
@@ -43,9 +44,15 @@ export function VersionHistorySidePanel({ sidePanel, isNodeEditorOpen, editPermi
         </FlexItem>
       )}
 
+      <KafkaGroupConflictDialog
+        conflicts={sidePanel.publication.groupConflicts}
+        isPending={sidePanel.publishDialog.isPublishing}
+        onConfirm={sidePanel.publication.confirmGroups}
+        onCancel={sidePanel.publication.cancelGroups}
+      />
       <PublishWorkflowDialog
         isOpen={sidePanel.publishDialog.isOpen}
-        isPublishing={false}
+        isPublishing={sidePanel.publishDialog.isPublishing}
         onClose={sidePanel.publishDialog.onClose}
         onPublish={sidePanel.publishDialog.onPublish}
       />

@@ -211,6 +211,7 @@ __all__ = (
     "KafkaStartPosition",
     "KafkaSubscribeParameters",
     "KafkaSubscribeParametersInputSchemaType0",
+    "KafkaSubscriptionSourceRead",
     "KPIDashboard",
     "ListIntegrationCatalogEnabled",
     "ListIntegrationCatalogIntegrationType",

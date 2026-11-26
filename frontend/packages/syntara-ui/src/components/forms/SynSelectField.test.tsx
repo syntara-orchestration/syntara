@@ -19,7 +19,7 @@ const options = [
 ]
 
 describe('SynSelectField', () => {
-  it('supports a distinct accessible name for repeated controls', async () => {
+  it('supports a distinct accessible name and associated help for repeated controls', async () => {
     const user = userEvent.setup()
     renderWithForm<FormData>({ schema, defaultValues: { projectId: '' } }, ({ control }) => (
       <SynSelectField
@@ -27,10 +27,14 @@ describe('SynSelectField', () => {
         control={control}
         label="Encoding"
         ariaLabel="Header 1 encoding"
+        hint="Choose how to encode the first header"
         options={options}
       />
     ))
     expect(screen.getByText('Encoding')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Header 1 encoding' })).toHaveAccessibleDescription(
+      'Choose how to encode the first header'
+    )
     await user.click(screen.getByRole('button', { name: 'Header 1 encoding' }))
     expect(screen.getByRole('listbox', { name: 'Header 1 encoding options' })).toBeVisible()
   })
@@ -42,6 +46,29 @@ describe('SynSelectField', () => {
     expect(screen.getByText('Project')).toBeInTheDocument()
     expect(screen.getByLabelText('Project')).toHaveAttribute('id', 'project-id')
     expect(screen.getByLabelText('Project')).toHaveTextContent('Select an option')
+  })
+
+  it('moves from the current option with the arrow keys and commits that option', async () => {
+    const user = userEvent.setup()
+    const choices = [
+      { value: 'proj-1', label: 'Project One' },
+      { value: 'proj-2', label: 'Project Two' },
+      { value: 'proj-3', label: 'Project Three' },
+    ]
+    renderWithForm<FormData>({ schema, defaultValues: { projectId: 'proj-1' } }, ({ control }) => (
+      <SynSelectField name="projectId" control={control} label="Project" options={choices} />
+    ))
+    const toggle = screen.getByRole('button', { name: 'Project' })
+    toggle.focus()
+    await user.keyboard(' ')
+    await user.keyboard('{ArrowDown}{Enter}')
+    expect(toggle).toHaveTextContent('Project Two')
+    expect(toggle).toHaveFocus()
+
+    toggle.focus()
+    await user.keyboard(' ')
+    await user.keyboard('{ArrowUp}{Enter}')
+    expect(toggle).toHaveTextContent('Project One')
   })
 
   it('selects an option and updates the toggle label', async () => {
@@ -117,6 +144,24 @@ describe('SynSelectField', () => {
     await user.click(screen.getByRole('button', { name: 'Submit' }))
 
     expect(await screen.findByText('Project is required')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Project' })).toHaveAccessibleDescription(/Project is required/)
+    expect(screen.getByRole('button', { name: 'Project' })).toHaveAttribute('aria-invalid', 'true')
+    await user.click(screen.getByRole('button', { name: 'Project' }))
+    await user.click(screen.getByRole('option', { name: 'Project One' }))
+    expect(screen.getByRole('button', { name: 'Project' })).toHaveAttribute('aria-invalid', 'false')
+  })
+
+  it('associates helper text with the select toggle', () => {
+    renderWithForm<FormData>({ schema, defaultValues: { projectId: 'proj-1' } }, ({ control }) => (
+      <SynSelectField
+        name="projectId"
+        control={control}
+        label="Project"
+        options={options}
+        hint="Select the workflow project"
+      />
+    ))
+    expect(screen.getByRole('button', { name: 'Project' })).toHaveAccessibleDescription('Select the workflow project')
   })
 
   it('has no accessibility violations in default state', async () => {

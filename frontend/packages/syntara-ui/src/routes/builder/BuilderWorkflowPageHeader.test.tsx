@@ -598,6 +598,35 @@ describe('BuilderWorkflowPageHeader', () => {
     expect(onPublish).toHaveBeenCalled()
   })
 
+  it('invalidates preparation when Escape dismisses the initial publish dialog', async () => {
+    const user = userEvent.setup()
+    const onCancelPublish = vi.fn()
+    const { rerender } = render(
+      <BuilderWorkflowPageHeader
+        {...baseProps}
+        isNew={false}
+        isDirty={false}
+        workflow={{ id: 'wf-1' }}
+        onCancelPublish={onCancelPublish}
+      />
+    )
+    await user.click(screen.getByRole('button', { name: /Publish/i }))
+    await screen.findByRole('dialog', { name: 'Publish workflow' })
+    rerender(
+      <BuilderWorkflowPageHeader
+        {...baseProps}
+        isNew={false}
+        isDirty={false}
+        workflow={{ id: 'wf-1' }}
+        onCancelPublish={onCancelPublish}
+        isPublishing
+      />
+    )
+    await user.keyboard('{Escape}')
+    expect(onCancelPublish).toHaveBeenCalledOnce()
+    expect(screen.queryByRole('dialog', { name: 'Publish workflow' })).not.toBeInTheDocument()
+  })
+
   describe('read-only mode (canEdit=false)', () => {
     const readOnlyPermissions = {
       ...baseProps.builderPermissions,

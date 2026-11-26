@@ -76,12 +76,12 @@ describe('TaskActivityDetails', () => {
 
     expect(screen.getByText('Publish order')).toBeInTheDocument()
     expect(screen.getByText('Kafka Publish')).toBeInTheDocument()
-    expect(screen.getByText('Target topic')).toBeInTheDocument()
+    expect(screen.getByText('Topic')).toBeInTheDocument()
     expect(screen.getByText('events.orders')).toBeInTheDocument()
 
     rerender(<TaskActivityDetails data={{ ...task, parameters: { ...task.parameters, topic: '' } }} />)
 
-    expect(screen.queryByText('Target topic')).not.toBeInTheDocument()
+    expect(screen.queryByText('Topic')).not.toBeInTheDocument()
     expect(screen.queryByText('events.orders')).not.toBeInTheDocument()
     expect(screen.getByText('Publish order')).toBeInTheDocument()
   })

@@ -118,10 +118,9 @@ test('Kafka Subscribe keeps the form stationary while saved resources load', asy
     await clickNode(app, 'Kafka Subscribe')
     const topic = app.getByRole('textbox', { name: 'Topic', exact: true })
     const access = app.getByRole('button', { name: 'Test runtime access', exact: true })
-    await expect(app.getByRole('textbox', { name: 'Kafka Integration', exact: true })).toHaveAttribute(
-      'placeholder',
-      'Loading Kafka Integrations…'
-    )
+    const integration = app.getByRole('button', { name: 'Integration', exact: true })
+    await expect(integration).toBeDisabled()
+    await expect(integration).toHaveText('Select a Kafka integration')
     await expect(topic).toHaveValue('orders.created')
     await expect(access).toHaveAttribute('aria-disabled', 'true')
     await expect(app.getByText(/Wait for Kafka .* to load/)).toHaveCount(0)
@@ -131,10 +130,11 @@ test('Kafka Subscribe keeps the form stationary while saved resources load', asy
     if (!pendingTopic || !pendingAccess) throw new Error('Kafka Subscribe controls are not visible')
 
     releaseResources?.()
-    await expect(app.getByRole('textbox', { name: 'Kafka Integration', exact: true })).toHaveValue('Orders Kafka')
+    await expect(integration).toBeEnabled()
+    await expect(integration).toContainText('Orders Kafka')
     await expect(app.getByText('Orders runtime', { exact: true })).toBeVisible()
     await expect(app.getByRole('button', { name: 'Change', exact: true })).toBeEnabled()
-    await expect(app.getByRole('textbox', { name: 'Kafka runtime credential', exact: true })).toBeHidden()
+    await expect(app.getByRole('textbox', { name: 'Runtime credential', exact: true })).toBeHidden()
     await expect(access).not.toHaveAttribute('aria-disabled', 'true')
     const loadedTopic = await topic.boundingBox()
     const loadedAccess = await access.boundingBox()

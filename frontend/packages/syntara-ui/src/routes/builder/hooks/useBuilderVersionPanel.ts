@@ -62,6 +62,8 @@ export function useBuilderVersionPanel(params: UseBuilderVersionPanelParams) {
     exportVersion,
     openInNewWindow,
     publishVersion,
+    publication,
+    isPublishing,
     isViewingVersion,
     viewedVersionDate,
     viewedVersionStatus,
@@ -207,13 +209,17 @@ export function useBuilderVersionPanel(params: UseBuilderVersionPanelParams) {
       onEditVersion: (v: WorkflowVersion) => editVersionDialog.open(v),
       onDuplicateVersion,
 
+      publication,
       publishDialog: {
+        isPublishing,
         isOpen: versionPublishDialog.isOpen,
-        onClose: versionPublishDialog.close,
+        onClose: () => {
+          publication.cancelGroups()
+          versionPublishDialog.close()
+        },
         onPublish: (publishName?: string, description?: string) => {
           if (versionPublishDialog.item != null) {
-            publishVersion(versionPublishDialog.item, publishName, description)
-            versionPublishDialog.close()
+            publishVersion(versionPublishDialog.item, publishName, description, versionPublishDialog.close)
           }
         },
       },

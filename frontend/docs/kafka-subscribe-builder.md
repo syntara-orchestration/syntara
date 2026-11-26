@@ -6,22 +6,15 @@ exact topic, and an optional payload JSON Schema. The schema controls validate
 the message payload. Publishing activates the subscription; later changes take effect on the next publish.
 
 Kafka credentials authenticate to the broker. Workflow execution identity is
-provided by the platform. The UI does not offer an execution-account selector,
-webhook authorization, group-ID editing, offset overrides, tuning, or
+provided by the platform. The UI does not offer or serialize an execution-account
+selector, webhook authorization, manual offset overrides, arbitrary consumer tuning, or
 CloudEvents controls. The Integration's management credential is never used as a
 fallback for a missing runtime credential.
 
-Save/reopen uses flat `event_subscribe_trigger` parameters: `integration_id`,
-`credential_id`, `topic`, optional `input_schema`, and optional `filter`. Leaving the schema blank
-omits it instead of inserting an empty schema or a default.
-
-Editing the same Kafka source preserves backend-configured `start` and `group_id`
-values, including partial reading settings and an explicit null group. Changing
-the topic or Integration preserves `start` but resets a saved `group_id` to null,
-requesting an auto-generated group for the replacement source. Credential-only
-changes preserve the group. The form does not expose these controls or add them
-when omitted. Clearing the payload schema still removes `input_schema`;
-unrelated consumer properties are not copied from the previous trigger.
+The builder saves flat `event_subscribe_trigger` parameters. The connection fields
+are `integration_id`, `credential_id`, and `topic`. Optional fields include
+`input_schema`, `filter`, `start`, and `group_id`. Clearing the payload schema
+removes `input_schema`.
 
 ## Optional CEL filter
 
@@ -144,36 +137,80 @@ Topic READ and consumer-group access remain unverified even after connectivity
 succeeds. Raw broker errors are not rendered. Editing configuration discards old
 results, including pending results for an earlier configuration.
 
-## Default reading behavior
+## Consumer settings
 
-The platform generates a separate group for each source when no custom group is
-supplied. The form does not expose the optional backend consumption controls;
-their defaults are:
+The Parameters column shows **Consumer settings** immediately after the CEL filter
+and its tester. Each control has contextual help and a short description.
+The supported controls are:
 
-- Partitions in the saved first-activation set start with new messages at their
-  saved visible-end boundary. Each boundary is selected when that partition
-  initializes, rather than when Publish is clicked, and is reused after a setup
-  interruption.
-- Partitions added outside that saved set start at their earliest retained message,
-  including messages produced before discovery. This also applies if discovery
-  happens while first activation is still incomplete. The earliest retained offset
-  can be greater than zero.
-- Initialized partitions resume from valid committed group offsets on restart,
-  re-enable, or republish. Missing or invalid established checkpoints recover from
-  retained beginning under the normal source, assignment, and drain safeguards.
+| Control                | API parameter                    | Options                | Default                         |
+| ---------------------- | -------------------------------- | ---------------------- | ------------------------------- |
+| Start position         | `start.position`                 | Latest, Earliest       | Latest                          |
+| New partition position | `start.added_partition_position` | Earliest, Latest       | Earliest                        |
+| Offset gap policy      | `start.offset_gap_policy`        | Fail, Earliest, Latest | Earliest                        |
+| Consumer group ID      | `group_id`                       | Optional custom ID     | Auto-generated for a new source |
 
-The backend API supports `start.position`, `start.added_partition_position`,
-`start.offset_gap_policy`, and an optional `group_id`. Initial and added-partition
-positions accept `earliest` or `latest`; gap policy also accepts `fail`, which
-holds only the affected partition. Valid group progress and previously saved
-position decisions take precedence over new settings. The group is fixed at
-the first successful publication. See the
-[backend settings contract](../backend/event-subscription-controls.md).
+The API defines concrete policy defaults without inheritance semantics.
+See the [backend settings contract](../backend/event-subscription-controls.md)
+for the `start` and `group_id` parameters.
+
+Opening and saving an unchanged form does not insert default policies. Partial
+`start` objects survive unrelated edits. Unpublished drafts retain optional group
+omissions. Same-source updates preserve established custom IDs; automatic groups
+remain omitted or null in definitions and exports, while the locked field displays
+their effective runtime ID. Copying such an export creates an independent automatic
+group for the new workflow.
+Clearing the group on a new source sends null. Custom IDs accept 1–512 ASCII letters, numbers, dots,
+underscores, or hyphens; whitespace is rejected rather than silently trimmed.
+Groups must be exclusive to their Syntara source. Backend publication remains
+authoritative for group uniqueness and immutability failures.
+
+Changing Integration or topic clears the saved group for a replacement source;
+a designer can then enter a different custom group. Reading policies are retained.
+Credential-only changes preserve the group. The existing workflow lifecycle
+controls activation: drafts do not affect consumption until publication.
+
+The group becomes fixed at the **first successful publication**, before worker
+activation. Workflow detail responses expose the current projected Kafka source,
+its generation and revision, its effective group ID, and whether that ID was
+automatically generated, including while unpublished.
+The UI reads this metadata directly without scanning version history, so large
+histories and definitions that omit the group do not hide the established ID.
+The group is disabled while this check loads or fails, with a retry on failure.
+Background refreshes preserve the raw draft value; Update reconciles against a
+fresh projection. A changed Integration or topic permits a replacement group.
+Published consumer groups appear as read-only text with an explanation of why the
+group is fixed. Saved version views also show the group as text and disable policy
+selectors.
+
+Publication from the main Publish action, Version History, and Workflows list checks the selected
+saved definition or unsaved changes against fresh source metadata. If a draft explicitly requests a different group for the same source,
+the designer can cancel without changing the draft or confirm carrying forward
+the established group into a new saved definition. Confirmation rechecks source
+generation and revision. Backend publication remains authoritative if another
+publication races with the request. Existing saved versions are never rewritten.
+A clean editor loads the corrected latest definition before advancing its version
+baseline. Pending local edits retain their original baseline and use the normal
+version-conflict flow when saved.
+Dismissing either initial Publish dialog cancels pending preparation before a
+publish request is sent; completing a submission closes the dialog separately.
+
+Valid committed offsets and saved initialization/recovery decisions take precedence
+over policy changes. Start position is not a replay or manual-reset control.
+Latest initialization saves a read-committed visible-end boundary when each
+partition initializes, rather than when Publish is clicked. Newly discovered
+partitions outside the saved initial set follow the new-partition policy, including
+during incomplete first activation. Earliest means the earliest retained offset,
+which may be greater than zero. For offset gaps, Fail holds only the affected
+partition, Earliest resumes at retained beginning, and Latest can skip retained
+messages. Healthy partitions continue when another partition is held.
 
 Auto-commit is disabled. Matching records commit after verified Temporal
 acceptance and normal Execution persistence, without waiting for workflow
 completion. Filter skips and audited invalid-content skips complete locally
-under the offset-safety checks; logging alone never authorizes a commit.
+under the offset-safety checks.
+Runtime-access testing remains non-consuming and does not verify group permissions,
+position selection, or recovery. CEL sample testing remains independent.
 
 ## Validation
 
@@ -242,3 +279,17 @@ envelope: `trigger.payload.order_id` reads an `order_id` payload property, while
 `trigger.metadata`, `trigger.original` and `trigger.envelope_version` remain
 top-level envelope fields. Payload schema properties are never flattened onto
 `trigger`.
+
+## Consumer settings verification
+
+Unit/component coverage includes optional/default serialization, partial settings,
+exact CEL persistence, export/import, group validation, source changes, keyboard
+selection, version views, effective source metadata, long version histories,
+older-version republishing, refresh races, cancellation, failure/retry, and axe checks. Shared select toggles associate helper
+text and validation errors with `aria-describedby`.
+
+`e2e/kafka-consumer-settings.spec.ts` checks draft save/reopen, replacement-topic
+groups, retained CEL, publication locking, locking after unpublish, and stale-draft
+carry-forward with export preservation against the mock API. It captures screenshots and audits the consumer-settings region and confirmation dialog. These
+checks do not prove broker consumption behavior; real Kafka verification requires
+a configured Kafka runtime environment.

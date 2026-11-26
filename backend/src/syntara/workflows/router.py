@@ -49,6 +49,7 @@ from syntara.workflows.models import (
 from syntara.workflows.models.execution import ExecutionRead, TestExecutionCreate
 from syntara.workflows.models.workflow_definition import WorkflowDefinition
 from syntara.workflows.services import ExecutionService, WorkflowService
+from syntara.workflows.services.kafka_subscription_sources import read_kafka_subscription_sources
 from syntara.workflows.validators import get_system_continue_on_failure, workflow_validator
 from syntara.workflows.workflow_engine.services.temporal_execution_service import TemporalExecutionService
 
@@ -175,6 +176,9 @@ async def _build_workflow_with_version_response(
     base = workflow_read.model_dump()
     version_read = await service.to_version_read(version, workflow.published_version_id, ever_published, pub_ts)
     base["version"] = version_read.model_dump()
+    base["kafka_subscription_sources"] = [
+        source.model_dump() for source in await read_kafka_subscription_sources(service.session, workflow.id)
+    ]
     if validation_result is not None and _has_validation_issues(validation_result):
         base["validation_result"] = validation_result.model_dump(mode="json")
     if warning is not None:

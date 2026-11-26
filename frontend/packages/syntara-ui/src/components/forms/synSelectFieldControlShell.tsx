@@ -1,7 +1,7 @@
 import { SelectList } from '@patternfly/react-core'
 import type { MenuToggleElement } from '@patternfly/react-core'
 import type { ReactElement, Ref } from 'react'
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import type { ControllerFieldState, ControllerRenderProps, FieldPath, FieldValues } from 'react-hook-form'
 
 import { SynSelect } from '../SynSelect'
@@ -11,6 +11,23 @@ import type { SynSelectFieldOption } from './synSelectFieldTypes'
 
 function renderSynSelectFieldToggle(toggleRef: Ref<MenuToggleElement>, state: SynSelectFieldToggleState) {
   return <SynSelectFieldToggle toggleRef={toggleRef} {...state} />
+}
+
+/** PatternFly's default arrow handler always lands on the first or last item. Move relative to the current option instead. */
+function focusSelectOptionFromToggle(menu: HTMLElement, key: 'ArrowDown' | 'ArrowUp') {
+  const options = Array.from(menu.querySelectorAll<HTMLElement>('[role="option"]:not([aria-disabled="true"])'))
+  if (options.length > 0) {
+    const selectedIndex = options.findIndex((option) => option.getAttribute('aria-selected') === 'true')
+    const direction = key === 'ArrowDown' ? 1 : -1
+    const unselectedIndex = key === 'ArrowDown' ? 0 : options.length - 1
+    const nextIndex =
+      selectedIndex < 0 ? unselectedIndex : (selectedIndex + direction + options.length) % options.length
+    options[nextIndex]?.focus()
+    return
+  }
+  const items = Array.from(menu.querySelectorAll<HTMLElement>('li button:not(:disabled), li input:not(:disabled)'))
+  const target = key === 'ArrowDown' ? items[0] : items[items.length - 1]
+  target?.focus()
 }
 
 type SynSelectFieldControlShellProps<TFieldValues extends FieldValues, TName extends FieldPath<TFieldValues>> = {
@@ -24,6 +41,7 @@ type SynSelectFieldControlShellProps<TFieldValues extends FieldValues, TName ext
   selected: string | string[]
   onSelect: (_event: React.MouseEvent | undefined, value: string | number | undefined) => void
   isDisabled?: boolean
+  describedBy?: string
   closeOnSelect?: boolean
   shouldFocusToggleOnSelect?: boolean
   renderOption: (option: SynSelectFieldOption, isSelected: boolean) => ReactElement
@@ -40,12 +58,22 @@ export function SynSelectFieldControlShell<TFieldValues extends FieldValues, TNa
   selected,
   onSelect,
   isDisabled,
+  describedBy,
   closeOnSelect = false,
   shouldFocusToggleOnSelect,
   renderOption,
 }: Readonly<SynSelectFieldControlShellProps<TFieldValues, TName>>) {
   const [isOpen, setIsOpen] = useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
   const hasError = Boolean(fieldState.error)
+  const handleToggleKeydown = useCallback(
+    (event: KeyboardEvent) => {
+      if (!isOpen || (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') || !menuRef.current) return
+      event.preventDefault()
+      focusSelectOptionFromToggle(menuRef.current, event.key)
+    },
+    [isOpen]
+  )
 
   const handleToggle = useCallback(() => {
     setIsOpen((open) => !open)
@@ -71,8 +99,9 @@ export function SynSelectFieldControlShell<TFieldValues extends FieldValues, TNa
       onBlur: field.onBlur,
       isDisabled,
       hasError,
+      describedBy,
     }),
-    [displayLabel, field.onBlur, handleToggle, hasError, isDisabled, isOpen, resolvedFieldId, ariaLabel]
+    [ariaLabel, describedBy, displayLabel, field.onBlur, handleToggle, hasError, isDisabled, isOpen, resolvedFieldId]
   )
 
   const renderToggle = useCallback(
@@ -86,6 +115,8 @@ export function SynSelectFieldControlShell<TFieldValues extends FieldValues, TNa
       selected={selected}
       onSelect={handleSelect}
       onOpenChange={setIsOpen}
+      onToggleKeydown={handleToggleKeydown}
+      menuRef={menuRef}
       toggle={renderToggle}
       shouldFocusToggleOnSelect={shouldFocusToggleOnSelect}
     >

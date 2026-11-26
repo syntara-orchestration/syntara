@@ -305,6 +305,7 @@ export function TriggerNodeDetails({
   return (
     <WorkflowValidationContext value={{ errors: validation.errors, nodeId: trigger.id }}>
       <TriggerNodeForm
+        kafkaTriggerId={trigger.type === TriggerTypeEnum.EVENT_SUBSCRIBE ? trigger.id : undefined}
         workflowId={workflowId}
         projectId={projectId}
         initialData={initialData}

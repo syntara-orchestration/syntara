@@ -5,6 +5,7 @@ import type { ReactNode } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useBuilderVersionHistory } from './useBuilderVersionHistory'
+import { useVersionHistory } from './useVersionHistory'
 
 const mockLoadWorkflowWithEdges = vi.fn()
 const mockRestoreMutate = vi.fn()
@@ -23,7 +24,7 @@ vi.mock('../../../stores/useWorkflowStore', () => ({
 }))
 
 vi.mock('./useVersionHistory', () => ({
-  useVersionHistory: () => ({
+  useVersionHistory: vi.fn(() => ({
     filteredVersions: mockVersions,
     statusFilter: null,
     setStatusFilter: vi.fn(),
@@ -41,7 +42,7 @@ vi.mock('./useVersionHistory', () => ({
       onNext: vi.fn(),
       onPerPageChange: vi.fn(),
     },
-  }),
+  })),
 }))
 
 vi.mock('../../../client', () => ({
@@ -113,6 +114,18 @@ describe('useBuilderVersionHistory', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  })
+
+  it('leaves the historical view after loading a corrected publication before updating the baseline', () => {
+    const params = createDefaultParams()
+    const onVersionUpdated = vi.fn()
+    params.viewingVersion = 2
+    params.searchParams.set('version', '2')
+    renderHook(() => useBuilderVersionHistory({ ...params, onVersionUpdated }), { wrapper: makeWrapper(queryClient) })
+    act(() => vi.mocked(useVersionHistory).mock.calls[0]?.[0].onVersionUpdated?.(3))
+    expect(params.dispatch).toHaveBeenCalledWith({ type: 'EXIT_VERSION_VIEW' })
+    expect(params.setSearchParams).toHaveBeenCalledWith(new URLSearchParams())
+    expect(onVersionUpdated).toHaveBeenCalledWith(3)
   })
 
   it('returns filtered versions from useVersionHistory', () => {

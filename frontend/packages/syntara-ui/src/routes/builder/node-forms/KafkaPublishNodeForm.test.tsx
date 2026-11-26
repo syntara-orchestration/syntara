@@ -126,8 +126,8 @@ describe('Kafka Publish builder', () => {
 
   it('offers labeled message controls and has no accessibility violations', async () => {
     const { container } = render(<KafkaPublishNodeForm onSubmit={vi.fn()} />)
-    expect(screen.getByRole('textbox', { name: 'Target topic' })).toBeInTheDocument()
-    expect(screen.getByRole('textbox', { name: 'Target topic' })).toHaveAccessibleDescription(
+    expect(screen.getByRole('textbox', { name: 'Topic' })).toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: 'Topic' })).toHaveAccessibleDescription(
       'Enter an existing Kafka topic name. Expressions are not supported.'
     )
     expect(screen.getByRole('textbox', { name: 'JSON payload' })).toBeInTheDocument()
@@ -279,8 +279,8 @@ describe('Kafka Publish builder', () => {
           </Button>
         </>
       )
-      await user.clear(screen.getByRole('textbox', { name: 'Target topic' }))
-      await user.type(screen.getByRole('textbox', { name: 'Target topic' }), 'outcomes.updated')
+      await user.clear(screen.getByRole('textbox', { name: 'Topic' }))
+      await user.type(screen.getByRole('textbox', { name: 'Topic' }), 'outcomes.updated')
       await user.clear(screen.getByRole('textbox', { name: 'JSON payload' }))
       await user.click(screen.getByRole('textbox', { name: 'JSON payload' }))
       await user.paste('{"result":"updated"}')
@@ -297,7 +297,7 @@ describe('Kafka Publish builder', () => {
 
       view.unmount()
       render(<KafkaPublishNodeDetails taskData={saved} onClose={vi.fn()} />)
-      expect(screen.getByRole('textbox', { name: 'Target topic' })).toHaveValue('outcomes.updated')
+      expect(screen.getByRole('textbox', { name: 'Topic' })).toHaveValue('outcomes.updated')
       expect(screen.getByRole('textbox', { name: 'JSON payload' })).toHaveValue(
         JSON.stringify({ result: 'updated' }, null, 2)
       )
@@ -346,7 +346,7 @@ describe('Kafka Publish builder', () => {
     expect(screen.getByRole('heading', { name: /Message delivery behavior/ })).toBeVisible()
     expect(screen.getAllByText(/Kafka acknowledgment confirms broker receipt/)).toHaveLength(1)
     expect(screen.getByRole('textbox', { name: 'JSON payload' })).toHaveValue('null')
-    expect(screen.getByRole('textbox', { name: 'Target topic' })).toHaveValue('outcomes')
+    expect(screen.getByRole('textbox', { name: 'Topic' })).toHaveValue('outcomes')
   })
 
   it.each(['SASL_SSL', 'SSL', 'PLAINTEXT'])(

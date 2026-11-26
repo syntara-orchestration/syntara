@@ -139,7 +139,7 @@ test('publishes a UI-saved payload template and exact key/header bytes through t
     await app.getByRole('button', { name: 'Change', exact: true }).click()
     await expect(app.getByRole('button', { name: 'Runtime credential', exact: true })).toContainText(`${name}-runtime`)
     await app.getByRole('button', { name: 'Cancel', exact: true }).click()
-    await app.getByRole('textbox', { name: 'Target topic', exact: true }).fill(topic)
+    await app.getByRole('textbox', { name: 'Topic', exact: true }).fill(topic)
     await fillCodeEditor(app, { value: '${trigger.payload}', label: 'JSON payload', inputMethod: 'insertText' })
     await app.getByRole('button', { name: 'Message key encoding', exact: true }).click()
     await app.getByRole('option', { name: 'Base64 binary', exact: true }).click()

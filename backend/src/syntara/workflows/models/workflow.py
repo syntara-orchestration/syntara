@@ -260,6 +260,21 @@ class WorkflowRead(UserReferenceFieldsMixin, WorkflowBase):
     updated_at: datetime
 
 
+class KafkaSubscriptionSourceRead(SQLModel):
+    """Effective Kafka group for the current, non-retired subscription source."""
+
+    trigger_node_id: str
+    source_id: UUID
+    generation: int
+    configuration_revision: int
+    integration_id: UUID
+    topic: str
+    group_id: str
+    group_id_is_generated: bool = Field(
+        description="Whether the effective group is the automatic ID for this source identity."
+    )
+
+
 class WorkflowReadWithVersion(WorkflowRead):
     """Schema for workflow response with current version details.
 
@@ -267,6 +282,10 @@ class WorkflowReadWithVersion(WorkflowRead):
     """
 
     version: "WorkflowVersionRead" = Field(..., description="Current active version details")
+    kafka_subscription_sources: list[KafkaSubscriptionSourceRead] = Field(
+        default_factory=list,
+        description="Current projected Kafka sources, including while unpublished; excludes retired subscriptions.",
+    )
 
 
 class PublishWorkflowVersionResponse(WorkflowReadWithVersion):

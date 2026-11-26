@@ -4,6 +4,7 @@ import { useCallback } from 'react'
 import { executionsFetchClient, workflowClient } from '../../client'
 import type { useAlerts } from '../../providers/alerts'
 import { getErrorMessage } from '../../utils/apiErrors'
+import { useKafkaPublishGroups, type PreparedPublishOptions } from '../builder/hooks/useKafkaPublishGroups'
 
 import { resolveWorkflowRunTrigger } from './resolveWorkflowRunTrigger'
 
@@ -98,14 +99,20 @@ export function useWorkflowActions({
     [deleteWorkflow, showSuccess, showError, onRefetch, onDeleteSettled]
   )
 
-  const handlePublishWorkflow = useCallback(
-    (workflow: Workflow, publishName?: string, description?: string) => {
-      if (!workflow?.id || !workflow.current_version) return
+  const submitPublish = useCallback(
+    (publishName?: string, description?: string, onSettled?: () => void, options?: PreparedPublishOptions) => {
+      const workflowId = options?.workflowIdOverride
+      const version = options?.versionOverride
+      if (!workflowId || version == null) return
 
       publishWorkflow(
         {
-          params: { path: { workflow_id: workflow.id, version: workflow.current_version } },
-          body: { name: publishName ?? null, change_description: description ?? null },
+          params: { path: { workflow_id: workflowId, version } },
+          body: {
+            name: publishName ?? null,
+            change_description: description ?? null,
+            ...(options?.workflowDefinition ? { workflow_definition: options.workflowDefinition } : {}),
+          },
         },
         {
           onSuccess: () => {
@@ -116,13 +123,22 @@ export function useWorkflowActions({
             showError({ title: 'Failed to publish workflow', description: getErrorMessage(error) })
           },
           onSettled: () => {
-            onPublishSettled?.()
+            onSettled?.()
           },
         }
       )
     },
-    [publishWorkflow, showSuccess, showError, onRefetch, onPublishSettled]
+    [publishWorkflow, showSuccess, showError, onRefetch]
   )
+
+  const publication = useKafkaPublishGroups({ workflowId: null, getDefinition: () => undefined, submit: submitPublish })
+  const handlePublishWorkflow = (workflow: Workflow, name?: string, description?: string) => {
+    if (!workflow.id || !workflow.current_version) return
+    publication.publish(name, description, onPublishSettled, {
+      workflowIdOverride: workflow.id,
+      versionOverride: workflow.current_version,
+    })
+  }
 
   const handleUnpublishWorkflow = useCallback(
     (workflow: Workflow) => {
@@ -153,6 +169,7 @@ export function useWorkflowActions({
     handlePublishWorkflow,
     handleUnpublishWorkflow,
     isDeleting,
-    isPublishing,
+    isPublishing: isPublishing || publication.isCheckingGroups,
+    publication,
   }
 }

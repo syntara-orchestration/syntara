@@ -1,9 +1,11 @@
 """Kafka Publish activities preserve uncertainty, snapshots and cancellation."""
 
+from __future__ import annotations
+
 import asyncio
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
-from typing import cast
+from typing import TYPE_CHECKING, cast
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -18,6 +20,29 @@ from syntara.workflows.workflow_engine.activities import kafka_publish_activity 
 from syntara.workflows.workflow_engine.activities.kafka_publish_errors import publish_failure
 from syntara.workflows.workflow_engine.constants import ENGINE_TIMEOUT_SECONDS_KEY
 from syntara.workflows.workflow_engine.services.kafka_publish_pool import KafkaPublishPool, set_kafka_publish_pool
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+
+@pytest.fixture
+def expire_publish_attempt(monkeypatch: pytest.MonkeyPatch) -> Callable[[], None]:
+    """Expire the real activity timeout after the intended publish phase starts."""
+    deadlines: list[asyncio.Timeout] = []
+
+    def controlled_timeout(_seconds: float | None) -> asyncio.Timeout:
+        # Bound a broken setup without racing it against the behavior under test.
+        deadline = asyncio.Timeout(asyncio.get_running_loop().time() + 10)
+        deadlines.append(deadline)
+        return deadline
+
+    # The activity looks up asyncio.timeout on the shared asyncio module.
+    monkeypatch.setattr(asyncio, "timeout", controlled_timeout)
+
+    def expire() -> None:
+        deadlines[-1].reschedule(asyncio.get_running_loop().time())
+
+    return expire
 
 
 @pytest_asyncio.fixture
@@ -101,14 +126,21 @@ async def test_acknowledged_unavailable_metadata_does_not_retry(publisher: Simpl
 
 
 @pytest.mark.asyncio
-async def test_timeout_retains_late_delivery_and_returns_uncertainty(publisher: SimpleNamespace) -> None:
-    publisher.inputs[ENGINE_TIMEOUT_SECONDS_KEY] = 0.03
+async def test_timeout_retains_late_delivery_and_returns_uncertainty(
+    publisher: SimpleNamespace, expire_publish_attempt: Callable[[], None]
+) -> None:
+    def enqueue(*_args: object, **_kwargs: object) -> asyncio.Future[RecordMetadata]:
+        expire_publish_attempt()
+        return cast("asyncio.Future[RecordMetadata]", publisher.future)
+
+    publisher.producer.send.side_effect = enqueue
     try:
         with pytest.raises(ApplicationError) as error:
             await module.execute_kafka_publish_activity(publisher.inputs, None, "project")
         assert error.value.type == "kafka_timeout"
         assert not error.value.non_retryable
         assert error.value.details[0]["output"]["delivery_status"] == "unconfirmed"
+        publisher.producer.send.assert_awaited_once()
         assert not publisher.future.cancelled()
     finally:
         await _cleanup(publisher)
@@ -224,10 +256,16 @@ async def test_cancellation_while_waiting_to_enqueue_prevents_later_send(publish
 
 
 @pytest.mark.asyncio
-async def test_startup_timeout_is_distinct_from_worker_capacity(publisher: SimpleNamespace) -> None:
+async def test_startup_timeout_is_distinct_from_worker_capacity(
+    publisher: SimpleNamespace, expire_publish_attempt: Callable[[], None]
+) -> None:
     ready = asyncio.Event()
-    publisher.producer.start.side_effect = ready.wait
-    publisher.inputs[ENGINE_TIMEOUT_SECONDS_KEY] = 0.03
+
+    async def start() -> None:
+        expire_publish_attempt()
+        await ready.wait()
+
+    publisher.producer.start.side_effect = start
     try:
         with pytest.raises(ApplicationError) as error:
             await module.execute_kafka_publish_activity(publisher.inputs, None, "project")
@@ -240,12 +278,23 @@ async def test_startup_timeout_is_distinct_from_worker_capacity(publisher: Simpl
 
 
 @pytest.mark.asyncio
-async def test_pending_delivery_holds_capacity_for_subsequent_invocation(publisher: SimpleNamespace) -> None:
-    publisher.inputs[ENGINE_TIMEOUT_SECONDS_KEY] = 0.03
+async def test_pending_delivery_holds_capacity_for_subsequent_invocation(
+    publisher: SimpleNamespace, expire_publish_attempt: Callable[[], None]
+) -> None:
+    def enqueue(*_args: object, **_kwargs: object) -> asyncio.Future[RecordMetadata]:
+        expire_publish_attempt()
+        return cast("asyncio.Future[RecordMetadata]", publisher.future)
+
+    def check_before_capacity(*_args: object) -> tuple[KafkaConfiguration, str]:
+        expire_publish_attempt()
+        return KafkaConfiguration.model_validate(publisher.inputs["_resolved_integration"]), "current-secret-revision"
+
+    publisher.producer.send.side_effect = enqueue
     try:
         with pytest.raises(ApplicationError) as first:
             await module.execute_kafka_publish_activity(publisher.inputs, None, "project")
         assert first.value.details[0]["output"]["delivery_status"] == "unconfirmed"
+        publisher.resources.side_effect = check_before_capacity
         with pytest.raises(ApplicationError) as second:
             await module.execute_kafka_publish_activity(publisher.inputs, None, "project")
         assert second.value.type == "kafka_capacity_unavailable"

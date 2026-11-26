@@ -1,10 +1,11 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { renderHook, act } from '@testing-library/react'
+import { renderHook, act, waitFor } from '@testing-library/react'
 import { createElement } from 'react'
 import type { ReactNode } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { workflowClient } from '../../../client'
+import { workflowClient, workflowFetchClient } from '../../../client'
+import { useWorkflowStore } from '../../../stores/useWorkflowStore'
 
 import { isVersionStatus, useVersionHistory } from './useVersionHistory'
 
@@ -44,6 +45,7 @@ vi.mock('../../../utils/downloadWorkflowExport', () => ({
 }))
 
 vi.mock('../../../client', () => ({
+  workflowFetchClient: { GET: vi.fn() },
   workflowClient: {
     useQuery: vi.fn((_method: string, _path: string, _params: unknown, opts: { enabled: boolean }) => ({
       data: opts.enabled ? { resources: mockVersions, next: mockNextCursor, prev: null, total: mockTotal } : undefined,
@@ -82,6 +84,13 @@ describe('useVersionHistory', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    useWorkflowStore.setState({ currentWorkflow: null, isDirty: false })
+    vi.mocked(workflowFetchClient.GET)
+      .mockReset()
+      .mockResolvedValue({
+        data: { kafka_subscription_sources: [], version: { version: 2, workflow_definition: { name: 'v2' } } },
+        response: new Response(),
+      })
     mockNextCursor = 'cursor-page-2'
     mockTotal = 45
     mockRefetch.mockResolvedValue({ data: { resources: mockVersions } })
@@ -389,7 +398,7 @@ describe('useVersionHistory', () => {
   })
 
   describe('publishVersion', () => {
-    it('calls publish mutation with correct params', () => {
+    it('calls publish mutation with correct params', async () => {
       const { result } = renderHook(() => useVersionHistory({ workflowId: 'wf-1', isNew: false }), {
         wrapper: makeWrapper(queryClient),
       })
@@ -398,6 +407,7 @@ describe('useVersionHistory', () => {
         result.current.publishVersion(2)
       })
 
+      await waitFor(() => expect(mockMutate).toHaveBeenCalled())
       expect(mockMutate).toHaveBeenCalledWith(
         {
           params: { path: { workflow_id: 'wf-1', version: 2 } },
@@ -410,7 +420,7 @@ describe('useVersionHistory', () => {
       )
     })
 
-    it('passes publishName and changeDescription when provided', () => {
+    it('passes publishName and changeDescription when provided', async () => {
       const { result } = renderHook(() => useVersionHistory({ workflowId: 'wf-1', isNew: false }), {
         wrapper: makeWrapper(queryClient),
       })
@@ -419,6 +429,7 @@ describe('useVersionHistory', () => {
         result.current.publishVersion(2, 'Release 1.0', 'First public release')
       })
 
+      await waitFor(() => expect(mockMutate).toHaveBeenCalled())
       expect(mockMutate).toHaveBeenCalledWith(
         {
           params: { path: { workflow_id: 'wf-1', version: 2 } },
@@ -431,7 +442,7 @@ describe('useVersionHistory', () => {
       )
     })
 
-    it('refetches versions and invalidates queries on publish success', () => {
+    it('refetches versions and invalidates queries on publish success', async () => {
       mockMutate.mockImplementation((_params: unknown, callbacks?: { onSuccess?: () => void }) => {
         callbacks?.onSuccess?.()
       })
@@ -444,17 +455,28 @@ describe('useVersionHistory', () => {
         result.current.publishVersion(2)
       })
 
-      expect(mockRefetch).toHaveBeenCalled()
-      expect(mockShowSuccess).toHaveBeenCalledWith({ title: 'Version published' })
+      await waitFor(() => expect(mockRefetch).toHaveBeenCalled())
+      await waitFor(() => expect(mockShowSuccess).toHaveBeenCalledWith({ title: 'Version published' }))
     })
 
-    it('calls onVersionUpdated when publish response includes current_version', () => {
-      const onVersionUpdated = vi.fn()
-      mockMutate.mockImplementation(
-        (_params: unknown, callbacks?: { onSuccess?: (data: { current_version: number }) => void }) => {
-          callbacks?.onSuccess?.({ current_version: 9 })
-        }
-      )
+    it('loads the returned definition before advancing a clean editor baseline', async () => {
+      const onVersionUpdated = vi.fn(() => {
+        expect(useWorkflowStore.getState().currentWorkflow?.triggers?.[0]?.parameters?.group_id).toBe('established-A')
+        expect(useWorkflowStore.getState().isDirty).toBe(false)
+      })
+      mockMutate.mockImplementation((_params: unknown, callbacks?: { onSuccess?: (data: object) => void }) => {
+        callbacks?.onSuccess?.({
+          current_version: 9,
+          version: {
+            version: 9,
+            workflow_definition: {
+              triggers: [
+                { id: 'subscribe', type: 'event_subscribe_trigger', parameters: { group_id: 'established-A' } },
+              ],
+            },
+          },
+        })
+      })
 
       const { result } = renderHook(() => useVersionHistory({ workflowId: 'wf-1', isNew: false, onVersionUpdated }), {
         wrapper: makeWrapper(queryClient),
@@ -464,10 +486,10 @@ describe('useVersionHistory', () => {
         result.current.publishVersion(2)
       })
 
-      expect(onVersionUpdated).toHaveBeenCalledWith(9)
+      await waitFor(() => expect(onVersionUpdated).toHaveBeenCalledWith(9))
     })
 
-    it('does not call onVersionUpdated when publish response omits current_version', () => {
+    it('does not call onVersionUpdated when publish response omits current_version', async () => {
       const onVersionUpdated = vi.fn()
       mockMutate.mockImplementation((_params: unknown, callbacks?: { onSuccess?: (data: object) => void }) => {
         callbacks?.onSuccess?.({})
@@ -481,6 +503,7 @@ describe('useVersionHistory', () => {
         result.current.publishVersion(2)
       })
 
+      await waitFor(() => expect(mockMutate).toHaveBeenCalled())
       expect(onVersionUpdated).not.toHaveBeenCalled()
     })
 
@@ -496,7 +519,7 @@ describe('useVersionHistory', () => {
       expect(mockMutate).not.toHaveBeenCalled()
     })
 
-    it('shows success alert on publish success', () => {
+    it('shows success alert on publish success', async () => {
       mockMutate.mockImplementation((_params: unknown, callbacks?: { onSuccess?: () => void }) => {
         callbacks?.onSuccess?.()
       })
@@ -509,10 +532,10 @@ describe('useVersionHistory', () => {
         result.current.publishVersion(2)
       })
 
-      expect(mockShowSuccess).toHaveBeenCalledWith({ title: 'Version published' })
+      await waitFor(() => expect(mockShowSuccess).toHaveBeenCalledWith({ title: 'Version published' }))
     })
 
-    it('shows error alert on publish failure', () => {
+    it('shows error alert on publish failure', async () => {
       const mockError = new Error('Publish failed')
       mockMutate.mockImplementation((_params: unknown, callbacks?: { onError?: (error: unknown) => void }) => {
         callbacks?.onError?.(mockError)
@@ -526,11 +549,90 @@ describe('useVersionHistory', () => {
         result.current.publishVersion(2)
       })
 
-      expect(mockShowError).toHaveBeenCalledWith({
-        title: 'Failed to publish version',
-        description: 'Publish failed',
-      })
+      await waitFor(() =>
+        expect(mockShowError).toHaveBeenCalledWith({
+          title: 'Failed to publish version',
+          description: 'Publish failed',
+        })
+      )
     })
+  })
+
+  it.each(['before submission', 'in flight'])('keeps the original baseline and local edits made %s', async (when) => {
+    const onVersionUpdated = vi.fn()
+    let succeed: (() => void) | undefined
+    mockMutate.mockImplementation((_params: unknown, callbacks?: { onSuccess?: (data: object) => void }) => {
+      succeed = () =>
+        callbacks?.onSuccess?.({
+          current_version: 9,
+          version: { version: 9, workflow_definition: { name: 'corrected' } },
+        })
+    })
+    if (when === 'before submission') useWorkflowStore.setState({ isDirty: true })
+    const { result } = renderHook(() => useVersionHistory({ workflowId: 'wf-1', isNew: false, onVersionUpdated }), {
+      wrapper: makeWrapper(queryClient),
+    })
+    act(() => result.current.publishVersion(2))
+    await waitFor(() => expect(mockMutate).toHaveBeenCalled())
+    act(() => {
+      useWorkflowStore.setState({ isDirty: true })
+      succeed?.()
+    })
+    expect(onVersionUpdated).not.toHaveBeenCalled()
+    expect(useWorkflowStore.getState().isDirty).toBe(true)
+    expect(useWorkflowStore.getState().currentWorkflow).toBeNull()
+  })
+
+  it('reconciles the explicitly selected saved version before publishing from history', async () => {
+    const source = {
+      trigger_node_id: 'subscribe',
+      source_id: 'source-1',
+      generation: 1,
+      configuration_revision: 1,
+      integration_id: 'integration-1',
+      topic: 'orders',
+      group_id: 'established-A',
+      group_id_is_generated: false,
+    }
+    const saved = {
+      name: 'selected-B',
+      triggers: [
+        {
+          id: 'subscribe',
+          type: 'event_subscribe_trigger',
+          parameters: {
+            integration_id: 'integration-1',
+            topic: 'orders',
+            group_id: 'stale-B',
+          },
+        },
+      ],
+    }
+    vi.mocked(workflowFetchClient.GET).mockImplementation((path) =>
+      Promise.resolve({
+        data:
+          path === '/workflows/{workflow_id}/versions/{version}'
+            ? { workflow_definition: saved }
+            : {
+                kafka_subscription_sources: [source],
+                version: { version: 9, workflow_definition: { name: 'latest' } },
+              },
+        response: new Response(),
+      })
+    )
+    const { result } = renderHook(() => useVersionHistory({ workflowId: 'wf-1', isNew: false }), {
+      wrapper: makeWrapper(queryClient),
+    })
+    act(() => result.current.publishVersion(2, 'Selected release'))
+    await waitFor(() => expect(result.current.publication.groupConflicts).toHaveLength(1))
+    expect(mockMutate).not.toHaveBeenCalled()
+    act(() => result.current.publication.confirmGroups())
+    await waitFor(() => expect(mockMutate).toHaveBeenCalled())
+    expect(mockMutate.mock.calls[0]?.[0]).toMatchObject({
+      params: { path: { version: 2 } },
+      body: { workflow_definition: { name: 'selected-B', triggers: [{ parameters: { group_id: 'established-A' } }] } },
+    })
+    expect(saved.triggers[0]?.parameters.group_id).toBe('stale-B')
   })
 
   describe('updateVersionMetadata', () => {
