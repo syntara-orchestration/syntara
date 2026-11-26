@@ -22,9 +22,14 @@ from syntara.core.services.secret_service import create_secret_service
 from syntara.credentials.lib.injector_resolver import InjectorResolver
 from syntara.execution_plane.commands.context import AOCommandContext
 from syntara.execution_plane.commands.errors import CommandResourceNotFoundError, CommandResourceStateError
+from syntara.execution_plane.registry.repository import (
+    execution_plane_plugin_credential_recipe_ids,
+    get_execution_plane_plugin_by_node_type,
+)
 from syntara.execution_plane.utils import execution_plane_work_item_id
 from syntara.integrations.exceptions import IntegrationCredentialNotFoundError
 from syntara.integrations.lib.credential_resolver import fetch_credential_with_type
+from syntara.workflow_core.models import NodeType
 from syntara.workflows.models.activity_execution import TERMINAL_ACTIVITY_STATUSES, ActivityExecution
 from syntara.workflows.models.execution import Execution
 from syntara.workflows.models.workflow_definition import WorkflowDefinition, WorkflowNode
@@ -105,6 +110,17 @@ class CredentialResolveWorkloadCommandHandler:
             for binding in bindings
         )
 
+    async def _recipe_is_plugin_reachable(self, session: AsyncSession, node: WorkflowNode, recipe_id: str) -> bool:
+        """Check whether the node's plugin can request the bound recipe."""
+        plugin = await get_execution_plane_plugin_by_node_type(session, NodeType(node.type))
+        if plugin is None:
+            return False
+        try:
+            recipe_ids = await execution_plane_plugin_credential_recipe_ids(session, plugin)
+        except ValueError:
+            return False
+        return recipe_id in recipe_ids
+
     async def _resolve_credential_document(
         self,
         session: AsyncSession,
@@ -147,6 +163,8 @@ class CredentialResolveWorkloadCommandHandler:
             raise CommandResourceStateError
         node = self._node_for_activity(activity)
         if not self._binding_matches(node, payload):
+            raise CommandResourceStateError
+        if not await self._recipe_is_plugin_reachable(context.session, node, payload.credential_recipe_id):
             raise CommandResourceStateError
         credential = await self._resolve_credential_document(
             context.session,

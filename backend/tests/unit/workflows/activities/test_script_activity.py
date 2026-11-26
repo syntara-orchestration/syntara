@@ -293,6 +293,38 @@ class TestScriptActivityDispatch:
         assert exc_info.value.type == "ConfigError"
         assert exc_info.value.non_retryable is True
 
+    def test_explicit_credential_binding_must_match_plugin_recipe(self) -> None:
+        input_config = {
+            "credential_bindings": [
+                {
+                    "credential_recipe_id": "other.plugin.token",
+                    "credential_ref": "00000000-0000-0000-0000-000000000041",
+                }
+            ]
+        }
+
+        with pytest.raises(ApplicationError) as exc_info:
+            activity_module._build_invocation(input_config, "future-step.v1", ("future.plugin.token",))
+
+        assert exc_info.value.type == "ConfigError"
+        assert exc_info.value.non_retryable is True
+
+    def test_explicit_credential_binding_rejects_plugin_without_recipes(self) -> None:
+        input_config = {
+            "credential_bindings": [
+                {
+                    "credential_recipe_id": "future.plugin.token",
+                    "credential_ref": "00000000-0000-0000-0000-000000000041",
+                }
+            ]
+        }
+
+        with pytest.raises(ApplicationError) as exc_info:
+            activity_module._build_invocation(input_config, "future-step.v1", ())
+
+        assert exc_info.value.type == "ConfigError"
+        assert exc_info.value.non_retryable is True
+
     @pytest.mark.asyncio
     async def test_legacy_credential_is_resolved_from_registry(self) -> None:
         credential_ref = "00000000-0000-0000-0000-000000000040"

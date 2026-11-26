@@ -73,6 +73,11 @@ def ep_submission(
                 )
             ),
         ),
+        patch.object(
+            dispatch,
+            "execution_plane_plugin_credential_recipe_ids",
+            AsyncMock(return_value=("acme.echo.api-token", "acme.echo.workspace-token")),
+        ),
         patch.object(dispatch, "ExecutionPlaneHttpClient"),
         patch.object(dispatch, "_submit_and_read_work", return_value={"status": "pending"}) as submission,
     ):

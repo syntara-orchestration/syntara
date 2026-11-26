@@ -79,6 +79,12 @@ def _build_invocation(
     if legacy_credential_id is not None and explicit_bindings:
         message = "Workflow node cannot combine a legacy credential with explicit credential bindings"
         raise ApplicationError(message, type="ConfigError", non_retryable=True)
+    if explicit_bindings:
+        for binding in explicit_bindings:
+            recipe_id = binding.get("credential_recipe_id")
+            if recipe_id not in credential_recipe_ids:
+                message = f"Workflow node binds unreachable credential recipe '{recipe_id}'"
+                raise ApplicationError(message, type="ConfigError", non_retryable=True)
     try:
         credential_bindings = explicit_bindings or legacy_credential_bindings(
             legacy_credential_id, credential_recipe_ids
