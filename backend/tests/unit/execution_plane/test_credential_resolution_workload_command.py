@@ -498,3 +498,114 @@ async def test_workload_credential_command_requires_explicit_work_item(callback)
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://ao") as client:
         response = await client.post("/api/execution_plane/v1/commands", json=body)
     assert response.status_code == 422
+
+
+def _aap_activity(credential_ref: UUID) -> ActivityExecution:
+    """Build a running AAP workflow node activity that carries a legacy credential_id."""
+    row = activity(
+        workflow_definition={
+            "schema_version": "2.0.0",
+            "name": "workflow",
+            "triggers": [{"id": "trigger", "type": "manual"}],
+            "nodes": [
+                {
+                    "id": "approval",
+                    "type": "aap_workflow_job_template",
+                    "parameters": {
+                        "credential_id": str(credential_ref),
+                        "workflow_job_template_id": 21,
+                        "organization_name": "org",
+                    },
+                }
+            ],
+            "edges": [],
+        }
+    )
+    row.node_type = "aap_workflow_job_template"
+    return row
+
+
+@pytest.mark.asyncio
+async def test_workload_credential_command_resolves_legacy_credential_id(
+    callback: tuple[FastAPI, AsyncMock], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A node configured with credential_id resolves through the plugin's single recipe."""
+    app, _ = callback
+    message, payload = workload_command(credential_recipe_id="syntara.aap.credential")
+    row = _aap_activity(payload.credential_ref)
+    resolved: dict[str, object] = {}
+
+    async def load_activity(_handler: object, _session: AsyncMock, _work_item_id: object) -> ActivityExecution:
+        return row
+
+    async def resolve_document(
+        _handler: object,
+        _session: AsyncMock,
+        credential_ref: object,
+        _project_id: object,
+    ) -> dict[str, str]:
+        resolved["credential_ref"] = credential_ref
+        return {"token": "resolved-token"}
+
+    monkeypatch.setattr(command_credentials.CredentialResolveWorkloadCommandHandler, "_load_activity", load_activity)
+    monkeypatch.setattr(
+        command_credentials.CredentialResolveWorkloadCommandHandler, "_resolve_credential_document", resolve_document
+    )
+    monkeypatch.setattr(
+        command_credentials,
+        "get_execution_plane_plugin_by_node_type",
+        AsyncMock(return_value=SimpleNamespace(name="aap-workflow")),
+    )
+    monkeypatch.setattr(
+        command_credentials,
+        "execution_plane_plugin_credential_recipe_ids",
+        AsyncMock(return_value=("syntara.aap.credential",)),
+    )
+
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://ao") as client:
+        response = await client.post("/api/execution_plane/v1/commands", json=message.model_dump(mode="json"))
+
+    assert response.status_code == 200, response.text
+    assert resolved["credential_ref"] == payload.credential_ref
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("legacy_ref", "recipes"),
+    [
+        (uuid4(), ("syntara.aap.credential",)),  # credential_id points at another credential
+        (None, ("syntara.aap.credential",)),  # node has no legacy credential_id
+        (None, ("recipe.a", "recipe.b")),  # plugin has multiple recipes (no unambiguous legacy mapping)
+    ],
+)
+async def test_workload_credential_command_rejects_unresolvable_legacy_references(
+    callback: tuple[FastAPI, AsyncMock],
+    monkeypatch: pytest.MonkeyPatch,
+    legacy_ref: UUID | None,
+    recipes: tuple[str, ...],
+) -> None:
+    app, _ = callback
+    message, payload = workload_command(credential_recipe_id="syntara.aap.credential")
+    row = _aap_activity(payload.credential_ref)
+    if legacy_ref is not None:
+        row.execution.workflow_version.workflow_definition["nodes"][0]["parameters"]["credential_id"] = str(legacy_ref)
+
+    async def load_activity(_handler: object, _session: AsyncMock, _work_item_id: object) -> ActivityExecution:
+        return row
+
+    monkeypatch.setattr(command_credentials.CredentialResolveWorkloadCommandHandler, "_load_activity", load_activity)
+    monkeypatch.setattr(
+        command_credentials,
+        "get_execution_plane_plugin_by_node_type",
+        AsyncMock(return_value=SimpleNamespace(name="aap-workflow")),
+    )
+    monkeypatch.setattr(
+        command_credentials,
+        "execution_plane_plugin_credential_recipe_ids",
+        AsyncMock(return_value=recipes),
+    )
+
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://ao") as client:
+        response = await client.post("/api/execution_plane/v1/commands", json=message.model_dump(mode="json"))
+
+    assert response.status_code == 409

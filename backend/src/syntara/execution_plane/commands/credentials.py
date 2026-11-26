@@ -22,6 +22,10 @@ from syntara.core.services.secret_service import create_secret_service
 from syntara.credentials.lib.injector_resolver import InjectorResolver
 from syntara.execution_plane.commands.context import AOCommandContext
 from syntara.execution_plane.commands.errors import CommandResourceNotFoundError, CommandResourceStateError
+from syntara.execution_plane.registry.repository import (
+    execution_plane_plugin_credential_recipe_ids,
+    get_execution_plane_plugin_by_node_type,
+)
 from syntara.execution_plane.utils import execution_plane_work_item_id
 from syntara.integrations.exceptions import IntegrationCredentialNotFoundError
 from syntara.integrations.lib.credential_resolver import fetch_credential_with_type
@@ -50,7 +54,10 @@ class CredentialResolveClusterCommandHandler:
         except (EncryptionError, KeyError) as error:
             raise CommandResourceStateError from error
         resolved = InjectorResolver.resolve(credential_type.injectors or {}, secret_data).extra_vars
-        document = {str(key): str(value) for key, value in resolved.items() if value is not None}
+        # Injector templates render absent secret fields as empty strings; a
+        # token-only credential must not emit empty username/password keys,
+        # because the command result contract requires non-empty values.
+        document = {str(key): str(value) for key, value in resolved.items() if value not in (None, "")}
         if not document:
             raise CommandResourceStateError
         return document
@@ -105,6 +112,32 @@ class CredentialResolveWorkloadCommandHandler:
             for binding in bindings
         )
 
+    async def _legacy_binding_matches(
+        self,
+        session: AsyncSession,
+        activity: ActivityExecution,
+        node: WorkflowNode,
+        payload: CredentialResolveWorkload,
+    ) -> bool:
+        """Accept the node's legacy single credential when it maps to one recipe.
+
+        Mirrors the dispatch-time ``legacy_credential_bindings`` conversion: a
+        node configured with ``credential_id`` instead of explicit
+        ``credential_bindings`` binds its single credential to the plugin
+        Action's sole credential recipe.
+        """
+        legacy_credential_id = getattr(node.parameters, "credential_id", None)
+        if legacy_credential_id is None or str(legacy_credential_id) != str(payload.credential_ref):
+            return False
+        plugin = await get_execution_plane_plugin_by_node_type(session, activity.node_type)
+        if plugin is None:
+            return False
+        try:
+            recipe_ids = await execution_plane_plugin_credential_recipe_ids(session, plugin)
+        except ValueError:
+            return False
+        return len(recipe_ids) == 1 and recipe_ids[0] == payload.credential_recipe_id
+
     async def _resolve_credential_document(
         self,
         session: AsyncSession,
@@ -124,7 +157,10 @@ class CredentialResolveWorkloadCommandHandler:
         except (EncryptionError, KeyError) as error:
             raise CommandResourceStateError from error
         resolved = InjectorResolver.resolve(credential_type.injectors or {}, secret_data).extra_vars
-        document = {str(key): str(value) for key, value in resolved.items() if value is not None}
+        # Injector templates render absent secret fields as empty strings; a
+        # token-only credential must not emit empty username/password keys,
+        # because the command result contract requires non-empty values.
+        document = {str(key): str(value) for key, value in resolved.items() if value not in (None, "")}
         if not document:
             raise CommandResourceStateError
         return document
@@ -146,7 +182,9 @@ class CredentialResolveWorkloadCommandHandler:
         if activity.status in TERMINAL_ACTIVITY_STATUSES:
             raise CommandResourceStateError
         node = self._node_for_activity(activity)
-        if not self._binding_matches(node, payload):
+        if not self._binding_matches(node, payload) and not await self._legacy_binding_matches(
+            context.session, activity, node, payload
+        ):
             raise CommandResourceStateError
         credential = await self._resolve_credential_document(
             context.session,
