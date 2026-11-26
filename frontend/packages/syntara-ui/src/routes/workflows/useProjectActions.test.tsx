@@ -3,6 +3,7 @@ import { renderHook, waitFor } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { useProjectStore } from '../../stores/useProjectStore'
 import type { ProjectRead } from '../access/types'
 
 import { useProjectActions } from './useProjectActions'
@@ -128,6 +129,36 @@ describe('useProjectActions', () => {
         expect(mockOnRefetch).toHaveBeenCalledTimes(1)
       })
       expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['all-projects'] })
+    })
+  })
+
+  // Deleting the project currently shown on the Workflows page should not leave the page
+  // pointed at the now-deleted project (which then errors with "project <id> not found").
+  describe('deleting the currently selected project', () => {
+    beforeEach(() => {
+      useProjectStore.setState({ selectedProjectId: 'proj-1', selectedProjectName: 'Test Project' })
+    })
+
+    it('clears the selected project so the page is no longer pointed at the deleted project', async () => {
+      const { Wrapper } = createWrapper()
+      const { result } = renderHook(
+        () =>
+          useProjectActions({
+            showSuccess: mockShowSuccess,
+            showError: mockShowError,
+            onRefetch: mockOnRefetch,
+          }),
+        { wrapper: Wrapper }
+      )
+
+      const project = mockProject({ id: 'proj-1', name: 'Test Project' })
+      result.current.handleDeleteProject(project)
+
+      await waitFor(() => {
+        expect(mockOnRefetch).toHaveBeenCalledTimes(1)
+      })
+
+      expect(useProjectStore.getState().selectedProjectId).not.toBe('proj-1')
     })
   })
 
