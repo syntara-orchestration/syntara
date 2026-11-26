@@ -85,7 +85,7 @@ Override ports if needed:
 SYNTARA_E2E_PORT=5174 SYNTARA_E2E_API_PORT=3301 npm run e2e
 ```
 
-**How server startup works:** `npm run e2e` invokes Playwright directly. The Playwright config starts the mock API and UI on ports 3300 and 4173 by default; locally it can reuse servers already listening on those ports. Set `SYNTARA_E2E_PORT` and `SYNTARA_E2E_API_PORT` to use different ports.
+**How the runner works:** `npm run e2e` invokes the package's `playwright test` script. `playwright.config.ts` starts the mock API and UI through Playwright's `webServer` entries, using `SYNTARA_E2E_PORT` (default `4173`) and `SYNTARA_E2E_API_PORT` (default `3300`). Set those variables to override the ports. In local runs, Playwright may reuse existing servers; stop conflicting processes or choose alternate ports when needed.
 
 If you set `SYNTARA_E2E_SKIP_WEB_SERVER=1`, the Playwright config will not start either server. Start the UI and API yourself, set `VITE_API_URL=http://localhost:<apiPort>`, and set `SYNTARA_E2E_BASE_URL` to the UI URL.
 
@@ -1277,4 +1277,4 @@ npm run tsc
 2. **Helpers** — Reusable functions in `frontend/packages/syntara-ui/e2e/helpers/`
 3. **Resource utilities** — `frontend/packages/syntara-ui/e2e/utils/` (if creating API-based setup/teardown)
 4. **Coverage summary** — Brief comment documenting features, edge cases, and known gaps
-5. **Visual regression** — If the PR changes any UI layout or visual appearance, check whether a visual regression snapshot exists. See [`packages/syntara-ui/VISUAL_REGRESSION.md`](../../../frontend/packages/syntara-ui/VISUAL_REGRESSION.md) for the page registry, baseline update workflow, and CI screenshot comparison. Run `npm run e2e:visual-regression` to verify; run with `--update-snapshots` to update baselines.
+5. **Visual regression** — If the PR changes any UI layout or visual appearance, check whether a visual regression snapshot exists. See `frontend/packages/syntara-ui/VISUAL_REGRESSION.md` for the page registry, baseline update workflow, and CI screenshot comparison. Run `npm run e2e:visual-regression` to verify; run with `--update-snapshots` to update baselines.

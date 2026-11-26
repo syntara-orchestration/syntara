@@ -236,6 +236,9 @@ make dev
 # Compose: API http://localhost:8000, UI http://localhost:8080
 make -C backend run-all
 
+# Start infrastructure services in the background when needed
+make services-up
+
 # If the local backend is already running and only the UI is missing:
 cd frontend
 VITE_API_URL=https://localhost:8000 npm run start:e2e --prefix packages/syntara-ui -- --port 5173
@@ -284,8 +287,8 @@ See `.agents/skills/frontend-playwright-e2e/SKILL.md` → **Test Suite Tags** fo
 | "Incorrect login credentials" | Password file and database are out of sync | Run `make admin-password` from repo root to sync |
 | Login errors (other) | Wrong password file or unseeded DB | Regenerate: `make secrets` then `make admin-password` |
 | API 404s in mock mode | UI started without correct VITE_API_URL | Playwright handles this automatically; if manual, use `VITE_API_URL=http://localhost:3300` |
-| Port conflicts | Another service uses an E2E port | Stop that service or set `SYNTARA_E2E_PORT` and `SYNTARA_E2E_API_PORT` to free ports |
-| Visual regression tests skipped | Expected in real-backend mode | The config excludes `e2e/visual-regression/` when `SYNTARA_E2E_SKIP_WEB_SERVER=1`; run them in mock mode with `npm run e2e:visual-regression` from `frontend/` |
+| Port conflicts | A process is using a configured E2E port | Stop it or override the port with `SYNTARA_E2E_PORT` / `SYNTARA_E2E_API_PORT` |
+| Visual regression tests skipped | Expected in real-backend mode | The config excludes `e2e/visual-regression/` when `SYNTARA_E2E_SKIP_WEB_SERVER=1`; run them in mock mode with deterministic data using `npm run e2e:visual-regression` from `frontend/` |
 
 ### What works where
 
