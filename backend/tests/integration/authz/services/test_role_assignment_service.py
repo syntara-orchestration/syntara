@@ -8,11 +8,15 @@ Tests cover:
 - Visibility: admin, own user/group/service_account, project-admin, cross-project
 """
 
+from unittest.mock import patch
 from uuid import UUID, uuid4
 
 import pytest
+from sqlalchemy.exc import IntegrityError
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from syntara.authz.models.assignments import RoleAssignment
+from syntara.authz.models.policy import Policy
 from syntara.authz.models.project import Project
 from syntara.authz.models.role import Role
 from syntara.authz.seed import seed_authz_data
@@ -1280,3 +1284,216 @@ async def test_list_filter_by_scope_project(seeded_db: AsyncSession, test_user: 
     assert len(result["resources"]) >= 1
     for r in result["resources"]:
         assert r["project_id"] is not None, "Expected project scope, got system"
+
+
+# ============================================================================
+# Project-pattern assignments (deny-only, several projects by name)
+# ============================================================================
+
+_SCRIPT_DENY = "step_type:write:any:deny:script"
+
+
+async def _create_deny_role(
+    session: AsyncSession,
+    name: str = "no-script",
+    *,
+    scope: str = "project",
+    project_id: UUID | None = None,
+    policy_names: list[str] | None = None,
+) -> Role:
+    """Create a custom role whose only statement denies writing Script steps."""
+    role = Role(
+        name=name,
+        is_builtin=False,
+        scope=scope,
+        project_id=project_id,
+        policy_names=policy_names if policy_names is not None else [_SCRIPT_DENY],
+    )
+    session.add(role)
+    await session.flush()
+    return role
+
+
+@pytest.mark.asyncio
+async def test_assign_project_pattern(seeded_db: AsyncSession, test_user: User) -> None:
+    """A deny-only project role can be assigned with a pattern and is audited with it."""
+    await _create_deny_role(seeded_db)
+    svc = RoleAssignmentService(seeded_db, test_user)
+    with patch("syntara.authz.services.role_assignment_service.AuditEventDispatcher.dispatch") as dispatch:
+        result = await svc.assign(principal_id=test_user.id, role_name="no-script", project_pattern="pay*")
+    assert result["project_pattern"] == "pay*"
+    assert result["project_id"] is None
+    assert result["project_name"] is None
+    event = dispatch.call_args.args[0]
+    assert event.action == "assigned"
+    assert event.project_pattern == "pay*"
+    assert event.project_id is None
+
+    fetched = await svc.get(result["id"])
+    assert fetched["project_pattern"] == "pay*"
+
+
+@pytest.mark.asyncio
+async def test_assign_project_pattern_to_group(seeded_db: AsyncSession, test_user: User) -> None:
+    await _create_deny_role(seeded_db)
+    group = await _create_group(seeded_db, name="pattern-group")
+    svc = RoleAssignmentService(seeded_db, test_user)
+    result = await svc.assign(group_id=group.id, role_name="no-script", project_pattern="pay*")
+    assert result["group_id"] == group.id
+    assert result["project_pattern"] == "pay*"
+
+
+@pytest.mark.asyncio
+async def test_assign_project_pattern_duplicate_rejected(seeded_db: AsyncSession, test_user: User) -> None:
+    await _create_deny_role(seeded_db)
+    svc = RoleAssignmentService(seeded_db, test_user)
+    await svc.assign(principal_id=test_user.id, role_name="no-script", project_pattern="pay*")
+    with pytest.raises(SafeValueError, match="already assigned"):
+        await svc.assign(principal_id=test_user.id, role_name="no-script", project_pattern="pay*")
+
+
+@pytest.mark.asyncio
+async def test_different_patterns_and_exact_project_of_same_role_coexist(
+    seeded_db: AsyncSession, test_user: User
+) -> None:
+    await _create_deny_role(seeded_db)
+    project = await _create_project(seeded_db, name="sandbox")
+    svc = RoleAssignmentService(seeded_db, test_user)
+    await svc.assign(principal_id=test_user.id, role_name="no-script", project_pattern="pay*")
+    await svc.assign(principal_id=test_user.id, role_name="no-script", project_pattern="*-prod")
+    await svc.assign(principal_id=test_user.id, role_name="no-script", project_id=project.id)
+    listed = await svc.list(principal_id=test_user.id, role_name="no-script")
+    assert {(r["project_pattern"], r["project_id"]) for r in listed["resources"]} == {
+        ("pay*", None),
+        ("*-prod", None),
+        (None, project.id),
+    }
+
+
+@pytest.mark.asyncio
+async def test_global_and_pattern_rows_of_same_role_do_not_collide(seeded_db: AsyncSession, test_user: User) -> None:
+    """The global unique index ignores pattern rows (and the pattern index ignores global rows)."""
+    await _create_deny_role(seeded_db)
+    seeded_db.add(RoleAssignment(principal_id=test_user.id, role_name="no-script"))
+    await seeded_db.commit()
+    svc = RoleAssignmentService(seeded_db, test_user)
+    result = await svc.assign(principal_id=test_user.id, role_name="no-script", project_pattern="pay*")
+    assert result["project_pattern"] == "pay*"
+
+
+@pytest.mark.asyncio
+async def test_project_id_and_pattern_cannot_both_be_stored(seeded_db: AsyncSession, test_user: User) -> None:
+    await _create_deny_role(seeded_db)
+    project = await _create_project(seeded_db, name="payments")
+    svc = RoleAssignmentService(seeded_db, test_user)
+    with pytest.raises(SafeValueError, match="not both"):
+        await svc.assign(
+            principal_id=test_user.id, role_name="no-script", project_id=project.id, project_pattern="pay*"
+        )
+    seeded_db.add(
+        RoleAssignment(principal_id=test_user.id, role_name="no-script", project_id=project.id, project_pattern="pay*")
+    )
+    with pytest.raises(IntegrityError):
+        await seeded_db.commit()
+    await seeded_db.rollback()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("pattern", "message"),
+    [("payments", "must contain '\\*'"), ("*", "matches every project"), ("pay%", "may only contain")],
+)
+async def test_assign_invalid_pattern_rejected(
+    seeded_db: AsyncSession, test_user: User, pattern: str, message: str
+) -> None:
+    await _create_deny_role(seeded_db)
+    svc = RoleAssignmentService(seeded_db, test_user)
+    with pytest.raises(SafeValueError, match=message):
+        await svc.assign(principal_id=test_user.id, role_name="no-script", project_pattern=pattern)
+
+
+@pytest.mark.asyncio
+async def test_assign_pattern_rejects_builtin_role(seeded_db: AsyncSession, test_user: User) -> None:
+    svc = RoleAssignmentService(seeded_db, test_user)
+    with pytest.raises(SafeValueError, match="built-in role"):
+        await svc.assign(principal_id=test_user.id, role_name="project-user", project_pattern="pay*")
+
+
+@pytest.mark.asyncio
+async def test_assign_pattern_rejects_role_with_an_allow(seeded_db: AsyncSession, test_user: User) -> None:
+    seeded_db.add(
+        Policy(
+            name="mixed-step-types",
+            statements=[
+                {"effect": "deny", "actions": ["step_type:write"], "scope": "any"},
+                {"effect": "allow", "actions": ["workflow:read"], "scope": "project"},
+            ],
+            labels={},
+        )
+    )
+    await _create_deny_role(seeded_db, name="mixed", policy_names=[_SCRIPT_DENY, "mixed-step-types"])
+    await _create_deny_role(seeded_db, name="builtin-allow", policy_names=[_SCRIPT_DENY, "workflow:read:project"])
+    svc = RoleAssignmentService(seeded_db, test_user)
+    for role_name in ("mixed", "builtin-allow"):
+        with pytest.raises(SafeValueError, match="only deny statements"):
+            await svc.assign(principal_id=test_user.id, role_name=role_name, project_pattern="pay*")
+
+
+@pytest.mark.asyncio
+async def test_assign_pattern_rejects_role_without_statements(seeded_db: AsyncSession, test_user: User) -> None:
+    await _create_deny_role(seeded_db, name="empty", policy_names=["does-not-exist"])
+    svc = RoleAssignmentService(seeded_db, test_user)
+    with pytest.raises(SafeValueError, match="only deny statements"):
+        await svc.assign(principal_id=test_user.id, role_name="empty", project_pattern="pay*")
+
+
+@pytest.mark.asyncio
+async def test_assign_pattern_rejects_project_owned_role(seeded_db: AsyncSession, test_user: User) -> None:
+    project = await _create_project(seeded_db, name="payments")
+    await _create_deny_role(seeded_db, name="owned-no-script", project_id=project.id)
+    svc = RoleAssignmentService(seeded_db, test_user)
+    with pytest.raises(SafeValueError, match="belongs to a project"):
+        await svc.assign(principal_id=test_user.id, role_name="owned-no-script", project_pattern="pay*")
+
+
+@pytest.mark.asyncio
+async def test_assign_pattern_rejects_system_scope_role(seeded_db: AsyncSession, test_user: User) -> None:
+    await _create_deny_role(seeded_db, name="system-no-script", scope="system")
+    svc = RoleAssignmentService(seeded_db, test_user)
+    with pytest.raises(SafeValueError, match="project-scope role"):
+        await svc.assign(principal_id=test_user.id, role_name="system-no-script", project_pattern="pay*")
+
+
+@pytest.mark.asyncio
+async def test_revoke_project_pattern_assignment_is_audited(seeded_db: AsyncSession, test_user: User) -> None:
+    await _create_deny_role(seeded_db)
+    svc = RoleAssignmentService(seeded_db, test_user)
+    created = await svc.assign(principal_id=test_user.id, role_name="no-script", project_pattern="pay*")
+    with patch("syntara.authz.services.role_assignment_service.AuditEventDispatcher.dispatch") as dispatch:
+        await svc.revoke(created["id"])
+    event = dispatch.call_args.args[0]
+    assert event.action == "revoked"
+    assert event.project_pattern == "pay*"
+    with pytest.raises(SafeValueError, match="not found"):
+        await svc.get(created["id"])
+
+
+@pytest.mark.asyncio
+async def test_project_scoped_revoke_does_not_reach_pattern_rows(seeded_db: AsyncSession, test_user: User) -> None:
+    await _create_deny_role(seeded_db)
+    project = await _create_project(seeded_db, name="payments")
+    svc = RoleAssignmentService(seeded_db, test_user)
+    created = await svc.assign(principal_id=test_user.id, role_name="no-script", project_pattern="pay*")
+    with pytest.raises(SafeValueError, match="not found"):
+        await svc.revoke(created["id"], project_id=project.id)
+
+
+@pytest.mark.asyncio
+async def test_list_scope_filter_treats_pattern_rows_as_project(seeded_db: AsyncSession, test_user: User) -> None:
+    await _create_deny_role(seeded_db)
+    svc = RoleAssignmentService(seeded_db, test_user)
+    created = await svc.assign(principal_id=test_user.id, role_name="no-script", project_pattern="pay*")
+    system_ids = {r["id"] for r in (await svc.list(scope="system", limit=100))["resources"]}
+    project_rows = {r["id"]: r for r in (await svc.list(scope="project", limit=100))["resources"]}
+    assert created["id"] not in system_ids
+    assert project_rows[created["id"]]["project_pattern"] == "pay*"

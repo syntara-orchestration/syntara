@@ -30,6 +30,7 @@ class RoleAssignmentRead:
         role_policies (list[str] | Unset):
         project_id (None | Unset | UUID):
         project_name (None | str | Unset):
+        project_pattern (None | str | Unset):
         is_builtin (bool | Unset):  Default: False.
         created_at (datetime.datetime | None | Unset):
     """
@@ -44,6 +45,7 @@ class RoleAssignmentRead:
     role_policies: list[str] | Unset = UNSET
     project_id: None | Unset | UUID = UNSET
     project_name: None | str | Unset = UNSET
+    project_pattern: None | str | Unset = UNSET
     is_builtin: bool | Unset = False
     created_at: datetime.datetime | None | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
@@ -103,6 +105,12 @@ class RoleAssignmentRead:
         else:
             project_name = self.project_name
 
+        project_pattern: None | str | Unset
+        if isinstance(self.project_pattern, Unset):
+            project_pattern = UNSET
+        else:
+            project_pattern = self.project_pattern
+
         is_builtin = self.is_builtin
 
         created_at: None | str | Unset
@@ -136,6 +144,8 @@ class RoleAssignmentRead:
             field_dict["project_id"] = project_id
         if project_name is not UNSET:
             field_dict["project_name"] = project_name
+        if project_pattern is not UNSET:
+            field_dict["project_pattern"] = project_pattern
         if is_builtin is not UNSET:
             field_dict["is_builtin"] = is_builtin
         if created_at is not UNSET:
@@ -240,6 +250,15 @@ class RoleAssignmentRead:
 
         project_name = _parse_project_name(d.pop("project_name", UNSET))
 
+        def _parse_project_pattern(data: object) -> None | str | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(None | str | Unset, data)
+
+        project_pattern = _parse_project_pattern(d.pop("project_pattern", UNSET))
+
         is_builtin = d.pop("is_builtin", UNSET)
 
         def _parse_created_at(data: object) -> datetime.datetime | None | Unset:
@@ -270,6 +289,7 @@ class RoleAssignmentRead:
             role_policies=role_policies,
             project_id=project_id,
             project_name=project_name,
+            project_pattern=project_pattern,
             is_builtin=is_builtin,
             created_at=created_at,
         )

@@ -88,18 +88,25 @@ const SORT_FIELDS: Record<number, string> = {
 
 const EXPANDABLE_COLUMN_COUNT = 7
 
+const PATTERN_EDIT_TOOLTIP = 'Assignments with a project pattern cannot be edited. Delete it and create a new one.'
+
 function getAssignmentRowActions(
   row: PermissionRow,
   permissions: ReturnType<typeof useAssignmentPermissions>,
   onEdit: (row: PermissionRow) => void,
   onDelete: (row: PermissionRow) => void
 ): IAction[] {
+  // Editing re-creates the assignment without its pattern, so pattern rows can only be deleted here.
+  const canEdit = permissions.canAssign && !row.projectPattern
+  let editTooltip: string | undefined
+  if (row.projectPattern) editTooltip = PATTERN_EDIT_TOOLTIP
+  else if (!permissions.canAssign) editTooltip = permissions.tooltips.assign
   return [
     {
       title: <IconLabel icon={<RhUiEditFillIcon />}>Edit assignment</IconLabel>,
-      isAriaDisabled: !permissions.canAssign,
-      tooltipProps: permissions.canAssign ? undefined : { content: permissions.tooltips.assign },
-      onClick: permissions.canAssign ? () => onEdit(row) : undefined,
+      isAriaDisabled: !canEdit,
+      tooltipProps: editTooltip ? { content: editTooltip } : undefined,
+      onClick: canEdit ? () => onEdit(row) : undefined,
     },
     { isSeparator: true },
     {
@@ -201,7 +208,11 @@ function AssignmentsTableBody({
                 <ScopeLabel scope={row.scopeType} />
               </Td>
               <Td dataLabel="Project">
-                <ProjectLabel projectId={row.projectId} projectNameMap={projectNameMap} />
+                {row.projectPattern ? (
+                  row.scopeName
+                ) : (
+                  <ProjectLabel projectId={row.projectId} projectNameMap={projectNameMap} />
+                )}
               </Td>
               <Td isActionCell>
                 {!row.isBuiltin && (
@@ -383,10 +394,16 @@ export function AssignmentsTab() {
         >
           This removes role <strong>{deleteItem.assignmentName}</strong> from{' '}
           <strong>{deleteItem.principalName}</strong>
-          {deleteItem.scopeType === 'project' && (
+          {deleteItem.scopeType === 'project' && !deleteItem.projectPattern && (
             <>
               {' '}
               in project <strong>{deleteItem.scopeName}</strong>
+            </>
+          )}
+          {deleteItem.projectPattern && (
+            <>
+              {' '}
+              in projects matching <strong>{deleteItem.projectPattern}</strong>
             </>
           )}
           . The associated permissions will be revoked.

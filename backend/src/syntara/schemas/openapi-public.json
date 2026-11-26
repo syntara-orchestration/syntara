@@ -9412,7 +9412,7 @@
     "/role_assignments": {
       "post": {
         "summary": "Create role assignment",
-        "description": "Assign a role to a user or group.\n\nWhen project_id is provided the assignment is project-scoped;\notherwise it is a global (system-level) assignment.",
+        "description": "Assign a role to a user or group.\n\nWhen project_id is provided the assignment is project-scoped; when\nproject_pattern is provided it applies (deny-only) to every project whose\nname matches; otherwise it is a global (system-level) assignment.",
         "operationId": "create_role_assignment",
         "x-app-permission": {
           "resource": "role-assignment",
@@ -42053,7 +42053,7 @@
       "RoleAssignmentCreate": {
         "type": "object",
         "title": "RoleAssignmentCreate",
-        "description": "Request body for creating a role assignment.\n\nExactly one of ``principal_id`` or ``group_id`` must be provided.",
+        "description": "Request body for creating a role assignment.\n\nExactly one of ``principal_id`` or ``group_id`` must be provided.\nAt most one of ``project_id`` or ``project_pattern`` may be provided.",
         "required": [
           "role_name"
         ],
@@ -42097,6 +42097,18 @@
               }
             ],
             "title": "Project Id"
+          },
+          "project_pattern": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Pattern",
+            "description": "Project-name pattern using '*' as a wildcard (for example 'pay*'). The assignment then applies to every project whose current name matches. Only custom, deny-only, project-scope roles can be assigned with a pattern. Mutually exclusive with project_id."
           }
         }
       },
@@ -42230,6 +42242,17 @@
               }
             ],
             "title": "Project Name"
+          },
+          "project_pattern": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Pattern"
           },
           "is_builtin": {
             "type": "boolean",

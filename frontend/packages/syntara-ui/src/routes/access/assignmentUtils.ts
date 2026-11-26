@@ -18,8 +18,17 @@ export function derivePrincipalType(a: RoleAssignmentRead): RolePrincipalType {
   return RolePrincipalType.USER
 }
 
+/**
+ * A pattern assignment has no project_id but is not system-wide: it denies only in
+ * projects whose name matches the pattern, so it is shown with the pattern as its scope.
+ */
+export function formatProjectPatternScope(pattern: string): string {
+  return `Projects matching ${pattern}`
+}
+
 export function buildPermissionRow(a: RoleAssignmentRead): PermissionRow {
   const isProject = !!a.project_id
+  const projectPattern = a.project_pattern ?? undefined
   return {
     id: a.id,
     isBuiltin: a.is_builtin,
@@ -30,11 +39,18 @@ export function buildPermissionRow(a: RoleAssignmentRead): PermissionRow {
     assignmentName: a.role_name,
     roleDescription: a.role_description ?? null,
     rolePolicies: a.role_policies ?? [],
-    scopeType: isProject ? 'project' : 'system',
-    scopeName: a.project_id != null ? (a.project_name ?? a.project_id) : 'System',
+    scopeType: isProject || projectPattern ? 'project' : 'system',
+    scopeName: scopeNameFor(a, projectPattern),
     projectId: a.project_id ?? undefined,
+    projectPattern,
     sourceEndpoint: isProject ? 'project-role-assignments' : 'role-assignments',
   }
+}
+
+function scopeNameFor(a: RoleAssignmentRead, projectPattern: string | undefined): string {
+  if (a.project_id != null) return a.project_name ?? a.project_id
+  if (projectPattern) return formatProjectPatternScope(projectPattern)
+  return 'System'
 }
 
 export function buildSortParam(

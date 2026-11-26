@@ -7,6 +7,7 @@ Tests cover:
 - _resolve_roles_to_policies() deduplication and project scoping
 """
 
+from typing import Any
 from uuid import uuid4
 
 import pytest
@@ -546,3 +547,175 @@ async def test_resolve_effective_policies_service_account_direct_role(seeded_db:
     assert statement["policy_name"] == "sa:direct:any"
     proj_policies = [p for p in policies if p.get("project") == "sa-resolver-proj"]
     assert len(proj_policies) >= 1
+
+
+# ============================================================================
+# Project-pattern assignments
+# ============================================================================
+
+_SCRIPT_DENY = "step_type:write:any:deny:script"
+
+
+async def _pattern_setup(
+    db: AsyncSession,
+    user: User,
+    *,
+    pattern: str = "pay*",
+    policy_names: list[str] | None = None,
+    project_names: tuple[str, ...] = ("payments", "payroll", "sandbox"),
+) -> dict[str, Project]:
+    projects = {name: Project(name=name, labels={}) for name in project_names}
+    db.add_all(projects.values())
+    db.add(Role(name="no-script", scope="project", policy_names=policy_names or [_SCRIPT_DENY], labels={}))
+    await db.flush()
+    db.add(RoleAssignment(principal_id=user.id, role_name="no-script", project_pattern=pattern))
+    await db.commit()
+    return projects
+
+
+def _pattern_denies(policies: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    return {p["project"]: p for p in policies if p.get("project_pattern")}
+
+
+@pytest.mark.asyncio
+async def test_pattern_expands_to_deny_per_matching_project(seeded_db: AsyncSession, test_user: User) -> None:
+    await _pattern_setup(seeded_db, test_user)
+    policies = await resolve_effective_policies(seeded_db, test_user.id)
+    denies = _pattern_denies(policies)
+    assert set(denies) == {"payments", "payroll"}
+    for project, stmt in denies.items():
+        assert stmt["effect"] == "deny"
+        assert stmt["scope"] == "project"
+        assert stmt["project"] == project
+        assert stmt["project_pattern"] == "pay*"
+        assert stmt["name"] == f"{_SCRIPT_DENY}@{project}"
+    # Never an unstamped copy: that would deny in every project.
+    assert not [p for p in policies if p.get("policy_name") == _SCRIPT_DENY and not p.get("project")]
+
+
+@pytest.mark.asyncio
+async def test_pattern_with_action_filter_still_emits_denies(seeded_db: AsyncSession, test_user: User) -> None:
+    await _pattern_setup(seeded_db, test_user)
+    policies = await resolve_effective_policies(seeded_db, test_user.id, action_filter="step_type:write")
+    assert set(_pattern_denies(policies)) == {"payments", "payroll"}
+
+
+@pytest.mark.asyncio
+async def test_pattern_covers_projects_created_later(seeded_db: AsyncSession, test_user: User) -> None:
+    await _pattern_setup(seeded_db, test_user)
+    seeded_db.add(Project(name="pay-new", labels={}))
+    await seeded_db.commit()
+    denies = _pattern_denies(await resolve_effective_policies(seeded_db, test_user.id))
+    assert set(denies) == {"payments", "payroll", "pay-new"}
+
+
+@pytest.mark.asyncio
+async def test_pattern_follows_renames(seeded_db: AsyncSession, test_user: User) -> None:
+    projects = await _pattern_setup(seeded_db, test_user)
+    projects["payroll"].name = "people-ops"
+    projects["sandbox"].name = "pay-sandbox"
+    await seeded_db.commit()
+    denies = _pattern_denies(await resolve_effective_policies(seeded_db, test_user.id))
+    assert set(denies) == {"payments", "pay-sandbox"}
+
+
+@pytest.mark.asyncio
+async def test_pattern_matching_nothing_emits_nothing(seeded_db: AsyncSession, test_user: User) -> None:
+    await _pattern_setup(seeded_db, test_user, pattern="billing-*")
+    policies = await resolve_effective_policies(seeded_db, test_user.id)
+    assert _pattern_denies(policies) == {}
+    assert not [p for p in policies if p.get("policy_name") == _SCRIPT_DENY]
+
+
+@pytest.mark.asyncio
+async def test_pattern_underscore_is_literal_in_sql(seeded_db: AsyncSession, test_user: User) -> None:
+    await _pattern_setup(seeded_db, test_user, pattern="pay_*", project_names=("pay_ments", "payXments"))
+    assert set(_pattern_denies(await resolve_effective_policies(seeded_db, test_user.id))) == {"pay_ments"}
+
+
+@pytest.mark.asyncio
+async def test_pattern_never_emits_allow_statements(seeded_db: AsyncSession, test_user: User) -> None:
+    """Even if the role gains an allow after assignment, the pattern only contributes denies."""
+    seeded_db.add(
+        Policy(
+            name="allow-and-deny",
+            statements=[
+                {"effect": "allow", "actions": ["workflow:delete"], "scope": "project"},
+                {"effect": "deny", "actions": ["step_type:write"], "scope": "project"},
+            ],
+            labels={},
+        )
+    )
+    await _pattern_setup(seeded_db, test_user, policy_names=["allow-and-deny", "workflow:delete:project"])
+    policies = await resolve_effective_policies(seeded_db, test_user.id)
+    from_pattern = [p for p in policies if p.get("project_pattern")]
+    assert from_pattern
+    assert {p["effect"] for p in from_pattern} == {"deny"}
+    assert not [p for p in policies if "workflow:delete" in p.get("actions", []) and p.get("effect") == "allow"]
+
+
+@pytest.mark.asyncio
+async def test_pattern_uses_system_level_policy_definition(seeded_db: AsyncSession, test_user: User) -> None:
+    """A pattern assignment uses the system-level definition of its policies."""
+    seeded_db.add(
+        Policy(
+            name="shared-deny",
+            statements=[{"effect": "deny", "actions": ["step_type:write"], "scope": "project"}],
+            labels={},
+        )
+    )
+    projects = await _pattern_setup(seeded_db, test_user, policy_names=["shared-deny"])
+    seeded_db.add(
+        Policy(
+            name="shared-deny",
+            project_id=projects["payments"].id,
+            statements=[{"effect": "allow", "actions": ["workflow:read"], "scope": "project"}],
+            labels={},
+        )
+    )
+    await seeded_db.commit()
+    denies = _pattern_denies(await resolve_effective_policies(seeded_db, test_user.id))
+    assert set(denies) == {"payments", "payroll"}
+    assert denies["payments"]["effect"] == "deny"
+
+
+@pytest.mark.asyncio
+async def test_pattern_overlapping_exact_assignment_yields_one_deny(seeded_db: AsyncSession, test_user: User) -> None:
+    projects = await _pattern_setup(seeded_db, test_user)
+    seeded_db.add(RoleAssignment(principal_id=test_user.id, role_name="no-script", project_id=projects["payments"].id))
+    await seeded_db.commit()
+    policies = await resolve_effective_policies(seeded_db, test_user.id)
+    in_payments = [p for p in policies if p["name"] == f"{_SCRIPT_DENY}@payments"]
+    assert len(in_payments) == 1
+    assert {p["project"] for p in policies if p.get("policy_name") == _SCRIPT_DENY} == {"payments", "payroll"}
+
+
+@pytest.mark.asyncio
+async def test_pattern_via_group_assignment(seeded_db: AsyncSession, test_user: User) -> None:
+    group = Group(id=uuid4(), name="pattern-grp", description="", labels={})
+    seeded_db.add(group)
+    seeded_db.add_all([Project(name="payments", labels={}), Project(name="sandbox", labels={})])
+    seeded_db.add(Role(name="no-script", scope="project", policy_names=[_SCRIPT_DENY], labels={}))
+    await seeded_db.flush()
+    seeded_db.add(RoleAssignment(group_id=group.id, role_name="no-script", project_pattern="pay*"))
+    await seeded_db.exec(insert(user_groups).values(user_id=test_user.id, group_id=group.id))
+    await seeded_db.commit()
+    assert set(_pattern_denies(await resolve_effective_policies(seeded_db, test_user.id))) == {"payments"}
+
+
+@pytest.mark.asyncio
+async def test_pattern_decisions_with_real_rego(seeded_db: AsyncSession, test_user: User) -> None:
+    await _pattern_setup(seeded_db, test_user)
+    policies = await resolve_effective_policies(seeded_db, test_user.id, action_filter="step_type:write")
+    for project, denied in (("payments", True), ("payroll", True), ("sandbox", False)):
+        result = evaluate_policy_input(
+            {
+                "user": {"id": str(test_user.id), "labels": {}, "metadata": {}},
+                "action": "write",
+                "resource": {"type": "step_type", "id": "", "project": project, "labels": {"kind": "script"}},
+                "groups": [],
+                "effective_policies": policies,
+            }
+        )
+        assert result["deny"] is denied, project
+        assert result["allow"] is not denied, project

@@ -71,5 +71,7 @@ export type PermissionRow = {
   scopeType: 'project' | 'system'
   scopeName: string
   projectId?: string
+  /** Set for assignments that apply to every project whose name matches this pattern. */
+  projectPattern?: string
   sourceEndpoint: 'role-assignments' | 'project-role-assignments'
 }

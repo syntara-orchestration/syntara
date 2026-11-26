@@ -5,6 +5,9 @@ role, optionally scoped to a project.
 
 When project_id is NULL the assignment is system-wide (global).
 When project_id is set the assignment is scoped to that project.
+When project_pattern is set (project_id is then NULL) the assignment covers
+every project whose current name matches the pattern; such assignments are
+deny-only and the resolver expands them into per-project deny statements.
 
 Exactly one of ``principal_id`` (FK → principals) or ``group_id``
 (FK → groups) must be set.  A CHECK constraint enforces mutual exclusion.
@@ -60,6 +63,12 @@ class RoleAssignment(BaseResource, table=True):
         index=True,
     )
 
+    project_pattern: str | None = Field(
+        default=None,
+        sa_type=String(FieldLimits.NAME_MAX_LENGTH),  # type: ignore[call-overload]
+        description="Project-name pattern ('*' wildcard); deny-only, mutually exclusive with project_id",
+    )
+
     is_builtin: bool = Field(
         default=False,
         description="Whether this is a seed-level assignment that cannot be revoked",
@@ -71,19 +80,23 @@ class RoleAssignment(BaseResource, table=True):
             "(principal_id IS NOT NULL) != (group_id IS NOT NULL)",
             name="ck_ra_principal_xor_group",
         ),
+        CheckConstraint(
+            "project_id IS NULL OR project_pattern IS NULL",
+            name="ck_ra_project_id_xor_pattern",
+        ),
         Index(
             "ix_ra_principal_role_global",
             "principal_id",
             "role_name",
             unique=True,
-            postgresql_where=text("project_id IS NULL AND principal_id IS NOT NULL"),
+            postgresql_where=text("project_id IS NULL AND project_pattern IS NULL AND principal_id IS NOT NULL"),
         ),
         Index(
             "ix_ra_group_role_global",
             "group_id",
             "role_name",
             unique=True,
-            postgresql_where=text("project_id IS NULL AND group_id IS NOT NULL"),
+            postgresql_where=text("project_id IS NULL AND project_pattern IS NULL AND group_id IS NOT NULL"),
         ),
         Index(
             "ix_ra_principal_role_project",
@@ -101,9 +114,28 @@ class RoleAssignment(BaseResource, table=True):
             unique=True,
             postgresql_where=text("project_id IS NOT NULL AND group_id IS NOT NULL"),
         ),
+        Index(
+            "ix_ra_principal_role_pattern",
+            "principal_id",
+            "role_name",
+            "project_pattern",
+            unique=True,
+            postgresql_where=text("project_pattern IS NOT NULL AND principal_id IS NOT NULL"),
+        ),
+        Index(
+            "ix_ra_group_role_pattern",
+            "group_id",
+            "role_name",
+            "project_pattern",
+            unique=True,
+            postgresql_where=text("project_pattern IS NOT NULL AND group_id IS NOT NULL"),
+        ),
     )
 
     def __repr__(self) -> str:
         """Return string representation."""
         target = f"principal_id={self.principal_id}" if self.principal_id else f"group_id={self.group_id}"
-        return f"<RoleAssignment({target}, role_name={self.role_name}, project_id={self.project_id})>"
+        return (
+            f"<RoleAssignment({target}, role_name={self.role_name}, project_id={self.project_id}, "
+            f"project_pattern={self.project_pattern})>"
+        )

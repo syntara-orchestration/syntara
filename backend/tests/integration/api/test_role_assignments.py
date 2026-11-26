@@ -517,3 +517,123 @@ async def test_revoke_builtin_group_assignment_forbidden(
     )
     assert response.status_code == 403
     assert response.json()["code"] == "BUILTIN_PROTECTED"
+
+
+# ============================================================================
+# Project-pattern assignments (global endpoint only)
+# ============================================================================
+
+
+async def _no_script_role(db: AsyncSession) -> None:
+    from syntara.authz.models.role import Role
+
+    db.add(Role(name="no-script", scope="project", policy_names=["step_type:write:any:deny:script"], labels={}))
+    await db.commit()
+
+
+@pytest.mark.asyncio
+async def test_admin_creates_lists_and_revokes_pattern_assignment(
+    admin_client: AsyncClient,
+    test_db_session: AsyncSession,
+    user_factory: Callable[..., Awaitable[User]],
+) -> None:
+    await _no_script_role(test_db_session)
+    target = await user_factory(username="pattern-target", email="pattern-target@example.com")
+
+    response = await admin_client.post(
+        ROLE_ASSIGNMENTS_URL,
+        json={"principal_id": str(target.id), "role_name": "no-script", "project_pattern": "pay*"},
+    )
+    assert response.status_code == 201, response.text
+    created = response.json()
+    assert created["project_pattern"] == "pay*"
+    assert created["project_id"] is None
+
+    system = await admin_client.get(ROLE_ASSIGNMENTS_URL, params={"principal_id": str(target.id), "scope": "system"})
+    assert created["id"] not in {r["id"] for r in system.json()["resources"]}
+    project = await admin_client.get(ROLE_ASSIGNMENTS_URL, params={"principal_id": str(target.id), "scope": "project"})
+    assert [r["project_pattern"] for r in project.json()["resources"]] == ["pay*"]
+
+    detail = await admin_client.get(f"{ROLE_ASSIGNMENTS_URL}/{created['id']}")
+    assert detail.json()["project_pattern"] == "pay*"
+
+    response = await admin_client.delete(f"{ROLE_ASSIGNMENTS_URL}/{created['id']}")
+    assert response.status_code == 204
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("extra", "message"),
+    [
+        ({"project_pattern": "payments"}, "use project_id for a single project"),
+        ({"project_pattern": "*"}, "matches every project"),
+        ({"project_pattern": "pay%"}, "may only contain"),
+        ({"project_pattern": "pay*", "project_id": "<payments>"}, "not both"),
+    ],
+)
+async def test_invalid_pattern_requests_return_422(
+    admin_client: AsyncClient, test_db_session: AsyncSession, test_user: User, extra: dict[str, str], message: str
+) -> None:
+    project = Project(name="payments", labels={})
+    test_db_session.add(project)
+    await test_db_session.commit()
+    body = {k: str(project.id) if v == "<payments>" else v for k, v in extra.items()}
+    response = await admin_client.post(
+        ROLE_ASSIGNMENTS_URL, json={"principal_id": str(test_user.id), "role_name": "no-script", **body}
+    )
+    assert response.status_code == 422
+    assert message in response.text
+
+
+@pytest.mark.asyncio
+async def test_pattern_with_builtin_role_returns_422(admin_client: AsyncClient, test_user: User) -> None:
+    response = await admin_client.post(
+        ROLE_ASSIGNMENTS_URL,
+        json={"principal_id": str(test_user.id), "role_name": "project-user", "project_pattern": "pay*"},
+    )
+    assert response.status_code == 422
+    assert "built-in role" in response.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_project_admin_cannot_create_pattern_assignment(
+    base_client: AsyncClient,
+    test_db_session: AsyncSession,
+    user_factory: Callable[..., Awaitable[User]],
+) -> None:
+    """Creating a pattern row is a system-level assignment, whatever projects it would match."""
+    test_user = await user_factory(username="payments-admin", email="payments-admin@example.com")
+    await _no_script_role(test_db_session)
+    project = Project(name="payments", labels={})
+    test_db_session.add(project)
+    await test_db_session.flush()
+    test_db_session.add(RoleAssignment(principal_id=test_user.id, role_name="project-admin", project_id=project.id))
+    await test_db_session.commit()
+
+    async def override() -> User:
+        return test_user
+
+    app.dependency_overrides[get_current_user] = override
+    response = await base_client.post(
+        ROLE_ASSIGNMENTS_URL,
+        json={"principal_id": str(test_user.id), "role_name": "no-script", "project_pattern": "pay*"},
+    )
+    assert response.status_code == 403
+    rows = await test_db_session.exec(select(RoleAssignment).where(RoleAssignment.project_pattern.is_not(None)))  # type: ignore[union-attr]
+    assert rows.all() == []
+
+
+@pytest.mark.asyncio
+async def test_project_sub_resource_rejects_pattern(
+    admin_client: AsyncClient, test_db_session: AsyncSession, test_user: User
+) -> None:
+    await _no_script_role(test_db_session)
+    project = Project(name="payments", labels={})
+    test_db_session.add(project)
+    await test_db_session.commit()
+    response = await admin_client.post(
+        f"/api/v1/projects/{project.id}/role_assignments",
+        json={"principal_id": str(test_user.id), "role_name": "no-script", "project_pattern": "pay*"},
+    )
+    assert response.status_code == 422
+    assert "only accepted by POST /role_assignments" in response.json()["detail"]

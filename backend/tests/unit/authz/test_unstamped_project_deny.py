@@ -198,3 +198,19 @@ def test_any_scope_deny_on_a_project_assignment_stays_in_its_project() -> None:
     assert [(s["scope"], s["project"]) for s in statements] == [("project", "payments")]
     assert _evaluate([allow_policy("allow-all", _WRITE), *statements], project="other")["allow"] is True
     assert _evaluate([allow_policy("allow-all", _WRITE), *statements], project="payments")["allow"] is False
+
+
+# --- Pattern provenance is ignored by Rego -----------------------------------
+
+
+@pytest.mark.parametrize("project", ["payments", "payroll", "sandbox", ""])
+@pytest.mark.parametrize("any_project", [False, True])
+def test_project_pattern_key_does_not_change_decisions(project: str, *, any_project: bool) -> None:
+    """The resolver stamps ``project_pattern`` on pattern-sourced denies for audit only."""
+    statements = _expand([_BUILTIN_PROJECT_DENY], {}, project="payments")
+    with_key = [{**s, "project_pattern": "pay*"} for s in statements]
+    allow = allow_policy("allow-all", _WRITE)
+    plain = _evaluate([allow, *statements], project=project, any_project=any_project)
+    tagged = _evaluate([allow, *with_key], project=project, any_project=any_project)
+    keys = ("allow", "deny", "denial_reason", "denied_by", "matched_policy")
+    assert {k: plain.get(k) for k in keys} == {k: tagged.get(k) for k in keys}

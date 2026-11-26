@@ -2,6 +2,10 @@
 
 Resolution chain: user → groups (GroupMembership) → role assignments
 → role names → policies (builtins from code, custom from DB).
+
+Assignments with a ``project_pattern`` are expanded here into one set of
+deny statements per project whose current name matches the pattern, so the
+Rego policy only ever sees concrete project names.
 """
 
 from collections.abc import Sequence
@@ -16,6 +20,7 @@ from syntara.authz.models.assignments import RoleAssignment
 from syntara.authz.models.policy import Policy
 from syntara.authz.models.project import Project
 from syntara.authz.models.role import Role
+from syntara.authz.project_patterns import LIKE_ESCAPE_CHAR, project_pattern_to_like
 from syntara.authz.role_conventions import (
     get_builtin_role,
     is_builtin_policy,
@@ -223,15 +228,59 @@ async def get_user_group_ids(db: AsyncSession, user_id: UUID) -> list[UUID]:
 def _partition_assignments(
     assignments: Sequence[RoleAssignment],
     project_roles: dict[UUID, list[str]],
+    pattern_roles: dict[str, list[str]],
 ) -> tuple[list[str], dict[UUID, list[str]]]:
-    """Split assignments into global role names and per-project role names."""
+    """Split assignments into global, per-project and per-pattern role names.
+
+    Pattern rows have ``project_id`` NULL like global rows, so they must be
+    separated here: treating one as global would apply its deny everywhere.
+    """
     global_names: list[str] = []
     for a in assignments:
-        if a.project_id is None:
+        if a.project_pattern is not None:
+            pattern_roles.setdefault(a.project_pattern, []).append(a.role_name)
+        elif a.project_id is None:
             global_names.append(a.role_name)
         else:
             project_roles.setdefault(a.project_id, []).append(a.role_name)
     return global_names, project_roles
+
+
+async def project_names_matching(db: AsyncSession, pattern: str) -> list[str]:
+    """Return the names of all projects whose current name matches *pattern*."""
+    rows = await db.exec(
+        select(Project.name).where(
+            Project.name.like(project_pattern_to_like(pattern), escape=LIKE_ESCAPE_CHAR),  # type: ignore[attr-defined]
+        )
+    )
+    return sorted(rows.all())
+
+
+async def _resolve_pattern_denies(
+    db: AsyncSession,
+    pattern_roles: dict[str, list[str]],
+    seen: set[str],
+    result: list[dict[str, Any]],
+) -> None:
+    """Expand pattern assignments into project-scoped deny statements.
+
+    Roles and policies are resolved from their system-level definitions,
+    and only deny statements are emitted whatever the role contains, so a pattern can never grant
+    access even if its role is edited after assignment.  Every emitted
+    statement carries a concrete project name (an empty project would make a
+    project-scoped deny apply everywhere) plus the ``project_pattern`` it came
+    from, which audit reads and Rego ignores.
+    """
+    for pattern, role_names in pattern_roles.items():
+        project_names = await project_names_matching(db, pattern)
+        if not project_names:
+            continue
+        unscoped: list[dict[str, Any]] = []
+        await _resolve_roles_to_policies(db, role_names, set(), unscoped)
+        denies = [stmt for stmt in unscoped if stmt.get("effect") == "deny"]
+        for project_name in project_names:
+            for stmt in denies:
+                _add_stmt({**stmt, "project_pattern": pattern}, stmt["name"], seen, result, project_name)
 
 
 async def resolve_effective_policies(
@@ -255,6 +304,8 @@ async def resolve_effective_policies(
     1. Global: principal → groups (including "authenticated") → roles → policies
     2. Global: principal → direct role assignments → policies
     3. Project-scoped: principal + group assignments with project_id set → policies
+    4. Pattern-scoped: assignments with project_pattern set → deny statements
+       for each project whose name matches
     """
     seen: set[str] = set()
     result: list[dict[str, Any]] = []
@@ -262,6 +313,7 @@ async def resolve_effective_policies(
     group_ids = await get_user_group_ids(db, principal_id)
 
     project_role_names: dict[UUID, list[str]] = {}
+    pattern_role_names: dict[str, list[str]] = {}
 
     if group_ids:
         group_assignments = await db.exec(
@@ -269,7 +321,9 @@ async def resolve_effective_policies(
                 RoleAssignment.group_id.in_(group_ids),  # type: ignore[union-attr]
             )
         )
-        global_group, project_role_names = _partition_assignments(group_assignments.all(), project_role_names)
+        global_group, project_role_names = _partition_assignments(
+            group_assignments.all(), project_role_names, pattern_role_names
+        )
         await _resolve_roles_to_policies(db, global_group, seen, result)
 
     direct_assignments = await db.exec(
@@ -277,7 +331,9 @@ async def resolve_effective_policies(
             RoleAssignment.principal_id == principal_id,
         )
     )
-    direct_global, project_role_names = _partition_assignments(direct_assignments.all(), project_role_names)
+    direct_global, project_role_names = _partition_assignments(
+        direct_assignments.all(), project_role_names, pattern_role_names
+    )
     await _resolve_roles_to_policies(db, direct_global, seen, result)
 
     if project_role_names:
@@ -306,6 +362,9 @@ async def resolve_effective_policies(
                 project_id=pid,
                 action_accept=accept,
             )
+
+    if pattern_role_names:
+        await _resolve_pattern_denies(db, pattern_role_names, seen, result)
 
     return result
 

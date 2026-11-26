@@ -17,18 +17,23 @@ class RoleAssignmentCreate:
     """Request body for creating a role assignment.
 
     Exactly one of ``principal_id`` or ``group_id`` must be provided.
+    At most one of ``project_id`` or ``project_pattern`` may be provided.
 
         Attributes:
             role_name (str):
             principal_id (None | Unset | UUID):
             group_id (None | Unset | UUID):
             project_id (None | Unset | UUID):
+            project_pattern (None | str | Unset): Project-name pattern using '*' as a wildcard (for example 'pay*'). The
+                assignment then applies to every project whose current name matches. Only custom, deny-only, project-scope roles
+                can be assigned with a pattern. Mutually exclusive with project_id.
     """
 
     role_name: str
     principal_id: None | Unset | UUID = UNSET
     group_id: None | Unset | UUID = UNSET
     project_id: None | Unset | UUID = UNSET
+    project_pattern: None | str | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -58,6 +63,12 @@ class RoleAssignmentCreate:
         else:
             project_id = self.project_id
 
+        project_pattern: None | str | Unset
+        if isinstance(self.project_pattern, Unset):
+            project_pattern = UNSET
+        else:
+            project_pattern = self.project_pattern
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -71,6 +82,8 @@ class RoleAssignmentCreate:
             field_dict["group_id"] = group_id
         if project_id is not UNSET:
             field_dict["project_id"] = project_id
+        if project_pattern is not UNSET:
+            field_dict["project_pattern"] = project_pattern
 
         return field_dict
 
@@ -130,11 +143,21 @@ class RoleAssignmentCreate:
 
         project_id = _parse_project_id(d.pop("project_id", UNSET))
 
+        def _parse_project_pattern(data: object) -> None | str | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(None | str | Unset, data)
+
+        project_pattern = _parse_project_pattern(d.pop("project_pattern", UNSET))
+
         role_assignment_create = cls(
             role_name=role_name,
             principal_id=principal_id,
             group_id=group_id,
             project_id=project_id,
+            project_pattern=project_pattern,
         )
 
         role_assignment_create.additional_properties = d

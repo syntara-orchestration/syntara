@@ -16,13 +16,14 @@ from syntara.core.utils.cursor import serialize_sort_value
 def _make_row(
     *,
     project_id: str | None = None,
+    project_pattern: str | None = None,
     role_name: str = "admin",
     principal_name: str = "alice",
     project_name: str | None = None,
     principal_type: str | None = "user",
 ) -> tuple[Any, ...]:
     """Build a mock result row matching the joined SELECT shape."""
-    assignment = SimpleNamespace(project_id=project_id, role_name=role_name)
+    assignment = SimpleNamespace(project_id=project_id, project_pattern=project_pattern, role_name=role_name)
     return (assignment, principal_name, project_name, principal_type)
 
 
@@ -65,6 +66,10 @@ class TestSortValueFromRow:
     def test_scope_system(self) -> None:
         row = _make_row(project_id=None)
         assert _sort_value_from_row(row, "scope") == serialize_sort_value("system")
+
+    def test_scope_project_pattern_sorts_as_project(self) -> None:
+        row = _make_row(project_pattern="pay*")
+        assert _sort_value_from_row(row, "scope") == serialize_sort_value("project")
 
     def test_fallback_uses_getattr(self) -> None:
         row = _make_row(role_name="viewer")

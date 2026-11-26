@@ -20,6 +20,8 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from syntara.api.main import app
 from syntara.auth.dependencies import get_current_user
+from syntara.authz.models.assignments import RoleAssignment
+from syntara.authz.models.project import Project
 from syntara.authz.resolver import resolve_effective_policies
 from syntara.core.models import User
 from syntara.core.models.group import Group, user_groups
@@ -612,3 +614,84 @@ async def test_revoke_group_role_removes_access(
     # Verify member lost project access
     policies = await resolve_effective_policies(test_db_session, member.id)
     assert not any(p.get("scope") == "project" and p.get("project") == project_name for p in policies)
+
+
+# ============================================================================
+# Renames and project-pattern assignments
+# ============================================================================
+
+_RENAME_DENIED = "Renaming this project changes which system-wide restrictions apply to it"
+
+
+async def _pattern_rename_setup(
+    db: AsyncSession, user_factory: Callable[..., Awaitable[User]]
+) -> tuple[User, dict[str, Project]]:
+    """A `pay*` pattern deny on someone else, and a user who administers every project."""
+    from syntara.authz.models.role import Role
+
+    project_admin = await user_factory(username="proj-admin", email="proj-admin@example.com")
+    restricted = await user_factory(username="restricted", email="restricted@example.com")
+    projects = {name: Project(name=name, labels={}) for name in ("payments", "sandbox")}
+    db.add_all(projects.values())
+    db.add(Role(name="no-script", scope="project", policy_names=["step_type:write:any:deny:script"], labels={}))
+    await db.flush()
+    for project in projects.values():
+        db.add(RoleAssignment(principal_id=project_admin.id, role_name="project-admin", project_id=project.id))
+    db.add(RoleAssignment(principal_id=restricted.id, role_name="no-script", project_pattern="pay*"))
+    await db.commit()
+    return project_admin, projects
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("project", "new_name"),
+    [("sandbox", "pay-sandbox"), ("payments", "billing")],
+    ids=["rename-into-pattern", "rename-out-of-pattern"],
+)
+async def test_project_admin_cannot_move_project_across_a_pattern(
+    base_client: AsyncClient,
+    test_db_session: AsyncSession,
+    user_factory: Callable[..., Awaitable[User]],
+    project: str,
+    new_name: str,
+) -> None:
+    project_admin, projects = await _pattern_rename_setup(test_db_session, user_factory)
+    _auth_as(project_admin)
+    response = await base_client.patch(f"/api/v1/projects/{projects[project].id}", json={"name": new_name})
+    assert response.status_code == 403, response.text
+    assert _RENAME_DENIED in response.json()["detail"]
+    assert "pay*" not in response.text
+    await test_db_session.refresh(projects[project])
+    assert projects[project].name == project
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("project", "new_name"),
+    [("sandbox", "sandbox-2"), ("payments", "payments-eu")],
+    ids=["outside-stays-outside", "inside-stays-inside"],
+)
+async def test_project_admin_rename_that_keeps_pattern_coverage_is_allowed(
+    base_client: AsyncClient,
+    test_db_session: AsyncSession,
+    user_factory: Callable[..., Awaitable[User]],
+    project: str,
+    new_name: str,
+) -> None:
+    project_admin, projects = await _pattern_rename_setup(test_db_session, user_factory)
+    _auth_as(project_admin)
+    response = await base_client.patch(f"/api/v1/projects/{projects[project].id}", json={"name": new_name})
+    assert response.status_code == 200, response.text
+    assert response.json()["name"] == new_name
+
+
+@pytest.mark.asyncio
+async def test_system_admin_can_move_project_across_a_pattern(
+    admin_client: AsyncClient,
+    test_db_session: AsyncSession,
+    user_factory: Callable[..., Awaitable[User]],
+) -> None:
+    _, projects = await _pattern_rename_setup(test_db_session, user_factory)
+    response = await admin_client.patch(f"/api/v1/projects/{projects['sandbox'].id}", json={"name": "pay-sandbox"})
+    assert response.status_code == 200, response.text
+    assert response.json()["name"] == "pay-sandbox"

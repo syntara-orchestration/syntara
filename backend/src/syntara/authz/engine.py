@@ -577,6 +577,7 @@ async def _has_direct_system_credential_use(db: AsyncSession, user_id: UUID) -> 
         select(RoleAssignment.role_name).where(
             RoleAssignment.principal_id == user_id,
             RoleAssignment.project_id.is_(None),  # type: ignore[union-attr]
+            RoleAssignment.project_pattern.is_(None),  # type: ignore[union-attr]
         )
     )
     return any(name in _SYSTEM_CREDENTIAL_USE_ROLES for name in result.all())
