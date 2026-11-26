@@ -579,6 +579,141 @@ async def test_reference_to_declared_child_output_has_no_finding(
 
 
 @pytest.mark.asyncio
+async def test_declared_nested_output_expression_is_accepted_on_save_and_publish(
+    test_db_session: AsyncSession,
+    test_user: User,
+    test_project_id: UUID,
+) -> None:
+    child = await _create_child_workflow(
+        test_db_session,
+        test_user,
+        test_project_id,
+        output_schema={
+            "type": "object",
+            "properties": {
+                "release": {
+                    "type": "object",
+                    "properties": {"artifact_url": {"type": "string"}},
+                    "additionalProperties": False,
+                }
+            },
+        },
+    )
+    parent_definition = _definition_with_subworkflow(child.id)
+    parent_definition["nodes"].append(
+        {
+            "id": "consume_output",
+            "name": "Consume child output",
+            "type": "script",
+            "parameters": {
+                "language": "python",
+                "code": 'print("${call_child.outputs.release.artifact_url}")',
+            },
+        }
+    )
+    parent_definition["edges"].append({"from": "call_child", "to": "consume_output"})
+    service = WorkflowService(test_db_session, test_user)
+
+    with (
+        patch(
+            "syntara.workflows.services.workflow_service.get_system_continue_on_failure",
+            new_callable=AsyncMock,
+            return_value=False,
+        ),
+        patch("syntara.workflows.services.workflow_service.WebhookTriggerService") as webhook_service,
+    ):
+        webhook_service.return_value.sync_webhook_triggers = AsyncMock()
+        parent, version, validation_result = await service.create_workflow(
+            name=f"parent-{uuid4().hex[:8]}",
+            description=None,
+            labels={},
+            workflow_definition=parent_definition,
+            project_id=test_project_id,
+        )
+
+        assert parent.has_validation_issues is False
+        assert validation_result.error_count == 0
+        assert validation_result.warning_count == 0
+
+        published_workflow, published_version, _warning = await service.publish_workflow_version(
+            workflow_id=parent.id,
+            version=version.version,
+        )
+
+    assert published_workflow.published_version_id == published_version.id
+    assert published_workflow.is_enabled is True
+
+
+@pytest.mark.asyncio
+async def test_legacy_result_outputs_expression_is_rejected_on_save_and_publish(
+    test_db_session: AsyncSession,
+    test_user: User,
+    test_project_id: UUID,
+) -> None:
+    child = await _create_child_workflow(
+        test_db_session,
+        test_user,
+        test_project_id,
+        output_schema={
+            "type": "object",
+            "properties": {
+                "release": {
+                    "type": "object",
+                    "properties": {"artifact_url": {"type": "string"}},
+                    "additionalProperties": False,
+                }
+            },
+        },
+    )
+    parent_definition = _definition_with_subworkflow(child.id)
+    parent_definition["nodes"].append(
+        {
+            "id": "consume_output",
+            "name": "Consume child output",
+            "type": "script",
+            "parameters": {
+                "language": "python",
+                "code": 'print("${call_child.Result.outputs.release.artifact_url}")',
+            },
+        }
+    )
+    parent_definition["edges"].append({"from": "call_child", "to": "consume_output"})
+    service = WorkflowService(test_db_session, test_user)
+
+    with (
+        patch(
+            "syntara.workflows.services.workflow_service.get_system_continue_on_failure",
+            new_callable=AsyncMock,
+            return_value=False,
+        ),
+        patch("syntara.workflows.services.workflow_service.WebhookTriggerService") as webhook_service,
+    ):
+        webhook_service.return_value.sync_webhook_triggers = AsyncMock()
+        parent, version, validation_result = await service.create_workflow(
+            name=f"parent-{uuid4().hex[:8]}",
+            description=None,
+            labels={},
+            workflow_definition=parent_definition,
+            project_id=test_project_id,
+        )
+
+        assert parent.has_validation_issues is True
+        assert validation_result.error_count == 1
+        finding = validation_result.findings[0]
+        assert finding.severity == ValidationSeverity.error
+        assert finding.category == ValidationCategory.invalid_reference
+        assert finding.node_id == "consume_output"
+        assert finding.field_path == "parameters.code"
+        assert "unknown Sub-workflow output field 'Result'" in finding.message
+
+        with pytest.raises(WorkflowPublishValidationError) as exc_info:
+            await service.publish_workflow_version(workflow_id=parent.id, version=version.version)
+
+    assert exc_info.value.validation_result.error_count == 1
+    assert "unknown Sub-workflow output field 'Result'" in exc_info.value.validation_result.findings[0].message
+
+
+@pytest.mark.asyncio
 async def test_declared_output_references_in_script_code_are_validated(
     test_db_session: AsyncSession,
     test_user: User,
