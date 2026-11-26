@@ -6,6 +6,7 @@ from typing import Any
 import jsonschema
 from temporalio.exceptions import ApplicationError
 
+from syntara.workflows.json_schema_validation import validate_json_schema_instance
 from syntara.workflows.utils.namespace_resolver import TEMPLATE_PATTERN, NamespaceResolver
 
 
@@ -204,11 +205,11 @@ def apply_declared_output_mapping(
 
     try:
         errors = sorted(
-            jsonschema.Draft7Validator(output_schema).iter_errors(declared),
+            validate_json_schema_instance(output_schema, declared),
             key=lambda error: tuple(str(part) for part in error.absolute_path),
         )
-    except jsonschema.SchemaError as exc:
-        raise DeclaredOutputContractError(DeclaredOutputErrorCode.INVALID_SCHEMA, exc.message) from exc
+    except (jsonschema.SchemaError, ValueError) as exc:
+        raise DeclaredOutputContractError(DeclaredOutputErrorCode.INVALID_SCHEMA, str(exc)) from exc
 
     if errors:
         first_error = errors[0]

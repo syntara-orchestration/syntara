@@ -1,0 +1,13 @@
+.outputNameRow {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.outputNameField {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.outputNameAction {
+  flex-shrink: 0;
+}

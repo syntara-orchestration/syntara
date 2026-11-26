@@ -130,7 +130,7 @@ describe('SubWorkflowSimpleOutputFields', () => {
         expression: '${deploy.stdout_json.release_tag}',
       }),
     ])
-    expect(screen.getByText(/dynamic source path is checked when its step runs/)).toBeInTheDocument()
+    expect(screen.getByText('Resolved at runtime; the child run fails if this path is missing.')).toBeInTheDocument()
   })
 
   it('does not mark a saved nested dynamic source as definitely unavailable', () => {

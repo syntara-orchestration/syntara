@@ -283,17 +283,17 @@ class TestRowLevelLockContention:
     ) -> None:
         """Verify concurrent drain SELECTs use FOR UPDATE SKIP LOCKED.
 
-        Seeds rows, then fires N concurrent drain SELECTs.  Each drain
-        locks its batch; overlapping drains skip those rows.  After
-        rollback the rows are visible again, so a second wave (NullPool
-        connect stagger longer than the lock hold) can re-read them.
+        Seeds rows, then fires N concurrent drain SELECTs and holds each
+        transaction open until all queries have completed. Each drain locks
+        its batch, and overlapping drains skip those rows. Keeping the locks
+        until the whole wave completes prevents later drains from re-reading
+        rows released by an earlier rollback.
         """
         seed_count = 200
         concurrent_drains = 5
         sem = asyncio.Semaphore(MAX_TEST_DB_CONNECTIONS)
         drain_latency = LatencyResult(label="concurrent_drain_skip_locked")
-        rows_per_drain: list[int] = []
-        lock = asyncio.Lock()
+        sessions: list[AsyncSession] = []
 
         seed_result = await seed_audit_outbox(
             audit_worker_perf_session_factory,
@@ -304,46 +304,43 @@ class TestRowLevelLockContention:
 
         seeded_id_set = set(all_ids)
 
-        async def drain_and_count() -> None:
-            async with sem, audit_worker_perf_session_factory() as session:
+        async def drain_and_count() -> set[UUID]:
+            async with sem:
+                session = audit_worker_perf_session_factory()
+                sessions.append(session)
                 async with measure_latency_async(drain_latency):
                     result = await session.execute(
                         _DRAIN_SELECT_SQL,
                         {"batch": DRAIN_BATCH_SIZE},
                     )
                     rows = result.fetchall()
-                seeded_rows = [r for r in rows if r[0] in seeded_id_set]
-                async with lock:
-                    rows_per_drain.append(len(seeded_rows))
-                # Hold the row-lock briefly to force contention for other drains
-                await asyncio.sleep(0.05)
-                await session.rollback()
+                return {row[0] for row in rows if row[0] in seeded_id_set}
 
         try:
-            tasks = [asyncio.create_task(drain_and_count()) for _ in range(concurrent_drains)]
-            await asyncio.gather(*tasks)
+            rows_by_drain = await asyncio.gather(*(drain_and_count() for _ in range(concurrent_drains)))
 
-            total_rows_seen = sum(rows_per_drain)
+            all_seen_ids = [record_id for drain_ids in rows_by_drain for record_id in drain_ids]
             drain_latency.log()
 
             logger.info(
                 "concurrent_drain_skip_locked",
                 seed_count=seed_count,
                 concurrent_drains=concurrent_drains,
-                rows_per_drain=rows_per_drain,
-                total_rows_seen=total_rows_seen,
+                rows_per_drain=[len(drain_ids) for drain_ids in rows_by_drain],
+                total_rows_seen=len(all_seen_ids),
                 drain_p95_ms=round(drain_latency.p95, 3),
             )
 
-            # 200: drains overlapped and SKIP LOCKED partitioned the rows.
-            # 400: two serial waves (AAP-87600) — first wave rollbacks, so the
-            # second legally re-reads the same rows. Harmless; not a product bug.
-            assert total_rows_seen in (seed_count, seed_count * 2), (
-                f"Drains processed {total_rows_seen} seeded rows (rows_per_drain={rows_per_drain}); "
-                f"expected {seed_count} (overlapping SKIP LOCKED) or {seed_count * 2} (two waves after rollback)"
+            assert len(all_seen_ids) == seed_count, (
+                f"Concurrent drains processed {len(all_seen_ids)} seeded rows "
+                f"(rows_per_drain={[len(drain_ids) for drain_ids in rows_by_drain]}); "
+                f"expected each seeded row to be locked by exactly one drain"
             )
+            assert len(set(all_seen_ids)) == seed_count, "Concurrent drains returned duplicate row IDs"
 
         finally:
+            for session in sessions:
+                await session.close()
             await cleanup_outbox_records(audit_worker_perf_session_factory, all_ids)
 
     async def test_writer_drain_contention(

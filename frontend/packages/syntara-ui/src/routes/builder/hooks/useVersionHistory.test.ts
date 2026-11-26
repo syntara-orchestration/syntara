@@ -228,6 +228,35 @@ describe('useVersionHistory', () => {
     expect(result.current.publishedVersionName).toBeNull()
   })
 
+  it('reviews a selected version before the publish dialog enables its action', async () => {
+    const { result } = renderHook(() => useVersionHistory({ workflowId: 'wf-1', isNew: false }), {
+      wrapper: makeWrapper(queryClient),
+    })
+
+    act(() => result.current.reviewVersionForPublish(2))
+
+    await waitFor(() => expect(result.current.reviewedPublishVersion).toBe(2))
+    expect(mockCheckBreakingChangesMutate).toHaveBeenCalledWith(
+      {
+        params: { path: { workflow_id: 'wf-1' } },
+        body: { workflow_definition: { name: 'v2' } },
+      },
+      expect.objectContaining({ onSuccess: expect.any(Function) as unknown })
+    )
+    expect(mockMutate).not.toHaveBeenCalled()
+
+    act(() => result.current.publishVersion(2, 'Release 1.0', 'Reviewed before opening the final action'))
+
+    expect(mockMutate).toHaveBeenCalledWith(
+      {
+        params: { path: { workflow_id: 'wf-1', version: 2 }, query: { confirm: false } },
+        body: { name: 'Release 1.0', change_description: 'Reviewed before opening the final action' },
+      },
+      expect.objectContaining({ onSuccess: expect.any(Function) as unknown })
+    )
+    expect(mockCheckBreakingChangesMutate).toHaveBeenCalledTimes(1)
+  })
+
   it('updates perPage through paginationFooterProps', () => {
     const { result } = renderHook(() => useVersionHistory({ workflowId: 'wf-1', isNew: false }), {
       wrapper: makeWrapper(queryClient),
@@ -477,6 +506,7 @@ describe('useVersionHistory', () => {
       act(() => result.current.publishVersion(2, 'Release'))
 
       await waitFor(() => expect(result.current.breakingChanges).toHaveLength(1))
+      await waitFor(() => expect(result.current.reviewedPublishVersion).toBe(2))
 
       expect(result.current.breakingChanges).toHaveLength(1)
       expect(mockMutate).not.toHaveBeenCalled()

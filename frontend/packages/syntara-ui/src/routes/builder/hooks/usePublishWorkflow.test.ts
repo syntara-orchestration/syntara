@@ -115,7 +115,7 @@ describe('usePublishWorkflow', () => {
     )
   })
 
-  it('waits for confirmation when a changed contract has published parent references', async () => {
+  it('preserves trigger confirmation when confirming output contract changes', async () => {
     vi.mocked(useWorkflowStore.getState).mockReturnValue({
       currentWorkflow: { workflow: { name: 'Child', activities: [] }, triggers: [] },
       isDirty: true,
@@ -172,9 +172,13 @@ describe('usePublishWorkflow', () => {
     expect(result.current.parentWorkflows).toHaveLength(1)
     expect(mockPublishMutate).not.toHaveBeenCalled()
 
-    act(() => result.current.confirmPublish())
+    act(() => result.current.confirmPublish('v2.0', undefined, undefined, { confirm: true }))
 
     expect(mockPublishMutate).toHaveBeenCalledOnce()
+    expect(mockPublishMutate.mock.calls[0]?.[0]).toEqual({
+      params: { path: { workflow_id: 'wf-123', version: 3 }, query: { confirm: true } },
+      body: { name: 'v2.0', change_description: null, workflow_definition: { built: true } },
+    })
   })
 
   it('sends null name when no name provided', () => {

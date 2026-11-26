@@ -1,19 +1,16 @@
 import type { WorkflowAPI } from '@syntara/contracts'
-import { useQueryClient } from '@tanstack/react-query'
 import { useCallback, useMemo, useState } from 'react'
 
 import { workflowClient } from '../../../client'
 import type { PaginationFooterProps } from '../../../components/table/PaginationFooter'
 import { useCursorPagination } from '../../../hooks/useCursorPagination'
-import { useTriggerRemovalPublishConfirm } from '../../../hooks/useTriggerRemovalPublishConfirm'
 import { useAlerts, type AlertMessage } from '../../../providers/alerts'
 import { getErrorMessage } from '../../../utils/apiErrors'
 import { detachPromise } from '../../../utils/detachPromise'
 import { downloadVersionExport } from '../../../utils/downloadWorkflowExport'
 
 import { buildWorkflowVersionsQuery } from './buildWorkflowVersionsQuery'
-import { useOutputContractReview } from './useOutputContractReview'
-import { isWorkflowQuery } from './usePublishWorkflow'
+import { useVersionHistoryPublishing } from './useVersionHistoryPublishing'
 import { resolvePublishedVersionName } from './versionHistoryHelpers'
 
 export type VersionStatus = 'draft' | 'published' | 'previously_published'
@@ -27,14 +24,6 @@ type WorkflowVersion = WorkflowAPI.components['schemas']['WorkflowVersionRead']
 
 function openWorkflowVersion(workflowId: string | null, version: number): void {
   if (workflowId) window.open(`/workflow-builder/${workflowId}?version=${version}`, '_blank', 'noopener,noreferrer')
-}
-
-type PendingVersionPublish = {
-  version: number
-  publishName?: string
-  changeDescription?: string
-  workflowDefinition: Record<string, unknown>
-  onSettled?: () => void
 }
 
 function downloadWorkflowVersion(
@@ -58,16 +47,7 @@ type UseVersionHistoryParams = {
 
 export function useVersionHistory({ workflowId, isNew, onVersionUpdated }: UseVersionHistoryParams) {
   const [statusFilter, setStatusFilterState] = useState<VersionStatus[]>([])
-  const queryClient = useQueryClient()
   const { showSuccess, showError } = useAlerts()
-  const {
-    breakingChanges,
-    contractChanges,
-    parentWorkflows,
-    isChecking: isCheckingOutputContract,
-    clearReview: clearOutputContractReview,
-    reviewOutputContract: runOutputContractReview,
-  } = useOutputContractReview(workflowId)
 
   const {
     cursor: versionsCursor,
@@ -107,12 +87,15 @@ export function useVersionHistory({ workflowId, isNew, onVersionUpdated }: UseVe
   )
 
   const restoreMutation = workflowClient.useMutation('post', '/workflows/{workflow_id}/versions/{version}/restore')
-  const publishMutation = workflowClient.useMutation('post', '/workflows/{workflow_id}/versions/{version}/publish')
-  const { guardPublishError, triggerRemovalConfirmDialog } = useTriggerRemovalPublishConfirm()
   const updateMetadataMutation = workflowClient.useMutation('patch', '/workflows/{workflow_id}/versions/{version}')
-  const [pendingPublish, setPendingPublish] = useState<PendingVersionPublish | null>(null)
 
   const allVersions = versionsQuery.data?.resources
+  const publishActions = useVersionHistoryPublishing({
+    workflowId,
+    versions: allVersions,
+    refetchVersions: versionsQuery.refetch,
+    onVersionUpdated,
+  })
   const publishedVersionName = useMemo(() => resolvePublishedVersionName(allVersions), [allVersions])
   const filteredVersions = useMemo((): WorkflowVersion[] => {
     if (!allVersions) return []
@@ -129,94 +112,6 @@ export function useVersionHistory({ workflowId, isNew, onVersionUpdated }: UseVe
     (version: number) => downloadWorkflowVersion(workflowId, version, showError),
     [workflowId, showError]
   )
-
-  const publishVersionNow = useCallback(
-    (pending: PendingVersionPublish, confirm = false) => {
-      // `attempt` is hoisted, so onError can retry with confirm=true after a trigger-removal 409
-      // without capturing the memoized callback (which React Compiler disallows).
-      function attempt(useConfirm: boolean) {
-        publishMutation.mutate(
-          {
-            params: {
-              path: { workflow_id: workflowId ?? '', version: pending.version },
-              query: { confirm: useConfirm },
-            },
-            body: {
-              name: pending.publishName ?? null,
-              change_description: pending.changeDescription ?? null,
-            },
-          },
-          {
-            onSuccess: (data) => {
-              showSuccess({ title: 'Version published' })
-              if (data?.current_version != null) onVersionUpdated?.(data.current_version)
-              detachPromise(versionsQuery.refetch())
-              detachPromise(queryClient.invalidateQueries({ predicate: isWorkflowQuery }))
-            },
-            onError: (error: unknown) => {
-              if (guardPublishError(error, () => attempt(true))) return
-              showError({ title: 'Failed to publish version', description: getErrorMessage(error) })
-            },
-            onSettled: pending.onSettled,
-          }
-        )
-      }
-      attempt(confirm)
-    },
-    [
-      workflowId,
-      publishMutation,
-      versionsQuery,
-      queryClient,
-      showSuccess,
-      showError,
-      onVersionUpdated,
-      guardPublishError,
-    ]
-  )
-
-  const publishVersion = useCallback(
-    (version: number, publishName?: string, changeDescription?: string, onSettled?: () => void) => {
-      if (!workflowId) return
-      const workflowDefinition = allVersions?.find((item) => item.version === version)?.workflow_definition
-      if (!workflowDefinition) {
-        showError({
-          title: 'Failed to check output contract changes',
-          description: 'Version definition is unavailable',
-        })
-        return
-      }
-      const pending: PendingVersionPublish = { version, publishName, changeDescription, workflowDefinition, onSettled }
-      clearOutputContractReview()
-      setPendingPublish(pending)
-      detachPromise(
-        runOutputContractReview(workflowDefinition, (error) => {
-          setPendingPublish(null)
-          showError({ title: 'Failed to check output contract changes', description: getErrorMessage(error) })
-        }).then((response) => {
-          if (!response) return
-          if (response.has_breaking_changes || (response.has_contract_changes && response.parent_workflows?.length))
-            return
-          setPendingPublish(null)
-          publishVersionNow(pending)
-        })
-      )
-    },
-    [workflowId, allVersions, clearOutputContractReview, runOutputContractReview, publishVersionNow, showError]
-  )
-
-  const confirmPublishVersion = useCallback(() => {
-    if (!pendingPublish) return
-    const pending = pendingPublish
-    clearOutputContractReview()
-    setPendingPublish(null)
-    publishVersionNow(pending)
-  }, [pendingPublish, clearOutputContractReview, publishVersionNow])
-
-  const cancelBreakingChangeWarning = useCallback(() => {
-    clearOutputContractReview()
-    setPendingPublish(null)
-  }, [clearOutputContractReview])
 
   const openInNewWindow = useCallback((version: number) => openWorkflowVersion(workflowId, version), [workflowId])
 
@@ -251,16 +146,9 @@ export function useVersionHistory({ workflowId, isNew, onVersionUpdated }: UseVe
     restoreMutation,
     exportVersion,
     openInNewWindow,
-    publishVersion,
-    isPublishingVersion: publishMutation.isPending || isCheckingOutputContract,
-    breakingChanges,
-    contractChanges,
-    parentWorkflows,
-    confirmPublishVersion,
-    cancelBreakingChangeWarning,
+    ...publishActions,
     updateVersionMetadata,
     updateMetadataMutation,
     paginationFooterProps,
-    triggerRemovalConfirmDialog,
   }
 }

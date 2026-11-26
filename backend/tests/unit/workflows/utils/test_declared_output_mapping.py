@@ -1,5 +1,7 @@
 """Tests for SubWorkflow Trigger declared output mapping at runtime."""
 
+from typing import Any
+
 import pytest
 
 from syntara.workflows.utils.namespace_resolver import NamespaceResolver
@@ -140,3 +142,15 @@ def test_dotted_schema_property_name_fails_contract() -> None:
 
     with pytest.raises(DeclaredOutputContractError, match="Invalid declared output path"):
         apply_declared_output_mapping(_resolver(), schema, {"release.tag": "${deploy.url}"})
+
+
+@pytest.mark.parametrize(
+    "schema",
+    [
+        {"type": "object", "properties": {"release": {"$ref": "https://example.test/schema"}}},
+        {"type": "object", "properties": {"release": {"type": "string", "pattern": "^(a+)+$"}}},
+    ],
+)
+def test_rejects_stored_output_schemas_that_bypass_definition_hardening(schema: dict[str, Any]) -> None:
+    with pytest.raises(DeclaredOutputContractError, match="Invalid declared output schema"):
+        apply_declared_output_mapping(_resolver(), schema, {"release": "${deploy.url}"})

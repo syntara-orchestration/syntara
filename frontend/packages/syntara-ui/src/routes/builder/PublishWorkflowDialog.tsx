@@ -1,4 +1,15 @@
-import { Alert, Button, Content, Form, Modal, ModalBody, ModalFooter, ModalHeader } from '@patternfly/react-core'
+import {
+  Alert,
+  Button,
+  Content,
+  Form,
+  Modal,
+  ModalBody,
+  ModalFooter,
+  ModalHeader,
+  Stack,
+  StackItem,
+} from '@patternfly/react-core'
 import type { WorkflowAPI } from '@syntara/contracts'
 import { format } from 'date-fns'
 import { useEffect, type ReactNode } from 'react'
@@ -15,6 +26,12 @@ import type { PublishWorkflowFormData } from './publishWorkflowSchema'
 
 function getDefaultVersionName(): string {
   return format(new Date(), 'PPp')
+}
+
+function getPublishButtonLabel(hasBreakingChanges: boolean, requiresContractConfirmation: boolean): string {
+  if (hasBreakingChanges) return 'Publish anyway'
+  if (requiresContractConfirmation) return 'Publish with changes'
+  return 'Publish workflow'
 }
 
 type PublishImpactAlertProps = Readonly<{
@@ -77,7 +94,7 @@ function PublishImpactAlert({
   }
 
   if (!alert) return null
-  return <div style={{ marginBottom: 'var(--pf-t--global--spacer--md)' }}>{alert}</div>
+  return alert
 }
 
 type ContractChange = WorkflowAPI.components['schemas']['TriggerBreakingChanges']
@@ -90,7 +107,6 @@ type DerivePublishStateInput = Readonly<{
   triggerRemovalState: { isLoading: boolean; isError: boolean }
   breakingChanges: ContractChange[]
   contractChanges: ContractChange[]
-  parentWorkflows: WorkflowAPI.components['schemas']['WorkflowReferenceRead'][]
 }>
 
 type PublishState = {
@@ -114,7 +130,6 @@ function derivePublishState({
   triggerRemovalState,
   breakingChanges,
   contractChanges,
-  parentWorkflows,
 }: DerivePublishStateInput): PublishState {
   const diffPending = !!triggerDiffLoading
   const diffError = !!triggerDiffError
@@ -128,14 +143,130 @@ function derivePublishState({
     impactPending: diffPending || removalImpactPending,
     hasBreakingChanges,
     reviewedContractChanges,
-    requiresContractConfirmation:
-      hasBreakingChanges || (reviewedContractChanges.length > 0 && parentWorkflows.length > 0),
+    requiresContractConfirmation: hasBreakingChanges || reviewedContractChanges.length > 0,
   }
+}
+
+type PublishDialogNoticesProps = Readonly<{
+  showPublishImpact: boolean
+  unverifiable: boolean
+  impactPending: boolean
+  hasRemovedTriggers: boolean
+  removedCount: number
+  affectedByRemovalCount: number
+  totalCount: number
+  requiresContractConfirmation: boolean
+  hasBreakingChanges: boolean
+  reviewedContractChanges: ContractChange[]
+  breakingChanges: ContractChange[]
+  parentWorkflows: WorkflowAPI.components['schemas']['WorkflowReferenceRead'][]
+  isCheckingContractChanges: boolean
+  hasContractReviewError: boolean
+  isPublishing: boolean
+  onRetryContractReview?: () => void
+}>
+
+function PublishDialogNotices({
+  showPublishImpact,
+  unverifiable,
+  impactPending,
+  hasRemovedTriggers,
+  removedCount,
+  affectedByRemovalCount,
+  totalCount,
+  requiresContractConfirmation,
+  hasBreakingChanges,
+  reviewedContractChanges,
+  breakingChanges,
+  parentWorkflows,
+  isCheckingContractChanges,
+  hasContractReviewError,
+  isPublishing,
+  onRetryContractReview,
+}: PublishDialogNoticesProps) {
+  return (
+    <>
+      {showPublishImpact && (
+        <StackItem>
+          <PublishImpactAlert
+            unverifiable={unverifiable}
+            pending={impactPending}
+            hasRemovedTriggers={hasRemovedTriggers}
+            removedCount={removedCount}
+            affectedByRemovalCount={affectedByRemovalCount}
+            totalCount={totalCount}
+          />
+        </StackItem>
+      )}
+      {requiresContractConfirmation && (
+        <StackItem>
+          <Alert
+            variant="warning"
+            isInline
+            component="h2"
+            title={hasBreakingChanges ? 'Breaking output contract changes' : 'Output contract changes'}
+          >
+            <OutputContractChangeSummary
+              context="publish"
+              contractChanges={reviewedContractChanges}
+              breakingChanges={breakingChanges}
+              hasBreakingChanges={hasBreakingChanges}
+              parentWorkflows={parentWorkflows}
+            />
+          </Alert>
+        </StackItem>
+      )}
+      {isCheckingContractChanges && (
+        <StackItem>
+          <Alert variant="info" isInline component="h2" title="Checking published parent impact">
+            Checking how this version may change the outputs used by published parent workflows.
+          </Alert>
+        </StackItem>
+      )}
+      {hasContractReviewError && (
+        <StackItem>
+          <Alert variant="warning" isInline component="h2" title="Unable to verify output contract changes">
+            <Content component="p">Retry the check before publishing.</Content>
+            {onRetryContractReview && (
+              <Button
+                variant="link"
+                type="button"
+                onClick={onRetryContractReview}
+                isDisabled={isPublishing || isCheckingContractChanges}
+              >
+                Retry check
+              </Button>
+            )}
+          </Alert>
+        </StackItem>
+      )}
+    </>
+  )
+}
+
+function isPublishButtonDisabled({
+  isPublishing,
+  blockPublish,
+  isCheckingContractChanges,
+  isPublishDisabled,
+  hasContractReviewError,
+}: Readonly<{
+  isPublishing: boolean
+  blockPublish: boolean
+  isCheckingContractChanges: boolean
+  isPublishDisabled: boolean
+  hasContractReviewError: boolean
+}>): boolean {
+  return isPublishing || blockPublish || isCheckingContractChanges || isPublishDisabled || hasContractReviewError
 }
 
 type PublishWorkflowDialogProps = Readonly<{
   isOpen: boolean
   isPublishing: boolean
+  isCheckingContractChanges?: boolean
+  isPublishDisabled?: boolean
+  hasContractReviewError?: boolean
+  onRetryContractReview?: () => void
   onClose: () => void
   onPublish: (publishName?: string, description?: string, options?: { confirm?: boolean }) => void
   /** The workflow being published; enables the "used by published workflows" impact alert. */
@@ -149,13 +280,17 @@ type PublishWorkflowDialogProps = Readonly<{
   breakingChanges?: WorkflowAPI.components['schemas']['TriggerBreakingChanges'][]
   contractChanges?: WorkflowAPI.components['schemas']['TriggerBreakingChanges'][]
   parentWorkflows?: WorkflowAPI.components['schemas']['WorkflowReferenceRead'][]
-  onConfirmContractChanges?: () => void
+  onConfirmContractChanges?: (publishName?: string, description?: string, options?: { confirm?: boolean }) => void
   onCancelBreakingChanges?: () => void
 }>
 
 export function PublishWorkflowDialog({
   isOpen,
   isPublishing,
+  isCheckingContractChanges = false,
+  isPublishDisabled = false,
+  hasContractReviewError = false,
+  onRetryContractReview,
   onClose,
   onPublish,
   workflowId,
@@ -212,72 +347,91 @@ export function PublishWorkflowDialog({
     triggerRemovalState: triggerRemoval,
     breakingChanges,
     contractChanges,
-    parentWorkflows,
   })
 
   const onSubmit = (data: PublishWorkflowFormData) => {
     const name = data.name.trim()
     const desc = data.description?.trim()
-    onPublish(name || undefined, desc || undefined, { confirm: affectedByRemovalCount > 0 })
+    const confirmOptions = { confirm: affectedByRemovalCount > 0 }
+    if (requiresContractConfirmation && onConfirmContractChanges) {
+      if (confirmOptions.confirm) onConfirmContractChanges(name || undefined, desc || undefined, confirmOptions)
+      else onConfirmContractChanges(name || undefined, desc || undefined)
+      return
+    }
+    onPublish(name || undefined, desc || undefined, confirmOptions)
   }
+  const publishButtonLabel = getPublishButtonLabel(hasBreakingChanges, requiresContractConfirmation)
+  const showPublishImpact =
+    unverifiable || impactPending || (hasRemovedTriggers ? affectedByRemovalCount > 0 : totalCount > 0)
 
   return (
     <Modal isOpen={isOpen} onClose={handleClose} variant="small" aria-label="Publish workflow">
       <ModalHeader title="Publish workflow?" />
       <ModalBody>
-        <Content component="p" style={{ marginBottom: 'var(--pf-t--global--spacer--md)' }}>
-          This will override any previously published workflow and your trigger step will now be able to trigger
-          workflow runs. These triggered runs will happen in the background and can be viewed in run history. The
-          previously published workflow can be viewed in version history.
-        </Content>
-        <PublishImpactAlert
-          unverifiable={unverifiable}
-          pending={impactPending}
-          hasRemovedTriggers={hasRemovedTriggers}
-          removedCount={removedCount}
-          affectedByRemovalCount={affectedByRemovalCount}
-          totalCount={totalCount}
-        />
-        {requiresContractConfirmation && (
-          <Alert
-            variant="warning"
-            isInline
-            title={hasBreakingChanges ? 'Breaking output contract changes' : 'Output contract changes'}
-          >
+        <Stack hasGutter>
+          <StackItem>
             <Content component="p">
-              Review the contract edits and any visible published parent workflows that reference this child.
+              This will override any previously published workflow and your trigger step will now be able to trigger
+              workflow runs. These triggered runs will happen in the background and can be viewed in run history. The
+              previously published workflow can be viewed in version history.
             </Content>
-            <OutputContractChangeSummary
-              context="publish"
-              contractChanges={reviewedContractChanges}
-              parentWorkflows={parentWorkflows}
-            />
-          </Alert>
-        )}
-        <Form onSubmit={handleSubmit(onSubmit)} id="publish-workflow-form">
-          <SynForm form={form}>
-            <SynTextField name="name" label="Version name" fieldId="publish-name" isRequired ariaLabel="Version name" />
-            <SynTextAreaField
-              name="description"
-              label="Description"
-              fieldId="publish-description"
-              placeholder="Describe what changed"
-              rows={4}
-              ariaLabel="Description"
-            />
-          </SynForm>
-        </Form>
+          </StackItem>
+          <PublishDialogNotices
+            showPublishImpact={showPublishImpact}
+            unverifiable={unverifiable}
+            impactPending={impactPending}
+            hasRemovedTriggers={hasRemovedTriggers}
+            removedCount={removedCount}
+            affectedByRemovalCount={affectedByRemovalCount}
+            totalCount={totalCount}
+            requiresContractConfirmation={requiresContractConfirmation}
+            hasBreakingChanges={hasBreakingChanges}
+            reviewedContractChanges={reviewedContractChanges}
+            breakingChanges={breakingChanges}
+            parentWorkflows={parentWorkflows}
+            isCheckingContractChanges={isCheckingContractChanges}
+            hasContractReviewError={hasContractReviewError}
+            isPublishing={isPublishing}
+            onRetryContractReview={onRetryContractReview}
+          />
+          <StackItem>
+            <Form onSubmit={handleSubmit(onSubmit)} id="publish-workflow-form">
+              <SynForm form={form}>
+                <SynTextField
+                  name="name"
+                  label="Version name"
+                  fieldId="publish-name"
+                  isRequired
+                  ariaLabel="Version name"
+                />
+                <SynTextAreaField
+                  name="description"
+                  label="Description"
+                  fieldId="publish-description"
+                  placeholder="Describe what changed"
+                  rows={4}
+                  ariaLabel="Description"
+                />
+              </SynForm>
+            </Form>
+          </StackItem>
+        </Stack>
       </ModalBody>
       <ModalFooter>
         <Button
           variant="primary"
-          type={requiresContractConfirmation ? 'button' : 'submit'}
-          form={requiresContractConfirmation ? undefined : 'publish-workflow-form'}
-          onClick={requiresContractConfirmation ? onConfirmContractChanges : undefined}
+          type="submit"
+          form="publish-workflow-form"
           isLoading={isPublishing}
-          isDisabled={isPublishing || blockPublish}
+          isDisabled={isPublishButtonDisabled({
+            isPublishing,
+            blockPublish,
+            isCheckingContractChanges,
+            isPublishDisabled,
+            hasContractReviewError,
+          })}
         >
-          {hasBreakingChanges ? 'Publish anyway' : 'Publish workflow'}
+          {publishButtonLabel}
         </Button>
         <Button
           variant="link"
@@ -285,7 +439,7 @@ export function PublishWorkflowDialog({
             onCancelBreakingChanges?.()
             handleClose()
           }}
-          isDisabled={isPublishing}
+          isDisabled={isPublishing || isCheckingContractChanges}
         >
           Cancel
         </Button>

@@ -14,6 +14,24 @@
       "output_schema": {
         "type": "object",
         "description": "JSON Schema defining the outputs exposed to parent workflows. Provides encapsulation—parent sees only declared fields, not internal child step structure.",
+        "examples": [
+          {
+            "type": "object",
+            "properties": {
+              "release": {
+                "type": "object",
+                "properties": {
+                  "url": {
+                    "type": "string",
+                    "description": "URL of the published release"
+                  }
+                },
+                "required": ["url"]
+              }
+            },
+            "required": ["release"]
+          }
+        ],
         "additionalProperties": true
       },
       "output_mapping": {

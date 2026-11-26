@@ -6,13 +6,14 @@ import { axe } from 'vitest-axe'
 
 import { WorkflowPublishDialog } from './WorkflowPublishDialog'
 
-const mocks = vi.hoisted(() => ({ review: vi.fn() }))
+const mocks = vi.hoisted(() => ({ review: vi.fn(), publishedVersionId: 'published-v2' }))
 const publishWorkflow = {
   id: 'workflow-id',
   name: 'Child workflow',
   description: null,
   labels: {},
   current_version: 4,
+  published_version_id: 'published-v2',
   is_enabled: true,
   is_builtin: false,
   project_id: 'project-id',
@@ -27,8 +28,17 @@ function createPublishDialog(isOpen: boolean) {
 vi.mock('../../client', () => ({
   workflowClient: {
     useQuery: () => ({
-      data: { version: { workflow_definition: { schema_version: '2.0.0', triggers: [], nodes: [], edges: [] } } },
+      data: {
+        published_version_id: mocks.publishedVersionId,
+        version: {
+          version: 3,
+          workflow_definition: { schema_version: '2.0.0', triggers: [], nodes: [], edges: [] },
+        },
+      },
       refetch: vi.fn(),
+      isFetching: false,
+      isLoading: false,
+      error: undefined,
     }),
   },
 }))
@@ -47,16 +57,18 @@ vi.mock('../builder/PublishWorkflowDialog', () => ({
     isOpen: boolean
     contractChanges: WorkflowAPI.components['schemas']['TriggerBreakingChanges'][]
     onPublish: (name?: string, description?: string) => void
-    onConfirmContractChanges?: () => void
+    onConfirmContractChanges?: (name?: string, description?: string) => void
   }) =>
     isOpen ? (
       <div>
-        <button type="button" onClick={() => onPublish('v2', 'Changed output contract')}>
-          Review publish
-        </button>
         {contractChanges.length > 0 && (
-          <button type="button" onClick={onConfirmContractChanges}>
+          <button type="button" onClick={() => onConfirmContractChanges?.('v2', 'Changed output contract')}>
             Confirm publish
+          </button>
+        )}
+        {contractChanges.length === 0 && (
+          <button type="button" onClick={() => onPublish('v2', 'Changed output contract')}>
+            Review publish
           </button>
         )}
       </div>
@@ -64,7 +76,10 @@ vi.mock('../builder/PublishWorkflowDialog', () => ({
 }))
 
 describe('WorkflowPublishDialog', () => {
-  beforeEach(() => vi.clearAllMocks())
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mocks.publishedVersionId = 'published-v2'
+  })
 
   it('publishes immediately when the output contract has no changes', async () => {
     mocks.review.mockResolvedValue({
@@ -84,11 +99,13 @@ describe('WorkflowPublishDialog', () => {
         onPublishWorkflow={onPublishWorkflow}
       />
     )
+    await waitFor(() => expect(mocks.review).toHaveBeenCalledOnce())
     await user.click(screen.getByRole('button', { name: 'Review publish' }))
 
     await waitFor(() =>
       expect(onPublishWorkflow).toHaveBeenCalledWith(
         expect.objectContaining({ id: 'workflow-id' }),
+        3,
         'v2',
         'Changed output contract'
       )
@@ -133,17 +150,40 @@ describe('WorkflowPublishDialog', () => {
         onPublishWorkflow={onPublishWorkflow}
       />
     )
-    await user.click(screen.getByRole('button', { name: 'Review publish' }))
-
     expect(await screen.findByRole('button', { name: 'Confirm publish' })).toBeInTheDocument()
     expect(onPublishWorkflow).not.toHaveBeenCalled()
     await user.click(screen.getByRole('button', { name: 'Confirm publish' }))
 
     expect(onPublishWorkflow).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'workflow-id' }),
+      3,
       'v2',
       'Changed output contract'
     )
+  })
+
+  it('rechecks the same candidate version when the published baseline changes', async () => {
+    mocks.review.mockResolvedValue({
+      has_breaking_changes: false,
+      triggers: [],
+      has_contract_changes: false,
+      contract_changes: [],
+      parent_workflows: [],
+    })
+    const publishDialog = createPublishDialog(true)
+    const onPublishWorkflow = vi.fn()
+    const { rerender } = render(
+      <WorkflowPublishDialog publishDialog={publishDialog} isPublishing={false} onPublishWorkflow={onPublishWorkflow} />
+    )
+
+    await waitFor(() => expect(mocks.review).toHaveBeenCalledTimes(1))
+    mocks.publishedVersionId = 'published-v3'
+    rerender(
+      <WorkflowPublishDialog publishDialog={publishDialog} isPublishing={false} onPublishWorkflow={onPublishWorkflow} />
+    )
+
+    await waitFor(() => expect(mocks.review).toHaveBeenCalledTimes(2))
+    expect(onPublishWorkflow).not.toHaveBeenCalled()
   })
 
   it('renders an accessible closed state', async () => {

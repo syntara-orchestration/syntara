@@ -163,9 +163,7 @@ describe('SubWorkflowAdvancedMappings', () => {
       />
     )
 
-    expect(
-      screen.getByText('This dynamic source path is checked when its step runs; a missing field fails the child run.')
-    ).toBeInTheDocument()
+    expect(screen.getByText('Resolved at runtime; the child run fails if this path is missing.')).toBeInTheDocument()
     expect(screen.getByRole('textbox', { name: 'Type to filter' })).toBeDisabled()
   })
 })

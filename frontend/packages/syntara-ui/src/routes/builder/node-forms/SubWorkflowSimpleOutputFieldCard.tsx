@@ -27,6 +27,7 @@ import {
   NO_CHILD_OUTPUTS_AVAILABLE_MESSAGE,
   type OutputSourceOption,
 } from './SubWorkflowOutputSourceOptions'
+import styles from './SubWorkflowSimpleOutputFieldCard.module.css'
 import type { TriggerFormData } from './triggerFormSchema'
 
 type OutputField = NonNullable<TriggerFormData['outputFields']>[number]
@@ -92,7 +93,7 @@ function getOutputSourceIssues({
   }
   if (isDynamicSource) {
     issues.push({
-      message: 'This dynamic source path is checked when its step runs; a missing field fails the child run.',
+      message: 'Resolved at runtime; the child run fails if this path is missing.',
       variant: 'warning',
     })
   }
@@ -175,6 +176,7 @@ function renderOutputMappingField({
                 selectedLabel={selectedSourceLabel}
                 emptyOptionsMessage={NO_CHILD_OUTPUTS_AVAILABLE_MESSAGE}
                 noResultsMessage={getNoChildOutputMatchesMessage}
+                matchToggleWidth
                 onChange={(value) => {
                   const option = sourceOptions.find((candidate) => candidate.expression === value)
                   if (!option) {
@@ -267,8 +269,8 @@ export function SubWorkflowSimpleOutputFieldCard({
         <CardBody>
           <Stack hasGutter>
             <StackItem>
-              <Flex>
-                <FlexItem flex={{ default: 'flex_1' }}>
+              <Flex className={styles.outputNameRow} flexWrap={{ default: 'wrap' }}>
+                <FlexItem className={styles.outputNameField} flex={{ default: 'flex_1' }}>
                   <FormGroup label="Output name" fieldId={getFieldId(index, 'path')}>
                     <TextInput
                       id={getFieldId(index, 'path')}
@@ -300,7 +302,7 @@ export function SubWorkflowSimpleOutputFieldCard({
                     )}
                   </FormGroup>
                 </FlexItem>
-                <FlexItem alignSelf={{ default: 'alignSelfCenter' }}>
+                <FlexItem className={styles.outputNameAction} alignSelf={{ default: 'alignSelfCenter' }}>
                   <Button
                     variant="plain"
                     icon={<RhUiTrashIcon />}
