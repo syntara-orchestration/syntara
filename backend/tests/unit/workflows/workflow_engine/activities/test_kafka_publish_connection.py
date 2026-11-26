@@ -2,6 +2,7 @@
 
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
@@ -49,7 +50,10 @@ async def test_expired_preparation_does_not_touch_resources(monkeypatch: pytest.
     resources.assert_not_awaited()
 
 
-async def test_each_invocation_resolves_selected_credential_once(monkeypatch: pytest.MonkeyPatch) -> None:
+@pytest.mark.parametrize("cloudevents_mode", [False, True])
+async def test_each_invocation_resolves_selected_credential_once(
+    monkeypatch: pytest.MonkeyPatch, *, cloudevents_mode: bool
+) -> None:
     config = KafkaConfiguration(bootstrap_servers=["broker.example:9093"])
     context = MagicMock()
     context.return_value.__aenter__ = AsyncMock()
@@ -67,14 +71,24 @@ async def test_each_invocation_resolves_selected_credential_once(monkeypatch: py
         ]
     )
     monkeypatch.setattr(module, "_resolve_single_credential", credentials)
-    parameters = {"integration_id": str(uuid4()), "credential_id": selected, "topic": "outcomes", "payload": None}
+    parameters: dict[str, Any] = {
+        "integration_id": str(uuid4()),
+        "credential_id": selected,
+        "topic": "outcomes",
+        "payload": None,
+    }
+    generated = {"id": str(uuid4()), "time": "2026-11-25T10:00:00Z"} if cloudevents_mode else None
+    if cloudevents_mode:
+        parameters.update(cloudevents_mode=True, ce_type="com.example.completed", ce_source="/workflows/orders")
     env = ActivityEnvironment()
-    first = await env.run(module.prepare_kafka_publish, parameters, "project")
-    second = await env.run(module.prepare_kafka_publish, parameters, "project")
+    first = await env.run(module.prepare_kafka_publish, parameters, "project", 30, None, generated)
+    second = await env.run(module.prepare_kafka_publish, parameters, "project", 30, None, generated)
     assert first["_resolved_credentials"] == {"extra_vars": {"kafka_password": "original"}}
     assert second["_resolved_credentials"] == {"extra_vars": {"kafka_password": "rotated"}}
     assert credentials.await_count == 2
     assert all(call.args[3] == selected for call in credentials.await_args_list)
+    if generated:
+        assert first["_kafka_cloudevents"] == second["_kafka_cloudevents"] == generated
 
 
 @pytest.mark.parametrize("protocol", ["SSL", "PLAINTEXT"])

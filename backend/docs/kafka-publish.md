@@ -60,6 +60,43 @@ An example node in a v2 workflow definition:
 }
 ```
 
+## CloudEvents mode
+
+Enable **CloudEvents mode** to publish JSON event data with CloudEvents attributes in Kafka headers.
+Set `ce_type` to a non-empty event type and `ce_source` to an absolute or relative URI-reference.
+Both accept workflow expressions. Keep only the event data in `payload`; the existing message
+key and custom headers remain available.
+
+For the Integration, credential and topic in the example above, use:
+
+```json
+{
+  "cloudevents_mode": true,
+  "ce_type": "com.example.order.completed",
+  "ce_source": "/workflows/order-completion",
+  "payload": { "outcome": "${previous_step.outcome}" }
+}
+```
+
+Syntara sets `ce_specversion: 1.0`, generates a UUIDv4 `ce_id` and an RFC 3339 UTC
+`ce_time` ending in `Z`, and sets `content-type: application/json`. The ID and time
+are frozen before preparation and reused across automatic retries, worker recovery
+and Temporal replay. A new invocation or workflow rerun generates new values;
+another send attempt can still publish a duplicate.
+
+Custom headers cannot override those headers or `ce_type`/`ce_source`, including
+case variants. Additional `ce_*` attributes require unique lowercase names
+(`ce_[a-z0-9]+`) and non-null UTF-8 text without control characters. Base64 input
+is accepted when its decoded text is valid. `ce_data`, `ce_datacontenttype` and
+`ce_extensions` are reserved. Other custom headers keep their ordinary byte,
+duplicate and null semantics. The six generated headers count toward the existing
+record and 128-header limits, leaving room for at most 122 custom entries.
+
+Invalid CloudEvents configuration fails with non-retryable `kafka_invalid_message`.
+Existing draft saves can retain unfinished fields, while Run and Publish require a
+valid configuration. When the mode is off or omitted, the existing JSON/key/header
+behavior applies and `ce_type`/`ce_source` parameters are omitted.
+
 ## Message contract
 
 One invocation sends one Kafka record. An array is one record, not a batch. The

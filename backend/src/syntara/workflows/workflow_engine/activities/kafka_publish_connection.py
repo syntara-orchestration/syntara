@@ -42,6 +42,7 @@ from syntara.workflows.workflow_engine.models.kafka_publish import (
     KafkaPublishParameters,
 )
 from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName
+from syntara.workflows.workflow_engine.services.kafka_publish_message import compile_publish_message
 from syntara.workflows.workflow_engine.utils.temporal_argument_size import temporal_argument_size
 
 _session_factory = AsyncSessionLocal
@@ -134,9 +135,21 @@ def _check_partitions(partitions: list[tuple[Any, ...]]) -> None:
             raise for_code(partition[0])
 
 
+def _cloudevents_snapshot(parameters: KafkaPublishParameters, context: dict[str, Any] | None) -> dict[str, Any]:
+    """Validate generated context before preparing a CloudEvents connection."""
+    if not parameters.cloudevents_mode:
+        return {}
+    compile_publish_message(parameters, cloudevents=context)
+    return {"_kafka_cloudevents": context}
+
+
 @activity.defn(name=ActivityName.KAFKA_PUBLISH_PREPARE)
 async def prepare_kafka_publish(
-    parameters: dict[str, Any], project_id: str, timeout_seconds: float = 30, deadline: str | None = None
+    parameters: dict[str, Any],
+    project_id: str,
+    timeout_seconds: float = 30,
+    deadline: str | None = None,
+    cloudevents: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Resolve secrets once per logical invocation; Temporal encrypts this result."""
     heartbeat = asyncio.create_task(_preparation_heartbeat())
@@ -149,6 +162,7 @@ async def prepare_kafka_publish(
                 fail_publish("kafka_timeout")
         async with asyncio.timeout(timeout_seconds):
             model = KafkaPublishParameters.model_validate(parameters)
+            cloudevents_snapshot = _cloudevents_snapshot(model, cloudevents)
             async with _session_factory() as session:
                 # The revision and decrypted fields must describe the same
                 # database snapshot when a credential rotates during preparation.
@@ -167,6 +181,7 @@ async def prepare_kafka_publish(
             await check_publish_topic(config, credentials["extra_vars"], model.topic)
             prepared = {
                 **parameters,
+                **cloudevents_snapshot,
                 "_resolved_credentials": credentials,
                 "_resolved_integration": config.model_dump(mode="json"),
                 "_kafka_revision": revision,

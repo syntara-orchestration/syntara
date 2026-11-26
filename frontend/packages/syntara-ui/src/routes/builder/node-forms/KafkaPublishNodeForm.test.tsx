@@ -106,6 +106,17 @@ const parameters = {
   ],
 }
 
+const EVENT_TYPE_LABEL = 'Event type (ce_type)'
+const EVENT_SOURCE_LABEL = 'Event source (ce_source)'
+const EVENT_DATA_LABEL = 'Event data (JSON)'
+const CLOUDEVENTS_LABEL = 'Publish as CloudEvent'
+const cloudEventsParameters = {
+  ...parameters,
+  cloudevents_mode: true,
+  ce_type: 'com.example.event.created',
+  ce_source: '/orders/service',
+}
+
 // Sortable keyboard navigation needs row geometry, which happy-dom does not lay out.
 function mockHeaderLayout() {
   vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
@@ -131,10 +142,125 @@ describe('Kafka Publish builder', () => {
       'Enter an existing Kafka topic name. Expressions are not supported.'
     )
     expect(screen.getByRole('textbox', { name: 'JSON payload' })).toBeInTheDocument()
+    expect(screen.getByRole('switch', { name: CLOUDEVENTS_LABEL })).not.toBeChecked()
+    expect(screen.queryByRole('textbox', { name: EVENT_TYPE_LABEL })).not.toBeInTheDocument()
+    expect(screen.queryByRole('textbox', { name: EVENT_SOURCE_LABEL })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Message key encoding' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Header source' })).toBeInTheDocument()
     expect(screen.getByText('Configure headers sent with each Kafka message.')).toBeVisible()
     expect(screen.getByRole('button', { name: 'Add header' })).toBeInTheDocument()
+    expect(await axe(container)).toHaveNoViolations()
+  })
+
+  it('reveals required CloudEvents fields with the keyboard while retaining event data and message controls', async () => {
+    const user = userEvent.setup()
+    const { container } = render(<KafkaPublishNodeForm onSubmit={vi.fn()} initialData={{ payload: 'null' }} />)
+    const toggle = screen.getByRole('switch', { name: CLOUDEVENTS_LABEL })
+    toggle.focus()
+    await user.keyboard('[Space]')
+    expect(toggle).toBeChecked()
+    expect(toggle).toHaveAccessibleDescription(
+      'Set the event type and source. ce_specversion, ce_id, and ce_time are generated automatically.'
+    )
+    const eventType = screen.getByRole('textbox', { name: EVENT_TYPE_LABEL })
+    const eventSource = screen.getByRole('textbox', { name: EVENT_SOURCE_LABEL })
+    expect(eventType).toBeRequired()
+    expect(eventSource).toBeRequired()
+    expect(eventType).toHaveAttribute('placeholder', cloudEventsParameters.ce_type)
+    expect(eventSource).toHaveAttribute('placeholder', cloudEventsParameters.ce_source)
+    expect(eventType).toHaveAccessibleDescription('Enter a value or drag an expression from the Input panel')
+    expect(screen.getByRole('textbox', { name: EVENT_DATA_LABEL })).toHaveValue('null')
+    expect(screen.getByText(/^Enter event data only; CloudEvents metadata is configured separately\./)).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Message key encoding' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Header source' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Add header' })).toBeEnabled()
+    expect(await axe(container)).toHaveNoViolations()
+    await user.type(eventType, cloudEventsParameters.ce_type)
+    await user.type(eventSource, cloudEventsParameters.ce_source)
+    await user.click(toggle)
+    expect(screen.queryByRole('textbox', { name: EVENT_TYPE_LABEL })).not.toBeInTheDocument()
+    expect(screen.queryByRole('textbox', { name: EVENT_SOURCE_LABEL })).not.toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: 'JSON payload' })).toHaveValue('null')
+    await user.click(toggle)
+    expect(screen.getByRole('textbox', { name: EVENT_TYPE_LABEL })).toHaveValue(cloudEventsParameters.ce_type)
+    expect(screen.getByRole('textbox', { name: EVENT_SOURCE_LABEL })).toHaveValue(cloudEventsParameters.ce_source)
+  })
+
+  it.each([
+    ['static values', cloudEventsParameters.ce_type, cloudEventsParameters.ce_source],
+    ['workflow expressions', '${trigger.payload.type}', '${trigger.payload.source}'],
+  ])('saves and reopens CloudEvents %s, then omits the fields when disabled', async (_description, type, source) => {
+    const user = userEvent.setup()
+    const stored: { activity?: Activity } = {}
+    updateActivity.mockImplementation((_id: string, activity: Activity) => {
+      stored.activity = activity
+    })
+    const view = render(
+      <>
+        <KafkaPublishNodeDetails
+          taskData={{ id: 'publish', type: ActivityTypeEnum.KAFKA_PUBLISH, parameters }}
+          onClose={vi.fn()}
+        />
+        <Button type="submit" form="kafka-publish-node-form">
+          Save
+        </Button>
+      </>
+    )
+    await user.click(screen.getByRole('switch', { name: CLOUDEVENTS_LABEL }))
+    await user.click(screen.getByRole('textbox', { name: EVENT_TYPE_LABEL }))
+    await user.paste(type)
+    await user.click(screen.getByRole('textbox', { name: EVENT_SOURCE_LABEL }))
+    await user.paste(source)
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(updateActivity).toHaveBeenCalledOnce())
+    const saved = stored.activity
+    if (!saved) throw new Error('CloudEvents Publish was not saved')
+    expect(saved.parameters).toEqual({ ...parameters, cloudevents_mode: true, ce_type: type, ce_source: source })
+    view.unmount()
+    updateActivity.mockClear()
+    render(
+      <>
+        <KafkaPublishNodeDetails taskData={saved} onClose={vi.fn()} />
+        <Button type="submit" form="kafka-publish-node-form">
+          Save
+        </Button>
+      </>
+    )
+    expect(screen.getByRole('switch', { name: CLOUDEVENTS_LABEL })).toBeChecked()
+    expect(screen.getByRole('textbox', { name: EVENT_TYPE_LABEL })).toHaveValue(type)
+    expect(screen.getByRole('textbox', { name: EVENT_SOURCE_LABEL })).toHaveValue(source)
+    expect(screen.getByRole('textbox', { name: EVENT_DATA_LABEL })).toHaveValue('null')
+    await user.click(screen.getByRole('switch', { name: CLOUDEVENTS_LABEL }))
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(updateActivity).toHaveBeenCalledOnce())
+    expect(stored.activity?.parameters).toEqual(parameters)
+  })
+
+  it('shows accessible CloudEvents validation while still allowing an unfinished draft to be saved', async () => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn()
+    const { container } = render(
+      <>
+        <KafkaPublishNodeForm
+          onSubmit={onSubmit}
+          initialData={{
+            cloudevents_mode: true,
+            ce_source: 'invalid source',
+            headers: [{ name: 'CE_ID', encoding: 'utf-8', value: 'override' }],
+          }}
+        />
+        <Button type="submit" form="kafka-publish-node-form">
+          Save
+        </Button>
+      </>
+    )
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+    expect(await screen.findByText('Enter a non-empty event type without control characters')).toBeVisible()
+    expect(screen.getByText('Enter an event source URI-reference or template')).toBeVisible()
+    expect(screen.getByText('This header is managed automatically in CloudEvents mode')).toBeVisible()
+    expect(screen.getByRole('textbox', { name: EVENT_TYPE_LABEL })).toHaveAttribute('aria-invalid', 'true')
+    expect(screen.getByRole('textbox', { name: EVENT_SOURCE_LABEL })).toHaveAttribute('aria-invalid', 'true')
+    expect(onSubmit).toHaveBeenCalledOnce()
     expect(await axe(container)).toHaveNoViolations()
   })
 
@@ -527,41 +653,46 @@ describe('Kafka Publish builder', () => {
     )
   })
 
-  it('disables message, connection, and settings controls in a published version', async () => {
-    const user = userEvent.setup()
-    const { container } = render(
-      <VersionViewContext value={true}>
-        <KafkaPublishNodeDetails
-          taskData={{
-            id: 'publish',
-            type: ActivityTypeEnum.KAFKA_PUBLISH,
-            parameters,
-            settings: { timeout: 30, retry_policy: { max_retries: 0 } },
-          }}
-          onClose={vi.fn()}
-        />
-      </VersionViewContext>
-    )
-    for (const textbox of screen.getAllByRole('textbox')) {
-      if (textbox.getAttribute('aria-label') === 'JSON payload') expect(textbox).toHaveAttribute('readonly')
-      else expect(textbox).toBeDisabled()
+  it.each([false, true])(
+    'disables message, connection, and settings controls in a published version (CloudEvents=%s)',
+    async (cloudeventsMode) => {
+      const user = userEvent.setup()
+      const { container } = render(
+        <VersionViewContext value={true}>
+          <KafkaPublishNodeDetails
+            taskData={{
+              id: 'publish',
+              type: ActivityTypeEnum.KAFKA_PUBLISH,
+              parameters: cloudeventsMode ? cloudEventsParameters : parameters,
+              settings: { timeout: 30, retry_policy: { max_retries: 0 } },
+            }}
+            onClose={vi.fn()}
+          />
+        </VersionViewContext>
+      )
+      for (const textbox of screen.getAllByRole('textbox')) {
+        if (textbox.getAttribute('aria-label') === (cloudeventsMode ? EVENT_DATA_LABEL : 'JSON payload'))
+          expect(textbox).toHaveAttribute('readonly')
+        else expect(textbox).toBeDisabled()
+      }
+      expect(screen.getByRole('switch', { name: CLOUDEVENTS_LABEL })).toBeDisabled()
+      expect(screen.queryByRole('button', { name: 'Set up connection' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Change' })).not.toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Message key encoding' })).toBeDisabled()
+      expect(screen.queryByRole('button', { name: 'Add header' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /Remove header/ })).not.toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Reorder header 1' })).toBeDisabled()
+      expect(screen.getByRole('button', { name: 'Reorder header 2' })).toBeDisabled()
+      expect(screen.queryByText('Drag to reorder headers.')).not.toBeInTheDocument()
+      expect(await axe(container)).toHaveNoViolations()
+      await user.click(screen.getByRole('tab', { name: 'Settings' }))
+      expect(screen.getByRole('spinbutton', { name: 'Timeout (seconds)' })).toBeDisabled()
+      expect(screen.getByRole('spinbutton', { name: 'Max retries' })).toHaveValue(0)
+      expect(screen.getByRole('spinbutton', { name: 'Max retries' })).toBeDisabled()
+      expect(await axe(container)).toHaveNoViolations()
+      expect(updateActivity).not.toHaveBeenCalled()
     }
-    expect(screen.queryByRole('button', { name: 'Set up connection' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Change' })).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Message key encoding' })).toBeDisabled()
-    expect(screen.queryByRole('button', { name: 'Add header' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /Remove header/ })).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Reorder header 1' })).toBeDisabled()
-    expect(screen.getByRole('button', { name: 'Reorder header 2' })).toBeDisabled()
-    expect(screen.queryByText('Drag to reorder headers.')).not.toBeInTheDocument()
-    expect(await axe(container)).toHaveNoViolations()
-    await user.click(screen.getByRole('tab', { name: 'Settings' }))
-    expect(screen.getByRole('spinbutton', { name: 'Timeout (seconds)' })).toBeDisabled()
-    expect(screen.getByRole('spinbutton', { name: 'Max retries' })).toHaveValue(0)
-    expect(screen.getByRole('spinbutton', { name: 'Max retries' })).toBeDisabled()
-    expect(await axe(container)).toHaveNoViolations()
-    expect(updateActivity).not.toHaveBeenCalled()
-  })
+  )
 
   it('reports malformed saved structures without displaying their contents', () => {
     render(

@@ -3,6 +3,7 @@
 from datetime import UTC, datetime
 from typing import Any
 from unittest.mock import AsyncMock
+from uuid import UUID
 
 import pytest
 from temporalio import workflow
@@ -94,3 +95,45 @@ async def test_missing_template_reference_fails_safely_before_preparation(
     assert error.value.type == "kafka_invalid_message"
     assert error.value.details[0]["output"]["delivery_status"] == "not_sent"
     call.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_cloud_event_context_is_frozen_before_preparation_and_new_for_each_invocation(
+    dispatch: tuple[OrchestratorWorkflow, AsyncMock], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    engine, call = dispatch
+    ids = iter([UUID("23a576e8-e9ed-4c04-9a24-3e95802eef1b"), UUID("b71d9276-22c5-4688-89ac-c7cc259a063f")])
+    monkeypatch.setattr(workflow, "uuid4", lambda: next(ids))
+    parameters = {
+        **PARAMETERS,
+        "cloudevents_mode": True,
+        "ce_type": "${trigger.event_type}",
+        "ce_source": "${trigger.source}",
+    }
+    resolved = {
+        **parameters,
+        "ce_type": "com.example.completed",
+        "ce_source": "/workflows/orders",
+        "payload": None,
+        "headers": [],
+    }
+
+    async def execute(function: object, *, args: list[Any], **_options: object) -> dict[str, Any]:
+        if function == prepare_kafka_publish:
+            return {**args[0], "_kafka_cloudevents": args[4]}
+        return {"output": {"offset": "99"}}
+
+    call.side_effect = execute
+    node = ActivityNode("publish", "kafka_publish", parameters)
+
+    await engine._dispatch_kafka_publish(node, resolved, 30)
+    await engine._dispatch_kafka_publish(node, resolved, 30)
+
+    first = call.await_args_list[0].kwargs["args"][4]
+    second = call.await_args_list[2].kwargs["args"][4]
+    assert first == {"id": "23a576e8-e9ed-4c04-9a24-3e95802eef1b", "time": "2026-01-01T00:00:00Z"}
+    assert second["id"] != first["id"]
+    assert call.await_args_list[1].kwargs["args"][0]["_kafka_cloudevents"] == first
+    assert call.await_args_list[3].kwargs["args"][0]["_kafka_cloudevents"] == second
+    assert "_kafka_cloudevents" not in engine.node_inputs["publish"]
+    assert parameters["ce_type"] == "${trigger.event_type}"

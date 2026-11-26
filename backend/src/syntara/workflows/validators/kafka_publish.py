@@ -10,6 +10,7 @@ from sqlmodel import SQLModel
 
 from syntara.core.exceptions import SafeValueError
 from syntara.workflows.models.validation_finding import ValidationCategory, ValidationFinding, ValidationSeverity
+from syntara.workflows.workflow_engine.models.kafka_cloudevents import KAFKA_CLOUDEVENTS_HEADER_COUNT
 from syntara.workflows.workflow_engine.models.kafka_publish import KAFKA_PUBLISH_MAX_HEADERS, KafkaPublishParameters
 
 _TEMPLATE = re.compile(r"\$\{[^}]+\}")
@@ -19,7 +20,12 @@ _FIELD_MESSAGES = {
     "topic": "Enter one literal Kafka topic name (1-249 characters)",
     "payload": "Enter a valid JSON payload; explicit JSON null is supported",
     "key": "Use a null key or an explicitly encoded UTF-8/Base64 value",
-    "headers": "Use ordered headers or a full-value header template, with at most 128 entries",
+    "headers": (
+        "Use ordered headers or a full-value template; the 128-entry limit includes generated CloudEvents headers"
+    ),
+    "cloudevents_mode": "CloudEvents mode must be enabled or disabled",
+    "ce_type": "Enter a non-empty CloudEvents event type or template",
+    "ce_source": "Enter a CloudEvents event source URI-reference or template",
 }
 
 
@@ -69,7 +75,8 @@ def _header_issues(parameters: KafkaPublishParameters) -> list[tuple[str, str]]:
     if not isinstance(parameters.headers, list):
         return []
     issues: list[tuple[str, str]] = []
-    if len(parameters.headers) > KAFKA_PUBLISH_MAX_HEADERS:
+    generated_count = KAFKA_CLOUDEVENTS_HEADER_COUNT if parameters.cloudevents_mode else 0
+    if len(parameters.headers) + generated_count > KAFKA_PUBLISH_MAX_HEADERS:
         issues.append(("headers", _FIELD_MESSAGES["headers"]))
     for index, header in enumerate(parameters.headers):
         try:

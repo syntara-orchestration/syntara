@@ -2358,6 +2358,22 @@ export interface components {
       key?: components['schemas']['KafkaEncodedValue'] | null
       /** Headers */
       headers?: components['schemas']['KafkaPublishHeader'][] | string
+      /**
+       * Cloudevents Mode
+       * @description Automatically add binary-mode CloudEvents headers
+       * @default false
+       */
+      cloudevents_mode?: boolean
+      /**
+       * Ce Type
+       * @description Required event type when CloudEvents mode is enabled
+       */
+      ce_type?: string | null
+      /**
+       * Ce Source
+       * @description Required event source URI-reference in CloudEvents mode
+       */
+      ce_source?: string | null
     }
     /**
      * KafkaPublishNode

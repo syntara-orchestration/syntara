@@ -100,6 +100,26 @@ async def test_acknowledged_unavailable_metadata_does_not_retry(publisher: Simpl
         await _cleanup(publisher)
 
 
+@pytest.mark.parametrize("attempt", [1, 2])
+async def test_invalid_cloud_event_is_terminal_and_preserves_prior_uncertainty(
+    publisher: SimpleNamespace, monkeypatch: pytest.MonkeyPatch, attempt: int
+) -> None:
+    monkeypatch.setattr(activity, "info", lambda: SimpleNamespace(attempt=attempt))
+    publisher.inputs.update(cloudevents_mode=True, ce_type="", ce_source="/workflows/orders")
+
+    try:
+        with pytest.raises(ApplicationError) as error:
+            await module.execute_kafka_publish_activity(publisher.inputs, None, "project")
+
+        assert error.value.type == "kafka_invalid_message"
+        assert error.value.non_retryable
+        assert error.value.details[0]["output"]["delivery_status"] == ("not_sent" if attempt == 1 else "unconfirmed")
+        publisher.producer.send.assert_not_awaited()
+        publisher.resources.assert_not_awaited()
+    finally:
+        await _cleanup(publisher)
+
+
 @pytest.mark.asyncio
 async def test_timeout_retains_late_delivery_and_returns_uncertainty(publisher: SimpleNamespace) -> None:
     publisher.inputs[ENGINE_TIMEOUT_SECONDS_KEY] = 0.03

@@ -23,6 +23,153 @@ const valid = {
   settings: {},
 }
 
+const cloudEvents = {
+  ...valid,
+  cloudevents_mode: true,
+  ce_type: 'com.example.order.completed',
+  ce_source: '/workflows/orders',
+}
+
+describe('Kafka Publish CloudEvents configuration', () => {
+  it('preserves mode, fields, payload, key and headers through save and reopen', () => {
+    const input = {
+      ...cloudEvents,
+      payload: '{"order_id":"order-123"}',
+      key: { encoding: 'utf-8', value: 'order-123' },
+      headers: [{ name: 'correlation-id', encoding: 'utf-8', value: 'request-123' }],
+    }
+    const parameters = buildKafkaPublishParameters(kafkaPublishFormSchema.parse(input))
+    const reopened = kafkaPublishFormSchema.parse({ ...valid, ...kafkaPublishInitialFields(parameters) })
+
+    expect(parameters).toMatchObject({
+      cloudevents_mode: true,
+      ce_type: cloudEvents.ce_type,
+      ce_source: cloudEvents.ce_source,
+      payload: { order_id: 'order-123' },
+      key: { encoding: 'utf-8', value: 'order-123' },
+      headers: [{ name: 'correlation-id', value: { encoding: 'utf-8', value: 'request-123' } }],
+    })
+    expect(buildKafkaPublishParameters(reopened)).toStrictEqual(parameters)
+    expect(kafkaPublishParametersSchema.safeParse(parameters).success).toBe(true)
+  })
+
+  it('omits CloudEvents parameters when disabled, even with retained editor values', () => {
+    const parameters = buildKafkaPublishParameters(
+      kafkaPublishFormSchema.parse({ ...cloudEvents, cloudevents_mode: false })
+    )
+
+    expect(parameters).not.toHaveProperty('cloudevents_mode')
+    expect(parameters).not.toHaveProperty('ce_type')
+    expect(parameters).not.toHaveProperty('ce_source')
+  })
+
+  it.each([
+    ['ce_type', '', 'Enter a non-empty event type without control characters'],
+    ['ce_type', 'invalid\nevent', 'Enter a non-empty event type without control characters'],
+    ['ce_type', 'invalid\ufdd0event', 'Enter a non-empty event type without control characters'],
+    ['ce_source', '', 'Enter an event source URI-reference or template'],
+    ['ce_source', 'not a URI', 'Enter an event source URI-reference or template'],
+    ['ce_source', '/bad%escape', 'Enter an event source URI-reference or template'],
+  ])('validates %s with value %s', (field, value, message) => {
+    const result = kafkaPublishFormSchema.safeParse({ ...cloudEvents, [field]: value })
+
+    expect(result.success).toBe(false)
+    if (!result.success) expect(result.error.issues).toContainEqual(expect.objectContaining({ path: [field], message }))
+  })
+
+  it('accepts type, source and whole-list header templates', () => {
+    const input = {
+      ...cloudEvents,
+      ce_type: '${trigger.event_type}',
+      ce_source: '/workflows/${trigger.source}',
+      headers_mode: 'template',
+      headers_template: '${trigger.headers}',
+    }
+
+    expect(kafkaPublishFormSchema.safeParse(input).success).toBe(true)
+  })
+
+  it.each(['CE_ID', 'content-type', 'ce_data', 'ce_Tenant', 'ce_bad_name'])(
+    'rejects conflicting or invalid CloudEvents header %s',
+    (name) => {
+      const result = kafkaPublishFormSchema.safeParse({
+        ...cloudEvents,
+        headers: [{ name, encoding: 'utf-8', value: 'value' }],
+      })
+
+      expect(result.success).toBe(false)
+      if (!result.success)
+        expect(result.error.issues).toContainEqual(expect.objectContaining({ path: ['headers', 0, 'name'] }))
+    }
+  )
+
+  it.each([
+    { name: 'ce_tenant', encoding: 'null', value: '' },
+    { name: 'ce_tenant', encoding: 'base64', value: '/w==' },
+    { name: 'ce_tenant', encoding: 'base64', value: 'Cg==' },
+  ])('rejects null or non-text attribute values: %o', (entry) => {
+    const result = kafkaPublishFormSchema.safeParse({ ...cloudEvents, headers: [entry] })
+
+    expect(result.success).toBe(false)
+    if (!result.success)
+      expect(result.error.issues).toContainEqual(
+        expect.objectContaining({ path: ['headers', 0, entry.encoding === 'null' ? 'encoding' : 'value'] })
+      )
+  })
+
+  it('accepts decoded UTF-8 attribute text and ordinary binary/null/duplicate headers', () => {
+    const result = kafkaPublishFormSchema.safeParse({
+      ...cloudEvents,
+      headers: [
+        { name: 'ce_tenant', encoding: 'base64', value: 'Y2Fmw6k=' },
+        { name: 'x', encoding: 'null', value: '' },
+        { name: 'x', encoding: 'base64', value: '/w==' },
+      ],
+    })
+
+    expect(result.success).toBe(true)
+  })
+
+  it('rejects duplicate CloudEvents attributes', () => {
+    const entry = { name: 'ce_tenant', encoding: 'utf-8', value: 'value' }
+    const result = kafkaPublishFormSchema.safeParse({ ...cloudEvents, headers: [entry, entry] })
+
+    expect(result.success).toBe(false)
+    if (!result.success)
+      expect(result.error.issues).toContainEqual(expect.objectContaining({ path: ['headers', 1, 'name'] }))
+  })
+
+  it('includes the six generated headers in the header limit', () => {
+    const entry = { name: 'x', encoding: 'null', value: '' }
+
+    expect(
+      kafkaPublishFormSchema.safeParse({ ...cloudEvents, headers: Array.from({ length: 122 }, () => entry) }).success
+    ).toBe(true)
+    const oversized = kafkaPublishFormSchema.safeParse({
+      ...cloudEvents,
+      headers: Array.from({ length: 123 }, () => entry),
+    })
+    expect(oversized.success).toBe(false)
+    if (!oversized.success)
+      expect(oversized.error.issues).toContainEqual(
+        expect.objectContaining({
+          path: ['headers'],
+          message: 'Use at most 122 custom headers; CloudEvents mode adds six headers',
+        })
+      )
+  })
+
+  it('preserves incomplete CloudEvents fields in a draft', () => {
+    const parameters = buildKafkaPublishParameters({
+      ...kafkaPublishFormSchema.parse(valid),
+      cloudevents_mode: true,
+    })
+
+    expect(parameters).toMatchObject({ cloudevents_mode: true, ce_type: '', ce_source: '' })
+    expect(kafkaPublishParametersSchema.safeParse(parameters).success).toBe(true)
+  })
+})
+
 describe('Kafka Publish form contract', () => {
   it.each([
     'null',

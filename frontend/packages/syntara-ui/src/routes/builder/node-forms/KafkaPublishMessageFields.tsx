@@ -39,11 +39,12 @@ import { SynTextAreaField } from '../../../components/forms/SynTextAreaField'
 import { SynTextField } from '../../../components/forms/SynTextField'
 import { useIsVersionView } from '../VersionViewContext'
 
+import { KAFKA_CLOUDEVENTS_HEADER_COUNT } from './kafkaCloudEventsValidation'
 import { KafkaPublishByteFields } from './KafkaPublishByteFields'
 import { KAFKA_MAX_HEADERS, type KafkaPublishFormData } from './kafkaPublishFormSchema'
 import styles from './KafkaPublishMessageFields.module.css'
 import { nodeHelp } from './shared/nodeFieldHelp'
-import { KAFKA_PUBLISH_HEADERS_HELP } from './shared/nodeFieldHelpText'
+import { KAFKA_PUBLISH_CLOUDEVENTS_HEADERS_HELP, KAFKA_PUBLISH_HEADERS_HELP } from './shared/nodeFieldHelpText'
 
 const HEADER_SOURCES = [
   { value: 'entries', label: 'Ordered entries' },
@@ -165,6 +166,8 @@ export function KafkaPublishMessageFields() {
   } = useFormContext<KafkaPublishFormData>()
   const { fields, append, remove, move } = useFieldArray({ control, name: 'headers' })
   const source = useWatch({ control, name: 'headers_mode' })
+  const cloudeventsMode = useWatch({ control, name: 'cloudevents_mode' })
+  const maxHeaders = KAFKA_MAX_HEADERS - (cloudeventsMode ? KAFKA_CLOUDEVENTS_HEADER_COUNT : 0)
   const readOnly = useIsVersionView()
   const addButtonRef = useRef<HTMLButtonElement>(null)
   const pendingFocusRef = useRef<HTMLElement | null>(null)
@@ -220,7 +223,12 @@ export function KafkaPublishMessageFields() {
       </StackItem>
       <StackItem>
         <FormSection
-          title={<FormLabelWithHelp label="Message headers" helpText={KAFKA_PUBLISH_HEADERS_HELP} />}
+          title={
+            <FormLabelWithHelp
+              label="Message headers"
+              helpText={cloudeventsMode ? KAFKA_PUBLISH_CLOUDEVENTS_HEADERS_HELP : KAFKA_PUBLISH_HEADERS_HELP}
+            />
+          }
           titleElement="h3"
         >
           <HelperText>
@@ -232,6 +240,11 @@ export function KafkaPublishMessageFields() {
             labelHelp={nodeHelp.kafkaPublishHeaderSource}
             options={HEADER_SOURCES}
             isDisabled={readOnly}
+            hint={
+              cloudeventsMode
+                ? 'Use Ordered entries in CloudEvents mode so custom headers can be checked against reserved CloudEvents header names.'
+                : undefined
+            }
           />
           {source === 'template' ? (
             <SynTextAreaField
@@ -307,7 +320,7 @@ export function KafkaPublishMessageFields() {
                     type="button"
                     variant="link"
                     icon={<RhUiAddIcon />}
-                    isDisabled={fields.length >= KAFKA_MAX_HEADERS}
+                    isDisabled={fields.length >= maxHeaders}
                     onClick={() =>
                       append({ name: '', encoding: 'utf-8', value: '' }, { focusName: `headers.${fields.length}.name` })
                     }
