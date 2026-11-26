@@ -9,9 +9,7 @@ metadata:
     pipelinesascode.tekton.dev/cancel-in-progress: "true"
     pipelinesascode.tekton.dev/max-keep-runs: "3"
     pipelinesascode.tekton.dev/on-cel-expression: >-
-      event == "push" && target_branch == "early-access" &&
-      (files.all.exists(x, x.startsWith("backend/")) ||
-      ".tekton/ansible-automation-orchestrator-backend-early-access-push.yaml".pathChanged())
+      event == "push" && target_branch == "early-access"
   creationTimestamp: null
   labels:
     appstudio.openshift.io/application: ansible-automation-orchestrator-early-access

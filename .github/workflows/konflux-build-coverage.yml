@@ -1,0 +1,139 @@
+# Guardrail for the Konflux push-pipeline path filter.
+#
+# Konflux's Pipelines-as-Code (PaC) decides whether to run a component's
+# *-on-push build from a CEL `on-cel-expression` that inspects the changed-file
+# list. On a very large push that list can be truncated, so a component can
+# change without its push pipeline ever starting — the build is silently
+# skipped and the change ships stale (or not at all).
+#
+# This job re-derives the changed files from the GitHub *compare* API (which
+# paginates up to 3000 files, unlike the list PaC evaluates) and asserts that
+# every component whose files changed has a matching Konflux *-on-push run on
+# the head commit. If one is missing, the job fails loudly so a human can
+# re-trigger the build. It is a safety net, not the primary trigger.
+name: Konflux Build Coverage
+
+on:
+  push:
+    branches: [early-access, devel]
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: Commit SHA to check (defaults to the branch HEAD)
+        required: false
+      before:
+        description: Base SHA to diff from (defaults to the previous commit)
+        required: false
+
+permissions:
+  checks: read
+  contents: read
+
+jobs:
+  verify-build-coverage:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      BRANCH: ${{ github.ref_name }}
+      # How long to wait for PaC to create the check runs after the push.
+      POLL_ATTEMPTS: "20"
+      POLL_INTERVAL_SECONDS: "30"
+    steps:
+      - name: Resolve commit range
+        id: range
+        run: |
+          set -euo pipefail
+          HEAD_SHA="${{ github.event.inputs.sha || github.event.after || github.sha }}"
+          BEFORE_SHA="${{ github.event.inputs.before || github.event.before }}"
+          echo "head=$HEAD_SHA" >> "$GITHUB_OUTPUT"
+          echo "before=$BEFORE_SHA" >> "$GITHUB_OUTPUT"
+          echo "Head: $HEAD_SHA"
+          echo "Before: $BEFORE_SHA"
+
+      - name: Compute changed files (accurate, paginated)
+        id: changed
+        run: |
+          set -euo pipefail
+          HEAD_SHA="${{ steps.range.outputs.head }}"
+          BEFORE_SHA="${{ steps.range.outputs.before }}"
+          ZERO="0000000000000000000000000000000000000000"
+
+          if [ -z "$BEFORE_SHA" ] || [ "$BEFORE_SHA" = "$ZERO" ]; then
+            # Branch creation / force push with no usable base — fall back to the
+            # single-commit file list. Less reliable, but better than nothing.
+            echo "No usable base SHA; using single-commit file list for $HEAD_SHA"
+            gh api "repos/$REPO/commits/$HEAD_SHA" --paginate \
+              --jq '.files[].filename' > changed_files.txt || true
+          else
+            gh api "repos/$REPO/compare/$BEFORE_SHA...$HEAD_SHA" --paginate \
+              --jq '.files[].filename' > changed_files.txt
+          fi
+
+          total=$(wc -l < changed_files.txt | tr -d ' ')
+          echo "Total changed files: $total"
+
+          backend_changed=false
+          frontend_changed=false
+          grep -q '^backend/'  changed_files.txt && backend_changed=true  || true
+          grep -q '^frontend/' changed_files.txt && frontend_changed=true || true
+
+          echo "backend_changed=$backend_changed"   >> "$GITHUB_OUTPUT"
+          echo "frontend_changed=$frontend_changed" >> "$GITHUB_OUTPUT"
+          echo "Backend changed:  $backend_changed"
+          echo "Frontend changed: $frontend_changed"
+
+      - name: Verify each changed component has a Konflux push run
+        env:
+          HEAD_SHA: ${{ steps.range.outputs.head }}
+          BACKEND_CHANGED: ${{ steps.changed.outputs.backend_changed }}
+          FRONTEND_CHANGED: ${{ steps.changed.outputs.frontend_changed }}
+        run: |
+          set -euo pipefail
+
+          # Returns 0 if a Konflux *-on-push check run matching the pattern
+          # exists on the head commit, polling to allow for PaC lag.
+          run_exists() {
+            local pattern="$1"
+            local attempt
+            for attempt in $(seq 1 "$POLL_ATTEMPTS"); do
+              if gh api "repos/$REPO/commits/$HEAD_SHA/check-runs" --paginate \
+                   --jq '.check_runs[].name' 2>/dev/null | grep -qF "$pattern"; then
+                return 0
+              fi
+              echo "  …not found yet (attempt $attempt/$POLL_ATTEMPTS), waiting ${POLL_INTERVAL_SECONDS}s"
+              sleep "$POLL_INTERVAL_SECONDS"
+            done
+            return 1
+          }
+
+          missing=()
+
+          if [ "$BACKEND_CHANGED" = "true" ]; then
+            pat="ansible-automation-orchestrator-backend-${BRANCH}-on-push"
+            echo "Backend changed — expecting a run matching: $pat"
+            if run_exists "$pat"; then
+              echo "  ✓ backend push run present"
+            else
+              echo "  ✗ backend push run MISSING"
+              missing+=("backend ($pat)")
+            fi
+          fi
+
+          if [ "$FRONTEND_CHANGED" = "true" ]; then
+            pat="ansible-automation-orchestrator-ui-${BRANCH}-on-push"
+            echo "Frontend changed — expecting a run matching: $pat"
+            if run_exists "$pat"; then
+              echo "  ✓ ui push run present"
+            else
+              echo "  ✗ ui push run MISSING"
+              missing+=("ui ($pat)")
+            fi
+          fi
+
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "::error title=Konflux push pipeline skipped::A component changed but its Konflux *-on-push build did not run on $HEAD_SHA: ${missing[*]}. The change may ship stale — re-trigger the build in the Konflux UI."
+            exit 1
+          fi
+
+          echo "All changed components have a matching Konflux push run."

@@ -9,9 +9,7 @@ metadata:
     pipelinesascode.tekton.dev/cancel-in-progress: "true"
     pipelinesascode.tekton.dev/max-keep-runs: "3"
     pipelinesascode.tekton.dev/on-cel-expression: >-
-      event == "push" && target_branch == "devel" &&
-      (files.all.exists(x, x.startsWith("frontend/")) ||
-      ".tekton/ansible-automation-orchestrator-ui-devel-push.yaml".pathChanged())
+      event == "push" && target_branch == "devel"
   creationTimestamp: null
   labels:
     appstudio.openshift.io/application: ansible-automation-orchestrator-devel
