@@ -15,6 +15,8 @@ export type ValidationError = {
   nodeName?: string
   severity?: ValidationSeverity
   fieldPath?: string | null
+  /** Exact source checked by the server, used to hide a CEL finding after an edit. */
+  filterExpression?: string
 }
 
 // Builder state interface

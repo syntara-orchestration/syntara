@@ -5,7 +5,7 @@ import {
   TriggerTypeEnum,
   WEBHOOK_TRIGGER_TYPES,
 } from '@syntara/contracts'
-import { useMemo, type ReactNode } from 'react'
+import { use, useMemo, type ReactNode } from 'react'
 
 import { useAlerts } from '../../../providers/alerts'
 import { useWorkflowStoreActions } from '../../../stores/useWorkflowStore'
@@ -15,6 +15,7 @@ import { isValidWebhookPath, normalizeWebhookPath } from '../../../utils/webhook
 import { buildKafkaSubscribeTrigger, kafkaSubscribeFormDefaults } from '../node-forms/kafkaSubscribeMapping'
 import type { TriggerFormData } from '../node-forms/TriggerNodeForm'
 import { TriggerNodeForm } from '../node-forms/TriggerNodeForm'
+import { WorkflowValidationContext } from '../WorkflowValidationContext'
 
 /**
  * Deep equality check for triggers to prevent marking workflow dirty when no changes are made.
@@ -24,9 +25,15 @@ function triggersEqual(a: Trigger, b: Trigger): boolean {
   if (a.type !== b.type) return false
   if (a.name !== b.name) return false
 
-  // Deep compare parameters objects
-  const aParams = a.parameters ?? {}
-  const bParams = b.parameters ?? {}
+  // Kafka normalizes both an omitted filter and explicit null to no filtering.
+  const aParams: Record<string, unknown> = {
+    ...a.parameters,
+    ...(a.type === TriggerTypeEnum.EVENT_SUBSCRIBE && { filter: a.parameters?.filter ?? null }),
+  }
+  const bParams: Record<string, unknown> = {
+    ...b.parameters,
+    ...(b.type === TriggerTypeEnum.EVENT_SUBSCRIBE && { filter: b.parameters?.filter ?? null }),
+  }
   const aKeys = Object.keys(aParams).sort((a, b) => a.localeCompare(b))
   const bKeys = Object.keys(bParams).sort((a, b) => a.localeCompare(b))
 
@@ -215,6 +222,7 @@ export function TriggerNodeDetails({
   onHeaderContentChange,
 }: TriggerNodeDetailsProps) {
   const { showError } = useAlerts()
+  const validation = use(WorkflowValidationContext)
   // Use action accessor - component won't re-render when store state changes
   const { updateTrigger } = useWorkflowStoreActions()
 
@@ -295,12 +303,14 @@ export function TriggerNodeDetails({
   }
 
   return (
-    <TriggerNodeForm
-      workflowId={workflowId}
-      projectId={projectId}
-      initialData={initialData}
-      onSubmit={handleSubmit}
-      onHeaderContentChange={onHeaderContentChange}
-    />
+    <WorkflowValidationContext value={{ errors: validation.errors, nodeId: trigger.id }}>
+      <TriggerNodeForm
+        workflowId={workflowId}
+        projectId={projectId}
+        initialData={initialData}
+        onSubmit={handleSubmit}
+        onHeaderContentChange={onHeaderContentChange}
+      />
+    </WorkflowValidationContext>
   )
 }

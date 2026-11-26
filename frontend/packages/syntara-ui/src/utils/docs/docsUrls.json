@@ -22,6 +22,7 @@
   "addIdentityProvider": "__PLACEHOLDER__/add-identity-provider",
   "identityProviderMapping": "__PLACEHOLDER__/identity-provider-mapping",
 
+  "kafkaSubscribeTrigger": "frontend/kafka-subscribe-builder/",
   "manualTrigger": "__PLACEHOLDER__/manual-trigger",
   "scheduleTrigger": "__PLACEHOLDER__/schedule-trigger",
   "webhookTrigger": "__PLACEHOLDER__/webhook-trigger",

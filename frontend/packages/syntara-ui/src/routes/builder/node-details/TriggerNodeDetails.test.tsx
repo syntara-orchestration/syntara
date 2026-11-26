@@ -126,7 +126,11 @@ describe('TriggerNodeDetails Component', () => {
 
       await user.click(screen.getByRole('button', { name: 'Save trigger' }))
 
-      expect(mockUpdateTrigger).toHaveBeenCalledWith(0, { ...trigger, name: 'Renamed orders' })
+      expect(mockUpdateTrigger).toHaveBeenCalledWith(0, {
+        ...trigger,
+        name: 'Renamed orders',
+        parameters: { ...trigger.parameters, filter: null },
+      })
       expect(mockOnClose).toHaveBeenCalledOnce()
     })
 
@@ -161,6 +165,7 @@ describe('TriggerNodeDetails Component', () => {
           integration_id: source.integrationId,
           topic: source.topic,
           group_id: null,
+          filter: null,
         },
       })
       expect(mockOnClose).toHaveBeenCalledOnce()
