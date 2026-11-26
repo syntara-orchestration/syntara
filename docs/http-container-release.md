@@ -78,3 +78,15 @@ uv run pytest tests/e2e/execution_plane/test_http_workflow.py -v
 
 Collection, model validation and static checks can run without a cluster. They
 are preparation only and must not be reported as live acceptance success.
+
+### Output-selection blocker found during preparation
+
+The shared EP worker filters outputs before storing/sending the result, whereas
+AO completion validation currently checks the full Action output schema. A local
+reproduction with the packaged HTTP manifest and `{"output": {}}` produces
+`ExecutionPlaneProtocolError` because `status_code` is required. Thus an HTTP
+node with `outputs: {}` cannot yet be treated as supported by the EP path.
+Non-empty mapping expressions also need parity with native output mapping; EP
+currently selects keys rather than evaluating those expressions. Resolve this
+shared completion/mapping contract before promoting the HTTP runtime draft.
+The five initial live cases above use the default full output contract.
