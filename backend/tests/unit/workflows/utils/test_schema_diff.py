@@ -111,7 +111,7 @@ class TestDetectOutputSchemaBreakingChanges:
         changes = detect_output_schema_breaking_changes(old_schema, new_schema)
 
         assert {(change.change_type, change.field_path) for change in changes} == {
-            ("constraint_change", "outputs"),
+            ("constraint_change", "$root"),
             ("constraint_change", "status"),
         }
         assert all(change.is_breaking for change in changes)
@@ -514,3 +514,31 @@ class TestDetectWorkflowBreakingChanges:
         assert len(changes) == 2
         assert "trigger1" in changes
         assert "trigger2" in changes
+
+
+def test_root_constraint_changes_do_not_collide_with_an_output_named_outputs() -> None:
+    old_schema: dict[str, Any] = {
+        "type": "object",
+        "additionalProperties": True,
+        "properties": {"outputs": {"type": "string"}},
+    }
+    new_schema: dict[str, Any] = {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {"outputs": {"type": "string"}},
+    }
+
+    changes = detect_output_schema_changes(old_schema, new_schema)
+
+    assert [(change.change_type, change.field_path) for change in changes] == [("constraint_change", "$root")]
+
+
+def test_malformed_trigger_collections_do_not_crash_contract_diff() -> None:
+    for malformed_triggers in (
+        None,
+        "not-a-list",
+        42,
+        [{"type": "subworkflow_trigger", "id": []}],
+    ):
+        assert detect_workflow_contract_changes({"triggers": malformed_triggers}, {"triggers": []}) == {}
+        assert detect_workflow_contract_changes({"triggers": []}, {"triggers": malformed_triggers}) == {}

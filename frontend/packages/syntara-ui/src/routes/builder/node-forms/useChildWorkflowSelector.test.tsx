@@ -173,16 +173,66 @@ describe('useChildWorkflowSelector', () => {
       .mockResolvedValueOnce({ data: { resources: [testWorkflows[0]], next: null } })
 
     const { result } = renderHook(
-      () => useChildWorkflowSelector({ projectId: 'project-1', selectedWorkflowId: null }),
+      () => useChildWorkflowSelector({ projectId: 'project-1', selectedWorkflowId: 'workflow-1' }),
       { wrapper: createWrapper() }
     )
 
     await waitFor(() => expect(result.current.hasError).toBe(true))
     expect(result.current.errorMessage).toBe('You do not have permission to view workflows in this project.')
+    const schemaRequestCount = mocks.invocationSchemaGet.mock.calls.length
 
     act(() => result.current.retryFailedLookups())
     await waitFor(() => expect(result.current.options).toHaveLength(1))
     expect(result.current.hasError).toBe(false)
+    expect(mocks.invocationSchemaGet).toHaveBeenCalledTimes(schemaRequestCount)
+  })
+
+  it('retries only the requested child schema when that lookup fails', async () => {
+    let failFirstWorkflowSchemaRequest = true
+    mocks.invocationSchemaGet.mockImplementation(
+      (_path: string, options: { params: { path: { workflow_id: string } } }) => {
+        const workflowId = options.params.path.workflow_id
+        if (workflowId === 'workflow-1' && failFirstWorkflowSchemaRequest) {
+          failFirstWorkflowSchemaRequest = false
+          return Promise.resolve({
+            error: { detail: 'Unavailable' },
+            response: new Response(null, { status: 503 }),
+          })
+        }
+        return Promise.resolve({
+          data: {
+            workflow_id: workflowId,
+            published_version_id: `version-${workflowId}`,
+            published_version: 4,
+            is_eligible: true,
+            triggers: [{ trigger_node_id: 'sub-trigger', name: 'Subworkflow Trigger', input_schema: {} }],
+          },
+          response: new Response(),
+        })
+      }
+    )
+
+    const { result } = renderHook(
+      () => useChildWorkflowSelector({ projectId: 'project-1', selectedWorkflowId: null }),
+      { wrapper: createWrapper() }
+    )
+
+    await waitFor(() => expect(result.current.hasError).toBe(true))
+    const workflowListRequestCount = mocks.projectWorkflowsGet.mock.calls.length
+    const requestsBeforeRetry = mocks.invocationSchemaGet.mock.calls.map(
+      ([, options]) => (options as { params: { path: { workflow_id: string } } }).params.path.workflow_id
+    )
+
+    act(() => result.current.retryFailedLookups('workflow-1'))
+    await waitFor(() => expect(result.current.hasError).toBe(false))
+
+    const requestsAfterRetry = mocks.invocationSchemaGet.mock.calls.map(
+      ([, options]) => (options as { params: { path: { workflow_id: string } } }).params.path.workflow_id
+    )
+    expect(requestsBeforeRetry.filter((id) => id === 'workflow-1')).toHaveLength(1)
+    expect(requestsAfterRetry.filter((id) => id === 'workflow-1')).toHaveLength(2)
+    expect(requestsAfterRetry.filter((id) => id === 'workflow-2')).toHaveLength(1)
+    expect(mocks.projectWorkflowsGet).toHaveBeenCalledTimes(workflowListRequestCount)
   })
 
   it('loads additional workflow pages on demand', async () => {

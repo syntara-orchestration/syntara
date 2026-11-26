@@ -14,4 +14,40 @@
   display: flex;
   align-items: center;
   gap: var(--pf-t--global--spacer--xs);
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.fieldDetails {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pf-t--global--spacer--xs);
+  min-width: 0;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.groupDetails {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pf-t--global--spacer--xs);
+  min-width: 0;
+  max-width: 100%;
+}
+
+.groupLabel {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--pf-t--global--spacer--xs);
+  min-width: 0;
+}
+
+.fieldDescription,
+.runtimeValue {
+  min-width: 0;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }

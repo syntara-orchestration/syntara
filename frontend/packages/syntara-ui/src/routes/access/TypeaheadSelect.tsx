@@ -16,6 +16,8 @@ import { type Ref, useCallback, useMemo, useRef, useState } from 'react'
 
 import { SynSelect } from '../../components/SynSelect'
 
+import styles from './TypeaheadSelect.module.css'
+
 export type TypeaheadOptionTag = {
   label: string
   color: 'blue' | 'green' | 'orange' | 'orangered' | 'red' | 'purple' | 'grey' | 'teal' | 'yellow'
@@ -57,6 +59,8 @@ type TypeaheadSelectProps = {
   emptyOptionsMessage?: string
   /** Message to show when a non-empty filter has no matching choices. */
   noResultsMessage?: (query: string) => string
+  /** Constrains the menu to the toggle width, useful for wrapped empty-state copy. */
+  matchToggleWidth?: boolean
 }
 
 function renderOption(option: TypeaheadOption, selected: string) {
@@ -144,7 +148,9 @@ function renderOptions({
     if (customTemplateOption) return customTemplateOption
     return (
       <SelectOption isDisabled>
-        {getNoOptionsMessage({ hasOptions, filterValue, emptyOptionsMessage, noResultsMessage })}
+        <span className={styles.noOptionsMessage}>
+          {getNoOptionsMessage({ hasOptions, filterValue, emptyOptionsMessage, noResultsMessage })}
+        </span>
       </SelectOption>
     )
   }
@@ -195,6 +201,7 @@ export function TypeaheadSelect({
   allowCustomTemplate = false,
   emptyOptionsMessage,
   noResultsMessage,
+  matchToggleWidth = false,
 }: Readonly<TypeaheadSelectProps>) {
   const [isOpen, setIsOpen] = useState(false)
   const [filterValue, setFilterValue] = useState('')
@@ -309,6 +316,7 @@ export function TypeaheadSelect({
       onSelect={onSelect}
       selected={selected}
       toggle={toggle}
+      popperProps={matchToggleWidth ? { width: 'trigger', minWidth: 'trigger', maxWidth: 'trigger' } : undefined}
     >
       <SelectList style={{ maxHeight: '200px', overflow: 'auto' }}>
         {renderOptions({

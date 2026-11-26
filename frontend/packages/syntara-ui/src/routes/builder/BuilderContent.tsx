@@ -275,9 +275,11 @@ export function BuilderContent(props: BuilderContentProps) {
     breakingChanges,
     contractChanges,
     parentWorkflows,
+    isPublishReviewFailed,
     confirmPublish,
     cancelBreakingChangeWarning,
     reviewOutputContract,
+    reviewOutputContractForPublish,
     triggerRemovalConfirmDialog: publishTriggerRemovalDialog,
   } = usePublishWorkflow({
     workflowId,
@@ -302,6 +304,9 @@ export function BuilderContent(props: BuilderContentProps) {
     },
     [handleSaveWorkflow, isNew, reviewOutputContract, workflow?.published_version_id]
   )
+  const handleReviewOutputContractOnPublishOpen = useCallback(() => {
+    detachPromise(reviewOutputContractForPublish())
+  }, [reviewOutputContractForPublish])
   const guardedSaveWorkflow = useGuardedSaveWorkflow({
     handleSaveWorkflow: handleSaveWithOutputContractReview,
     isNodeEditorOpen,
@@ -639,11 +644,15 @@ export function BuilderContent(props: BuilderContentProps) {
                   publishedVersionId={workflow?.published_version_id ?? null}
                   currentVersionId={workflow?.version?.id}
                   isPublishing={isPublishing}
+                  isCheckingContractChanges={isCheckingBreakingChanges}
+                  isPublishDisabled={isPublishReviewFailed}
+                  hasContractReviewError={isPublishReviewFailed}
                   breakingChanges={breakingChanges}
                   contractChanges={contractChanges}
                   parentWorkflows={parentWorkflows}
                   onConfirmPublish={confirmPublish}
                   onCancelBreakingChanges={cancelBreakingChangeWarning}
+                  onReviewOutputContract={handleReviewOutputContractOnPublishOpen}
                   ProjectSelector={ProjectSelector}
                   dispatch={dispatch}
                   markDirty={markDirty}

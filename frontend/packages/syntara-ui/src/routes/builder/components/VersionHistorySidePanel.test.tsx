@@ -59,6 +59,10 @@ function createSidePanelState(overrides: Partial<VersionSidePanelState> = {}): V
     publishDialog: {
       isOpen: false,
       isPublishing: false,
+      isCheckingContractChanges: false,
+      isPublishDisabled: true,
+      hasContractReviewError: false,
+      onRetryContractReview: vi.fn(),
       breakingChanges: [],
       contractChanges: [],
       parentWorkflows: [],
@@ -143,6 +147,10 @@ describe('VersionHistorySidePanel', () => {
       publishDialog: {
         isOpen: true,
         isPublishing: false,
+        isCheckingContractChanges: false,
+        isPublishDisabled: false,
+        hasContractReviewError: false,
+        onRetryContractReview: vi.fn(),
         breakingChanges: [],
         contractChanges: [],
         parentWorkflows: [],

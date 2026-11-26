@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { axe } from 'vitest-axe'
 
 import { TypeaheadSelect, type TypeaheadOption } from './TypeaheadSelect'
+import styles from './TypeaheadSelect.module.css'
 
 const defaultOptions: TypeaheadOption[] = [
   { value: 'opt-1', label: 'Alpha Option' },
@@ -217,11 +218,23 @@ describe('TypeaheadSelect', () => {
 
     it('shows setup guidance before searching when no options exist', async () => {
       const user = userEvent.setup()
-      renderSelect({ options: [], emptyOptionsMessage: 'No child outputs are available yet.' })
+      renderSelect({
+        options: [],
+        emptyOptionsMessage: 'No child step outputs are available yet. Add a reachable child step with outputs.',
+        matchToggleWidth: true,
+      })
 
       await user.click(getInput())
 
-      expect(screen.getByRole('option', { name: 'No child outputs are available yet.' })).toBeInTheDocument()
+      const option = screen.getByRole('option', {
+        name: 'No child step outputs are available yet. Add a reachable child step with outputs.',
+      })
+      expect(option).toHaveTextContent(
+        'No child step outputs are available yet. Add a reachable child step with outputs.'
+      )
+      expect(
+        screen.getByText('No child step outputs are available yet. Add a reachable child step with outputs.')
+      ).toHaveClass(styles.noOptionsMessage)
     })
 
     it('uses a query-specific message when the search has no matches', async () => {
