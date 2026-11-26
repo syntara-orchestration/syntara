@@ -19,7 +19,7 @@ const options = [
 ]
 
 describe('SynSelectField', () => {
-  it('supports a distinct accessible name for repeated controls', async () => {
+  it('supports a distinct accessible name and associated help for repeated controls', async () => {
     const user = userEvent.setup()
     renderWithForm<FormData>({ schema, defaultValues: { projectId: '' } }, ({ control }) => (
       <SynSelectField
@@ -27,10 +27,14 @@ describe('SynSelectField', () => {
         control={control}
         label="Encoding"
         ariaLabel="Header 1 encoding"
+        hint="Choose how to encode the first header"
         options={options}
       />
     ))
     expect(screen.getByText('Encoding')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Header 1 encoding' })).toHaveAccessibleDescription(
+      'Choose how to encode the first header'
+    )
     await user.click(screen.getByRole('button', { name: 'Header 1 encoding' }))
     expect(screen.getByRole('listbox', { name: 'Header 1 encoding options' })).toBeVisible()
   })

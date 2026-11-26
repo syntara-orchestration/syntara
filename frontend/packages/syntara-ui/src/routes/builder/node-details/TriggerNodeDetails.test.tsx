@@ -99,12 +99,13 @@ describe('TriggerNodeDetails Component', () => {
         integration_id: integrationId,
         credential_id: credentialId,
         topic: 'orders',
+        filter: null,
         start: { offset_gap_policy: 'fail' },
         group_id: 'orders-reader',
       },
     }
 
-    it('preserves hidden consumption settings when saving a new name', async () => {
+    it('preserves saved consumption settings when saving a new name', async () => {
       const user = userEvent.setup()
       vi.spyOn(TriggerNodeFormModule, 'TriggerNodeForm').mockImplementation(({ onSubmit }) => (
         <button
@@ -171,7 +172,7 @@ describe('TriggerNodeDetails Component', () => {
       expect(mockOnClose).toHaveBeenCalledOnce()
     })
 
-    it('does not mark an unchanged trigger with hidden settings as changed', async () => {
+    it('does not mark an unchanged trigger with saved settings as changed', async () => {
       const user = userEvent.setup()
       render(<TriggerNodeDetails trigger={trigger} triggerIndex={0} onClose={mockOnClose} />)
 
