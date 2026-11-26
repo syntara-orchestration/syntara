@@ -151,7 +151,7 @@ The supported controls are:
 | Consumer group ID      | `group_id`                       | Optional custom ID     | Auto-generated for a new source |
 
 The API defines concrete policy defaults without inheritance semantics.
-See the [backend settings contract](../../backend/docs/event-subscription-controls.md)
+See the [backend settings contract](../backend/event-subscription-controls.md)
 for the `start` and `group_id` parameters.
 
 Opening and saving an unchanged form does not insert default policies. Partial
