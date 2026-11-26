@@ -44,7 +44,7 @@ _PLUGIN_SEEDS = (
     (
         "aap-workflow",
         NodeType.AAP_WORKFLOW_JOB_TEMPLATE,
-        "syntara.aap-workflow.aap-workflow",
+        "syntara.aap.aap-workflow",
         "aap-workflow.yaml",
         "RELATED_IMAGE_AAP_WORKFLOW",
         "quay.io/aap/ansible-automation-platform/ao-aap-workflow-rhel9:devel",
