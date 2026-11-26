@@ -31,8 +31,8 @@ from syntara.execution_plane.registry.repository import (
 from syntara.execution_plane.utils import execution_plane_work_item_id
 from syntara.integrations.exceptions import IntegrationCredentialNotFoundError
 from syntara.integrations.lib.credential_resolver import fetch_credential_with_type
-from syntara.workflow_core.models import NodeType
 from syntara.integrations.models.integration import Integration, IntegrationType
+from syntara.workflow_core.models import NodeType
 from syntara.workflows.models.activity_execution import TERMINAL_ACTIVITY_STATUSES, ActivityExecution
 from syntara.workflows.models.execution import Execution
 from syntara.workflows.models.workflow_definition import WorkflowDefinition, WorkflowNode
