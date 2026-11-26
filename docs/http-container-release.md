@@ -42,3 +42,39 @@ Execution-target placement and submission/completion use the same shared command
 path as script steps. This does not migrate all legacy authentication forms or
 promise identical native retry/error behavior. Credentialed EP HTTP still requires
 trusted integration-instance context and a separate contract change.
+
+## Live acceptance suite
+
+The HTTP suite is `backend/tests/e2e/execution_plane/test_http_workflow.py`.
+It creates temporary workflows and deletes them after each test, cancelling any
+unfinished executions first. Successful EP requests must have a claimed/completed
+work item with the exact execution UUID and selected target; native requests must
+have no corresponding EP work item. Additional cases cover upstream errors,
+request timeouts and cancellation. Failure cases disable retries deliberately;
+these tests do not establish complete native-versus-EP retry equivalence.
+
+Before running, deploy the HTTP runtime branch and approved seeded image into a
+test AO/EP installation. Provide the existing suite inputs: `APP_BASE_URL`,
+`APP_ADMIN_PASSWORD_PATH` (or `ADMIN_PASSWORD`), `EP_API_URL`, `EP_API_CA_FILE`,
+and `EP_SERVICE_TOKEN` or `EP_AO_JWT_PRIVATE_KEY_FILE`. The JWT material must match
+the test deployment. Do not print credentials into logs or put them in workflow
+parameters.
+
+HTTP-specific inputs:
+
+- `E2E_HTTP_TARGET_ID`: UUID of a ready EP target in the test deployment.
+- `E2E_HTTP_BASE_URL`: operator-owned public HTTPS httpbin-compatible fixture
+  supporting `/get`, `/status/503`, `/delay/10` and `/delay/30`. The fixture must
+  echo the `marker` query parameter on `/get` and honor the full delays. Both the
+  AO worker and selected EP target must reach it. Private cluster addresses are
+  unsuitable for the container's current destination policy.
+- `E2E_POLL_TIMEOUT`: optional maximum wait per polling phase (defaults to 180s).
+
+From `backend/`, with those inputs set in the local environment:
+
+```sh
+uv run pytest tests/e2e/execution_plane/test_http_workflow.py -v
+```
+
+Collection, model validation and static checks can run without a cluster. They
+are preparation only and must not be reported as live acceptance success.
