@@ -8,10 +8,14 @@ from syntara.audit.handler import AuditEventHandler
 from syntara.audit.models.audit_event import EventCategory, EventSeverity, EventStatus
 from syntara.audit.models.structured_data import AuditContextData
 from syntara.credentials.audit.credential import (
+    CredentialClusterResolvedEvent,
+    CredentialClusterResolvedHandler,
     CredentialEncryptionFailureEvent,
     CredentialEncryptionFailureHandler,
     CredentialLifecycleEvent,
     CredentialLifecycleHandler,
+    CredentialWorkloadResolvedEvent,
+    CredentialWorkloadResolvedHandler,
 )
 
 
@@ -280,3 +284,61 @@ class TestCredentialEncryptionFailureHandler:
         result = CredentialEncryptionFailureHandler().handle(event)
         assert result.resource_urn == f"urn:syntara:credential:{cred_id}"
         assert result.resource_name == "db-backup-creds"
+
+
+class TestCredentialClusterResolvedHandler:
+    """Tests for CredentialClusterResolvedHandler."""
+
+    def test_cluster_resolution_audit_mapping(self) -> None:
+        credential_id = uuid4()
+        integration_id = uuid4()
+        message_id = uuid4()
+        event = CredentialClusterResolvedEvent(
+            credential_id=credential_id,
+            integration_id=integration_id,
+            message_id=message_id,
+            service_identity="execution-plane",
+        )
+
+        result = CredentialClusterResolvedHandler().handle(event)
+
+        assert result.event_category == EventCategory.SECURITY_EVENT
+        assert result.event_status == EventStatus.SUCCESS
+        assert result.actor_username == "execution-plane"
+        assert result.resource_urn == f"urn:syntara:credential:{credential_id}"
+        assert isinstance(result.structured_data, AuditContextData)
+        assert result.structured_data.data_type == "credential-cluster-resolution"
+        assert result.structured_data.credential_id == str(credential_id)
+        assert result.structured_data.integration_id == str(integration_id)
+        assert result.structured_data.message_id == str(message_id)
+        assert result.structured_data.service_identity == "execution-plane"
+        assert "credential" not in result.structured_data.model_dump()
+
+
+class TestCredentialWorkloadResolvedHandler:
+    """Tests for CredentialWorkloadResolvedHandler."""
+
+    def test_workload_resolution_audit_mapping(self) -> None:
+        credential_id = uuid4()
+        work_item_id = uuid4()
+        message_id = uuid4()
+        event = CredentialWorkloadResolvedEvent(
+            credential_id=credential_id,
+            work_item_id=work_item_id,
+            message_id=message_id,
+            service_identity="execution-plane",
+        )
+
+        result = CredentialWorkloadResolvedHandler().handle(event)
+
+        assert result.event_category == EventCategory.SECURITY_EVENT
+        assert result.event_status == EventStatus.SUCCESS
+        assert result.actor_username == "execution-plane"
+        assert result.resource_urn == f"urn:syntara:credential:{credential_id}"
+        assert isinstance(result.structured_data, AuditContextData)
+        assert result.structured_data.data_type == "credential-workload-resolution"
+        assert result.structured_data.credential_id == str(credential_id)
+        assert result.structured_data.work_item_id == str(work_item_id)
+        assert result.structured_data.message_id == str(message_id)
+        assert result.structured_data.service_identity == "execution-plane"
+        assert "credential" not in result.structured_data.model_dump()

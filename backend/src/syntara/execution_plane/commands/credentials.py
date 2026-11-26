@@ -17,8 +17,10 @@ from sqlalchemy.orm import selectinload
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from syntara.audit.dispatcher import AuditEventDispatcher
 from syntara.core.lib.encryption import EncryptionError
 from syntara.core.services.secret_service import create_secret_service
+from syntara.credentials.audit.credential import CredentialClusterResolvedEvent, CredentialWorkloadResolvedEvent
 from syntara.credentials.lib.injector_resolver import InjectorResolver
 from syntara.execution_plane.commands.context import AOCommandContext
 from syntara.execution_plane.commands.errors import CommandResourceNotFoundError, CommandResourceStateError
@@ -29,6 +31,7 @@ from syntara.execution_plane.registry.repository import (
 from syntara.execution_plane.utils import execution_plane_work_item_id
 from syntara.integrations.exceptions import IntegrationCredentialNotFoundError
 from syntara.integrations.lib.credential_resolver import fetch_credential_with_type
+from syntara.integrations.models.integration import Integration, IntegrationType
 from syntara.workflow_core.models import NodeType
 from syntara.workflows.models.activity_execution import TERMINAL_ACTIVITY_STATUSES, ActivityExecution
 from syntara.workflows.models.execution import Execution
@@ -40,6 +43,11 @@ if TYPE_CHECKING:
 
 class CredentialResolveClusterCommandHandler:
     """Resolve one opaque cluster credential reference into its credential document."""
+
+    async def _load_integration(self, session: AsyncSession, resource_id: UUID) -> Integration | None:
+        """Load the Integration that owns the requesting Execution Plane Cluster."""
+        result = await session.exec(select(Integration).where(col(Integration.id) == resource_id))
+        return result.one_or_none()
 
     async def _resolve_credential_document(self, session: AsyncSession, credential_ref: UUID) -> dict[str, str]:
         """Resolve an AO credential reference without logging or persisting its values."""
@@ -64,12 +72,27 @@ class CredentialResolveClusterCommandHandler:
         self, message: MessageEnvelope, payload: CommandPayload, context: AOCommandContext
     ) -> HandlingResult:
         """Return a correlated credential document without exposing resolution details."""
-        del message
         if not isinstance(payload, CredentialResolveCluster):
             raise ProtocolConflict
+        integration = await self._load_integration(context.session, payload.resource_id)
+        if (
+            integration is None
+            or integration.integration_type != IntegrationType.OPENSHIFT
+            or integration.management_credential_id != payload.credential_ref
+            or not integration.enabled
+        ):
+            raise CommandResourceStateError
         credential = await self._resolve_credential_document(context.session, payload.credential_ref)
+        AuditEventDispatcher.dispatch(
+            CredentialClusterResolvedEvent(
+                credential_id=payload.credential_ref,
+                integration_id=payload.resource_id,
+                message_id=message.message_id,
+                service_identity=message.source_id,
+            )
+        )
         return HandlingResult(
-            resource=None,
+            resource=ResourceReference(kind="cluster", resource_id=payload.resource_id),
             result=CredentialResolveClusterCommandResult(credential=credential),
         )
 
@@ -152,7 +175,6 @@ class CredentialResolveWorkloadCommandHandler:
         context: AOCommandContext,
     ) -> HandlingResult:
         """Resolve a credential only after validating its work-item binding."""
-        del message
         if not isinstance(payload, CredentialResolveWorkload):
             raise ProtocolConflict
         work_item_id = payload.work_item_id
@@ -170,6 +192,14 @@ class CredentialResolveWorkloadCommandHandler:
             context.session,
             payload.credential_ref,
             activity.execution.project_id,
+        )
+        AuditEventDispatcher.dispatch(
+            CredentialWorkloadResolvedEvent(
+                credential_id=payload.credential_ref,
+                work_item_id=work_item_id,
+                message_id=message.message_id,
+                service_identity=message.source_id,
+            )
         )
         return HandlingResult(
             resource=ResourceReference(kind="work_item", resource_id=work_item_id),

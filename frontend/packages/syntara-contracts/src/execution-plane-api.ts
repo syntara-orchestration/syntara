@@ -425,7 +425,7 @@ export interface components {
       id: string
       /**
        * Runtime Context
-       * @description Optional caller-defined JSON object, defaulting to {}. Stored once, unencrypted, on the work item and passed to the plugin as context.runtime_context; also returned in work-item reads and completion notifications. Do not include secrets. Syntara supplies project_id (Project.id), workflow_id (Workflow.id), and execution_id (the containing Execution.id); EP does not require these keys. These values do not authorize access, select placement, identify the work item, or control its lifecycle. List filters runtime_context[key]=value match exact JSON strings at literal top-level keys; an empty value checks key existence and multiple keys use AND.
+       * @description Optional caller-defined JSON object, defaulting to {}. Stored once, unencrypted, on the work item and passed to the plugin as context.runtime_context; also returned in work-item reads, completion notifications, and workload credential-resolution commands. Do not include secrets. Syntara supplies project_id (Project.id), workflow_id (Workflow.id), execution_id (the containing Execution.id), and temporal_activity_id (the full Temporal activity identity, including any loop-iteration suffix); EP does not require these keys. These values do not authorize access, select placement, identify the work item, or control its lifecycle. List filters runtime_context[key]=value match exact JSON strings at literal top-level keys; an empty value checks key existence and multiple keys use AND.
        */
       runtime_context?: {
         [key: string]: unknown

@@ -13,11 +13,13 @@ from execution_plane_client.commands.credentials import CredentialResolveCluster
 from execution_plane_client.errors import ProtocolConflict
 from fastapi import FastAPI, Request, Response
 
+from syntara.audit.dispatcher import AuditEventDispatcher
 from syntara.authz.exceptions import AuthorizationDeniedError, authorization_denied_handler
 from syntara.core.config.base import get_settings
 from syntara.core.database.session import get_db
 from syntara.core.lib.encryption import EncryptionError
 from syntara.core.models.principal import service_principal_id
+from syntara.credentials.audit.credential import CredentialWorkloadResolvedEvent
 from syntara.execution_plane import bridge
 from syntara.execution_plane.commands import credentials as command_credentials
 from syntara.execution_plane.commands.context import AOCommandContext
@@ -175,6 +177,8 @@ async def test_workload_credential_command_resolves_bound_generic_node(
     monkeypatch.setattr(
         command_credentials.CredentialResolveWorkloadCommandHandler, "_resolve_credential_document", resolve_document
     )
+    dispatch = MagicMock()
+    monkeypatch.setattr(AuditEventDispatcher, "dispatch", dispatch)
 
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://ao") as client:
         response = await client.post("/api/execution_plane/v1/commands", json=message.model_dump(mode="json"))
@@ -196,6 +200,13 @@ async def test_workload_credential_command_resolves_bound_generic_node(
         },
     }
     assert resolved["credential_ref"] == payload.credential_ref
+    dispatch.assert_called_once()
+    event = dispatch.call_args.args[0]
+    assert isinstance(event, CredentialWorkloadResolvedEvent)
+    assert event.credential_id == payload.credential_ref
+    assert event.work_item_id == payload.work_item_id
+    assert event.message_id == message.message_id
+    assert event.service_identity == message.source_id
 
 
 @pytest.mark.asyncio
@@ -207,6 +218,7 @@ async def test_workload_credential_command_uses_workload_specific_permission(
     authorize.return_value.allowed = True
     monkeypatch.setattr(bridge, "authorize", authorize)
     _allow_plugin_recipe(monkeypatch)
+    monkeypatch.setattr(AuditEventDispatcher, "dispatch", MagicMock())
     message, payload = workload_command()
     monkeypatch.setattr(
         command_credentials.CredentialResolveWorkloadCommandHandler,
@@ -531,7 +543,7 @@ async def test_workload_credential_command_handler_rejects_unexpected_payload(
 ) -> None:
     handler = command_credentials.CredentialResolveWorkloadCommandHandler()
     message, _payload = workload_command()
-    payload = CredentialResolveCluster(credential_ref=uuid4())
+    payload = CredentialResolveCluster(resource_id=uuid4(), credential_ref=uuid4())
 
     with pytest.raises(ProtocolConflict):
         await handler.handle(message, payload, command_context)
