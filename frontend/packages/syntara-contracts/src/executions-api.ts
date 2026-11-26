@@ -1316,6 +1316,23 @@ export interface components {
       [key: string]: unknown
     }
     /**
+     * ExecutionTargetProfile
+     * @description Execution Plane profile that selects a specific Execution Target.
+     */
+    ExecutionTargetProfile: {
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      type: 'execution_target'
+      /**
+       * Execution Target Id
+       * Format: uuid
+       * @description UUID of the Execution Plane execution target selected for this workload.
+       */
+      execution_target_id: string
+    }
+    /**
      * HTTPMethod
      * @description Supported HTTP methods for API requests.
      * @enum {string}
@@ -1326,6 +1343,11 @@ export interface components {
      * @description Parameters for API executor (http_request activity).
      */
     APIExecutorParameters: {
+      /**
+       * Execution Profile
+       * @description Execution Plane placement profile for this workload.
+       */
+      execution_profile?: components['schemas']['ExecutionTargetProfile'] | null
       /** @description HTTP method */
       method: components['schemas']['HTTPMethod']
       /**
@@ -1479,23 +1501,6 @@ export interface components {
       settings?: components['schemas']['NodeSettingsCof'] | null
     } & {
       [key: string]: unknown
-    }
-    /**
-     * ExecutionTargetProfile
-     * @description Execution Plane profile that selects a specific Execution Target.
-     */
-    ExecutionTargetProfile: {
-      /**
-       * @description discriminator enum property added by openapi-typescript
-       * @enum {string}
-       */
-      type: 'execution_target'
-      /**
-       * Execution Target Id
-       * Format: uuid
-       * @description UUID of the Execution Plane execution target selected for this workload.
-       */
-      execution_target_id: string
     }
     /**
      * PythonScriptExecutorParameters

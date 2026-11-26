@@ -12,13 +12,33 @@ HTTP step container. All configured image references are verified before any
 writes. Registry changes commit together; reseeding advances managed image
 references while preserving administrator pins.
 
-Seeding does not switch workflow HTTP requests to the Execution Plane. The
-existing HTTP executor remains in use. Runtime migration needs separate handling
-for execution targets, credentials and trusted HTTP endpoint context, private-host
-policy, and workflow completion/retry/cancellation. Installing the bearer recipe
-does not create an HTTP integration instance or enable credentialed dispatch.
+Seeding alone does not switch workflow HTTP requests to the Execution Plane.
+Existing HTTP nodes without an execution profile keep their native executor.
+Installing the bearer recipe does not create an HTTP integration instance or
+enable credentialed dispatch. See the explicit opt-in contract below.
 
 Release integration also requires the operator to forward the HTTP image from
 its bundle into the backend migration job. The release must supply the signed
 image, approved digest and public verification key; this change supplies no
 placeholder digest or mutable tag.
+
+## Explicit execution-target opt-in
+
+An HTTP node with an `execution_profile` selecting an `execution_target` executes
+through the seeded HTTP Action. Nodes without a profile retain the existing HTTP
+executor even when the Action is installed. The workflow records a Temporal patch
+before adding the execution ID to the HTTP activity, and tracks only opted-in
+HTTP activities for EP cancellation.
+
+This initial EP path accepts unauthenticated public HTTP requests with string
+header/query values. Credentials (including credential bindings, URL userinfo and
+standard authentication headers) are rejected before dispatch. For existing
+credentialed or private-host workflows, omit the execution profile. EP HTTP uses
+the container's strict public-destination policy and result-size limits; native
+private-host exceptions are not forwarded. Missing seeds, rejected image policy
+and failed EP submission are errors, with no automatic fallback to another executor.
+
+Execution-target placement and submission/completion use the same shared command
+path as script steps. This does not migrate all legacy authentication forms or
+promise identical native retry/error behavior. Credentialed EP HTTP still requires
+trusted integration-instance context and a separate contract change.

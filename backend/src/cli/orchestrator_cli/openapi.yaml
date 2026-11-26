@@ -36826,6 +36826,17 @@ components:
         inventory, extra_vars, limit, tags, skip_tags, labels, timeout).
     APIExecutorParameters:
       properties:
+        execution_profile:
+          anyOf:
+            - oneOf:
+                - $ref: '#/components/schemas/ExecutionTargetProfile'
+              discriminator:
+                propertyName: type
+                mapping:
+                  execution_target: '#/components/schemas/ExecutionTargetProfile'
+            - type: 'null'
+          title: Execution Profile
+          description: Execution Plane placement profile for this workload.
         method:
           $ref: '#/components/schemas/HTTPMethod'
           description: HTTP method

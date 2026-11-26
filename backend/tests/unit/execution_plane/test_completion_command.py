@@ -279,3 +279,33 @@ async def test_completion_rejects_completed_result_that_violates_output_schema(c
     error = temporal.fail_async_activity.await_args.kwargs["error"]
     assert error.type == "ExecutionPlaneProtocolError"
     assert error.non_retryable is True
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("outcome", [CompletionStatus.COMPLETED, CompletionStatus.FAILED, CompletionStatus.CANCELLED])
+async def test_http_completion_uses_packaged_contract_and_temporal_identity(callback, monkeypatch, outcome):
+    from syntara.execution_plane.commands import completion as completion_module
+    from syntara.execution_plane.registry.seeder import _load_manifest
+
+    app, temporal, activity_rows = callback
+    activity_rows.first.return_value = ("workflow-id", "activity-id", NodeType.HTTP_REQUEST)
+    plugin = SimpleNamespace(name="http-request", manifest=_load_manifest("http-request.yaml", "http-request"))
+    lookup = AsyncMock(return_value=plugin)
+    monkeypatch.setattr(completion_module, "get_execution_plane_plugin_by_node_type", lookup)
+    result = {"output": {"status_code": 200, "body": {"ok": True}, "headers": {}, "elapsed": 0.1}}
+    body = completion().model_dump(mode="json")
+    body["command"]["payload"].update(status=outcome, result=result)
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://ao") as client:
+        response = await client.post("/api/execution_plane/v1/commands", json=body)
+    assert response.status_code == 200, response.text
+    if outcome is CompletionStatus.COMPLETED:
+        assert lookup.await_args.args[1] is NodeType.HTTP_REQUEST
+        temporal.complete_async_activity.assert_awaited_once_with(
+            temporal_workflow_id="workflow-id", activity_id="activity-id", result=result
+        )
+    elif outcome is CompletionStatus.CANCELLED:
+        temporal.report_cancellation_async_activity.assert_awaited_once_with(
+            temporal_workflow_id="workflow-id", activity_id="activity-id"
+        )
+    else:
+        temporal.fail_async_activity.assert_awaited_once()

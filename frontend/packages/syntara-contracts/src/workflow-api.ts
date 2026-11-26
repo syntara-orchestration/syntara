@@ -1716,6 +1716,11 @@ export interface components {
      * @description Parameters for API executor (http_request activity).
      */
     APIExecutorParameters: {
+      /**
+       * Execution Profile
+       * @description Execution Plane placement profile for this workload.
+       */
+      execution_profile?: components['schemas']['ExecutionTargetProfile'] | null
       /** @description HTTP method */
       method: components['schemas']['HTTPMethod']
       /**
