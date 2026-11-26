@@ -196,6 +196,94 @@ async def test_subworkflow_reference_in_same_project_passes_validation(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("source_expression", "expected_detail"),
+    [
+        ("${removed_step.stdout}", "references unknown step 'removed_step'"),
+        (
+            "${build.removed_output}",
+            "references unavailable child output 'removed_output' on step 'build'",
+        ),
+    ],
+)
+async def test_stale_subworkflow_output_mapping_source_fails_save_and_publish(
+    test_db_session: AsyncSession,
+    test_user: User,
+    test_project_id: UUID,
+    source_expression: str,
+    expected_detail: str,
+) -> None:
+    workflow_definition = {
+        "schema_version": "2.0.0",
+        "name": "stale-output-mapping",
+        "triggers": [
+            {
+                "id": "child_entry",
+                "type": "subworkflow_trigger",
+                "parameters": {
+                    "output_schema": {
+                        "type": "object",
+                        "properties": {"release_url": {"type": "string"}},
+                    },
+                    "output_mapping": {"release_url": source_expression},
+                },
+            }
+        ],
+        "nodes": [
+            {
+                "id": "build",
+                "name": "Build",
+                "type": "script",
+                "parameters": {"language": "python", "code": "print('build')"},
+            }
+        ],
+        "edges": [{"from": "child_entry", "to": "build"}],
+    }
+    service = WorkflowService(test_db_session, test_user)
+
+    with (
+        patch(
+            "syntara.workflows.services.workflow_service.get_system_continue_on_failure",
+            new_callable=AsyncMock,
+            return_value=False,
+        ),
+        patch("syntara.workflows.services.workflow_service.WebhookTriggerService") as webhook_service,
+    ):
+        webhook_service.return_value.sync_webhook_triggers = AsyncMock()
+        workflow, version, validation_result = await service.create_workflow(
+            name=f"stale-output-mapping-{uuid4().hex[:8]}",
+            description=None,
+            labels={},
+            workflow_definition=workflow_definition,
+            project_id=test_project_id,
+        )
+
+        assert workflow.has_validation_issues is True
+        assert validation_result.error_count == 1
+        mapping_findings = [
+            finding
+            for finding in validation_result.findings
+            if finding.field_path == "parameters.output_mapping.release_url"
+            and finding.severity == ValidationSeverity.error
+        ]
+        assert len(mapping_findings) == 1
+        assert expected_detail in mapping_findings[0].message
+
+        with pytest.raises(WorkflowPublishValidationError) as exc_info:
+            await service.publish_workflow_version(workflow_id=workflow.id, version=version.version)
+
+    assert exc_info.value.validation_result.error_count == 1
+    publish_mapping_findings = [
+        finding
+        for finding in exc_info.value.validation_result.findings
+        if finding.field_path == "parameters.output_mapping.release_url"
+        and finding.severity == ValidationSeverity.error
+    ]
+    assert len(publish_mapping_findings) == 1
+    assert expected_detail in publish_mapping_findings[0].message
+
+
+@pytest.mark.asyncio
 async def test_missing_child_workflow_reference_returns_error_finding(
     test_db_session: AsyncSession,
     test_project_id: UUID,
