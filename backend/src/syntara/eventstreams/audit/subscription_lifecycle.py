@@ -6,6 +6,7 @@ database; this audit record (and any optional post-commit hint) is advisory.
 """
 
 from dataclasses import dataclass, field
+from typing import Literal
 from uuid import UUID
 
 from syntara.audit.handler import AuditEventHandler
@@ -20,7 +21,7 @@ from syntara.audit.models.structured_data import AuditContextData
 _OPERATIONAL_LOGS_HINT = "See operational logs for details."
 
 # ---------------------------------------------------------------------------
-# Domain event
+# Domain events
 # ---------------------------------------------------------------------------
 
 
@@ -42,9 +43,42 @@ class EventSubscriptionLifecycleEvent:
     error_type: str | None = field(default=None)
 
 
+@dataclass(frozen=True)
+class EventSubscriptionStateChangedEvent:
+    """An individual subscription transition in the publication transaction."""
+
+    workflow_id: UUID
+    subscription_id: UUID
+    actor_id: UUID
+    action: Literal["created", "enabled", "disabled", "retired"]
+    configuration_revision: int
+
+
 # ---------------------------------------------------------------------------
 # Handler
 # ---------------------------------------------------------------------------
+
+
+class EventSubscriptionStateChangedHandler(AuditEventHandler[EventSubscriptionStateChangedEvent]):
+    """Record the desired state change using identifiers only."""
+
+    def handle(self, event: EventSubscriptionStateChangedEvent) -> AuditEvent:
+        """Describe a specific subscription transition without its settings."""
+        return AuditEvent(
+            event_category=EventCategory.WORKFLOW_EVENT,
+            event_status=EventStatus.SUCCESS,
+            event_action=f"event_subscription_{event.action}",
+            event_message=f"Event subscription {event.action}",
+            source_component="syntara.eventstreams.subscription",
+            resource_urn=f"urn:syntara:event-subscription:{event.subscription_id}",
+            actor_id=event.actor_id,
+            workflow_id=event.workflow_id,
+            structured_data=AuditContextData(
+                data_type="event-subscription-state-change",
+                subscription_id=str(event.subscription_id),
+                configuration_revision=event.configuration_revision,
+            ),
+        )
 
 
 class EventSubscriptionLifecycleHandler(AuditEventHandler[EventSubscriptionLifecycleEvent]):
