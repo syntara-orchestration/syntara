@@ -46,7 +46,7 @@ class AuditEventDispatcher:
                 handler_list.append(handler)
 
     @staticmethod
-    def dispatch(event: object, session: Session | None = None) -> None:
+    def dispatch(event: object, session: Session | None = None, *, max_pending: int | None = None) -> None:
         """Route *event* to its handlers and emit any resulting AuditEvents.
 
         Args:
@@ -55,6 +55,8 @@ class AuditEventDispatcher:
                     If provided, the event is written to the outbox in the same
                     transaction as the caller's business logic (guaranteeing
                     at-least-once delivery).
+            max_pending: Optional limit on background writes for best-effort
+                callers. Transactional writes are never dropped by this limit.
 
         Never raises. Two distinct failure modes are logged separately
         so ops can tell them apart:
@@ -75,7 +77,10 @@ class AuditEventDispatcher:
             try:
                 audit_event = handler.handle(event)
                 if audit_event is not None:
-                    emit_audit_event(audit_event, session)
+                    if max_pending is None:
+                        emit_audit_event(audit_event, session)
+                    else:
+                        emit_audit_event(audit_event, session, max_pending=max_pending)
             except Exception:
                 logger.exception(
                     "Audit handler raised — event dropped",

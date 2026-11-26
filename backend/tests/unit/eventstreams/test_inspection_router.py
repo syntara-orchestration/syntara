@@ -68,7 +68,27 @@ def test_unsaved_flat_request_delegates(client: TestClient, service: AsyncMock) 
         **data,
         "input_schema": None,
         "filter": None,
+        "start": {"position": "latest", "added_partition_position": "earliest", "offset_gap_policy": "earliest"},
+        "group_id": None,
     }
+
+
+def test_unsaved_consumption_overrides_reach_service(client: TestClient, service: AsyncMock) -> None:
+    settings = {"position": "earliest", "added_partition_position": "latest", "offset_gap_policy": "fail"}
+    data = {
+        "topic": "alerts",
+        "integration_id": str(uuid4()),
+        "credential_id": str(uuid4()),
+        "start": settings,
+        "group_id": "orders-reader",
+    }
+
+    response = client.post(f"/api/v1/workflows/{uuid4()}/event_subscriptions/test", json=data)
+
+    assert response.status_code == 200
+    parameters = service.test_unsaved.call_args.args[1]
+    assert parameters.start.model_dump(mode="json") == settings
+    assert parameters.group_id == "orders-reader"
 
 
 @pytest.mark.parametrize(
@@ -79,6 +99,18 @@ def test_unsaved_flat_request_delegates(client: TestClient, service: AsyncMock) 
         {"transport": "kafka"},
         {"initial_partition_ids": [0, 2, 5]},
         {"credential_id": None},
+        {"group_id": ""},
+        {"group_id": "a" * 513},
+        {"group_id": "\n"},
+        {"group_id": "\x00"},
+        {"group_id": "../x"},
+        {"group_id": "orders\n"},
+        {"start": None},
+        {"start": {"position": "invalid"}},
+        {"start": {"added_partition_position": "fail"}},
+        {"start": {"offset_gap_policy": "ignore"}},
+        {"start": {"enable_auto_commit": True}},
+        {"enable_auto_commit": True},
     ],
 )
 def test_unsaved_rejects_invalid_or_selected_account_fields(

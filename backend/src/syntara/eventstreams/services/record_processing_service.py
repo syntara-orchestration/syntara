@@ -1,16 +1,19 @@
 """Resolve accepted runs before decoding and admitting new Kafka records."""
 
 from collections.abc import Callable
+from contextlib import suppress
 from datetime import UTC, datetime, timedelta
 
 import structlog
 from sqlalchemy.exc import SQLAlchemyError
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from syntara.audit.dispatcher import AuditEventDispatcher
 from syntara.core.config.base import get_settings
 from syntara.core.constants import EventSchedulingDefaults
 from syntara.core.exceptions import SyntaraError
-from syntara.eventstreams.adapters.record_identity import record_matches_metadata
+from syntara.eventstreams.adapters.record_identity import record_matches_metadata, record_matches_source
+from syntara.eventstreams.audit.record_rejection import EventRecordRejectedEvent
 from syntara.eventstreams.core.deduplication import DeliveryIdentity
 from syntara.eventstreams.core.envelope import RawEvent
 from syntara.eventstreams.core.filter_input import EventFilterInput, FilterPayload
@@ -32,7 +35,7 @@ logger = structlog.stdlib.get_logger(__name__)
 
 
 class EventRecordProcessingService:
-    """Keep unresolved records in the partition queue; never discard without activity evidence."""
+    """Keep unresolved work queued; classify local skips without activity-log dependencies."""
 
     def __init__(
         self,
@@ -158,12 +161,12 @@ class EventRecordProcessingService:
         guard: Callable[[], bool] | None,
     ) -> RecordResult:
         if isinstance(decoded, EventDecodeFailure):
-            return HeldRecord(reason="activity_log_unavailable", permanent_content_error=True)
+            return self._skip_content(snapshot, identity, decoded, guard)
         if not self._admission_open(snapshot, guard):
             return self._hold("admission_closed")
         prepared = await self._preparation.prepare_delivery(snapshot, identity, decoded.envelope)
         if isinstance(prepared, EventDecodeFailure):
-            return HeldRecord(reason="activity_log_unavailable", permanent_content_error=True)
+            return self._skip_content(snapshot, identity, prepared, guard)
         if not isinstance(prepared, PreparedExecution):
             return self._hold(prepared.reason)
         if not self._admission_open(snapshot, guard):
@@ -196,7 +199,9 @@ class EventRecordProcessingService:
         else:
             decoded = self._decoder.decode(event, schema=snapshot.model_dump(mode="json")["input_schema"])
         if isinstance(decoded, EventDecodeFailure):
-            return HeldRecord(reason="activity_log_unavailable", permanent_content_error=True)
+            if apply_filter:
+                return self._skip_content(snapshot, identity, decoded, admission_guard)
+            self._audit_content_failure(snapshot, identity, decoded)
         return InspectedRecord(identity=identity)
 
     async def hold_content_failure(
@@ -207,13 +212,55 @@ class EventRecordProcessingService:
         *,
         admission_guard: Callable[[], bool] | None = None,
     ) -> RecordResult:
-        """Keep unbufferable invalid content uncommitted until activity logging exists."""
+        """Recover accepted work or classify proven invalid content under current gates."""
         accepted = await self._accepted(snapshot, identity)
         if accepted is not None:
             return accepted
-        if not self._admission_open(snapshot, admission_guard):
+        return self._skip_content(snapshot, identity, failure, admission_guard)
+
+    def _skip_content(
+        self,
+        snapshot: SubscriptionSnapshot,
+        identity: DeliveryIdentity,
+        failure: EventDecodeFailure,
+        guard: Callable[[], bool] | None,
+    ) -> SkippedRecord | HeldRecord:
+        if (
+            identity.subscription_id != snapshot.subscription_id
+            or identity.workflow_id != snapshot.workflow_id
+            or identity.source_id != snapshot.source_id
+            or identity.source_generation != snapshot.source_generation
+            or identity.integration_identity != snapshot.integration_identity
+            or identity.deployment_id != snapshot.deployment_id
+            or not record_matches_source(identity.record, snapshot.configuration)
+        ):
+            return self._hold("delivery_evidence_mismatch")
+        if not self._admission_open(snapshot, guard):
             return self._hold("admission_closed")
-        return HeldRecord(reason=failure.code.value, permanent_content_error=True)
+        self._audit_content_failure(snapshot, identity, failure)
+        if not self._admission_open(snapshot, guard):
+            return self._hold("admission_closed")
+        return SkippedRecord(
+            identity=identity,
+            configuration_revision=snapshot.configuration_revision,
+            outcome="invalid_content",
+            error_code=failure.code,
+        )
+
+    @staticmethod
+    def _audit_content_failure(
+        snapshot: SubscriptionSnapshot, identity: DeliveryIdentity, failure: EventDecodeFailure
+    ) -> None:
+        """Use existing best-effort OTEL audit delivery; it is never offset evidence."""
+        with suppress(Exception):
+            AuditEventDispatcher.dispatch(
+                EventRecordRejectedEvent(
+                    identity=identity,
+                    configuration_revision=snapshot.configuration_revision,
+                    error_code=failure.code,
+                ),
+                max_pending=get_settings().audit_writer_max_concurrent_writes,
+            )
 
     @staticmethod
     def _event_matches(snapshot: SubscriptionSnapshot, identity: DeliveryIdentity, event: RawEvent) -> bool:

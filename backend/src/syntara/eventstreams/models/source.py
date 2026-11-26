@@ -35,8 +35,9 @@ class EventSubscriptionSource(BaseResource, table=True):
 
     Inherits ``id``, ``created_at``, ``updated_at`` and ``labels`` from
     ``BaseResource``. A source is created inside the workflow publication
-    transaction and is immutable apart from its initialization/retirement
-    boundary fields.
+    transaction. Its address and group stay fixed; publication may replace
+    reading policies under a new configuration revision. Initialization and
+    retirement retain their existing lifecycle boundaries.
     """
 
     __tablename__ = "event_subscription_sources"
@@ -118,9 +119,9 @@ class EventSubscriptionSource(BaseResource, table=True):
             "generation",
             unique=True,
         ),
-        # Kafka-only partial-unique index over the generated consumer group id
+        # Kafka-only partial-unique index over the consumer group id
         # (a JSONB expression). A replaced source gets a new generation and group,
-        # so group ids stay unique within Kafka sources.
+        # so custom and generated group ids stay unique within Kafka sources.
         Index(
             "ix_event_subscription_sources_kafka_group_id",
             text("(configuration->>'group_id')"),

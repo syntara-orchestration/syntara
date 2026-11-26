@@ -1,8 +1,10 @@
 """Kafka initialization and gap recovery without worker or route imports."""
 
 import asyncio
+from contextlib import suppress
 from uuid import UUID
 
+import structlog
 from sqlalchemy.exc import SQLAlchemyError
 
 from syntara.core.constants import EventSchedulingDefaults, EventStreamLimits
@@ -28,6 +30,7 @@ from syntara.eventstreams.adapters.kafka_position_store import (
     KafkaPositionError,
     PositionContext,
 )
+from syntara.eventstreams.adapters.kafka_start_configuration import KafkaOffsetGapPolicy, KafkaStartPosition
 from syntara.eventstreams.core.consumer import CommittedPositionResult, SourceIdentityObservation
 from syntara.eventstreams.core.consumer import PositionStatus as BrokerPositionStatus
 from syntara.eventstreams.exceptions import (
@@ -39,6 +42,7 @@ from syntara.eventstreams.exceptions import (
 )
 
 _DEPENDENCY_ERRORS = (SQLAlchemyError, OSError, TimeoutError, KafkaTransportError)
+logger = structlog.stdlib.get_logger(__name__)
 
 
 class KafkaInitialPositionService:
@@ -84,7 +88,7 @@ class KafkaInitialPositionService:
         return await self._run(request, recover=True)
 
     async def recover_automatically(self, request: PositionRequest) -> PositionResult:
-        """Reset an offset gap to retained beginning without a manual decision."""
+        """Apply the saved recovery decision or the published offset-gap policy."""
         return await self._run(request, recover=True, automatic=True)
 
     async def replace_recovery(self, request: RecoveryReplacementRequest) -> PositionResult:
@@ -155,6 +159,7 @@ class KafkaInitialPositionService:
             if exc.status == PositionStatus.RECOVERY_GAP:
                 try:
                     await self._store.mark_gap(request, GapReason(exc.reason))
+                    self._log_gap(request, exc.reason)
                 except KafkaPositionError as changed:
                     status, reason = changed.status, changed.reason
                 except _DEPENDENCY_ERRORS:
@@ -165,6 +170,17 @@ class KafkaInitialPositionService:
             status = PositionStatus.BLOCKED
             reason = "storage_unavailable" if isinstance(exc, SQLAlchemyError) else "dependency_unavailable"
         return self._result(request, status, reason=reason)
+
+    @staticmethod
+    def _log_gap(request: PositionRequest, reason: str) -> None:
+        """Report sanitized position failures without making log delivery a recovery gate."""
+        with suppress(Exception):
+            logger.error(
+                "event_subscription_offset_gap",
+                source_id=str(request.source_id),
+                partition=request.partition,
+                reason=reason,
+            )
 
     async def _fenced(self, request: PositionRequest, *, token: UUID) -> bool:
         self._assigned(request)
@@ -244,12 +260,24 @@ class KafkaInitialPositionService:
             raise KafkaPositionError(GapReason.INITIAL_METADATA_MISSING.value, PositionStatus.RECOVERY_GAP)
         return lower
 
-    async def _existing_group_position(self, request: PositionRequest, offset: int) -> KafkaPartitionInitialPosition:
+    async def _existing_group_position(
+        self, request: PositionRequest, offset: int, observation: SourceIdentityObservation
+    ) -> KafkaPartitionInitialPosition:
         # An initializer may have committed since the first database read.
         winner = await self._store.read(request)
         self._source(winner)
         if winner.position is not None:
             return winner.position
+        if winner.source_initialized_at is None or (
+            winner.configuration.initial_partition_ids is not None
+            and request.partition not in winner.configuration.initial_partition_ids
+        ):
+            configuration = await self._store.capture_initial_partitions(request, observation)
+            self._assigned(request)
+            kind = KafkaInitialPositionStore.initialization_kind(configuration, request.partition)
+            return await self._store.choose_initial(
+                request, observation, offset, initialization_kind=kind, existing_group_position=True
+            )
         try:
             return await self._store.record_missing_initial(request, offset)
         except _DEPENDENCY_ERRORS as exc:
@@ -257,18 +285,48 @@ class KafkaInitialPositionService:
             raise KafkaPositionError(msg) from exc
 
     async def _new_position(
-        self, request: PositionRequest, committed: CommittedPositionResult, observation: SourceIdentityObservation
+        self,
+        request: PositionRequest,
+        committed: CommittedPositionResult,
+        observation: SourceIdentityObservation,
+        context: PositionContext,
     ) -> KafkaPartitionInitialPosition:
-        if committed.status == BrokerPositionStatus.VERIFIED and committed.offset is not None:
-            return await self._existing_group_position(request, committed.offset)
-        if committed.status != BrokerPositionStatus.ABSENT:
-            msg = "committed_position_uncertain"
-            raise KafkaPositionError(msg)
+        if (
+            context.source_initialized_at is not None
+            and context.configuration.initial_partition_ids is None
+            and committed.status == BrokerPositionStatus.VERIFIED
+            and committed.offset is not None
+        ):
+            # Unknown history must be persisted before attempting to capture a
+            # first set. Capture correctly refuses to invent established history.
+            return await self._existing_group_position(request, committed.offset, observation)
         configuration = await self._store.capture_initial_partitions(request, observation)
         self._assigned(request)
         bounds = await self._bounds(request)
+        if committed.status == BrokerPositionStatus.VERIFIED and committed.offset is not None:
+            if bounds[0] <= committed.offset <= bounds[1]:
+                return await self._existing_group_position(request, committed.offset, observation)
+            # A completed source's missing first-partition history is still a
+            # recovery problem. A genuinely new partition uses its start policy.
+            context = await self._store.read(request)
+            self._source(context)
+            if context.position is not None:
+                return context.position
+            if context.source_initialized_at is not None and (
+                context.configuration.initial_partition_ids is None
+                or request.partition in context.configuration.initial_partition_ids
+            ):
+                return await self._existing_group_position(request, committed.offset, observation)
+        elif committed.status != BrokerPositionStatus.ABSENT:
+            msg = "committed_position_uncertain"
+            raise KafkaPositionError(msg)
         kind = KafkaInitialPositionStore.initialization_kind(configuration, request.partition)
-        boundary = bounds[1] if kind == InitializationKind.FIRST_ACTIVATION else bounds[0]
+        policy = (
+            configuration.start.position
+            if kind == InitializationKind.FIRST_ACTIVATION
+            else configuration.start.added_partition_position
+        )
+        boundary = bounds[1] if policy == KafkaStartPosition.LATEST else bounds[0]
         return await self._store.choose_initial(request, observation, boundary, initialization_kind=kind)
 
     @staticmethod
@@ -301,7 +359,7 @@ class KafkaInitialPositionService:
         observation = await self._observe_identity(request)
         committed = await self._committed(request)
         if row is None:
-            row = await self._new_position(request, committed, observation)
+            row = await self._new_position(request, committed, observation, context)
             if row.gap_detected_at is not None:
                 return self._gap_result(request, row)
             # Reload the winner's committed progress rather than overwriting it.
@@ -322,7 +380,13 @@ class KafkaInitialPositionService:
             msg = "recovery_incomplete"
             raise KafkaPositionError(msg)
         established = row.initial_commit_confirmed_at is not None or row.recovery_confirmed_at is not None
-        if committed.status == BrokerPositionStatus.ABSENT:
+        stale_initial_commit = (
+            not established
+            and committed.status == BrokerPositionStatus.VERIFIED
+            and committed.offset is not None
+            and not bounds[0] <= committed.offset <= bounds[1]
+        )
+        if committed.status == BrokerPositionStatus.ABSENT or stale_initial_commit:
             if established:
                 raise KafkaPositionError(GapReason.MISSING_COMMIT.value, PositionStatus.RECOVERY_GAP)
             boundary = row.initial_next_offset
@@ -422,13 +486,26 @@ class KafkaInitialPositionService:
             return await self._initialize(request)
         if row.gap_reason not in AUTOMATIC_RECOVERY_REASONS:
             return self._gap_result(request, row)
-        if row.recovery_token is not None and (
-            row.pending_policy != RecoveryPolicy.RETAINED_BEGINNING.value
-            or row.pending_duplicate_risk_acknowledged
-            or row.pending_reason not in AUTOMATIC_RECOVERY_REASONS
-        ):
-            msg = "administrative_recovery_pending"
-            raise KafkaPositionError(msg)
+        if row.recovery_token is not None:
+            pending_policy = row.pending_policy
+            if (
+                pending_policy is None
+                or pending_policy not in {RecoveryPolicy.RETAINED_BEGINNING.value, RecoveryPolicy.CURRENT_END.value}
+                or row.pending_duplicate_risk_acknowledged
+                or row.pending_reason not in AUTOMATIC_RECOVERY_REASONS
+            ):
+                msg = "administrative_recovery_pending"
+                raise KafkaPositionError(msg)
+            policy = RecoveryPolicy(pending_policy)
+        else:
+            configured_policy = context.configuration.start.offset_gap_policy
+            if configured_policy == KafkaOffsetGapPolicy.FAIL:
+                return self._gap_result(request, row)
+            policy = (
+                RecoveryPolicy.CURRENT_END
+                if configured_policy == KafkaOffsetGapPolicy.LATEST
+                else RecoveryPolicy.RETAINED_BEGINNING
+            )
         reason = row.pending_reason if row.recovery_token is not None else row.gap_reason
         if reason is None:
             msg = "recovery_reason_unavailable"
@@ -437,6 +514,7 @@ class KafkaInitialPositionService:
             **request.model_dump(),
             expected_recovery_revision=row.recovery_revision,
             reason=reason,
+            policy=policy,
         )
         if row.pending_boundary is not None:
             bounds = await self._bounds(recovery)
@@ -445,7 +523,8 @@ class KafkaInitialPositionService:
                 replacement = RecoveryReplacementRequest(
                     **recovery.model_dump(), expected_pending_boundary=row.pending_boundary
                 )
-                row = await self._store.replace_recovery(replacement, bounds[0])
+                boundary = bounds[1] if policy == RecoveryPolicy.CURRENT_END else bounds[0]
+                row = await self._store.replace_recovery(replacement, boundary)
                 recovery = recovery.model_copy(update={"expected_recovery_revision": row.recovery_revision})
         return await self._recover(recovery)
 

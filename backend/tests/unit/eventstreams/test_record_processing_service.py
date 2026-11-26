@@ -5,6 +5,8 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from syntara.audit.dispatcher import AuditEventDispatcher
+from syntara.eventstreams.audit.record_rejection import EventRecordRejectedEvent
 from syntara.eventstreams.core.deduplication import DeliveryIdentity, DeliveryState, TerminalDelivery
 from syntara.eventstreams.core.envelope import RawEvent
 from syntara.eventstreams.core.handler import ResolvedDelivery, RetryDelivery, SchedulingFailureCode
@@ -14,6 +16,14 @@ from syntara.eventstreams.core.results import EventDecodeFailure, EventFailureCo
 from syntara.eventstreams.services.admission_service import EventAdmissionService
 from syntara.eventstreams.services.record_processing_service import EventRecordProcessingService
 from tests.unit.eventstreams.test_execution_preparation_service import PreparationContext, preparation_context
+
+
+@pytest.fixture(autouse=True)
+def audit_dispatch(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
+    """Keep platform audit delivery outside isolated processing tests."""
+    dispatch = MagicMock()
+    monkeypatch.setattr(AuditEventDispatcher, "dispatch", dispatch)
+    return dispatch
 
 
 def terminal(identity: DeliveryIdentity) -> ResolvedDelivery:
@@ -45,8 +55,10 @@ def processing_context(
 
 
 @pytest.mark.parametrize("entrypoint", ["process", "inspection", "content_failure"])
-async def test_accepted_run_wins_before_current_validation(monkeypatch, entrypoint) -> None:
+@pytest.mark.parametrize("value", [b'{"count":2}', b"invalid", None], ids=["valid", "invalid", "tombstone"])
+async def test_accepted_run_wins_before_current_validation(monkeypatch, entrypoint, value) -> None:
     context, service, admission, event = processing_context(monkeypatch)
+    event = event.model_copy(update={"value": value})
     admission.recover_accepted.return_value = terminal(context.identity)
     forbidden = AsyncMock(side_effect=AssertionError("Accepted work must not use current admission"))
     monkeypatch.setattr(service, "admission_eligible", forbidden)
@@ -76,14 +88,66 @@ async def test_valid_message_prepares_in_memory_then_schedules(monkeypatch) -> N
     context.session.add.assert_not_called()
 
 
-async def test_invalid_message_is_held_without_execution_or_discard(monkeypatch) -> None:
+async def test_invalid_message_is_audited_and_skipped_without_execution(monkeypatch, audit_dispatch) -> None:
     context, service, admission, event = processing_context(monkeypatch)
     monkeypatch.setattr(service, "admission_eligible", AsyncMock(return_value=True))
     result = await service.process(context.snapshot, context.identity, event.model_copy(update={"value": b"invalid"}))
-    assert isinstance(result, HeldRecord)
-    assert result.permanent_content_error
+    assert isinstance(result, SkippedRecord)
+    assert result.outcome == "invalid_content"
+    assert result.error_code == EventFailureCode.invalid_json
+    audit_dispatch.assert_called_once()
+    rejected = audit_dispatch.call_args.args[0]
+    assert isinstance(rejected, EventRecordRejectedEvent)
+    assert rejected.identity == context.identity
+    assert rejected.configuration_revision == context.snapshot.configuration_revision
+    assert rejected.error_code == EventFailureCode.invalid_json
+    admission.recover_accepted.assert_awaited_once_with(context.identity)
     admission.schedule.assert_not_awaited()
     context.session.add.assert_not_called()
+
+
+async def test_audit_delivery_failure_does_not_hold_invalid_content(monkeypatch, audit_dispatch) -> None:
+    context, service, admission, event = processing_context(monkeypatch)
+    monkeypatch.setattr(service, "admission_eligible", AsyncMock(return_value=True))
+    audit_dispatch.side_effect = RuntimeError("audit unavailable")
+
+    result = await service.process(context.snapshot, context.identity, event.model_copy(update={"value": b"invalid"}))
+
+    assert isinstance(result, SkippedRecord)
+    assert result.outcome == "invalid_content"
+    admission.schedule.assert_not_awaited()
+    context.session.add.assert_not_called()
+
+
+async def test_closed_admission_prevents_invalid_content_skip(monkeypatch, audit_dispatch) -> None:
+    context, service, admission, event = processing_context(monkeypatch)
+
+    result = await service.process(
+        context.snapshot,
+        context.identity,
+        event.model_copy(update={"value": b"invalid"}),
+        admission_guard=lambda: False,
+    )
+
+    assert isinstance(result, HeldRecord)
+    audit_dispatch.assert_not_called()
+    admission.schedule.assert_not_awaited()
+
+
+async def test_invalid_content_inspection_behind_a_fence_does_not_authorize_commit(monkeypatch, audit_dispatch) -> None:
+    context, service, admission, event = processing_context(monkeypatch)
+    gate = MagicMock(spec=RecordProcessingGate)
+    gate.admission_open.return_value = gate.resolution_open.return_value = False
+    service._gate = gate
+
+    result = await service.inspect_only(
+        context.snapshot, context.identity, event.model_copy(update={"value": b"invalid"})
+    )
+
+    assert isinstance(result, InspectedRecord)
+    audit_dispatch.assert_called_once()
+    admission.recover_accepted.assert_awaited_once_with(context.identity)
+    admission.schedule.assert_not_awaited()
 
 
 async def test_closed_placement_guard_blocks_new_work(monkeypatch) -> None:
