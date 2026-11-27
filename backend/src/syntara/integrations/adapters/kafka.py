@@ -86,6 +86,9 @@ class KafkaAdapter:
             context.verify_mode = ssl.CERT_NONE  # NOSONAR
             return context
         context = ssl.create_default_context()  # NOSONAR
+        # Accept legacy broker CAs that omit keyUsage while keeping chain and
+        # hostname verification enabled.
+        context.verify_flags &= ~ssl.VERIFY_X509_STRICT
         if self._config.ca_certificate:
             context.load_verify_locations(cadata=self._config.ca_certificate)
         return context

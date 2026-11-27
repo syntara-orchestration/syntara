@@ -428,6 +428,21 @@ class TestKafkaTlsContext:
         assert isinstance(context, ssl.SSLContext)
         load_ca.assert_called_once()
 
+    def test_verified_context_allows_legacy_ca_certificates(
+        self, kafka_config: KafkaConfiguration, resolved_credential: dict[str, Any]
+    ) -> None:
+        """Clear strict X.509 checks while continuing to verify the Kafka broker."""
+        default_context = ssl.create_default_context()
+        default_context.verify_flags |= ssl.VERIFY_X509_STRICT
+        default_flags = default_context.verify_flags
+        with patch.object(ssl, "create_default_context", return_value=default_context):
+            options = KafkaAdapter(kafka_config).connection_options(resolved_credential, timeout_seconds=5)
+
+        context = options["ssl_context"]
+        assert context.verify_flags == default_flags & ~ssl.VERIFY_X509_STRICT
+        assert context.verify_mode == ssl.CERT_REQUIRED
+        assert context.check_hostname
+
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(("protocol", "opt_in"), [("SSL", False), ("PLAINTEXT", True)])
