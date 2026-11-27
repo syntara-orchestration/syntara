@@ -12,6 +12,7 @@ from syntara.workflow_runtime.engines.temporal.utils.datetime import ensure_time
 from syntara.workflow_runtime.engines.temporal.utils.loop_iteration_ids import (
     innermost_iteration_index,
     iteration_indices,
+    resolve_loop_iteration_canvas_id,
     strip_loop_iteration_suffixes,
 )
 from syntara.workflow_runtime.engines.utils.timeout_messages import build_timeout_error_message
@@ -28,13 +29,24 @@ class ActivitySyncEventProcessorMixin:
         attrs = event.activity_task_scheduled_event_attributes
         if attrs.activity_id.startswith("__internal__"):
             return
-        iteration_number = innermost_iteration_index(attrs.activity_id)
-        if iteration_number is not None:
-            base_activity_id = strip_loop_iteration_suffixes(attrs.activity_id)
-            has_iter_suffix = True
+        resolved_activity_id = resolve_loop_iteration_canvas_id(
+            attrs.activity_id,
+            metadata.activity_definitions_map,
+            metadata.loop_body_activity_ids,
+            (
+                node_id
+                for node_id, node in metadata.activity_definitions_map.items()
+                if node.get("type") == NodeType.LOOP
+            ),
+        )
+        if resolved_activity_id is not None:
+            base_activity_id = resolved_activity_id
+        elif metadata.activity_definitions_map:
+            return
         else:
-            base_activity_id = attrs.activity_id
-            has_iter_suffix = False
+            base_activity_id = strip_loop_iteration_suffixes(attrs.activity_id)
+        has_iter_suffix = base_activity_id != attrs.activity_id
+        iteration_number = innermost_iteration_index(attrs.activity_id) if has_iter_suffix else None
         is_loop_iteration = (
             has_iter_suffix
             or base_activity_id in metadata.terminal_activity_ids
@@ -82,7 +94,9 @@ class ActivitySyncEventProcessorMixin:
             "error_details": None,
             "retry_count": 0,
             "iteration": iteration_number,
-            "_history_activity_id": attrs.activity_id if iteration_indices(attrs.activity_id) else None,
+            "_history_activity_id": attrs.activity_id
+            if has_iter_suffix or iteration_indices(attrs.activity_id)
+            else None,
             "scheduled_at": ensure_timezone_aware(event.event_time),
             "configured_timeout_seconds": configured_timeout_seconds,
         }

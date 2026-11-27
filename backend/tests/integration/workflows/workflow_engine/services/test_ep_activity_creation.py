@@ -12,6 +12,8 @@ from uuid import UUID, uuid4, uuid5
 
 import pytest
 from execution_plane_client.commands.control import CompletionStatus
+from execution_plane_client.commands.credentials import CredentialResolveWorkload
+from execution_plane_client.commands.results import CredentialResolveWorkloadCommandResult
 from execution_plane_client.commands.work import WorkExecute
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlmodel import select
@@ -19,13 +21,16 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from temporalio import activity
 from temporalio.exceptions import ApplicationError
 
+from syntara.execution_plane.commands import credentials as command_credentials
 from syntara.execution_plane.commands.completion import CompletionCommandHandler
 from syntara.execution_plane.commands.context import AOCommandContext
+from syntara.execution_plane.commands.credentials import CredentialResolveWorkloadCommandHandler
 from syntara.workflow_core.models import NodeType
 from syntara.workflow_runtime.engines.temporal.activities.ep import ep_dispatch_activity as dispatch
 from syntara.workflow_runtime.engines.temporal.services.activity_sync_service import ActivitySyncService
 from syntara.workflows.models.activity_execution import ActivityExecution, ActivityStatus
 from syntara.workflows.models.execution import Execution
+from syntara.workflows.models.workflow_version import WorkflowVersion
 
 _NODE_ID = "test_activity"
 _DEFINITIONS = {
@@ -82,6 +87,20 @@ def ep_submission(
         patch.object(dispatch, "_submit_and_read_work", return_value={"status": "pending"}) as submission,
     ):
         yield submission
+
+
+def allow_plugin_recipe(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Isolate callback correlation from the built-in script plugin registry."""
+    monkeypatch.setattr(
+        command_credentials,
+        "get_execution_plane_plugin_by_node_type",
+        AsyncMock(return_value=SimpleNamespace(name="script-bash")),
+    )
+    monkeypatch.setattr(
+        command_credentials,
+        "execution_plane_plugin_credential_recipe_ids",
+        AsyncMock(return_value=("acme.echo.api-token",)),
+    )
 
 
 @pytest.mark.asyncio
@@ -300,3 +319,149 @@ async def test_loop_body_completion_correlates_canvas_activity(
             result=result,
             runtime_context=runtime_context,
         )
+
+
+@pytest.mark.asyncio
+async def test_loop_body_credential_resolution_correlates_canvas_activity(
+    test_execution: Execution,
+    test_db_session_factory: async_sessionmaker[AsyncSession],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Credential commands can resolve loop-body work through runtime context."""
+    credential_ref = uuid4()
+    async with test_db_session_factory() as session:
+        version = await session.get(WorkflowVersion, test_execution.workflow_version_id)
+        assert version is not None
+        definition = dict(version.workflow_definition)
+        nodes = [dict(node) for node in definition["nodes"]]
+        target = next(node for node in nodes if node["id"] == _NODE_ID)
+        parameters = dict(target.get("parameters", {}))
+        parameters["credential_bindings"] = [
+            {"credential_recipe_id": "acme.echo.api-token", "credential_ref": str(credential_ref)}
+        ]
+        target["parameters"] = parameters
+        definition["nodes"] = nodes
+        version.workflow_definition = definition
+        await session.commit()
+
+    monitor = ActivitySyncService(Mock(), test_db_session_factory, AsyncMock())
+    await monitor._create_all_activities_upfront(test_execution.id, _DEFINITIONS)
+
+    loop_activity_id = f"{_NODE_ID}_iter_0"
+    work_id = uuid5(test_execution.id, loop_activity_id)
+    message = CredentialResolveWorkload(
+        work_item_id=work_id,
+        attempt_id="attempt",
+        credential_ref=credential_ref,
+        credential_recipe_id="acme.echo.api-token",
+        step_revision_id="step-revision",
+        runtime_context={
+            "execution_id": str(test_execution.id),
+            "temporal_activity_id": loop_activity_id,
+        },
+    ).to_message(
+        source_id="execution-plane",
+        destination_id="syntara-orchestration",
+        client_id="syntara-orchestration",
+    )
+    payload = CredentialResolveWorkload.model_validate(message.command.payload)
+    resolve_document = AsyncMock(return_value={"token": "resolved-token"})
+    monkeypatch.setattr(CredentialResolveWorkloadCommandHandler, "_resolve_credential_document", resolve_document)
+    allow_plugin_recipe(monkeypatch)
+
+    async with test_db_session_factory() as reader:
+        handling = await CredentialResolveWorkloadCommandHandler().handle(
+            message,
+            payload,
+            AOCommandContext(reader, AsyncMock()),
+        )
+
+    assert handling.result is not None
+    assert isinstance(handling.result, CredentialResolveWorkloadCommandResult)
+    assert handling.result.credential == {"token": "resolved-token"}
+    assert handling.resource is not None
+    assert handling.resource.resource_id == work_id
+    resolve_document.assert_awaited_once_with(reader, credential_ref, test_execution.project_id)
+
+
+@pytest.mark.asyncio
+async def test_later_loop_iteration_credential_resolution_selects_active_row(
+    test_execution: Execution,
+    test_db_session_factory: async_sessionmaker[AsyncSession],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A later callback must not validate against terminal iteration zero."""
+    credential_ref = uuid4()
+    async with test_db_session_factory() as session:
+        version = await session.get(WorkflowVersion, test_execution.workflow_version_id)
+        assert version is not None
+        definition = dict(version.workflow_definition)
+        nodes = [dict(node) for node in definition["nodes"]]
+        target = next(node for node in nodes if node["id"] == _NODE_ID)
+        parameters = dict(target.get("parameters", {}))
+        parameters["credential_bindings"] = [
+            {"credential_recipe_id": "acme.echo.api-token", "credential_ref": str(credential_ref)}
+        ]
+        target["parameters"] = parameters
+        definition["nodes"] = nodes
+        version.workflow_definition = definition
+        await session.commit()
+
+    monitor = ActivitySyncService(Mock(), test_db_session_factory, AsyncMock())
+    await monitor._create_all_activities_upfront(test_execution.id, _DEFINITIONS)
+    temporal_activity_id = f"{_NODE_ID}_iter_1"
+    async with test_db_session_factory() as session:
+        base_row = (
+            await session.exec(
+                select(ActivityExecution).where(
+                    ActivityExecution.execution_id == test_execution.id,
+                    ActivityExecution.activity_name == _NODE_ID,
+                )
+            )
+        ).one()
+        base_row.status = ActivityStatus.COMPLETED
+        base_row.iteration = 0
+        session.add(
+            ActivityExecution(
+                execution_id=test_execution.id,
+                activity_name=f"{_NODE_ID}#iter-1",
+                node_type=NodeType.SCRIPT_PYTHON,
+                temporal_activity_id=temporal_activity_id,
+                status=ActivityStatus.RUNNING,
+                iteration=1,
+            )
+        )
+        await session.commit()
+
+    work_id = uuid5(test_execution.id, temporal_activity_id)
+    message = CredentialResolveWorkload(
+        work_item_id=work_id,
+        attempt_id="attempt",
+        credential_ref=credential_ref,
+        credential_recipe_id="acme.echo.api-token",
+        step_revision_id="step-revision",
+        runtime_context={
+            "execution_id": str(test_execution.id),
+            "temporal_activity_id": temporal_activity_id,
+        },
+    ).to_message(
+        source_id="execution-plane",
+        destination_id="syntara-orchestration",
+        client_id="syntara-orchestration",
+    )
+    payload = CredentialResolveWorkload.model_validate(message.command.payload)
+    resolve_document = AsyncMock(return_value={"token": "resolved-token"})
+    monkeypatch.setattr(CredentialResolveWorkloadCommandHandler, "_resolve_credential_document", resolve_document)
+    allow_plugin_recipe(monkeypatch)
+
+    async with test_db_session_factory() as reader:
+        handling = await CredentialResolveWorkloadCommandHandler().handle(
+            message,
+            payload,
+            AOCommandContext(reader, AsyncMock()),
+        )
+
+    assert handling.result is not None
+    assert isinstance(handling.result, CredentialResolveWorkloadCommandResult)
+    assert handling.result.credential == {"token": "resolved-token"}
+    resolve_document.assert_awaited_once_with(reader, credential_ref, test_execution.project_id)

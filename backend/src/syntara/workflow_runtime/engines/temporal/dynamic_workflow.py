@@ -63,7 +63,10 @@ from syntara.workflow_core.models import (
 from syntara.workflow_core.utils.namespace_resolver import NamespaceResolver
 from syntara.workflow_runtime.engines.temporal.approval_mixin import WorkflowApprovalMixin
 from syntara.workflow_runtime.engines.temporal.converge_mixin import WorkflowConvergeMixin
-from syntara.workflow_runtime.engines.temporal.utils.loop_iteration_ids import loop_control_activity_id
+from syntara.workflow_runtime.engines.temporal.utils.loop_iteration_ids import (
+    loop_body_temporal_activity_id,
+    loop_control_activity_id,
+)
 from syntara.workflow_runtime.engines.unified_eval import safe_eval_with_namespace
 
 # Trigger types allowed for dynamic dispatch via Temporal activities.
@@ -359,8 +362,10 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
             copy.deepcopy({**output, "status": "completed"})
         )
         completed_node = graph.get_node(completed_node_id)
-        if completed_node.type == NodeType.APPROVAL:
-            history_activity_id = self._approval_activity_id(completed_node_id)
+        if completed_node.type != NodeType.LOOP:
+            history_activity_id = loop_body_temporal_activity_id(
+                completed_node_id, self.loop_body_map, self.node_control_data
+            )
             if history_activity_id != completed_node_id:
                 self.activity_output_history.setdefault(history_activity_id, []).append(
                     copy.deepcopy({**output, "status": "completed"})
@@ -465,8 +470,8 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
             history_activity_id = loop_control_activity_id(
                 node_id, current_index, self.loop_body_map, self.node_control_data
             )
-        elif failed_node.type == NodeType.APPROVAL:
-            history_activity_id = self._approval_activity_id(node_id)
+        else:
+            history_activity_id = loop_body_temporal_activity_id(node_id, self.loop_body_map, self.node_control_data)
         if history_activity_id and history_activity_id != node_id:
             self.activity_output_history.setdefault(history_activity_id, []).append(copy.deepcopy(namespace_entry))
 
@@ -1315,7 +1320,11 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
             await workflow.execute_activity(
                 activity_name,
                 args=args,
-                activity_id=node.id,
+                activity_id=loop_body_temporal_activity_id(
+                    node.id,
+                    self.loop_body_map,
+                    self.node_control_data,
+                ),
                 start_to_close_timeout=timedelta(seconds=timeout_seconds),
                 heartbeat_timeout=heartbeat_timeout,
                 retry_policy=retry_policy,
@@ -1630,8 +1639,8 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         timeout_seconds = resolve_timeout(node, self._runtime_settings)
         self.node_inputs[node.id] = copy.deepcopy(resolved_parameters)
         self.activity_input_history.setdefault(node.id, []).append(copy.deepcopy(resolved_parameters))
-        if node.type == NodeType.APPROVAL:
-            history_activity_id = self._approval_activity_id(node.id)
+        if node.type != NodeType.LOOP:
+            history_activity_id = loop_body_temporal_activity_id(node.id, self.loop_body_map, self.node_control_data)
             if history_activity_id != node.id:
                 self.activity_input_history.setdefault(history_activity_id, []).append(
                     copy.deepcopy(resolved_parameters)

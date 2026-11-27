@@ -34,7 +34,7 @@ with workflow.unsafe.imports_passed_through():
 from syntara.workflow_core.graph import ActivityNode, WorkflowGraph
 from syntara.workflow_core.utils.namespace_resolver import NamespaceResolver
 from syntara.workflow_runtime.engines.temporal.utils.loop_iteration_ids import (
-    approval_temporal_activity_id,
+    loop_body_temporal_activity_id,
     loop_index_chain,
     use_unique_loop_iteration_ids,
 )
@@ -159,7 +159,7 @@ class WorkflowApprovalMixin:
         pre-patch executions keep the canvas ID so replay matches history.
         The Approvals API ``approval_node_id`` is always the canvas ID.
         """
-        return approval_temporal_activity_id(node_id, self.loop_body_map, self.node_control_data)
+        return loop_body_temporal_activity_id(node_id, self.loop_body_map, self.node_control_data)
 
     async def _expire_approvals(self, node_id: str | None, activity_id: str) -> None:
         """Best-effort expire pending approval requests.

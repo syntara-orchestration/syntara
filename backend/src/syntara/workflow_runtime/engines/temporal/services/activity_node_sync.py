@@ -12,6 +12,7 @@ from temporalio.client import WorkflowHandle
 from syntara.core.constants import FieldLimits
 from syntara.workflow_core.models import NodeType
 from syntara.workflow_runtime.engines.temporal.services.activity_sync_types import ExecutionMonitorMetadata
+from syntara.workflow_runtime.engines.temporal.utils.loop_iteration_ids import extract_loop_body_node_ids
 from syntara.workflows.models.activity_execution import TERMINAL_ACTIVITY_STATUSES, ActivityExecution, ActivityStatus
 from syntara.workflows.models.workflow_version import WorkflowVersion
 
@@ -68,38 +69,7 @@ class ActivityNodeSyncMixin:
     @staticmethod
     def _extract_loop_body_activity_ids(definition: dict[str, Any]) -> set[str]:
         """Return node IDs reachable from loop iterate edges before feedback."""
-        loop_ids = {
-            node.get("id")
-            for node in [*definition.get("nodes", []), *definition.get("triggers", [])]
-            if node.get("type") == NodeType.LOOP and node.get("id")
-        }
-        edges = definition.get("edges", [])
-        body_ids: set[str] = set()
-
-        for loop_id in loop_ids:
-            queue = [
-                edge["to"]
-                for edge in edges
-                if edge.get("from") == loop_id and edge.get("from_port") == "iterate" and edge.get("to") != loop_id
-            ]
-            visited: set[str] = set()
-            while queue:
-                node_id = queue.pop(0)
-                if node_id in visited or node_id == loop_id:
-                    continue
-                visited.add(node_id)
-                is_nested_loop = node_id in loop_ids
-                if not is_nested_loop:
-                    body_ids.add(node_id)
-                next_edges = [edge for edge in edges if edge.get("from") == node_id]
-                if is_nested_loop:
-                    # A nested loop is a boundary inside the outer body, but its
-                    # complete edge continues the outer traversal to the tail.
-                    # Following only iterate edges loses that tail activity.
-                    next_edges = [edge for edge in next_edges if edge.get("from_port") in ("iterate", "complete")]
-                queue.extend(edge["to"] for edge in next_edges if edge.get("to") != loop_id)
-
-        return body_ids
+        return extract_loop_body_node_ids(definition)
 
     async def _sync_skipped_nodes(
         self,

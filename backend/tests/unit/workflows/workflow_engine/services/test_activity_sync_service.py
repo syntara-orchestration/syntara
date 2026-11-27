@@ -505,6 +505,85 @@ class TestActivityEventProcessing:
         update = self.metadata.pending_activity_updates[5]
         assert update["iteration"] == 3
 
+    def test_process_activity_scheduled_resolves_canvas_ids_containing_iteration_suffix(self) -> None:
+        """Known canvas IDs win over blind suffix stripping."""
+        self.metadata.activity_definitions_map["approval"] = {"id": "approval", "type": NodeType.APPROVAL}
+        self.metadata.activity_definitions_map["approval_iter_0"] = {
+            "id": "approval_iter_0",
+            "type": NodeType.SCRIPT_PYTHON,
+        }
+        event = self._create_mock_event(
+            EventType.EVENT_TYPE_ACTIVITY_TASK_SCHEDULED,
+            event_id=7,
+            activity_id="approval_iter_0_iter_1",
+        )
+
+        self.service._process_activity_scheduled(event, self.metadata)
+
+        update = self.metadata.pending_activity_updates[7]
+        assert update["activity_id"] == "approval_iter_0"
+        assert update["_history_activity_id"] == "approval_iter_0_iter_1"
+        assert update["_is_loop_iteration"] is True
+        assert update["_is_loop_control"] is False
+
+    def test_process_activity_scheduled_prefers_sole_loop_body_candidate(self) -> None:
+        """A sole loop-body candidate wins over a longer ordinary canvas ID."""
+        self.metadata.activity_definitions_map["approval"] = {"id": "approval", "type": NodeType.APPROVAL}
+        self.metadata.activity_definitions_map["approval_iter_0"] = {
+            "id": "approval_iter_0",
+            "type": NodeType.SCRIPT_PYTHON,
+        }
+        self.metadata.loop_body_activity_ids = {"approval"}
+        event = self._create_mock_event(
+            EventType.EVENT_TYPE_ACTIVITY_TASK_SCHEDULED,
+            event_id=9,
+            activity_id="approval_iter_0_iter_1",
+        )
+
+        self.service._process_activity_scheduled(event, self.metadata)
+
+        update = self.metadata.pending_activity_updates[9]
+        assert update["activity_id"] == "approval"
+        assert update["_history_activity_id"] == "approval_iter_0_iter_1"
+
+    def test_process_activity_scheduled_ignores_loop_body_and_control_overlap(self) -> None:
+        """A loop-body ID colliding with a loop-control ID stays unresolved."""
+        self.metadata.activity_definitions_map["approval"] = {"id": "approval", "type": NodeType.APPROVAL}
+        self.metadata.activity_definitions_map["approval_iter_0"] = {
+            "id": "approval_iter_0",
+            "type": NodeType.LOOP,
+        }
+        self.metadata.loop_body_activity_ids = {"approval"}
+        event = self._create_mock_event(
+            EventType.EVENT_TYPE_ACTIVITY_TASK_SCHEDULED,
+            event_id=10,
+            activity_id="approval_iter_0_iter_1",
+        )
+
+        self.service._process_activity_scheduled(event, self.metadata)
+
+        assert event.event_id not in self.metadata.pending_activity_updates
+        assert event.event_id not in self.metadata.pending_sync_event_ids
+
+    def test_process_activity_scheduled_ignores_ambiguous_canvas_ids(self) -> None:
+        """An ambiguous Temporal ID must not update either candidate node."""
+        self.metadata.activity_definitions_map["approval"] = {"id": "approval", "type": NodeType.APPROVAL}
+        self.metadata.activity_definitions_map["approval_iter_0"] = {
+            "id": "approval_iter_0",
+            "type": NodeType.SCRIPT_PYTHON,
+        }
+        self.metadata.loop_body_activity_ids = {"approval"}
+        event = self._create_mock_event(
+            EventType.EVENT_TYPE_ACTIVITY_TASK_SCHEDULED,
+            event_id=8,
+            activity_id="approval_iter_0",
+        )
+
+        self.service._process_activity_scheduled(event, self.metadata)
+
+        assert event.event_id not in self.metadata.pending_activity_updates
+        assert event.event_id not in self.metadata.pending_sync_event_ids
+
     def test_process_activity_scheduled_no_loop_flags_for_plain_activity(self) -> None:
         """A plain activity without iter suffix and not in terminal_activity_ids gets no loop flags."""
         event = self._create_mock_event(
@@ -2453,6 +2532,27 @@ class TestGetOrCreateIterationRecord:
         assert result.activity_name == "body-node#iter-1"
         assert result.iteration == 1
         assert original.iteration == 0
+        session.add.assert_called_once()
+
+    def test_creates_iteration_record_with_full_temporal_activity_id(self) -> None:
+        """Later iterations retain their unique Temporal identity for callbacks."""
+        metadata = create_test_metadata(execution_id=uuid4(), activity_index_map={"body-node": 0})
+        original = self._create_mock_activity()
+        existing_activities: dict[str, ActivityExecution] = {"body-node": original}
+        session = Mock()
+
+        result, is_new = ActivitySyncService._get_or_create_iteration_record(
+            "body-node",
+            existing_activities,
+            metadata,
+            session,
+            temporal_activity_id="body-node_iter_7_iter_2",
+        )
+
+        assert is_new is True
+        assert result is not None
+        assert result.activity_name == "body-node#iter-1"
+        assert result.temporal_activity_id == "body-node_iter_7_iter_2"
         session.add.assert_called_once()
 
     def test_reuses_non_terminal_iteration_record(self) -> None:

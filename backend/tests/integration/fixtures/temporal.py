@@ -143,7 +143,10 @@ async def temporal_env(
                 work_id=work_item_id,
                 status=CompletionStatus(status),
                 result=result,
-                runtime_context={},
+                runtime_context={
+                    "execution_id": str(execution_id),
+                    "temporal_activity_id": activity_id,
+                },
             )
         if not delivered:
             message = f"No activity found for fake Execution Plane work item {work_item_id}"

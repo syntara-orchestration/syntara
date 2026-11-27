@@ -15,12 +15,21 @@ import time
 from collections.abc import Callable
 from datetime import UTC, datetime
 from http import HTTPStatus
+from pathlib import Path
 from typing import Any
 from uuid import UUID, uuid5
 
+import httpx
 import pytest
+from execution_plane_client.commands.credentials import CredentialResolveWorkload
 from orchestrator_test_sdk.e2e import unique_name
-from orchestrator_test_sdk.e2e.helpers import _retry_api_call, create_and_run_workflow, poll_for_pending_approval
+from orchestrator_test_sdk.e2e.helpers import (
+    _retry_api_call,
+    create_and_run_workflow,
+    poll_execution,
+    poll_for_pending_approval,
+)
+from orchestrator_test_sdk.factories.credentials import CredentialFactory
 from syntara_api_client.api import SyntaraApiRegistry
 from syntara_api_client.client import AuthenticatedClient
 from syntara_api_client.models import (
@@ -37,6 +46,10 @@ pytestmark = [pytest.mark.e2e]
 
 # Cancel while paused on approval: Temporal + API propagation can exceed 60s on loaded CI runners.
 _CANCEL_WHILE_PAUSED_POLL_SECONDS = 120
+_LOOP_E2E_TIMEOUT = 180
+_CREDENTIAL_RECIPE_ID = "syntara.e2e.bearer-token"
+_LOOP_BODY_NODE_ID = "loop_body"
+_CERTS_DIR = Path(__file__).resolve().parents[3] / ".secrets" / "certs"
 
 
 def _workflow_definition_with_nodes(
@@ -74,6 +87,103 @@ def _list_work_items(
     if not isinstance(resources, list):
         pytest.fail(f"Unexpected Execution Plane work-item payload: {body!r}")
     return [resource for resource in resources if isinstance(resource, dict)]
+
+
+def _loop_definition(name: str, marker: str, *, credential_ref: str | None = None) -> dict[str, Any]:
+    """Build trigger → for_each loop → Bash script body → final script."""
+    code = f"echo 'loop body {marker}'"
+    if credential_ref is not None:
+        code = f"{code}; sleep 8"
+    body_parameters: dict[str, Any] = {
+        "code": code,
+    }
+    if credential_ref is not None:
+        body_parameters["credential_bindings"] = [
+            {"credential_recipe_id": _CREDENTIAL_RECIPE_ID, "credential_ref": credential_ref}
+        ]
+    return {
+        "name": name,
+        "schema_version": "2.0.0",
+        "triggers": [{"id": "trigger_manual", "type": "manual_trigger", "parameters": {}}],
+        "nodes": [
+            {
+                "id": "loop",
+                "name": "Loop Over Items",
+                "type": "loop",
+                "parameters": {"type": "for_each", "items": '["alpha", "bravo"]'},
+            },
+            {
+                "id": "loop_body",
+                "name": "Loop Body",
+                "type": "script_bash",
+                "parameters": body_parameters,
+            },
+            {
+                "id": "after_loop",
+                "name": "After Loop",
+                "type": "script_bash",
+                "parameters": {"code": "echo 'loop complete'"},
+            },
+        ],
+        "edges": [
+            {"from": "trigger_manual", "to": "loop"},
+            {"from": "loop", "to": "loop_body", "from_port": "iterate"},
+            {"from": "loop_body", "to": "loop", "to_port": "iterate"},
+            {"from": "loop", "to": "after_loop", "from_port": "complete"},
+        ],
+    }
+
+
+def _activity_stdout(activity: object) -> str:
+    """Read stdout from either the direct or nested activity output shape."""
+    output_data = getattr(activity, "output_data", None)
+    if output_data is not None and hasattr(output_data, "to_dict"):
+        output_data = output_data.to_dict()
+    if not isinstance(output_data, dict):
+        return ""
+    stdout = output_data.get("stdout")
+    if isinstance(stdout, str):
+        return stdout
+    nested = output_data.get("output")
+    if isinstance(nested, dict) and isinstance(nested.get("stdout"), str):
+        return str(nested["stdout"])
+    return ""
+
+
+def _resolve_loop_credential(
+    syntara_base_url: str,
+    *,
+    work_item_id: UUID,
+    credential_ref: UUID,
+    runtime_context: dict[str, Any],
+) -> dict[str, Any]:
+    """Resolve a loop-body credential through AO's real mTLS command endpoint."""
+    message = CredentialResolveWorkload(
+        work_item_id=work_item_id,
+        attempt_id=f"e2e-{uuid5(work_item_id, 'attempt')}",
+        credential_ref=credential_ref,
+        credential_recipe_id=_CREDENTIAL_RECIPE_ID,
+        step_revision_id="syntara.script-bash.script-bash",
+        runtime_context=runtime_context,
+    ).to_message(
+        source_id="execution-plane",
+        destination_id="syntara-orchestration",
+        client_id="syntara-orchestration",
+    )
+    with httpx.Client(
+        cert=(str(_CERTS_DIR / "execution-plane.crt"), str(_CERTS_DIR / "execution-plane.key")),
+        verify=str(_CERTS_DIR / "ca.pem"),
+        timeout=30,
+    ) as client:
+        response = client.post(
+            f"{syntara_base_url}/api/execution_plane/v1/commands", json=message.model_dump(mode="json")
+        )
+    assert response.status_code == HTTPStatus.OK, response.text
+    result = response.json().get("result")
+    assert isinstance(result, dict), f"Unexpected credential command result: {response.json()!r}"
+    credential = result.get("credential")
+    assert isinstance(credential, dict), f"Unexpected credential document: {result!r}"
+    return {str(key): value for key, value in credential.items()}
 
 
 class TestWorkflowExecution:
@@ -670,6 +780,88 @@ class TestWorkflowExecution:
         assert work_item_statuses == {"cancelled"}, (
             f"Execution Plane work item should be cancelled, got {work_item_statuses}"
         )
+
+
+class TestLoops:
+    """Loop-body activity identity and credential resolution."""
+
+    def test_loop_body_completes(self, syntara_api: SyntaraApiRegistry, first_project_id: UUID) -> None:
+        """Each loop-body work item completes the canvas activity."""
+        marker = unique_name("e2e-loop-completion")
+        result = create_and_run_workflow(
+            syntara_api,
+            marker,
+            _loop_definition(marker, marker),
+            timeout=_LOOP_E2E_TIMEOUT,
+            project_id=first_project_id,
+        )
+
+        assert result.status == ExecutionStatus.COMPLETED, f"Failed: {result.error_details}"
+        activities = {activity.activity_id: activity for activity in (result.activities or [])}
+        assert activities["loop"].status == "completed"
+        assert activities["loop_body"].status == "completed"
+        assert activities["after_loop"].status == "completed"
+
+    @pytest.mark.skip(reason="script_bash does not support credentials; enable with an HTTP step")
+    def test_loop_body_resolves_credential(
+        self,
+        syntara_api: SyntaraApiRegistry,
+        syntara_client: AuthenticatedClient,
+        syntara_base_url: str,
+        first_project_id: UUID,
+        create_credential: CredentialFactory,
+    ) -> None:
+        """Loop-body credential work carries the callback correlation context."""
+        marker = unique_name("e2e-loop-credential")
+        credential_id, _, _, token = create_credential(
+            syntara_api,
+            project_id=first_project_id,
+            prefix="loop-e2e",
+        )
+        workflow = syntara_api.workflows.create(
+            body=WorkflowCreate(
+                name=marker,
+                description=f"E2E test: {marker}",
+                workflow_definition=WorkflowDefinition.from_dict(
+                    _loop_definition(marker, marker, credential_ref=str(credential_id))
+                ),
+                project_id=first_project_id,
+            )
+        ).assert_and_get()
+        execution = syntara_api.executions.create(
+            body=ExecutionCreate(workflow_id=workflow.id, trigger_node_id="trigger_manual")
+        ).assert_and_get()
+        execution_id = UUID(str(execution.id))
+        temporal_activity_id = f"{_LOOP_BODY_NODE_ID}_iter_0"
+        work_item_id = uuid5(execution_id, temporal_activity_id)
+
+        work_items: list[dict[str, Any]] = []
+        for _ in range(30):
+            work_items = _list_work_items(syntara_client, syntara_base_url, work_item_id)
+            if work_items:
+                break
+            time.sleep(1)
+        assert len(work_items) == 1, f"Expected one work item for {temporal_activity_id}, got {work_items!r}"
+        work_item = work_items[0]
+        assert work_item["status"] in {"pending", "claimed", "dispatched", "running"}, (
+            f"Work item became terminal before credential resolution: {work_item!r}"
+        )
+
+        credential = _resolve_loop_credential(
+            syntara_base_url,
+            work_item_id=work_item_id,
+            credential_ref=credential_id,
+            runtime_context=work_item["runtime_context"],
+        )
+        assert credential == {"auth_type": "bearer", "bearer_token": token}
+
+        result = poll_execution(syntara_api, str(execution_id), timeout=_LOOP_E2E_TIMEOUT)
+        assert result.status == ExecutionStatus.COMPLETED, f"Failed: {result.error_details}"
+        activities = {activity.activity_id: activity for activity in (result.activities or [])}
+        body = activities[_LOOP_BODY_NODE_ID]
+        assert body.status == "completed", f"Failed: {body.error_details}"
+        assert marker in _activity_stdout(body)
+        assert token not in repr(result), "Execution result leaked the raw credential token"
 
 
 # ---------------------------------------------------------------------------
