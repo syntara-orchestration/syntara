@@ -340,10 +340,11 @@ class SubscriptionSupervisor:
         self, snapshot: SubscriptionSnapshot, revision: RuntimeRevision, connection_revision: str | None
     ) -> None:
         async with asyncio.timeout(self._startup_timeout):
-            runner = await self._factory(snapshot)
+            binding = snapshot.for_processing()
+            runner = await self._factory(binding)
             self._runner, self._runner_revision = runner, revision
             self._runner_connection_revision = connection_revision
-            if runner.snapshot != snapshot:
+            if runner.snapshot != binding:
                 raise SubscriptionRuntimeError(RuntimeFailureCode.RUNNER_FAILED)
             if self._retained_inspections is not None:
                 previous_revision, inspections = self._retained_inspections

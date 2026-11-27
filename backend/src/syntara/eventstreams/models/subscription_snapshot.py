@@ -93,12 +93,23 @@ class SubscriptionSnapshot(SQLModel):
     @model_validator(mode="after")
     def _prepare_filter(self, info: ValidationInfo) -> "SubscriptionSnapshot":
         """Prepare immutable published conditions when loading this configuration."""
-        prepare = info.context is None or info.context.get("prepare_filter", True)
-        if self.filter is not None and prepare:
+        if info.context is None or info.context.get("prepare_filter", True):
+            self._initialize_filter()
+        return self
+
+    def _initialize_filter(self) -> None:
+        if self.filter is not None and self._prepared_filter is None:
             configuration = FilterConfiguration.model_validate(_to_plain_json(self.filter))
             # Use Pydantic's private-attribute setter while public snapshot fields remain frozen.
             super().__setattr__("_prepared_filter", PreparedSubscriptionFilter(configuration))
-        return self
+
+    def for_processing(self) -> "SubscriptionSnapshot":
+        """Give the runner a prepared binding without modifying the desired snapshot."""
+        if self.filter is None or self._prepared_filter is not None:
+            return self
+        snapshot = self.model_copy()
+        snapshot._initialize_filter()  # noqa: SLF001 - Initialize the runner's copy.
+        return snapshot
 
     @property
     def prepared_filter(self) -> PreparedSubscriptionFilter | None:

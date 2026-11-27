@@ -4,7 +4,7 @@ import asyncio
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from typing import cast
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, Mock
 from uuid import uuid4
 
 import pytest
@@ -18,6 +18,7 @@ from syntara.eventstreams.adapters.kafka_initial_position import PositionResult,
 from syntara.eventstreams.adapters.kafka_initial_position_service import KafkaInitialPositionService
 from syntara.eventstreams.adapters.kafka_record_runner import KafkaRecordRunner
 from syntara.eventstreams.core import runtime as runtime_module
+from syntara.eventstreams.core.filter_input import EventFilterInput, FilterPayload, FilterTextValue
 from syntara.eventstreams.core.handler import RetryDelivery, SchedulingFailureCode
 from syntara.eventstreams.core.placement import PlacementAuthority
 from syntara.eventstreams.core.preparation import PreparedExecution
@@ -35,11 +36,15 @@ from syntara.eventstreams.services import subscription_supervisor as module
 from syntara.eventstreams.services.admission_service import EventAdmissionService
 from syntara.eventstreams.services.execution_preparation_service import EventExecutionPreparationService
 from syntara.eventstreams.services.record_processing_service import EventRecordProcessingService
+from syntara.eventstreams.services.subscription_reader import EventSubscriptionReader
 from syntara.eventstreams.services.subscription_supervisor import SubscriptionSupervisor
+from syntara.filtering import evaluator
+from syntara.filtering.models.result import FilterOutcome
 from tests.helpers.eventstream_runtime import IsolatedSubscriptionRunner, confirmed_placement
 from tests.unit.eventstreams.test_connection_provider import connection_context
 from tests.unit.eventstreams.test_filtered_record_processing import filtered_context
 from tests.unit.eventstreams.test_record_processing_service import terminal
+from tests.unit.eventstreams.test_subscription_snapshot import _source, _subscription
 
 
 @pytest_asyncio.fixture
@@ -94,6 +99,72 @@ async def test_repeated_and_overlapping_snapshots_keep_one_runner(harness):
     status = context.supervisor.status
     assert status.state == RuntimeState.ACTIVE
     assert status.desired_revision == status.applied_revision == RuntimeRevision.from_snapshot(context.snapshot)
+
+
+async def test_compiled_cel_filter_survives_subscription_reload(harness, monkeypatch):
+    old_expression = 'input.key.text == "incoming" && input.payload.value.labels.env == "prod"'
+    new_expression = old_expression.replace('"prod"', '"stage"')
+    subscription = _subscription(id=harness.snapshot.subscription_id, filter={"expression": old_expression})
+    source = _source(subscription)
+    source.deployment_id = harness.snapshot.deployment_id
+    session_factory = MagicMock()
+    session = session_factory.return_value.__aenter__.return_value
+    session.exec = AsyncMock(return_value=MagicMock())
+    session.exec.return_value.all.return_value = [(subscription, source)]
+    reader = EventSubscriptionReader(session_factory, deployment_id=source.deployment_id)
+    compile_expression = Mock(wraps=evaluator.compile_expression)
+    monkeypatch.setattr(evaluator, "compile_expression", compile_expression)
+
+    (snapshot,) = await reader.read()
+    compile_expression.assert_not_called()
+    await harness.supervisor.apply(snapshot)
+    old_runner = harness.runners[0]
+    old_filter = old_runner.snapshot.prepared_filter
+    assert old_filter is not None
+
+    record = EventFilterInput(
+        key=FilterTextValue.from_bytes(b"other"), headers={}, metadata={}, payload=FilterPayload(state="not_decoded")
+    )
+    assert old_filter.precheck(record).outcome == FilterOutcome.NO_MATCH
+    record.key = FilterTextValue.from_bytes(b"incoming")
+    assert old_filter.precheck(record).outcome == FilterOutcome.MATCH
+
+    for payload, outcome in [
+        ({"labels": {"env": "prod"}}, FilterOutcome.MATCH),
+        ({"labels": {}}, FilterOutcome.NO_MATCH),
+        ({"labels": {"env": "stage"}}, FilterOutcome.NO_MATCH),
+        ({"labels": {"env": "prod"}}, FilterOutcome.MATCH),
+    ]:
+        record.payload = FilterPayload(state="decoded", value=payload)
+        assert old_filter.evaluate(record).outcome == outcome
+        (reloaded,) = await reader.read()
+        await harness.supervisor.apply(reloaded)
+
+    harness.factory.assert_awaited_once()
+    compile_expression.assert_called_once_with(old_expression)
+
+    subscription.configuration_revision += 1
+    subscription.filter = {"expression": new_expression}
+    (replacement,) = await reader.read()
+    old_runner.drain_release = asyncio.Event()
+    change = asyncio.create_task(harness.supervisor.apply(replacement))
+    try:
+        await asyncio.wait_for(old_runner.drain_entered.wait(), timeout=1)
+        assert old_runner.snapshot.prepared_filter is old_filter
+        assert old_filter.evaluate(record).outcome == FilterOutcome.MATCH
+        compile_expression.assert_called_once_with(old_expression)
+    finally:
+        old_runner.drain_release.set()
+        await change
+
+    assert old_runner.stopped
+    new_filter = harness.runners[1].snapshot.prepared_filter
+    assert new_filter is not None
+    assert new_filter is not old_filter
+    assert new_filter.evaluate(record).outcome == FilterOutcome.NO_MATCH
+    record.payload = FilterPayload(state="decoded", value={"labels": {"env": "stage"}})
+    assert new_filter.evaluate(record).outcome == FilterOutcome.MATCH
+    assert [call.args[0] for call in compile_expression.call_args_list] == [old_expression, new_expression]
 
 
 async def test_applied_revision_does_not_hide_runner_initialization(harness, monkeypatch):
