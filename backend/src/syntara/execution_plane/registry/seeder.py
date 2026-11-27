@@ -42,13 +42,13 @@ _PLUGIN_SEEDS = (
         None,
     ),
     (
-        "agent-runtime",
+        "ao-task-agent",
         NodeType.AGENTIC,
-        "syntara.agent-runtime.agent-runtime",
-        "agent-runtime.yaml",
+        "syntara.ao-task-agent.ao-task-agent",
+        "ao-task-agent.yaml",
         None,
-        "quay.io/aap/ansible-automation-platform/ao-agent-runtime:devel",
-        "agent-runtime-resolved-execution.json",
+        "quay.io/aap/ansible-automation-platform/ao-task-agent-rhel9:devel",
+        "ao-task-agent-resolved-execution.json",
     ),
 )
 
@@ -90,7 +90,7 @@ def _load_resolved_execution(filename: str | None, expected_identity: str) -> di
 
 
 def _resolve_image_reference(name: str, image_env_var: str | None, default: str) -> str:
-    if name == "agent-runtime":
+    if name == "ao-task-agent":
         return get_settings().agent_runtime_image
     if image_env_var is None:
         return default

@@ -22,7 +22,7 @@ def build_ao_registry() -> CommandRegistry[AOCommandContext]:
         agent_operation = catalog.definition("agent.operation", 1)
     except UnsupportedCommand:
         if get_settings().agent_runtime_enabled:
-            message = "Agent Runtime is enabled, but execution-plane-client does not support agent.operation"
+            message = "AO Task Agent is enabled, but execution-plane-client does not support agent.operation"
             raise RuntimeError(message) from None
     else:
         from syntara.execution_plane.commands.agent_operations import (  # noqa: PLC0415 -- older client versions lack the command contract.

@@ -1776,15 +1776,15 @@ class WorkflowClientSettings(BaseSettings):
     agent_runtime_enabled: bool = Field(
         default=False,
         description=(
-            "Run workflow-backed agent invocations in the Execution Plane agent-runtime container. "
-            "Requires the agent-runtime Action image and agent.operation callback command to be deployed."
+            "Run workflow-backed agent invocations in the Execution Plane ao-task-agent container. "
+            "Requires the ao-task-agent Action image and agent.operation callback command to be deployed."
         ),
     )
 
     agent_runtime_image: str = Field(
-        default="quay.io/aap/ansible-automation-platform/ao-agent-runtime:devel",
+        default="quay.io/aap/ansible-automation-platform/ao-task-agent-rhel9:devel",
         description=(
-            "Container image reference seeded for the Agent Runtime Action. Set a customer-controlled registry "
+            "Container image reference seeded for the AO Task Agent Action. Set a customer-controlled registry "
             "reference pinned by sha256 digest before enabling the container backend."
         ),
         min_length=1,
@@ -1857,7 +1857,7 @@ class WorkflowClientSettings(BaseSettings):
             )
             raise SafeValueError(msg)
         if self.agent_runtime_enabled and not re.fullmatch(r"[^@\s]+@sha256:[0-9a-f]{64}", self.agent_runtime_image):
-            message = "APP_AGENT_RUNTIME_IMAGE must use an immutable sha256 digest when Agent Runtime is enabled"
+            message = "APP_AGENT_RUNTIME_IMAGE must use an immutable sha256 digest when AO Task Agent is enabled"
             raise SafeValueError(message)
         return self
 

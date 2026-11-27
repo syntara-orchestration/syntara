@@ -52,8 +52,8 @@ from syntara.settings.cache.settings_cache import get_runtime_settings
 from syntara.workflows.models.execution import Execution
 
 logger = structlog.stdlib.get_logger(__name__)
-_PLUGIN_NAME = "agent-runtime"
-_STEP_IDENTITY = "syntara.agent-runtime.agent-runtime"
+_PLUGIN_NAME = "ao-task-agent"
+_STEP_IDENTITY = "syntara.ao-task-agent.ao-task-agent"
 _MAX_MODEL_CALLS = 8
 
 
@@ -67,7 +67,7 @@ def _work_item_error(status: str, result: object) -> ApplicationError | None:
         return None
 
     value = result if isinstance(result, dict) else {}
-    error_message = str(value.get("error", "Agent Runtime workload failed"))
+    error_message = str(value.get("error", "AO Task Agent workload failed"))
     if status == WorkItemStatus.RECONCILIATION_REQUIRED.value:
         return ApplicationError(
             error_message,
@@ -104,7 +104,7 @@ async def execute_container_agent(  # noqa: C901, PLR0912, PLR0915 -- preserves 
     """Prepare AO-owned context/tools, run one workload, and signal its result."""
     execution_id = extract_execution_id(ctx)
     if execution_id is None or not ctx.activity_id:
-        raise ApplicationError("Agent Runtime requires a workflow activity context", non_retryable=True)
+        raise ApplicationError("AO Task Agent requires a workflow activity context", non_retryable=True)
 
     initial_state = AgentStateFactory.create_initial_state(
         prompt=invocation.prompt,
@@ -174,7 +174,7 @@ async def execute_container_agent(  # noqa: C901, PLR0912, PLR0915 -- preserves 
         result = await _submit_and_wait(invocation, ctx, inputs)
         output = result.get("output")
         if not isinstance(output, dict) or not isinstance(output.get("content"), (str, dict)):
-            message = "Agent Runtime returned an invalid result"
+            message = "AO Task Agent returned an invalid result"
             raise ApplicationError(  # noqa: TRY301 -- invalid workload output is terminal and audited below.
                 message, type="AgentRuntimeProtocolError", non_retryable=True
             )
@@ -250,7 +250,7 @@ async def execute_container_agent(  # noqa: C901, PLR0912, PLR0915 -- preserves 
             **response_metadata,
             "source": "container",
             "model": model_name,
-            "orchestration": "agent-runtime",
+            "orchestration": "ao-task-agent",
         },
         "structured_output_metadata": output.get("structured_output_metadata"),
         "agent_trace": {
@@ -306,7 +306,7 @@ async def _submit_and_wait(  # noqa: C901, PLR0912, PLR0915 -- keeps submit, rec
     """Submit one stable WorkExecute and poll its terminal outcome."""
     execution_id = extract_execution_id(ctx)
     if execution_id is None or not ctx.activity_id:
-        raise ApplicationError("Agent Runtime requires an activity identity", non_retryable=True)
+        raise ApplicationError("AO Task Agent requires an activity identity", non_retryable=True)
     work_item_id = execution_plane_work_item_id(execution_id, ctx.activity_id)
     settings = get_settings()
     timeout_seconds = max(1, int(ctx.timeout_seconds or 300))
@@ -316,14 +316,14 @@ async def _submit_and_wait(  # noqa: C901, PLR0912, PLR0915 -- keeps submit, rec
         plugin = await get_execution_plane_plugin(session, _PLUGIN_NAME)
         if plugin is None or plugin.step_identity != _STEP_IDENTITY:
             raise ApplicationError(
-                "Agent Runtime Action is not registered in AO", type="AgentRuntimeConfigError", non_retryable=True
+                "AO Task Agent Action is not registered in AO", type="AgentRuntimeConfigError", non_retryable=True
             )
         image = plugin.image_reference
         try:
             resolved_execution_model = ResolvedExecution.model_validate(plugin.resolved_execution)
         except PydanticValidationError as error:
             raise ApplicationError(
-                "Agent Runtime compiled binding is missing or inconsistent in AO",
+                "AO Task Agent compiled binding is missing or inconsistent in AO",
                 type="AgentRuntimeConfigError",
                 non_retryable=True,
             ) from error
@@ -334,7 +334,7 @@ async def _submit_and_wait(  # noqa: C901, PLR0912, PLR0915 -- keeps submit, rec
             or not execution_plane_plugin_supports_revision(plugin, resolved_bindings[0].step_revision_id)
         ):
             raise ApplicationError(
-                "Agent Runtime compiled binding is missing or inconsistent in AO",
+                "AO Task Agent compiled binding is missing or inconsistent in AO",
                 type="AgentRuntimeConfigError",
                 non_retryable=True,
             )
@@ -343,14 +343,14 @@ async def _submit_and_wait(  # noqa: C901, PLR0912, PLR0915 -- keeps submit, rec
             Draft202012Validator(execution_plane_plugin_input_schema(plugin)).validate(inputs)
         except (ValueError, JsonSchemaValidationError) as error:
             raise ApplicationError(
-                f"Agent Runtime input is invalid: {error}", type="AgentRuntimeConfigError", non_retryable=True
+                f"AO Task Agent input is invalid: {error}", type="AgentRuntimeConfigError", non_retryable=True
             ) from None
 
     runtime_context = await _runtime_context(execution_id, invocation.id)
     required_invocation_fields = {"host_operations", "resolved_execution"}
     if not required_invocation_fields.issubset(WorkloadInvocation.model_fields):
         raise ApplicationError(
-            "Agent Runtime requires an execution-plane-client build with host operations and resolved execution",
+            "AO Task Agent requires an execution-plane-client build with host operations and resolved execution",
             type="AgentRuntimeConfigError",
             non_retryable=True,
         )
@@ -401,7 +401,7 @@ async def _submit_and_wait(  # noqa: C901, PLR0912, PLR0915 -- keeps submit, rec
             with suppress(Exception):
                 await client.cancel_work_items(selector=WorkItemSelector(work_item_ids=[work_item_id]))
             raise ApplicationError(
-                "Agent Runtime exceeded the step timeout", type="AgentRuntimeTimeout", non_retryable=True
+                "AO Task Agent exceeded the step timeout", type="AgentRuntimeTimeout", non_retryable=True
             )
     except ExecutionPlaneUnavailableError as error:
         raise ApplicationError(

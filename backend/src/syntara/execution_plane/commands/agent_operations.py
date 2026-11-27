@@ -1,4 +1,4 @@
-"""Resolve model and MCP operations requested by one Agent Runtime workload."""
+"""Resolve model and MCP operations requested by one AO Task Agent workload."""
 
 from __future__ import annotations
 
@@ -82,7 +82,7 @@ class AgentOperationCommandHandler:
         if not get_settings().agent_runtime_enabled:
             raise CommandResourceStateError
 
-        plugin = await get_execution_plane_plugin(context.session, "agent-runtime")
+        plugin = await get_execution_plane_plugin(context.session, "ao-task-agent")
         if (
             plugin is None
             or plugin.node_type is not NodeType.AGENTIC
@@ -93,7 +93,7 @@ class AgentOperationCommandHandler:
         request_context = InvocationContextData.model_validate(invocation.context_data or {})
         result = await self._resolve_operation(invocation, request_context, payload)
         logger.info(
-            "Resolved Agent Runtime host operation",
+            "Resolved AO Task Agent host operation",
             invocation_id=str(invocation.id),
             operation=payload.operation,
             request_id=payload.request_id,

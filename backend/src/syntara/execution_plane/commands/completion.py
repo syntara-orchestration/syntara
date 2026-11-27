@@ -120,7 +120,7 @@ class CompletionCommandHandler:
         temporal_workflow_id, temporal_activity_id, raw_node_type = row
         node_type = NodeType(raw_node_type)
         if node_type is NodeType.AGENTIC:
-            # Agent Runtime work is observed by InvocationExecutor, which persists
+            # AO Task Agent work is observed by InvocationExecutor, which persists
             # the AO invocation result before sending its established workflow signal.
             # Completing this async activity from EP would race that finalization.
             return True
