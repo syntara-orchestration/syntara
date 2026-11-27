@@ -526,6 +526,45 @@ class TestActivityEventProcessing:
         assert update["_is_loop_iteration"] is True
         assert update["_is_loop_control"] is False
 
+    def test_process_activity_scheduled_prefers_sole_loop_body_candidate(self) -> None:
+        """A sole loop-body candidate wins over a longer ordinary canvas ID."""
+        self.metadata.activity_definitions_map["approval"] = {"id": "approval", "type": NodeType.APPROVAL}
+        self.metadata.activity_definitions_map["approval_iter_0"] = {
+            "id": "approval_iter_0",
+            "type": NodeType.SCRIPT_PYTHON,
+        }
+        self.metadata.loop_body_activity_ids = {"approval"}
+        event = self._create_mock_event(
+            EventType.EVENT_TYPE_ACTIVITY_TASK_SCHEDULED,
+            event_id=9,
+            activity_id="approval_iter_0_iter_1",
+        )
+
+        self.service._process_activity_scheduled(event, self.metadata)
+
+        update = self.metadata.pending_activity_updates[9]
+        assert update["activity_id"] == "approval"
+        assert update["_history_activity_id"] == "approval_iter_0_iter_1"
+
+    def test_process_activity_scheduled_ignores_loop_body_and_control_overlap(self) -> None:
+        """A loop-body ID colliding with a loop-control ID stays unresolved."""
+        self.metadata.activity_definitions_map["approval"] = {"id": "approval", "type": NodeType.APPROVAL}
+        self.metadata.activity_definitions_map["approval_iter_0"] = {
+            "id": "approval_iter_0",
+            "type": NodeType.LOOP,
+        }
+        self.metadata.loop_body_activity_ids = {"approval"}
+        event = self._create_mock_event(
+            EventType.EVENT_TYPE_ACTIVITY_TASK_SCHEDULED,
+            event_id=10,
+            activity_id="approval_iter_0_iter_1",
+        )
+
+        self.service._process_activity_scheduled(event, self.metadata)
+
+        assert event.event_id not in self.metadata.pending_activity_updates
+        assert event.event_id not in self.metadata.pending_sync_event_ids
+
     def test_process_activity_scheduled_ignores_ambiguous_canvas_ids(self) -> None:
         """An ambiguous Temporal ID must not update either candidate node."""
         self.metadata.activity_definitions_map["approval"] = {"id": "approval", "type": NodeType.APPROVAL}

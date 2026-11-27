@@ -139,6 +139,7 @@ class RuntimeContextResolutionStrategy:
             temporal_activity_id,
             (node.id for node in definition.nodes),
             extract_loop_body_node_ids(execution.workflow_version.workflow_definition),
+            _loop_control_node_ids(definition),
         )
         if base_activity_id is None:
             return None
@@ -236,6 +237,7 @@ def _canvas_node_for_activity(execution: Execution, temporal_activity_id: str) -
         temporal_activity_id,
         (node.id for node in definition.nodes),
         extract_loop_body_node_ids(workflow_version.workflow_definition),
+        _loop_control_node_ids(definition),
     )
     if canvas_activity_id is None:
         return None
@@ -313,9 +315,15 @@ def resolution_for_activity(
         temporal_activity_id or activity.temporal_activity_id,
         node_ids,
         loop_body_node_ids,
+        _loop_control_node_ids(definition),
     )
     if canvas_activity_id is None:
-        canvas_activity_id = resolve_loop_iteration_canvas_id(activity.activity_name, node_ids, loop_body_node_ids)
+        canvas_activity_id = resolve_loop_iteration_canvas_id(
+            activity.activity_name,
+            node_ids,
+            loop_body_node_ids,
+            _loop_control_node_ids(definition),
+        )
     node = None
     if canvas_activity_id is not None:
         node = next((candidate for candidate in definition.nodes if candidate.id == canvas_activity_id), None)
@@ -331,3 +339,7 @@ def resolution_for_activity(
         temporal_activity_id=temporal_activity_id or activity.temporal_activity_id,
         activity=activity,
     )
+
+
+def _loop_control_node_ids(definition: WorkflowDefinition) -> set[str]:
+    return {node.id for node in definition.nodes if node.type == NodeType.LOOP.value}

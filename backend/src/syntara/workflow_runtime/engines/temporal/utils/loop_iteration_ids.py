@@ -58,6 +58,7 @@ def resolve_loop_iteration_canvas_id(
     activity_id: str,
     canvas_node_ids: Iterable[str],
     loop_body_node_ids: Iterable[str] = (),
+    loop_control_node_ids: Iterable[str] = (),
 ) -> str | None:
     """Resolve a Temporal activity ID to its canvas node using known node IDs.
 
@@ -65,25 +66,31 @@ def resolve_loop_iteration_canvas_id(
     canvas-node prefix ensures ``approval_iter_0_iter_1`` resolves to
     ``approval_iter_0`` when that canvas node exists, rather than ``approval``.
 
-    An exact canvas-node match is rejected when the same string can also be
-    generated as an iteration of a known loop-body node. Such a collision is
-    ambiguous and must not silently select either node.
-    Multiple loop-body candidates are likewise rejected because each could
-    generate the same suffixed Temporal activity ID.
+    A sole loop-body match wins over longer ordinary canvas IDs because only
+    loop-body nodes append enclosing-loop indices. A sole loop-control match is
+    likewise authoritative. Exact matches and overlapping loop-body/control
+    matches are rejected when another node can generate the same ID.
     """
     known_ids = tuple(canvas_node_ids)
+    loop_body_ids = set(loop_body_node_ids)
+    loop_control_ids = set(loop_control_node_ids)
     matches = [
         node_id
         for node_id in known_ids
         if activity_id.startswith(node_id) and _is_iteration_suffix(activity_id[len(node_id) :])
     ]
+    loop_body_matches = [node_id for node_id in matches if node_id in loop_body_ids]
+    loop_control_matches = [node_id for node_id in matches if node_id in loop_control_ids]
+
     if activity_id in known_ids:
-        if any(node_id != activity_id and node_id in loop_body_node_ids for node_id in matches):
-            return None
-        return activity_id
-    loop_body_matches = [node_id for node_id in matches if node_id in loop_body_node_ids]
-    if len(loop_body_matches) > 1:
+        return activity_id if not (loop_body_matches or loop_control_matches) else None
+
+    if (loop_body_matches and loop_control_matches) or len(loop_body_matches) > 1 or len(loop_control_matches) > 1:
         return None
+    if len(loop_body_matches) == 1:
+        return loop_body_matches[0]
+    if len(loop_control_matches) == 1:
+        return loop_control_matches[0]
     return max(matches, key=len) if matches else None
 
 

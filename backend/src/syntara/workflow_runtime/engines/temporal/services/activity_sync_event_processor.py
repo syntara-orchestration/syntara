@@ -33,6 +33,11 @@ class ActivitySyncEventProcessorMixin:
             attrs.activity_id,
             metadata.activity_definitions_map,
             metadata.loop_body_activity_ids,
+            (
+                node_id
+                for node_id, node in metadata.activity_definitions_map.items()
+                if node.get("type") == NodeType.LOOP
+            ),
         )
         if resolved_activity_id is not None:
             base_activity_id = resolved_activity_id

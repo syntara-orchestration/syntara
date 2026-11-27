@@ -301,6 +301,33 @@ def test_activity_resolution_rejects_nested_loop_body_collision() -> None:
     assert resolution.node is None
 
 
+def test_activity_resolution_prefers_sole_loop_body_candidate() -> None:
+    definition: dict[str, object] = {
+        "schema_version": "2.0.0",
+        "name": "workflow",
+        "triggers": [{"id": "trigger", "type": "manual"}],
+        "nodes": [
+            {"id": "loop", "type": "loop", "parameters": {"type": "for_each", "items": "a"}},
+            {"id": "approval", "type": "approval", "parameters": {}},
+            {"id": "approval_iter_0", "type": "approval", "parameters": {}},
+        ],
+        "edges": [
+            {"from": "trigger", "to": "loop"},
+            {"from": "loop", "from_port": "iterate", "to": "approval"},
+            {"from": "loop", "from_port": "complete", "to": "approval_iter_0"},
+        ],
+    }
+    row = activity(workflow_definition=definition)
+    row.activity_name = "approval_iter_0_iter_1"
+    row.temporal_activity_id = "approval_iter_0_iter_1"
+
+    resolution = resolution_for_activity(row)
+
+    assert resolution is not None
+    assert resolution.node is not None
+    assert resolution.node.id == "approval"
+
+
 def test_activity_resolution_rejects_invalid_workflow_definitions() -> None:
     row = activity(workflow_definition={"schema_version": "invalid"})
 
