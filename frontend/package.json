@@ -81,7 +81,7 @@
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-import-x": "^4.17.1",
     "eslint-plugin-no-only-tests": "^3.4.0",
-    "happy-dom": "^20.14.5",
+    "happy-dom": "^21.0.4",
     "mermaid": "^12.0.0",
     "msw": "2.15.0",
     "prettier": "3.9.9",
