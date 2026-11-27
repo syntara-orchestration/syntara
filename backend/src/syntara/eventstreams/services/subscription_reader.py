@@ -43,5 +43,8 @@ class EventSubscriptionReader:
         )
         async with self._session_factory() as session:
             rows = (await session.exec(statement)).all()
-            snapshots = [SubscriptionSnapshot.from_models(subscription, source) for subscription, source in rows]
+            snapshots = [
+                SubscriptionSnapshot.from_models(subscription, source, prepare_filter=False)
+                for subscription, source in rows
+            ]
         return snapshots  # noqa: RET504 - close the read session before dependency construction
