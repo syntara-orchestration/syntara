@@ -3,6 +3,7 @@ import { IntegrationTypeEnum, TriggerTypeEnum } from '@syntara/contracts'
 import { z } from 'zod'
 
 import { expect, test, toAppUrl } from './fixtures'
+import { mockKafkaAdvisorySaves } from './helpers/kafka-publish-validation'
 import {
   buildUniqueName,
   clickAddConnectedStep,
@@ -236,7 +237,11 @@ test('creates, edits and saves a Kafka Publish action', async ({ app }, testInfo
     await expect(app.getByRole('textbox', { name: 'Header 2 value', exact: true })).toHaveValue('AAEC')
     await expect(secondGrip).not.toHaveAttribute('aria-pressed', 'true')
     await expect(secondGrip).toBeFocused()
-    await app.getByRole('textbox', { name: 'Topic', exact: true }).fill('automation.outcomes.updated')
+    const targetTopic = app.getByRole('textbox', { name: 'Topic', exact: true })
+    await targetTopic.fill('${trigger.topic}')
+    await targetTopic.blur()
+    await expect(targetTopic).toHaveAccessibleDescription(/Enter one literal Kafka topic name/)
+    await targetTopic.fill('automation.outcomes.updated')
     await app.getByRole('button', { name: 'Update', exact: true }).click()
     await expect(publishNode.getByText('automation.outcomes.updated', { exact: true })).toBeVisible()
     await clickSaveAndWait(app)
@@ -255,6 +260,10 @@ test('creates, edits and saves a Kafka Publish action', async ({ app }, testInfo
                 type: z.string(),
                 settings: z.object({ disabled: z.boolean(), expected_duration: z.number() }),
                 parameters: z.object({
+                  integration_id: z.string(),
+                  credential_id: z.string(),
+                  topic: z.string(),
+                  key: z.object({ encoding: z.string(), value: z.string() }),
                   headers: z.array(
                     z.object({
                       name: z.string(),
@@ -271,12 +280,22 @@ test('creates, edits and saves a Kafka Publish action', async ({ app }, testInfo
       .version.workflow_definition.nodes.find((node) => node.type === 'kafka_publish')
     expect(savedPublish?.settings.disabled).toBe(true)
     expect(savedPublish?.settings.expected_duration).toBe(2)
+    expect(savedPublish?.parameters).toMatchObject({
+      integration_id: integrationId,
+      credential_id: credentialId,
+      topic: 'automation.outcomes.updated',
+      key: { encoding: 'base64', value: 'AAEC' },
+    })
     expect(savedPublish?.parameters.headers).toEqual([
       { name: 'x', value: { encoding: 'utf-8', value: '' } },
       { name: 'binary', value: { encoding: 'base64', value: 'AAEC' } },
       { name: 'x', value: null },
     ])
+    await app.reload()
     await clickNode(app, 'Publish outcome')
+    await expect(app.getByRole('textbox', { name: 'Topic', exact: true })).toHaveValue('automation.outcomes.updated')
+    await expect(app.getByRole('button', { name: 'Message key encoding', exact: true })).toContainText('Base64 binary')
+    await expect(app.getByRole('button', { name: 'Header 2 encoding', exact: true })).toContainText('Base64 binary')
     await expect(app.getByRole('textbox', { name: 'Header 2 value', exact: true })).toHaveValue('AAEC')
     await expect(app.getByRole('button', { name: 'Header 3 encoding', exact: true })).toContainText('Null')
     await fillCodeEditor(app, { value: '${trigger.payload}', label: 'JSON payload', inputMethod: 'insertText' })
@@ -374,7 +393,6 @@ test('creates, edits and saves a Kafka Publish action', async ({ app }, testInfo
 })
 
 test('saves and reopens unfinished Kafka Publish drafts with validation gates', async ({ app }) => {
-  test.skip(!isSkipWebServerForPlaywrightTests(), 'Requires backend advisory-save validation findings')
   test.setTimeout(120_000)
   const name = buildUniqueName('kafka-publish-draft')
   const token = await getAuthToken(app)
@@ -400,6 +418,8 @@ test('saves and reopens unfinished Kafka Publish drafts with validation gates', 
     })
     expect(created.ok()).toBeTruthy()
     workflowId = z.object({ id: z.string() }).parse(await created.json()).id
+    const liveBackend = isSkipWebServerForPlaywrightTests()
+    if (!liveBackend) await mockKafkaAdvisorySaves(app, { workflowId })
     await app.goto(toAppUrl(`/workflow-builder/${workflowId}`))
     const panel = await clickAddConnectedStep(app)
     await panel.getByRole('button', { name: 'Action', exact: true }).click()
@@ -415,6 +435,7 @@ test('saves and reopens unfinished Kafka Publish drafts with validation gates', 
       'true'
     )
     await app.reload()
+    await expect(app.getByTestId('validation-error-badge')).toBeVisible()
     await clickNode(app, 'Unfinished publish')
     await expect(app.getByTestId('inline-code-editor').locator('.view-lines')).toContainText('{"result":')
     await expect(app.getByRole('button', { name: 'Integration', exact: true })).toContainText(
@@ -430,7 +451,7 @@ test('saves and reopens unfinished Kafka Publish drafts with validation gates', 
     const response = await apiRequest(app, 'get', `/workflows/${workflowId}`, { token })
     const saved = z
       .object({
-        has_validation_issues: z.literal(true),
+        has_validation_issues: z.boolean().optional(),
         version: z.object({
           workflow_definition: z.object({
             nodes: z.array(
@@ -443,6 +464,7 @@ test('saves and reopens unfinished Kafka Publish drafts with validation gates', 
         }),
       })
       .parse(await response.json())
+    if (liveBackend) expect(saved.has_validation_issues).toBe(true)
     expect(saved.version.workflow_definition.nodes[0]?.parameters).not.toHaveProperty('payload')
     expect(saved.version.workflow_definition.nodes[0]?.metadata.__kafkaPublishPayloadDraft).toBe('{"edited":')
   } finally {

@@ -1,7 +1,7 @@
-"""Support the opt-in Playwright test in kafka-publish-live.spec.ts.
+"""Provide real broker operations for the opt-in Kafka Playwright tests.
 
 The frontend E2E test invokes this helper to create and delete its disposable
-Kafka test topic and read back the record published by the workflow for verification.
+Kafka test topic, inspect consumer assignments, and send or read a record.
 """
 
 import asyncio
@@ -12,8 +12,9 @@ import ssl
 import sys
 from pathlib import Path
 
-from aiokafka import AIOKafkaConsumer
+from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
 from aiokafka.admin import AIOKafkaAdminClient, NewTopic
+from aiokafka.protocol.group import MemberAssignment
 
 
 async def main() -> None:
@@ -21,7 +22,8 @@ async def main() -> None:
     root = Path(__file__).resolve().parents[5]
     options = {
         "bootstrap_servers": os.getenv(
-            "SYNTARA_E2E_KAFKA_BOOTSTRAP", "host.containers.internal:9093"
+            "SYNTARA_E2E_KAFKA_CLIENT_BOOTSTRAP",
+            os.getenv("SYNTARA_E2E_KAFKA_BOOTSTRAP", "localhost:9093"),
         ),
         "security_protocol": "SASL_SSL",
         "sasl_mechanism": "PLAIN",
@@ -63,6 +65,15 @@ async def main() -> None:
         finally:
             await consumer.stop()
         return
+    if action == "send":
+        producer = AIOKafkaProducer(**options)
+        await producer.start()
+        try:
+            record = await producer.send_and_wait(topic, b'{"source":"subscribe-ui"}')
+            print(json.dumps({"partition": record.partition, "offset": record.offset}))
+        finally:
+            await producer.stop()
+        return
     admin = AIOKafkaAdminClient(**options)
     await admin.start()
     try:
@@ -72,8 +83,26 @@ async def main() -> None:
             )
         elif action == "delete":
             await admin.delete_topics([topic])
+        elif action == "has-consumer":
+            groups = [
+                group_id
+                for group_id, protocol in await admin.list_consumer_groups()
+                if protocol == "consumer"
+            ]
+            described = await admin.describe_consumer_groups(groups) if groups else []
+            has_consumer = any(
+                assigned_topic == topic and partitions
+                for response in described
+                for group in response.groups
+                for member in group[5]
+                if member[-1]
+                for assigned_topic, partitions in MemberAssignment.decode(
+                    member[-1]
+                ).assignment
+            )
+            print(json.dumps(has_consumer))
         else:
-            raise ValueError("Expected create, consume, or delete")
+            raise ValueError(f"Unknown fixture action: {action}")
     finally:
         await admin.close()
 
