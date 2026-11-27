@@ -1882,7 +1882,7 @@ async def _build_login_session_redirect(
             is_first_login=is_first_login,
         )
     )
-    logger.info("OIDC login successful", user_id=str(user.id), provider=provider.name)
+    logger.info("User logged in", user_id=str(user.id), amr=[AMR.FEDERATED], idp=provider.name)
     AuditEventDispatcher.dispatch(LoginAttemptEvent(username=user.username, method=LoginMethod.OIDC, user_id=user.id))
     return response
 

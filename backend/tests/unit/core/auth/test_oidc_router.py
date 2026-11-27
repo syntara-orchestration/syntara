@@ -7,10 +7,12 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import UUID, uuid4
 
 import pytest
+import structlog
 from sqlalchemy.exc import DataError, IntegrityError, SQLAlchemyError
 
 from syntara.audit.dispatcher import AuditEventDispatcher
 from syntara.audit.models.audit_event import EventCategory
+from syntara.auth.audit.user_login import AMR
 from syntara.auth.exceptions import OIDCCallbackError, OIDCErrorCode, SessionStoreUnavailableError
 from syntara.auth.router import (
     _auto_create_user,
@@ -850,6 +852,66 @@ class TestOidcCallback:
         call_kwargs = mock_store.create.call_args.kwargs
         assert call_kwargs["amr"] == ["fed"]
         assert call_kwargs["idp"] == "Okta"
+
+    @pytest.mark.asyncio
+    async def test_oidc_login_log_uses_the_same_fields_as_local_login(self) -> None:
+        """A successful OIDC login logs the same event and field names as a local login."""
+        provider = _make_provider(name="Okta")
+        test_user = _make_user(email="user@example.com")
+        test_identity = _make_identity(user_id=test_user.id, provider_id=provider.id)
+        request = _make_request()
+
+        state_data = {
+            "provider_id": str(provider.id),
+            "nonce": "test-nonce",
+            "code_verifier": "test-verifier",
+        }
+
+        db = AsyncMock()
+        provider_result = MagicMock()
+        provider_result.one_or_none.return_value = provider
+        db.exec.return_value = provider_result
+
+        mock_oidc_service = _make_oidc_service_mock(state_data=state_data, user_claims=_make_user_claims())
+
+        mock_token_service = MagicMock()
+        mock_token_service.create_refresh_token.return_value = ("refresh-jwt", "jti-555", datetime.now(UTC))
+
+        mock_settings = MagicMock()
+        mock_settings.jwt_issuer = "http://localhost:3000"
+        mock_settings.cors_allow_origins = ["http://localhost:3000"]
+        mock_settings.jwt_refresh_token_lifetime_hours = 8
+
+        # A fresh logger created inside capture_logs() binds to the capture
+        # processor chain, even if the module logger was cached earlier.
+        with structlog.testing.capture_logs() as captured:
+            with (
+                patch("syntara.auth.router.logger", structlog.get_logger("syntara.auth.router")),
+                patch("syntara.auth.router.OIDCService", return_value=mock_oidc_service),
+                patch("syntara.auth.router._get_token_service", return_value=mock_token_service),
+                patch("syntara.auth.router.create_session_store", _patch_session_store(AsyncMock())),
+                patch("syntara.auth.router.get_settings", return_value=mock_settings),
+                patch("syntara.auth.router.set_refresh_cookie"),
+                patch("syntara.auth.router._resolve_oidc_user", AsyncMock(return_value=(test_user, test_identity))),
+                patch("syntara.auth.router.sync_idp_groups", AsyncMock()),
+                patch("syntara.auth.router.generate_csrf_seed", return_value="test-seed"),
+                patch("syntara.auth.router.set_csrf_cookie"),
+            ):
+                await oidc_callback(
+                    state="valid-state",
+                    request=request,
+                    db=db,
+                    code="auth-code-123",
+                )
+
+        info_events = [entry["event"] for entry in captured if entry["log_level"] == "info"]
+        login_records = [entry for entry in captured if entry["event"] == "User logged in"]
+        assert len(login_records) == 1, info_events
+        record = login_records[0]
+        assert record["user_id"] == str(test_user.id)
+        assert record["amr"] == [AMR.FEDERATED]
+        assert record["idp"] == "Okta"
+        assert "provider" not in record
 
     @pytest.mark.asyncio
     async def test_raises_503_when_session_store_unavailable(self) -> None:
