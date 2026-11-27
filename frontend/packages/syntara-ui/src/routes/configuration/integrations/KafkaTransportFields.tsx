@@ -15,7 +15,7 @@ import { SynSelect } from '../../../components/SynSelect'
 
 const PROTOCOLS = [
   { value: 'SASL_SSL', label: 'SASL_SSL — TLS with username and password' },
-  { value: 'SSL', label: 'SSL — TLS without SASL authentication' },
+  { value: 'SSL', label: 'SSL — TLS with optional client identity' },
   { value: 'PLAINTEXT', label: 'PLAINTEXT — unencrypted and unauthenticated' },
 ]
 

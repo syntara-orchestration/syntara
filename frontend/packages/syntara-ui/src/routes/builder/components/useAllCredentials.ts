@@ -7,6 +7,8 @@ import type { Credential } from '../../configuration/credentials/credentialConst
 type UseAllCredentialsOptions = {
   /** Filter credentials to this project */
   projectId?: string
+  /** Skip fetching when the caller has no credential to look up. */
+  enabled?: boolean
 }
 
 async function fetchAllCredentials({ projectId }: UseAllCredentialsOptions = {}): Promise<Credential[]> {
@@ -33,7 +35,7 @@ async function fetchAllCredentials({ projectId }: UseAllCredentialsOptions = {})
  * which only returns the first page and silently hides any credentials beyond it.
  */
 export function useAllCredentials(options: UseAllCredentialsOptions = {}) {
-  const { projectId } = options
+  const { projectId, enabled = true } = options
   const {
     data: credentials = [],
     isPending,
@@ -42,6 +44,7 @@ export function useAllCredentials(options: UseAllCredentialsOptions = {}) {
   } = useQuery({
     queryKey: ['all-credentials', projectId],
     queryFn: () => fetchAllCredentials({ projectId }),
+    enabled,
   })
   return { credentials, isLoading: isPending, error, refetch }
 }

@@ -283,6 +283,10 @@ function redactCredential(credential: (typeof credentials)[number]) {
   const credType = credentialTypes.find((t) => t.id === credential.credential_type_id)
   const fields = ((credType?.inputs as Record<string, unknown>)?.fields as { id: string; secret?: boolean }[]) ?? []
   const redactedInputs = { ...credential.inputs }
+  const passphrase = redactedInputs.client_key_passphrase
+  if (credType?.name === 'mTLS Client Identity' && (passphrase == null || passphrase === '')) {
+    delete redactedInputs.client_key_passphrase
+  }
   for (const field of fields) {
     if (field.secret && field.id in redactedInputs) {
       ;(redactedInputs as Record<string, unknown>)[field.id] = '$encrypted$'
@@ -1314,15 +1318,13 @@ export const handlers = [
       (item) => item.id === body.integration_id && item.integration_type === IntegrationTypeEnum.KAFKA && item.enabled
     )
     const credential = credentials.find(
-      (item) =>
-        item.id === body.credential_id &&
-        item.enabled &&
-        item.credential_type_id === 'ctype-kafka' &&
-        item.project_id === workflow.project_id
+      (item) => item.id === body.credential_id && item.enabled && item.project_id === workflow.project_id
     )
+    const credentialTypeName =
+      credential && credentialTypes.find((type) => type.id === credential.credential_type_id)?.name
     if (
       !integration ||
-      !credential ||
+      (credentialTypeName !== 'Kafka' && credentialTypeName !== 'mTLS Client Identity') ||
       typeof body.topic !== 'string' ||
       !/^[a-zA-Z0-9._-]{1,249}$/.test(body.topic) ||
       ['.', '..'].includes(body.topic)
@@ -1334,6 +1336,16 @@ export const handlers = [
         },
         { status: 422 }
       )
+    }
+    if (credentialTypeName === 'mTLS Client Identity') {
+      const configuration = integration.configuration
+      const usesSsl = configuration && 'security_protocol' in configuration && configuration.security_protocol === 'SSL'
+      const detail = !usesSsl
+        ? 'Select SSL to use an mTLS Client Identity.'
+        : configuration.insecure_skip_tls_verify
+          ? 'Turn on TLS certificate verification to use an mTLS Client Identity.'
+          : undefined
+      if (detail) return HttpResponse.json({ title: 'Invalid Kafka binding', detail }, { status: 422 })
     }
     const result: WorkflowAPI.components['schemas']['EventSubscriptionTestResponse'] = {
       success: true,

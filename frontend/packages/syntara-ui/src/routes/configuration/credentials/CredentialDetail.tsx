@@ -6,6 +6,7 @@ import {
   RhUiMinusCircleIcon,
   RhUiTrashIcon,
 } from '@patternfly/react-icons'
+import { IntegrationTypeEnum } from '@syntara/contracts'
 import { useNavigate, useParams } from '@tanstack/react-router'
 import { useMemo, useState } from 'react'
 
@@ -32,6 +33,7 @@ import { useAlerts } from '../../../providers/alerts'
 import { getErrorMessage } from '../../../utils/apiErrors'
 import { detachPromise } from '../../../utils/detachPromise'
 import { useDocLink } from '../../../utils/docs/useDocLink'
+import { CREDENTIAL_TYPES_BY_INTEGRATION } from '../integrations/integrationFilters'
 
 import { ENCRYPTED_SENTINEL, type Credential } from './credentialConstants'
 import styles from './CredentialDetail.module.css'
@@ -456,7 +458,9 @@ export default function CredentialDetail() {
               >
                 <CredentialIntegrationsTab
                   credentialId={credential.id}
-                  isKafkaCredential={credType?.name === 'Kafka'}
+                  isKafkaCredential={CREDENTIAL_TYPES_BY_INTEGRATION[IntegrationTypeEnum.KAFKA].includes(
+                    credType?.name ?? ''
+                  )}
                 />
               </Tab>
             )}

@@ -13,6 +13,7 @@ from sqlalchemy.exc import OperationalError
 from temporalio import activity
 from temporalio.exceptions import ApplicationError
 
+from syntara.credentials.lib.preseed import MTLS_CLIENT_IDENTITY_TYPE_NAME
 from syntara.integrations.adapters.kafka import KafkaAdapter
 from syntara.integrations.lib.kafka_producer import create_kafka_publish_producer
 from syntara.integrations.models.integration_configuration import KafkaConfiguration
@@ -97,10 +98,13 @@ def _reuse_profile(config: KafkaConfiguration, options: dict[str, Any]) -> str:
     return hashlib.sha256(json.dumps(profile, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
 
 
-async def _recheck_connection(parameters: KafkaPublishParameters, config: KafkaConfiguration, project_id: str) -> None:
+async def _recheck_connection(
+    parameters: KafkaPublishParameters, config: KafkaConfiguration, project_id: str, prepared_revision: str
+) -> None:
     async with _session_factory() as session:
-        current, _revision = await current_publish_resources(session, parameters, project_id)
-    if current.model_dump(mode="json") != config.model_dump(mode="json"):
+        current, revision, credential_type_name = await current_publish_resources(session, parameters, project_id)
+    identity_changed = credential_type_name == MTLS_CLIENT_IDENTITY_TYPE_NAME and revision != prepared_revision
+    if identity_changed or current.model_dump(mode="json") != config.model_dump(mode="json"):
         fail_publish("kafka_connection_settings_changed")
 
 
@@ -112,15 +116,16 @@ async def _publish_once(
     )
     value, key, headers, size = compile_publish_message(parameters)
     config = KafkaConfiguration.model_validate(input_config["_resolved_integration"])
-    await _recheck_connection(parameters, config, project_id)
+    prepared_revision = input_config["_kafka_revision"]
+    await _recheck_connection(parameters, config, project_id, prepared_revision)
     options = _producer_options(config, input_config["_resolved_credentials"]["extra_vars"])
     identity = f"{parameters.integration_id}:{parameters.credential_id}"
-    reuse_key = f"{identity}:{input_config['_kafka_revision']}:{_reuse_profile(config, options)}"
+    reuse_key = f"{identity}:{prepared_revision}:{_reuse_profile(config, options)}"
     pool = get_kafka_publish_pool()
 
     async def before_send() -> None:
         attempt.waiting_for_capacity = False
-        await _recheck_connection(parameters, config, project_id)
+        await _recheck_connection(parameters, config, project_id, prepared_revision)
 
     def admitted(entry: ProducerEntry) -> None:
         attempt.entry = entry

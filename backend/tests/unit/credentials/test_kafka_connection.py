@@ -13,7 +13,8 @@ from syntara.credentials.lib.kafka_connection import (
     resolve_publish_kafka_login,
     resolve_supplied_kafka_login,
 )
-from syntara.credentials.lib.preseed import GA_CREDENTIAL_TYPES
+from syntara.credentials.lib.mtls_identity import MTLS_CERTIFICATE_VAR, MTLS_PRIVATE_KEY_VAR
+from syntara.credentials.lib.preseed import GA_CREDENTIAL_TYPES, MTLS_CLIENT_IDENTITY_TYPE_NAME
 from syntara.credentials.models.credential import Credential
 from syntara.credentials.models.credential_type import CredentialType
 from syntara.credentials.services.credential_service import CredentialService, _validate_inputs
@@ -185,6 +186,82 @@ def _session_for(credentials: dict[object, MagicMock], types: dict[object, Magic
 
     session.get = AsyncMock(side_effect=get)
     return session
+
+
+async def test_mtls_connector_and_listener_resolve_only_their_explicit_ids() -> None:
+    management, credential_type, secret_service = _stored_kafka_credential("unused", "unused-secret")
+    runtime, _, _ = _stored_kafka_credential("unused", "unused-secret")
+    definition = next(item for item in GA_CREDENTIAL_TYPES if item["name"] == "mTLS Client Identity")
+    credential_type.name = definition["name"]
+    credential_type.injectors = definition["injectors"]
+    runtime.credential_type_id = management.credential_type_id
+    stored = {management.id: management, runtime.id: runtime}
+    session = _session_for(stored, {management.credential_type_id: credential_type})
+    secret_service.retrieve_secret.side_effect = {
+        management.secret_id: {"client_certificate": "management-cert", "client_private_key": "management-key"},
+        runtime.secret_id: {"client_certificate": "runtime-cert", "client_private_key": "runtime-key"},
+    }.__getitem__
+
+    connector = await resolve_connector_kafka_login(
+        session, secret_service, management_credential_id=management.id, security_protocol="SSL"
+    )
+    listener = await resolve_listener_kafka_login(
+        session, secret_service, runtime_credential_id=runtime.id, security_protocol="SSL"
+    )
+    assert connector is not None
+    assert connector[MTLS_CERTIFICATE_VAR] == "management-cert"
+    assert listener is not None
+    assert listener[MTLS_CERTIFICATE_VAR] == "runtime-cert"
+    assert connector[MTLS_PRIVATE_KEY_VAR] == "management-key"
+    assert listener[MTLS_PRIVATE_KEY_VAR] == "runtime-key"
+    assert [call.args[0] for call in secret_service.retrieve_secret.await_args_list] == [
+        management.secret_id,
+        runtime.secret_id,
+    ]
+
+    secret_service.retrieve_secret.reset_mock()
+    assert (
+        await resolve_listener_kafka_login(session, secret_service, runtime_credential_id=None, security_protocol="SSL")
+        is None
+    )
+    runtime.enabled = False
+    with pytest.raises(CredentialDisabledError):
+        await resolve_listener_kafka_login(
+            session, secret_service, runtime_credential_id=runtime.id, security_protocol="SSL"
+        )
+    del stored[runtime.id]
+    with pytest.raises(CredentialValidationError):
+        await resolve_listener_kafka_login(
+            session, secret_service, runtime_credential_id=runtime.id, security_protocol="SSL"
+        )
+    secret_service.retrieve_secret.assert_not_awaited()
+
+
+async def test_mtls_resolvers_reject_disabled_verification_before_decryption() -> None:
+    credential, credential_type, secret_service = _stored_kafka_credential("unused", "unused-secret")
+    credential_type.name = MTLS_CLIENT_IDENTITY_TYPE_NAME
+    session = _session_for({credential.id: credential}, {credential.credential_type_id: credential_type})
+    message = "Turn on TLS certificate verification to use an mTLS Client Identity."
+
+    with pytest.raises(CredentialValidationError, match=message):
+        await resolve_connector_kafka_login(
+            session,
+            secret_service,
+            management_credential_id=credential.id,
+            security_protocol="SSL",
+            insecure_skip_tls_verify=True,
+        )
+    for resolve in (resolve_listener_kafka_login, resolve_publish_kafka_login):
+        with pytest.raises(CredentialValidationError, match=message):
+            await resolve(
+                session,
+                secret_service,
+                runtime_credential_id=credential.id,
+                security_protocol="SSL",
+                insecure_skip_tls_verify=True,
+            )
+
+    secret_service.retrieve_secret.assert_not_awaited()
 
 
 class TestKafkaCredentialResolution:

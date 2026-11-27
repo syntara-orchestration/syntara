@@ -9,7 +9,10 @@ from syntara.core.lib.encryption import EncryptionError
 from syntara.core.models.secret import EncryptedSecret
 from syntara.core.services.secret_service import SecretService, create_secret_service
 from syntara.core.storage_exceptions import StorageBackendNotFoundError
+from syntara.credentials.exceptions import CredentialValidationError
 from syntara.credentials.lib.injector_resolver import InjectorResolver
+from syntara.credentials.lib.mtls_identity import mtls_identity_vars
+from syntara.credentials.lib.preseed import MTLS_CLIENT_IDENTITY_TYPE_NAME
 from syntara.eventstreams.adapters.connection_credentials import validate_connection_credentials
 from syntara.eventstreams.core.connection_revision import ConnectionRevision
 from syntara.eventstreams.models.subscription_snapshot import SubscriptionSnapshot
@@ -77,14 +80,25 @@ class EventConnectionProvider:
             # Values remain local and never contribute to the revision hash.
             decrypted = await secret_service.retrieve_secret(credential.secret_id)  # type: ignore[arg-type]
             resolved = InjectorResolver.resolve(credential_type.injectors or {}, decrypted)
+            extra_vars = resolved.extra_vars
+            if credential_type.name == MTLS_CLIENT_IDENTITY_TYPE_NAME:
+                extra_vars = mtls_identity_vars(extra_vars)
+            config = integration.configuration
             validate_connection_credentials(
                 snapshot.transport,
-                resolved.extra_vars,
-                security_protocol=integration.configuration.security_protocol
-                if isinstance(integration.configuration, KafkaConfiguration)
-                else "SASL_SSL",
+                extra_vars,
+                security_protocol=config.security_protocol if isinstance(config, KafkaConfiguration) else "SASL_SSL",
+                insecure_skip_tls_verify=isinstance(config, KafkaConfiguration) and config.insecure_skip_tls_verify,
             )
-        except (EncryptionError, StorageBackendNotFoundError, KeyError, TypeError, ValueError, AttributeError) as exc:
+        except (
+            CredentialValidationError,
+            EncryptionError,
+            StorageBackendNotFoundError,
+            KeyError,
+            TypeError,
+            ValueError,
+            AttributeError,
+        ) as exc:
             logger.warning(
                 "Event runtime credential resolution failed",
                 credential_id=str(credential.id),

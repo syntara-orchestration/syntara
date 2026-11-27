@@ -4,20 +4,26 @@ Tests the full stack: router → service → SecretService → DatabaseBackend �
 Requires a running database with migrations applied.
 """
 
+from pathlib import Path
 from uuid import UUID, uuid4
 
 import pytest
+from cryptography.hazmat.primitives import serialization
 from httpx import AsyncClient
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from syntara.authz.models import Project
+from syntara.core.lib.encryption import ENCRYPTED_SENTINEL
 from syntara.core.models import User
+from syntara.core.models.secret import EncryptedSecret
+from syntara.core.services.secret_service import create_secret_service
 from syntara.credentials.lib.preseed import GA_CREDENTIAL_TYPES, preseed_credential_types
 from syntara.credentials.models.credential import Credential
 from syntara.credentials.models.credential_type import CredentialType
 from syntara.workflows.models import Workflow, WorkflowVersion
 from syntara.workflows.models.workflow_publish_event import PublishAction, WorkflowPublishEvent
+from tests.fixtures.tls import generate_self_signed_cert
 from tests.helpers.user_reference import assert_user_reference
 
 
@@ -29,6 +35,181 @@ async def preseeded_types(test_db_session: AsyncSession) -> None:
     so this fixture ensures managed types exist for tests that need them.
     """
     await preseed_credential_types(test_db_session)
+
+
+@pytest.fixture
+async def mtls_type(test_db_session: AsyncSession, preseeded_types: None) -> CredentialType:
+    """Read the managed type registered by the real seeder."""
+    return (
+        await test_db_session.exec(select(CredentialType).where(CredentialType.name == "mTLS Client Identity"))
+    ).one()
+
+
+@pytest.fixture
+def mtls_inputs(tmp_path: Path) -> dict[str, str]:
+    """Generate a matching certificate and passphrase-protected key."""
+    certificate, key_file = generate_self_signed_cert(tmp_path, "test client", "client")
+    passphrase = "client-fixture-passphrase"  # noqa: S105 - generated test identity only
+    private_key = serialization.load_pem_private_key(key_file.read_bytes(), password=None)
+    return {
+        "client_certificate": certificate.read_text(),
+        "client_private_key": private_key.private_bytes(
+            serialization.Encoding.PEM,
+            serialization.PrivateFormat.PKCS8,
+            serialization.BestAvailableEncryption(passphrase.encode()),
+        ).decode(),
+        "client_key_passphrase": passphrase,
+    }
+
+
+class TestMTLSCredential:
+    """Persist and validate a client identity through the credential endpoints."""
+
+    async def test_secrets_are_encrypted_and_masked(
+        self,
+        auth_client: AsyncClient,
+        test_db_session: AsyncSession,
+        test_project_id: str,
+        mtls_type: CredentialType,
+        mtls_inputs: dict[str, str],
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        created = await auth_client.post(
+            "/api/v1/credentials",
+            json={
+                "name": "Client identity",
+                "credential_type_id": str(mtls_type.id),
+                "project_id": test_project_id,
+                "inputs": mtls_inputs,
+            },
+        )
+        assert created.status_code == 201
+        credential_id = UUID(created.json()["id"])
+        masked = {
+            "client_certificate": mtls_inputs["client_certificate"],
+            "client_private_key": ENCRYPTED_SENTINEL,
+            "client_key_passphrase": ENCRYPTED_SENTINEL,
+        }
+        assert created.json()["inputs"] == masked
+        fetched = await auth_client.get(f"/api/v1/credentials/{credential_id}")
+        assert fetched.status_code == 200
+        assert fetched.json()["inputs"] == masked
+
+        credential = await test_db_session.get(Credential, credential_id)
+        assert credential is not None
+        assert credential.secret_id is not None
+        row = (
+            await test_db_session.exec(select(EncryptedSecret).where(EncryptedSecret.secret_id == credential.secret_id))
+        ).one()
+        assert row.encrypted_data.keys() == mtls_inputs.keys()
+        for field, value in mtls_inputs.items():
+            assert value not in row.encrypted_data[field]
+        assert await create_secret_service(test_db_session).retrieve_secret(credential.secret_id) == mtls_inputs
+        assert "BEGIN ENCRYPTED PRIVATE KEY" not in caplog.text
+        assert mtls_inputs["client_key_passphrase"] not in caplog.text
+
+    @pytest.mark.parametrize(
+        ("field", "value", "code"),
+        [
+            ("client_certificate", None, "CREDENTIAL_VALIDATION_ERROR"),
+            ("client_private_key", None, "CREDENTIAL_VALIDATION_ERROR"),
+            ("client_certificate", "invalid certificate data", "MTLS_INVALID_CLIENT_CERTIFICATE"),
+            ("client_private_key", "invalid private key data", "MTLS_INVALID_PRIVATE_KEY"),
+            ("client_key_passphrase", "wrong fixture passphrase", "MTLS_WRONG_PASSPHRASE"),
+            ("client_key_passphrase", "123", "CREDENTIAL_VALIDATION_ERROR"),
+        ],
+    )
+    async def test_create_returns_safe_validation_errors(
+        self,
+        auth_client: AsyncClient,
+        test_project_id: str,
+        mtls_type: CredentialType,
+        mtls_inputs: dict[str, str],
+        field: str,
+        value: str | None,
+        code: str,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        inputs = {**mtls_inputs}
+        if value is None:
+            del inputs[field]
+        else:
+            inputs[field] = value
+        response = await auth_client.post(
+            "/api/v1/credentials",
+            json={
+                "name": "Invalid client identity",
+                "credential_type_id": str(mtls_type.id),
+                "project_id": test_project_id,
+                "inputs": inputs,
+            },
+        )
+        assert response.status_code == 422
+        assert response.json()["code"] == code
+        if code == "CREDENTIAL_VALIDATION_ERROR":
+            assert field in response.json()["detail"]
+        assert "BEGIN ENCRYPTED PRIVATE KEY" not in response.text + caplog.text
+        assert mtls_inputs["client_key_passphrase"] not in response.text + caplog.text
+        if value is not None and len(value) > 4:
+            assert value not in response.text + caplog.text
+
+    async def test_patch_checks_merged_identity_and_preserves_stored_secrets(
+        self,
+        auth_client: AsyncClient,
+        test_project_id: str,
+        mtls_type: CredentialType,
+        mtls_inputs: dict[str, str],
+        tmp_path: Path,
+    ) -> None:
+        created = await auth_client.post(
+            "/api/v1/credentials",
+            json={
+                "name": "Identity to rotate",
+                "credential_type_id": str(mtls_type.id),
+                "project_id": test_project_id,
+                "inputs": mtls_inputs,
+            },
+        )
+        assert created.status_code == 201
+        url = f"/api/v1/credentials/{created.json()['id']}"
+        for field in ("client_certificate", "client_private_key"):
+            missing = await auth_client.patch(url, json={"inputs": {field: None}})
+            assert missing.status_code == 422
+            assert field in missing.json()["detail"]
+
+        certificate, private_key = generate_self_signed_cert(tmp_path, "rotated client", "rotated")
+        mismatch = await auth_client.patch(
+            url,
+            json={"inputs": {"client_certificate": certificate.read_text(), "client_private_key": ENCRYPTED_SENTINEL}},
+        )
+        assert mismatch.status_code == 422
+        assert mismatch.json()["code"] == "MTLS_CERTIFICATE_KEY_MISMATCH"
+        saved = await auth_client.get(url)
+        assert saved.json()["inputs"] == created.json()["inputs"]
+
+        rotated = await auth_client.patch(
+            url,
+            json={
+                "name": "Rotated client identity",
+                "enabled": False,
+                "inputs": {
+                    "client_certificate": certificate.read_text(),
+                    "client_private_key": private_key.read_text(),
+                    "client_key_passphrase": None,
+                },
+            },
+        )
+        assert rotated.status_code == 200
+        assert rotated.json()["enabled"] is False
+        expected_inputs = {
+            "client_certificate": certificate.read_text(),
+            "client_private_key": ENCRYPTED_SENTINEL,
+        }
+        assert rotated.json()["inputs"] == expected_inputs
+
+        reopened = await auth_client.get(url)
+        assert reopened.status_code == 200
+        assert reopened.json()["inputs"] == expected_inputs
 
 
 class TestCreateCredential:

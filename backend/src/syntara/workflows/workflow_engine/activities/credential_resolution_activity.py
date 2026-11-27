@@ -26,6 +26,8 @@ from syntara.credentials.lib.kafka_connection import (
     KafkaSecurityProtocol,
     resolve_supplied_kafka_login,
 )
+from syntara.credentials.lib.mtls_identity import mtls_identity_vars
+from syntara.credentials.lib.preseed import MTLS_CLIENT_IDENTITY_TYPE_NAME
 from syntara.credentials.models.credential import Credential
 from syntara.credentials.models.credential_type import CredentialType
 from syntara.workflows.workflow_engine.models.workflow_definition import ActivityName
@@ -138,29 +140,7 @@ async def _resolve_single_credential(
         msg = f"Credential type for credential '{credential.name}' not found"
         raise ApplicationError(msg, non_retryable=True)
 
-    try:
-        resolved_injectors = InjectorResolver.resolve(cred_type.injectors, decrypted_inputs)
-    except Exception as e:
-        msg = f"Failed to resolve injector templates for credential '{credential.name}'"
-        raise ApplicationError(msg, non_retryable=True) from e
-
-    if cred_type.name == KAFKA_CONNECTION_TYPE_NAME:
-        runtime_credential_id = credential.id if isinstance(credential.id, UUID) else UUID(str(credential.id))
-        try:
-            # decrypted_inputs is already this credential's secret. Applying the
-            # Kafka rules here avoids a second credential load and secret read.
-            login = resolve_supplied_kafka_login(
-                credential_id=runtime_credential_id,
-                decrypted_inputs=decrypted_inputs,
-                security_protocol=KafkaSecurityProtocol.SASL_SSL,
-            )
-        except CredentialValidationError as exc:
-            raise ApplicationError(str(exc), non_retryable=True) from exc
-        resolved_injectors = ResolvedInjectors(
-            extra_vars={"auth_type": AUTH_TYPE_KAFKA_CONNECTION, **(login or {})},
-            env=resolved_injectors.env,
-            file=resolved_injectors.file,
-        )
+    resolved_injectors = _resolve_workflow_injectors(credential, cred_type, decrypted_inputs)
 
     logger.info(
         "Credential resolved",
@@ -184,6 +164,38 @@ async def _resolve_single_credential(
         "file": resolved_injectors.file,
         "_secret_values": secret_values,
     }
+
+
+def _resolve_workflow_injectors(
+    credential: Credential, cred_type: CredentialType, decrypted_inputs: dict[str, Any]
+) -> ResolvedInjectors:
+    """Render injector templates and apply the rules for the selected credential type."""
+    try:
+        resolved_injectors = InjectorResolver.resolve(cred_type.injectors, decrypted_inputs)
+    except Exception as e:
+        msg = f"Failed to resolve injector templates for credential '{credential.name}'"
+        raise ApplicationError(msg, non_retryable=True) from e
+
+    if cred_type.name == KAFKA_CONNECTION_TYPE_NAME:
+        runtime_credential_id = credential.id if isinstance(credential.id, UUID) else UUID(str(credential.id))
+        try:
+            # decrypted_inputs is already this credential's secret. Applying the
+            # Kafka rules here avoids a second credential load and secret read.
+            login = resolve_supplied_kafka_login(
+                credential_id=runtime_credential_id,
+                decrypted_inputs=decrypted_inputs,
+                security_protocol=KafkaSecurityProtocol.SASL_SSL,
+            )
+        except CredentialValidationError as exc:
+            raise ApplicationError(str(exc), non_retryable=True) from exc
+        return ResolvedInjectors(
+            extra_vars={"auth_type": AUTH_TYPE_KAFKA_CONNECTION, **(login or {})},
+            env=resolved_injectors.env,
+            file=resolved_injectors.file,
+        )
+    if cred_type.name == MTLS_CLIENT_IDENTITY_TYPE_NAME:
+        return ResolvedInjectors(extra_vars=mtls_identity_vars(resolved_injectors.extra_vars))
+    return resolved_injectors
 
 
 def _extract_secret_field_ids(cred_type: CredentialType) -> set[str]:

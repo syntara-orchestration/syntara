@@ -109,6 +109,10 @@ def sync_detailed(
 
      Update a Credential. Fields set to $encrypted$ retain existing values.
 
+    An mTLS Client Identity is validated after the update is merged with the stored inputs.
+    The same mTLS validation codes apply as on create. Set `client_key_passphrase` to null
+    to clear it when replacing a protected key with an unprotected key.
+
     Args:
         credential_id (UUID):
         body (CredentialUpdate): Schema for partially updating a credential. $encrypted$ preserves
@@ -144,6 +148,10 @@ def sync(
 
      Update a Credential. Fields set to $encrypted$ retain existing values.
 
+    An mTLS Client Identity is validated after the update is merged with the stored inputs.
+    The same mTLS validation codes apply as on create. Set `client_key_passphrase` to null
+    to clear it when replacing a protected key with an unprotected key.
+
     Args:
         credential_id (UUID):
         body (CredentialUpdate): Schema for partially updating a credential. $encrypted$ preserves
@@ -173,6 +181,10 @@ async def asyncio_detailed(
     """Update credential
 
      Update a Credential. Fields set to $encrypted$ retain existing values.
+
+    An mTLS Client Identity is validated after the update is merged with the stored inputs.
+    The same mTLS validation codes apply as on create. Set `client_key_passphrase` to null
+    to clear it when replacing a protected key with an unprotected key.
 
     Args:
         credential_id (UUID):
@@ -206,6 +218,10 @@ async def asyncio(
     """Update credential
 
      Update a Credential. Fields set to $encrypted$ retain existing values.
+
+    An mTLS Client Identity is validated after the update is merged with the stored inputs.
+    The same mTLS validation codes apply as on create. Set `client_key_passphrase` to null
+    to clear it when replacing a protected key with an unprotected key.
 
     Args:
         credential_id (UUID):

@@ -19,6 +19,7 @@ from aiokafka.protocol.metadata import MetadataRequest_v4, MetadataRequest_v5
 
 from syntara.eventstreams.models.responses import EventSubscriptionTestResponse
 from syntara.integrations.adapters.kafka import KafkaAdapter, KafkaAuthenticationConfigurationError
+from syntara.integrations.adapters.kafka_tls import KafkaMTLSError
 from syntara.integrations.lib.kafka_connection import create_pinned_connection as create_conn
 from syntara.integrations.models.integration_configuration import KafkaConfiguration
 
@@ -110,6 +111,9 @@ async def test_kafka_connection(
         result.error_code = "timeout"
     except (IncompatibleBrokerVersion, NotImplementedError):
         result.error_code = "safe_metadata_unsupported"
+    except KafkaMTLSError as exc:
+        result.connection = "failed"
+        result.error_code = exc.code.value
     except ssl.SSLError:
         result.connection = "failed"
         result.error_code = "tls_failed"

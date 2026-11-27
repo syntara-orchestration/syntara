@@ -14,6 +14,8 @@ import {
   getDefaultInputs,
   getTypeInputs,
   getVisibleFields,
+  prepareMtlsInputs,
+  setMtlsCredentialError,
   stripHiddenGroupFields,
   validateAllDynamicFields,
   validateCreateModeRequiredDynamicField,
@@ -634,6 +636,65 @@ describe('validateAllDynamicFields', () => {
   })
 })
 
+const certificateMarkers = '-----BEGIN CERTIFICATE-----\n\n-----END CERTIFICATE-----'
+const mtlsTypeInputs = getTypeInputs(
+  makeCredentialType({
+    name: 'mTLS Client Identity',
+    inputs: {
+      fields: [
+        { id: 'client_certificate', label: 'Client certificate', type: 'string', default: certificateMarkers },
+        { id: 'client_private_key', label: 'Private key', type: 'string', secret: true },
+        { id: 'client_key_passphrase', label: 'Key passphrase', type: 'string', secret: true },
+      ],
+      required: ['client_certificate', 'client_private_key'],
+    },
+  })
+)
+
+describe('prepareMtlsInputs', () => {
+  it('treats certificate markers and a whitespace-only key as missing and omits an empty passphrase', () => {
+    const inputs = {
+      client_certificate: certificateMarkers,
+      client_private_key: ' \n ',
+      client_key_passphrase: '',
+    }
+
+    expect(prepareMtlsInputs(inputs, mtlsTypeInputs)).toEqual({ client_certificate: '', client_private_key: '' })
+  })
+
+  it('keeps a stored key when its edit field is blank', () => {
+    const inputs = { client_certificate: 'certificate fixture', client_private_key: '' }
+    const storedInputs = { client_private_key: ENCRYPTED_SENTINEL }
+
+    expect(prepareMtlsInputs(inputs, mtlsTypeInputs, storedInputs)).toEqual({
+      client_certificate: 'certificate fixture',
+      client_private_key: ENCRYPTED_SENTINEL,
+    })
+  })
+})
+
+describe('setMtlsCredentialError', () => {
+  it.each([
+    ['MTLS_INVALID_CLIENT_CERTIFICATE', 'inputs.client_certificate'],
+    ['MTLS_INVALID_PRIVATE_KEY', 'inputs.client_private_key'],
+    ['MTLS_WRONG_PASSPHRASE', 'inputs.client_key_passphrase'],
+    ['MTLS_CERTIFICATE_KEY_MISMATCH', 'inputs.client_private_key'],
+  ])('sends %s to %s', (code, field) => {
+    const setError = makeSetError()
+    const detail = 'Check the client identity.'
+
+    expect(setMtlsCredentialError({ code, detail }, setError)).toBe(true)
+    expect(setError).toHaveBeenCalledWith(field, { type: 'server', message: detail })
+  })
+
+  it('leaves unrelated errors for the form to report', () => {
+    const setError = makeSetError()
+
+    expect(setMtlsCredentialError({ code: 'CREDENTIAL_VALIDATION_ERROR' }, setError)).toBe(false)
+    expect(setError).not.toHaveBeenCalled()
+  })
+})
+
 describe('buildEditInputs', () => {
   it('replaces untouched secret fields with encrypted sentinel', () => {
     const result = buildEditInputs({ host: 'example.com', oauth_token: 'tok' }, aapTypeInputs, new Set())
@@ -650,6 +711,17 @@ describe('buildEditInputs', () => {
     )
 
     expect(result.oauth_token).toBe('new-token')
+  })
+
+  it('clears only the edited blank mTLS passphrase', () => {
+    const result = buildEditInputs(
+      { client_private_key: '', client_key_passphrase: '' },
+      mtlsTypeInputs,
+      new Set(['client_private_key', 'client_key_passphrase']),
+      true
+    )
+
+    expect(result).toEqual({ client_private_key: ENCRYPTED_SENTINEL, client_key_passphrase: null })
   })
 
   it('keeps the Kafka password masked when only the username changes', () => {

@@ -11,6 +11,7 @@ import { useSelectableProjects } from '../../../access/useAllProjects'
 import type { Credential } from '../credentialConstants'
 
 import { CredentialFormModal } from './CredentialFormModal'
+import styles from './CredentialFormModal.module.css'
 import {
   asCredentialMutationResult,
   type CredentialTypeFixture,
@@ -41,6 +42,10 @@ const wrapper = ({ children }: { children: ReactNode }) => (
     <AlertProvider>{children}</AlertProvider>
   </QueryClientProvider>
 )
+
+const certificateMarkers = '-----BEGIN CERTIFICATE-----\n\n-----END CERTIFICATE-----'
+const certificate = '-----BEGIN CERTIFICATE-----\ncertificate-fixture\n-----END CERTIFICATE-----'
+const privateKey = '-----BEGIN PRIVATE KEY-----\nkey-fixture\n-----END PRIVATE KEY-----'
 
 const mockTypes: CredentialTypeFixture[] = [
   {
@@ -112,6 +117,42 @@ const mockTypes: CredentialTypeFixture[] = [
       ],
       required: [],
       required_together: [['username', 'password']],
+    },
+    injectors: {},
+    managed: true,
+  },
+  {
+    id: 'type-mtls',
+    name: 'mTLS Client Identity',
+    description: 'Lets a service prove its identity to an external system that requires mTLS.',
+    inputs: {
+      fields: [
+        {
+          id: 'client_certificate',
+          label: 'Client certificate',
+          type: 'string',
+          multiline: true,
+          default: certificateMarkers,
+          help_text: 'Paste the certificate contents between the markers.',
+        },
+        {
+          id: 'client_private_key',
+          label: 'Private key',
+          type: 'string',
+          multiline: true,
+          secret: true,
+          help_text: 'Paste the complete PEM private key, including its BEGIN and END markers.',
+        },
+        {
+          id: 'client_key_passphrase',
+          label: 'Key passphrase',
+          type: 'string',
+          secret: true,
+          min_length: 4,
+          help_text: 'Enter a passphrase only if the private key is passphrase protected.',
+        },
+      ],
+      required: ['client_certificate', 'client_private_key'],
     },
     injectors: {},
     managed: true,
@@ -731,6 +772,195 @@ describe('CredentialFormModal', () => {
       await selectAAPType(user)
 
       expect(await axe(container)).toHaveNoViolations()
+    })
+  })
+
+  describe('mTLS Client Identity', () => {
+    const storedIdentity: Credential = {
+      ...mockCredential,
+      name: 'Customer identity',
+      credential_type_id: 'type-mtls',
+      inputs: {
+        client_certificate: certificate,
+        client_private_key: '$encrypted$',
+        client_key_passphrase: '$encrypted$',
+      },
+    }
+
+    function renderIdentityCreate() {
+      return render(
+        <CredentialFormModal isOpen onClose={vi.fn()} defaultProjectId="proj-1" preSelectedTypeId="type-mtls" />,
+        { wrapper }
+      )
+    }
+
+    async function fillIdentity(user: ReturnType<typeof userEvent.setup>) {
+      await user.type(screen.getByLabelText('Credential name'), 'Customer identity')
+      const certificateField = screen.getByRole('textbox', { name: 'Client certificate' })
+      await user.clear(certificateField)
+      await user.type(certificateField, certificate)
+      await user.type(screen.getByRole('textbox', { name: 'Private key' }), privateKey)
+    }
+
+    it('shows certificate markers and keeps secrets masked until revealed with the keyboard', async () => {
+      const user = userEvent.setup()
+      renderIdentityCreate()
+      const certificateField = screen.getByRole('textbox', { name: 'Client certificate' })
+      const privateKeyField = screen.getByRole('textbox', { name: 'Private key' })
+      const passphraseField = screen.getByLabelText('Key passphrase')
+      const showPrivateKey = screen.getByRole('button', { name: 'Show Private key secret' })
+      const showPassphrase = screen.getByRole('button', { name: 'Show Key passphrase secret' })
+      const maskedPrivateKeySelector = `.${styles.maskedSecretTextarea} > textarea`
+
+      expect(certificateField).toHaveValue(certificateMarkers)
+      expect(certificateField).toHaveAccessibleDescription('Paste the certificate contents between the markers.')
+      expect(certificateField).toBeRequired()
+      expect(privateKeyField).toBeRequired()
+      expect(passphraseField).not.toBeRequired()
+      expect(showPrivateKey).toHaveAttribute('aria-disabled', 'true')
+      expect(showPassphrase).toHaveAttribute('aria-disabled', 'true')
+      expect(screen.queryByText(/required together/i)).not.toBeInTheDocument()
+
+      await user.click(certificateField)
+      await user.tab()
+      expect(privateKeyField).toHaveFocus()
+      await user.keyboard('key-fixture')
+      expect(privateKeyField.matches(maskedPrivateKeySelector)).toBe(true)
+      await user.tab()
+      expect(showPrivateKey).toHaveFocus()
+      await user.keyboard('{Enter}')
+      expect(privateKeyField.matches(maskedPrivateKeySelector)).toBe(false)
+      expect(screen.getByRole('button', { name: 'Hide Private key secret' })).toHaveFocus()
+      await user.keyboard('{Enter}')
+      expect(privateKeyField.matches(maskedPrivateKeySelector)).toBe(true)
+
+      await user.tab()
+      expect(passphraseField).toHaveFocus()
+      await user.keyboard('phrase-fixture')
+      expect(passphraseField).toHaveAttribute('type', 'password')
+      await user.tab()
+      expect(showPassphrase).toHaveFocus()
+      await user.keyboard('{Enter}')
+      expect(passphraseField).toHaveAttribute('type', 'text')
+      await user.keyboard('{Enter}')
+      expect(passphraseField).toHaveAttribute('type', 'password')
+      expect(await axe(screen.getByRole('dialog'))).toHaveNoViolations()
+    })
+
+    it('announces both missing fields when only the certificate markers are present', async () => {
+      const user = userEvent.setup()
+      renderIdentityCreate()
+      await user.type(screen.getByLabelText('Credential name'), 'Customer identity')
+
+      await user.click(screen.getByRole('button', { name: 'Create credential' }))
+
+      await waitFor(() => {
+        expect(screen.getByRole('textbox', { name: 'Client certificate' })).toHaveAccessibleDescription(
+          /^Client certificate is required\./
+        )
+        expect(screen.getByRole('textbox', { name: 'Private key' })).toHaveAccessibleDescription(
+          /^Private key is required\./
+        )
+      })
+      expect(screen.getByText('Private key is required.', { selector: '[aria-live="polite"]' })).toBeInTheDocument()
+      expect(mockMutate).not.toHaveBeenCalled()
+    })
+
+    it.each(['', 'phrase-fixture'])('sends the identity fields with optional passphrase %j', async (passphrase) => {
+      const user = userEvent.setup()
+      renderIdentityCreate()
+      await fillIdentity(user)
+      if (passphrase) await user.type(screen.getByLabelText('Key passphrase'), passphrase)
+
+      await user.click(screen.getByRole('button', { name: 'Create credential' }))
+
+      await waitFor(() => expect(mockMutate).toHaveBeenCalledOnce())
+      const variables = mockMutate.mock.calls[0]?.[0] as { body: { credential_type_id: string; inputs: unknown } }
+      expect(variables.body.credential_type_id).toBe('type-mtls')
+      expect(variables.body.inputs).toEqual({
+        client_certificate: certificate,
+        client_private_key: privateKey,
+        ...(passphrase ? { client_key_passphrase: passphrase } : {}),
+      })
+    })
+
+    it('requires at least four characters for a supplied passphrase', async () => {
+      const user = userEvent.setup()
+      renderIdentityCreate()
+      await fillIdentity(user)
+      const passphraseField = screen.getByLabelText('Key passphrase')
+      await user.type(passphraseField, 'abc')
+
+      await user.click(screen.getByRole('button', { name: 'Create credential' }))
+
+      await waitFor(() =>
+        expect(passphraseField).toHaveAccessibleDescription(/^Key passphrase must be at least 4 characters\./)
+      )
+      expect(mockMutate).not.toHaveBeenCalled()
+    })
+
+    it('keeps the blanked key and the untouched passphrase on edit', async () => {
+      const user = userEvent.setup()
+      detailCredential = storedIdentity
+      render(<CredentialFormModal isOpen onClose={vi.fn()} credentialToEdit={storedIdentity} />, { wrapper })
+      const privateKeyField = screen.getByRole('textbox', { name: 'Private key' })
+      const passphraseField = screen.getByLabelText('Key passphrase')
+      expect(screen.getByRole('textbox', { name: 'Client certificate' })).toHaveValue(certificate)
+      expect(privateKeyField).toHaveValue('')
+      expect(passphraseField).toHaveValue('')
+      expect(privateKeyField).toHaveAttribute('placeholder', '••••••••')
+      expect(passphraseField).toHaveAttribute('placeholder', '••••••••')
+      await user.type(privateKeyField, 'temporary key')
+      await user.clear(privateKeyField)
+
+      await user.click(screen.getByRole('button', { name: 'Save changes' }))
+
+      await waitFor(() => expect(mockMutate).toHaveBeenCalledOnce())
+      expect(mockMutate.mock.calls[0]?.[0]).toHaveProperty('body.inputs', storedIdentity.inputs)
+    })
+
+    it('clears the stored passphrase when rotating to an unprotected key', async () => {
+      const user = userEvent.setup()
+      detailCredential = storedIdentity
+      render(<CredentialFormModal isOpen onClose={vi.fn()} credentialToEdit={storedIdentity} />, { wrapper })
+      const rotatedCertificate = certificate.replace('certificate-fixture', 'rotated-certificate-fixture')
+      const certificateField = screen.getByRole('textbox', { name: 'Client certificate' })
+      const passphraseField = screen.getByLabelText('Key passphrase')
+      await user.clear(certificateField)
+      await user.type(certificateField, rotatedCertificate)
+      await user.type(screen.getByRole('textbox', { name: 'Private key' }), privateKey)
+      await user.type(passphraseField, 'temporary passphrase')
+      await user.clear(passphraseField)
+
+      await user.click(screen.getByRole('button', { name: 'Save changes' }))
+
+      await waitFor(() => expect(mockMutate).toHaveBeenCalledOnce())
+      expect(mockMutate.mock.calls[0]?.[0]).toHaveProperty('body.inputs', {
+        client_certificate: rotatedCertificate,
+        client_private_key: privateKey,
+        client_key_passphrase: null,
+      })
+    })
+
+    it.each([
+      ['MTLS_INVALID_CLIENT_CERTIFICATE', 'Client certificate', 'Enter a valid PEM client certificate.'],
+      ['MTLS_INVALID_PRIVATE_KEY', 'Private key', 'Enter a valid PEM private key.'],
+      ['MTLS_CERTIFICATE_KEY_MISMATCH', 'Private key', 'The private key must match the client certificate.'],
+      ['MTLS_WRONG_PASSPHRASE', 'Key passphrase', 'The key passphrase could not open the private key.'],
+    ])('attaches server error %s to the relevant field', async (code, fieldLabel, detail) => {
+      const user = userEvent.setup()
+      mockMutate.mockImplementation((_request: unknown, callbacks: { onError: (error: unknown) => void }) => {
+        callbacks.onError({ code, detail })
+      })
+      renderIdentityCreate()
+      await fillIdentity(user)
+
+      await user.click(screen.getByRole('button', { name: 'Create credential' }))
+
+      const field = screen.getByLabelText(fieldLabel)
+      await waitFor(() => expect(field).toHaveAttribute('aria-invalid', 'true'))
+      expect(field).toHaveAccessibleDescription(expect.stringContaining(detail))
+      expect(field).not.toHaveAccessibleDescription(/key-fixture/)
     })
   })
 

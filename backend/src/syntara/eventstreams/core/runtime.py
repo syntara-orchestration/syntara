@@ -53,11 +53,12 @@ class RuntimeFailureCode(StrEnum):
 class SubscriptionRuntimeError(SyntaraError):
     """Factory/adapter failure classified by the supervisor's retry policy."""
 
-    def __init__(self, code: RuntimeFailureCode, *, transient: bool = False) -> None:
+    def __init__(self, code: RuntimeFailureCode, *, transient: bool = False, reason: str | None = None) -> None:
         """Expose a fixed reason and retry classification without customer data."""
         self.code = code
         self.transient = transient
-        super().__init__(code.value)
+        self.reason = reason if reason is not None else code.value
+        super().__init__(self.reason)
 
 
 class RunnerStatus(DeliveryValue):

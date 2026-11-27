@@ -49,21 +49,30 @@ async def test_expired_preparation_does_not_touch_resources(monkeypatch: pytest.
     resources.assert_not_awaited()
 
 
-async def test_each_invocation_resolves_selected_credential_once(monkeypatch: pytest.MonkeyPatch) -> None:
-    config = KafkaConfiguration(bootstrap_servers=["broker.example:9093"])
+@pytest.mark.parametrize(
+    ("protocol", "type_name", "secret_var"),
+    [
+        ("SASL_SSL", "Kafka", "kafka_password"),
+        ("SSL", "mTLS Client Identity", "mtls_client_private_key"),
+    ],
+)
+async def test_each_invocation_resolves_selected_credential_once(
+    monkeypatch: pytest.MonkeyPatch, protocol: str, type_name: str, secret_var: str
+) -> None:
+    config = KafkaConfiguration(bootstrap_servers=["broker.example:9093"], security_protocol=protocol)
     context = MagicMock()
     context.return_value.__aenter__ = AsyncMock()
     context.return_value.__aexit__ = AsyncMock(return_value=False)
     monkeypatch.setattr(module, "_session_factory", context)
-    monkeypatch.setattr(module, "current_publish_resources", AsyncMock(return_value=(config, "revision")))
+    monkeypatch.setattr(module, "current_publish_resources", AsyncMock(return_value=(config, "revision", type_name)))
     monkeypatch.setattr(module, "create_secret_service", MagicMock())
     preflight = AsyncMock()
     monkeypatch.setattr(module, "check_publish_topic", preflight)
     selected = str(uuid4())
     credentials = AsyncMock(
         side_effect=[
-            {"extra_vars": {"kafka_password": "original"}},
-            {"extra_vars": {"kafka_password": "rotated"}},
+            {"extra_vars": {secret_var: "original"}},
+            {"extra_vars": {secret_var: "rotated"}},
         ]
     )
     monkeypatch.setattr(module, "_resolve_single_credential", credentials)
@@ -71,8 +80,8 @@ async def test_each_invocation_resolves_selected_credential_once(monkeypatch: py
     env = ActivityEnvironment()
     first = await env.run(module.prepare_kafka_publish, parameters, "project")
     second = await env.run(module.prepare_kafka_publish, parameters, "project")
-    assert first["_resolved_credentials"] == {"extra_vars": {"kafka_password": "original"}}
-    assert second["_resolved_credentials"] == {"extra_vars": {"kafka_password": "rotated"}}
+    assert first["_resolved_credentials"] == {"extra_vars": {secret_var: "original"}}
+    assert second["_resolved_credentials"] == {"extra_vars": {secret_var: "rotated"}}
     assert credentials.await_count == 2
     assert all(call.args[3] == selected for call in credentials.await_args_list)
 
@@ -88,7 +97,7 @@ async def test_non_sasl_preparation_binds_credential_without_sasl_fields(
     context.return_value.__aenter__ = AsyncMock()
     context.return_value.__aexit__ = AsyncMock(return_value=False)
     monkeypatch.setattr(module, "_session_factory", context)
-    monkeypatch.setattr(module, "current_publish_resources", AsyncMock(return_value=(config, "revision")))
+    monkeypatch.setattr(module, "current_publish_resources", AsyncMock(return_value=(config, "revision", "Kafka")))
     credentials = AsyncMock()
     monkeypatch.setattr(module, "_resolve_single_credential", credentials)
     preflight = AsyncMock()

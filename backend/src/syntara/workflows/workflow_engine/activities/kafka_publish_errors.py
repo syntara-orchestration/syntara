@@ -6,6 +6,8 @@ from typing import Never
 from aiokafka import errors
 from temporalio.exceptions import ApplicationError
 
+from syntara.integrations.adapters.kafka_tls import KAFKA_MTLS_ERROR_MESSAGES, KafkaMTLSError
+
 
 class KafkaPublishProducerUnavailableError(RuntimeError):
     """A counted producer is retiring or its worker has stopped admission."""
@@ -30,6 +32,7 @@ _ERROR_MESSAGES = {
     "kafka_connection_settings_changed": "Kafka connection settings changed during this Publish invocation.",
     "kafka_producer_failed": "The Kafka producer is unavailable for this send.",
     "kafka_unexpected_error": "Kafka Publish failed unexpectedly.",
+    **{f"kafka_{code.value}": message for code, message in KAFKA_MTLS_ERROR_MESSAGES.items()},
 }
 
 
@@ -85,6 +88,8 @@ _ERROR_RULES: tuple[tuple[tuple[type[Exception], ...], str, bool, bool], ...] = 
 
 def classify_publish_error(exc: Exception) -> tuple[str, bool, bool]:
     """Return code, retryable, and whether a producer must leave reuse."""
+    if isinstance(exc, KafkaMTLSError):
+        return f"kafka_{exc.code.value}", False, True
     for types, code, retryable, fatal in _ERROR_RULES:
         if isinstance(exc, types):
             return code, retryable, fatal

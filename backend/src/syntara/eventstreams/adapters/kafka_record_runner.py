@@ -58,6 +58,7 @@ from syntara.eventstreams.models.subscription_snapshot import SubscriptionSnapsh
 from syntara.eventstreams.services.admission_service import EventAdmissionService
 from syntara.eventstreams.services.execution_preparation_service import EventExecutionPreparationService
 from syntara.eventstreams.services.record_processing_service import EventRecordProcessingService
+from syntara.integrations.adapters.kafka_tls import KafkaMTLSError
 
 logger = structlog.stdlib.get_logger(__name__)
 _TRANSPORT_ERRORS = (ConsumerNotRunningError, KafkaTransportError, OwnershipRevokedError, StaleEpochError)
@@ -374,6 +375,10 @@ class KafkaRecordRunner:
             self._started = True
         except BaseException as exc:
             await self._client.stop()
+            if isinstance(exc, KafkaMTLSError):
+                raise SubscriptionRuntimeError(
+                    RuntimeFailureCode.CONNECTION_UNAVAILABLE, reason=exc.code.value
+                ) from None
             if isinstance(exc, KafkaTransportError):
                 cause = exc.__cause__
                 raise SubscriptionRuntimeError(

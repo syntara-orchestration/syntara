@@ -6,6 +6,8 @@ import { useFormContext, useWatch } from 'react-hook-form'
 import { FormFieldError } from '../../../components/FormFieldError'
 import { FormLabelWithHelp } from '../../../components/FormLabelWithHelp'
 import { SynFormField } from '../../../components/forms/SynFormField'
+import { MTLS_CLIENT_IDENTITY_TYPE_NAME } from '../../configuration/credentials/credentialConstants'
+import { getKafkaCredentialTypes, getKafkaTlsMode } from '../../configuration/integrations/integrationFilters'
 import { CredentialSelector } from '../components/CredentialSelector'
 import { IntegrationSelector } from '../components/IntegrationSelector'
 import { useIsVersionView } from '../VersionViewContext'
@@ -20,9 +22,20 @@ import { KafkaSubscribeResourceContext } from './kafkaSubscribeResourceContext'
 import { PayloadValidationSection } from './PayloadValidationSection'
 import nodeFormStyles from './shared/nodeFormStyles.module.css'
 import { DEFAULT_JSON_SCHEMA, EXAMPLE_JSON_SCHEMA, triggerFormSchema, type TriggerFormData } from './triggerFormSchema'
-import { kafkaResourceErrors } from './useKafkaSubscribeResources'
+import { kafkaResourceErrors, type KafkaSubscribeResources } from './useKafkaSubscribeResources'
 
-const KAFKA_CREDENTIAL_TYPES = ['Kafka']
+function getRuntimeCredentialOptions(values: Partial<TriggerFormData>, resources: KafkaSubscribeResources | null) {
+  const integration = resources?.visibleIntegrations.find((item) => item.id === values.integrationId)
+  const protocol = integration?.configuration?.security_protocol
+  const credential = resources?.credentials.credentials.find((item) => item.id === values.runtimeCredentialId)
+  const credentialType = resources?.types.data?.resources.find((item) => item.id === credential?.credential_type_id)
+  return {
+    compatibleTypeNames: getKafkaCredentialTypes(protocol),
+    credentialName: credential?.name,
+    isClientIdentity: credentialType?.name === MTLS_CLIENT_IDENTITY_TYPE_NAME,
+    tlsMode: credentialType ? getKafkaTlsMode(protocol, credentialType.name) : undefined,
+  }
+}
 
 export function KafkaSubscribeFields({
   workflowId,
@@ -33,6 +46,10 @@ export function KafkaSubscribeFields({
   const resources = use(KafkaSubscribeResourceContext)
   const { control, setValue } = useFormContext<TriggerFormData>()
   const values = useWatch({ control })
+  const { compatibleTypeNames, credentialName, isClientIdentity, tlsMode } = getRuntimeCredentialOptions(
+    values,
+    resources
+  )
   const parsed = triggerFormSchema.safeParse(values)
   const resourceErrors = resources ? kafkaResourceErrors(values, resources) : {}
   const resourcesLoading = Boolean(
@@ -109,8 +126,10 @@ export function KafkaSubscribeFields({
                   {({ field, fieldState }) => (
                     <KafkaCredentialConnection
                       key={values.integrationId}
-                      credentialName={resources?.credentials.credentials.find((item) => item.id === field.value)?.name}
+                      credentialName={credentialName}
                       credentialLabel="Kafka credential"
+                      isClientIdentity={isClientIdentity}
+                      tlsMode={tlsMode}
                       isPending={resourcesLoading}
                       errorMessage={resourceErrors.runtimeCredentialId ?? fieldState.error?.message}
                       isDisabled={isReadOnly}
@@ -125,7 +144,7 @@ export function KafkaSubscribeFields({
                             onSelected()
                           }}
                           projectId={projectId}
-                          compatibleTypeNames={KAFKA_CREDENTIAL_TYPES}
+                          compatibleTypeNames={compatibleTypeNames}
                           label="Runtime credential"
                           hideLabel
                           fieldId="subscribe-credential"

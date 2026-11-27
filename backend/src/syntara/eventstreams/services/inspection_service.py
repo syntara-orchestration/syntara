@@ -76,6 +76,7 @@ class EventSubscriptionInspectionService(BaseService):
                     self.secret_service,
                     runtime_credential_id=parameters.credential_id,
                     security_protocol=integration.configuration.security_protocol,
+                    insecure_skip_tls_verify=integration.configuration.insecure_skip_tls_verify,
                 )
                 return await test_kafka_connection(integration.configuration, credential or {}, parameters.topic)
         except TimeoutError:

@@ -106,6 +106,11 @@ def sync_detailed(
 
      Create a new Credential with encrypted inputs.
 
+    The mTLS Client Identity type requires `client_certificate` and `client_private_key` in PEM format.
+    An optional `client_key_passphrase` must contain at least four characters.
+    A 422 response can identify the invalid field using `MTLS_INVALID_CLIENT_CERTIFICATE`,
+    `MTLS_INVALID_PRIVATE_KEY`, `MTLS_WRONG_PASSPHRASE`, or `MTLS_CERTIFICATE_KEY_MISMATCH`.
+
     Args:
         body (CredentialCreate): Schema for creating a new credential.
 
@@ -137,6 +142,11 @@ def sync(
 
      Create a new Credential with encrypted inputs.
 
+    The mTLS Client Identity type requires `client_certificate` and `client_private_key` in PEM format.
+    An optional `client_key_passphrase` must contain at least four characters.
+    A 422 response can identify the invalid field using `MTLS_INVALID_CLIENT_CERTIFICATE`,
+    `MTLS_INVALID_PRIVATE_KEY`, `MTLS_WRONG_PASSPHRASE`, or `MTLS_CERTIFICATE_KEY_MISMATCH`.
+
     Args:
         body (CredentialCreate): Schema for creating a new credential.
 
@@ -162,6 +172,11 @@ async def asyncio_detailed(
     """Create credential
 
      Create a new Credential with encrypted inputs.
+
+    The mTLS Client Identity type requires `client_certificate` and `client_private_key` in PEM format.
+    An optional `client_key_passphrase` must contain at least four characters.
+    A 422 response can identify the invalid field using `MTLS_INVALID_CLIENT_CERTIFICATE`,
+    `MTLS_INVALID_PRIVATE_KEY`, `MTLS_WRONG_PASSPHRASE`, or `MTLS_CERTIFICATE_KEY_MISMATCH`.
 
     Args:
         body (CredentialCreate): Schema for creating a new credential.
@@ -191,6 +206,11 @@ async def asyncio(
     """Create credential
 
      Create a new Credential with encrypted inputs.
+
+    The mTLS Client Identity type requires `client_certificate` and `client_private_key` in PEM format.
+    An optional `client_key_passphrase` must contain at least four characters.
+    A 422 response can identify the invalid field using `MTLS_INVALID_CLIENT_CERTIFICATE`,
+    `MTLS_INVALID_PRIVATE_KEY`, `MTLS_WRONG_PASSPHRASE`, or `MTLS_CERTIFICATE_KEY_MISMATCH`.
 
     Args:
         body (CredentialCreate): Schema for creating a new credential.

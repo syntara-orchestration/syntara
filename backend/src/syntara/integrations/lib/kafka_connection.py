@@ -24,6 +24,7 @@ from aiokafka.protocol.metadata import MetadataRequest
 
 from syntara.core.config.base import get_settings
 from syntara.core.lib.url_validation import validate_url_no_ssrf
+from syntara.integrations.adapters.kafka_tls import KafkaMTLSContext, classify_kafka_mtls_failure
 from syntara.integrations.lib.url_validation import validate_integration_url_no_ssrf
 from syntara.integrations.models.integration_configuration import parse_bootstrap_server
 
@@ -107,11 +108,15 @@ class PinnedKafkaConnection(AIOKafkaConnection):
         self._loop = _PinnedLoop(original_loop)
         try:
             return cast("tuple[asyncio.StreamReader, asyncio.StreamWriter]", await AIOKafkaConnection.connect(self))
-        except BaseException:
+        except BaseException as exc:
             closed = AIOKafkaConnection.close(self)
             # No protocol can settle connection_lost when socket setup failed.
             if self._writer is None and closed is not None and not closed.done():
                 closed.cancel()
+            if isinstance(self._ssl_context, KafkaMTLSContext):
+                failure = classify_kafka_mtls_failure(exc, during_socket_setup=self._protocol is None)
+                if failure is not None:
+                    raise failure from None
             raise
         finally:
             self._loop = original_loop

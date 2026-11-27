@@ -195,6 +195,38 @@ async def test_incompatible_runtime_credential_rejected(service: WorkflowService
         await service._validate_kafka_publish_bindings(definition)
 
 
+@pytest.mark.parametrize("skip_tls", [False, True])
+async def test_publish_draft_checks_mtls_verification_at_save(
+    service: WorkflowService,
+    definition: dict[str, Any],
+    login_validation: AsyncMock,
+    *,
+    skip_tls: bool,
+) -> None:
+    session = service.session
+    assert isinstance(session, AsyncMock)
+    credential = SimpleNamespace(enabled=True, credential_type_id=uuid4())
+    session.get.side_effect = [
+        SimpleNamespace(
+            enabled=True,
+            integration_type="kafka",
+            configuration=KafkaConfiguration(
+                bootstrap_servers=["broker.example:9093"], security_protocol="SSL", insecure_skip_tls_verify=skip_tls
+            ),
+        ),
+        credential,
+        credential,
+        SimpleNamespace(name="mTLS Client Identity"),
+    ]
+    with patch.object(service, "_resolve_visible_integration_ids", return_value=None):
+        if skip_tls:
+            with pytest.raises(CredentialValidationError, match="Turn on TLS certificate verification"):
+                await service._validate_kafka_publish_bindings(definition, allow_incomplete=True)
+        else:
+            await service._validate_kafka_publish_bindings(definition, allow_incomplete=True)
+    login_validation.assert_not_awaited()
+
+
 async def test_binding_checks_run_when_publish_has_no_credential(
     service: WorkflowService, definition: dict[str, Any]
 ) -> None:

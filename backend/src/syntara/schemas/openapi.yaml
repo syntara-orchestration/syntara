@@ -7319,7 +7319,13 @@ paths:
         - bearerAuth: []
     post:
       summary: Create credential
-      description: Create a new Credential with encrypted inputs.
+      description: |-
+        Create a new Credential with encrypted inputs.
+
+        The mTLS Client Identity type requires `client_certificate` and `client_private_key` in PEM format.
+        An optional `client_key_passphrase` must contain at least four characters.
+        A 422 response can identify the invalid field using `MTLS_INVALID_CLIENT_CERTIFICATE`,
+        `MTLS_INVALID_PRIVATE_KEY`, `MTLS_WRONG_PASSPHRASE`, or `MTLS_CERTIFICATE_KEY_MISMATCH`.
       operationId: create_credential
       tags:
         - Credentials
@@ -7566,7 +7572,12 @@ paths:
         - bearerAuth: []
     patch:
       summary: Update credential
-      description: Update a Credential. Fields set to $encrypted$ retain existing values.
+      description: |-
+        Update a Credential. Fields set to $encrypted$ retain existing values.
+
+        An mTLS Client Identity is validated after the update is merged with the stored inputs.
+        The same mTLS validation codes apply as on create. Set `client_key_passphrase` to null
+        to clear it when replacing a protected key with an unprotected key.
       operationId: update_credential
       tags:
         - Credentials
@@ -33118,9 +33129,10 @@ components:
       description: |-
         Configuration for a Kafka cluster integration.
 
-        Broker addresses live here. The username and password stay on the
-        linked Kafka credential when SASL_SSL is selected. Unauthenticated SSL
-        and explicitly opted-in PLAINTEXT do not require a credential.
+        Broker addresses live here. SASL_SSL uses the username and password on
+        the linked Kafka credential. SSL can use an mTLS Client Identity when
+        broker certificate verification is enabled. SSL without a client identity
+        and explicitly opted-in PLAINTEXT allow an omitted credential.
     DiscoveredLLMModel:
       description: A model discovered from an LLM provider.
       properties:
@@ -33197,6 +33209,13 @@ components:
         - rate_limit
         - ssl_error
         - timeout
+        - mtls_untrusted_ca
+        - mtls_invalid_client_certificate
+        - mtls_invalid_private_key
+        - mtls_wrong_passphrase
+        - mtls_certificate_key_mismatch
+        - mtls_hostname_mismatch
+        - mtls_handshake_failed
       title: HealthCheckErrorType
     ValidateResult:
       description: |-

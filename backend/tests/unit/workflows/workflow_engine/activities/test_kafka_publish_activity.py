@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, cast
 from unittest.mock import AsyncMock, MagicMock
@@ -15,11 +16,13 @@ from aiokafka.structs import RecordMetadata
 from temporalio import activity
 from temporalio.exceptions import ApplicationError
 
+from syntara.integrations.adapters.kafka_tls import KafkaMTLSContext
 from syntara.integrations.models.integration_configuration import KafkaConfiguration
 from syntara.workflows.workflow_engine.activities import kafka_publish_activity as module
 from syntara.workflows.workflow_engine.activities.kafka_publish_errors import publish_failure
 from syntara.workflows.workflow_engine.constants import ENGINE_TIMEOUT_SECONDS_KEY
 from syntara.workflows.workflow_engine.services.kafka_publish_pool import KafkaPublishPool, set_kafka_publish_pool
+from tests.fixtures.tls import generate_self_signed_cert
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -62,7 +65,7 @@ async def publisher(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
     session_factory.return_value.__aexit__ = AsyncMock(return_value=False)
     monkeypatch.setattr(module, "_session_factory", session_factory)
     config = KafkaConfiguration(bootstrap_servers=["broker.example.com:9093"])
-    resources = AsyncMock(return_value=(config, "current-secret-revision"))
+    resources = AsyncMock(return_value=(config, "current-secret-revision", "Kafka"))
     monkeypatch.setattr(module, "current_publish_resources", resources)
     pool = KafkaPublishPool(1)
     set_kafka_publish_pool(pool)
@@ -166,7 +169,11 @@ async def test_revoked_resource_does_not_send_and_preserves_prior_uncertainty(
 
 @pytest.mark.asyncio
 async def test_connection_change_stops_retry_without_redirecting(publisher: SimpleNamespace) -> None:
-    publisher.resources.return_value = (KafkaConfiguration(bootstrap_servers=["different.example.com:9093"]), "new")
+    publisher.resources.return_value = (
+        KafkaConfiguration(bootstrap_servers=["different.example.com:9093"]),
+        "new",
+        "Kafka",
+    )
     try:
         with pytest.raises(ApplicationError) as error:
             await module.execute_kafka_publish_activity(publisher.inputs, None, "project")
@@ -180,13 +187,44 @@ async def test_connection_change_stops_retry_without_redirecting(publisher: Simp
 @pytest.mark.asyncio
 async def test_revocation_after_capacity_admission_prevents_the_send(publisher: SimpleNamespace) -> None:
     config = KafkaConfiguration.model_validate(publisher.inputs["_resolved_integration"])
-    publisher.resources.side_effect = [(config, "revision"), publish_failure("kafka_invalid_reference")]
+    publisher.resources.side_effect = [(config, "revision", "Kafka"), publish_failure("kafka_invalid_reference")]
     try:
         with pytest.raises(ApplicationError) as error:
             await module.execute_kafka_publish_activity(publisher.inputs, None, "project")
         assert error.value.type == "kafka_invalid_reference"
         assert error.value.details[0]["output"]["delivery_status"] == "not_sent"
         publisher.producer.send.assert_not_awaited()
+    finally:
+        await _cleanup(publisher)
+
+
+@pytest.mark.parametrize("rotate_before_send", [False, True])
+async def test_rotating_mtls_identity_blocks_prepared_publish(
+    publisher: SimpleNamespace, tmp_path: Path, *, rotate_before_send: bool
+) -> None:
+    config = KafkaConfiguration(bootstrap_servers=["broker.example.com:9093"], security_protocol="SSL")
+    certificate, private_key = generate_self_signed_cert(tmp_path, "publish client", "client")
+    publisher.inputs["_resolved_integration"] = config.model_dump(mode="json")
+    publisher.inputs["_resolved_credentials"] = {
+        "credential_type_name": "mTLS Client Identity",
+        "extra_vars": {
+            "mtls_client_certificate": certificate.read_text(),
+            "mtls_client_private_key": private_key.read_text(),
+        },
+    }
+    prepared = (config, publisher.inputs["_kafka_revision"], "mTLS Client Identity")
+    rotated = (config, "rotated-identity-revision", "mTLS Client Identity")
+    publisher.resources.side_effect = [prepared, rotated] if rotate_before_send else [rotated]
+    try:
+        with pytest.raises(ApplicationError) as error:
+            await module.execute_kafka_publish_activity(publisher.inputs, None, "project")
+        assert error.value.type == "kafka_connection_settings_changed"
+        assert error.value.details[0]["output"]["delivery_status"] == "not_sent"
+        publisher.producer.send.assert_not_awaited()
+        if rotate_before_send:
+            assert isinstance(publisher.constructor.call_args.kwargs["ssl_context"], KafkaMTLSContext)
+        else:
+            publisher.constructor.assert_not_called()
     finally:
         await _cleanup(publisher)
 

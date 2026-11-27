@@ -33,7 +33,9 @@ from syntara.credentials.lib.kafka_connection import (
     KafkaSecurityProtocol,
     kafka_credential_required,
     resolve_connector_kafka_login,
+    validate_kafka_mtls_configuration,
 )
+from syntara.credentials.lib.preseed import MTLS_CLIENT_IDENTITY_TYPE_NAME
 from syntara.integrations.adapters.factory import create_health_check_adapter
 from syntara.integrations.adapters.protocol import (
     DiscoveredLLMModel,
@@ -89,7 +91,7 @@ ALLOWED_CREDENTIAL_TYPES: dict[IntegrationType, frozenset[str]] = {
     IntegrationType.MCP_SERVER: frozenset({"HTTP Bearer Token"}),
     IntegrationType.LLM_PROVIDER: frozenset({"LLM Provider"}),
     IntegrationType.ANSIBLE_AUTOMATION_PLATFORM: frozenset({"Ansible Automation Platform"}),
-    IntegrationType.KAFKA: frozenset({"Kafka"}),
+    IntegrationType.KAFKA: frozenset({KAFKA_CONNECTION_TYPE_NAME, MTLS_CLIENT_IDENTITY_TYPE_NAME}),
 }
 
 CREDENTIAL_REQUIRED_TYPES: frozenset[IntegrationType] = frozenset(
@@ -156,13 +158,21 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
         self,
         integration_type: IntegrationType,
         credential_id: UUID,
-    ) -> None:
-        """Verify the credential's type is compatible with the integration type."""
+        *,
+        configuration: IntegrationConfigurationInputTypes | None = None,
+    ) -> str:
+        """Check the credential against the integration type and any selected settings."""
         _, cred_type = await fetch_credential_with_type(self.session, credential_id, require_secret=False)
 
         allowed = ALLOWED_CREDENTIAL_TYPES.get(integration_type)
         if allowed and cred_type.name not in allowed:
             raise IntegrationCredentialTypeMismatchError(integration_type.value, cred_type.name, allowed)
+        if cred_type.name == MTLS_CLIENT_IDENTITY_TYPE_NAME and isinstance(configuration, KafkaConfiguration):
+            validate_kafka_mtls_configuration(
+                security_protocol=configuration.security_protocol,
+                insecure_skip_tls_verify=configuration.insecure_skip_tls_verify,
+            )
+        return cred_type.name
 
     @staticmethod
     def _validate_discovered_resources(data: IntegrationCreate) -> None:
@@ -459,7 +469,9 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
         ``POST /integrations/{id}/refresh``.
         """
         if data.management_credential_id is not None:
-            await self._validate_credential_type(data.integration_type, data.management_credential_id)
+            await self._validate_credential_type(
+                data.integration_type, data.management_credential_id, configuration=data.configuration
+            )
         elif _credential_required(data.integration_type, data.configuration):
             raise IntegrationCredentialRequiredError(data.integration_type.value)
 
@@ -654,25 +666,29 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
 
     async def _validate_patch(self, integration: Integration, data: IntegrationUpdate) -> None:
         """Validate a patch payload against the existing integration before applying updates."""
-        if data.configuration is not None:
-            if data.configuration.integration_type != integration.integration_type.value:
-                msg = (
-                    f"configuration.integration_type '{data.configuration.integration_type}' "
-                    f"does not match integration type '{integration.integration_type.value}'"
-                )
-                raise SafeValueError(msg)
-            await self._validate_configuration_ssrf(data.configuration)
-
-        if "management_credential_id" in data.model_fields_set and data.management_credential_id is not None:
-            await self._validate_credential_type(integration.integration_type, data.management_credential_id)
+        if data.configuration is not None and data.configuration.integration_type != integration.integration_type.value:
+            msg = (
+                f"configuration.integration_type '{data.configuration.integration_type}' "
+                f"does not match integration type '{integration.integration_type.value}'"
+            )
+            raise SafeValueError(msg)
         credential_id = (
             data.management_credential_id
             if "management_credential_id" in data.model_fields_set
             else integration.management_credential_id
         )
         configuration = data.configuration if data.configuration is not None else integration.configuration
+        if credential_id is not None and (
+            "management_credential_id" in data.model_fields_set
+            or (data.configuration is not None and isinstance(configuration, KafkaConfiguration))
+        ):
+            await self._validate_credential_type(
+                integration.integration_type, credential_id, configuration=configuration
+            )
         if credential_id is None and _credential_required(integration.integration_type, configuration):
             raise IntegrationCredentialRequiredError(integration.integration_type.value)
+        if data.configuration is not None:
+            await self._validate_configuration_ssrf(data.configuration)
 
         if data.name is not None and data.name != integration.name:
             await self._raise_if_name_exists(data.name)
@@ -750,7 +766,7 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
         return await self._to_read_with_counts(integration)
 
     async def _resolve_credential(
-        self, credential_id: UUID, *, security_protocol: str | None = None
+        self, credential_id: UUID, *, security_protocol: str | None = None, insecure_skip_tls_verify: bool = False
     ) -> dict[str, object]:
         """Resolve a credential to its extra_vars dict for adapter use.
 
@@ -785,6 +801,7 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
                 security_protocol=security_protocol
                 if security_protocol is not None
                 else KafkaSecurityProtocol.SASL_SSL,
+                insecure_skip_tls_verify=insecure_skip_tls_verify,
             )
             return dict(login or {})
         logger.debug("Resolving credential", credential_id=str(credential_id), credential_type=cred_type.name)
@@ -917,13 +934,15 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
 
         resolved_credential: dict[str, object] = {}
         if integration.management_credential_id:
+            configuration = integration.configuration
             try:
                 resolved_credential = await self._resolve_credential(
                     integration.management_credential_id,
-                    **(
-                        {"security_protocol": integration.configuration.security_protocol}
-                        if isinstance(integration.configuration, KafkaConfiguration)
-                        else {}
+                    security_protocol=(
+                        configuration.security_protocol if isinstance(configuration, KafkaConfiguration) else None
+                    ),
+                    insecure_skip_tls_verify=(
+                        isinstance(configuration, KafkaConfiguration) and configuration.insecure_skip_tls_verify
                     ),
                 )
             except (CredentialDisabledError, CredentialValidationError, CredentialDecryptionError) as exc:
@@ -995,12 +1014,14 @@ class IntegrationService(UserReferenceResolverMixin, BaseService):
 
         resolved_credential: dict[str, object] = {}
         if data.credential_id is not None:
+            configuration = data.configuration
             resolved_credential = await self._resolve_credential(
                 data.credential_id,
-                **(
-                    {"security_protocol": data.configuration.security_protocol}
-                    if isinstance(data.configuration, KafkaConfiguration)
-                    else {}
+                security_protocol=(
+                    configuration.security_protocol if isinstance(configuration, KafkaConfiguration) else None
+                ),
+                insecure_skip_tls_verify=(
+                    isinstance(configuration, KafkaConfiguration) and configuration.insecure_skip_tls_verify
                 ),
             )
 

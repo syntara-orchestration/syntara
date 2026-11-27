@@ -17,6 +17,13 @@ vi.mock('../components/useAllCredentials', () => ({ useAllCredentials: vi.fn() }
 const integrationId = '11111111-1111-4111-8111-111111111111'
 const credentialId = '22222222-2222-4222-8222-222222222222'
 const values = { integrationId, runtimeCredentialId: credentialId }
+const integration: IntegrationsAPI.components['schemas']['KafkaIntegrationRead'] = {
+  id: integrationId,
+  name: 'Kafka',
+  integration_type: 'kafka',
+  configuration: { integration_type: 'kafka', bootstrap_servers: ['kafka.example.com:9093'] },
+  enabled: true,
+}
 
 function wrapper({ children }: Readonly<{ children: ReactNode }>) {
   return (
@@ -27,13 +34,6 @@ function wrapper({ children }: Readonly<{ children: ReactNode }>) {
 }
 
 beforeEach(() => {
-  const integration: IntegrationsAPI.components['schemas']['KafkaIntegrationRead'] = {
-    id: integrationId,
-    name: 'Kafka',
-    integration_type: 'kafka',
-    configuration: { integration_type: 'kafka', bootstrap_servers: ['kafka.example.com:9093'] },
-    enabled: true,
-  }
   vi.mocked(integrationsFetchClient.GET).mockResolvedValue({
     data: { resources: [integration] },
     response: new Response(),
@@ -73,6 +73,55 @@ describe('Kafka resource validation', () => {
   it('allows omitted references in drafts', async () => {
     expect(kafkaResourceErrors({}, await renderResources())).toEqual({})
   })
+
+  it.each([
+    { protocol: 'SSL', skipVerification: false, error: undefined },
+    {
+      protocol: 'SSL',
+      skipVerification: true,
+      error: 'Turn on TLS certificate verification to use an mTLS Client Identity.',
+    },
+    { protocol: 'PLAINTEXT', skipVerification: false, error: 'Select SSL to use an mTLS Client Identity.' },
+    { protocol: 'SASL_SSL', skipVerification: false, error: 'Select SSL to use an mTLS Client Identity.' },
+  ] as const)('checks $protocol with skip verification $skipVerification', async (settings) => {
+    vi.mocked(credentialsClient.useQuery).mockReturnValue({
+      data: { resources: [{ id: 'identity-type', name: 'mTLS Client Identity' }] },
+      isPending: false,
+      isError: false,
+    })
+    vi.mocked(useAllCredentials).mockReturnValue({
+      credentials: [
+        {
+          id: credentialId,
+          project_id: 'project-1',
+          name: 'Client identity',
+          credential_type_id: 'identity-type',
+          enabled: true,
+        },
+      ],
+      isLoading: false,
+      error: null,
+      refetch: vi.fn(),
+    })
+    vi.mocked(integrationsFetchClient.GET).mockResolvedValue({
+      data: {
+        resources: [
+          {
+            ...integration,
+            configuration: {
+              ...integration.configuration,
+              security_protocol: settings.protocol,
+              insecure_skip_tls_verify: settings.skipVerification,
+            },
+          },
+        ],
+      },
+      response: new Response(),
+    })
+
+    expect(kafkaResourceErrors(values, await renderResources()).runtimeCredentialId).toBe(settings.error)
+  })
+
   it('rejects an Integration that disappears from the visible list', async () => {
     vi.mocked(integrationsFetchClient.GET).mockResolvedValue({ data: { resources: [] }, response: new Response() })
     expect(kafkaResourceErrors(values, await renderResources()).integrationId).toBe(

@@ -1,5 +1,6 @@
 """Check Publish references against the same database scope used by other actions."""
 
+from pathlib import Path
 from uuid import UUID, uuid4
 
 import pytest
@@ -8,8 +9,11 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from temporalio.exceptions import ApplicationError
 
 from syntara.core.models import User
-from syntara.credentials.models.credential import Credential
+from syntara.core.services.secret_service import create_secret_service
+from syntara.credentials.lib.preseed import MTLS_CLIENT_IDENTITY_TYPE_NAME, preseed_credential_types
+from syntara.credentials.models.credential import Credential, CredentialCreate, CredentialUpdate
 from syntara.credentials.models.credential_type import CredentialType
+from syntara.credentials.services.credential_service import CredentialService
 from syntara.integrations.models.integration import (
     Integration,
     IntegrationProjectAssignment,
@@ -19,6 +23,7 @@ from syntara.integrations.models.integration import (
 from syntara.integrations.models.integration_configuration import KafkaConfiguration
 from syntara.workflows.workflow_engine.activities.kafka_publish_connection import current_publish_resources
 from syntara.workflows.workflow_engine.models.kafka_publish import KafkaPublishParameters
+from tests.fixtures.tls import generate_self_signed_cert
 
 
 @pytest.mark.asyncio
@@ -71,9 +76,10 @@ async def test_project_scope_and_disabling_are_checked_without_management_fallba
             await current_publish_resources(test_db_session, parameters, str(test_project_id))
         assert error.value.non_retryable
         return
-    resolved, revision = await current_publish_resources(test_db_session, parameters, str(test_project_id))
+    resolved, revision, type_name = await current_publish_resources(test_db_session, parameters, str(test_project_id))
     assert resolved == config
     assert len(revision) == 64
+    assert type_name == "Kafka"
     integration.enabled = False
     await test_db_session.flush()
     with pytest.raises(ApplicationError) as error:
@@ -86,3 +92,61 @@ async def test_project_scope_and_disabling_are_checked_without_management_fallba
     with pytest.raises(ApplicationError) as error:
         await current_publish_resources(test_db_session, parameters, str(test_project_id))
     assert error.value.non_retryable
+
+
+async def test_publish_identity_revision_tracks_rotation_disable_and_delete(
+    test_db_session: AsyncSession, test_user: User, test_project_id: UUID, tmp_path: Path
+) -> None:
+    await preseed_credential_types(test_db_session)
+    identity_type = (
+        await test_db_session.exec(select(CredentialType).where(CredentialType.name == MTLS_CLIENT_IDENTITY_TYPE_NAME))
+    ).one()
+    service = CredentialService(test_db_session, test_user, create_secret_service(test_db_session))
+    certificate, private_key = generate_self_signed_cert(tmp_path, "publish", "original")
+    stored = {"client_certificate": certificate.read_text(), "client_private_key": private_key.read_text()}
+    management = await service.create_credential(
+        CredentialCreate(
+            name="Management identity", credential_type_id=identity_type.id, project_id=test_project_id, inputs=stored
+        )
+    )
+    runtime = await service.create_credential(
+        CredentialCreate(
+            name="Runtime identity", credential_type_id=identity_type.id, project_id=test_project_id, inputs=stored
+        )
+    )
+    integration = Integration(
+        name="Broker with management identity",
+        integration_type=IntegrationType.KAFKA,
+        configuration=KafkaConfiguration(bootstrap_servers=["broker.example:9093"], security_protocol="SSL"),
+        management_credential_id=management.id,
+        scope=IntegrationScope.GLOBAL,
+        created_by=test_user.id,
+    )
+    test_db_session.add(integration)
+    await test_db_session.flush()
+    parameters = KafkaPublishParameters(
+        integration_id=str(integration.id), credential_id=str(runtime.id), topic="outcomes", payload=None
+    )
+    _, before, credential_type_name = await current_publish_resources(test_db_session, parameters, str(test_project_id))
+    assert credential_type_name == MTLS_CLIENT_IDENTITY_TYPE_NAME
+
+    certificate, private_key = generate_self_signed_cert(tmp_path, "rotated publish", "rotated")
+    await service.update_credential(
+        runtime.id,
+        CredentialUpdate(
+            inputs={"client_certificate": certificate.read_text(), "client_private_key": private_key.read_text()}
+        ),
+    )
+    _, after, _ = await current_publish_resources(test_db_session, parameters, str(test_project_id))
+    assert before != after
+
+    await service.update_credential(runtime.id, CredentialUpdate(enabled=False))
+    with pytest.raises(ApplicationError) as disabled:
+        await current_publish_resources(test_db_session, parameters, str(test_project_id))
+    assert disabled.value.type == "kafka_invalid_reference"
+
+    await service.delete_credential(runtime.id)
+    with pytest.raises(ApplicationError) as deleted:
+        await current_publish_resources(test_db_session, parameters, str(test_project_id))
+    assert deleted.value.type == "kafka_invalid_reference"
+    assert (await service.get_credential(management.id)).enabled

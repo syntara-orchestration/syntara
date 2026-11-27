@@ -1,15 +1,84 @@
 """Kafka credential requirements follow the effective transport on every operation."""
 
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
+from uuid import UUID
 
 import pytest
+from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from syntara.core.models import User
+from syntara.credentials.exceptions import CredentialValidationError
+from syntara.credentials.lib.preseed import MTLS_CLIENT_IDENTITY_TYPE_NAME, preseed_credential_types
+from syntara.credentials.models.credential import Credential
+from syntara.credentials.models.credential_type import CredentialType
 from syntara.integrations.exceptions import IntegrationCredentialRequiredError
 from syntara.integrations.models.integration import IntegrationCreate, IntegrationType, IntegrationUpdate
 from syntara.integrations.models.integration_configuration import KafkaConfiguration
 from syntara.integrations.services.integration_service import IntegrationService
+
+
+@pytest.mark.parametrize(
+    ("protocol", "skip_tls", "message"),
+    [
+        ("PLAINTEXT", False, "Select SSL"),
+        ("SASL_SSL", False, "Select SSL"),
+        ("SSL", True, "Turn on TLS certificate verification"),
+    ],
+)
+async def test_mtls_credential_checks_effective_settings_on_create_and_update(
+    test_db_session: AsyncSession,
+    test_user: User,
+    test_project_id: UUID,
+    protocol: str,
+    *,
+    skip_tls: bool,
+    message: str,
+) -> None:
+    await preseed_credential_types(test_db_session)
+    credential_type = (
+        await test_db_session.exec(select(CredentialType).where(CredentialType.name == MTLS_CLIENT_IDENTITY_TYPE_NAME))
+    ).one()
+    credential = Credential(
+        name="Client identity reference",
+        credential_type_id=credential_type.id,
+        project_id=test_project_id,
+        created_by=test_user.id,
+    )
+    test_db_session.add(credential)
+    await test_db_session.flush()
+
+    service = IntegrationService(test_db_session, test_user)
+    config = KafkaConfiguration(bootstrap_servers=["broker.example:9093"], security_protocol="SSL")
+    incompatible = KafkaConfiguration(
+        bootstrap_servers=config.bootstrap_servers,
+        security_protocol=protocol,
+        allow_plaintext=protocol == "PLAINTEXT",
+        insecure_skip_tls_verify=skip_tls,
+    )
+    with patch.object(service, "_validate_configuration_ssrf", new_callable=AsyncMock) as address_check:
+        saved = await service.create_integration(
+            IntegrationCreate(
+                name="Broker with client identity",
+                integration_type=IntegrationType.KAFKA,
+                configuration=config,
+                management_credential_id=credential.id,
+            )
+        )
+        assert saved.management_credential_id == credential.id
+        address_check.reset_mock()
+        with pytest.raises(CredentialValidationError, match=message):
+            await service.create_integration(
+                IntegrationCreate(
+                    name="Incompatible broker",
+                    integration_type=IntegrationType.KAFKA,
+                    configuration=incompatible,
+                    management_credential_id=credential.id,
+                )
+            )
+        with pytest.raises(CredentialValidationError, match=message):
+            await service.update_integration(saved.id, IntegrationUpdate(configuration=incompatible))
+        address_check.assert_not_awaited()
 
 
 @pytest.mark.asyncio
@@ -47,10 +116,6 @@ async def test_supplied_credential_must_be_kafka_for_every_transport(protocol: s
     """Optional authentication does not make an unrelated credential valid."""
     from unittest.mock import AsyncMock, MagicMock
     from uuid import uuid4
-
-    from syntara.credentials.exceptions import CredentialValidationError
-    from syntara.credentials.models.credential import Credential
-    from syntara.credentials.models.credential_type import CredentialType
 
     credential = MagicMock(spec=Credential)
     credential.enabled = True

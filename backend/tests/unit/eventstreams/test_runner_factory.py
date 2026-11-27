@@ -2,7 +2,9 @@
 
 import ssl
 from datetime import timedelta
-from unittest.mock import MagicMock
+from pathlib import Path
+from unittest.mock import AsyncMock, MagicMock
+from uuid import uuid4
 
 import pytest
 from pydantic import SecretStr
@@ -11,10 +13,64 @@ from sqlalchemy.exc import SQLAlchemyError
 from syntara.core.exceptions import SafeValueError
 from syntara.core.lib.encryption import SecretEncryptor
 from syntara.credentials.lib.kafka_connection import KafkaSecurityProtocol
+from syntara.credentials.lib.preseed import GA_CREDENTIAL_TYPES, MTLS_CLIENT_IDENTITY_TYPE_NAME
+from syntara.credentials.models.credential import Credential
 from syntara.eventstreams.adapters import runner_factory as module
-from syntara.eventstreams.core.runtime import SubscriptionRuntimeError
+from syntara.eventstreams.core.runtime import RuntimeFailureCode, SubscriptionRuntimeError
 from syntara.eventstreams.services.worker_resources import EventWorkerResources
+from syntara.integrations.adapters.kafka import KafkaAuthenticationConfigurationError
+from syntara.integrations.adapters.kafka_tls import KafkaMTLSContext
+from syntara.integrations.models.integration_configuration import KafkaConfiguration
+from tests.fixtures.tls import generate_self_signed_cert
 from tests.unit.eventstreams.test_connection_provider import connection_context
+
+
+async def test_factory_uses_runtime_identity_and_retains_group(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    context = connection_context()
+    context.session.__aenter__.return_value = context.session
+    config = context.integration.configuration
+    assert isinstance(config, KafkaConfiguration)
+    config.security_protocol = KafkaSecurityProtocol.SSL
+    context.integration.management_credential_id = uuid4()
+    identity_type = next(item for item in GA_CREDENTIAL_TYPES if item["name"] == MTLS_CLIENT_IDENTITY_TYPE_NAME)
+    context.credential_type.name = identity_type["name"]
+    context.credential_type.injectors = identity_type["injectors"]
+    certificate, private_key = generate_self_signed_cert(tmp_path, "runtime identity", "runtime")
+    context.secrets.retrieve_secret.return_value = {
+        "client_certificate": certificate.read_text(),
+        "client_private_key": private_key.read_text(),
+    }
+    monkeypatch.setattr(module, "SecretService", lambda *_args: context.secrets)
+    monkeypatch.setattr(module, "EventConnectionProvider", lambda *_args, **_kwargs: context.provider)
+    construct = MagicMock()
+    monkeypatch.setattr(module, "KafkaPartitionConsumer", construct)
+    monkeypatch.setattr(module, "KafkaRecordRunner", MagicMock())
+    factory = module.ManagedRunnerFactory(
+        MagicMock(return_value=context.session),
+        MagicMock(),
+        MagicMock(),
+        EventWorkerResources(),
+        SecretEncryptor(b"a" * 32),
+        owner_worker_id="test-worker",
+    )
+    before = await factory.connection_revision(context.snapshot)
+    await factory(context.snapshot)
+    connection, source = construct.call_args.args
+    assert isinstance(connection.ssl_context, KafkaMTLSContext)
+    assert connection.ssl_context.check_hostname
+    assert source.group_id == context.snapshot.configuration.group_id
+    assert all(call.args[0] == context.credential.secret_id for call in context.secrets.retrieve_secret.await_args_list)
+    assert all(
+        call.args[1] == context.snapshot.runtime_credential_id
+        for call in context.session.get.await_args_list
+        if call.args[0] is Credential
+    )
+
+    context.session.exec.return_value.one_or_none.return_value += timedelta(microseconds=1)
+    assert await factory.connection_revision(context.snapshot) != before
+    context.credential.enabled = False
+    with pytest.raises(SafeValueError, match="runtime credential is unavailable"):
+        await factory.connection_revision(context.snapshot)
 
 
 @pytest.mark.parametrize("skip_verification", [False, True])
@@ -94,6 +150,32 @@ async def test_unavailable_binding_creates_no_transport_client(monkeypatch):
         await factory(context.snapshot)
     construct.assert_not_called()
     context.session.__aexit__.assert_awaited_once()
+
+
+async def test_factory_sanitizes_authentication_configuration_errors(monkeypatch: pytest.MonkeyPatch) -> None:
+    factory = module.ManagedRunnerFactory(
+        MagicMock(),
+        MagicMock(),
+        MagicMock(),
+        EventWorkerResources(),
+        SecretEncryptor(b"a" * 32),
+        owner_worker_id="test-worker",
+    )
+    monkeypatch.setattr(
+        factory,
+        "resolve_connection",
+        AsyncMock(side_effect=KafkaAuthenticationConfigurationError("underlying error detail")),
+    )
+    construct = MagicMock()
+    monkeypatch.setattr(module, "KafkaPartitionConsumer", construct)
+
+    with pytest.raises(SubscriptionRuntimeError) as failure:
+        await factory(connection_context().snapshot)
+
+    assert failure.value.code == RuntimeFailureCode.CONFIGURATION_UNAVAILABLE
+    assert str(failure.value) == RuntimeFailureCode.CONFIGURATION_UNAVAILABLE.value
+    assert failure.value.__suppress_context__
+    construct.assert_not_called()
 
 
 async def test_database_resolution_failure_closes_shared_gate_and_is_transient(monkeypatch):
