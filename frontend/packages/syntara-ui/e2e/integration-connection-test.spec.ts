@@ -10,11 +10,20 @@
  * - Health check status transitions between available and error on list and detail pages
  * - Health check error classifications appear correctly on the integration detail page
  */
+import { z } from 'zod'
+
 import { test, expect, toAppUrl, type Page } from './fixtures'
+import {
+  createKafkaCredential,
+  createKafkaIntegration,
+  hasLiveKafka,
+  liveKafkaConfiguration,
+  liveKafkaInputs,
+} from './helpers/kafka'
 import { buildUniqueName } from './helpers/workflows'
 import { isSkipWebServerForPlaywrightTests } from './playwrightWebServerEnv'
 import { deleteIntegrationViaApi, deleteCredentialViaApi } from './seeds/resources'
-import { apiRequest, ensureProject } from './utils/api'
+import { apiRequest, createProjectViaApi, deleteProjectViaApi, ensureProject } from './utils/api'
 
 const processEnv: Record<string, string | undefined> = (
   process as unknown as { env: Record<string, string | undefined> }
@@ -529,4 +538,120 @@ test.describe('Integration Wizard @pr-check', () => {
       }
     })
   })
+})
+
+test('Kafka integration reports a safe error and recovers on the next health check', async ({ app }) => {
+  test.skip(isRealBackend && !hasLiveKafka, 'Live mode requires the Compose Kafka fixture')
+  // The built-in workflow runs every five minutes. Allow two cycles for the stale check.
+  if (hasLiveKafka) test.setTimeout(660_000)
+  const name = buildUniqueName('kafka-health')
+  const rejectedPassword = 'fixture-rejected-password'
+  const stateSchema = z.object({
+    validation_status: z.string(),
+    validation_error: z.string().nullable(),
+    last_validated_at: z.string().nullable(),
+  })
+  const project = await createProjectViaApi(app, name)
+  let credentialId: string | undefined
+  let integrationId: string | undefined
+  try {
+    credentialId = await createKafkaCredential(app, name, project.id, liveKafkaInputs)
+    integrationId = await createKafkaIntegration(app, name, {
+      projectId: project.id,
+      managementCredentialId: credentialId,
+      configuration: hasLiveKafka ? await liveKafkaConfiguration() : undefined,
+    })
+    let mockPassword = liveKafkaInputs.password
+    let mockStatus: z.infer<typeof stateSchema> = {
+      validation_status: 'unknown',
+      validation_error: null,
+      last_validated_at: null,
+    }
+    if (!hasLiveKafka) {
+      await app.route(
+        (url) =>
+          url.pathname === `/api/v1/kafka_integrations/${integrationId}` ||
+          url.pathname === '/api/v1/integrations/catalog',
+        async (route) => {
+          if (route.request().method() !== 'GET') return route.fallback()
+          const response = await route.fetch()
+          if (!response.ok()) return route.fulfill({ response })
+          const record = z.looseObject({ id: z.string() })
+          const json: unknown = await response.json()
+          if (new URL(route.request().url()).pathname.endsWith('/catalog')) {
+            const catalog = z.looseObject({ resources: z.array(record) }).parse(json)
+            return route.fulfill({
+              response,
+              json: {
+                ...catalog,
+                resources: catalog.resources.map((item) =>
+                  item.id === integrationId ? { ...item, ...mockStatus } : item
+                ),
+              },
+            })
+          }
+          return route.fulfill({ response, json: { ...record.parse(json), ...mockStatus } })
+        }
+      )
+    }
+    const validate = async () => {
+      if (hasLiveKafka) {
+        const response = await apiRequest(app, 'post', `/integrations/${integrationId}/validate`)
+        expect(response.ok()).toBeTruthy()
+        return z.object({ success: z.boolean() }).parse(await response.json())
+      }
+      const success = mockPassword !== rejectedPassword
+      mockStatus = {
+        validation_status: success ? 'available' : 'error',
+        validation_error: success ? null : 'Authentication failed',
+        last_validated_at: success ? '2026-06-15T10:00:02Z' : '2026-06-15T10:00:01Z',
+      }
+      return { success }
+    }
+    const status = async () => {
+      if (!hasLiveKafka) return mockStatus
+      const response = await apiRequest(app, 'get', `/kafka_integrations/${integrationId}`)
+      expect(response.ok()).toBeTruthy()
+      return stateSchema.parse(await response.json())
+    }
+    const updatePassword = async (password: string) => {
+      const response = await apiRequest(app, 'patch', `/credentials/${credentialId}`, {
+        data: { inputs: { ...liveKafkaInputs, password } },
+      })
+      expect(response.ok()).toBeTruthy()
+      mockPassword = password
+    }
+
+    expect(await validate()).toMatchObject({ success: true })
+    await app.goto(toAppUrl('/configuration/integrations'))
+    await app.getByPlaceholder('Filter by name').fill(name)
+    await app.getByRole('button', { name: 'Apply filter' }).click()
+    const row = app.getByRole('row', { name: new RegExp(name) })
+    await expect(row.getByText('Available', { exact: true })).toBeVisible()
+
+    await updatePassword(rejectedPassword)
+    expect(await validate()).toMatchObject({ success: false })
+    const failed = await status()
+    expect(failed).toMatchObject({ validation_status: 'error', validation_error: 'Authentication failed' })
+    await app.goto(toAppUrl(`/configuration/integrations/kafka/${integrationId}`))
+    const badge = app.getByText('Error', { exact: true })
+    await expect(badge).toBeVisible()
+    await badge.hover()
+    await expect(app.getByRole('tooltip')).toHaveText('Authentication failed')
+
+    await updatePassword(liveKafkaInputs.password)
+    // Live mode waits for the scheduler. Mock mode runs the same check on demand.
+    if (!hasLiveKafka) expect(await validate()).toMatchObject({ success: true })
+    await expect.poll(status, { timeout: hasLiveKafka ? 620_000 : 10_000, intervals: [1000] }).toMatchObject({
+      validation_status: 'available',
+      validation_error: null,
+    })
+    expect((await status()).last_validated_at).not.toBe(failed.last_validated_at)
+    await app.reload()
+    await expect(app.getByText('Available', { exact: true })).toBeVisible()
+  } finally {
+    if (integrationId) await deleteIntegrationViaApi(app, integrationId)
+    if (credentialId) await deleteCredentialViaApi(app, credentialId)
+    await deleteProjectViaApi(app, project.id)
+  }
 })

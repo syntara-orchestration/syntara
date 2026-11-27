@@ -17,7 +17,7 @@ export interface paths {
      * Test a CEL filter expression
      * @description Evaluate caller-supplied JSON with the shared CEL evaluator.
      *
-     *     Requires authentication and workflow:create permission in at least one project.
+     *     Requires authentication and workflow:create permission globally or in at least one project.
      *     Evaluates only supplied JSON; no Kafka decoding or payload-schema validation.
      *     Invalid CEL returns 422. Evaluation returns match, no_match or evaluation_error.
      */

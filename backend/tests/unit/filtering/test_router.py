@@ -63,9 +63,12 @@ def client(app: FastAPI) -> TestClient:
     return TestClient(app)
 
 
-def test_authentication_is_required(app: FastAPI) -> None:
+def test_authentication_is_required(app: FastAPI, monkeypatch: pytest.MonkeyPatch) -> None:
+    evaluate = Mock(side_effect=AssertionError("Unauthenticated callers must not evaluate CEL"))
+    monkeypatch.setattr(router_module, "PreparedFilter", evaluate)
     response = TestClient(app).post(_URL, json={"expression": "true", "input": None})
     assert response.status_code == 401
+    evaluate.assert_not_called()
 
 
 @pytest.mark.parametrize("scope", ["system", "project", "none"])

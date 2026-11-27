@@ -1,12 +1,15 @@
-import { execFile } from 'node:child_process'
-import { readFile } from 'node:fs/promises'
-import { fileURLToPath } from 'node:url'
-import { promisify } from 'node:util'
-
-import { IntegrationTypeEnum, TriggerTypeEnum } from '@syntara/contracts'
+import { ActivityTypeEnum, TriggerTypeEnum } from '@syntara/contracts'
 import { z } from 'zod'
 
 import { expect, test, toAppUrl } from './fixtures'
+import {
+  createKafkaCredential,
+  createKafkaIntegration,
+  hasLiveKafka,
+  kafkaFixture,
+  liveKafkaConfiguration,
+  liveKafkaInputs,
+} from './helpers/kafka'
 import {
   buildUniqueName,
   clickAddConnectedStep,
@@ -25,21 +28,11 @@ import {
   pollExecutionStatus,
 } from './utils/api'
 
-const execute = promisify(execFile)
-const backend = fileURLToPath(new URL('../../../../backend', import.meta.url))
-const fixture = fileURLToPath(new URL('./helpers/kafka-publish-record.py', import.meta.url))
 const idResponse = z.object({ id: z.string() })
 
-async function kafkaFixture(action: string, topic: string) {
-  return execute('uv', ['run', '--project', backend, 'python', fixture, action, topic], { timeout: 45_000 })
-}
+test.skip(isSkipWebServerForPlaywrightTests() && !hasLiveKafka, 'Live mode requires the Compose Kafka fixture')
 
-test.skip(
-  !isSkipWebServerForPlaywrightTests() || process.env.SYNTARA_E2E_KAFKA_PUBLISH_LIVE !== '1',
-  'Requires the root Compose Kafka SASL/TLS fixture and a real backend'
-)
-
-test('publishes a UI-saved payload template and exact key/header bytes through the real worker', async ({ app }) => {
+test('runs a Kafka Publish action with a saved payload template and ordered binary headers', async ({ app }) => {
   test.setTimeout(150_000)
   const name = buildUniqueName('kafka-publish-live')
   const topic = name.replaceAll('-', '_')
@@ -51,50 +44,21 @@ test('publishes a UI-saved payload template and exact key/header bytes through t
   const credentialIds: string[] = []
   let topicCreated = false
   try {
-    await kafkaFixture('create', topic)
-    topicCreated = true
-    projectId = (await createProjectViaApi(app, name)).id
-    const types = await apiRequest(app, 'get', '/credential_types', { token })
-    const kafkaType = z
-      .object({ resources: z.array(z.object({ id: z.string(), name: z.string() })) })
-      .parse(await types.json())
-      .resources.find((type) => type.name === 'Kafka')
-    if (!kafkaType) throw new Error('The Kafka credential type is required')
-    for (const purpose of ['management', 'runtime']) {
-      const response = await apiRequest(app, 'post', '/credentials', {
-        token,
-        data: {
-          name: `${name}-${purpose}`,
-          project_id: projectId,
-          credential_type_id: kafkaType.id,
-          inputs: { username: 'fixture', password: 'disposable-local-only' },
-        },
-      })
-      expect(response.ok()).toBeTruthy()
-      credentialIds.push(idResponse.parse(await response.json()).id)
+    if (hasLiveKafka) {
+      await kafkaFixture('create', topic)
+      topicCreated = true
     }
-    const caCertificate = await readFile(`${backend}/.secrets/certs/ca.pem`, 'utf8')
-    const integration = await apiRequest(app, 'post', '/kafka_integrations', {
-      token,
-      data: {
-        name,
-        integration_type: IntegrationTypeEnum.KAFKA,
-        enabled: true,
-        scope: 'project',
-        management_credential_id: credentialIds[0],
-        configuration: {
-          integration_type: IntegrationTypeEnum.KAFKA,
-          bootstrap_servers: [process.env.SYNTARA_E2E_KAFKA_BOOTSTRAP ?? 'host.containers.internal:9093'],
-          security_protocol: 'SASL_SSL',
-          sasl_mechanism: 'PLAIN',
-          ca_certificate: caCertificate,
-        },
-      },
+    projectId = (await createProjectViaApi(app, name)).id
+    for (const purpose of ['management', 'runtime']) {
+      credentialIds.push(
+        await createKafkaCredential(app, `${name}-${purpose}`, projectId, hasLiveKafka ? liveKafkaInputs : undefined)
+      )
+    }
+    integrationId = await createKafkaIntegration(app, name, {
+      projectId,
+      managementCredentialId: credentialIds[0],
+      configuration: hasLiveKafka ? await liveKafkaConfiguration() : undefined,
     })
-    expect(integration.ok()).toBeTruthy()
-    integrationId = idResponse.parse(await integration.json()).id
-    const assignment = await apiRequest(app, 'post', `/integrations/${integrationId}/projects/${projectId}`, { token })
-    expect(assignment.ok()).toBeTruthy()
     const workflow = await apiRequest(app, 'post', '/workflows', {
       token,
       data: {
@@ -162,6 +126,10 @@ test('publishes a UI-saved payload template and exact key/header bytes through t
     await expect(app.getByText(`${name}-runtime`, { exact: true })).toBeVisible()
     await expect(app.getByRole('button', { name: 'Change', exact: true })).toBeEnabled()
     await expect(app.getByRole('button', { name: 'Runtime credential', exact: true })).toBeHidden()
+    await expect(app.getByRole('textbox', { name: 'Topic', exact: true })).toHaveValue(topic)
+    await expect(app.getByRole('button', { name: 'Message key encoding', exact: true })).toContainText('Base64 binary')
+    await expect(app.getByRole('textbox', { name: 'Message key value', exact: true })).toHaveValue('AAEC')
+    await expect(app.getByRole('button', { name: 'Header 3 encoding', exact: true })).toContainText('Base64 binary')
     await expect(app.getByRole('textbox', { name: 'Header 3 value', exact: true })).toHaveValue('AAEC')
     await app.getByRole('button', { name: 'Update', exact: true }).click()
     const execution = await apiRequest(app, 'post', '/executions', {
@@ -175,6 +143,32 @@ test('publishes a UI-saved payload template and exact key/header bytes through t
     expect(execution.ok()).toBeTruthy()
     const executionId = idResponse.parse(await execution.json()).id
     await pollExecutionStatus(app, executionId, ['completed'], { token, timeout: 60_000 })
+    const saved = await apiRequest(app, 'get', `/workflows/${workflowId}`, { token })
+    expect(saved.ok()).toBeTruthy()
+    expect(await saved.json()).toMatchObject({
+      version: {
+        workflow_definition: {
+          nodes: expect.arrayContaining([
+            expect.objectContaining({
+              type: ActivityTypeEnum.KAFKA_PUBLISH,
+              parameters: expect.objectContaining({
+                credential_id: credentialIds[1],
+                topic,
+                payload: '${trigger.payload}',
+                key: { encoding: 'base64', value: 'AAEC' },
+                headers: [
+                  { name: 'same', value: null },
+                  { name: 'same', value: { encoding: 'utf-8', value: '' } },
+                  { name: 'same', value: { encoding: 'base64', value: 'AAEC' } },
+                ],
+              }),
+            }),
+          ]),
+        },
+      },
+    })
+    if (!hasLiveKafka) return
+
     const record = z
       .object({
         value: z.string(),
@@ -193,8 +187,6 @@ test('publishes a UI-saved payload template and exact key/header bytes through t
       ['same', 'AAEC'],
     ])
     expect(record.topic).toBe(topic)
-    const saved = await apiRequest(app, 'get', `/workflows/${workflowId}`, { token })
-    expect(JSON.stringify(await saved.json())).toContain(`"credential_id":"${credentialIds[1]}"`)
     const activities = await apiRequest(app, 'get', `/executions/${executionId}/activities`, { token })
     const output = z
       .object({ resources: z.array(z.object({ output_data: z.unknown() })) })

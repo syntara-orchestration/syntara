@@ -1,9 +1,11 @@
 import { readFile } from 'node:fs/promises'
 
 import AxeBuilder from '@axe-core/playwright'
+import { z } from 'zod'
 
 import { test, expect, toAppUrl } from './fixtures'
 import { buildUniqueName, clickSaveAndWait, fillCodeEditor, openNodeForEditing } from './helpers/workflows'
+import { isSkipWebServerForPlaywrightTests } from './playwrightWebServerEnv'
 import { createWorkflowViaApi, deleteWorkflowViaApi } from './utils/api'
 
 const EXPRESSION = 'Filter expression (CEL)'
@@ -51,9 +53,17 @@ test.describe('Kafka Subscribe CEL filter', () => {
   test('tests unsaved input without Kafka resources and distinguishes validation and evaluation outcomes', async ({
     app,
   }, testInfo) => {
+    const requests: unknown[] = []
+    let brokerRequests = 0
+    await app.route('**/api/v1/workflows/*/event_subscriptions/test', (route) => {
+      brokerRequests += 1
+      return route.fulfill({ status: 503 })
+    })
     // Konflux deploys the devel API, which does not serve this route.
     await app.route('**/api/v1/filtering/test', async (route) => {
-      const expression = filterExpression(route.request().postDataJSON())
+      const body: unknown = route.request().postDataJSON()
+      requests.push(body)
+      const expression = filterExpression(body)
       if (expression === 'input.') {
         await route.fulfill({
           status: 422,
@@ -91,9 +101,13 @@ test.describe('Kafka Subscribe CEL filter', () => {
       await app.keyboard.press('Escape')
       await editor.focus()
       await app.keyboard.press('Tab')
-      await expect(app.getByRole('button', { name: 'Test filter expression', exact: true })).toBeFocused()
-      await app.keyboard.press('Enter')
-      await expect(app.getByRole('button', { name: 'Hide filter test', exact: true })).toBeFocused()
+      const testToggle = app.getByRole('button', { name: 'Test filter expression', exact: true })
+      await expect(testToggle).toBeFocused()
+      await testToggle.press('Space')
+      await expect(app.getByRole('button', { name: 'Hide filter test', exact: true })).toHaveAttribute(
+        'aria-expanded',
+        'true'
+      )
       await app.getByRole('button', { name: TEST_FILTER, exact: true }).click()
       await expect(app.getByRole('heading', { name: 'Success alert: Match', exact: true })).toBeVisible()
       await editor.fill('false')
@@ -120,12 +134,20 @@ test.describe('Kafka Subscribe CEL filter', () => {
       await editor.scrollIntoViewIfNeeded()
       await app.screenshot({ path: testInfo.outputPath('kafka-cel-filter-configuration-error.png'), fullPage: true })
       await editor.fill('true')
+      const requestCount = requests.length
       await fillCodeEditor(app, { label: SAMPLE, value: '{' })
       await app.getByRole('button', { name: TEST_FILTER, exact: true }).click()
       await expect(app.getByText('Enter valid JSON before testing the filter')).toBeVisible()
+      expect(requests).toHaveLength(requestCount)
       await fillCodeEditor(app, { label: SAMPLE, value: 'null' })
       await app.getByRole('button', { name: TEST_FILTER, exact: true }).click()
       await expect(app.getByRole('heading', { name: 'Success alert: Match', exact: true })).toBeVisible()
+      expect(requests.at(-1)).toEqual({ expression: 'true', input: null })
+      await fillCodeEditor(app, { label: SAMPLE, value: '{"count":"forty-two"}' })
+      await app.getByRole('button', { name: TEST_FILTER, exact: true }).click()
+      await expect(app.getByRole('heading', { name: 'Success alert: Match', exact: true })).toBeVisible()
+      expect(requests.at(-1)).toEqual({ expression: 'true', input: { count: 'forty-two' } })
+      expect(brokerRequests).toBe(0)
       await app.getByRole('heading', { name: 'Success alert: Match', exact: true }).scrollIntoViewIfNeeded()
       await app.screenshot({ path: testInfo.outputPath('kafka-cel-filter-match.png'), fullPage: true })
       const results = await new AxeBuilder({ page: app })
@@ -134,14 +156,15 @@ test.describe('Kafka Subscribe CEL filter', () => {
       expect(results.violations).toEqual([])
       await editor.clear()
       await expect(editor).toBeFocused()
-      await app.getByRole('button', { name: 'Hide filter test', exact: true }).click()
-      await expect(app.getByRole('button', { name: 'Test filter expression', exact: true })).toBeFocused()
+      await app.getByRole('button', { name: 'Hide filter test', exact: true }).press('Space')
+      await expect(testToggle).toHaveAttribute('aria-expanded', 'false')
     } finally {
       await app.unroute('**/api/v1/filtering/test')
+      await app.unroute('**/api/v1/workflows/*/event_subscriptions/test')
     }
   })
 
-  test('retains invalid source after rejected save, then preserves corrected source through unrelated edits and removal', async ({
+  test('retains invalid source after rejected save, then preserves corrected source through unrelated edits and whitespace-only removal', async ({
     app,
   }) => {
     const { id } = await createWorkflowViaApi({
@@ -206,7 +229,7 @@ test.describe('Kafka Subscribe CEL filter', () => {
       await openNodeForEditing(app, 'Kafka orders')
       await expect(app.getByRole('textbox', { name: 'Topic', exact: true })).toHaveValue('orders.qa')
       await expect(app.getByRole('textbox', { name: EXPRESSION })).toHaveValue(EXACT_SOURCE)
-      await app.getByRole('textbox', { name: EXPRESSION }).clear()
+      await app.getByRole('textbox', { name: EXPRESSION }).fill('  \t  ')
       await app.getByRole('button', { name: 'Update', exact: true }).click()
       const saved = app.waitForResponse(
         (response) => response.request().method() === 'PATCH' && response.url().endsWith(`/workflows/${id}`)
@@ -251,100 +274,155 @@ test.describe('Kafka Subscribe CEL filter', () => {
     }
   })
 
-  test('exports and imports the original CEL expression without rewriting it', async ({ app }) => {
+  test('round-trips Subscribe and Publish and flags missing Kafka bindings', async ({ app }) => {
+    test.skip(isSkipWebServerForPlaywrightTests(), 'Uses unavailable fixture references accepted by the mock API')
+    const bindings = {
+      integration_id: 'a4170000-1111-4111-8111-111111111111',
+      credential_id: 'a4170000-2222-4222-8222-222222222222',
+    }
+    // Deliberately absent from the mock API. Import should retain them so users can repair the bindings.
+    const step = z.object({ type: z.string(), parameters: z.record(z.string(), z.unknown()) })
+    const workflow = z.object({ triggers: z.array(step), nodes: z.array(step) })
+    const subscribe = { ...bindings, topic: 'orders.in', filter: { expression: EXACT_SOURCE } }
+    const publish = {
+      ...bindings,
+      topic: 'orders.out',
+      payload: { delivered: true },
+      key: { encoding: 'base64', value: 'AAEC' },
+      headers: [{ name: 'source', value: { encoding: 'utf-8', value: 'orders' } }],
+    }
     const { id } = await createWorkflowViaApi({
       app,
       name: buildUniqueName('kafka-cel-export'),
-      triggers: [
-        {
-          id: 'kafka_trigger',
-          name: 'Kafka orders',
-          type: 'event_subscribe_trigger',
-          parameters: { filter: { expression: EXACT_SOURCE } },
-        },
-      ],
+      triggers: [{ id: 'kafka_trigger', name: 'Kafka orders', type: 'event_subscribe_trigger', parameters: subscribe }],
+      nodes: [{ id: 'kafka_publish', name: 'Forward orders', type: 'kafka_publish', parameters: publish }],
+      edges: [{ from: 'kafka_trigger', to: 'kafka_publish' }],
     })
-    try {
-      await app.goto(toAppUrl(`/workflow-builder/${id}`))
+    const exportWorkflow = async () => {
       await app.getByRole('button', { name: 'Workflow actions', exact: true }).click()
       const downloadPromise = app.waitForEvent('download')
       await app.getByRole('menuitem', { name: 'Export workflow', exact: true }).click()
-      const download = await downloadPromise
-      const exported = await readFile(await download.path(), 'utf8')
-      const definition: unknown = JSON.parse(exported)
-      expect(definition).toMatchObject({ triggers: [{ parameters: { filter: { expression: EXACT_SOURCE } } }] })
-
+      return readFile(await (await downloadPromise).path(), 'utf8')
+    }
+    const importWorkflow = async (definition: string) => {
       await app.getByRole('button', { name: 'Workflow actions', exact: true }).click()
       await app.getByRole('menuitem', { name: 'Import workflow', exact: true }).click()
       await app.locator('input[type="file"][accept=".json"]').setInputFiles({
-        name: 'kafka-filter.json',
+        name: 'workflow.json',
         mimeType: 'application/json',
-        buffer: Buffer.from(exported),
+        buffer: Buffer.from(definition),
       })
       const dialog = app.getByRole('dialog', { name: 'Import workflow?' })
       await dialog.getByRole('radio', { name: /Import into current workflow/ }).click()
       await dialog.getByRole('button', { name: 'Import workflow', exact: true }).click()
       await expect(dialog).toBeHidden()
+    }
+    try {
+      await app.goto(toAppUrl(`/workflow-builder/${id}`))
+      const exported = await exportWorkflow()
+      const original = workflow.parse(JSON.parse(exported))
+      expect(original).toMatchObject({
+        triggers: [{ type: 'event_subscribe_trigger', parameters: subscribe }],
+        nodes: [{ type: 'kafka_publish', parameters: publish }],
+      })
+      await importWorkflow(exported)
       await openNodeForEditing(app, 'Kafka orders')
       await expect(app.getByRole('textbox', { name: EXPRESSION })).toHaveValue(EXACT_SOURCE)
+      const integration = app.getByRole('button', { name: 'Integration', exact: true })
+      await expect(integration).toHaveText('Selected integration is unavailable')
+      await expect(app.getByRole('button', { name: 'Test runtime access', exact: true })).toHaveAttribute(
+        'aria-disabled',
+        'true'
+      )
+      await expect(app.getByText(/^Select an available Kafka Integration(?=\s*:|$)/)).toBeVisible()
+      await expect(app.getByText(/Select an available Kafka runtime credential you can use/)).toBeVisible()
+      await app.getByRole('button', { name: 'Cancel without saving', exact: true }).click()
+      const roundTrip = workflow.parse(JSON.parse(await exportWorkflow()))
+      expect(roundTrip).toEqual(original)
+
+      await importWorkflow(
+        JSON.stringify({
+          schema_version: '2.0.0',
+          name: 'Pre-Kafka workflow',
+          triggers: [{ id: 'manual', name: 'Manual start', type: 'manual_trigger', parameters: {} }],
+          nodes: [
+            {
+              id: 'script',
+              name: 'Legacy script',
+              type: 'script',
+              parameters: { language: 'python', code: 'print("ok")' },
+            },
+          ],
+          edges: [{ from: 'manual', to: 'script' }],
+        })
+      )
+      await openNodeForEditing(app, 'Legacy script')
+      await expect(app.getByRole('textbox', { name: 'Name', exact: true })).toHaveValue('Legacy script')
     } finally {
       await deleteWorkflowViaApi(app, id)
     }
   })
 
-  test('shows Verify findings beside the filter and clears field feedback on correction', async ({ app }, testInfo) => {
-    const { id } = await createWorkflowViaApi({
+  for (const { source, message } of [
+    { source: 'input.', message: 'Syntax error at line 1, column 7.' },
+    { source: '42', message: 'This expression must return true or false.' },
+  ]) {
+    test(`shows the Verify finding for "${source}" beside the filter and clears it on correction`, async ({
       app,
-      name: buildUniqueName('kafka-verify'),
-      triggers: [
-        {
-          id: 'kafka_trigger',
-          name: 'Kafka validation',
-          type: 'event_subscribe_trigger',
-          parameters: { filter: null },
-        },
-      ],
-    })
-    await app.route('**/api/v1/workflows/validate', (route) =>
-      route.fulfill({
-        json: {
-          is_valid: false,
-          error_count: 1,
-          warning_count: 0,
-          findings: [
-            {
-              severity: 'error',
-              category: 'schema_violation',
-              node_id: 'kafka_trigger',
-              field_path: 'parameters.filter.expression',
-              message: 'CEL filter: Syntax error at line 1, column 7.',
-            },
-          ],
-        },
+    }, testInfo) => {
+      const { id } = await createWorkflowViaApi({
+        app,
+        name: buildUniqueName('kafka-verify'),
+        triggers: [
+          {
+            id: 'kafka_trigger',
+            name: 'Kafka validation',
+            type: 'event_subscribe_trigger',
+            parameters: { filter: null },
+          },
+        ],
       })
-    )
-    try {
-      await app.goto(toAppUrl(`/workflow-builder/${id}`))
-      await openNodeForEditing(app, 'Kafka validation')
-      await app.getByRole('textbox', { name: EXPRESSION }).fill('input.')
-      await app.getByRole('button', { name: 'Update', exact: true }).click()
-      await app.getByRole('button', { name: 'Workflow actions' }).click()
-      await app.getByRole('menuitem', { name: 'Verify workflow' }).click()
-      await app.getByRole('button', { name: 'Danger alert details', exact: true }).click()
-      await expect(app.getByText('CEL filter: Syntax error at line 1, column 7.', { exact: true })).toBeVisible()
-      await openNodeForEditing(app, 'Kafka validation')
-      const editor = app.getByRole('textbox', { name: EXPRESSION })
-      await expect(editor).toHaveValue('input.')
-      await expect(editor).toHaveAccessibleDescription(/Syntax error at line 1, column 7/)
-      await editor.scrollIntoViewIfNeeded()
-      await app.screenshot({ path: testInfo.outputPath('kafka-verify-filter-field-error.png'), fullPage: true })
-      await editor.fill('true')
-      await expect(editor).toHaveAttribute('aria-invalid', 'false')
-    } finally {
-      await app.unroute('**/api/v1/workflows/validate')
-      await deleteWorkflowViaApi(app, id)
-    }
-  })
+      await app.route('**/api/v1/workflows/validate', (route) =>
+        route.fulfill({
+          json: {
+            is_valid: false,
+            error_count: 1,
+            warning_count: 0,
+            findings: [
+              {
+                severity: 'error',
+                category: 'schema_violation',
+                node_id: 'kafka_trigger',
+                field_path: 'parameters.filter.expression',
+                message: `CEL filter: ${message}`,
+              },
+            ],
+          },
+        })
+      )
+      try {
+        await app.goto(toAppUrl(`/workflow-builder/${id}`))
+        await openNodeForEditing(app, 'Kafka validation')
+        await app.getByRole('textbox', { name: EXPRESSION }).fill(source)
+        await app.getByRole('button', { name: 'Update', exact: true }).click()
+        await app.getByRole('button', { name: 'Workflow actions' }).click()
+        await app.getByRole('menuitem', { name: 'Verify workflow' }).click()
+        await app.getByRole('button', { name: 'Danger alert details', exact: true }).click()
+        await expect(app.getByText(`CEL filter: ${message}`, { exact: true })).toBeVisible()
+        await openNodeForEditing(app, 'Kafka validation')
+        const editor = app.getByRole('textbox', { name: EXPRESSION })
+        await expect(editor).toHaveValue(source)
+        await expect(editor).toHaveAccessibleDescription(new RegExp(`CEL filter: ${message}`))
+        await editor.scrollIntoViewIfNeeded()
+        await app.screenshot({ path: testInfo.outputPath('kafka-verify-filter-field-error.png'), fullPage: true })
+        await editor.fill('true')
+        await expect(editor).toHaveAttribute('aria-invalid', 'false')
+      } finally {
+        await app.unroute('**/api/v1/workflows/validate')
+        await deleteWorkflowViaApi(app, id)
+      }
+    })
+  }
 
   test('uses compact request feedback and retries with the existing Test filter action', async ({ app }, testInfo) => {
     let attempts = 0
