@@ -52,6 +52,12 @@ class ExecutionPlanePlugin(BaseResource, table=True):
         description="Canonical Action manifest describing the step contract",
     )
 
+    resolved_execution: dict[str, Any] | None = Field(
+        default=None,
+        sa_type=JSONB,
+        description="Compiled runtime binding metadata supplied to an SDK custom-runner workload",
+    )
+
     image_reference: str = Field(
         min_length=1,
         sa_type=Text(),  # type: ignore[call-overload]

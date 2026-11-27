@@ -138,6 +138,7 @@ constraint-dependencies = [
 ]
 
 [tool.uv.sources]
+execution-plane-client = { git = "https://github.com/syntara-orchestration/syntara-execution-plane.git", rev = "78f1fa8509a5d491c6b951e5754b96f8ac0272c0", subdirectory = "src/execution_plane_client" }
 syntara-api-client = { path = "src/api_client", editable = true }
 orchestrator-cli = { path = "src/cli", editable = true }
 orchestrator-test-sdk = { path = "test-sdk", editable = true }
@@ -155,7 +156,7 @@ Issues = "https://github.com/syntara-orchestration/syntara/issues"
 # Hatchling configuration for multiple modules
 [tool.hatch.build.targets.wheel]
 packages = ["src/syntara"]
-include = ["src/syntara/execution_plane/registry/manifests/*.yaml"]
+include = ["src/syntara/execution_plane/registry/manifests/*.yaml", "src/syntara/execution_plane/registry/manifests/*.json"]
 
 [tool.hatch.build.targets.sdist]
 only-include = [

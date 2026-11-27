@@ -1,0 +1,15 @@
+{
+  "bindings": [
+    {
+      "abi": "syntara.container/v1alpha1",
+      "entry_point": "syntara_node_ao_task_agent:AOTaskAgentStep",
+      "runtime_kind": "custom-runner",
+      "schema_digests": {
+        "input": "sha256:bfc227c023a89f75341772d20db825f667933551ae561348c2214c8e211ff10c",
+        "output": "sha256:fed2ace7f9e7f76894bfa70fd845ae8e19917aaf89f7232084b614fd935e67ff"
+      },
+      "step_identity": "syntara.ao-task-agent.ao-task-agent",
+      "step_revision_id": "sha256:1f026ea41d9a7abf81d96dc8fd92617962d0186deea176bea040a33dabbd8b23"
+    }
+  ]
+}

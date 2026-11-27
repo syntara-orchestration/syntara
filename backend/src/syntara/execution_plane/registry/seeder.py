@@ -1,17 +1,19 @@
-"""Seed Python and Bash Actions with configured workload images."""
+"""Seed SDK Action manifests with configured workload images."""
 
 from __future__ import annotations
 
+import json
 import os
 from datetime import UTC, datetime
 from importlib.resources import files
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 from uuid import uuid4
 
 import structlog
 import yaml
 from sqlalchemy.dialects.postgresql import insert
 
+from syntara.core.config.base import get_settings
 from syntara.execution_plane.registry.models import ExecutionPlanePlugin
 from syntara.workflow_core.models import NodeType
 
@@ -28,6 +30,7 @@ _PLUGIN_SEEDS = (
         "script-python.yaml",
         "RELATED_IMAGE_SCRIPT_PYTHON",
         "quay.io/aap/ansible-automation-platform/ao-python-rhel9:devel",
+        None,
     ),
     (
         "script-bash",
@@ -36,6 +39,16 @@ _PLUGIN_SEEDS = (
         "script-bash.yaml",
         "RELATED_IMAGE_SCRIPT_BASH",
         "quay.io/aap/ansible-automation-platform/ao-bash-rhel9:devel",
+        None,
+    ),
+    (
+        "ao-task-agent",
+        NodeType.AGENTIC,
+        "syntara.ao-task-agent.ao-task-agent",
+        "ao-task-agent.yaml",
+        None,
+        "quay.io/aap/ansible-automation-platform/ao-task-agent-rhel9:devel",
+        "ao-task-agent-resolved-execution.json",
     ),
 )
 
@@ -54,8 +67,38 @@ def _load_manifest(filename: str, expected_name: str) -> dict[str, Any]:
     return manifest
 
 
+def _load_resolved_execution(filename: str | None, expected_identity: str) -> dict[str, Any] | None:
+    """Load compiled SDK binding metadata paired with a packaged Action manifest."""
+    if filename is None:
+        return None
+    contents = files("syntara.execution_plane.registry.manifests").joinpath(filename).read_text(encoding="utf-8")
+    loaded: object = json.loads(contents)
+    if not isinstance(loaded, dict):
+        message = f"Packaged resolved execution data {filename!r} must be a JSON object"
+        raise TypeError(message)
+    document = cast("dict[str, Any]", loaded)
+    bindings = document.get("bindings")
+    if (
+        not isinstance(bindings, list)
+        or len(bindings) != 1
+        or not isinstance(bindings[0], dict)
+        or bindings[0].get("step_identity") != expected_identity
+    ):
+        message = f"Packaged resolved execution data {filename!r} has the wrong Action identity"
+        raise ValueError(message)
+    return document
+
+
+def _resolve_image_reference(name: str, image_env_var: str | None, default: str) -> str:
+    if name == "ao-task-agent":
+        return get_settings().agent_runtime_image
+    if image_env_var is None:
+        return default
+    return os.environ.get(image_env_var) or default
+
+
 async def seed_execution_plane_plugins(session: AsyncSession) -> None:
-    """Seed script Actions, allowing the operator to override their image refs."""
+    """Idempotently seed SDK Actions, applying configured image overrides."""
     now = datetime.now(UTC)
     rows = [
         {
@@ -64,12 +107,13 @@ async def seed_execution_plane_plugins(session: AsyncSession) -> None:
             "node_type": node_type,
             "step_identity": step_identity,
             "manifest": _load_manifest(filename, name),
-            "image_reference": os.environ.get(image_env_var) or image_reference,
+            "image_reference": _resolve_image_reference(name, image_env_var, image_reference),
+            "resolved_execution": _load_resolved_execution(resolved_filename, step_identity),
             "created_at": now,
             "updated_at": now,
             "labels": {},
         }
-        for name, node_type, step_identity, filename, image_env_var, image_reference in _PLUGIN_SEEDS
+        for name, node_type, step_identity, filename, image_env_var, image_reference, resolved_filename in _PLUGIN_SEEDS
     ]
     statement = insert(ExecutionPlanePlugin).values(rows)
     statement = statement.on_conflict_do_update(
@@ -78,6 +122,7 @@ async def seed_execution_plane_plugins(session: AsyncSession) -> None:
             "step_identity": statement.excluded.step_identity,
             "node_type": statement.excluded.node_type,
             "manifest": statement.excluded.manifest,
+            "resolved_execution": statement.excluded.resolved_execution,
             "image_reference": statement.excluded.image_reference,
             "updated_at": now,
         },

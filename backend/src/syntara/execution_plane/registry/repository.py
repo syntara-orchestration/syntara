@@ -46,6 +46,20 @@ def execution_plane_plugin_output_schema(plugin: ExecutionPlanePlugin) -> dict[s
     return _inline_schema(plugin.manifest, "output", plugin.name)
 
 
+def execution_plane_plugin_supports_revision(plugin: ExecutionPlanePlugin, step_revision_id: str) -> bool:
+    """Check that a selected compiled revision belongs to this registered Action."""
+    document = plugin.resolved_execution
+    bindings = document.get("bindings") if isinstance(document, dict) else None
+    if not isinstance(bindings, list):
+        return False
+    return any(
+        isinstance(binding, dict)
+        and binding.get("step_revision_id") == step_revision_id
+        and binding.get("step_identity") == plugin.step_identity
+        for binding in bindings
+    )
+
+
 async def execution_plane_plugin_credential_recipe_ids(
     session: AsyncSession, plugin: ExecutionPlanePlugin
 ) -> tuple[str, ...]:
