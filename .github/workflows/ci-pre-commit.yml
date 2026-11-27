@@ -47,3 +47,16 @@ jobs:
         run: uv run --project backend pre-commit run --all-files
         env:
           SKIP: frontend-prettier,frontend-eslint,frontend-tsc
+
+      # Expose the PR number so the workflow_run-based "Label PR" workflow can
+      # identify the PR (workflow_run runs have write access; this one does not).
+      - name: Save PR number
+        if: always() && github.event_name == 'pull_request'
+        run: echo "${{ github.event.pull_request.number }}" > pr_number.txt
+
+      - name: Upload PR number
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: precommit-pr_number
+          path: pr_number.txt

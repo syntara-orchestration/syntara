@@ -9,7 +9,14 @@
 # change only for a CVE/critical security vulnerability with no non-breaking
 # remediation, after escalation to engineering and BU leadership.
 #
-# Team membership requires an `read:org` scoped token. Provision the
+# This is the privileged half of the guard. The read-only
+# "Breaking Change Label Detect" workflow runs on the `labeled` event (safe for
+# forks, no secrets) and records the event as an artifact; this workflow runs as
+# a `workflow_run` finisher in the base-repo context, where it has the org-read
+# token and write access. This split replaces an earlier `pull_request_target`
+# trigger, which GitHub blocks by default on public repositories from 2026-12-02.
+#
+# Team membership requires a `read:org` scoped token. Provision the
 # `SYNTARA_LEADS_READ_TOKEN` secret (a fine-grained PAT or GitHub App token with
 # organization "Members: read"). If it is missing, the guard fails fast with a
 # clear configuration error (a preflight step) rather than silently falling back
@@ -17,33 +24,23 @@
 name: Breaking Change Label Guard
 
 on:
-  # pull_request_target so the token has write access to manage labels/comments,
-  # including on fork PRs. No fork code is checked out or executed here.
-  #
-  # opened/synchronize/reopened are included so this workflow reports a check
-  # result on every PR (the job's `if:` skips them, and GitHub treats a skipped
-  # required check as satisfied). This lets it be made a **required** status
-  # check. That required-check configuration is what closes the TOCTOU window
-  # where the OpenAPI gate could pass on a label this guard is concurrently
-  # removing. It is a manual branch-protection setting on `devel` (see the
-  # repo-admin action items on the PR) and cannot be verified from this workflow
-  # file; until it is in place, the guard still removes an unauthorized label,
-  # but asynchronously (best effort) rather than blocking the merge.
-  pull_request_target:
-    types: [opened, synchronize, reopened, labeled]
+  workflow_run:
+    workflows: ["Breaking Change Label Detect"]
+    types: [completed]
 
 concurrency:
-  group: breaking-change-label-guard-${{ github.event.pull_request.number }}
+  group: breaking-change-label-guard-${{ github.event.workflow_run.id }}
   cancel-in-progress: false
 
 permissions:
   contents: read
   pull-requests: write
+  checks: write
+  actions: read
 
 jobs:
   verify-label-authority:
-    # Only act when the privileged label is the one that was added.
-    if: github.event.label.name == 'breaking-change-approved'
+    if: github.event.workflow_run.event == 'pull_request'
     runs-on: ubuntu-24.04
     steps:
       - name: Ensure org-read token is configured
@@ -55,7 +52,29 @@ jobs:
             exit 1
           fi
 
+      - name: Download label event
+        id: download
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: breaking-change-label-event
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+        continue-on-error: true
+
+      - name: Skip if no label event
+        if: steps.download.outcome == 'failure'
+        run: echo "No breaking-change-label-event artifact — the privileged label was not added. Nothing to do."
+
+      - name: Parse label event
+        if: steps.download.outcome == 'success'
+        id: event
+        run: |
+          # shellcheck disable=SC2129
+          grep -E '^(pr_number|head_sha|actor|label)=' label-event.txt >> "$GITHUB_OUTPUT"
+
       - name: Verify actor is a member of syntara-leads
+        if: steps.download.outcome == 'success'
+        id: membership
         uses: actions/github-script@373c709c69115d41ff229c7e5df9f8788daa9553 # v9
         with:
           # Requires a read:org token; the preflight step above fails the job if
@@ -64,11 +83,8 @@ jobs:
           github-token: ${{ secrets.SYNTARA_LEADS_READ_TOKEN }}
           script: |
             const org = context.repo.owner;
-            const repo = context.repo.repo;
             const team = 'syntara-leads';
-            const label = 'breaking-change-approved';
-            const prNumber = context.payload.pull_request.number;
-            const actor = context.payload.sender.login;
+            const actor = process.env.ACTOR;
 
             let isMember = false;
             try {
@@ -86,13 +102,47 @@ jobs:
               );
               isMember = false;
             }
+            core.setOutput('is_member', isMember ? 'true' : 'false');
+        env:
+          ACTOR: ${{ steps.event.outputs.actor }}
+
+      - name: Enforce label authority
+        if: steps.download.outcome == 'success'
+        uses: actions/github-script@373c709c69115d41ff229c7e5df9f8788daa9553 # v9
+        with:
+          # Writes (label removal, comment, check run) use the default token,
+          # which has write access in the base-repo context.
+          github-token: ${{ github.token }}
+          script: |
+            const org = context.repo.owner;
+            const repo = context.repo.repo;
+            const team = 'syntara-leads';
+            const label = process.env.LABEL;
+            const prNumber = Number(process.env.PR_NUMBER);
+            const headSha = process.env.HEAD_SHA;
+            const actor = process.env.ACTOR;
+            const isMember = process.env.IS_MEMBER === 'true';
+
+            const checkName = 'Breaking Change Label Authority';
 
             if (isMember) {
               core.info(`'${actor}' is an active member of '${org}/${team}'. Label authorized.`);
+              await github.rest.checks.create({
+                owner: org,
+                repo,
+                name: checkName,
+                head_sha: headSha,
+                status: 'completed',
+                conclusion: 'success',
+                output: {
+                  title: 'Authorized',
+                  summary: `'${actor}' is an authorized member of ${org}/${team}.`,
+                },
+              });
               return;
             }
 
-            // Unauthorized: remove the label, comment, and fail the check.
+            // Unauthorized: remove the label, comment, record a failing check.
             try {
               await github.rest.issues.removeLabel({
                 owner: org,
@@ -122,6 +172,26 @@ jobs:
               body,
             });
 
+            await github.rest.checks.create({
+              owner: org,
+              repo,
+              name: checkName,
+              head_sha: headSha,
+              status: 'completed',
+              conclusion: 'failure',
+              output: {
+                title: 'Unauthorized label removed',
+                summary:
+                  `'${actor}' is not authorized to apply the '${label}' label; it has been removed.`,
+              },
+            });
+
             core.setFailed(
               `'${actor}' is not authorized to apply the '${label}' label; it has been removed.`
             );
+        env:
+          LABEL: ${{ steps.event.outputs.label }}
+          PR_NUMBER: ${{ steps.event.outputs.pr_number }}
+          HEAD_SHA: ${{ steps.event.outputs.head_sha }}
+          ACTOR: ${{ steps.event.outputs.actor }}
+          IS_MEMBER: ${{ steps.membership.outputs.is_member }}
