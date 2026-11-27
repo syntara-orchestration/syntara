@@ -526,6 +526,25 @@ class TestActivityEventProcessing:
         assert update["_is_loop_iteration"] is True
         assert update["_is_loop_control"] is False
 
+    def test_process_activity_scheduled_ignores_ambiguous_canvas_ids(self) -> None:
+        """An ambiguous Temporal ID must not update either candidate node."""
+        self.metadata.activity_definitions_map["approval"] = {"id": "approval", "type": NodeType.APPROVAL}
+        self.metadata.activity_definitions_map["approval_iter_0"] = {
+            "id": "approval_iter_0",
+            "type": NodeType.SCRIPT_PYTHON,
+        }
+        self.metadata.loop_body_activity_ids = {"approval"}
+        event = self._create_mock_event(
+            EventType.EVENT_TYPE_ACTIVITY_TASK_SCHEDULED,
+            event_id=8,
+            activity_id="approval_iter_0",
+        )
+
+        self.service._process_activity_scheduled(event, self.metadata)
+
+        assert event.event_id not in self.metadata.pending_activity_updates
+        assert event.event_id not in self.metadata.pending_sync_event_ids
+
     def test_process_activity_scheduled_no_loop_flags_for_plain_activity(self) -> None:
         """A plain activity without iter suffix and not in terminal_activity_ids gets no loop flags."""
         event = self._create_mock_event(

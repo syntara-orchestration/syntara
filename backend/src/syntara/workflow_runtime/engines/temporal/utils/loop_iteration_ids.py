@@ -68,6 +68,8 @@ def resolve_loop_iteration_canvas_id(
     An exact canvas-node match is rejected when the same string can also be
     generated as an iteration of a known loop-body node. Such a collision is
     ambiguous and must not silently select either node.
+    Multiple loop-body candidates are likewise rejected because each could
+    generate the same suffixed Temporal activity ID.
     """
     known_ids = tuple(canvas_node_ids)
     matches = [
@@ -79,6 +81,9 @@ def resolve_loop_iteration_canvas_id(
         if any(node_id != activity_id and node_id in loop_body_node_ids for node_id in matches):
             return None
         return activity_id
+    loop_body_matches = [node_id for node_id in matches if node_id in loop_body_node_ids]
+    if len(loop_body_matches) > 1:
+        return None
     return max(matches, key=len) if matches else None
 
 

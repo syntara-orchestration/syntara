@@ -274,6 +274,33 @@ def test_activity_resolution_prefers_the_longest_ambiguous_canvas_node() -> None
     assert resolution.node.id == "approval_iter_1"
 
 
+def test_activity_resolution_rejects_nested_loop_body_collision() -> None:
+    definition: dict[str, object] = {
+        "schema_version": "2.0.0",
+        "name": "workflow",
+        "triggers": [{"id": "trigger", "type": "manual"}],
+        "nodes": [
+            {"id": "outer", "type": "loop", "parameters": {"type": "for_each", "items": "a"}},
+            {"id": "inner", "type": "loop", "parameters": {"type": "for_each", "items": "b"}},
+            {"id": "approval", "type": "approval", "parameters": {}},
+            {"id": "approval_iter_0", "type": "approval", "parameters": {}},
+        ],
+        "edges": [
+            {"from": "outer", "from_port": "iterate", "to": "inner"},
+            {"from": "inner", "from_port": "iterate", "to": "approval"},
+            {"from": "outer", "from_port": "iterate", "to": "approval_iter_0"},
+        ],
+    }
+    row = activity(workflow_definition=definition)
+    row.activity_name = "approval_iter_0_iter_1"
+    row.temporal_activity_id = "approval_iter_0_iter_1"
+
+    resolution = resolution_for_activity(row)
+
+    assert resolution is not None
+    assert resolution.node is None
+
+
 def test_activity_resolution_rejects_invalid_workflow_definitions() -> None:
     row = activity(workflow_definition={"schema_version": "invalid"})
 

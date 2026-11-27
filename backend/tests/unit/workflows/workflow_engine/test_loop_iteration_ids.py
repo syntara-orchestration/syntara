@@ -54,6 +54,18 @@ def test_resolve_loop_iteration_canvas_id_prefers_longest_node_prefix() -> None:
     assert resolve_loop_iteration_canvas_id(activity_id, ["approval", "approval_iter_0"]) == "approval_iter_0"
 
 
+def test_resolve_loop_iteration_canvas_id_rejects_multiple_loop_body_candidates() -> None:
+    """Reject an ID that multiple loop-body nodes can generate."""
+    assert (
+        resolve_loop_iteration_canvas_id(
+            "approval_iter_0_iter_1",
+            ["approval", "approval_iter_0"],
+            ["approval", "approval_iter_0"],
+        )
+        is None
+    )
+
+
 def test_resolve_loop_iteration_canvas_id_rejects_unknown_nodes() -> None:
     """A Temporal ID must correlate to a known canvas node."""
     assert resolve_loop_iteration_canvas_id("approval_iter_0", ["other"]) is None

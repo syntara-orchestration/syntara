@@ -37,7 +37,7 @@ class ActivitySyncEventProcessorMixin:
         if resolved_activity_id is not None:
             base_activity_id = resolved_activity_id
         elif metadata.activity_definitions_map:
-            base_activity_id = attrs.activity_id
+            return
         else:
             base_activity_id = strip_loop_iteration_suffixes(attrs.activity_id)
         has_iter_suffix = base_activity_id != attrs.activity_id
