@@ -33,7 +33,7 @@ Syntara UI is a React-based application for building and managing complex automa
 
 ### Prerequisites
 
-- Node.js 22+
+- Node.js 22.18+
 - npm 10+
 - Git
 

@@ -3,9 +3,11 @@
  * Auto-discovers registration modules using import.meta.glob (each maps to React Flow node components).
  */
 
+// Stryker disable all: Vite needs static glob arguments before test transforms run.
 const stepModules = import.meta.glob<{ default: () => void }>(['./register*Step.ts', '!./*.test.ts', '!./*.spec.ts'], {
   eager: true,
 })
+// Stryker restore all
 
 /**
  * Register all workflow step types.

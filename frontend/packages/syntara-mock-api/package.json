@@ -8,6 +8,7 @@
     "start": "tsx src/index.ts",
     "test": "vitest run",
     "vitest": "vitest run",
+    "mutate": "stryker run",
     "lint": "eslint src/resources/ src/utils/",
     "podman:build": "podman build --platform linux/amd64,linux/arm64 --tag syntara-mock-api -f Containerfile ../..",
     "podman:run": "podman run --rm -p 3000:3000 syntara-mock-api"

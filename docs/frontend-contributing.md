@@ -26,7 +26,7 @@ The guide includes copy-ready prompt templates, a workflow diagram, and worked e
 
 ## Prerequisites
 
-- Node.js 22+ (see package.json for exact requirements)
+- Node.js 22.18+
 - npm (comes with Node.js)
 - Familiarity with React, TypeScript, and modern web development practices
 

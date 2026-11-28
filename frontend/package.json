@@ -36,6 +36,7 @@
     "storybook:build": "npm run storybook:build --prefix packages/syntara-ui",
     "gen": "npm run gen:local --prefix packages/syntara-contracts",
     "mutate": "npm run mutate --prefix packages/syntara-ui",
+    "mutation:audit": "node scripts/run-mutation-audit.mjs",
     "podman:build": "concurrently npm:podman:build:* -c auto",
     "podman:build:ui": "podman build -f packages/syntara-ui/Containerfile -t syntara-ui:latest -t localhost/syntara-ui:latest .",
     "podman:build:mock-api": "podman build -f packages/syntara-mock-api/Containerfile -t syntara-mock-api:latest -t localhost/syntara-mock-api:latest .",
@@ -74,6 +75,8 @@
   "devDependencies": {
     "@emnapi/core": "2.0.0-alpha.3",
     "@emnapi/runtime": "2.0.0-alpha.3",
+    "@stryker-mutator/core": "10.0.0",
+    "@stryker-mutator/vitest-runner": "10.0.0",
     "@testing-library/dom": "^10.4.2",
     "@vitest/coverage-v8": "^5.0.3",
     "concurrently": "^10.0.6",
