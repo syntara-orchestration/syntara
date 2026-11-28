@@ -11,6 +11,7 @@ from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
     from ..models.aap_configuration import AAPConfiguration
+    from ..models.http_configuration import HTTPConfiguration
     from ..models.integration_update_labels_type_0 import IntegrationUpdateLabelsType0
     from ..models.llm_provider_configuration import LLMProviderConfiguration
     from ..models.mcp_server_configuration_input import MCPServerConfigurationInput
@@ -27,8 +28,8 @@ class IntegrationUpdate:
     Attributes:
         name (None | str | Unset): Human-readable name for the integration
         description (None | str | Unset): Detailed description of the integration
-        configuration (AAPConfiguration | LLMProviderConfiguration | MCPServerConfigurationInput | None |
-            OpenShiftConfiguration | Unset): Integration-specific configuration
+        configuration (AAPConfiguration | HTTPConfiguration | LLMProviderConfiguration | MCPServerConfigurationInput |
+            None | OpenShiftConfiguration | Unset): Integration-specific configuration
         management_credential_id (None | Unset | UUID): Optional credential for admin operations
         enabled (bool | None | Unset): Whether the integration is active
         scope (IntegrationScope | None | Unset): Visibility scope: global or project
@@ -39,6 +40,7 @@ class IntegrationUpdate:
     description: None | str | Unset = UNSET
     configuration: (
         AAPConfiguration
+        | HTTPConfiguration
         | LLMProviderConfiguration
         | MCPServerConfigurationInput
         | None
@@ -52,6 +54,7 @@ class IntegrationUpdate:
 
     def to_dict(self) -> dict[str, Any]:
         from ..models.aap_configuration import AAPConfiguration
+        from ..models.http_configuration import HTTPConfiguration
         from ..models.integration_update_labels_type_0 import IntegrationUpdateLabelsType0
         from ..models.llm_provider_configuration import LLMProviderConfiguration
         from ..models.mcp_server_configuration_input import MCPServerConfigurationInput
@@ -79,6 +82,8 @@ class IntegrationUpdate:
         elif isinstance(self.configuration, AAPConfiguration):
             configuration = self.configuration.to_dict()
         elif isinstance(self.configuration, OpenShiftConfiguration):
+            configuration = self.configuration.to_dict()
+        elif isinstance(self.configuration, HTTPConfiguration):
             configuration = self.configuration.to_dict()
         else:
             configuration = self.configuration
@@ -136,6 +141,7 @@ class IntegrationUpdate:
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         from ..models.aap_configuration import AAPConfiguration
+        from ..models.http_configuration import HTTPConfiguration
         from ..models.integration_update_labels_type_0 import IntegrationUpdateLabelsType0
         from ..models.llm_provider_configuration import LLMProviderConfiguration
         from ..models.mcp_server_configuration_input import MCPServerConfigurationInput
@@ -165,6 +171,7 @@ class IntegrationUpdate:
             data: object,
         ) -> (
             AAPConfiguration
+            | HTTPConfiguration
             | LLMProviderConfiguration
             | MCPServerConfigurationInput
             | None
@@ -207,8 +214,17 @@ class IntegrationUpdate:
                 return configuration_type_0_type_3
             except (TypeError, ValueError, AttributeError, KeyError):
                 pass
+            try:
+                if not isinstance(data, dict):
+                    raise TypeError()
+                configuration_type_0_type_4 = HTTPConfiguration.from_dict(data)
+
+                return configuration_type_0_type_4
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
             return cast(
                 AAPConfiguration
+                | HTTPConfiguration
                 | LLMProviderConfiguration
                 | MCPServerConfigurationInput
                 | None

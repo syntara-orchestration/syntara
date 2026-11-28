@@ -314,7 +314,7 @@ export interface components {
      * @description Type of external integration.
      * @enum {string}
      */
-    IntegrationType: 'mcp_server' | 'llm_provider' | 'ansible_automation_platform' | 'openshift'
+    IntegrationType: 'mcp_server' | 'llm_provider' | 'ansible_automation_platform' | 'openshift' | 'http'
     /**
      * IntegrationStatus
      * @description Validation status of an integration.
@@ -386,6 +386,7 @@ export interface components {
         | components['schemas']['LLMProviderConfiguration']
         | components['schemas']['AAPConfiguration']
         | components['schemas']['OpenShiftConfiguration']
+        | components['schemas']['HTTPConfiguration']
       /**
        * Management Credential Id
        * @description Optional credential for admin operations
@@ -509,6 +510,7 @@ export interface components {
             | components['schemas']['LLMProviderConfiguration']
             | components['schemas']['AAPConfiguration']
             | components['schemas']['OpenShiftConfiguration']
+            | components['schemas']['HTTPConfiguration']
           )
         | null
       /**
@@ -547,6 +549,7 @@ export interface components {
         | components['schemas']['LLMProviderConfiguration']
         | components['schemas']['AAPConfiguration']
         | components['schemas']['OpenShiftConfiguration']
+        | components['schemas']['HTTPConfiguration']
       /**
        * Credential Id
        * @description Credential to use for the connection test
@@ -584,6 +587,7 @@ export interface components {
         | components['schemas']['LLMProviderConfiguration']
         | components['schemas']['AAPConfiguration']
         | components['schemas']['OpenShiftConfiguration']
+        | components['schemas']['HTTPConfiguration']
       /** Last Validated At */
       last_validated_at?: string | null
       /** Management Credential Id */
@@ -736,6 +740,39 @@ export interface components {
        * @description PEM-encoded CA certificate to trust for this integration's TLS connections.
        */
       ca_certificate?: string | null
+    }
+    /**
+     * HTTPConfiguration
+     * @description HTTPS origin for credentialed HTTP workloads.
+     */
+    HTTPConfiguration: {
+      /**
+       * Allow Http
+       * @description Allow HTTP (unencrypted) connections. Loopback addresses are always permitted over HTTP.
+       * @default false
+       */
+      allow_http?: boolean
+      /**
+       * Insecure Skip Tls Verify
+       * @description Disable TLS certificate verification for connections to this integration.
+       * @default false
+       */
+      insecure_skip_tls_verify?: boolean
+      /**
+       * Ca Certificate
+       * @description PEM-encoded CA certificate to trust for this integration's TLS connections.
+       */
+      ca_certificate?: string | null
+      /**
+       * @description discriminator enum property added by openapi-typescript
+       * @enum {string}
+       */
+      integration_type: 'http'
+      /**
+       * Base Url
+       * @description Authorized HTTPS origin for HTTP requests
+       */
+      base_url: string
     }
     /**
      * OpenShiftConfiguration

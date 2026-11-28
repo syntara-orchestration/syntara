@@ -1672,6 +1672,13 @@ class OrchestratorWorkflow(WorkflowConvergeMixin, WorkflowApprovalMixin):
         If the node's parameters has a credential_id, calls the credential resolution
         activity to decrypt and inject resolved credentials into the parameters.
         """
+        if (
+            node.type == NodeType.HTTP_REQUEST
+            and resolved_parameters.get("execution_profile") is not None
+            and workflow.patched("http-ep-bearer-credentials-v1")
+        ):
+            return
+
         credential_id = resolved_parameters.get("credential_id")
         if not credential_id:
             return

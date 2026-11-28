@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, TypeVar, cast
+from uuid import UUID
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
@@ -14,6 +15,7 @@ if TYPE_CHECKING:
     from ..models.api_executor_parameters_headers import APIExecutorParametersHeaders
     from ..models.api_executor_parameters_query_params import APIExecutorParametersQueryParams
     from ..models.credential_binding import CredentialBinding
+    from ..models.execution_target_profile import ExecutionTargetProfile
 
 
 T = TypeVar("T", bound="APIExecutorParameters")
@@ -25,6 +27,8 @@ class APIExecutorParameters:
 
     Attributes:
         method (HTTPMethod): Supported HTTP methods for API requests.
+        integration_id (None | Unset | UUID): HTTP integration authorizing an EP bearer credential and HTTPS origin
+        execution_profile (ExecutionTargetProfile | None | Unset): Execution Plane placement profile for this workload.
         url (None | str | Unset): Request URL (optional when a Secret URL credential provides it)
         headers (APIExecutorParametersHeaders | Unset):
         body (APIExecutorParametersBodyType0 | None | str | Unset):
@@ -35,6 +39,8 @@ class APIExecutorParameters:
     """
 
     method: HTTPMethod
+    integration_id: None | Unset | UUID = UNSET
+    execution_profile: ExecutionTargetProfile | None | Unset = UNSET
     url: None | str | Unset = UNSET
     headers: APIExecutorParametersHeaders | Unset = UNSET
     body: APIExecutorParametersBodyType0 | None | str | Unset = UNSET
@@ -45,8 +51,25 @@ class APIExecutorParameters:
 
     def to_dict(self) -> dict[str, Any]:
         from ..models.api_executor_parameters_body_type_0 import APIExecutorParametersBodyType0
+        from ..models.execution_target_profile import ExecutionTargetProfile
 
         method = self.method.value
+
+        integration_id: None | str | Unset
+        if isinstance(self.integration_id, Unset):
+            integration_id = UNSET
+        elif isinstance(self.integration_id, UUID):
+            integration_id = str(self.integration_id)
+        else:
+            integration_id = self.integration_id
+
+        execution_profile: dict[str, Any] | None | Unset
+        if isinstance(self.execution_profile, Unset):
+            execution_profile = UNSET
+        elif isinstance(self.execution_profile, ExecutionTargetProfile):
+            execution_profile = self.execution_profile.to_dict()
+        else:
+            execution_profile = self.execution_profile
 
         url: None | str | Unset
         if isinstance(self.url, Unset):
@@ -90,6 +113,10 @@ class APIExecutorParameters:
                 "method": method,
             }
         )
+        if integration_id is not UNSET:
+            field_dict["integration_id"] = integration_id
+        if execution_profile is not UNSET:
+            field_dict["execution_profile"] = execution_profile
         if url is not UNSET:
             field_dict["url"] = url
         if headers is not UNSET:
@@ -111,9 +138,44 @@ class APIExecutorParameters:
         from ..models.api_executor_parameters_headers import APIExecutorParametersHeaders
         from ..models.api_executor_parameters_query_params import APIExecutorParametersQueryParams
         from ..models.credential_binding import CredentialBinding
+        from ..models.execution_target_profile import ExecutionTargetProfile
 
         d = dict(src_dict)
         method = HTTPMethod(d.pop("method"))
+
+        def _parse_integration_id(data: object) -> None | Unset | UUID:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            try:
+                if not isinstance(data, str):
+                    raise TypeError()
+                integration_id_type_0 = UUID(data)
+
+                return integration_id_type_0
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            return cast(None | Unset | UUID, data)
+
+        integration_id = _parse_integration_id(d.pop("integration_id", UNSET))
+
+        def _parse_execution_profile(data: object) -> ExecutionTargetProfile | None | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            try:
+                if not isinstance(data, dict):
+                    raise TypeError()
+                execution_profile_type_0 = ExecutionTargetProfile.from_dict(data)
+
+                return execution_profile_type_0
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            return cast(ExecutionTargetProfile | None | Unset, data)
+
+        execution_profile = _parse_execution_profile(d.pop("execution_profile", UNSET))
 
         def _parse_url(data: object) -> None | str | Unset:
             if data is None:
@@ -175,6 +237,8 @@ class APIExecutorParameters:
 
         api_executor_parameters = cls(
             method=method,
+            integration_id=integration_id,
+            execution_profile=execution_profile,
             url=url,
             headers=headers,
             body=body,

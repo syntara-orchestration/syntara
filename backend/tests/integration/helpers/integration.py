@@ -9,6 +9,7 @@ from syntara.core.models import User
 from syntara.integrations.models.integration import Integration, IntegrationType
 from syntara.integrations.models.integration_configuration import (
     AAPConfiguration,
+    HTTPConfiguration,
     IntegrationConfigurationTypes,
     LLMProviderConfiguration,
     MCPServerConfiguration,
@@ -69,6 +70,8 @@ class IntegrationFactory:
                 integration_type="openshift",
                 base_url=base_url,
             )
+        elif integration_type == IntegrationType.HTTP:
+            configuration = HTTPConfiguration(base_url=base_url)
         else:
             assert_never(integration_type)
 

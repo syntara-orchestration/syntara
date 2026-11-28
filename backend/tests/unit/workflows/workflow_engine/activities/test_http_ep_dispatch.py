@@ -119,3 +119,36 @@ async def test_output_selection_is_rejected_before_http_can_run(outputs: dict[st
             )
         assert raised.value.non_retryable
         dispatch.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_bearer_dispatch_uses_server_origin_and_reference_only() -> None:
+    from types import SimpleNamespace
+
+    inputs = _inputs() | {
+        "integration_id": str(uuid4()),
+        "credential_bindings": [{"credential_recipe_id": "syntara.http.bearer", "credential_ref": str(uuid4())}],
+        "runtime_context": {"httpEndpoint": "https://attacker.example.com"},
+    }
+    config = APIExecutorParameters.model_validate(inputs)
+    session = AsyncMock()
+    session.get.return_value = SimpleNamespace(project_id=uuid4())
+    with (
+        patch.object(http_dispatch, "AsyncSessionLocal") as factory,
+        patch.object(
+            http_dispatch, "authorize_http_binding", AsyncMock(return_value="https://example.com")
+        ) as authorize,
+        patch.object(
+            http_dispatch, "_dispatch_to_ep", AsyncMock(return_value={"output": {"status_code": 200}})
+        ) as dispatch,
+    ):
+        factory.return_value.__aenter__.return_value = session
+        await http_dispatch.dispatch_http_to_ep(inputs, None, str(uuid4()), config)
+    authorize.assert_awaited_once_with(session, config, session.get.return_value.project_id)
+    assert dispatch.await_args is not None
+    invocation = dispatch.await_args.args[0]
+    assert invocation["credential_bindings"] == inputs["credential_bindings"]
+    assert invocation["credential_name"] == "syntara.http.bearer"
+    assert "integration_id" not in invocation
+    assert "runtime_context" not in invocation
+    assert dispatch.await_args.kwargs == {"http_endpoint": "https://example.com"}

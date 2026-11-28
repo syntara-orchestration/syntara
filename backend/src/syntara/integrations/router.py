@@ -8,6 +8,7 @@ from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 import syntara.integrations.adapters.aap  # register AAP adapter
+import syntara.integrations.adapters.http
 import syntara.integrations.adapters.llm_provider  # register LLM provider adapter
 import syntara.integrations.adapters.mcp_server
 import syntara.integrations.adapters.openshift  # noqa: F401 — register OpenShift adapter

@@ -24,7 +24,7 @@ from syntara.execution_plane.commands.context import AOCommandContext
 from syntara.execution_plane.commands.errors import CommandResourceStateError
 from syntara.execution_plane.utils import execution_plane_work_item_id
 from syntara.integrations.exceptions import IntegrationCredentialNotFoundError
-from syntara.workflow_core.models import ConditionNodeParameters
+from syntara.workflow_core.models import ConditionNodeParameters, NodeType
 from syntara.workflows.models.activity_execution import ActivityExecution, ActivityStatus
 from syntara.workflows.models.execution import Execution
 from syntara.workflows.models.workflow_definition import ConditionNode
@@ -498,3 +498,59 @@ async def test_workload_credential_command_requires_explicit_work_item(callback)
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://ao") as client:
         response = await client.post("/api/execution_plane/v1/commands", json=body)
     assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("authorized", [True, False])
+async def test_http_callback_rechecks_integration_before_reading_secret(
+    callback: tuple[FastAPI, AsyncMock], monkeypatch: pytest.MonkeyPatch, *, authorized: bool
+) -> None:
+    app, _ = callback
+    message, payload = workload_command(credential_ref=uuid4(), credential_recipe_id="syntara.http.bearer")
+    row = activity(
+        credential_ref=payload.credential_ref,
+        workflow_definition={
+            "schema_version": "2.0.0",
+            "name": "http",
+            "edges": [],
+            "triggers": [{"id": "trigger", "type": "manual"}],
+            "nodes": [
+                {
+                    "id": "approval",
+                    "type": "http_request",
+                    "parameters": {
+                        "method": "GET",
+                        "url": "https://example.com",
+                        "integration_id": str(uuid4()),
+                        "credential_bindings": [
+                            {
+                                "credential_recipe_id": "syntara.http.bearer",
+                                "credential_ref": str(payload.credential_ref),
+                            }
+                        ],
+                    },
+                }
+            ],
+        },
+    )
+    row.node_type = NodeType.HTTP_REQUEST
+    monkeypatch.setattr(
+        command_credentials.CredentialResolveWorkloadCommandHandler, "_load_activity", AsyncMock(return_value=row)
+    )
+    authorize = AsyncMock(return_value="https://example.com")
+    if not authorized:
+        authorize.side_effect = CommandResourceStateError
+    monkeypatch.setattr(command_credentials, "authorize_http_binding", authorize)
+    resolve = AsyncMock(return_value={"bearer_token": "http-token", "auth_type": "bearer"})
+    monkeypatch.setattr(
+        command_credentials.CredentialResolveWorkloadCommandHandler, "_resolve_credential_document", resolve
+    )
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://ao") as client:
+        response = await client.post("/api/execution_plane/v1/commands", json=message.model_dump(mode="json"))
+    if authorized:
+        assert response.status_code == 200
+        assert response.json()["result"]["credential"] == {"token": "http-token"}
+        resolve.assert_awaited_once()
+    else:
+        assert response.status_code >= 400
+        resolve.assert_not_awaited()

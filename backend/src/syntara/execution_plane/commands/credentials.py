@@ -22,9 +22,11 @@ from syntara.core.services.secret_service import create_secret_service
 from syntara.credentials.lib.injector_resolver import InjectorResolver
 from syntara.execution_plane.commands.context import AOCommandContext
 from syntara.execution_plane.commands.errors import CommandResourceNotFoundError, CommandResourceStateError
+from syntara.execution_plane.http_credentials import HTTP_BEARER_RECIPE, authorize_http_binding
 from syntara.execution_plane.utils import execution_plane_work_item_id
 from syntara.integrations.exceptions import IntegrationCredentialNotFoundError
 from syntara.integrations.lib.credential_resolver import fetch_credential_with_type
+from syntara.workflow_core.models import APIExecutorParameters, NodeType
 from syntara.workflows.models.activity_execution import TERMINAL_ACTIVITY_STATUSES, ActivityExecution
 from syntara.workflows.models.execution import Execution
 from syntara.workflows.models.workflow_definition import WorkflowDefinition, WorkflowNode
@@ -148,11 +150,24 @@ class CredentialResolveWorkloadCommandHandler:
         node = self._node_for_activity(activity)
         if not self._binding_matches(node, payload):
             raise CommandResourceStateError
+        is_http = activity.node_type == NodeType.HTTP_REQUEST
+        if is_http:
+            if payload.credential_recipe_id != HTTP_BEARER_RECIPE or not isinstance(
+                node.parameters, APIExecutorParameters
+            ):
+                raise CommandResourceStateError
+            await authorize_http_binding(context.session, node.parameters, activity.execution.project_id)
         credential = await self._resolve_credential_document(
             context.session,
             payload.credential_ref,
             activity.execution.project_id,
         )
+        if is_http:
+            token = credential.get("bearer_token")
+            if not token:
+                raise CommandResourceStateError
+            credential = {"token": token}
+
         return HandlingResult(
             resource=ResourceReference(kind="work_item", resource_id=work_item_id),
             result=CredentialResolveWorkloadCommandResult(credential=credential),

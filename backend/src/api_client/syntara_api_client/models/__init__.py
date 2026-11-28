@@ -158,6 +158,7 @@ __all__ = (
     "GroupReadLabels",
     "GroupUpdate",
     "HealthCheckErrorType",
+    "HTTPConfiguration",
     "HTTPMethod",
     "HTTPRequestNode",
     "HTTPRequestNodeOutputsType0",
