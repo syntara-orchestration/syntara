@@ -2115,6 +2115,13 @@ components:
       description: "Parameters for Ansible Automation Platform Workflow Job Template executor.\n\nInherits common Ansible Automation Platform fields from AAPResourceReferenceMixin (credential_id, organization,\ninventory, extra_vars, limit, tags, skip_tags, labels, timeout)."
     APIExecutorParameters:
       properties:
+        integration_id:
+          anyOf:
+            - type: string
+              format: uuid
+            - type: 'null'
+          title: Integration Id
+          description: HTTP integration authorizing an EP bearer credential and HTTPS origin
         execution_profile:
           anyOf:
             - oneOf:

@@ -440,6 +440,10 @@ class BashScriptExecutorParameters(ScriptExecutorParametersBase):
 class APIExecutorParameters(ExecutionPlaneMixin, CredentialBindingsMixin, TemplateAwareBaseModel):
     """Parameters for API executor (http_request activity)."""
 
+    integration_id: uuid.UUID | None = Field(
+        default=None, description="HTTP integration authorizing an EP bearer credential and HTTPS origin"
+    )
+
     method: HTTPMethod = Field(description="HTTP method")
     url: str | None = Field(default=None, description="Request URL (optional when a Secret URL credential provides it)")
     headers: dict[str, Any] = Field(default_factory=dict)

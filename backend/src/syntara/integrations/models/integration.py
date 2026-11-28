@@ -38,6 +38,7 @@ class IntegrationType(StrEnum):
     LLM_PROVIDER = "llm_provider"
     ANSIBLE_AUTOMATION_PLATFORM = "ansible_automation_platform"
     OPENSHIFT = "openshift"
+    HTTP = "http"
 
 
 class IntegrationStatus(StrEnum):

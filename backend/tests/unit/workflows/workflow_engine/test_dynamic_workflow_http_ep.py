@@ -33,3 +33,22 @@ async def test_http_placement_controls_activity_identity_and_cancellation_tracki
     assert execute.await_args is not None
     assert execute.await_args.kwargs["extra_args"] == ([wf.execution_id] if uses_ep else None)
     assert ("http" in wf._active_ep_nodes) is uses_ep
+
+
+@pytest.mark.asyncio
+async def test_ep_http_does_not_resolve_secrets_into_activity_inputs() -> None:
+    wf = OrchestratorWorkflow.__new__(OrchestratorWorkflow)
+    node = cast("Any", SimpleNamespace(id="http", type=NodeType.HTTP_REQUEST))
+    parameters = {
+        "credential_id": str(uuid4()),
+        "execution_profile": {"type": "execution_target", "execution_target_id": str(uuid4())},
+    }
+    with (
+        patch("syntara.workflow_runtime.engines.temporal.dynamic_workflow.workflow.patched", return_value=True),
+        patch(
+            "syntara.workflow_runtime.engines.temporal.dynamic_workflow.workflow.execute_activity", AsyncMock()
+        ) as resolve,
+    ):
+        await wf._resolve_and_inject_credentials(node, parameters)
+    resolve.assert_not_awaited()
+    assert "_resolved_credentials" not in parameters

@@ -17,6 +17,7 @@ if TYPE_CHECKING:
 from sqlmodel import col, or_, select
 
 import syntara.integrations.adapters.aap
+import syntara.integrations.adapters.http
 import syntara.integrations.adapters.llm_provider
 import syntara.integrations.adapters.mcp_server
 import syntara.integrations.adapters.openshift  # noqa: F401 — register OpenShift adapter

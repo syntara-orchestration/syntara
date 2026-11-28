@@ -9,6 +9,7 @@ tokens, passwords) are stored in the linked Credential, not here.
 import ssl
 from enum import StrEnum
 from typing import Annotated, ClassVar, Literal, Self
+from urllib.parse import urlsplit
 
 from pydantic import ConfigDict, Field, field_validator, model_validator
 from sqlmodel import SQLModel
@@ -159,9 +160,39 @@ class OpenShiftConfiguration(IntegrationSecurityMixin):
         return self
 
 
+class HTTPConfiguration(IntegrationSecurityMixin):
+    """HTTPS origin for credentialed HTTP workloads."""
+
+    integration_type: Literal["http"] = "http"
+    base_url: str = Field(description="Authorized HTTPS origin for HTTP requests")
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")  # type: ignore[assignment]
+
+    @model_validator(mode="after")
+    def validate_tls(self) -> Self:
+        """Require the TLS contract implemented by the HTTP workload."""
+        if self.allow_http or self.insecure_skip_tls_verify or self.ca_certificate is not None:
+            message = "HTTP workloads require HTTPS with system certificate verification"
+            raise ValueError(message)
+        return self
+
+    @field_validator("base_url")
+    @classmethod
+    def validate_origin(cls, value: str) -> str:
+        """Require a bare HTTPS origin with normal certificate verification."""
+        value = validate_host_url(value, allow_http=False)
+        if urlsplit(value).scheme != "https":
+            message = "HTTP integrations require HTTPS"
+            raise ValueError(message)
+        return value
+
+
 # Configuration types (used by DB model, read schema, and create/patch)
 IntegrationConfigurationTypes = (
-    MCPServerConfigurationInput | LLMProviderConfiguration | AAPConfiguration | OpenShiftConfiguration
+    MCPServerConfigurationInput
+    | LLMProviderConfiguration
+    | AAPConfiguration
+    | OpenShiftConfiguration
+    | HTTPConfiguration
 )
 IntegrationConfiguration = Annotated[
     IntegrationConfigurationTypes,

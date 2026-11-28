@@ -157,6 +157,11 @@ class TestExtractLlmModelIds:
 class TestCollectExpectedIntegrationTypes:
     """Tests for _collect_expected_integration_types."""
 
+    def test_http_node_expects_http_type(self) -> None:
+        intg_id = str(uuid4())
+        definition = {"nodes": [{"type": "http_request", "parameters": {"integration_id": intg_id}}]}
+        assert _collect_expected_integration_types(definition)[UUID(intg_id)] == "http"
+
     def test_aap_node_expects_aap_type(self) -> None:
         intg_id = str(uuid4())
         definition = {"nodes": [{"type": "aap_job_template", "parameters": {"integration_id": intg_id}}]}

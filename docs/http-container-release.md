@@ -30,18 +30,31 @@ executor even when the Action is installed. The workflow records a Temporal patc
 before adding the execution ID to the HTTP activity, and tracks only opted-in
 HTTP activities for EP cancellation.
 
-This initial EP path accepts unauthenticated public HTTP requests with string
-header/query values. Credentials (including credential bindings, URL userinfo and
-standard authentication headers) are rejected before dispatch. For existing
-credentialed or private-host workflows, omit the execution profile. EP HTTP uses
-the container's strict public-destination policy and result-size limits; native
-private-host exceptions are not forwarded. Missing seeds, rejected image policy
-and failed EP submission are errors, with no automatic fallback to another executor.
+The EP path supports public HTTP requests and explicit bearer bindings. Credentialed nodes select an HTTP integration through `integration_id` and supply one `syntara.http.bearer` entry in `credential_bindings`. The reference must equal the integration's selected `management_credential_id`. The integration must be enabled and visible to the execution project, and the credential must be an enabled HTTP Bearer Token in that project.
 
-Execution-target placement and submission/completion use the same shared command
-path as script steps. This does not migrate all legacy authentication forms or
-promise identical native retry/error behavior. Credentialed EP HTTP still requires
-trusted integration-instance context and a separate contract change.
+AO obtains `httpEndpoint` from the stored integration and compares the request's HTTPS origin before submission. EP receives the reference only. The HTTP handler reads the bearer document through the SDK callback, where AO checks the pairing again and returns `{"token": "..."}`. The Temporal dispatch path skips eager secret resolution for EP HTTP using a history patch.
+
+Create the HTTP integration through the integrations API with `integration_type: http`, `configuration: {integration_type: http, base_url: "https://api.example.com"}`, and the selected bearer credential reference. Existing integration API authorization governs this operation. Then use these node parameters, substituting real IDs:
+
+```json
+{
+  "method": "GET",
+  "url": "https://api.example.com/status",
+  "integration_id": "<integration UUID>",
+  "credential_bindings": [
+    {
+      "credential_recipe_id": "syntara.http.bearer",
+      "credential_ref": "<same credential UUID as the integration>"
+    }
+  ],
+  "execution_profile": {
+    "type": "execution_target",
+    "execution_target_id": "<target UUID>"
+  }
+}
+```
+
+The first credentialed contract requires explicit bindings and HTTPS with system certificate verification. Header and query values must be strings. Full outputs are required. The container applies public-destination validation, including redirect checks, and response limits. Standard authentication headers, URL credentials, legacy `credential_id`, and caller-provided secrets are rejected by this dispatch path. Missing seeds, image-policy rejection, and failed submission produce errors.
 
 ## Live acceptance suite
 

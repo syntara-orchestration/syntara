@@ -86,6 +86,7 @@ ALLOWED_CREDENTIAL_TYPES: dict[IntegrationType, frozenset[str]] = {
     IntegrationType.LLM_PROVIDER: frozenset({"LLM Provider"}),
     IntegrationType.ANSIBLE_AUTOMATION_PLATFORM: frozenset({"Ansible Automation Platform"}),
     IntegrationType.OPENSHIFT: frozenset({"HTTP Bearer Token"}),
+    IntegrationType.HTTP: frozenset({"HTTP Bearer Token"}),
 }
 
 CREDENTIAL_REQUIRED_TYPES: frozenset[IntegrationType] = frozenset(
@@ -93,6 +94,7 @@ CREDENTIAL_REQUIRED_TYPES: frozenset[IntegrationType] = frozenset(
         IntegrationType.LLM_PROVIDER,
         IntegrationType.ANSIBLE_AUTOMATION_PLATFORM,
         IntegrationType.OPENSHIFT,
+        IntegrationType.HTTP,
     }
 )
 

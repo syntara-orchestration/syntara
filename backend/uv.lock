@@ -1,5 +1,5 @@
 version = 1
-revision = 5
+revision = 3
 requires-python = ">=3.12, <3.15"
 resolution-markers = [
     "python_full_version >= '3.14'",
@@ -975,14 +975,14 @@ wheels = [
 
 [[package]]
 name = "execution-plane-client"
-version = "0.1.27"
+version = "0.1.28"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "pydantic" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/f2/1f/7d3cfc4b6f080efcfab9127ab1ecddfae02fcf68ccc8ea67892000dfe81c/execution_plane_client-0.1.27.tar.gz", hash = "sha256:60ff35261f039b48421f585bf3d1ecafcd42b3043680c3225ce1cb5ae95ce009", size = 21559, upload-time = "2026-11-24T01:06:06.526Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/b6/b4/b22e9c07f6d04cfe0e77ac9b1855d06559612ab232b34ab2af56061ff479/execution_plane_client-0.1.28.tar.gz", hash = "sha256:c3c12c31595ef91612321ae817e70e93d435ac6320cb35b1b2fc5ccedaa7193b", size = 21630, upload-time = "2026-11-25T14:05:14.098Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/12/20/5bf84d695145286580b527d987231b3ac7787e6c8e8dbb869a604a79f86d/execution_plane_client-0.1.27-py3-none-any.whl", hash = "sha256:f3bff596555a6f15393bfd83c416d319e9a48e2ac9bd3001131cf66cc0d7c6c7", size = 34063, upload-time = "2026-11-24T01:06:05.527Z" },
+    { url = "https://files.pythonhosted.org/packages/0c/a7/1aa372f722c072a8e6eb994e381f4e92de4316f527647ce2e5952c52ce83/execution_plane_client-0.1.28-py3-none-any.whl", hash = "sha256:cbce607bff93fd7bd96ae4a50fb636ecab8f6f722fed25b5dc6c3161d5d16206", size = 34184, upload-time = "2026-11-25T14:05:13.119Z" },
 ]
 
 [[package]]
@@ -4455,7 +4455,7 @@ requires-dist = [
     { name = "boto3-stubs", extras = ["s3"], marker = "extra == 'dev'", specifier = ">=1.35.0" },
     { name = "cachetools", specifier = ">=5.0" },
     { name = "cryptography", specifier = ">=48.0.1" },
-    { name = "execution-plane-client", specifier = ">=0.1.27,<0.2.0" },
+    { name = "execution-plane-client", specifier = "==0.1.28" },
     { name = "fastapi", specifier = ">=0.135.0" },
     { name = "fastmcp", marker = "extra == 'dev'", specifier = ">=3.2.0,<4.0.0" },
     { name = "filelock", specifier = ">=4.2.1" },

@@ -31022,6 +31022,7 @@ components:
         - llm_provider
         - ansible_automation_platform
         - openshift
+        - http
       title: IntegrationType
       description: Type of external integration.
     IntegrationStatus:
@@ -31162,6 +31163,7 @@ components:
             - $ref: '#/components/schemas/LLMProviderConfiguration'
             - $ref: '#/components/schemas/AAPConfiguration'
             - $ref: '#/components/schemas/OpenShiftConfiguration'
+            - $ref: '#/components/schemas/HTTPConfiguration'
           title: Configuration
           description: Integration-specific configuration
           discriminator:
@@ -31171,6 +31173,7 @@ components:
               llm_provider: '#/components/schemas/LLMProviderConfiguration'
               mcp_server: '#/components/schemas/MCPServerConfigurationInput'
               openshift: '#/components/schemas/OpenShiftConfiguration'
+              http: '#/components/schemas/HTTPConfiguration'
         management_credential_id:
           anyOf:
             - type: string
@@ -31314,6 +31317,7 @@ components:
                 - $ref: '#/components/schemas/LLMProviderConfiguration'
                 - $ref: '#/components/schemas/AAPConfiguration'
                 - $ref: '#/components/schemas/OpenShiftConfiguration'
+                - $ref: '#/components/schemas/HTTPConfiguration'
               discriminator:
                 propertyName: integration_type
                 mapping:
@@ -31321,6 +31325,7 @@ components:
                   llm_provider: '#/components/schemas/LLMProviderConfiguration'
                   mcp_server: '#/components/schemas/MCPServerConfigurationInput'
                   openshift: '#/components/schemas/OpenShiftConfiguration'
+                  http: '#/components/schemas/HTTPConfiguration'
             - type: 'null'
           title: Configuration
           description: Integration-specific configuration
@@ -31368,11 +31373,13 @@ components:
               llm_provider: '#/components/schemas/LLMProviderConfiguration'
               ansible_automation_platform: '#/components/schemas/AAPConfiguration'
               openshift: '#/components/schemas/OpenShiftConfiguration'
+              http: '#/components/schemas/HTTPConfiguration'
           oneOf:
             - $ref: '#/components/schemas/MCPServerConfigurationInput'
             - $ref: '#/components/schemas/LLMProviderConfiguration'
             - $ref: '#/components/schemas/AAPConfiguration'
             - $ref: '#/components/schemas/OpenShiftConfiguration'
+            - $ref: '#/components/schemas/HTTPConfiguration'
           title: Configuration
         credential_id:
           anyOf:
@@ -31469,6 +31476,7 @@ components:
             - $ref: '#/components/schemas/LLMProviderConfiguration'
             - $ref: '#/components/schemas/AAPConfiguration'
             - $ref: '#/components/schemas/OpenShiftConfiguration'
+            - $ref: '#/components/schemas/HTTPConfiguration'
           title: Configuration
           description: Integration-specific configuration
           discriminator:
@@ -31478,6 +31486,7 @@ components:
               llm_provider: '#/components/schemas/LLMProviderConfiguration'
               mcp_server: '#/components/schemas/MCPServerConfigurationInput'
               openshift: '#/components/schemas/OpenShiftConfiguration'
+              http: '#/components/schemas/HTTPConfiguration'
         last_validated_at:
           anyOf:
             - type: string
@@ -31665,6 +31674,39 @@ components:
       required:
         - base_url
       title: AAPConfiguration
+      type: object
+    HTTPConfiguration:
+      additionalProperties: false
+      description: HTTPS origin for credentialed HTTP workloads.
+      properties:
+        allow_http:
+          default: false
+          description: Allow HTTP (unencrypted) connections. Loopback addresses are always permitted over HTTP.
+          title: Allow Http
+          type: boolean
+        insecure_skip_tls_verify:
+          default: false
+          description: Disable TLS certificate verification for connections to this integration.
+          title: Insecure Skip Tls Verify
+          type: boolean
+        ca_certificate:
+          anyOf:
+            - type: string
+            - type: 'null'
+          description: PEM-encoded CA certificate to trust for this integration's TLS connections.
+          title: Ca Certificate
+        integration_type:
+          const: http
+          default: http
+          title: Integration Type
+          type: string
+        base_url:
+          description: Authorized HTTPS origin for HTTP requests
+          title: Base Url
+          type: string
+      required:
+        - base_url
+      title: HTTPConfiguration
       type: object
     OpenShiftConfiguration:
       description: Non-secret connection settings for an OpenShift cluster.
@@ -36826,6 +36868,13 @@ components:
         inventory, extra_vars, limit, tags, skip_tags, labels, timeout).
     APIExecutorParameters:
       properties:
+        integration_id:
+          anyOf:
+            - type: string
+              format: uuid
+            - type: 'null'
+          title: Integration Id
+          description: HTTP integration authorizing an EP bearer credential and HTTPS origin
         execution_profile:
           anyOf:
             - oneOf:

@@ -11,6 +11,7 @@ from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
     from ..models.aap_configuration import AAPConfiguration
+    from ..models.http_configuration import HTTPConfiguration
     from ..models.llm_provider_configuration import LLMProviderConfiguration
     from ..models.mcp_server_configuration_input import MCPServerConfigurationInput
     from ..models.openshift_configuration import OpenShiftConfiguration
@@ -25,19 +26,26 @@ class IntegrationTestConnection:
 
     Attributes:
         integration_type (IntegrationType): Type of external integration.
-        configuration (AAPConfiguration | LLMProviderConfiguration | MCPServerConfigurationInput |
+        configuration (AAPConfiguration | HTTPConfiguration | LLMProviderConfiguration | MCPServerConfigurationInput |
             OpenShiftConfiguration): Integration-specific configuration
         credential_id (None | Unset | UUID): Credential to use for the connection test
     """
 
     integration_type: IntegrationType
-    configuration: AAPConfiguration | LLMProviderConfiguration | MCPServerConfigurationInput | OpenShiftConfiguration
+    configuration: (
+        AAPConfiguration
+        | HTTPConfiguration
+        | LLMProviderConfiguration
+        | MCPServerConfigurationInput
+        | OpenShiftConfiguration
+    )
     credential_id: None | Unset | UUID = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         from ..models.aap_configuration import AAPConfiguration
         from ..models.llm_provider_configuration import LLMProviderConfiguration
         from ..models.mcp_server_configuration_input import MCPServerConfigurationInput
+        from ..models.openshift_configuration import OpenShiftConfiguration
 
         integration_type = self.integration_type.value
 
@@ -47,6 +55,8 @@ class IntegrationTestConnection:
         elif isinstance(self.configuration, LLMProviderConfiguration):
             configuration = self.configuration.to_dict()
         elif isinstance(self.configuration, AAPConfiguration):
+            configuration = self.configuration.to_dict()
+        elif isinstance(self.configuration, OpenShiftConfiguration):
             configuration = self.configuration.to_dict()
         else:
             configuration = self.configuration.to_dict()
@@ -75,6 +85,7 @@ class IntegrationTestConnection:
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         from ..models.aap_configuration import AAPConfiguration
+        from ..models.http_configuration import HTTPConfiguration
         from ..models.llm_provider_configuration import LLMProviderConfiguration
         from ..models.mcp_server_configuration_input import MCPServerConfigurationInput
         from ..models.openshift_configuration import OpenShiftConfiguration
@@ -84,7 +95,13 @@ class IntegrationTestConnection:
 
         def _parse_configuration(
             data: object,
-        ) -> AAPConfiguration | LLMProviderConfiguration | MCPServerConfigurationInput | OpenShiftConfiguration:
+        ) -> (
+            AAPConfiguration
+            | HTTPConfiguration
+            | LLMProviderConfiguration
+            | MCPServerConfigurationInput
+            | OpenShiftConfiguration
+        ):
             try:
                 if not isinstance(data, dict):
                     raise TypeError()
@@ -109,11 +126,19 @@ class IntegrationTestConnection:
                 return configuration_type_2
             except (TypeError, ValueError, AttributeError, KeyError):
                 pass
+            try:
+                if not isinstance(data, dict):
+                    raise TypeError()
+                configuration_type_3 = OpenShiftConfiguration.from_dict(data)
+
+                return configuration_type_3
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
             if not isinstance(data, dict):
                 raise TypeError()
-            configuration_type_3 = OpenShiftConfiguration.from_dict(data)
+            configuration_type_4 = HTTPConfiguration.from_dict(data)
 
-            return configuration_type_3
+            return configuration_type_4
 
         configuration = _parse_configuration(d.pop("configuration"))
 

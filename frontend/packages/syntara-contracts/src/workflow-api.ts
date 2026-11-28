@@ -1717,6 +1717,11 @@ export interface components {
      */
     APIExecutorParameters: {
       /**
+       * Integration Id
+       * @description HTTP integration authorizing an EP bearer credential and HTTPS origin
+       */
+      integration_id?: string | null
+      /**
        * Execution Profile
        * @description Execution Plane placement profile for this workload.
        */
